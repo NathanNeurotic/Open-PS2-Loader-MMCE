@@ -7,6 +7,7 @@
 #include "include/opl.h"
 #include "include/util.h"
 #include "include/ioman.h"
+#include "include/opl_config.h"
 #include "include/sound.h"
 #include <string.h>
 
@@ -418,17 +419,17 @@ static int configReadLegacyIP(void)
         read(fd, &ipconfig, size);
         close(fd);
 
-        sscanf(ipconfig, "%d.%d.%d.%d %d.%d.%d.%d %d.%d.%d.%d", &ps2_ip[0], &ps2_ip[1], &ps2_ip[2], &ps2_ip[3],
-               &ps2_netmask[0], &ps2_netmask[1], &ps2_netmask[2], &ps2_netmask[3],
-               &ps2_gateway[0], &ps2_gateway[1], &ps2_gateway[2], &ps2_gateway[3]);
+        sscanf(ipconfig, "%d.%d.%d.%d %d.%d.%d.%d %d.%d.%d.%d", &gNetworkConfig.ps2_ip[0], &gNetworkConfig.ps2_ip[1], &gNetworkConfig.ps2_ip[2], &gNetworkConfig.ps2_ip[3],
+               &gNetworkConfig.ps2_netmask[0], &gNetworkConfig.ps2_netmask[1], &gNetworkConfig.ps2_netmask[2], &gNetworkConfig.ps2_netmask[3],
+               &gNetworkConfig.ps2_gateway[0], &gNetworkConfig.ps2_gateway[1], &gNetworkConfig.ps2_gateway[2], &gNetworkConfig.ps2_gateway[3]);
 
         configSet = &configFiles[CONFIG_INDEX_NETWORK];
 
-        snprintf(temp, sizeof(temp), "%d.%d.%d.%d", ps2_ip[0], ps2_ip[1], ps2_ip[2], ps2_ip[3]);
+        snprintf(temp, sizeof(temp), "%d.%d.%d.%d", gNetworkConfig.ps2_ip[0], gNetworkConfig.ps2_ip[1], gNetworkConfig.ps2_ip[2], gNetworkConfig.ps2_ip[3]);
         configSetStr(configSet, CONFIG_NET_PS2_IP, temp);
-        snprintf(temp, sizeof(temp), "%d.%d.%d.%d", ps2_netmask[0], ps2_netmask[1], ps2_netmask[2], ps2_netmask[3]);
+        snprintf(temp, sizeof(temp), "%d.%d.%d.%d", gNetworkConfig.ps2_netmask[0], gNetworkConfig.ps2_netmask[1], gNetworkConfig.ps2_netmask[2], gNetworkConfig.ps2_netmask[3]);
         configSetStr(configSet, CONFIG_NET_PS2_NETM, temp);
-        snprintf(temp, sizeof(temp), "%d.%d.%d.%d", ps2_gateway[0], ps2_gateway[1], ps2_gateway[2], ps2_gateway[3]);
+        snprintf(temp, sizeof(temp), "%d.%d.%d.%d", gNetworkConfig.ps2_gateway[0], gNetworkConfig.ps2_gateway[1], gNetworkConfig.ps2_gateway[2], gNetworkConfig.ps2_gateway[3]);
         configSetStr(configSet, CONFIG_NET_PS2_GATEW, temp);
         // The legacy format has no setting for the DNS server, so duplicate the gateway address.
         configSetStr(configSet, CONFIG_NET_PS2_DNS, temp);

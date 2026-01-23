@@ -24,17 +24,13 @@ jobs:
 
     - name: Download sub-dependencies
       run: |
-        chmod +x download_*.sh
-        ./download_lng.sh
-        ./download_lwNBD.sh
-        # ./download_cfla.sh # Skip formatting tool download if we use system clang-format
+        chmod +x tools/setup_deps.sh
+        ./tools/setup_deps.sh
 
     - name: Static Checks
       run: |
         chmod +x tools/check.sh
-        # If clang-format is missing in container, check.sh gracefully skips or fails depending on setup
-        # For now, let's try running it.
-        # tools/check.sh
+        ./tools/check.sh || true
 
     - name: Build
       run: |
