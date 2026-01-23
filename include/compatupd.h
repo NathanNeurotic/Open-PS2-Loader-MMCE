@@ -1,6 +1,8 @@
 #ifndef __COMPATUPD_H
 #define __COMPATUPD_H
 
+#include "opl.h"
+
 #define OPL_USER_AGENT          "OPL/" OPL_VERSION
 #define OPL_COMPAT_HTTP_HOST    "sx.sytes.net"
 #define OPL_COMPAT_HTTP_PORT    80
