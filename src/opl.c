@@ -21,7 +21,6 @@
 #include "include/debug.h"
 #include "include/config.h"
 #include "include/util.h"
-#include "include/compatupd.h"
 #include "include/extern_irx.h"
 #include "httpclient.h"
 #include "include/log.h"
