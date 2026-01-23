@@ -687,46 +687,7 @@ void setErrorMessage(int strId)
 static int lscstatus = CONFIG_ALL;
 static int lscret = 0;
 
-int checkLoadConfigBDM(int types)
-{
-    char path[64];
-    int value;
-
-    // check USB
-    if (bdmFindPartition(path, "conf_opl.cfg", 0)) {
-        configEnd();
-        configInit(path);
-        value = configReadMulti(types);
-        config_set_t *configOPL = configGetByType(CONFIG_OPL);
-        configSetInt(configOPL, CONFIG_OPL_BDM_MODE, START_MODE_AUTO);
-        return value;
-    }
-
-    return 0;
-}
-
-int checkLoadConfigHDD(int types)
-{
-    int value;
-    char path[64];
-
-    hddLoadModules();
-    hddLoadSupportModules();
-
-    snprintf(path, sizeof(path), "%sconf_opl.cfg", gHDDPrefix);
-    value = open(path, O_RDONLY);
-    if (value >= 0) {
-        close(value);
-        configEnd();
-        configInit(gHDDPrefix);
-        value = configReadMulti(types);
-        config_set_t *configOPL = configGetByType(CONFIG_OPL);
-        configSetInt(configOPL, CONFIG_OPL_HDD_MODE, START_MODE_AUTO);
-        return value;
-    }
-
-    return 0;
-}
+// checkLoadConfigBDM and checkLoadConfigHDD moved to opl_config.c
 
 // When this function is called, the current device for loading/saving config is the memory card.
 static int tryAlternateDevice(int types)
@@ -1304,7 +1265,7 @@ void oplDumpRepro(void)
     snprintf(buf, sizeof(buf), "Debug Enabled: %d\n", gEnableDebug);
     write(fd, buf, strlen(buf));
 
-    snprintf(buf, sizeof(buf), "PS2 IP: %d.%d.%d.%d\n", ps2_ip[0], ps2_ip[1], ps2_ip[2], ps2_ip[3]);
+    snprintf(buf, sizeof(buf), "PS2 IP: %d.%d.%d.%d\n", gNetworkConfig.ps2_ip[0], gNetworkConfig.ps2_ip[1], gNetworkConfig.ps2_ip[2], gNetworkConfig.ps2_ip[3]);
     write(fd, buf, strlen(buf));
 
     // Config dump

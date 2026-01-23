@@ -22,6 +22,7 @@
 #include "include/cheatman.h"
 #include "include/sound.h"
 #include "include/guigame.h"
+#include "include/opl_config.h"
 
 #include <limits.h>
 #include <stdlib.h>
@@ -774,34 +775,34 @@ void guiShowNetConfig(void)
     diaSetEnabled(diaNetConfig, NETCFG_ETHOPMODE, 0);
     diaSetEnabled(diaNetConfig, NETCFG_SHARE_PORT, 0);
 
-    diaSetInt(diaNetConfig, NETCFG_PS2_IP_ADDR_TYPE, ps2_ip_use_dhcp);
-    diaSetInt(diaNetConfig, NETCFG_SHARE_ADDR_TYPE, gPCShareAddressIsNetBIOS);
-    diaSetVisible(diaNetConfig, NETCFG_SHARE_NB_ADDR, gPCShareAddressIsNetBIOS);
-    diaSetInt(diaNetConfig, NETCFG_SHARE_NB_ADDR, gPCShareAddressIsNetBIOS);
-    diaSetString(diaNetConfig, NETCFG_SHARE_NB_ADDR, gPCShareNBAddress);
+    diaSetInt(diaNetConfig, NETCFG_PS2_IP_ADDR_TYPE, gNetworkConfig.ps2_ip_use_dhcp);
+    diaSetInt(diaNetConfig, NETCFG_SHARE_ADDR_TYPE, gNetworkConfig.pc_share_is_netbios);
+    diaSetVisible(diaNetConfig, NETCFG_SHARE_NB_ADDR, gNetworkConfig.pc_share_is_netbios);
+    diaSetInt(diaNetConfig, NETCFG_SHARE_NB_ADDR, gNetworkConfig.pc_share_is_netbios);
+    diaSetString(diaNetConfig, NETCFG_SHARE_NB_ADDR, gNetworkConfig.pc_share_nb_addr);
 
     for (i = 0; i < 4; ++i) {
-        diaSetEnabled(diaNetConfig, NETCFG_PS2_IP_ADDR_0 + i, !ps2_ip_use_dhcp);
-        diaSetEnabled(diaNetConfig, NETCFG_PS2_NETMASK_0 + i, !ps2_ip_use_dhcp);
-        diaSetEnabled(diaNetConfig, NETCFG_PS2_GATEWAY_0 + i, !ps2_ip_use_dhcp);
-        diaSetEnabled(diaNetConfig, NETCFG_PS2_DNS_0 + i, !ps2_ip_use_dhcp);
+        diaSetEnabled(diaNetConfig, NETCFG_PS2_IP_ADDR_0 + i, !gNetworkConfig.ps2_ip_use_dhcp);
+        diaSetEnabled(diaNetConfig, NETCFG_PS2_NETMASK_0 + i, !gNetworkConfig.ps2_ip_use_dhcp);
+        diaSetEnabled(diaNetConfig, NETCFG_PS2_GATEWAY_0 + i, !gNetworkConfig.ps2_ip_use_dhcp);
+        diaSetEnabled(diaNetConfig, NETCFG_PS2_DNS_0 + i, !gNetworkConfig.ps2_ip_use_dhcp);
 
-        diaSetVisible(diaNetConfig, NETCFG_SHARE_IP_ADDR_0 + i, !gPCShareAddressIsNetBIOS);
-        diaSetInt(diaNetConfig, NETCFG_PS2_IP_ADDR_0 + i, ps2_ip[i]);
-        diaSetInt(diaNetConfig, NETCFG_PS2_NETMASK_0 + i, ps2_netmask[i]);
-        diaSetInt(diaNetConfig, NETCFG_PS2_GATEWAY_0 + i, ps2_gateway[i]);
-        diaSetInt(diaNetConfig, NETCFG_PS2_DNS_0 + i, ps2_dns[i]);
-        diaSetInt(diaNetConfig, NETCFG_SHARE_IP_ADDR_0 + i, pc_ip[i]);
+        diaSetVisible(diaNetConfig, NETCFG_SHARE_IP_ADDR_0 + i, !gNetworkConfig.pc_share_is_netbios);
+        diaSetInt(diaNetConfig, NETCFG_PS2_IP_ADDR_0 + i, gNetworkConfig.ps2_ip[i]);
+        diaSetInt(diaNetConfig, NETCFG_PS2_NETMASK_0 + i, gNetworkConfig.ps2_netmask[i]);
+        diaSetInt(diaNetConfig, NETCFG_PS2_GATEWAY_0 + i, gNetworkConfig.ps2_gateway[i]);
+        diaSetInt(diaNetConfig, NETCFG_PS2_DNS_0 + i, gNetworkConfig.ps2_dns[i]);
+        diaSetInt(diaNetConfig, NETCFG_SHARE_IP_ADDR_0 + i, gNetworkConfig.pc_ip[i]);
     }
 
     for (i = 0; i < 3; ++i)
-        diaSetVisible(diaNetConfig, NETCFG_SHARE_IP_ADDR_DOT_0 + i, !gPCShareAddressIsNetBIOS);
+        diaSetVisible(diaNetConfig, NETCFG_SHARE_IP_ADDR_DOT_0 + i, !gNetworkConfig.pc_share_is_netbios);
 
-    diaSetInt(diaNetConfig, NETCFG_SHARE_PORT, gPCPort);
-    diaSetString(diaNetConfig, NETCFG_SHARE_NAME, gPCShareName);
-    diaSetString(diaNetConfig, NETCFG_SHARE_USERNAME, gPCUserName);
-    diaSetString(diaNetConfig, NETCFG_SHARE_PASSWORD, gPCPassword);
-    diaSetInt(diaNetConfig, NETCFG_ETHOPMODE, gETHOpMode);
+    diaSetInt(diaNetConfig, NETCFG_SHARE_PORT, gNetworkConfig.pc_port);
+    diaSetString(diaNetConfig, NETCFG_SHARE_NAME, gNetworkConfig.pc_share_name);
+    diaSetString(diaNetConfig, NETCFG_SHARE_USERNAME, gNetworkConfig.pc_user_name);
+    diaSetString(diaNetConfig, NETCFG_SHARE_PASSWORD, gNetworkConfig.pc_password);
+    diaSetInt(diaNetConfig, NETCFG_ETHOPMODE, gNetworkConfig.eth_op_mode);
 
     // Update the spacer item between the OK and reconnect buttons (See dialogs.c).
     if (gNetworkStartup == 0) {
@@ -818,23 +819,23 @@ void guiShowNetConfig(void)
     int result = diaExecuteDialog(diaNetConfig, -1, 1, &netConfigUpdater);
     if (result) {
         // Store values
-        diaGetInt(diaNetConfig, NETCFG_PS2_IP_ADDR_TYPE, &ps2_ip_use_dhcp);
-        diaGetInt(diaNetConfig, NETCFG_SHARE_ADDR_TYPE, &gPCShareAddressIsNetBIOS);
-        diaGetString(diaNetConfig, NETCFG_SHARE_NB_ADDR, gPCShareNBAddress, sizeof(gPCShareNBAddress));
+        diaGetInt(diaNetConfig, NETCFG_PS2_IP_ADDR_TYPE, &gNetworkConfig.ps2_ip_use_dhcp);
+        diaGetInt(diaNetConfig, NETCFG_SHARE_ADDR_TYPE, &gNetworkConfig.pc_share_is_netbios);
+        diaGetString(diaNetConfig, NETCFG_SHARE_NB_ADDR, gNetworkConfig.pc_share_nb_addr, sizeof(gNetworkConfig.pc_share_nb_addr));
 
         for (i = 0; i < 4; ++i) {
-            diaGetInt(diaNetConfig, NETCFG_PS2_IP_ADDR_0 + i, &ps2_ip[i]);
-            diaGetInt(diaNetConfig, NETCFG_PS2_NETMASK_0 + i, &ps2_netmask[i]);
-            diaGetInt(diaNetConfig, NETCFG_PS2_GATEWAY_0 + i, &ps2_gateway[i]);
-            diaGetInt(diaNetConfig, NETCFG_PS2_DNS_0 + i, &ps2_dns[i]);
-            diaGetInt(diaNetConfig, NETCFG_SHARE_IP_ADDR_0 + i, &pc_ip[i]);
+            diaGetInt(diaNetConfig, NETCFG_PS2_IP_ADDR_0 + i, &gNetworkConfig.ps2_ip[i]);
+            diaGetInt(diaNetConfig, NETCFG_PS2_NETMASK_0 + i, &gNetworkConfig.ps2_netmask[i]);
+            diaGetInt(diaNetConfig, NETCFG_PS2_GATEWAY_0 + i, &gNetworkConfig.ps2_gateway[i]);
+            diaGetInt(diaNetConfig, NETCFG_PS2_DNS_0 + i, &gNetworkConfig.ps2_dns[i]);
+            diaGetInt(diaNetConfig, NETCFG_SHARE_IP_ADDR_0 + i, &gNetworkConfig.pc_ip[i]);
         }
-        diaGetInt(diaNetConfig, NETCFG_ETHOPMODE, &gETHOpMode);
+        diaGetInt(diaNetConfig, NETCFG_ETHOPMODE, &gNetworkConfig.eth_op_mode);
 
-        diaGetInt(diaNetConfig, NETCFG_SHARE_PORT, &gPCPort);
-        diaGetString(diaNetConfig, NETCFG_SHARE_NAME, gPCShareName, sizeof(gPCShareName));
-        diaGetString(diaNetConfig, NETCFG_SHARE_USERNAME, gPCUserName, sizeof(gPCUserName));
-        diaGetString(diaNetConfig, NETCFG_SHARE_PASSWORD, gPCPassword, sizeof(gPCPassword));
+        diaGetInt(diaNetConfig, NETCFG_SHARE_PORT, &gNetworkConfig.pc_port);
+        diaGetString(diaNetConfig, NETCFG_SHARE_NAME, gNetworkConfig.pc_share_name, sizeof(gNetworkConfig.pc_share_name));
+        diaGetString(diaNetConfig, NETCFG_SHARE_USERNAME, gNetworkConfig.pc_user_name, sizeof(gNetworkConfig.pc_user_name));
+        diaGetString(diaNetConfig, NETCFG_SHARE_PASSWORD, gNetworkConfig.pc_password, sizeof(gNetworkConfig.pc_password));
 
         if (result == NETCFG_RECONNECT && gNetworkStartup < ERROR_ETH_SMB_CONN)
             gNetworkStartup = ERROR_ETH_SMB_LOGON;

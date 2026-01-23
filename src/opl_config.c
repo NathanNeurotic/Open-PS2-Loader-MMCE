@@ -21,24 +21,11 @@
 // We move definitions here. opl.h has extern declarations.
 
 char *gBaseMCDir;
-int ps2_ip_use_dhcp;
-int ps2_ip[4];
-int ps2_netmask[4];
-int ps2_gateway[4];
-int ps2_dns[4];
-int gETHOpMode;
-int gPCShareAddressIsNetBIOS;
-int pc_ip[4];
-int gPCPort;
-char gPCShareNBAddress[17];
-char gPCShareName[32];
-char gPCUserName[32];
-char gPCPassword[32];
-int gNetworkStartup;
+OPL_NetworkConfig gNetworkConfig;
+
 int gHDDSpindown;
 int gBDMStartMode;
 int gHDDStartMode;
-int gETHStartMode;
 int gAPPStartMode;
 int bdmCacheSize;
 int hddCacheSize;
@@ -83,7 +70,6 @@ int gPS2Logo;
 int gDefaultDevice;
 int gEnableWrite;
 char gBDMPrefix[32];
-char gETHPrefix[32];
 int gRememberLastPlayed;
 int KeyPressedOnce;
 int gAutoStartLastPlayed;
@@ -155,35 +141,38 @@ void setDefaults(void)
     hddCacheSize = 8;
     smbCacheSize = 16;
 
-    ps2_ip_use_dhcp = 1;
-    gETHOpMode = ETH_OP_MODE_AUTO;
-    gPCShareAddressIsNetBIOS = 1;
-    gPCShareNBAddress[0] = '\0';
-    ps2_ip[0] = 192;
-    ps2_ip[1] = 168;
-    ps2_ip[2] = 0;
-    ps2_ip[3] = 10;
-    ps2_netmask[0] = 255;
-    ps2_netmask[1] = 255;
-    ps2_netmask[2] = 255;
-    ps2_netmask[3] = 0;
-    ps2_gateway[0] = 192;
-    ps2_gateway[1] = 168;
-    ps2_gateway[2] = 0;
-    ps2_gateway[3] = 1;
-    pc_ip[0] = 192;
-    pc_ip[1] = 168;
-    pc_ip[2] = 0;
-    pc_ip[3] = 2;
-    ps2_dns[0] = 192;
-    ps2_dns[1] = 168;
-    ps2_dns[2] = 0;
-    ps2_dns[3] = 1;
-    gPCPort = 445;
-    gPCShareName[0] = '\0';
-    gPCUserName[0] = '\0';
-    gPCPassword[0] = '\0';
-    gNetworkStartup = ERROR_ETH_NOT_STARTED;
+    gNetworkConfig.ps2_ip_use_dhcp = 1;
+    gNetworkConfig.eth_op_mode = ETH_OP_MODE_AUTO;
+    gNetworkConfig.pc_share_is_netbios = 1;
+    gNetworkConfig.pc_share_nb_addr[0] = '\0';
+    gNetworkConfig.ps2_ip[0] = 192;
+    gNetworkConfig.ps2_ip[1] = 168;
+    gNetworkConfig.ps2_ip[2] = 0;
+    gNetworkConfig.ps2_ip[3] = 10;
+    gNetworkConfig.ps2_netmask[0] = 255;
+    gNetworkConfig.ps2_netmask[1] = 255;
+    gNetworkConfig.ps2_netmask[2] = 255;
+    gNetworkConfig.ps2_netmask[3] = 0;
+    gNetworkConfig.ps2_gateway[0] = 192;
+    gNetworkConfig.ps2_gateway[1] = 168;
+    gNetworkConfig.ps2_gateway[2] = 0;
+    gNetworkConfig.ps2_gateway[3] = 1;
+    gNetworkConfig.pc_ip[0] = 192;
+    gNetworkConfig.pc_ip[1] = 168;
+    gNetworkConfig.pc_ip[2] = 0;
+    gNetworkConfig.pc_ip[3] = 2;
+    gNetworkConfig.ps2_dns[0] = 192;
+    gNetworkConfig.ps2_dns[1] = 168;
+    gNetworkConfig.ps2_dns[2] = 0;
+    gNetworkConfig.ps2_dns[3] = 1;
+    gNetworkConfig.pc_port = 445;
+    gNetworkConfig.pc_share_name[0] = '\0';
+    gNetworkConfig.pc_user_name[0] = '\0';
+    gNetworkConfig.pc_password[0] = '\0';
+    gNetworkConfig.network_startup = ERROR_ETH_NOT_STARTED;
+    gNetworkConfig.eth_start_mode = START_MODE_DISABLED;
+    gNetworkConfig.eth_prefix[0] = '\0';
+
     gHDDSpindown = 20;
     gScrollSpeed = 1;
     gExitPath[0] = '\0';
@@ -198,7 +187,6 @@ void setDefaults(void)
     gAutoStartLastPlayed = 9;
     gSelectButton = KEY_CIRCLE; // Default to Japan.
     gBDMPrefix[0] = '\0';
-    gETHPrefix[0] = '\0';
     gEnableNotifications = 0;
     gEnableArt = 0;
     gWideScreen = 0;
@@ -214,7 +202,6 @@ void setDefaults(void)
 
     gBDMStartMode = START_MODE_DISABLED;
     gHDDStartMode = START_MODE_DISABLED;
-    gETHStartMode = START_MODE_DISABLED;
     gAPPStartMode = START_MODE_DISABLED;
 
     gEnableILK = 0;
@@ -440,29 +427,29 @@ static void _loadConfig()
         if (result & CONFIG_NETWORK) {
             config_set_t *configNet = configGetByType(CONFIG_NETWORK);
 
-            configGetInt(configNet, CONFIG_NET_ETH_LINKM, &gETHOpMode);
+            configGetInt(configNet, CONFIG_NET_ETH_LINKM, &gNetworkConfig.eth_op_mode);
 
-            configGetInt(configNet, CONFIG_NET_PS2_DHCP, &ps2_ip_use_dhcp);
-            configGetInt(configNet, CONFIG_NET_SMB_NBNS, &gPCShareAddressIsNetBIOS);
-            configGetStrCopy(configNet, CONFIG_NET_SMB_NB_ADDR, gPCShareNBAddress, sizeof(gPCShareNBAddress));
+            configGetInt(configNet, CONFIG_NET_PS2_DHCP, &gNetworkConfig.ps2_ip_use_dhcp);
+            configGetInt(configNet, CONFIG_NET_SMB_NBNS, &gNetworkConfig.pc_share_is_netbios);
+            configGetStrCopy(configNet, CONFIG_NET_SMB_NB_ADDR, gNetworkConfig.pc_share_nb_addr, sizeof(gNetworkConfig.pc_share_nb_addr));
 
             if (configGetStr(configNet, CONFIG_NET_SMB_IP_ADDR, &temp))
-                sscanf(temp, "%d.%d.%d.%d", &pc_ip[0], &pc_ip[1], &pc_ip[2], &pc_ip[3]);
+                sscanf(temp, "%d.%d.%d.%d", &gNetworkConfig.pc_ip[0], &gNetworkConfig.pc_ip[1], &gNetworkConfig.pc_ip[2], &gNetworkConfig.pc_ip[3]);
 
-            configGetInt(configNet, CONFIG_NET_SMB_PORT, &gPCPort);
+            configGetInt(configNet, CONFIG_NET_SMB_PORT, &gNetworkConfig.pc_port);
 
-            configGetStrCopy(configNet, CONFIG_NET_SMB_SHARE, gPCShareName, sizeof(gPCShareName));
-            configGetStrCopy(configNet, CONFIG_NET_SMB_USER, gPCUserName, sizeof(gPCUserName));
-            configGetStrCopy(configNet, CONFIG_NET_SMB_PASSW, gPCPassword, sizeof(gPCPassword));
+            configGetStrCopy(configNet, CONFIG_NET_SMB_SHARE, gNetworkConfig.pc_share_name, sizeof(gNetworkConfig.pc_share_name));
+            configGetStrCopy(configNet, CONFIG_NET_SMB_USER, gNetworkConfig.pc_user_name, sizeof(gNetworkConfig.pc_user_name));
+            configGetStrCopy(configNet, CONFIG_NET_SMB_PASSW, gNetworkConfig.pc_password, sizeof(gNetworkConfig.pc_password));
 
             if (configGetStr(configNet, CONFIG_NET_PS2_IP, &temp))
-                sscanf(temp, "%d.%d.%d.%d", &ps2_ip[0], &ps2_ip[1], &ps2_ip[2], &ps2_ip[3]);
+                sscanf(temp, "%d.%d.%d.%d", &gNetworkConfig.ps2_ip[0], &gNetworkConfig.ps2_ip[1], &gNetworkConfig.ps2_ip[2], &gNetworkConfig.ps2_ip[3]);
             if (configGetStr(configNet, CONFIG_NET_PS2_NETM, &temp))
-                sscanf(temp, "%d.%d.%d.%d", &ps2_netmask[0], &ps2_netmask[1], &ps2_netmask[2], &ps2_netmask[3]);
+                sscanf(temp, "%d.%d.%d.%d", &gNetworkConfig.ps2_netmask[0], &gNetworkConfig.ps2_netmask[1], &gNetworkConfig.ps2_netmask[2], &gNetworkConfig.ps2_netmask[3]);
             if (configGetStr(configNet, CONFIG_NET_PS2_GATEW, &temp))
-                sscanf(temp, "%d.%d.%d.%d", &ps2_gateway[0], &ps2_gateway[1], &ps2_gateway[2], &ps2_gateway[3]);
+                sscanf(temp, "%d.%d.%d.%d", &gNetworkConfig.ps2_gateway[0], &gNetworkConfig.ps2_gateway[1], &gNetworkConfig.ps2_gateway[2], &gNetworkConfig.ps2_gateway[3]);
             if (configGetStr(configNet, CONFIG_NET_PS2_DNS, &temp))
-                sscanf(temp, "%d.%d.%d.%d", &ps2_dns[0], &ps2_dns[1], &ps2_dns[2], &ps2_dns[3]);
+                sscanf(temp, "%d.%d.%d.%d", &gNetworkConfig.ps2_dns[0], &gNetworkConfig.ps2_dns[1], &gNetworkConfig.ps2_dns[2], &gNetworkConfig.ps2_dns[3]);
 
             configGetStrCopy(configNet, CONFIG_NET_NBD_DEFAULT_EXPORT, gExportName, sizeof(gExportName));
         }
@@ -598,25 +585,25 @@ static void _saveConfig()
     if (lscstatus & CONFIG_NETWORK) {
         config_set_t *configNet = configGetByType(CONFIG_NETWORK);
 
-        snprintf(temp, sizeof(temp), "%d.%d.%d.%d", ps2_ip[0], ps2_ip[1], ps2_ip[2], ps2_ip[3]);
+        snprintf(temp, sizeof(temp), "%d.%d.%d.%d", gNetworkConfig.ps2_ip[0], gNetworkConfig.ps2_ip[1], gNetworkConfig.ps2_ip[2], gNetworkConfig.ps2_ip[3]);
         configSetStr(configNet, CONFIG_NET_PS2_IP, temp);
-        snprintf(temp, sizeof(temp), "%d.%d.%d.%d", ps2_netmask[0], ps2_netmask[1], ps2_netmask[2], ps2_netmask[3]);
+        snprintf(temp, sizeof(temp), "%d.%d.%d.%d", gNetworkConfig.ps2_netmask[0], gNetworkConfig.ps2_netmask[1], gNetworkConfig.ps2_netmask[2], gNetworkConfig.ps2_netmask[3]);
         configSetStr(configNet, CONFIG_NET_PS2_NETM, temp);
-        snprintf(temp, sizeof(temp), "%d.%d.%d.%d", ps2_gateway[0], ps2_gateway[1], ps2_gateway[2], ps2_gateway[3]);
+        snprintf(temp, sizeof(temp), "%d.%d.%d.%d", gNetworkConfig.ps2_gateway[0], gNetworkConfig.ps2_gateway[1], gNetworkConfig.ps2_gateway[2], gNetworkConfig.ps2_gateway[3]);
         configSetStr(configNet, CONFIG_NET_PS2_GATEW, temp);
-        snprintf(temp, sizeof(temp), "%d.%d.%d.%d", ps2_dns[0], ps2_dns[1], ps2_dns[2], ps2_dns[3]);
+        snprintf(temp, sizeof(temp), "%d.%d.%d.%d", gNetworkConfig.ps2_dns[0], gNetworkConfig.ps2_dns[1], gNetworkConfig.ps2_dns[2], gNetworkConfig.ps2_dns[3]);
         configSetStr(configNet, CONFIG_NET_PS2_DNS, temp);
 
-        configSetInt(configNet, CONFIG_NET_ETH_LINKM, gETHOpMode);
-        configSetInt(configNet, CONFIG_NET_PS2_DHCP, ps2_ip_use_dhcp);
-        configSetInt(configNet, CONFIG_NET_SMB_NBNS, gPCShareAddressIsNetBIOS);
-        configSetStr(configNet, CONFIG_NET_SMB_NB_ADDR, gPCShareNBAddress);
-        snprintf(temp, sizeof(temp), "%d.%d.%d.%d", pc_ip[0], pc_ip[1], pc_ip[2], pc_ip[3]);
+        configSetInt(configNet, CONFIG_NET_ETH_LINKM, gNetworkConfig.eth_op_mode);
+        configSetInt(configNet, CONFIG_NET_PS2_DHCP, gNetworkConfig.ps2_ip_use_dhcp);
+        configSetInt(configNet, CONFIG_NET_SMB_NBNS, gNetworkConfig.pc_share_is_netbios);
+        configSetStr(configNet, CONFIG_NET_SMB_NB_ADDR, gNetworkConfig.pc_share_nb_addr);
+        snprintf(temp, sizeof(temp), "%d.%d.%d.%d", gNetworkConfig.pc_ip[0], gNetworkConfig.pc_ip[1], gNetworkConfig.pc_ip[2], gNetworkConfig.pc_ip[3]);
         configSetStr(configNet, CONFIG_NET_SMB_IP_ADDR, temp);
-        configSetInt(configNet, CONFIG_NET_SMB_PORT, gPCPort);
-        configSetStr(configNet, CONFIG_NET_SMB_SHARE, gPCShareName);
-        configSetStr(configNet, CONFIG_NET_SMB_USER, gPCUserName);
-        configSetStr(configNet, CONFIG_NET_SMB_PASSW, gPCPassword);
+        configSetInt(configNet, CONFIG_NET_SMB_PORT, gNetworkConfig.pc_port);
+        configSetStr(configNet, CONFIG_NET_SMB_SHARE, gNetworkConfig.pc_share_name);
+        configSetStr(configNet, CONFIG_NET_SMB_USER, gNetworkConfig.pc_user_name);
+        configSetStr(configNet, CONFIG_NET_SMB_PASSW, gNetworkConfig.pc_password);
     }
 
     char *path = configGetDir();
