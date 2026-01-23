@@ -215,6 +215,7 @@ extern bdm_device_data_t *gAutoLaunchDeviceData;
 extern char *gHDDPrefix;
 extern char gOPLPart[128];
 
+void oplDumpRepro(void);
 void initSupport(item_list_t *itemList, int mode, int force_reinit);
 
 void setDefaultColors(void);

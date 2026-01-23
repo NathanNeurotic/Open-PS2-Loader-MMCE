@@ -54,3 +54,7 @@ lng/lang_*.lng
 src/lang_internal.c
 include/lang_autogen.h
 tmp/
+
+# Build artifacts
+artifacts/
+build_*.log

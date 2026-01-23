@@ -53,9 +53,11 @@ int ioPrintf(const char *format, ...);
 */
 int ioBlockOps(int block);
 
+#include "log.h"
+
 #ifdef __DEBUG
 #define PREINIT_LOG(...) printf(__VA_ARGS__)
-#define LOG(...)         ioPrintf(__VA_ARGS__)
+#define LOG(...)         LOG_DEBUG(__VA_ARGS__)
 #else
 #define PREINIT_LOG(...)
 #define LOG(...)

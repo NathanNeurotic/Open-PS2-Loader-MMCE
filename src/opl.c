@@ -1979,6 +1979,52 @@ static void autoLaunchBDMGame(char *argv[])
     bdmLaunchGame(NULL, -1, configSet);
 }
 
+void oplDumpRepro(void)
+{
+    int fd = open("mass:/opl_repro.txt", O_WRONLY | O_CREAT | O_TRUNC);
+    if (fd < 0) {
+        LOG_ERR("Failed to create repro dump file\n");
+        return;
+    }
+
+    char buf[512];
+    snprintf(buf, sizeof(buf), "OPL Repro Bundle\nVersion: %s\n", OPL_VERSION);
+    write(fd, buf, strlen(buf));
+
+    snprintf(buf, sizeof(buf), "Default Device: %d\n", gDefaultDevice);
+    write(fd, buf, strlen(buf));
+
+    snprintf(buf, sizeof(buf), "BDM Mode: %d\n", gBDMStartMode);
+    write(fd, buf, strlen(buf));
+    snprintf(buf, sizeof(buf), "HDD Mode: %d\n", gHDDStartMode);
+    write(fd, buf, strlen(buf));
+    snprintf(buf, sizeof(buf), "ETH Mode: %d\n", gETHStartMode);
+    write(fd, buf, strlen(buf));
+    snprintf(buf, sizeof(buf), "APP Mode: %d\n", gAPPStartMode);
+    write(fd, buf, strlen(buf));
+
+    snprintf(buf, sizeof(buf), "Debug Enabled: %d\n", gEnableDebug);
+    write(fd, buf, strlen(buf));
+
+    snprintf(buf, sizeof(buf), "PS2 IP: %d.%d.%d.%d\n", ps2_ip[0], ps2_ip[1], ps2_ip[2], ps2_ip[3]);
+    write(fd, buf, strlen(buf));
+
+    // Config dump
+    int i;
+    for (i = 0; i < MODE_COUNT; i++) {
+        if (list_support[i].support && list_support[i].support->enabled) {
+            snprintf(buf, sizeof(buf), "Mode %d Enabled\n", i);
+            write(fd, buf, strlen(buf));
+        }
+    }
+
+    // Dump logs
+    log_dump_to_fd(fd);
+
+    close(fd);
+    LOG_INFO("Repro bundle dumped to mass:/opl_repro.txt\n");
+}
+
 // --------------------- Main --------------------
 int main(int argc, char *argv[])
 {
@@ -1994,6 +2040,9 @@ int main(int argc, char *argv[])
     // reset, load modules
     reset();
     ResetDeckardXParams();
+
+    // Initialize logging
+    log_init();
 
     if (argc >= 5) {
         /* argv[0] boot path
