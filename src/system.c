@@ -16,7 +16,6 @@
 #include "include/pad.h"
 #include "include/system.h"
 #include "include/ioman.h"
-#include "include/opl_config.h"
 #include "include/ioprp.h"
 #include "include/bdmsupport.h"
 #include "include/OSDHistory.h"
@@ -903,7 +902,7 @@ void sysLaunchLoaderElf(const char *filename, const char *mode_str, int size_cdv
 
     config->EnableDebug = gEnableDebug;
     config->HDDSpindown = gHDDSpindown;
-    config->g_ps2_ETHOpMode = gNetworkConfig.eth_op_mode;
+    config->g_ps2_ETHOpMode = gETHOpMode;
 
     if (GetCheatsEnabled()) {
         set_cheats_list();

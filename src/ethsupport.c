@@ -11,7 +11,6 @@
 #include "include/system.h"
 #include "include/extern_irx.h"
 #include "include/cheatman.h"
-#include "include/opl_config.h"
 #include "modules/iopcore/common/cdvd_config.h"
 
 #define NEWLIB_PORT_AWARE
@@ -63,32 +62,32 @@ static void ethSMBConnect(void)
     smbOpenShare_in_t openshare;
     int result;
 
-    if (gNetworkConfig.eth_prefix[0] != '\0')
-        sprintf(ethPrefix, "%s%s\\", ethBase, gNetworkConfig.eth_prefix);
+    if (gETHPrefix[0] != '\0')
+        sprintf(ethPrefix, "%s%s\\", ethBase, gETHPrefix);
     else
         strcpy(ethPrefix, ethBase);
 
     // open tcp connection with the server / logon to SMB server
-    if (gNetworkConfig.pc_share_is_netbios) {
-        if (nbnsFindName(gNetworkConfig.pc_share_nb_addr, share_ip_address) != 0) {
-            gNetworkConfig.network_startup = ERROR_ETH_SMB_CONN;
+    if (gPCShareAddressIsNetBIOS) {
+        if (nbnsFindName(gPCShareNBAddress, share_ip_address) != 0) {
+            gNetworkStartup = ERROR_ETH_SMB_CONN;
             return;
         }
 
         sprintf(logon.serverIP, "%u.%u.%u.%u", share_ip_address[0], share_ip_address[1], share_ip_address[2], share_ip_address[3]);
     } else {
-        sprintf(logon.serverIP, "%u.%u.%u.%u", gNetworkConfig.pc_ip[0], gNetworkConfig.pc_ip[1], gNetworkConfig.pc_ip[2], gNetworkConfig.pc_ip[3]);
+        sprintf(logon.serverIP, "%u.%u.%u.%u", pc_ip[0], pc_ip[1], pc_ip[2], pc_ip[3]);
     }
 
-    logon.serverPort = gNetworkConfig.pc_port;
+    logon.serverPort = gPCPort;
 
-    if (strlen(gNetworkConfig.pc_password) > 0) {
+    if (strlen(gPCPassword) > 0) {
         smbGetPasswordHashes_in_t passwd;
         smbGetPasswordHashes_out_t passwdhashes;
 
         // we'll try to generate hashed password first
-        strncpy(logon.User, gNetworkConfig.pc_user_name, sizeof(logon.User));
-        strncpy(passwd.password, gNetworkConfig.pc_password, sizeof(passwd.password));
+        strncpy(logon.User, gPCUserName, sizeof(logon.User));
+        strncpy(passwd.password, gPCPassword, sizeof(passwd.password));
 
         if (fileXioDevctl(ethBase, SMB_DEVCTL_GETPASSWORDHASHES, (void *)&passwd, sizeof(passwd), (void *)&passwdhashes, sizeof(passwdhashes)) == 0) {
             // hash generated okay, can use
@@ -98,13 +97,13 @@ static void ethSMBConnect(void)
             openshare.PasswordType = HASHED_PASSWORD;
         } else {
             // failed hashing, failback to plaintext
-            strncpy(logon.Password, gNetworkConfig.pc_password, sizeof(logon.Password));
+            strncpy(logon.Password, gPCPassword, sizeof(logon.Password));
             logon.PasswordType = PLAINTEXT_PASSWORD;
-            strncpy(openshare.Password, gNetworkConfig.pc_password, sizeof(openshare.Password));
+            strncpy(openshare.Password, gPCPassword, sizeof(openshare.Password));
             openshare.PasswordType = PLAINTEXT_PASSWORD;
         }
     } else {
-        strncpy(logon.User, gNetworkConfig.pc_user_name, sizeof(logon.User));
+        strncpy(logon.User, gPCUserName, sizeof(logon.User));
         logon.PasswordType = NO_PASSWORD;
         openshare.PasswordType = NO_PASSWORD;
     }
@@ -114,31 +113,31 @@ static void ethSMBConnect(void)
         strcpy(echo.echo, "ALIVE ECHO TEST");
         echo.len = strlen("ALIVE ECHO TEST");
 
-        if (gNetworkConfig.pc_share_is_netbios) {
+        if (gPCShareAddressIsNetBIOS) {
             // Since the SMB server can be connected to, update the IP address.
-            gNetworkConfig.pc_ip[0] = share_ip_address[0];
-            gNetworkConfig.pc_ip[1] = share_ip_address[1];
-            gNetworkConfig.pc_ip[2] = share_ip_address[2];
-            gNetworkConfig.pc_ip[3] = share_ip_address[3];
+            pc_ip[0] = share_ip_address[0];
+            pc_ip[1] = share_ip_address[1];
+            pc_ip[2] = share_ip_address[2];
+            pc_ip[3] = share_ip_address[3];
         }
 
         if (fileXioDevctl(ethBase, SMB_DEVCTL_ECHO, (void *)&echo, sizeof(echo), NULL, 0) >= 0) {
-            gNetworkConfig.network_startup = ERROR_ETH_SMB_OPENSHARE;
+            gNetworkStartup = ERROR_ETH_SMB_OPENSHARE;
 
-            if (gNetworkConfig.pc_share_name[0]) {
+            if (gPCShareName[0]) {
                 // connect to the share
-                strcpy(openshare.ShareName, gNetworkConfig.pc_share_name);
+                strcpy(openshare.ShareName, gPCShareName);
 
                 if (fileXioDevctl(ethBase, SMB_DEVCTL_OPENSHARE, (void *)&openshare, sizeof(openshare), NULL, 0) >= 0) {
                     // everything is ok
-                    gNetworkConfig.network_startup = 0;
+                    gNetworkStartup = 0;
                 }
             }
         } else {
-            gNetworkConfig.network_startup = ERROR_ETH_SMB_ECHO;
+            gNetworkStartup = ERROR_ETH_SMB_ECHO;
         }
     } else {
-        gNetworkConfig.network_startup = (result == -SMB_DEVCTL_LOGON_ERR_CONN) ? ERROR_ETH_SMB_CONN : ERROR_ETH_SMB_LOGON;
+        gNetworkStartup = (result == -SMB_DEVCTL_LOGON_ERR_CONN) ? ERROR_ETH_SMB_CONN : ERROR_ETH_SMB_LOGON;
     }
 }
 
@@ -207,22 +206,22 @@ static int ethInitApplyConfig(void)
 
     do {
         if (ethWaitValidNetIFLinkState() != 0) {
-            gNetworkConfig.network_startup = ERROR_ETH_LINK_FAIL;
+            gNetworkStartup = ERROR_ETH_LINK_FAIL;
             return ERROR_ETH_LINK_FAIL;
         }
     } while (ethApplyNetIFConfig() != 0);
 
     // Before the network configuration is applied, wait for a valid link status.
     if (ethWaitValidNetIFLinkState() != 0) {
-        gNetworkConfig.network_startup = ERROR_ETH_LINK_FAIL;
+        gNetworkStartup = ERROR_ETH_LINK_FAIL;
         return ERROR_ETH_LINK_FAIL;
     }
 
     ethApplyIPConfig();
 
     // Wait for DHCP to initialize, if DHCP is enabled.
-    if (gNetworkConfig.ps2_ip_use_dhcp && (ethWaitValidDHCPState() != 0)) {
-        gNetworkConfig.network_startup = ERROR_ETH_DHCP_FAIL;
+    if (ps2_ip_use_dhcp && (ethWaitValidDHCPState() != 0)) {
+        gNetworkStartup = ERROR_ETH_DHCP_FAIL;
         return ERROR_ETH_DHCP_FAIL;
     }
 
@@ -256,7 +255,7 @@ static void ethInitSMB(void)
     // connect
     ethSMBConnect();
 
-    if (gNetworkConfig.network_startup == 0) {
+    if (gNetworkStartup == 0) {
         // update Themes
         char path[256];
         sprintf(path, "%sTHM", ethPrefix);
@@ -266,7 +265,7 @@ static void ethInitSMB(void)
         lngAddLanguages(path, "\\", ethGameList.mode);
 
         sbCreateFolders(ethPrefix, 1);
-    } else if (gNetworkConfig.pc_share_name[0] || !(gNetworkConfig.network_startup >= ERROR_ETH_SMB_OPENSHARE)) {
+    } else if (gPCShareName[0] || !(gNetworkStartup >= ERROR_ETH_SMB_OPENSHARE)) {
         ethDisplayErrorStatus();
     }
 }
@@ -305,7 +304,7 @@ static int ethLoadModules(void)
             }
         }
 
-        gNetworkConfig.network_startup = ERROR_ETH_MODULE_NETIF_FAILURE;
+        gNetworkStartup = ERROR_ETH_MODULE_NETIF_FAILURE;
         return -1;
     }
 
@@ -322,7 +321,7 @@ void ethDeinitModules(void)
         nbnsDeinit();
         NetManDeinit();
         ethModulesLoaded = 0;
-        gNetworkConfig.network_startup = ERROR_ETH_NOT_STARTED;
+        gNetworkStartup = ERROR_ETH_NOT_STARTED;
 
         if (ethInitSemaID >= 0) {
             DeleteSema(ethInitSemaID);
@@ -355,37 +354,37 @@ int ethLoadInitModules(void)
 
 void ethDisplayErrorStatus(void)
 {
-    switch (gNetworkConfig.network_startup) {
+    switch (gNetworkStartup) {
         case 0: // No error
             break;
         case ERROR_ETH_MODULE_NETIF_FAILURE:
-            setErrorMessageWithCode(_STR_NETWORK_STARTUP_ERROR_NETIF, gNetworkConfig.network_startup);
+            setErrorMessageWithCode(_STR_NETWORK_STARTUP_ERROR_NETIF, gNetworkStartup);
             break;
         case ERROR_ETH_SMB_CONN:
-            setErrorMessageWithCode(_STR_NETWORK_STARTUP_ERROR_CONN, gNetworkConfig.network_startup);
+            setErrorMessageWithCode(_STR_NETWORK_STARTUP_ERROR_CONN, gNetworkStartup);
             break;
         case ERROR_ETH_SMB_LOGON:
-            setErrorMessageWithCode(_STR_NETWORK_STARTUP_ERROR_LOGON, gNetworkConfig.network_startup);
+            setErrorMessageWithCode(_STR_NETWORK_STARTUP_ERROR_LOGON, gNetworkStartup);
             break;
         case ERROR_ETH_SMB_OPENSHARE:
-            setErrorMessageWithCode(_STR_NETWORK_STARTUP_ERROR_SHARE, gNetworkConfig.network_startup);
+            setErrorMessageWithCode(_STR_NETWORK_STARTUP_ERROR_SHARE, gNetworkStartup);
             break;
         case ERROR_ETH_SMB_LISTSHARES:
-            setErrorMessageWithCode(_STR_NETWORK_SHARE_LIST_ERROR, gNetworkConfig.network_startup);
+            setErrorMessageWithCode(_STR_NETWORK_SHARE_LIST_ERROR, gNetworkStartup);
             break;
         case ERROR_ETH_SMB_LISTGAMES:
-            setErrorMessageWithCode(_STR_NETWORK_GAMES_LIST_ERROR, gNetworkConfig.network_startup);
+            setErrorMessageWithCode(_STR_NETWORK_GAMES_LIST_ERROR, gNetworkStartup);
             break;
         case ERROR_ETH_LINK_FAIL:
             LOG("ETH: Unable to get valid link status.\n");
-            setErrorMessageWithCode(_STR_NETWORK_ERROR_LINK_FAIL, gNetworkConfig.network_startup);
+            setErrorMessageWithCode(_STR_NETWORK_ERROR_LINK_FAIL, gNetworkStartup);
             break;
         case ERROR_ETH_DHCP_FAIL:
             LOG("ETH: Unable to get valid IP address via DHCP.\n");
-            setErrorMessageWithCode(_STR_NETWORK_ERROR_DHCP_FAIL, gNetworkConfig.network_startup);
+            setErrorMessageWithCode(_STR_NETWORK_ERROR_DHCP_FAIL, gNetworkStartup);
             break;
         default:
-            setErrorMessageWithCode(_STR_NETWORK_STARTUP_ERROR, gNetworkConfig.network_startup);
+            setErrorMessageWithCode(_STR_NETWORK_STARTUP_ERROR, gNetworkStartup);
     }
 }
 
@@ -400,7 +399,7 @@ static void smbLoadModules(void)
     SignalSema(ethInitSemaID);
 
     if (ret == 0) {
-        gNetworkConfig.network_startup = ERROR_ETH_MODULE_SMBMAN_FAILURE;
+        gNetworkStartup = ERROR_ETH_MODULE_SMBMAN_FAILURE;
         LOG("[SMBMAN]:\n");
         if (sysLoadModuleBuffer(&smbman_irx, size_smbman_irx, 0, NULL) >= 0) {
             LOG("[NBNS]:\n");
@@ -421,7 +420,7 @@ void ethInit(item_list_t *itemList)
     if (ethInitSema() < 0)
         return;
 
-    if (gNetworkConfig.network_startup >= ERROR_ETH_SMB_CONN) {
+    if (gNetworkStartup >= ERROR_ETH_SMB_CONN) {
         LOG("ETHSUPPORT Re-Init\n");
         thmReinit(ethBase);
         ethULSizePrev = -2;
@@ -436,7 +435,7 @@ void ethInit(item_list_t *itemList)
         ethGameCount = 0;
         ethGames = NULL;
         configGetInt(configGetByType(CONFIG_OPL), "eth_frames_delay", &ethGameList.delay);
-        gNetworkConfig.network_startup = ERROR_ETH_NOT_STARTED;
+        gNetworkStartup = ERROR_ETH_NOT_STARTED;
         ioPutRequest(IO_CUSTOM_SIMPLEACTION, &smbLoadModules);
         ethGameList.enabled = 1;
     }
@@ -458,7 +457,7 @@ static int ethNeedsUpdate(item_list_t *itemList)
     if (ethULSizePrev == -2)
         result = 1;
 
-    if (gNetworkConfig.network_startup == 0) {
+    if (gNetworkStartup == 0) {
         struct stat st;
         char path[256];
 
@@ -487,12 +486,12 @@ static int ethNeedsUpdate(item_list_t *itemList)
 
 static int ethUpdateGameList(item_list_t *itemList)
 {
-    if (gNetworkConfig.pc_share_name[0]) {
-        if (gNetworkConfig.network_startup != 0)
+    if (gPCShareName[0]) {
+        if (gNetworkStartup != 0)
             return 0;
 
         if ((sbReadList(&ethGames, ethPrefix, &ethULSizePrev, &ethGameCount)) < 0) {
-            gNetworkConfig.network_startup = ERROR_ETH_SMB_LISTGAMES;
+            gNetworkStartup = ERROR_ETH_SMB_LISTGAMES;
             ethDisplayErrorStatus();
         }
     } else {
@@ -500,7 +499,7 @@ static int ethUpdateGameList(item_list_t *itemList)
         ShareEntry_t sharelist[128];
         smbGetShareList_in_t getsharelist;
 
-        if (gNetworkConfig.network_startup < ERROR_ETH_SMB_OPENSHARE)
+        if (gNetworkStartup < ERROR_ETH_SMB_OPENSHARE)
             return 0;
 
         getsharelist.EE_addr = (void *)&sharelist[0];
@@ -524,7 +523,7 @@ static int ethUpdateGameList(item_list_t *itemList)
             }
             ethGameCount = count;
         } else if (count < 0) {
-            gNetworkConfig.network_startup = ERROR_ETH_SMB_LISTSHARES;
+            gNetworkStartup = ERROR_ETH_SMB_LISTSHARES;
             ethDisplayErrorStatus();
         }
     }
@@ -582,8 +581,8 @@ static void ethLaunchGame(item_list_t *itemList, int id, config_set_t *configSet
     u32 layer1_start, layer1_offset;
     unsigned short int layer1_part;
 
-    if (!gNetworkConfig.pc_share_name[0]) {
-        memcpy(gNetworkConfig.pc_share_name, game->name, sizeof(gNetworkConfig.pc_share_name));
+    if (!gPCShareName[0]) {
+        memcpy(gPCShareName, game->name, sizeof(gPCShareName));
         ethULSizePrev = -2;
         ethGameCount = 0;
         ioPutRequest(IO_MENU_UPDATE_DEFFERED, &ethGameList.mode); // clear the share list
@@ -609,8 +608,8 @@ static void ethLaunchGame(item_list_t *itemList, int id, config_set_t *configSet
                 smb_vmc_infos.specs.card_size = vmc_superblock.pages_per_cluster * vmc_superblock.clusters_per_card;
                 smb_vmc_infos.active = 1;
                 smb_vmc_infos.fid = 0xFFFF;
-                if (gNetworkConfig.eth_prefix[0])
-                    snprintf(smb_vmc_infos.fname, sizeof(smb_vmc_infos.fname), "%s\\VMC\\%s.bin", gNetworkConfig.eth_prefix, vmc_name);
+                if (gETHPrefix[0])
+                    snprintf(smb_vmc_infos.fname, sizeof(smb_vmc_infos.fname), "%s\\VMC\\%s.bin", gETHPrefix, vmc_name);
                 else
                     snprintf(smb_vmc_infos.fname, sizeof(smb_vmc_infos.fname), "VMC\\%s.bin", vmc_name);
             } else {
@@ -662,12 +661,12 @@ static void ethLaunchGame(item_list_t *itemList, int id, config_set_t *configSet
             settings->common.flags |= IOPCORE_SMB_FORMAT_USBLD;
     }
 
-    sprintf(settings->smb_ip, "%u.%u.%u.%u", gNetworkConfig.pc_ip[0], gNetworkConfig.pc_ip[1], gNetworkConfig.pc_ip[2], gNetworkConfig.pc_ip[3]);
-    settings->smb_port = gNetworkConfig.pc_port;
-    strcpy(settings->smb_share, gNetworkConfig.pc_share_name);
-    strcpy(settings->smb_prefix, gNetworkConfig.eth_prefix);
-    strcpy(settings->smb_user, gNetworkConfig.pc_user_name);
-    strcpy(settings->smb_password, gNetworkConfig.pc_password);
+    sprintf(settings->smb_ip, "%u.%u.%u.%u", pc_ip[0], pc_ip[1], pc_ip[2], pc_ip[3]);
+    settings->smb_port = gPCPort;
+    strcpy(settings->smb_share, gPCShareName);
+    strcpy(settings->smb_prefix, gETHPrefix);
+    strcpy(settings->smb_user, gPCUserName);
+    strcpy(settings->smb_password, gPCPassword);
 
     // Initialize layer 1 information.
     sbCreatePath(game, partname, ethPrefix, "\\", 0);
@@ -842,7 +841,7 @@ static int ethApplyNetIFConfig(void)
     int mode, result;
     static int CurrentMode = NETMAN_NETIF_ETH_LINK_MODE_AUTO;
 
-    switch (gNetworkConfig.eth_op_mode) {
+    switch (gETHOpMode) {
         case ETH_OP_MODE_100M_FDX:
             mode = NETMAN_NETIF_ETH_LINK_MODE_100M_FDX;
             break;
@@ -881,21 +880,21 @@ static int ethApplyIPConfig(void)
     int result;
 
     if ((result = ps2ip_getconfig("sm0", &ip_info)) >= 0) {
-        IP4_ADDR(&ipaddr, gNetworkConfig.ps2_ip[0], gNetworkConfig.ps2_ip[1], gNetworkConfig.ps2_ip[2], gNetworkConfig.ps2_ip[3]);
-        IP4_ADDR(&netmask, gNetworkConfig.ps2_netmask[0], gNetworkConfig.ps2_netmask[1], gNetworkConfig.ps2_netmask[2], gNetworkConfig.ps2_netmask[3]);
-        IP4_ADDR(&gw, gNetworkConfig.ps2_gateway[0], gNetworkConfig.ps2_gateway[1], gNetworkConfig.ps2_gateway[2], gNetworkConfig.ps2_gateway[3]);
-        IP4_ADDR(&dns, gNetworkConfig.ps2_dns[0], gNetworkConfig.ps2_dns[1], gNetworkConfig.ps2_dns[2], gNetworkConfig.ps2_dns[3]);
+        IP4_ADDR(&ipaddr, ps2_ip[0], ps2_ip[1], ps2_ip[2], ps2_ip[3]);
+        IP4_ADDR(&netmask, ps2_netmask[0], ps2_netmask[1], ps2_netmask[2], ps2_netmask[3]);
+        IP4_ADDR(&gw, ps2_gateway[0], ps2_gateway[1], ps2_gateway[2], ps2_gateway[3]);
+        IP4_ADDR(&dns, ps2_dns[0], ps2_dns[1], ps2_dns[2], ps2_dns[3]);
         dns_curr = dns_getserver(0);
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wstrict-aliasing"
         // Check if it's the same. Otherwise, apply the new configuration.
-        if ((gNetworkConfig.ps2_ip_use_dhcp != ip_info.dhcp_enabled) || (!gNetworkConfig.ps2_ip_use_dhcp &&
+        if ((ps2_ip_use_dhcp != ip_info.dhcp_enabled) || (!ps2_ip_use_dhcp &&
                                                           (!ip_addr_cmp(&ipaddr, (struct ip4_addr *)&ip_info.ipaddr) ||
                                                            !ip_addr_cmp(&netmask, (struct ip4_addr *)&ip_info.netmask) ||
                                                            !ip_addr_cmp(&gw, (struct ip4_addr *)&ip_info.gw) ||
                                                            !ip_addr_cmp(&dns, dns_curr)))) {
-            if (gNetworkConfig.ps2_ip_use_dhcp) {
+            if (ps2_ip_use_dhcp) {
                 ip4_addr_set_zero((struct ip4_addr *)&ip_info.ipaddr);
                 ip4_addr_set_zero((struct ip4_addr *)&ip_info.netmask);
                 ip4_addr_set_zero((struct ip4_addr *)&ip_info.gw);
@@ -911,7 +910,7 @@ static int ethApplyIPConfig(void)
             }
 
             result = ps2ip_setconfig(&ip_info);
-            if (!gNetworkConfig.ps2_ip_use_dhcp)
+            if (!ps2_ip_use_dhcp)
                 dns_setserver(0, &dns);
         } else
             result = 0;

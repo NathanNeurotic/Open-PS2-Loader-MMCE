@@ -69,7 +69,6 @@ int oplShouldAppsUpdate(void);
 config_set_t *oplGetLegacyAppsConfig(void);
 config_set_t *oplGetLegacyAppsInfo(char *name);
 
-void clearErrorMessage(void);
 void setErrorMessage(int strId);
 void setErrorMessageWithCode(int strId, int error);
 int loadConfig(int types);
@@ -95,17 +94,30 @@ enum ETH_OP_MODES {
     ETH_OP_MODE_COUNT
 };
 
-// Network Globals moved to OPL_NetworkConfig gNetworkConfig in opl_config.h
+extern int ps2_ip_use_dhcp;
+extern int ps2_ip[4];
+extern int ps2_netmask[4];
+extern int ps2_gateway[4];
+extern int ps2_dns[4];
+extern int gETHOpMode; // See ETH_OP_MODES.
+extern int gPCShareAddressIsNetBIOS;
+extern int pc_ip[4];
+extern int gPCPort;
+// Please keep these string lengths in-sync with the limits within CDVDMAN.
+extern char gPCShareNBAddress[17];
+extern char gPCShareName[32];
+extern char gPCUserName[32];
+extern char gPCPassword[32];
 
 //// Settings
 
 // describes what is happening in the network startup thread (>0 means loading, <0 means error)...
-// gNetworkStartup is now in gNetworkConfig
+extern int gNetworkStartup;
 extern int gHDDSpindown;
 /// Refer to enum START_MODE within iosupport.h
 extern int gBDMStartMode;
 extern int gHDDStartMode;
-// gETHStartMode is now in gNetworkConfig
+extern int gETHStartMode;
 extern int gAPPStartMode;
 extern int bdmCacheSize;
 extern int hddCacheSize;
@@ -181,7 +193,7 @@ extern int gEnableWrite;
 
 // These prefixes are relative to the device's name (meaning that they do not include the device name).
 extern char gBDMPrefix[32];
-// gETHPrefix is now in gNetworkConfig
+extern char gETHPrefix[32];
 
 extern int gRememberLastPlayed;
 
@@ -203,7 +215,6 @@ extern bdm_device_data_t *gAutoLaunchDeviceData;
 extern char *gHDDPrefix;
 extern char gOPLPart[128];
 
-void oplDumpRepro(void);
 void initSupport(item_list_t *itemList, int mode, int force_reinit);
 
 void setDefaultColors(void);
@@ -222,8 +233,6 @@ typedef struct
     /// submenu list
     submenu_list_t *subMenu;
 } opl_io_module_t;
-
-extern opl_io_module_t list_support[MODE_COUNT];
 
 /*
 BLURT output char blurttext[128];

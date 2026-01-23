@@ -73,7 +73,7 @@ endif
 
 FRONTEND_OBJS = pad.o xparam.o fntsys.o renderman.o menusys.o OSDHistory.o system.o lang.o lang_internal.o config.o hdd.o dialogs.o \
 		dia.o ioman.o texcache.o themes.o supportbase.o bdmsupport.o ethsupport.o hddsupport.o zso.o lz4.o \
-		appsupport.o gui.o guigame.o textures.o opl.o atlas.o nbns.o httpclient.o gsm.o cheatman.o sound.o ps2cnf.o log.o compatupd.o nbd_loader.o autolaunch.o opl_config.o
+		appsupport.o gui.o guigame.o textures.o opl.o atlas.o nbns.o httpclient.o gsm.o cheatman.o sound.o ps2cnf.o log.o
 
 IOP_OBJS =	iomanx.o filexio.o ps2fs.o usbd.o bdmevent.o \
 		bdm.o bdmfs_fatfs.o usbmass_bd.o iLinkman.o IEEE1394_bd.o mx4sio_bd.o \
@@ -365,10 +365,6 @@ format-check:
 format:
 	@echo "Formatting code..."
 	@find src include -name "*.[ch]" | xargs $(CLANG_FORMAT) -i
-
-test:
-	gcc -o tests/test_config tests/test_config.c -Iinclude
-	./tests/test_config
 
 $(EE_ASM_DIR):
 	@mkdir -p $@
@@ -798,10 +794,10 @@ LANG_COMPILER = lang_compiler.py
 languages: $(ENGLISH_TEMPLATE_YML) $(TRANSLATIONS_YML) $(ENGLISH_LNG) $(TRANSLATIONS_LNG) $(INTERNAL_LANGUAGE_C) $(INTERNAL_LANGUAGE_H)
 
 download_lng:
-	./tools/setup_deps.sh
+	./download_lng.sh
 
 download_lwNBD:
-	./tools/setup_deps.sh
+	./download_lwNBD.sh
 
 download_cfla:
 	./download_cfla.sh
