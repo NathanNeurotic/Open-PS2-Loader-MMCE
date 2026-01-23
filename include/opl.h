@@ -223,6 +223,8 @@ typedef struct
     submenu_list_t *subMenu;
 } opl_io_module_t;
 
+extern opl_io_module_t list_support[MODE_COUNT];
+
 /*
 BLURT output char blurttext[128];
 #define BLURT                                                                           \

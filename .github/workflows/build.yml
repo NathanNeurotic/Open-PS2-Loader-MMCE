@@ -18,9 +18,11 @@ jobs:
 
     - name: Install dependencies
       run: |
-        apk add --no-cache build-base git bash zip python3 py3-pip
-        # If clang-format is needed
-        # apk add clang
+        if command -v apk > /dev/null; then
+          apk add --no-cache build-base git bash zip python3 py3-pip clang
+        else
+          apt-get update && apt-get install -y build-essential git bash zip python3 python3-pip clang-format
+        fi
 
     - name: Download sub-dependencies
       run: |
