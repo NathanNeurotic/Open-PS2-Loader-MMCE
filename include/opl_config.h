@@ -36,5 +36,6 @@ typedef struct {
 } OPL_NetworkConfig;
 
 extern OPL_NetworkConfig gNetworkConfig;
+extern char gExportName[32];
 
 #endif

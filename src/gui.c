@@ -805,10 +805,10 @@ void guiShowNetConfig(void)
     diaSetInt(diaNetConfig, NETCFG_ETHOPMODE, gNetworkConfig.eth_op_mode);
 
     // Update the spacer item between the OK and reconnect buttons (See dialogs.c).
-    if (gNetworkStartup == 0) {
+    if (gNetworkConfig.network_startup == 0) {
         diaSetLabel(diaNetConfig, NETCFG_OK, _l(_STR_OK));
         diaSetVisible(diaNetConfig, NETCFG_RECONNECT, 1);
-    } else if (gNetworkStartup >= ERROR_ETH_SMB_CONN) {
+    } else if (gNetworkConfig.network_startup >= ERROR_ETH_SMB_CONN) {
         diaSetLabel(diaNetConfig, NETCFG_OK, _l(_STR_RECONNECT));
         diaSetVisible(diaNetConfig, NETCFG_RECONNECT, 0);
     } else {
@@ -837,8 +837,8 @@ void guiShowNetConfig(void)
         diaGetString(diaNetConfig, NETCFG_SHARE_USERNAME, gNetworkConfig.pc_user_name, sizeof(gNetworkConfig.pc_user_name));
         diaGetString(diaNetConfig, NETCFG_SHARE_PASSWORD, gNetworkConfig.pc_password, sizeof(gNetworkConfig.pc_password));
 
-        if (result == NETCFG_RECONNECT && gNetworkStartup < ERROR_ETH_SMB_CONN)
-            gNetworkStartup = ERROR_ETH_SMB_LOGON;
+        if (result == NETCFG_RECONNECT && gNetworkConfig.network_startup < ERROR_ETH_SMB_CONN)
+            gNetworkConfig.network_startup = ERROR_ETH_SMB_LOGON;
 
         applyConfig(-1, -1, 0);
     }

@@ -9,6 +9,7 @@
 #include "include/pad.h"
 #include "include/sound.h"
 #include "include/log.h"
+#include "include/opl_config.h"
 
 // reset() was static in opl.c.
 // We need to call sysReset and mcInit manually or expose reset().
@@ -55,7 +56,7 @@ static int loadLwnbdSvr(void)
 
     config.readonly = !gEnableWrite;
 
-    // see gETHStartMode, gNetworkStartup ? this is slow, so if we don't have to do it (like debug build).
+    // see gNetworkConfig.eth_start_mode, gNetworkConfig.network_startup ? this is slow, so if we don't have to do it (like debug build).
     ret = ethLoadInitModules();
     if (ret == 0) {
         ret = sysLoadModuleBuffer(&ps2atad_irx, size_ps2atad_irx, 0, NULL); /* gHDDStartMode ? */

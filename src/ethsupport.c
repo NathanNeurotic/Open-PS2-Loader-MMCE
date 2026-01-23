@@ -488,11 +488,11 @@ static int ethNeedsUpdate(item_list_t *itemList)
 static int ethUpdateGameList(item_list_t *itemList)
 {
     if (gNetworkConfig.pc_share_name[0]) {
-        if (gNetworkStartup != 0)
+        if (gNetworkConfig.network_startup != 0)
             return 0;
 
         if ((sbReadList(&ethGames, ethPrefix, &ethULSizePrev, &ethGameCount)) < 0) {
-            gNetworkStartup = ERROR_ETH_SMB_LISTGAMES;
+            gNetworkConfig.network_startup = ERROR_ETH_SMB_LISTGAMES;
             ethDisplayErrorStatus();
         }
     } else {
@@ -500,7 +500,7 @@ static int ethUpdateGameList(item_list_t *itemList)
         ShareEntry_t sharelist[128];
         smbGetShareList_in_t getsharelist;
 
-        if (gNetworkStartup < ERROR_ETH_SMB_OPENSHARE)
+        if (gNetworkConfig.network_startup < ERROR_ETH_SMB_OPENSHARE)
             return 0;
 
         getsharelist.EE_addr = (void *)&sharelist[0];
@@ -524,7 +524,7 @@ static int ethUpdateGameList(item_list_t *itemList)
             }
             ethGameCount = count;
         } else if (count < 0) {
-            gNetworkStartup = ERROR_ETH_SMB_LISTSHARES;
+            gNetworkConfig.network_startup = ERROR_ETH_SMB_LISTSHARES;
             ethDisplayErrorStatus();
         }
     }

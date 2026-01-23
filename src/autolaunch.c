@@ -8,33 +8,12 @@
 #include "include/hdd.h"
 #include "include/supportbase.h"
 #include "include/log.h"
+#include "include/opl_config.h"
 
 // Needed for USBMASS_IOCTL_GET_DRIVERNAME
 #include <usbhdfsd-common.h>
 
 extern void *_gp;
-
-// Forward declarations or externs if not in headers
-// These were static in opl.c. Since we are moving them, we need to handle dependencies.
-// checkLoadConfigBDM/HDD will be moved to opl_config.c later.
-// For now, I will create local static copies or expose them?
-// The plan step "Refactor: Extract OPL Configuration Logic" comes after.
-// So checkLoadConfigBDM/HDD are still in opl.c and static.
-// I MUST expose them or duplicate them.
-// To avoid duplication, I will expose them in opl.h temporarily?
-// No, I can't easily change opl.c static without separate step.
-// Actually, I can modify opl.c in this step too.
-// But checkLoadConfigBDM/HDD are used by tryAlternateDevice in opl.c.
-// So I should leave them in opl.c and expose them.
-
-// However, I'm refactoring Auto-Launch.
-// `miniInit` uses `checkLoadConfigBDM` and `checkLoadConfigHDD`.
-// `miniInit` also uses `setDefaults`.
-
-// I will add prototypes here for now and rely on linker, assuming I remove `static` in opl.c.
-void setDefaults(void);
-int checkLoadConfigBDM(int types);
-int checkLoadConfigHDD(int types);
 
 static void miniInit(int mode)
 {
