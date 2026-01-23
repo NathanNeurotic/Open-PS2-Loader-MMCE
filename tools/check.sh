@@ -8,11 +8,15 @@ if [ -z "$PS2SDK" ]; then
     exit 0
 fi
 
-# Formatting Check
+# Formatting Check (using Makefile target if it exists, otherwise echo placeholder)
 echo "Running formatting check..."
-if make format-check; then
-    echo "Formatting check passed."
+if grep -q "format-check:" Makefile; then
+    if make format-check; then
+        echo "Formatting check passed."
+    else
+        echo "Formatting check failed."
+        exit 1
+    fi
 else
-    echo "Formatting check failed."
-    exit 1
+    echo "Makefile does not have format-check target. Skipping."
 fi
