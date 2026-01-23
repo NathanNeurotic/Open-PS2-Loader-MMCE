@@ -8,7 +8,6 @@
 #include <string.h>
 
 static int log_fd = -1;
-static int log_try_open_counter = 0;
 
 #define LOG_MEM_SIZE 8192
 static char log_mem[LOG_MEM_SIZE];
@@ -17,16 +16,11 @@ static int log_mem_full = 0;
 
 void log_init(void)
 {
-    // Try to open log file on mass storage
-    // We assume mass: is available if USB modules are loaded.
-    // If not, this might fail, which is fine.
-    log_fd = open("mass:/opl.log", O_WRONLY | O_CREAT | O_TRUNC);
-    if (log_fd >= 0) {
-        // Write header
-        char header[128];
-        snprintf(header, sizeof(header), "OPL Log Started. Version: %s\n", OPL_VERSION);
-        write(log_fd, header, strlen(header));
-    }
+    // Initialize nothing for now. File opening is defered to repro dump.
+    // If we want persistent file log, we should open it here, but per review feedback,
+    // avoiding constant I/O during gameplay is preferred.
+    // Ideally we would have a background thread or flush mechanism.
+    // For now, logging goes to console (TTY) and memory ring buffer.
 }
 
 void log_print(int level, const char *fmt, ...)
@@ -40,26 +34,6 @@ void log_print(int level, const char *fmt, ...)
 
     // Always print to IO manager (console/debug)
     ioPrintf("%s", buf);
-
-    // Try to open file if not open
-    if (log_fd < 0) {
-        log_try_open_counter++;
-        if ((log_try_open_counter % 50) == 1) {
-             log_fd = open("mass:/opl.log", O_WRONLY | O_CREAT | O_APPEND);
-             if (log_fd >= 0) {
-                  // Dump memory buffer to file
-                  if (log_mem_full) {
-                      write(log_fd, log_mem + log_mem_ptr, LOG_MEM_SIZE - log_mem_ptr);
-                  }
-                  write(log_fd, log_mem, log_mem_ptr);
-             }
-        }
-    }
-
-    // Write to file if open
-    if (log_fd >= 0) {
-        write(log_fd, buf, strlen(buf));
-    }
 
     // Write to memory buffer
     int len = strlen(buf);

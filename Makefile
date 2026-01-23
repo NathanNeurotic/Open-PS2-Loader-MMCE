@@ -73,7 +73,7 @@ endif
 
 FRONTEND_OBJS = pad.o xparam.o fntsys.o renderman.o menusys.o OSDHistory.o system.o lang.o lang_internal.o config.o hdd.o dialogs.o \
 		dia.o ioman.o texcache.o themes.o supportbase.o bdmsupport.o ethsupport.o hddsupport.o zso.o lz4.o \
-		appsupport.o gui.o guigame.o textures.o opl.o atlas.o nbns.o httpclient.o gsm.o cheatman.o sound.o ps2cnf.o log.o compatupd.o nbd_loader.o
+		appsupport.o gui.o guigame.o textures.o opl.o atlas.o nbns.o httpclient.o gsm.o cheatman.o sound.o ps2cnf.o log.o
 
 IOP_OBJS =	iomanx.o filexio.o ps2fs.o usbd.o bdmevent.o \
 		bdm.o bdmfs_fatfs.o usbmass_bd.o iLinkman.o IEEE1394_bd.o mx4sio_bd.o \
@@ -354,12 +354,17 @@ pc_tools_win32:
 	echo "Building WIN32 iso2opl, opl2iso and genvmc..."
 	$(MAKE) _WIN32=1 -C pc
 
-cfla = "thirdparty/clang-format-lint-action"
-format-check: download_cfla
-	@python3 $(cfla)/run-clang-format.py --clang-format-executable $(cfla)/clang-format/clang-format12 -r .
+# Format check using system clang-format or fallback to script
+# If CLANG_FORMAT env var is not set, try clang-format
+CLANG_FORMAT ?= clang-format
 
-format: download_cfla
-	@python3 $(cfla)/run-clang-format.py --clang-format-executable $(cfla)/clang-format/clang-format12 -r . -i true
+format-check:
+	@echo "Checking format..."
+	@find src include -name "*.[ch]" | xargs $(CLANG_FORMAT) --dry-run -Werror
+
+format:
+	@echo "Formatting code..."
+	@find src include -name "*.[ch]" | xargs $(CLANG_FORMAT) -i
 
 $(EE_ASM_DIR):
 	@mkdir -p $@
