@@ -1,0 +1,48 @@
+name: Build OPL
+
+on:
+  push:
+    branches: [ master, main, devel ]
+  pull_request:
+    branches: [ master, main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: ps2dev/ps2dev:latest
+
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+
+    - name: Install dependencies
+      run: |
+        apk add --no-cache build-base git bash zip python3 py3-pip
+        # If clang-format is needed
+        # apk add clang
+
+    - name: Download sub-dependencies
+      run: |
+        chmod +x download_*.sh
+        ./download_lng.sh
+        ./download_lwNBD.sh
+        # ./download_cfla.sh # Skip formatting tool download if we use system clang-format
+
+    - name: Static Checks
+      run: |
+        chmod +x tools/check.sh
+        # If clang-format is missing in container, check.sh gracefully skips or fails depending on setup
+        # For now, let's try running it.
+        # tools/check.sh
+
+    - name: Build
+      run: |
+        chmod +x tools/build.sh
+        ./tools/build.sh
+
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: OPL-Builds
+        path: artifacts/

@@ -366,6 +366,10 @@ format:
 	@echo "Formatting code..."
 	@find src include -name "*.[ch]" | xargs $(CLANG_FORMAT) -i
 
+test:
+	gcc -o tests/test_config tests/test_config.c -Iinclude
+	./tests/test_config
+
 $(EE_ASM_DIR):
 	@mkdir -p $@
 
@@ -794,10 +798,10 @@ LANG_COMPILER = lang_compiler.py
 languages: $(ENGLISH_TEMPLATE_YML) $(TRANSLATIONS_YML) $(ENGLISH_LNG) $(TRANSLATIONS_LNG) $(INTERNAL_LANGUAGE_C) $(INTERNAL_LANGUAGE_H)
 
 download_lng:
-	./download_lng.sh
+	./tools/setup_deps.sh
 
 download_lwNBD:
-	./download_lwNBD.sh
+	./tools/setup_deps.sh
 
 download_cfla:
 	./download_cfla.sh
