@@ -24,6 +24,29 @@ void log_init(void);
 void log_print(int level, const char *fmt, ...);
 void log_dump_to_fd(int fd);
 
+#ifdef __EESIO_DEBUG
+#include "SIOCookie.h"
+#define LOG_INIT() ee_sio_start(38400, 0, 0, 0, 0, 1)
+#define LOG_ENABLE() \
+    do {             \
+    } while (0)
+#else
+#ifdef __DEBUG
+#include "include/debug.h"
+#define LOG_INIT() \
+    do {           \
+    } while (0)
+#define LOG_ENABLE() ioPutRequest(IO_CUSTOM_SIMPLEACTION, &debugSetActive)
+#else
+#define LOG_INIT() \
+    do {           \
+    } while (0)
+#define LOG_ENABLE() \
+    do {             \
+    } while (0)
+#endif
+#endif
+
 // Macros
 #if OPL_LOG_LEVEL >= LOG_LEVEL_ERROR
 #define LOG_ERR(fmt, ...) log_print(LOG_LEVEL_ERROR, "ERR: " fmt, ##__VA_ARGS__)
