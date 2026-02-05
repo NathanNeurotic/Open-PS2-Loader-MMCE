@@ -135,6 +135,14 @@ BIN2C = $(PS2SDK)/bin/bin2c
 
 ifeq ($(RTL),1)
   EE_CFLAGS += -D__RTL
+
+# Optional SIOCookie support
+SIOCOOKIE_PATH := $(shell $(CC) -print-file-name=libsiocookie.a)
+ifneq ($(wildcard $(SIOCOOKIE_PATH)),)
+EE_CFLAGS += -DHAVE_SIOCOOKIE
+EE_LIBS += -lsiocookie
+endif
+
 endif
 
 ifeq ($(DTL_T10000),1)
