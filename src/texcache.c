@@ -34,14 +34,13 @@ static void cacheLoadImage(void *data)
         return;
     }
 
-    // The cache entry was already reused or the cache entry was cleared while this request was pending.
-    // In either case, do not touch the entry and just drop the request.
+    // the cache entry was already reused (or cleared) while this request was pending!
     if (req->cacheUID != req->entry->UID) {
         free(req);
         return;
     }
 
-    // Seems okay. We can proceed.
+    // seems okay. we can proceed
     GSTEXTURE *texture = &req->entry->texture;
     texFree(texture);
 
@@ -54,7 +53,6 @@ static void cacheLoadImage(void *data)
 
     free(req);
 }
-
 
 void cacheInit()
 {
