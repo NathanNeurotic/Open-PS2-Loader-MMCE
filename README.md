@@ -1,13 +1,13 @@
 # Open PS2 Loader
 
 ![logo](https://github.com/ps2homebrew/Open-PS2-Loader/blob/master/gfx/logo.png)
-
-Copyright 2013, Ifcaro & jimmikaelkael
-Licensed under Academic Free License version 3.0
-Review the LICENSE file for further details.
-
-[![CI](https://github.com/ps2homebrew/Open-PS2-Loader/actions/workflows/compilation.yml/badge.svg?branch=master)](https://github.com/ps2homebrew/Open-PS2-Loader/actions/workflows/compilation.yml)
-[![Codacy Badge](https://app.codacy.com/project/badge/Grade/99032a6a180243bfa0d0e23efeb0608d)](https://www.codacy.com/gh/ps2homebrew/Open-PS2-Loader/dashboard?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=ps2homebrew/Open-PS2-Loader&amp;utm_campaign=Badge_Grade)
+<br>
+Copyright 2013, Ifcaro & jimmikaelkael<br>
+Licensed under Academic Free License version 3.0<br>
+Review the LICENSE file for further details.<br><br>
+![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/NathanNeurotic/open-ps2-loader-mmce/total?style=plastic&logo=github&logoSize=auto&label=Total%20Downloads&labelColor=navy&color=skyblue&link=https%3A%2F%2Fgithub.com%2FNathanNeurotic%2FOpen-PS2-Loader-MMCE%2Freleases)
+[![CI](https://github.com/NathanNeurotic/Open-PS2-Loader-MMCE/actions/workflows/compilation.yml/badge.svg?branch=master)](https://github.com/NathanNeurotic/Open-PS2-Loader-MMCE/actions/workflows/compilation.yml)
+[![Codacy Badge](https://app.codacy.com/project/badge/Grade/581556b20d6b4dbf8e8af2232c89d60c)](https://app.codacy.com/gh/NathanNeurotic/Open-PS2-Loader-MMCE/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade)
 [![Discord](https://img.shields.io/discord/1275875800318476381?style=flat&logo=Discord)](https://tinyurl.com/PS2SPACE)
 [![Mega](https://img.shields.io/badge/Mega-%23D90007.svg?style=flat&logo=Mega&logoColor=white)](https://mega.nz/folder/Ndwi1bAK#oLWNhH_g-h0p4BoT4c556A)
 
