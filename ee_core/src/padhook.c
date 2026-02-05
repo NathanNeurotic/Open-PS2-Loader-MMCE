@@ -236,7 +236,7 @@ static void IGR_Thread(void *arg)
             char *slots = "00";
             if ((config->MMCEIGRSettings & 1))
                 slots[0] = '1';
-            
+
             if ((config->MMCEIGRSettings & 2))
                 slots[1] = '1';
 

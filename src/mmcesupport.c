@@ -336,18 +336,18 @@ void mmceLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
     if (gMMCEEnableGameID) {
 #endif
 
-    // Send GameID to MMCE
-    fileXioDevctl(mmcePrefix, 0x8, game->startup, (strlen(game->startup) + 1), NULL, 0);
+        // Send GameID to MMCE
+        fileXioDevctl(mmcePrefix, 0x8, game->startup, (strlen(game->startup) + 1), NULL, 0);
 
-    for (int i = 0; i < 15; i++) {
-        sleep(1);
+        for (int i = 0; i < 15; i++) {
+            sleep(1);
 
-        // Poll MMCE status until busy bit is clear
-        if ((fileXioDevctl(mmcePrefix, 0x2, NULL, 0, NULL, 0) & 1) == 0) {
-            LOG("Set MMCE GameID to: %s\n", game->startup);
-            break;
+            // Poll MMCE status until busy bit is clear
+            if ((fileXioDevctl(mmcePrefix, 0x2, NULL, 0, NULL, 0) & 1) == 0) {
+                LOG("Set MMCE GameID to: %s\n", game->startup);
+                break;
+            }
         }
-    }
 #ifdef __DEBUG
     }
 #endif

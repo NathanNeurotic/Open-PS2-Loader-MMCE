@@ -119,7 +119,7 @@ typedef struct _McImageSpec
 #endif
 
 #ifdef MMCE_DRIVER
-    int fd;       /* fd used with MMCE */
+    int fd; /* fd used with MMCE */
 #endif
 
     int flags;    /* Memory Card Flags */
