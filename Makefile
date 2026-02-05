@@ -187,7 +187,15 @@ ifeq ($(DEBUG),1)
     endif
   else ifeq ($(EESIO_DEBUG),1)
     EE_CFLAGS += -D__EESIO_DEBUG
-    EE_LIBS += -lsiocookie
+    EE_LIBS += $(SIOCOOKIE_LIB)
+
+# Optional SIOCookie support (only if available)
+SIOCOOKIE_PATH := $(shell $(CC) -print-file-name=libsiocookie.a)
+ifeq ($(wildcard $(SIOCOOKIE_PATH)),)
+SIOCOOKIE_LIB :=
+else
+SIOCOOKIE_LIB := -lsiocookie
+endif
   else ifeq ($(INGAME_DEBUG),1)
     EE_CFLAGS += -D__INGAME_DEBUG
     EECORE_EXTRA_FLAGS += LOAD_DEBUG_MODULES=1
