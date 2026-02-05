@@ -144,7 +144,6 @@ static void ioWorkerThread(void *arg)
 
             if (!gReqList)
                 gReqEnd = NULL;
-    gReqCount = 0;
 
             SignalSema(gEndSemaId);
         }
