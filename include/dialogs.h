@@ -34,9 +34,17 @@ enum UI_ITEMS {
     CFG_HDDMODE,
     CFG_ETHMODE,
     CFG_APPMODE,
+    CFG_MMCEMODE,
+    CFG_MMCEPREFIX,
+    CFG_MMCESLOT,
+    CFG_MMCEIGRSLOT,
+    CFG_MMCE_WAIT_CYCLES,
+    CFG_MMCE_USE_ALARMS,
+    CFG_MMCEGAMEID,
     CFG_BDMCACHE,
     CFG_HDDCACHE,
     CFG_SMBCACHE,
+    CFG_ENABLEUSB,
     CFG_ENABLEILK,
     CFG_ENABLEMX4SIO,
     CFG_ENABLEBDMHDD,
@@ -227,4 +235,6 @@ extern struct UIItem diaParentalLockConfig[];
 extern struct UIItem diaBlockDevicesConfig[];
 
 extern struct UIItem diaOSDConfig[];
+extern struct UIItem diaMMCEConfig[];
+
 #endif

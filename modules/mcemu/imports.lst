@@ -22,6 +22,10 @@ I_oplRegisterShutdownCallback
 I_bdm_readSector
 I_bdm_writeSector
 #endif
+#ifdef MMCE_DRIVER
+I_mmce_read_offset
+I_mmce_write_offset
+#endif
 #ifdef HDD_DRIVER
 I_sceAtaDmaTransfer
 #endif

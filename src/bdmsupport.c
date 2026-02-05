@@ -19,6 +19,7 @@
 #define NEWLIB_PORT_AWARE
 #include <fileXio_rpc.h> // fileXioIoctl, fileXioDevctl
 
+static int iUSBModLoaded = 0;
 static int iLinkModLoaded = 0;
 static int mx4sioModLoaded = 0;
 static int hddModLoaded = 0;
@@ -31,40 +32,6 @@ static int bdmDeviceListInitialized = 0;
 void bdmInitDevicesData();
 int bdmUpdateDeviceData(item_list_t *itemList);
 
-// Identifies the partition that the specified file is stored on and generates a full path to it.
-int bdmFindPartition(char *target, const char *name, int write)
-{
-    int i, fd;
-    char path[256];
-
-    for (i = 0; i < MAX_BDM_DEVICES; i++) {
-        if (gBDMPrefix[0] != '\0')
-            sprintf(path, "mass%d:%s/%s", i, gBDMPrefix, name);
-        else
-            sprintf(path, "mass%d:%s", i, name);
-        if (write)
-            fd = open(path, O_WRONLY | O_TRUNC | O_CREAT, 0666);
-        else
-            fd = open(path, O_RDONLY);
-
-        if (fd >= 0) {
-            if (gBDMPrefix[0] != '\0')
-                sprintf(target, "mass%d:%s/", i, gBDMPrefix);
-            else
-                sprintf(target, "mass%d:", i);
-            close(fd);
-            return 1;
-        }
-    }
-
-    // default to first partition (for themes, ...)
-    if (gBDMPrefix[0] != '\0')
-        sprintf(target, "mass0:%s/", gBDMPrefix);
-    else
-        sprintf(target, "mass0:");
-    return 0;
-}
-
 static unsigned int BdmGeneration = 0;
 
 static void bdmEventHandler(void *packet, void *opt)
@@ -75,6 +42,14 @@ static void bdmEventHandler(void *packet, void *opt)
 static void bdmLoadBlockDeviceModules(void)
 {
     WaitSema(bdmLoadModuleLock);
+
+    if (gEnableUSB && !iUSBModLoaded) {
+        // Load USB Block Device drivers
+        LOG("[USBMASS_BD]:\n");
+        sysLoadModuleBuffer(&usbmass_bd_irx, size_usbmass_bd_irx, 0, NULL);
+
+        iUSBModLoaded = 1;
+    }
 
     if (gEnableILK && !iLinkModLoaded) {
         // Load iLink Block Device drivers
@@ -117,12 +92,6 @@ void bdmLoadModules(void)
     LOG("[BDMFS_FATFS]:\n");
     sysLoadModuleBuffer(&bdmfs_fatfs_irx, size_bdmfs_fatfs_irx, 0, NULL);
 
-    // Load USB Block Device drivers
-    LOG("[USBD]:\n");
-    sysLoadModuleBuffer(&usbd_irx, size_usbd_irx, 0, NULL);
-    LOG("[USBMASS_BD]:\n");
-    sysLoadModuleBuffer(&usbmass_bd_irx, size_usbmass_bd_irx, 0, NULL);
-
     // Load Optional Block Device drivers
     ioPutRequest(IO_CUSTOM_SIMPLEACTION, &bdmLoadBlockDeviceModules);
 
@@ -133,7 +102,7 @@ void bdmLoadModules(void)
     LOG("BDMSUPPORT Modules loaded\n");
 }
 
-void bdmInit(item_list_t *itemList)
+static void bdmInit(item_list_t *itemList)
 {
     LOG("BDMSUPPORT Init\n");
 
@@ -144,6 +113,7 @@ void bdmInit(item_list_t *itemList)
     pDeviceData->bdmGameCount = 0;
     pDeviceData->bdmGames = NULL;
     configGetInt(configGetByType(CONFIG_OPL), "usb_frames_delay", &itemList->delay);
+    bdmLoadModules();
     itemList->enabled = 1;
 }
 
@@ -177,7 +147,7 @@ static int bdmNeedsUpdate(item_list_t *itemList)
         int deviceEnabled = 0;
         switch (pDeviceData->bdmDeviceType) {
             case BDM_TYPE_USB:
-                deviceEnabled = (gBDMStartMode != START_MODE_DISABLED);
+                deviceEnabled = gEnableUSB;
                 break;
             case BDM_TYPE_ILINK:
                 deviceEnabled = gEnableILK;
@@ -372,8 +342,8 @@ void bdmLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
                             LOG("BDMSUPPORT Cluster Chain OK\n");
                             have_error = 0;
                             bdm_vmc_infos.active = 1;
-                            bdm_vmc_infos.start_sector = (u32)startingLBA;
-                            LOG("BDMSUPPORT VMC slot %d start: 0x%X\n", vmc_id, (u32)startingLBA);
+                            bdm_vmc_infos.start_sector = startingLBA;
+                            LOG("BDMSUPPORT VMC slot %d start: 0x%08x%08x\n", vmc_id, ((u32 *)&startingLBA)[1], ((u32 *)&startingLBA)[0]);
                         } else {
                             LOG("BDMSUPPORT Cluster Chain NG\n");
                             have_error = 2;

@@ -67,6 +67,8 @@ struct EECoreConfig_t
 
     int EnableGSMOp;
     struct GsmConfig_t GsmConfig;
+
+    int MMCEIGRSettings;
 };
 
 #define USE_LOCAL_EECORE_CONFIG struct EECoreConfig_t *config = &g_ee_core_config;

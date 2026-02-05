@@ -11,7 +11,7 @@ unsigned int USBA_crc32(const char *string);
 int sysGetDiscID(char *discID);
 void sysInitDev9(void);
 void sysShutdownDev9(void);
-void sysReset(int modload_mask);
+void sysReset();
 void sysExecExit(void);
 void sysPowerOff(void);
 #ifdef __DECI2_DEBUG

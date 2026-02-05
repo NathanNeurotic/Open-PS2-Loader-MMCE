@@ -18,6 +18,7 @@
 #include "include/ioman.h"
 #include "include/ioprp.h"
 #include "include/bdmsupport.h"
+#include "include/mmcesupport.h"
 #include "include/OSDHistory.h"
 #include "include/renderman.h"
 #include "include/extern_irx.h"
@@ -178,7 +179,7 @@ void sysShutdownDev9(void)
     }
 }
 
-void sysReset(int modload_mask)
+void sysReset()
 {
 #ifdef PADEMU
     ds34usb_reset();
@@ -232,34 +233,22 @@ void sysReset(int modload_mask)
     sysLoadModuleBuffer(&iomanx_irx, size_iomanx_irx, 0, NULL);
     LOG("[FILEXIO]:\n");
     sysLoadModuleBuffer(&filexio_irx, size_filexio_irx, 0, NULL);
-
     LOG("[SIO2MAN]:\n");
     sysLoadModuleBuffer(&sio2man_irx, size_sio2man_irx, 0, NULL);
-
-    if (modload_mask & SYS_LOAD_MC_MODULES) {
-        LOG("[MCMAN]:\n");
-        sysLoadModuleBuffer(&mcman_irx, size_mcman_irx, 0, NULL);
-        LOG("[MCSERV]:\n");
-        sysLoadModuleBuffer(&mcserv_irx, size_mcserv_irx, 0, NULL);
-    }
-
+    LOG("[MCMAN]:\n");
+    sysLoadModuleBuffer(&mcman_irx, size_mcman_irx, 0, NULL);
+    LOG("[MCSERV]:\n");
+    sysLoadModuleBuffer(&mcserv_irx, size_mcserv_irx, 0, NULL);
     LOG("[PADMAN]:\n");
     sysLoadModuleBuffer(&padman_irx, size_padman_irx, 0, NULL);
-
     LOG("[POWEROFF]:\n");
     sysLoadModuleBuffer(&poweroff_irx, size_poweroff_irx, 0, NULL);
-
-    if (modload_mask & SYS_LOAD_USB_MODULES) {
-        bdmLoadModules();
-    }
-    if (modload_mask & SYS_LOAD_ISOFS_MODULE) {
-        LOG("[ISOFS]:\n");
-        sysLoadModuleBuffer(&isofs_irx, size_isofs_irx, 0, NULL);
-    }
-
+    LOG("[USBD]:\n");
+    sysLoadModuleBuffer(&usbd_irx, size_usbd_irx, 0, NULL);
+    LOG("[ISOFS]:\n");
+    sysLoadModuleBuffer(&isofs_irx, size_isofs_irx, 0, NULL);
     LOG("[GENVMC]:\n");
     sysLoadModuleBuffer(&genvmc_irx, size_genvmc_irx, 0, NULL);
-
     LOG("[LIBSD]:\n");
     sysLoadModuleBuffer(&libsd_irx, size_libsd_irx, 0, NULL);
     LOG("[AUDSRV]:\n");
@@ -271,15 +260,13 @@ void sysReset(int modload_mask)
     ds34usb_deinit();
     ds34bt_deinit();
 
-    if (modload_mask & SYS_LOAD_USB_MODULES) {
-        LOG("[DS34_USB]:\n");
-        sysLoadModuleBuffer(&ds34usb_irx, size_ds34usb_irx, 4, (char *)&ds3pads);
-        LOG("[DS34_BT]:\n");
-        sysLoadModuleBuffer(&ds34bt_irx, size_ds34bt_irx, 4, (char *)&ds3pads);
+    LOG("[DS34_USB]:\n");
+    sysLoadModuleBuffer(&ds34usb_irx, size_ds34usb_irx, 4, (char *)&ds3pads);
+    LOG("[DS34_BT]:\n");
+    sysLoadModuleBuffer(&ds34bt_irx, size_ds34bt_irx, 4, (char *)&ds3pads);
 
-        ds34usb_init();
-        ds34bt_init();
-    }
+    ds34usb_init();
+    ds34bt_init();
 #endif
 
     fileXioInit();
@@ -392,6 +379,7 @@ void sysExecExit(void)
 #define CORE_IRX_DECI2  0x40
 #define CORE_IRX_ILINK  0x80
 #define CORE_IRX_MX4SIO 0x100
+#define CORE_IRX_MMCE   0x200
 
 typedef struct
 {
@@ -477,8 +465,10 @@ static unsigned int sendIrxKernelRAM(const char *startup, const char *mode_str, 
         modules |= CORE_IRX_HDD;
     else if (!strcmp(mode_str, "ETH_MODE"))
         modules |= CORE_IRX_ETH | CORE_IRX_SMB;
-    else
+    else if (!strcmp(mode_str, "HDD_MODE"))
         modules |= CORE_IRX_HDD;
+    else if (!strcmp(mode_str, "MMCE_MODE"))
+        modules |= CORE_IRX_MMCE;
 
     irxtable = (irxtab_t *)ModuleStorage;
     irxptr_tab = (irxptr_t *)((unsigned char *)irxtable + sizeof(irxtab_t));
@@ -498,6 +488,12 @@ static unsigned int sendIrxKernelRAM(const char *startup, const char *mode_str, 
     irxptr_tab[modcount++].ptr = (void *)&imgdrv_irx;
     irxptr_tab[modcount].info = size_resetspu_irx | SET_OPL_MOD_ID(OPL_MODULE_ID_RESETSPU);
     irxptr_tab[modcount++].ptr = (void *)&resetspu_irx;
+
+    //Load MMCEIGR module (~1.4KB) on reset if bootcard switch is enabled for either slot
+    if (gMMCEIGRSlot != 0) {
+        irxptr_tab[modcount].info = size_mmceigr_irx | SET_OPL_MOD_ID(OPL_MODULE_ID_MMCEIGR);
+        irxptr_tab[modcount++].ptr = (void *)&mmceigr_irx;
+    }
 
 #ifdef PADEMU
 #define PADEMU_ARG || gEnablePadEmu
@@ -536,6 +532,11 @@ static unsigned int sendIrxKernelRAM(const char *startup, const char *mode_str, 
     if (modules & CORE_IRX_VMC) {
         irxptr_tab[modcount].info = size_mcemu_irx | SET_OPL_MOD_ID(OPL_MODULE_ID_MCEMU);
         irxptr_tab[modcount++].ptr = (void *)mcemu_irx;
+    }
+
+    if (modules & CORE_IRX_MMCE) {
+        irxptr_tab[modcount].info = size_mmcedrv_irx | SET_OPL_MOD_ID(OPL_MODULE_ID_MMCEDRV);
+        irxptr_tab[modcount++].ptr = (void *)mmcedrv_irx;
     }
 
 #ifdef PADEMU
@@ -899,6 +900,9 @@ void sysLaunchLoaderElf(const char *filename, const char *mode_str, int size_cdv
 
     strncpy(config->ExitPath, gExitPath, CORE_EXIT_PATH_MAX_LEN);
     strncpy(config->GameModeDesc, mode_str, CORE_GAME_MODE_DESC_MAX_LEN);
+
+    //MMCEIGR Settings
+    config->MMCEIGRSettings = gMMCEIGRSlot;
 
     config->EnableDebug = gEnableDebug;
     config->HDDSpindown = gHDDSpindown;

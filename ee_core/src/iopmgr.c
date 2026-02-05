@@ -145,6 +145,9 @@ static void ResetIopSpecial(const char *args, unsigned int arglen)
             break;
         case BDM_HDD_MODE:
             break;
+        case MMCE_MODE:
+            LoadOPLModule(OPL_MODULE_ID_MMCEDRV, 0, 0, NULL);
+            break;
     };
 }
 

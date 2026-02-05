@@ -17,6 +17,7 @@ extern void *usb_bd_png;
 extern void *ilk_bd_png;
 extern void *m4s_bd_png;
 extern void *hdd_bd_png;
+extern void *mmce_png;
 extern void *hdd_png;
 extern void *eth_png;
 extern void *app_png;
@@ -140,6 +141,7 @@ static texture_t internalDefault[TEXTURES_COUNT] = {
     {ILINK_ICON, "ilk_bd", &ilk_bd_png},
     {MX4SIO_ICON, "m4s_bd", &m4s_bd_png},
     {HDD_BD_ICON, "hdd_bd", &hdd_bd_png},
+    {MMCE_ICON, "mmce", &mmce_png},
     {HDD_ICON, "hdd", &hdd_png},
     {ETH_ICON, "eth", &eth_png},
     {APP_ICON, "app", &app_png},

@@ -29,6 +29,7 @@ enum MENU_IDs {
     MENU_NET_CONFIG,
     MENU_NET_UPDATE,
     MENU_START_NBD,
+    MENU_MMCE_SETTINGS,
     MENU_ABOUT,
     MENU_SAVE_CHANGES,
     MENU_EXIT,
@@ -221,6 +222,7 @@ static void menuInitMainMenu(void)
     submenuAppendItem(&mainMenu, -1, NULL, MENU_NET_CONFIG, _STR_NETCONFIG);
     submenuAppendItem(&mainMenu, -1, NULL, MENU_NET_UPDATE, _STR_NET_UPDATE);
     submenuAppendItem(&mainMenu, -1, NULL, MENU_START_NBD, _STR_STARTNBD);
+    submenuAppendItem(&mainMenu, -1, NULL, MENU_MMCE_SETTINGS, _STR_MMCE_SETTINGS);
     submenuAppendItem(&mainMenu, -1, NULL, MENU_ABOUT, _STR_ABOUT);
     submenuAppendItem(&mainMenu, -1, NULL, MENU_SAVE_CHANGES, _STR_SAVE_CHANGES);
     submenuAppendItem(&mainMenu, -1, NULL, MENU_EXIT, _STR_EXIT);
@@ -892,6 +894,9 @@ void menuHandleInputMenu()
         } else if (id == MENU_START_NBD) {
             if (menuCheckParentalLock() == 0)
                 handleLwnbdSrv();
+        } else if (id == MENU_MMCE_SETTINGS) {
+            if (menuCheckParentalLock() == 0)
+                guiShowMMCEConfig();
         } else if (id == MENU_ABOUT) {
             guiShowAbout();
         } else if (id == MENU_SAVE_CHANGES) {
@@ -918,7 +923,7 @@ void menuHandleInputMenu()
 
     if (getKeyOn(KEY_START) || getKeyOn(gSelectButton == KEY_CIRCLE ? KEY_CROSS : KEY_CIRCLE)) {
         // Check if there is anything to show the user, at all.
-        if (gAPPStartMode || gETHStartMode || gBDMStartMode || gHDDStartMode) {
+        if (gAPPStartMode || gETHStartMode || gBDMStartMode || gHDDStartMode || gMMCEStartMode) {
             guiSwitchScreen(GUI_SCREEN_MAIN);
             refreshMenuPosition();
         }

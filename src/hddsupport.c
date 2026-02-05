@@ -197,6 +197,8 @@ void hddLoadModules(void)
             LOG("[XHDD]:\n");
             sysLoadModuleBuffer(&xhdd_irx, size_xhdd_irx, 6, "-hdpro");
         } else {
+            LOG("[BDM]:\n");
+            sysLoadModuleBuffer(&bdm_irx, size_bdm_irx, 0, NULL);
             LOG("[ATAD]:\n");
             ret = sysLoadModuleBuffer(&ps2atad_irx, size_ps2atad_irx, 0, NULL);
             LOG("[XHDD]:\n");

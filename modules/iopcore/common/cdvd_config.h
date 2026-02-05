@@ -88,6 +88,16 @@ struct cdvdman_settings_bdm
     bd_fragment_t frags[BDM_MAX_FRAGS];
 } __attribute__((packed));
 
+struct cdvdman_settings_mmce
+{
+    struct cdvdman_settings_common common;
+    int port;
+    int iso_fd;
+    //vmc_id is in mcemu struct
+    int ack_wait_cycles;
+    int use_alarms;
+} __attribute__((packed));
+
 #define CDVDMAN_SETTINGS_DEFAULT_COMMON                    \
     {                                                      \
         0x68, 0x68, 0x1234, 0x39393939, "DSKID", 16, 8, 16 \

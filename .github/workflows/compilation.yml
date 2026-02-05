@@ -10,7 +10,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    container: ghcr.io/ps2homebrew/ps2homebrew:main
+    container: ps2max/dev:v20250725-2
     steps:
     - name: git checkout
       uses: actions/checkout@v4
@@ -51,7 +51,7 @@ jobs:
         extra: [EXTRA_FEATURES=0, EXTRA_FEATURES=1]
         pademu: [PADEMU=0, PADEMU=1]
     runs-on: ubuntu-latest
-    container: ghcr.io/ps2homebrew/ps2homebrew:main
+    container: ps2max/dev:v20250725-2
     steps:
     - name: git checkout
       uses: actions/checkout@v4
@@ -91,7 +91,7 @@ jobs:
 
   build-lang:
     runs-on: ubuntu-latest
-    container: ghcr.io/ps2homebrew/ps2homebrew:main
+    container: ps2max/dev:v20250725-2
     steps:
     - name: git checkout
       uses: actions/checkout@v4
@@ -120,9 +120,9 @@ jobs:
       matrix:
         debug: [iopcore_debug, ingame_debug, eesio_debug, iopcore_ppctty_debug, ingame_ppctty_debug, DTL_T10000=1]
         # container_commit: [":main", "@sha256:1f00689809455d43b520e4cd4eea00c6be56d71819ae38efc6b55b56464cbd1e"] Replace with desired docker image hash or tag
-        container_commit: [":main"]
+        container_commit: [":v20250725-2"]
     runs-on: ubuntu-latest
-    container: ghcr.io/ps2homebrew/ps2homebrew${{ matrix.container_commit }}
+    container: ps2max/dev${{ matrix.container_commit }}
     steps:
     - name: git checkout
       uses: actions/checkout@v4
@@ -192,6 +192,7 @@ jobs:
         cp -f OPNPS2LD-${{ env.OPL_VERSION }}.7z OPNPS2LD.7z
         cp -f OPNPS2LD-VARIANTS-${{ env.OPL_VERSION }}.7z OPNPS2LD-VARIANTS.7z
         cp -f OPNPS2LD-LANGS-${{ env.OPL_VERSION }}.7z OPNPS2LD-LANGS.7z
+        cp -f OPNPS2LD/OPNPS2LD-${{ env.OPL_VERSION }}.ELF OPNPS2LD.ELF
 
     - name: Create prerelease
       if: github.ref == 'refs/heads/master'
@@ -208,6 +209,7 @@ jobs:
           OPNPS2LD.7z
           OPNPS2LD-VARIANTS.7z
           OPNPS2LD-LANGS.7z
+          OPNPS2LD.ELF
 
     - name: Create release
       if: startsWith(github.ref, 'refs/tags/v')
@@ -223,6 +225,7 @@ jobs:
           OPNPS2LD.7z
           OPNPS2LD-VARIANTS.7z
           OPNPS2LD-LANGS.7z
+          OPNPS2LD.ELF
 
     - name: Upload pre-release to Mega
       if: github.ref == 'refs/heads/master' && env.USERNAME != null

@@ -441,6 +441,7 @@ static void guiShowBlockDeviceConfig(void)
 {
     int ret;
 
+    diaSetInt(diaBlockDevicesConfig, CFG_ENABLEUSB, gEnableUSB);
     diaSetInt(diaBlockDevicesConfig, CFG_ENABLEILK, gEnableILK);
     diaSetInt(diaBlockDevicesConfig, CFG_ENABLEMX4SIO, gEnableMX4SIO);
     diaSetEnabled(diaBlockDevicesConfig, CFG_ENABLEBDMHDD, !gHDDStartMode);
@@ -448,6 +449,7 @@ static void guiShowBlockDeviceConfig(void)
 
     ret = diaExecuteDialog(diaBlockDevicesConfig, -1, 1, NULL);
     if (ret) {
+        diaGetInt(diaBlockDevicesConfig, CFG_ENABLEUSB, &gEnableUSB);
         diaGetInt(diaBlockDevicesConfig, CFG_ENABLEILK, &gEnableILK);
         diaGetInt(diaBlockDevicesConfig, CFG_ENABLEMX4SIO, &gEnableMX4SIO);
         diaGetInt(diaBlockDevicesConfig, CFG_ENABLEBDMHDD, &gEnableBdmHDD);
@@ -478,8 +480,10 @@ int guiDeviceTypeToIoMode(int deviceType)
         return ETH_MODE;
     else if (deviceType == 2)
         return HDD_MODE;
-    else
+    else if (deviceType == 3)
         return APP_MODE;
+    else
+        return MMCE_MODE;
 }
 
 int guiIoModeToDeviceType(int ioMode)
@@ -497,6 +501,8 @@ int guiIoModeToDeviceType(int ioMode)
             return 2;
         case APP_MODE:
             return 3;
+        case MMCE_MODE:
+            return 4;
         default:
             return 0;
     }
@@ -505,7 +511,7 @@ int guiIoModeToDeviceType(int ioMode)
 void guiShowConfig()
 {
     // configure the enumerations
-    const char *deviceNames[] = {_l(_STR_BDM_GAMES), _l(_STR_NET_GAMES), _l(_STR_HDD_GAMES), _l(_STR_APPS), NULL};
+    const char *deviceNames[] = {_l(_STR_BDM_GAMES), _l(_STR_NET_GAMES), _l(_STR_HDD_GAMES), _l(_STR_APPS), _l(_STR_MMCE), NULL};
     const char *deviceModes[] = {_l(_STR_OFF), _l(_STR_MANUAL), _l(_STR_AUTO), NULL};
 
     diaSetEnum(diaConfig, CFG_DEFDEVICE, deviceNames);
@@ -843,6 +849,55 @@ void guiShowNetConfig(void)
     }
 }
 
+void guiShowMMCEConfig()
+{
+    int ret;
+    const char *deviceModes[] = {_l(_STR_OFF), _l(_STR_MANUAL), _l(_STR_AUTO), NULL};
+    const char *deviceSlots[] = {"0", "1", _l(_STR_AUTO), NULL};
+    const char *deviceAckWaitCycles[] = {"0", "1", "2", "3", "4", "5", NULL};
+    const char *deviceOnOff[] = {"OFF", "ON", NULL};
+    const char *deviceIGRSlots[] = {"NONE", "0", "1", "BOTH", NULL};
+
+    diaSetEnum(diaMMCEConfig, CFG_MMCEMODE, deviceModes);
+    diaSetInt(diaMMCEConfig, CFG_MMCEMODE, gMMCEStartMode);
+
+    diaSetEnum(diaMMCEConfig, CFG_MMCESLOT, deviceSlots);
+    diaSetInt(diaMMCEConfig, CFG_MMCESLOT, gMMCESlot);
+
+    diaSetEnum(diaMMCEConfig, CFG_MMCEIGRSLOT, deviceIGRSlots);
+    diaSetInt(diaMMCEConfig, CFG_MMCEIGRSLOT, gMMCEIGRSlot);
+
+    diaSetEnum(diaMMCEConfig, CFG_MMCE_WAIT_CYCLES, deviceAckWaitCycles);
+    diaSetInt(diaMMCEConfig, CFG_MMCE_WAIT_CYCLES, gMMCEAckWaitCycles);
+
+    diaSetEnum(diaMMCEConfig, CFG_MMCE_USE_ALARMS, deviceOnOff);
+    diaSetInt(diaMMCEConfig, CFG_MMCE_USE_ALARMS, gMMCEUseAlarms);
+
+    diaSetString(diaMMCEConfig, CFG_MMCEPREFIX, gMMCEPrefix);
+
+#ifdef __DEBUG
+    diaSetInt(diaMMCEConfig, CFG_MMCEGAMEID, gMMCEEnableGameID);
+#endif
+
+    ret = diaExecuteDialog(diaMMCEConfig, -1, 1, NULL);
+    if (ret) {
+        diaGetInt(diaMMCEConfig, CFG_MMCEMODE, &gMMCEStartMode);
+        diaGetInt(diaMMCEConfig, CFG_MMCESLOT, &gMMCESlot);
+#ifdef __DEBUG
+        diaGetInt(diaMMCEConfig, CFG_MMCEGAMEID, &gMMCEEnableGameID);
+#endif
+        diaGetInt(diaMMCEConfig, CFG_MMCEIGRSLOT, &gMMCEIGRSlot);
+
+        diaGetInt(diaMMCEConfig, CFG_MMCE_WAIT_CYCLES, &gMMCEAckWaitCycles);
+        diaGetInt(diaMMCEConfig, CFG_MMCE_USE_ALARMS, &gMMCEUseAlarms);
+
+        diaGetString(diaMMCEConfig, CFG_MMCEPREFIX, gMMCEPrefix, sizeof(gMMCEPrefix));
+    }
+
+    applyConfig(-1, -1, 0);
+    menuReinitMainMenu();
+}
+
 void guiShowParentalLockConfig(void)
 {
     int result;
@@ -1006,14 +1061,15 @@ static void guiHandleOp(struct gui_update_t *item)
             break;
 
         case GUI_OP_APPEND_MENU:
-            result = submenuAppendItem(item->menu.subMenu, item->submenu.icon_id,
-                                       item->submenu.text, item->submenu.id, item->submenu.text_id);
-
+            result = submenuAppendItem(item->menu.subMenu, item->submenu.icon_id, item->submenu.text, item->submenu.id, item->submenu.text_id);
             if (!item->menu.menu->submenu) { // first subitem in list
                 item->menu.menu->submenu = result;
-                item->menu.menu->current = result;
-                item->menu.menu->pagestart = result;
-            } else if (item->submenu.selected) { // remember last played game feature
+                if (!item->submenu.selected) {
+                    item->menu.menu->current = result;
+                    item->menu.menu->pagestart = result;
+                }
+            }
+            if (item->submenu.selected) { // remember last played game feature
                 item->menu.menu->current = result;
                 item->menu.menu->pagestart = result;
                 item->menu.menu->remindLast = 1;

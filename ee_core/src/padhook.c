@@ -231,6 +231,19 @@ static void IGR_Thread(void *arg)
         // Reset SPU - do it after the IOP reboot, so nothing will compete with the EE for it.
         LoadOPLModule(OPL_MODULE_ID_RESETSPU, 0, 0, NULL);
 
+        if (config->MMCEIGRSettings != 0) {
+            // Trigger switch to bootcard on MMCE's
+            char *slots = "00";
+            if ((config->MMCEIGRSettings & 1))
+                slots[0] = '1';
+            
+            if ((config->MMCEIGRSettings & 2))
+                slots[1] = '1';
+
+            LoadOPLModule(OPL_MODULE_ID_MMCEIGR, 0, 2, slots);
+        }
+
+
 #ifdef IGS
         if ((Pad_Data.combo_type == IGR_COMBO_UP) && (config->EnableGSMOp))
             InGameScreenshot();

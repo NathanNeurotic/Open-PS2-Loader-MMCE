@@ -218,6 +218,10 @@ DECLARE_EXPORT_TABLE(oplutils, 1, 2)
 	DECLARE_EXPORT(bdm_readSector)
 	DECLARE_EXPORT(bdm_writeSector)
 #endif
+#ifdef MMCE_DRIVER
+	DECLARE_EXPORT(mmce_read_offset)
+	DECLARE_EXPORT(mmce_write_offset)
+#endif
 #ifdef HDD_DRIVER
 	DECLARE_EXPORT(sceAtaDmaTransfer)
 #endif

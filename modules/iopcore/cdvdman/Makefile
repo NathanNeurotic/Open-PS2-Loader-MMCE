@@ -51,6 +51,16 @@ IOP_CFLAGS += -DDEV9_DEBUG
 endif
 endif
 
+ifeq ($(USE_MMCE),1)
+IOP_BIN  = mmce_cdvdman.irx
+IOP_OBJS_DIR = obj.mmce/
+IOP_OBJS += device-mmce.o
+IOP_CFLAGS += -DMMCE_DRIVER
+ifeq ($(IOPCORE_DEBUG),1)
+USE_DEV9 = 1
+endif
+endif
+
 IOP_INCS += -I../common
 
 ifeq ($(IOPCORE_DEBUG),1)
