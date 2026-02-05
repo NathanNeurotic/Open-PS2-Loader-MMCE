@@ -37,6 +37,9 @@ struct io_handler_t
 static struct io_request_t *gReqList;
 static struct io_request_t *gReqEnd;
 
+// Total number of queued requests (bounded by MAX_IO_REQUESTS).
+static int gReqCount;
+
 static struct io_handler_t gRequestHandlers[MAX_IO_HANDLERS];
 
 static int gHandlerCount;
@@ -136,9 +139,12 @@ static void ioWorkerThread(void *arg)
             // can't be sure if the request was
             gReqList = req->next;
             free(req);
+            if (gReqCount > 0)
+                gReqCount--;
 
             if (!gReqList)
                 gReqEnd = NULL;
+    gReqCount = 0;
 
             SignalSema(gEndSemaId);
         }
@@ -150,6 +156,8 @@ static void ioWorkerThread(void *arg)
         struct io_request_t *req = gReqList;
         gReqList = gReqList->next;
         free(req);
+        if (gReqCount > 0)
+            gReqCount--;
     }
 
     // delete the semaphores
@@ -175,6 +183,7 @@ void ioInit(void)
     gHandlerCount = 0;
     gReqList = NULL;
     gReqEnd = NULL;
+    gReqCount = 0;
 
     gIOThreadId = 0;
 
@@ -212,6 +221,11 @@ int ioPutRequest(int type, void *data)
 
     WaitSema(gEndSemaId);
 
+    if (gReqCount >= MAX_IO_REQUESTS) {
+        SignalSema(gEndSemaId);
+        return IO_ERR_TOO_MANY_REQUESTS;
+    }
+
     // We don't have to lock the tip of the queue...
     // If it exists, it won't be touched, if it does not exist, it is not being processed
     struct io_request_t *req = gReqEnd;
@@ -229,6 +243,7 @@ int ioPutRequest(int type, void *data)
     req->next = NULL;
     req->type = type;
     req->data = data;
+    gReqCount++;
 
     SignalSema(gEndSemaId);
 
@@ -262,6 +277,8 @@ int ioRemoveRequests(int type)
 
             count++;
             free(req);
+            if (gReqCount > 0)
+                gReqCount--;
 
             req = next;
         } else {

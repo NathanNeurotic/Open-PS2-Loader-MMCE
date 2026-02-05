@@ -22,18 +22,26 @@ static void cacheLoadImage(void *data)
     load_image_request_t *req = data;
 
     // Safeguards...
-    if (!req || !req->entry || !req->cache)
+    if (!req || !req->entry || !req->cache) {
+        if (req)
+            free(req);
         return;
+    }
 
     item_list_t *handler = req->list;
-    if (!handler)
+    if (!handler) {
+        free(req);
         return;
+    }
 
-    // the cache entry was already reused!
-    if (req->cacheUID != req->entry->UID)
+    // The cache entry was already reused or the cache entry was cleared while this request was pending.
+    // In either case, do not touch the entry and just drop the request.
+    if (req->cacheUID != req->entry->UID) {
+        free(req);
         return;
+    }
 
-    // seems okay. we can proceed
+    // Seems okay. We can proceed.
     GSTEXTURE *texture = &req->entry->texture;
     texFree(texture);
 
@@ -46,6 +54,7 @@ static void cacheLoadImage(void *data)
 
     free(req);
 }
+
 
 void cacheInit()
 {
@@ -168,7 +177,15 @@ GSTEXTURE *cacheGetTexture(image_cache_t *cache, item_list_t *list, int *cacheId
 
         *UID = cache->nextUID++;
 
-        ioPutRequest(IO_CACHE_LOAD_ART, req);
+        if (ioPutRequest(IO_CACHE_LOAD_ART, req) != IO_OK) {
+            // Queue is full or IO is blocked. Drop request and free the cache slot.
+            oldestEntry->qr = NULL;
+            oldestEntry->lastUsed = -1;
+            oldestEntry->UID = 0;
+            texFree(&oldestEntry->texture);
+            free(req);
+            *cacheId = -1;
+        }
     }
 
     return NULL;
