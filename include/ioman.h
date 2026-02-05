@@ -10,6 +10,7 @@
 #define IO_ERR_DUPLICIT_HANDLER     -3
 #define IO_ERR_INVALID_HANDLER      -4
 #define IO_ERR_IO_BLOCKED           -5
+#define IO_ERR_TOO_MANY_REQUESTS    -6
 
 typedef void (*io_request_handler_t)(void *request);
 
