@@ -105,7 +105,7 @@ GFX_OBJS = $(PNG_ASSETS:%=%_png.o) poeveticanew.o icon_sys.o icon_icn.o
 
 AUDIO_OBJS =	boot.o cancel.o confirm.o cursor.o message.o transition.o bd_connect.o bd_disconnect.o
 
-MISC_OBJS =	icon_sys_A.o icon_sys_J.o icon_sys_C.o conf_theme_OPL.o
+MISC_OBJS =	icon_sys_A.o icon_sys_J.o icon_sys_C.o conf_theme_OPL.o obj/eesio_stub.o
 
 TRANSLATIONS = Albanian Arabic Bulgarian Cebuano Croatian Czech Danish Dutch Filipino French \
 	German Greek Hungarian Indonesian Italian Japanese Korean Laotian Persian Polish Portuguese \
@@ -135,14 +135,6 @@ BIN2C = $(PS2SDK)/bin/bin2c
 
 ifeq ($(RTL),1)
   EE_CFLAGS += -D__RTL
-
-# Optional SIOCookie support
-SIOCOOKIE_PATH := $(shell $(CC) -print-file-name=libsiocookie.a)
-ifneq ($(wildcard $(SIOCOOKIE_PATH)),)
-EE_CFLAGS += -DHAVE_SIOCOOKIE
-EE_LIBS += -lsiocookie
-endif
-
 endif
 
 ifeq ($(DTL_T10000),1)
