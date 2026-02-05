@@ -1,17 +1,16 @@
+#include <stdint.h>
+
 /*
- * EESIO / SIOCookie optional support stub
+ * EESIO debug builds in this tree call ee_sio_start() from src/opl.c when
+ * __EESIO_DEBUG is enabled, but the implementation is not present in this repo.
  *
- * Some build environments (including CI) may enable __EESIO_DEBUG without
- * providing an external libsiocookie that implements ee_sio_start().
- *
- * Provide a weak no-op implementation so the project links cleanly.
- * If a real implementation is linked in, it will override this one.
+ * Provide a weak no-op implementation so link succeeds. If a real implementation
+ * is later added (or linked from a library), it will override this symbol.
  */
-
-#include "SIOCookie.h"
-
 __attribute__((weak))
-int ee_sio_start(void)
+int ee_sio_start(const uint8_t *data, int size)
 {
+    (void)data;
+    (void)size;
     return 0;
 }
