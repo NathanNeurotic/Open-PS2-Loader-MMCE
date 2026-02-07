@@ -308,7 +308,7 @@ static void findDuplicate(theme_element_t *first, const char *cachePattern, cons
 {
     theme_element_t *elem = first;
     while (elem) {
-        if ((elem->type == ELEM_TYPE_STATIC_IMAGE) || (elem->type == ELEM_TYPE_ATTRIBUTE_IMAGE) || (elem->type == ELEM_TYPE_GAME_IMAGE || type == ELEM_TYPE_COVERFLOW) || (elem->type == ELEM_TYPE_BACKGROUND)) {
+        if ((elem->type == ELEM_TYPE_STATIC_IMAGE) || (elem->type == ELEM_TYPE_ATTRIBUTE_IMAGE) || ((elem->type == ELEM_TYPE_GAME_IMAGE) || (elem->type == ELEM_TYPE_COVERFLOW)) || (elem->type == ELEM_TYPE_BACKGROUND)) {
             mutable_image_t *source = (mutable_image_t *)elem->extended;
 
             if (cachePattern && source->cache && !strcmp(cachePattern, source->cache->suffix)) {
@@ -630,6 +630,9 @@ static void drawCoverFlow(struct menu_list *menu, struct submenu_list *item, con
         {item->prev, NULL, NULL},
         {item, NULL, NULL},
         {item->next, NULL, NULL}};
+
+        }
+    }
 
     int scaling = 30;
     for (int i = 0; i < COVERFLOW_COUNT; i++) {
