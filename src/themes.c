@@ -631,9 +631,6 @@ static void drawCoverFlow(struct menu_list *menu, struct submenu_list *item, con
         {item, NULL, NULL},
         {item->next, NULL, NULL}};
 
-        }
-    }
-
     int scaling = 30;
     for (int i = 0; i < COVERFLOW_COUNT; i++) {
         int renderPosX = posX;
