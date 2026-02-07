@@ -138,6 +138,7 @@ extern int gAutosort;
 extern int gAutoRefresh;
 extern int gEnableNotifications;
 extern int gEnableArt;
+extern int gEnableCoverflow;
 extern int gWideScreen;
 extern int gVMode; // 0 - Auto, 1 - PAL, 2 - NTSC
 extern int gXOff;

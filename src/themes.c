@@ -13,6 +13,7 @@
 #define MENU_POS_V     50
 #define HINT_HEIGHT    32
 #define DECORATOR_SIZE 20
+#define COVERFLOW_COUNT 3
 
 extern const char conf_theme_OPL_cfg;
 extern u16 size_conf_theme_OPL_cfg;
@@ -48,6 +49,7 @@ enum ELEM_ATTRIBUTE_TYPE {
     ELEM_TYPE_LOADING_ICON,
     ELEM_TYPE_BDM_INDEX,
     ELEM_TYPE_GAME_COUNT_TEXT,
+    ELEM_TYPE_COVERFLOW,
     ELEM_TYPE_COUNT
 };
 
@@ -306,7 +308,7 @@ static void findDuplicate(theme_element_t *first, const char *cachePattern, cons
 {
     theme_element_t *elem = first;
     while (elem) {
-        if ((elem->type == ELEM_TYPE_STATIC_IMAGE) || (elem->type == ELEM_TYPE_ATTRIBUTE_IMAGE) || (elem->type == ELEM_TYPE_GAME_IMAGE) || (elem->type == ELEM_TYPE_BACKGROUND)) {
+        if ((elem->type == ELEM_TYPE_STATIC_IMAGE) || (elem->type == ELEM_TYPE_ATTRIBUTE_IMAGE) || (elem->type == ELEM_TYPE_GAME_IMAGE || type == ELEM_TYPE_COVERFLOW) || (elem->type == ELEM_TYPE_BACKGROUND)) {
             mutable_image_t *source = (mutable_image_t *)elem->extended;
 
             if (cachePattern && source->cache && !strcmp(cachePattern, source->cache->suffix)) {
@@ -594,6 +596,102 @@ static void initGameImage(const char *themePath, config_set_t *themeConfig, them
         LOG("THEMES GameImage %s: NO pattern, elem disabled !!\n", name);
 }
 
+static void drawCoverFlow(struct menu_list *menu, struct submenu_list *item, config_set_t *config, struct theme_element *elem)
+{
+    if (item == NULL)
+        return;
+
+    int coverSpacing = 0;
+    int coverHeight = elem->height;
+    int coverWidth = gWideScreen ? rmWideScale(elem->width) : elem->width;
+    int totalCoversWidth = COVERFLOW_COUNT * coverWidth;
+    int totalRemainingSpace = screenWidth - totalCoversWidth;
+
+    if (totalRemainingSpace >= 0) {
+        coverSpacing = totalRemainingSpace / 4; // Divide by 4 to distribute the space equally (2 spaces between covers + 2 on the sides)
+        // If coverSpacing ends up negative set it to a minimum value
+        if (coverSpacing < 0)
+            coverSpacing = 0;
+    }
+
+    if (gWideScreen)
+        coverSpacing = rmWideScale(coverSpacing);
+
+    int coverDistance = coverWidth + coverSpacing;
+    int posX = (coverSpacing << 1) + (coverWidth >> 1);
+
+
+    struct
+    {
+        submenu_list_t *game;
+        mutable_image_t *cover;
+        GSTEXTURE *texture;
+    } covers[COVERFLOW_COUNT] = {
+        {item->prev, NULL, NULL},
+        {item, NULL, NULL},
+        {item->next, NULL, NULL}};
+
+        }
+    }
+
+    int scaling = 30;
+    for (int i = 0; i < COVERFLOW_COUNT; i++) {
+        int renderPosX = posX;
+        posX += coverDistance;
+
+        if (covers[i].game == NULL)
+            continue;
+
+        int currentCoverWidth = coverWidth;
+        int currentCoverHeight = coverHeight;
+        int overlayOffsetY = 0;
+        int overlayOffsetX = 0;
+
+        if (i == 1) {
+            currentCoverWidth += scaling;
+            currentCoverHeight += scaling;
+            overlayOffsetY = scaling;
+            overlayOffsetX = scaling * (gWideScreen ? (4.0f / 3.0f) : 1.0f) - (scaling * ((4.0f / 3.0f) - 1.0f) / 2.0f);
+        }
+
+        covers[i].cover = (mutable_image_t *)elem->extended;
+        covers[i].texture = getGameImageTexture(covers[i].cover->cache, menu->item->userdata, &covers[i].game->item);
+        if (!covers[i].texture || !covers[i].texture->Mem)
+            covers[i].texture = (covers[i].cover->defaultTexture) ? &covers[i].cover->defaultTexture->source : thmGetTexture(COVER_DEFAULT);
+
+        if (covers[i].cover->overlayTexture) {
+            if (elem->reflection)
+                rmDrawOverlayPixmapWithReflection(&covers[i].cover->overlayTexture->source, renderPosX, elem->posY, ALIGN_CENTER, currentCoverWidth, currentCoverHeight, SCALING_NONE, gDefaultCol,
+                                                  covers[i].texture, covers[i].cover->overlayTexture->upperLeft_x, covers[i].cover->overlayTexture->upperLeft_y, covers[i].cover->overlayTexture->upperRight_x + overlayOffsetX,
+                                                  covers[i].cover->overlayTexture->upperRight_y, covers[i].cover->overlayTexture->lowerLeft_x, covers[i].cover->overlayTexture->lowerLeft_y + overlayOffsetY,
+                                                  covers[i].cover->overlayTexture->lowerRight_x + overlayOffsetX, covers[i].cover->overlayTexture->lowerRight_y + overlayOffsetY);
+            else
+                rmDrawOverlayPixmap(&covers[i].cover->overlayTexture->source, renderPosX, elem->posY, ALIGN_CENTER, currentCoverWidth, currentCoverHeight, SCALING_NONE, gDefaultCol,
+                                    covers[i].texture, covers[i].cover->overlayTexture->upperLeft_x, covers[i].cover->overlayTexture->upperLeft_y, covers[i].cover->overlayTexture->upperRight_x + overlayOffsetX,
+                                    covers[i].cover->overlayTexture->upperRight_y, covers[i].cover->overlayTexture->lowerLeft_x, covers[i].cover->overlayTexture->lowerLeft_y + overlayOffsetY,
+                                    covers[i].cover->overlayTexture->lowerRight_x + overlayOffsetX, covers[i].cover->overlayTexture->lowerRight_y + overlayOffsetY);
+        } else {
+            if (elem->reflection)
+                rmDrawPixmapWithReflection(covers[i].texture, renderPosX, elem->posY, ALIGN_CENTER, currentCoverWidth, currentCoverHeight, SCALING_NONE, gDefaultCol);
+            else
+                rmDrawPixmap(covers[i].texture, renderPosX, elem->posY, ALIGN_CENTER, currentCoverWidth, currentCoverHeight, SCALING_NONE, gDefaultCol);
+        }
+    }
+}
+
+static void initCoverflow(const char *themePath, config_set_t *themeConfig, theme_t *theme, theme_element_t *elem, const char *name, int count, const char *texture, const char *overlay)
+{
+    mutable_image_t *mutableImage = initMutableImage(themePath, themeConfig, theme, name, ELEM_TYPE_COVERFLOW, "COV", count, texture, overlay);
+    elem->extended = mutableImage;
+    elem->endElem = &endMutableImage;
+
+    if (mutableImage->cache)
+        elem->drawElem = &drawCoverFlow;
+    else
+        LOG("THEMES GameImage %s: NO pattern, elem disabled !!\n", name);
+}
+
+
 // AttributeImage ///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 static void drawAttributeImage(struct menu_list *menu, struct submenu_list *item, config_set_t *config, struct theme_element *elem)
@@ -741,6 +839,9 @@ static theme_element_t *initBasic(const char *themePath, config_set_t *themeConf
         elem->color = color;
 
     elem->font = font;
+    elem->reflection = 0;
+    elem->wsX = 0;
+    elem->skip = 0;
     snprintf(elemProp, sizeof(elemProp), "%s_font", name);
     if (configGetInt(themeConfig, elemProp, &intValue)) {
         if (intValue > 0 && intValue < THM_MAX_FONTS)
@@ -875,6 +976,14 @@ static void drawItemsList(struct menu_list *menu, struct submenu_list *item, con
     }
 }
 
+static void drawItemsListHidden(struct menu_list *menu, struct submenu_list *item, config_set_t *config, struct theme_element *elem)
+{
+    (void)menu;
+    (void)item;
+    (void)config;
+    (void)elem;
+}
+
 static void initItemsList(const char *themePath, config_set_t *themeConfig, theme_t *theme, theme_element_t *elem, const char *name, const char *decorator)
 {
     char elemProp[64];
@@ -986,6 +1095,28 @@ static void validateItemsList(const char *themePath, config_set_t *themeConfig, 
                 decoratorElem = decoratorElem->next;
             }
             itemsList->decorator = NULL;
+
+        if (gEnableCoverflow) {
+            // Hide the classic list renderer; keep the list logic for navigation/selection.
+            list->drawElem = &drawItemsListHidden;
+            if (mainElems == &theme->mainElems) {
+                if (theme->gamesCoverflow == NULL) {
+                    theme_element_t *cf = initBasic(themePath, themeConfig, theme, "cf", ELEM_TYPE_COVERFLOW, screenWidth >> 1, MENU_POS_V, ALIGN_CENTER, 96, 128, SCALING_NONE, gDefaultCol, theme->fonts[0]);
+                    initCoverflow(themePath, themeConfig, theme, cf, "cf", 5, NULL, NULL);
+                    cf->next = mainElems->first->next;
+                    mainElems->first->next = cf;
+                    theme->gamesCoverflow = cf;
+                }
+            } else if (mainElems == &theme->appsMainElems) {
+                if (theme->appsCoverflow == NULL) {
+                    theme_element_t *cf = initBasic(themePath, themeConfig, theme, "cf", ELEM_TYPE_COVERFLOW, screenWidth >> 1, MENU_POS_V, ALIGN_CENTER, 96, 128, SCALING_NONE, gDefaultCol, theme->fonts[0]);
+                    initCoverflow(themePath, themeConfig, theme, cf, "cf", 5, NULL, NULL);
+                    cf->next = mainElems->first->next;
+                    mainElems->first->next = cf;
+                    theme->appsCoverflow = cf;
+                }
+            }
+        }
         }
     } else {
         LOG("THEMES No itemsList found, adding a default one\n");
@@ -993,6 +1124,18 @@ static void validateItemsList(const char *themePath, config_set_t *themeConfig, 
         initItemsList(themePath, themeConfig, theme, list, "il", NULL);
         list->next = mainElems->first->next; // Position the itemsList as second element (right after the Background)
         mainElems->first->next = list;
+
+        if (gEnableCoverflow) {
+            list->drawElem = &drawItemsListHidden;
+            theme_element_t *cf = initBasic(themePath, themeConfig, theme, "cf", ELEM_TYPE_COVERFLOW, screenWidth >> 1, MENU_POS_V, ALIGN_CENTER, 96, 128, SCALING_NONE, gDefaultCol, theme->fonts[0]);
+            initCoverflow(themePath, themeConfig, theme, cf, "cf", 5, NULL, NULL);
+            cf->next = mainElems->first->next;
+            mainElems->first->next = cf;
+            if (mainElems == &theme->mainElems)
+                theme->gamesCoverflow = cf;
+            else if (mainElems == &theme->appsMainElems)
+                theme->appsCoverflow = cf;
+        }
     }
 }
 
@@ -1032,6 +1175,9 @@ static int addGUIElem(const char *themePath, config_set_t *themeConfig, theme_t 
             } else if (!strcmp(elementsType[ELEM_TYPE_ATTRIBUTE_IMAGE], type)) {
                 elem = initBasic(themePath, themeConfig, theme, name, ELEM_TYPE_ATTRIBUTE_IMAGE, 0, 0, ALIGN_CENTER, DIM_UNDEF, DIM_UNDEF, SCALING_RATIO, gDefaultCol, theme->fonts[0]);
                 initAttributeImage(themePath, themeConfig, theme, elem, name);
+            } else if (!strcmp(elementsType[ELEM_TYPE_COVERFLOW], type)) {
+                elem = initBasic(themePath, themeConfig, theme, name, ELEM_TYPE_COVERFLOW, 0, 0, ALIGN_CENTER, DIM_UNDEF, DIM_UNDEF, SCALING_RATIO, gDefaultCol, theme->fonts[0]);
+                initCoverflow(themePath, themeConfig, theme, elem, name, 5, NULL, NULL);
             } else if (!strcmp(elementsType[ELEM_TYPE_GAME_IMAGE], type)) {
                 elem = initBasic(themePath, themeConfig, theme, name, ELEM_TYPE_GAME_IMAGE, 0, 0, ALIGN_CENTER, DIM_UNDEF, DIM_UNDEF, SCALING_RATIO, gDefaultCol, theme->fonts[0]);
                 initGameImage(themePath, themeConfig, theme, elem, name, NULL, 1, NULL, NULL);
@@ -1058,6 +1204,16 @@ static int addGUIElem(const char *themePath, config_set_t *themeConfig, theme_t 
                     elem = initBasic(themePath, themeConfig, theme, name, ELEM_TYPE_ITEMS_LIST, 42, 42, ALIGN_NONE, 400, 360, SCALING_RATIO, theme->textColor, theme->fonts[0]);
                     initItemsList(themePath, themeConfig, theme, elem, name, NULL);
                     theme->appsItemsList = elem;
+                }
+            } else if (!strcmp(elementsType[ELEM_TYPE_COVERFLOW], type)) {
+                if (!theme->gamesCoverflow) {
+                    elem = initBasic(themePath, themeConfig, theme, name, ELEM_TYPE_COVERFLOW, screenWidth >> 1, MENU_POS_V, ALIGN_CENTER, 96, 128, SCALING_NONE, gDefaultCol, theme->fonts[0]);
+                    initCoverflow(themePath, themeConfig, theme, elem, name, 5, NULL, NULL);
+                    theme->gamesCoverflow = elem;
+                } else if (!theme->appsCoverflow) {
+                    elem = initBasic(themePath, themeConfig, theme, name, ELEM_TYPE_COVERFLOW, screenWidth >> 1, MENU_POS_V, ALIGN_CENTER, 96, 128, SCALING_NONE, gDefaultCol, theme->fonts[0]);
+                    initCoverflow(themePath, themeConfig, theme, elem, name, 5, NULL, NULL);
+                    theme->appsCoverflow = elem;
                 }
             } else if (!strcmp(elementsType[ELEM_TYPE_ITEM_ICON], type)) {
                 elem = initBasic(themePath, themeConfig, theme, name, ELEM_TYPE_GAME_IMAGE, 0, 0, ALIGN_CENTER, 64, 64, SCALING_RATIO, gDefaultCol, theme->fonts[0]);
@@ -1265,7 +1421,9 @@ static void thmLoad(const char *themePath)
     newT->gameCacheCount = 0;
     newT->itemsList = NULL;
     newT->gamesItemsList = NULL;
+    newT->gamesCoverflow = NULL;
     newT->appsItemsList = NULL;
+    newT->appsCoverflow = NULL;
     newT->loadingIcon = NULL;
     newT->loadingIconCount = LOAD7_ICON - LOAD0_ICON + 1;
 

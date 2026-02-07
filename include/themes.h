@@ -77,6 +77,9 @@ typedef struct theme_element
     short scaled;
     u64 color;
     int font;
+    int reflection;
+    int wsX;
+    int skip;
 
     void *extended;
 
@@ -111,10 +114,12 @@ typedef struct theme
     theme_elems_t mainElems;
     theme_elems_t infoElems;
     theme_element_t *gamesItemsList;
+    theme_element_t *gamesCoverflow;
 
     theme_elems_t appsMainElems;
     theme_elems_t appsInfoElems;
     theme_element_t *appsItemsList;
+    theme_element_t *appsCoverflow;
 
     int gameCacheCount;
 
