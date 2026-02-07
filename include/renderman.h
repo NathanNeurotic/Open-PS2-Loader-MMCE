@@ -95,9 +95,9 @@ void rmDrawPixmap(GSTEXTURE *txt, int x, int y, short aligned, int w, int h, sho
 void rmDrawPixmapWithReflection(GSTEXTURE *txt, int x, int y, short aligned, int w, int h, short scaled, u64 color);
 
 void rmDrawOverlayPixmap(GSTEXTURE *overlay, int x, int y, short aligned, int w, int h, short scaled, u64 color,
-void rmDrawOverlayPixmapWithReflection(GSTEXTURE *overlay, int x, int y, short aligned, int w, int h, short scaled, u64 color,
-                                     GSTEXTURE *inlay, int ulx, int uly, int urx, int ury, int blx, int bly, int brx, int bry);
                          GSTEXTURE *inlay, int ulx, int uly, int urx, int ury, int blx, int bly, int brx, int bry);
+void rmDrawOverlayPixmapWithReflection(GSTEXTURE *overlay, int x, int y, short aligned, int w, int h, short scaled, u64 color,
+                                       GSTEXTURE *inlay, int ulx, int uly, int urx, int ury, int blx, int bly, int brx, int bry);
 
 /** Queues a opaque rectangle to be rendered */
 void rmDrawRect(int x, int y, int w, int h, u64 color);
