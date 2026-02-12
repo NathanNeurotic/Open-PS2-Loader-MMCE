@@ -15,6 +15,47 @@ jobs:
     - name: git checkout
       uses: actions/checkout@v4
 
+    - name: Install runner tools
+      run: |
+        set -eu
+        if command -v apk >/dev/null 2>&1; then
+          apk update
+          apk add --no-cache \
+            git \
+            make \
+            bash \
+            coreutils \
+            findutils \
+            grep \
+            sed \
+            gawk \
+            tar \
+            xz \
+            zip \
+            p7zip \
+            python3
+        elif command -v apt-get >/dev/null 2>&1; then
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            git \
+            make \
+            bash \
+            coreutils \
+            findutils \
+            grep \
+            sed \
+            gawk \
+            tar \
+            xz-utils \
+            zip \
+            p7zip-full \
+            python3
+          rm -rf /var/lib/apt/lists/*
+        else
+          echo "ERROR: No supported package manager found (apk/apt-get)."
+          exit 1
+        fi
+
     - run: |
         git config --global --add safe.directory "$GITHUB_WORKSPACE"
         git fetch --prune --unshallow
@@ -56,6 +97,47 @@ jobs:
     - name: git checkout
       uses: actions/checkout@v4
 
+    - name: Install runner tools
+      run: |
+        set -eu
+        if command -v apk >/dev/null 2>&1; then
+          apk update
+          apk add --no-cache \
+            git \
+            make \
+            bash \
+            coreutils \
+            findutils \
+            grep \
+            sed \
+            gawk \
+            tar \
+            xz \
+            zip \
+            p7zip \
+            python3
+        elif command -v apt-get >/dev/null 2>&1; then
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            git \
+            make \
+            bash \
+            coreutils \
+            findutils \
+            grep \
+            sed \
+            gawk \
+            tar \
+            xz-utils \
+            zip \
+            p7zip-full \
+            python3
+          rm -rf /var/lib/apt/lists/*
+        else
+          echo "ERROR: No supported package manager found (apk/apt-get)."
+          exit 1
+        fi
+
     - run: |
         git config --global --add safe.directory "$GITHUB_WORKSPACE"
         git fetch --prune --unshallow
@@ -95,6 +177,47 @@ jobs:
     steps:
     - name: git checkout
       uses: actions/checkout@v4
+
+    - name: Install runner tools
+      run: |
+        set -eu
+        if command -v apk >/dev/null 2>&1; then
+          apk update
+          apk add --no-cache \
+            git \
+            make \
+            bash \
+            coreutils \
+            findutils \
+            grep \
+            sed \
+            gawk \
+            tar \
+            xz \
+            zip \
+            p7zip \
+            python3
+        elif command -v apt-get >/dev/null 2>&1; then
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            git \
+            make \
+            bash \
+            coreutils \
+            findutils \
+            grep \
+            sed \
+            gawk \
+            tar \
+            xz-utils \
+            zip \
+            p7zip-full \
+            python3
+          rm -rf /var/lib/apt/lists/*
+        else
+          echo "ERROR: No supported package manager found (apk/apt-get)."
+          exit 1
+        fi
 
     - run: |
         git config --global --add safe.directory "$GITHUB_WORKSPACE"
