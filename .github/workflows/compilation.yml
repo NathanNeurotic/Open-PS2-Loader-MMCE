@@ -12,17 +12,49 @@ jobs:
     runs-on: ubuntu-latest
     container: ghcr.io/ps2dev/ps2dev:latest
     steps:
+    - name: git checkout
+      uses: actions/checkout@v4
+
     - name: Install runner tools
       run: |
         set -eu
         if command -v apk >/dev/null 2>&1; then
           apk update
-          apk add --no-cache git make bash coreutils findutils grep sed gawk tar xz zip p7zip python3 ca-certificates
+          apk add --no-cache \
+            git \
+            make \
+            bash \
+            coreutils \
+            findutils \
+            grep \
+            sed \
+            gawk \
+            tar \
+            xz \
+            zip \
+            p7zip \
+            python3 \
+            py3-pip \
+            ca-certificates
           update-ca-certificates || true
         elif command -v apt-get >/dev/null 2>&1; then
           apt-get update
           DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            git make bash coreutils findutils grep sed gawk tar xz-utils zip p7zip-full python3 ca-certificates
+            git \
+            make \
+            bash \
+            coreutils \
+            findutils \
+            grep \
+            sed \
+            gawk \
+            tar \
+            xz-utils \
+            zip \
+            p7zip-full \
+            python3 \
+            python3-pip \
+            ca-certificates
           update-ca-certificates || true
           rm -rf /var/lib/apt/lists/*
         else
@@ -30,35 +62,21 @@ jobs:
           exit 1
         fi
 
-    - name: Checkout repository (manual)
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Install Python deps
       run: |
         set -eu
-        mkdir -p "$GITHUB_WORKSPACE"
-        cd "$GITHUB_WORKSPACE"
+        python3 -m ensurepip --upgrade || true
+        python3 -m pip install --upgrade pip
+        python3 -m pip install pyyaml
+
+    - run: |
         git config --global --add safe.directory "$GITHUB_WORKSPACE"
-
-        # Determine the correct ref for push vs pull_request
-        if [ "${{ github.event_name }}" = "pull_request" ]; then
-          REF="${{ github.event.pull_request.head.ref }}"
-          REPO="${{ github.event.pull_request.head.repo.full_name }}"
-        else
-          REF="${{ github.ref_name }}"
-          REPO="${{ github.repository }}"
-        fi
-
-        git clone --no-tags --depth 1 "https://x-access-token:${GITHUB_TOKEN}@github.com/${REPO}.git" .
-        git fetch --prune --unshallow || true
-        git fetch --prune origin "${REF}:${REF}" || true
-        git checkout -f "${REF}" || true
+        git fetch --prune --unshallow
 
     - name: Compile -> make clean release
-      working-directory: ${{ github.workspace }}
       run: make --trace clean release
 
     - name: Create detailed changelog
-      working-directory: ${{ github.workspace }}
       run: sh ./make_changelog.sh
 
     - name: Upload release artifact ELF
@@ -89,17 +107,49 @@ jobs:
     runs-on: ubuntu-latest
     container: ghcr.io/ps2dev/ps2dev:latest
     steps:
+    - name: git checkout
+      uses: actions/checkout@v4
+
     - name: Install runner tools
       run: |
         set -eu
         if command -v apk >/dev/null 2>&1; then
           apk update
-          apk add --no-cache git make bash coreutils findutils grep sed gawk tar xz zip p7zip python3 ca-certificates
+          apk add --no-cache \
+            git \
+            make \
+            bash \
+            coreutils \
+            findutils \
+            grep \
+            sed \
+            gawk \
+            tar \
+            xz \
+            zip \
+            p7zip \
+            python3 \
+            py3-pip \
+            ca-certificates
           update-ca-certificates || true
         elif command -v apt-get >/dev/null 2>&1; then
           apt-get update
           DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            git make bash coreutils findutils grep sed gawk tar xz-utils zip p7zip-full python3 ca-certificates
+            git \
+            make \
+            bash \
+            coreutils \
+            findutils \
+            grep \
+            sed \
+            gawk \
+            tar \
+            xz-utils \
+            zip \
+            p7zip-full \
+            python3 \
+            python3-pip \
+            ca-certificates
           update-ca-certificates || true
           rm -rf /var/lib/apt/lists/*
         else
@@ -107,41 +157,27 @@ jobs:
           exit 1
         fi
 
-    - name: Checkout repository (manual)
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Install Python deps
       run: |
         set -eu
-        mkdir -p "$GITHUB_WORKSPACE"
-        cd "$GITHUB_WORKSPACE"
+        python3 -m ensurepip --upgrade || true
+        python3 -m pip install --upgrade pip
+        python3 -m pip install pyyaml
+
+    - run: |
         git config --global --add safe.directory "$GITHUB_WORKSPACE"
-
-        if [ "${{ github.event_name }}" = "pull_request" ]; then
-          REF="${{ github.event.pull_request.head.ref }}"
-          REPO="${{ github.event.pull_request.head.repo.full_name }}"
-        else
-          REF="${{ github.ref_name }}"
-          REPO="${{ github.repository }}"
-        fi
-
-        git clone --no-tags --depth 1 "https://x-access-token:${GITHUB_TOKEN}@github.com/${REPO}.git" .
-        git fetch --prune --unshallow || true
-        git fetch --prune origin "${REF}:${REF}" || true
-        git checkout -f "${REF}" || true
+        git fetch --prune --unshallow
 
     - name: Get version
-      working-directory: ${{ github.workspace }}
       run: |
         echo "OPL_VERSION=$(make oplversion)" >> $GITHUB_ENV
 
     - name: Compile -> make ${{ matrix.extra }} ${{ matrix.pademu }} ${{ matrix.extra }} NOT_PACKED=1
-      working-directory: ${{ github.workspace }}
       run: |
         make --trace ${{ matrix.pademu }} ${{ matrix.extra }} NOT_PACKED=1
         mv opl.elf OPNPS2LD-${{ env.OPL_VERSION }}-${{ matrix.pademu }}-${{ matrix.extra }}.ELF
 
     - name: Create detailed changelog
-      working-directory: ${{ github.workspace }}
       run: sh ./make_changelog.sh
 
     - name: Upload variants artifact ELF
@@ -165,17 +201,49 @@ jobs:
     runs-on: ubuntu-latest
     container: ghcr.io/ps2dev/ps2dev:latest
     steps:
+    - name: git checkout
+      uses: actions/checkout@v4
+
     - name: Install runner tools
       run: |
         set -eu
         if command -v apk >/dev/null 2>&1; then
           apk update
-          apk add --no-cache git make bash coreutils findutils grep sed gawk tar xz zip p7zip python3 ca-certificates
+          apk add --no-cache \
+            git \
+            make \
+            bash \
+            coreutils \
+            findutils \
+            grep \
+            sed \
+            gawk \
+            tar \
+            xz \
+            zip \
+            p7zip \
+            python3 \
+            py3-pip \
+            ca-certificates
           update-ca-certificates || true
         elif command -v apt-get >/dev/null 2>&1; then
           apt-get update
           DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            git make bash coreutils findutils grep sed gawk tar xz-utils zip p7zip-full python3 ca-certificates
+            git \
+            make \
+            bash \
+            coreutils \
+            findutils \
+            grep \
+            sed \
+            gawk \
+            tar \
+            xz-utils \
+            zip \
+            p7zip-full \
+            python3 \
+            python3-pip \
+            ca-certificates
           update-ca-certificates || true
           rm -rf /var/lib/apt/lists/*
         else
@@ -183,34 +251,21 @@ jobs:
           exit 1
         fi
 
-    - name: Checkout repository (manual)
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Install Python deps
       run: |
         set -eu
-        mkdir -p "$GITHUB_WORKSPACE"
-        cd "$GITHUB_WORKSPACE"
+        python3 -m ensurepip --upgrade || true
+        python3 -m pip install --upgrade pip
+        python3 -m pip install pyyaml
+
+    - run: |
         git config --global --add safe.directory "$GITHUB_WORKSPACE"
-
-        if [ "${{ github.event_name }}" = "pull_request" ]; then
-          REF="${{ github.event.pull_request.head.ref }}"
-          REPO="${{ github.event.pull_request.head.repo.full_name }}"
-        else
-          REF="${{ github.ref_name }}"
-          REPO="${{ github.repository }}"
-        fi
-
-        git clone --no-tags --depth 1 "https://x-access-token:${GITHUB_TOKEN}@github.com/${REPO}.git" .
-        git fetch --prune --unshallow || true
-        git fetch --prune origin "${REF}:${REF}" || true
-        git checkout -f "${REF}" || true
+        git fetch --prune --unshallow
 
     - name: Compile -> make download_lng languages
-      working-directory: ${{ github.workspace }}
       run: make --trace download_lng languages
 
     - name: Create artifact
-      working-directory: ${{ github.workspace }}
       run: sh ./lng_pack.sh
 
     - name: Upload release artifact
@@ -242,7 +297,6 @@ jobs:
       run: |
         echo "OPL_VERSION=$(make oplversion)" >> $GITHUB_ENV
         SHORT_COMMIT="${{ matrix.container_commit }}"
-        # Extract the last 4 characters
         SHORT_COMMIT=${SHORT_COMMIT: -4}
         echo "SHORT_COMMIT=$SHORT_COMMIT" >> $GITHUB_ENV
 
@@ -300,6 +354,8 @@ jobs:
         cp -f OPNPS2LD-VARIANTS-${{ env.OPL_VERSION }}.7z OPNPS2LD-VARIANTS.7z
         cp -f OPNPS2LD-LANGS-${{ env.OPL_VERSION }}.7z OPNPS2LD-LANGS.7z
         cp -f OPNPS2LD/OPNPS2LD-${{ env.OPL_VERSION }}.ELF OPNPS2LD.ELF
+
+# (release steps to Mega / auto releases remain commented exactly as you had them)
 
 #    - name: Create prerelease
 #      if: github.ref == 'refs/heads/master'
