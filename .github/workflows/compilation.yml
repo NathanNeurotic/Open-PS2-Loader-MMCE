@@ -10,7 +10,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    container: ps2max/dev:v20250725-2
+    container: ghcr.io/ps2dev/ps2dev:latest
     steps:
     - name: git checkout
       uses: actions/checkout@v4
@@ -51,7 +51,7 @@ jobs:
         extra: [EXTRA_FEATURES=0, EXTRA_FEATURES=1]
         pademu: [PADEMU=0, PADEMU=1]
     runs-on: ubuntu-latest
-    container: ps2max/dev:v20250725-2
+    container: ghcr.io/ps2dev/ps2dev:latest
     steps:
     - name: git checkout
       uses: actions/checkout@v4
@@ -91,7 +91,7 @@ jobs:
 
   build-lang:
     runs-on: ubuntu-latest
-    container: ps2max/dev:v20250725-2
+    container: ghcr.io/ps2dev/ps2dev:latest
     steps:
     - name: git checkout
       uses: actions/checkout@v4
@@ -194,47 +194,48 @@ jobs:
         cp -f OPNPS2LD-LANGS-${{ env.OPL_VERSION }}.7z OPNPS2LD-LANGS.7z
         cp -f OPNPS2LD/OPNPS2LD-${{ env.OPL_VERSION }}.ELF OPNPS2LD.ELF
 
-    - name: Create prerelease
-      if: github.ref == 'refs/heads/master'
-      uses: mathieucarbou/marvinpinto-action-automatic-releases@latest
-      with:
-        repo_token: "${{ secrets.GITHUB_TOKEN }}"
-        prerelease: true
-        automatic_release_tag: "latest"
-        title: "${{ steps.version.outputs.version }}"
-        files: |
-          OPNPS2LD-${{ env.OPL_VERSION }}.7z
-          OPNPS2LD-VARIANTS-${{ env.OPL_VERSION }}.7z
-          OPNPS2LD-LANGS-${{ env.OPL_VERSION }}.7z
-          OPNPS2LD.7z
-          OPNPS2LD-VARIANTS.7z
-          OPNPS2LD-LANGS.7z
-          OPNPS2LD.ELF
-
-    - name: Create release
-      if: startsWith(github.ref, 'refs/tags/v')
-      uses: mathieucarbou/marvinpinto-action-automatic-releases@latest
-      with:
-        repo_token: "${{ secrets.GITHUB_TOKEN }}"
-        prerelease: "${{ contains(github.ref, '-rc') }}"
-        title: "${{ env.OPL_VERSION }}"
-        files: |
-          OPNPS2LD-${{ env.OPL_VERSION }}.7z
-          OPNPS2LD-VARIANTS-${{ env.OPL_VERSION }}.7z
-          OPNPS2LD-LANGS-${{ env.OPL_VERSION }}.7z
-          OPNPS2LD.7z
-          OPNPS2LD-VARIANTS.7z
-          OPNPS2LD-LANGS.7z
-          OPNPS2LD.ELF
-
-    - name: Upload pre-release to Mega
-      if: github.ref == 'refs/heads/master' && env.USERNAME != null
-      uses: Difegue/action-megacmd@master
-      with:
-        args: put -c OPNPS2LD.7z /OPL/Pre-Release/${{ env.OPL_VERSION }}/run_${{ github.run_number }}/
-
-    - name: Upload release to Mega
-      if: startsWith(github.ref, 'refs/tags/v') && env.USERNAME != null
-      uses: Difegue/action-megacmd@master
-      with:
-        args: put -c OPNPS2LD.7z /OPL/Release/${{ env.OPL_VERSION }}/
+#    - name: Create prerelease
+#      if: github.ref == 'refs/heads/master'
+#      uses: mathieucarbou/marvinpinto-action-automatic-releases@latest
+#      with:
+#        repo_token: "${{ secrets.GITHUB_TOKEN }}"
+#        prerelease: true
+#        automatic_release_tag: "latest"
+#        title: "${{ steps.version.outputs.version }}"
+#        files: |
+#          OPNPS2LD-${{ env.OPL_VERSION }}.7z
+#          OPNPS2LD-VARIANTS-${{ env.OPL_VERSION }}.7z
+#          OPNPS2LD-LANGS-${{ env.OPL_VERSION }}.7z
+#          OPNPS2LD.7z
+#          OPNPS2LD-VARIANTS.7z
+#          OPNPS2LD-LANGS.7z
+#          OPNPS2LD.ELF
+#
+#    - name: Create release
+#      if: startsWith(github.ref, 'refs/tags/v')
+#      uses: mathieucarbou/marvinpinto-action-automatic-releases@latest
+#      with:
+#        repo_token: "${{ secrets.GITHUB_TOKEN }}"
+#        prerelease: "${{ contains(github.ref, '-rc') }}"
+#        title: "${{ env.OPL_VERSION }}"
+#        files: |
+#          OPNPS2LD-${{ env.OPL_VERSION }}.7z
+#          OPNPS2LD-VARIANTS-${{ env.OPL_VERSION }}.7z
+#          OPNPS2LD-LANGS-${{ env.OPL_VERSION }}.7z
+#          OPNPS2LD.7z
+#          OPNPS2LD-VARIANTS.7z
+#          OPNPS2LD-LANGS.7z
+#          OPNPS2LD.ELF
+#
+#    - name: Upload pre-release to Mega
+#      if: github.ref == 'refs/heads/master' && env.USERNAME != null
+#      uses: Difegue/action-megacmd@master
+#      with:
+#        args: put -c OPNPS2LD.7z /OPL/Pre-Release/${{ env.OPL_VERSION }}/run_${{ github.run_number }}/
+#
+#    - name: Upload release to Mega
+#      if: startsWith(github.ref, 'refs/tags/v') && env.USERNAME != null
+#      uses: Difegue/action-megacmd@master
+#      with:
+#        args: put -c OPNPS2LD.7z /OPL/Release/${{ env.OPL_VERSION }}/
+#
