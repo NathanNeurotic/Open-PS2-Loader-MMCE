@@ -10,37 +10,14 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    container: ghcr.io/ps2dev/ps2dev:latest
+    container: ghcr.io/ps2homebrew/ps2homebrew:main
     steps:
-    - name: Install build prerequisites (Alpine)
-      run: |
-        set -eu
-        apk update
-        apk add --no-cache \
-          git \
-          make \
-          bash \
-          coreutils \
-          findutils \
-          grep \
-          sed \
-          gawk \
-          tar \
-          xz \
-          zip \
-          p7zip \
-          python3 \
-          py3-yaml \
-          ca-certificates
-        update-ca-certificates || true
-
     - name: git checkout
       uses: actions/checkout@v4
       with:
         fetch-depth: 0
 
-    - name: Mark workspace safe
-      run: |
+    - run: |
         git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
     - name: Compile -> make clean release
@@ -75,37 +52,14 @@ jobs:
         extra: [EXTRA_FEATURES=0, EXTRA_FEATURES=1]
         pademu: [PADEMU=0, PADEMU=1]
     runs-on: ubuntu-latest
-    container: ghcr.io/ps2dev/ps2dev:latest
+    container: ghcr.io/ps2homebrew/ps2homebrew:main
     steps:
-    - name: Install build prerequisites (Alpine)
-      run: |
-        set -eu
-        apk update
-        apk add --no-cache \
-          git \
-          make \
-          bash \
-          coreutils \
-          findutils \
-          grep \
-          sed \
-          gawk \
-          tar \
-          xz \
-          zip \
-          p7zip \
-          python3 \
-          py3-yaml \
-          ca-certificates
-        update-ca-certificates || true
-
     - name: git checkout
       uses: actions/checkout@v4
       with:
         fetch-depth: 0
 
-    - name: Mark workspace safe
-      run: |
+    - run: |
         git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
     - name: Get version
@@ -139,37 +93,14 @@ jobs:
 
   build-lang:
     runs-on: ubuntu-latest
-    container: ghcr.io/ps2dev/ps2dev:latest
+    container: ghcr.io/ps2homebrew/ps2homebrew:main
     steps:
-    - name: Install build prerequisites (Alpine)
-      run: |
-        set -eu
-        apk update
-        apk add --no-cache \
-          git \
-          make \
-          bash \
-          coreutils \
-          findutils \
-          grep \
-          sed \
-          gawk \
-          tar \
-          xz \
-          zip \
-          p7zip \
-          python3 \
-          py3-yaml \
-          ca-certificates
-        update-ca-certificates || true
-
     - name: git checkout
       uses: actions/checkout@v4
       with:
         fetch-depth: 0
 
-    - name: Mark workspace safe
-      run: |
+    - run: |
         git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
     - name: Compile -> make download_lng languages
@@ -192,21 +123,23 @@ jobs:
       matrix:
         debug: [iopcore_debug, ingame_debug, eesio_debug, iopcore_ppctty_debug, ingame_ppctty_debug, DTL_T10000=1]
         # container_commit: [":main", "@sha256:1f00689809455d43b520e4cd4eea00c6be56d71819ae38efc6b55b56464cbd1e"] Replace with desired docker image hash or tag
-        container_commit: [":v20250725-2"]
+        container_commit: [":main"]
     runs-on: ubuntu-latest
-    container: ps2max/dev${{ matrix.container_commit }}
+    container: ghcr.io/ps2homebrew/ps2homebrew${{ matrix.container_commit }}
     steps:
     - name: git checkout
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
 
     - run: |
         git config --global --add safe.directory "$GITHUB_WORKSPACE"
-        git fetch --prune --unshallow
 
     - name: Get version
       run: |
         echo "OPL_VERSION=$(make oplversion)" >> $GITHUB_ENV
         SHORT_COMMIT="${{ matrix.container_commit }}"
+        # Extract the last 4 characters
         SHORT_COMMIT=${SHORT_COMMIT: -4}
         echo "SHORT_COMMIT=$SHORT_COMMIT" >> $GITHUB_ENV
 
@@ -242,8 +175,8 @@ jobs:
     steps:
     - name: git checkout
       uses: actions/checkout@v4
-
-    - run: git fetch --prune --unshallow
+      with:
+        fetch-depth: 0
 
     - name: Get version
       run: |
@@ -264,10 +197,6 @@ jobs:
         cp -f OPNPS2LD-VARIANTS-${{ env.OPL_VERSION }}.7z OPNPS2LD-VARIANTS.7z
         cp -f OPNPS2LD-LANGS-${{ env.OPL_VERSION }}.7z OPNPS2LD-LANGS.7z
         cp -f OPNPS2LD/OPNPS2LD-${{ env.OPL_VERSION }}.ELF OPNPS2LD.ELF
-
-# (Your auto-release + Mega steps stay commented exactly as you had them)
-
-# (release steps to Mega / auto releases remain commented exactly as you had them)
 
 #    - name: Create prerelease
 #      if: github.ref == 'refs/heads/master'
