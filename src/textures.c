@@ -50,6 +50,13 @@ extern void *info_png;
 extern void *cover_png;
 extern void *disc_png;
 extern void *screen_png;
+extern void *incebtion_png;
+extern void *ip_png;
+extern void *coverapp_png;
+extern void *missing_png;
+extern void *no_Device_png;
+extern void *no_Rating_png;
+extern void *screens_png;
 
 extern void *ELF_png;
 extern void *HDL_png;
@@ -172,6 +179,13 @@ static texture_t internalDefault[TEXTURES_COUNT] = {
     {COVER_DEFAULT, "cover", &cover_png},
     {DISC_DEFAULT, "disc", &disc_png},
     {SCREEN_DEFAULT, "screen", &screen_png},
+    {INCEBTION_PICTURE, "incebtion", &incebtion_png},
+    {IP_PICTURE, "ip", &ip_png},
+    {COVERAPP_DEFAULT, "coverapp", &coverapp_png},
+    {MISSING_PICTURE, "missing", &missing_png},
+    {NO_DEVICE_PICTURE, "no_Device", &no_Device_png},
+    {NO_RATING_PICTURE, "no_Rating", &no_Rating_png},
+    {SCREENS_OVERLAY, "screens", &screens_png},
     {ELF_FORMAT, "ELF", &ELF_png},
     {HDL_FORMAT, "HDL", &HDL_png},
     {ISO_FORMAT, "ISO", &ISO_png},
