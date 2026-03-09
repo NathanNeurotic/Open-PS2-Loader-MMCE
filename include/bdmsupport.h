@@ -7,6 +7,9 @@
 
 #include "include/mcemu.h"
 
+#define BDM_DEVICE_ROOT_MAX 32
+#define BDM_PREFIX_MAX      96
+
 typedef struct
 {
     int active;       /* Activation flag */
@@ -25,8 +28,9 @@ typedef struct
 
 typedef struct
 {
-    int massDeviceIndex; // Underlying device index backing the mass fs partition, ex: usb0 = 0, usb1 = 1, etc.
-    char bdmPrefix[40];  // Contains the full path to the folder where all the games are.
+    int massDeviceIndex;                 // Underlying device index backing the block device. This is not the same as the typed-path unit.
+    char bdmDeviceRoot[BDM_DEVICE_ROOT_MAX]; // Canonical device root used for filesystem access, ex: usb0:, mx4sio0:
+    char bdmPrefix[BDM_PREFIX_MAX];      // Full path to the folder where all the games are.
     int bdmULSizePrev;
     time_t bdmModifiedCDPrev;
     time_t bdmModifiedDVDPrev;
@@ -49,5 +53,6 @@ void bdmInitSemaphore();
 void bdmEnumerateDevices();
 
 void bdmResolveLBA_UDMA(bdm_device_data_t *pDeviceData);
+int bdmResolveDeviceRoot(char *target, int targetLength, const char *driverName, int massDeviceIndex, int massSlot);
 
 #endif

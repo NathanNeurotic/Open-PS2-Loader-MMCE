@@ -34,6 +34,127 @@ int bdmUpdateDeviceData(item_list_t *itemList);
 
 static unsigned int BdmGeneration = 0;
 
+static const char *bdmGetTypedPathForDriver(const char *driverName)
+{
+    if (!strcmp(driverName, "usb"))
+        return "usb";
+    if (!strcmp(driverName, "sd") && strlen(driverName) == 2)
+        return "ilink";
+    if (!strcmp(driverName, "sdc") && strlen(driverName) == 3)
+        return "mx4sio";
+    if (!strcmp(driverName, "ata") && strlen(driverName) == 3)
+        return "ata";
+
+    return NULL;
+}
+
+static void bdmBuildGamePrefix(char *target, int targetLength, const char *deviceRoot)
+{
+    if (gBDMPrefix[0] != '\0')
+        snprintf(target, targetLength, "%s%s/", deviceRoot, gBDMPrefix);
+    else
+        snprintf(target, targetLength, "%s", deviceRoot);
+}
+
+static int bdmReadDeviceIdentity(const char *path, char *driverName, int driverNameLength, int *deviceIndex)
+{
+    int dir, result;
+
+    if (driverNameLength > 0)
+        memset(driverName, 0, driverNameLength);
+    *deviceIndex = -1;
+
+    dir = fileXioDopen(path);
+    if (dir < 0)
+        return dir;
+
+    result = fileXioIoctl2(dir, USBMASS_IOCTL_GET_DRIVERNAME, NULL, 0, driverName, driverNameLength - 1);
+    if (result >= 0)
+        result = fileXioIoctl2(dir, USBMASS_IOCTL_GET_DEVICE_NUMBER, NULL, 0, deviceIndex, sizeof(*deviceIndex));
+
+    fileXioDclose(dir);
+    return result;
+}
+
+static int bdmProbeTypedDeviceRoot(char *target, int targetLength, const char *typedPath, int unit, const char *driverName, int massDeviceIndex)
+{
+    char probeRoot[BDM_DEVICE_ROOT_MAX];
+    char probePath[BDM_DEVICE_ROOT_MAX + 2];
+    char probeDriver[32];
+    int probeDeviceIndex;
+
+    snprintf(probeRoot, sizeof(probeRoot), "%s%d:", typedPath, unit);
+    snprintf(probePath, sizeof(probePath), "%s/", probeRoot);
+
+    if (bdmReadDeviceIdentity(probePath, probeDriver, sizeof(probeDriver), &probeDeviceIndex) < 0)
+        return 0;
+
+    if (strcmp(probeDriver, driverName) != 0 || probeDeviceIndex != massDeviceIndex)
+        return 0;
+
+    snprintf(target, targetLength, "%s", probeRoot);
+    return 1;
+}
+
+static int bdmGetTypedRootOrdinal(const char *driverName, int massSlot)
+{
+    char path[BDM_DEVICE_ROOT_MAX + 2];
+    char previousDriver[32];
+    int previousDeviceIndex;
+    int ordinal = 0;
+    const char *typedPath = bdmGetTypedPathForDriver(driverName);
+    const char *previousTypedPath;
+
+    if (typedPath == NULL)
+        return -1;
+
+    for (int i = 0; i < massSlot; i++) {
+        snprintf(path, sizeof(path), "mass%d:/", i);
+        if (bdmReadDeviceIdentity(path, previousDriver, sizeof(previousDriver), &previousDeviceIndex) < 0)
+            continue;
+
+        previousTypedPath = bdmGetTypedPathForDriver(previousDriver);
+        if (previousTypedPath != NULL && !strcmp(typedPath, previousTypedPath))
+            ordinal++;
+    }
+
+    return ordinal;
+}
+
+int bdmResolveDeviceRoot(char *target, int targetLength, const char *driverName, int massDeviceIndex, int massSlot)
+{
+    int preferredUnit;
+    const char *typedPath;
+
+    snprintf(target, targetLength, "mass%d:", massSlot);
+
+    typedPath = bdmGetTypedPathForDriver(driverName);
+    if (typedPath == NULL) {
+        LOG("BDMSUPPORT Using legacy root %s for driver %s\n", target, driverName);
+        return 0;
+    }
+
+    preferredUnit = bdmGetTypedRootOrdinal(driverName, massSlot);
+    if (preferredUnit >= 0 && preferredUnit < MAX_BDM_DEVICES &&
+        bdmProbeTypedDeviceRoot(target, targetLength, typedPath, preferredUnit, driverName, massDeviceIndex)) {
+        LOG("BDMSUPPORT Resolved mass%d (%s,%d) -> %s\n", massSlot, driverName, massDeviceIndex, target);
+        return 1;
+    }
+
+    for (int i = 0; i < MAX_BDM_DEVICES; i++) {
+        if (i == preferredUnit)
+            continue;
+        if (bdmProbeTypedDeviceRoot(target, targetLength, typedPath, i, driverName, massDeviceIndex)) {
+            LOG("BDMSUPPORT Resolved mass%d (%s,%d) -> %s\n", massSlot, driverName, massDeviceIndex, target);
+            return 1;
+        }
+    }
+
+    snprintf(target, targetLength, "mass%d:", massSlot);
+    LOG("BDMSUPPORT Falling back to legacy root %s for %s device %d\n", target, driverName, massDeviceIndex);
+    return 0;
+}
+
 static void bdmEventHandler(void *packet, void *opt)
 {
     BdmGeneration++;
@@ -612,17 +733,14 @@ static void bdmCleanUp(item_list_t *itemList, int exception)
 // This may be called, even if bdmInit() was not.
 static void bdmShutdown(item_list_t *itemList)
 {
-    char path[16];
-
+    char path[BDM_DEVICE_ROOT_MAX];
     LOG("BDMSUPPORT Shutdown\n");
 
-    // Format the device path.
-    // Getting the device number is only relevant per module ie usb0 and mx40 will result in both being massDeviceIndex = 0 or mass0, use mode to determine instead.
     bdm_device_data_t *pDeviceData = (bdm_device_data_t *)itemList->priv;
     snprintf(path, sizeof(path), "mass%d:", itemList->mode);
 
     // As required by some (typically 2.5") HDDs, issue the SCSI STOP UNIT command to avoid causing an emergency park.
-    fileXioDevctl(path, USBMASS_DEVCTL_STOP_ALL, NULL, 0, NULL, 0);
+    fileXioDevctl(pDeviceData->bdmDeviceRoot[0] != '\0' ? pDeviceData->bdmDeviceRoot : path, USBMASS_DEVCTL_STOP_ALL, NULL, 0, NULL, 0);
 
     if (itemList->enabled) {
         LOG("BDMSUPPORT Shutdown free data\n");
@@ -752,7 +870,7 @@ void bdmResolveLBA_UDMA(bdm_device_data_t *pDeviceData)
 
 int bdmUpdateDeviceData(item_list_t *itemList)
 {
-    char path[16] = {0};
+    char path[BDM_DEVICE_ROOT_MAX + 2] = {0};
 
     // If bdm mode is disabled bail out as we don't want to update the visibility state of the device pages.
     if (gBDMStartMode == START_MODE_DISABLED)
@@ -765,20 +883,17 @@ int bdmUpdateDeviceData(item_list_t *itemList)
     int visible = itemList->owner != NULL ? ((opl_io_module_t *)itemList->owner)->menuItem.visible : 0;
 
     // Format the device path and try to open the device.
-    sprintf(path, "mass%d:/", itemList->mode);
+    snprintf(path, sizeof(path), "mass%d:/", itemList->mode);
     int dir = fileXioDopen(path);
     // LOG("opendir %s -> %d\n", path, dir);
 
     // If we opened the device and the menu isn't visible (OR is visible but hasn't been initialized ex: manual device start) initialize device info.
-    if (dir >= 0 && (visible == 0 || pDeviceData->bdmPrefix[0] == '\0')) {
-        if (gBDMPrefix[0] != '\0')
-            snprintf(pDeviceData->bdmPrefix, sizeof(pDeviceData->bdmPrefix), "mass%d:%s/", itemList->mode, gBDMPrefix);
-        else
-            snprintf(pDeviceData->bdmPrefix, sizeof(pDeviceData->bdmPrefix), "mass%d:", itemList->mode);
-
+    if (dir >= 0 && (visible == 0 || pDeviceData->bdmDeviceRoot[0] == '\0')) {
         // Get the name of the underlying device driver that backs the fat fs.
         fileXioIoctl2(dir, USBMASS_IOCTL_GET_DRIVERNAME, NULL, 0, &pDeviceData->bdmDriver, sizeof(pDeviceData->bdmDriver) - 1);
         fileXioIoctl2(dir, USBMASS_IOCTL_GET_DEVICE_NUMBER, NULL, 0, &pDeviceData->massDeviceIndex, sizeof(pDeviceData->massDeviceIndex));
+        bdmResolveDeviceRoot(pDeviceData->bdmDeviceRoot, sizeof(pDeviceData->bdmDeviceRoot), pDeviceData->bdmDriver, pDeviceData->massDeviceIndex, itemList->mode);
+        bdmBuildGamePrefix(pDeviceData->bdmPrefix, sizeof(pDeviceData->bdmPrefix), pDeviceData->bdmDeviceRoot);
 
         itemList->flags = 0;
 
@@ -798,9 +913,9 @@ int bdmUpdateDeviceData(item_list_t *itemList)
         // If the device is backed by the ATA driver then get the supported LBA size for the drive.
         if (pDeviceData->bdmDeviceType == BDM_TYPE_ATA) {
             bdmResolveLBA_UDMA(pDeviceData);
-            LOG("Mass device: %d (%d LBA%d UDMA%d) %s -> %s\n", itemList->mode, pDeviceData->massDeviceIndex, (pDeviceData->bdmHddIsLBA48 == 1 ? 48 : 28), pDeviceData->ataHighestUDMAMode, pDeviceData->bdmPrefix, pDeviceData->bdmDriver);
+            LOG("Mass device: %d (%d LBA%d UDMA%d) %s -> %s (root %s)\n", itemList->mode, pDeviceData->massDeviceIndex, (pDeviceData->bdmHddIsLBA48 == 1 ? 48 : 28), pDeviceData->ataHighestUDMAMode, pDeviceData->bdmPrefix, pDeviceData->bdmDriver, pDeviceData->bdmDeviceRoot);
         } else
-            LOG("Mass device: %d (%d) %s -> %s\n", itemList->mode, pDeviceData->massDeviceIndex, pDeviceData->bdmPrefix, pDeviceData->bdmDriver);
+            LOG("Mass device: %d (%d) %s -> %s (root %s)\n", itemList->mode, pDeviceData->massDeviceIndex, pDeviceData->bdmPrefix, pDeviceData->bdmDriver, pDeviceData->bdmDeviceRoot);
 
         // Make the menu item visible.
         if (itemList->owner != NULL) {

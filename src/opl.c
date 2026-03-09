@@ -1824,26 +1824,37 @@ static void autoLaunchBDMGame(char *argv[])
     gAutoLaunchDeviceData = malloc(sizeof(bdm_device_data_t));
     memset(gAutoLaunchDeviceData, 0, sizeof(bdm_device_data_t));
 
-    char apaDevicePrefix[8] = {0};
+    char apaDevicePrefix[BDM_DEVICE_ROOT_MAX] = {0};
+    int selectedMassSlot = -1;
     delay(8);
-    snprintf(apaDevicePrefix, sizeof(apaDevicePrefix), "mass0:");
     // Loop through mass0: to mass4:
     for (int i = 0; i <= 4; i++) {
-        snprintf(path, sizeof(path), "mass%d:", i);
+        snprintf(path, sizeof(path), "mass%d:/", i);
         int dir = fileXioDopen(path);
 
         if (dir >= 0) {
-            fileXioIoctl2(dir, USBMASS_IOCTL_GET_DRIVERNAME, NULL, 0, &gAutoLaunchDeviceData->bdmDriver, sizeof(gAutoLaunchDeviceData->bdmDriver) - 1);
-            fileXioIoctl2(dir, USBMASS_IOCTL_GET_DEVICE_NUMBER, NULL, 0, &gAutoLaunchDeviceData->massDeviceIndex, sizeof(gAutoLaunchDeviceData->massDeviceIndex));
+            char detectedDriver[sizeof(gAutoLaunchDeviceData->bdmDriver)] = {0};
+            int detectedDeviceIndex = -1;
 
-            if (!strcmp(gAutoLaunchDeviceData->bdmDriver, "ata") && strlen(gAutoLaunchDeviceData->bdmDriver) == 3) {
-                bdmResolveLBA_UDMA(gAutoLaunchDeviceData);
-                snprintf(apaDevicePrefix, sizeof(apaDevicePrefix), "mass%d:", i);
-                fileXioDclose(dir);
-                break; // Exit the loop if "ata" device is found
+            fileXioIoctl2(dir, USBMASS_IOCTL_GET_DRIVERNAME, NULL, 0, detectedDriver, sizeof(detectedDriver) - 1);
+            fileXioIoctl2(dir, USBMASS_IOCTL_GET_DEVICE_NUMBER, NULL, 0, &detectedDeviceIndex, sizeof(detectedDeviceIndex));
+            fileXioDclose(dir);
+
+            if (selectedMassSlot < 0) {
+                selectedMassSlot = i;
+                snprintf(gAutoLaunchDeviceData->bdmDriver, sizeof(gAutoLaunchDeviceData->bdmDriver), "%s", detectedDriver);
+                gAutoLaunchDeviceData->massDeviceIndex = detectedDeviceIndex;
+                bdmResolveDeviceRoot(apaDevicePrefix, sizeof(apaDevicePrefix), detectedDriver, detectedDeviceIndex, i);
             }
 
-            fileXioDclose(dir);
+            if (!strcmp(detectedDriver, "ata") && strlen(detectedDriver) == 3) {
+                selectedMassSlot = i;
+                snprintf(gAutoLaunchDeviceData->bdmDriver, sizeof(gAutoLaunchDeviceData->bdmDriver), "%s", detectedDriver);
+                gAutoLaunchDeviceData->massDeviceIndex = detectedDeviceIndex;
+                bdmResolveDeviceRoot(apaDevicePrefix, sizeof(apaDevicePrefix), detectedDriver, detectedDeviceIndex, i);
+                bdmResolveLBA_UDMA(gAutoLaunchDeviceData);
+                break; // Exit the loop if "ata" device is found
+            }
         } else {
             // Retry for mass0: only
             if (i == 0) {
@@ -1855,6 +1866,11 @@ static void autoLaunchBDMGame(char *argv[])
         }
         delay(6);
     }
+
+    if (selectedMassSlot < 0)
+        snprintf(apaDevicePrefix, sizeof(apaDevicePrefix), "mass0:");
+
+    snprintf(gAutoLaunchDeviceData->bdmDeviceRoot, sizeof(gAutoLaunchDeviceData->bdmDeviceRoot), "%s", apaDevicePrefix);
 
     if (gBDMPrefix[0] != '\0') {
         snprintf(path, sizeof(path), "%s%s/CFG/%s.cfg", apaDevicePrefix, gBDMPrefix, gAutoLaunchBDMGame->startup);
