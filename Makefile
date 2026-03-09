@@ -415,7 +415,7 @@ $(EE_ASM_DIR)udnl.c: $(UDNL_OUT) | $(EE_ASM_DIR)
 	$(BIN2C) $(UDNL_OUT) $@ udnl_irx
 
 $(MMCE_IRX) &: download_mmce.sh
-	./download_mmce.sh
+	bash ./download_mmce.sh
 
 $(EE_ASM_DIR)mmceman.c: $(MMCE_ASSETS_DIR)/mmceman.irx | $(EE_ASM_DIR)
 	$(BIN2C) $< $@ $(*F)_irx
