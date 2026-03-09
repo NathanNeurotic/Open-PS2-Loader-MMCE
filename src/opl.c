@@ -276,13 +276,14 @@ static void itemExecSelect(struct menu_item *curMenu)
         if (support->enabled) {
             if (curMenu->current) {
                 config_set_t *configSet = menuLoadConfig();
+                cacheCancelPendingImageLoads();
                 support->itemLaunch(support, curMenu->current->item.id, configSet);
             }
         } else {
             // If we're trying to enable BDM support we need to enable it for all BDM menu slots.
             if (support->mode == BDM_MODE) {
                 // Initialize support for all bdm modules.
-                for (int i = 0; i <= BDM_MODE4; i++) {
+                for (int i = BDM_MODE; i <= BDM_MODE_LAST; i++) {
                     opl_io_module_t *mod = &list_support[i];
                     itemInitSupport(mod->support);
                 }

@@ -17,7 +17,6 @@
 #include "include/system.h"
 #include "include/ioman.h"
 #include "include/sound.h"
-#include "include/texcache.h"
 #include <assert.h>
 
 enum MENU_IDs {
@@ -384,12 +383,8 @@ static void refreshMenuPosition(void)
 
     if (cur->item->visible == 0) {
         // No visible menu was found, just set the current menu to the first one in the list.
-        if (selected_item != menu)
-            cacheInvalidatePendingLoads();
         selected_item = menu;
     } else {
-        if (selected_item != cur)
-            cacheInvalidatePendingLoads();
         selected_item = cur;
     }
 }
@@ -615,7 +610,6 @@ static void menuNextH()
 
     // If we found a valid menu transition to it.
     if (next != NULL) {
-        cacheInvalidatePendingLoads();
         selected_item = next;
         itemConfigId = -1;
         sfxPlay(SFX_CURSOR);
@@ -629,7 +623,6 @@ static void menuPrevH()
         prev = prev->prev;
 
     if (prev != NULL) {
-        cacheInvalidatePendingLoads();
         selected_item = prev;
         itemConfigId = -1;
         sfxPlay(SFX_CURSOR);
@@ -640,7 +633,6 @@ static void menuFirstPage()
 {
     submenu_list_t *cur = selected_item->item->current;
     if (cur && cur != selected_item->item->submenu) {
-        cacheInvalidatePendingLoads();
         if (cur->prev) {
             sfxPlay(SFX_CURSOR);
         }
@@ -654,7 +646,6 @@ static void menuLastPage()
 {
     submenu_list_t *cur = selected_item->item->current;
     if (cur && cur->next) {
-        cacheInvalidatePendingLoads();
         if (cur->next) {
             sfxPlay(SFX_CURSOR);
         }
@@ -676,7 +667,6 @@ static void menuNextV()
     submenu_list_t *cur = selected_item->item->current;
 
     if (cur && cur->next) {
-        cacheInvalidatePendingLoads();
         selected_item->item->current = cur->next;
         sfxPlay(SFX_CURSOR);
 
@@ -700,7 +690,6 @@ static void menuPrevV()
     submenu_list_t *cur = selected_item->item->current;
 
     if (cur && cur->prev) {
-        cacheInvalidatePendingLoads();
         selected_item->item->current = cur->prev;
         sfxPlay(SFX_CURSOR);
 
@@ -721,7 +710,6 @@ static void menuNextPage()
 
     if (cur && cur->next) {
         int itms = ((items_list_t *)gTheme->itemsList->extended)->displayedItems + 1;
-        cacheInvalidatePendingLoads();
         sfxPlay(SFX_CURSOR);
 
         while (--itms && cur->next)
@@ -740,7 +728,6 @@ static void menuPrevPage()
 
     if (cur && cur->prev) {
         int itms = ((items_list_t *)gTheme->itemsList->extended)->displayedItems + 1;
-        cacheInvalidatePendingLoads();
         sfxPlay(SFX_CURSOR);
 
         while (--itms && cur->prev)
@@ -759,8 +746,6 @@ void menuSetSelectedItem(menu_item_t *item)
 
     while (itm) {
         if (itm->item == item) {
-            if (selected_item != itm)
-                cacheInvalidatePendingLoads();
             selected_item = itm;
             return;
         }

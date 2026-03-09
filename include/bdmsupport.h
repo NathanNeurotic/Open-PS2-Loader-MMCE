@@ -18,7 +18,7 @@ typedef struct
     vmc_spec_t specs; /* Card specifications */
 } bdm_vmc_infos_t;
 
-#define MAX_BDM_DEVICES 5
+#define MAX_BDM_DEVICES BDM_MODE_COUNT
 
 #define BDM_TYPE_UNKNOWN -1
 #define BDM_TYPE_USB     0

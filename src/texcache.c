@@ -57,14 +57,6 @@ static void cacheUnregister(image_cache_t *cache)
     }
 }
 
-static void cacheDropQueuedImage(void *data)
-{
-    load_image_request_t *req = data;
-
-    if (req != NULL)
-        free(req);
-}
-
 // Io handled action...
 static void cacheLoadImage(void *data)
 {
@@ -177,10 +169,13 @@ void cacheDestroyCache(image_cache_t *cache)
     free(cache);
 }
 
-void cacheInvalidatePendingLoads(void)
+void cacheCancelPendingImageLoads(void)
 {
-    cache_registry_entry_t *registry = gCacheRegistry;
+    cache_registry_entry_t *registry;
 
+    ioRemoveRequests(IO_CACHE_LOAD_ART);
+
+    registry = gCacheRegistry;
     while (registry != NULL) {
         image_cache_t *cache = registry->cache;
 
@@ -188,15 +183,15 @@ void cacheInvalidatePendingLoads(void)
             for (int i = 0; i < cache->count; i++) {
                 cache_entry_t *entry = &cache->content[i];
 
-                if (entry->qr != NULL)
+                if (entry->qr != NULL) {
+                    free(entry->qr);
                     cacheClearItem(entry, 0);
+                }
             }
         }
 
         registry = registry->next;
     }
-
-    ioRemoveRequestsWithHandler(IO_CACHE_LOAD_ART, &cacheDropQueuedImage);
 }
 
 GSTEXTURE *cacheGetTexture(image_cache_t *cache, item_list_t *list, int *cacheId, int *UID, char *value)

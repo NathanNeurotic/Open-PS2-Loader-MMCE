@@ -488,24 +488,18 @@ int guiDeviceTypeToIoMode(int deviceType)
 
 int guiIoModeToDeviceType(int ioMode)
 {
-    switch (ioMode) {
-        case BDM_MODE:
-        case BDM_MODE1:
-        case BDM_MODE2:
-        case BDM_MODE3:
-        case BDM_MODE4:
-            return 0;
-        case ETH_MODE:
-            return 1;
-        case HDD_MODE:
-            return 2;
-        case APP_MODE:
-            return 3;
-        case MMCE_MODE:
-            return 4;
-        default:
-            return 0;
-    }
+    if (ioMode >= BDM_MODE && ioMode < ETH_MODE)
+        return 0;
+    if (ioMode == ETH_MODE)
+        return 1;
+    if (ioMode == HDD_MODE)
+        return 2;
+    if (ioMode == APP_MODE)
+        return 3;
+    if (ioMode == MMCE_MODE)
+        return 4;
+
+    return 0;
 }
 
 void guiShowConfig()
