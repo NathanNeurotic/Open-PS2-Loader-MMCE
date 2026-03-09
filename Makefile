@@ -691,10 +691,10 @@ $(EE_ASM_DIR)genvmc.c: modules/vmc/genvmc/genvmc.irx | $(EE_ASM_DIR)
 modules/network/lwNBD/Makefile: download_lwNBD.sh
 	./download_lwNBD.sh
 
-# Use a repo-owned IOP linkfile because the CI image's installed linkfile is
-# incompatible with the pinned lwNBD build glue.
+# Use a repo-owned IOP linkfile and expose PS2SDK/bin because the pinned
+# lwNBD build glue invokes bare iopfixup during IRX fixup.
 modules/network/lwNBD/lwnbdsvr.irx: modules/network/lwNBD/Makefile thirdparty/ps2sdk_iop_linkfile.ld
-	$(MAKE) TARGET=iop IOP_LINKFILE=$(LWNBD_IOP_LINKFILE) -C modules/network/lwNBD
+	PATH="$(PS2SDK)/bin:$$PATH" $(MAKE) TARGET=iop IOP_LINKFILE=$(LWNBD_IOP_LINKFILE) -C modules/network/lwNBD
 
 $(EE_ASM_DIR)lwnbdsvr.c: modules/network/lwNBD/lwnbdsvr.irx | $(EE_ASM_DIR)
 	$(BIN2C) $< $@ $(*F)_irx

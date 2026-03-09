@@ -70,6 +70,8 @@ SECTIONS
   } =0
   PROVIDE(_etext = .);
   PROVIDE (etext = .);
+  /* Compatibility aliases used by relocatable IRX linking on current binutils. */
+  PROVIDE(_text_size = _etext - _ftext);
   .fini      : { *(.fini)    } =0
   .rodata ALIGN(16) : SUBALIGN(16) { *(.rodata) *(.rodata.*) *(.gnu.linkonce.r*) }
   .rodata1   : { *(.rodata1) }
@@ -103,6 +105,7 @@ SECTIONS
   .lit4 : { *(.lit4) }
   PROVIDE(_edata  =  .);
   PROVIDE (edata = .);
+  PROVIDE(_data_size = _edata - _fdata);
   __bss_start = .;
   PROVIDE(_fbss = .);
   .sbss      : { *(.sbss) *(.scommon) }
@@ -115,6 +118,7 @@ SECTIONS
   . = ALIGN(32 / 8);
   PROVIDE(_end = .);
   PROVIDE (end = .);
+  PROVIDE(_bss_size = _end - _fbss);
   /* Stabs debugging sections.  */
   .stab 0 : { *(.stab) }
   .stabstr 0 : { *(.stabstr) }
