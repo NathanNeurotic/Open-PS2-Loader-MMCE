@@ -127,6 +127,9 @@ LNG_SRC_DIR = lng_src/
 LNG_TMPL_DIR = lng_tmpl/
 LNG_DIR = lng/
 PNG_ASSETS_DIR = gfx/
+MMCE_ASSETS_DIR = thirdparty/mmce
+MMCE_IRX = $(MMCE_ASSETS_DIR)/mmceman.irx $(MMCE_ASSETS_DIR)/mmcedrv.irx $(MMCE_ASSETS_DIR)/mmceigr.irx
+LWNBD_IOP_LINKFILE = $(abspath thirdparty/ps2sdk_iop_linkfile.ld)
 
 MAPFILE = opl.map
 EE_LDFLAGS += -Wl,-Map,$(MAPFILE)
@@ -240,11 +243,11 @@ EE_LDFLAGS += -fdata-sections -ffunction-sections -Wl,--gc-sections
 
 .SILENT:
 
-.PHONY: all release debug iopcore_debug eesio_debug ingame_debug deci2_debug debug_ppctty iopcore_ppctty_debug ingame_ppctty_debug clean rebuild pc_tools pc_tools_win32 oplversion format format-check ps2sdk-not-setup download_lng download_lwNBD languages
+.PHONY: all release debug iopcore_debug eesio_debug ingame_debug deci2_debug debug_ppctty iopcore_ppctty_debug ingame_ppctty_debug clean rebuild pc_tools pc_tools_win32 oplversion format format-check ps2sdk-not-setup download_lng download_lwNBD download_mmce languages
 
 ifdef PS2SDK
 
-all: download_lng download_lwNBD languages
+all: download_lng download_lwNBD download_mmce languages
 	echo "Building Open PS2 Loader $(OPL_VERSION)..."
 	echo "-Interface"
 ifneq ($(NOT_PACKED),1)
@@ -253,7 +256,7 @@ else
 	$(MAKE) $(EE_BIN)
 endif
 
-release: download_lng download_lwNBD languages $(EE_VPKD).ZIP
+release: download_lng download_lwNBD download_mmce languages $(EE_VPKD).ZIP
 
 debug:
 	$(MAKE) DEBUG=1 all
@@ -411,13 +414,16 @@ $(EE_ASM_DIR)ee_core.c: ee_core/ee_core.elf | $(EE_ASM_DIR)
 $(EE_ASM_DIR)udnl.c: $(UDNL_OUT) | $(EE_ASM_DIR)
 	$(BIN2C) $(UDNL_OUT) $@ udnl_irx
 
-$(EE_ASM_DIR)mmceman.c: $(PS2SDK)/iop/irx/mmceman.irx | $(EE_ASM_DIR)
+$(MMCE_IRX) &: download_mmce.sh
+	./download_mmce.sh
+
+$(EE_ASM_DIR)mmceman.c: $(MMCE_ASSETS_DIR)/mmceman.irx | $(EE_ASM_DIR)
 	$(BIN2C) $< $@ $(*F)_irx
 
-$(EE_ASM_DIR)mmcedrv.c: $(PS2SDK)/iop/irx/mmcedrv.irx | $(EE_ASM_DIR)
+$(EE_ASM_DIR)mmcedrv.c: $(MMCE_ASSETS_DIR)/mmcedrv.irx | $(EE_ASM_DIR)
 	$(BIN2C) $< $@ $(*F)_irx
 
-$(EE_ASM_DIR)mmceigr.c: $(PS2SDK)/iop/irx/mmceigr.irx | $(EE_ASM_DIR)
+$(EE_ASM_DIR)mmceigr.c: $(MMCE_ASSETS_DIR)/mmceigr.irx | $(EE_ASM_DIR)
 	$(BIN2C) $< $@ $(*F)_irx
 
 modules/iopcore/imgdrv/imgdrv.irx: modules/iopcore/imgdrv
@@ -682,8 +688,13 @@ modules/vmc/genvmc/genvmc.irx: modules/vmc/genvmc
 $(EE_ASM_DIR)genvmc.c: modules/vmc/genvmc/genvmc.irx | $(EE_ASM_DIR)
 	$(BIN2C) $< $@ $(*F)_irx
 
-modules/network/lwNBD/lwnbdsvr.irx: modules/network/lwNBD
-	$(MAKE) TARGET=iop -C $<
+modules/network/lwNBD/Makefile: download_lwNBD.sh
+	./download_lwNBD.sh
+
+# Use a repo-owned IOP linkfile because the CI image's installed linkfile is
+# incompatible with the pinned lwNBD build glue.
+modules/network/lwNBD/lwnbdsvr.irx: modules/network/lwNBD/Makefile thirdparty/ps2sdk_iop_linkfile.ld
+	$(MAKE) TARGET=iop IOP_LINKFILE=$(LWNBD_IOP_LINKFILE) -C modules/network/lwNBD
 
 $(EE_ASM_DIR)lwnbdsvr.c: modules/network/lwNBD/lwnbdsvr.irx | $(EE_ASM_DIR)
 	$(BIN2C) $< $@ $(*F)_irx
@@ -827,8 +838,9 @@ languages: $(ENGLISH_TEMPLATE_YML) $(TRANSLATIONS_YML) $(ENGLISH_LNG) $(TRANSLAT
 download_lng:
 	./download_lng.sh
 
-download_lwNBD:
-	./download_lwNBD.sh
+download_lwNBD: modules/network/lwNBD/Makefile
+
+download_mmce: $(MMCE_IRX)
 
 download_cfla:
 	./download_cfla.sh
