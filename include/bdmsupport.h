@@ -28,9 +28,9 @@ typedef struct
 
 typedef struct
 {
-    int massDeviceIndex;                 // Underlying device index backing the block device. This is not the same as the typed-path unit.
+    int massDeviceIndex;                     // Underlying device index backing the block device. This is not the same as the typed-path unit.
     char bdmDeviceRoot[BDM_DEVICE_ROOT_MAX]; // Canonical device root used for filesystem access, ex: usb0:, mx4sio0:
-    char bdmPrefix[BDM_PREFIX_MAX];      // Full path to the folder where all the games are.
+    char bdmPrefix[BDM_PREFIX_MAX];          // Full path to the folder where all the games are.
     int bdmULSizePrev;
     time_t bdmModifiedCDPrev;
     time_t bdmModifiedDVDPrev;
