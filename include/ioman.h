@@ -34,6 +34,11 @@ int ioPutRequest(int type, void *data);
  * @return the count of the requests removed */
 int ioRemoveRequests(int type);
 
+/** removes all requests of a given type from the queue and optionally frees their payloads
+ * @param cleanup called for each removed request payload when not NULL
+ * @return the count of the requests removed */
+int ioRemoveRequestsWithHandler(int type, io_request_handler_t cleanup);
+
 /** returns the count of pending requests */
 int ioGetPendingRequestCount(void);
 

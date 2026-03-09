@@ -16,6 +16,55 @@ typedef struct
     char *value;
 } load_image_request_t;
 
+typedef struct cache_registry_entry
+{
+    image_cache_t *cache;
+    struct cache_registry_entry *next;
+} cache_registry_entry_t;
+
+static cache_registry_entry_t *gCacheRegistry = NULL;
+
+static void cacheRegister(image_cache_t *cache)
+{
+    cache_registry_entry_t *entry = malloc(sizeof(*entry));
+
+    if (entry == NULL)
+        return;
+
+    entry->cache = cache;
+    entry->next = gCacheRegistry;
+    gCacheRegistry = entry;
+}
+
+static void cacheUnregister(image_cache_t *cache)
+{
+    cache_registry_entry_t *entry = gCacheRegistry;
+    cache_registry_entry_t *previous = NULL;
+
+    while (entry != NULL) {
+        if (entry->cache == cache) {
+            if (previous != NULL)
+                previous->next = entry->next;
+            else
+                gCacheRegistry = entry->next;
+
+            free(entry);
+            return;
+        }
+
+        previous = entry;
+        entry = entry->next;
+    }
+}
+
+static void cacheDropQueuedImage(void *data)
+{
+    load_image_request_t *req = data;
+
+    if (req != NULL)
+        free(req);
+}
+
 // Io handled action...
 static void cacheLoadImage(void *data)
 {
@@ -56,6 +105,7 @@ static void cacheLoadImage(void *data)
 
 void cacheInit()
 {
+    gCacheRegistry = NULL;
     ioRegisterHandler(IO_CACHE_LOAD_ART, &cacheLoadImage);
 }
 
@@ -107,11 +157,15 @@ image_cache_t *cacheInitCache(int userId, const char *prefix, int isPrefixRelati
     for (i = 0; i < count; ++i)
         cacheClearItem(&cache->content[i], 0);
 
+    cacheRegister(cache);
+
     return cache;
 }
 
 void cacheDestroyCache(image_cache_t *cache)
 {
+    cacheUnregister(cache);
+
     int i;
     for (i = 0; i < cache->count; ++i) {
         cacheClearItem(&cache->content[i], 1);
@@ -121,6 +175,28 @@ void cacheDestroyCache(image_cache_t *cache)
     free(cache->suffix);
     free(cache->content);
     free(cache);
+}
+
+void cacheInvalidatePendingLoads(void)
+{
+    cache_registry_entry_t *registry = gCacheRegistry;
+
+    while (registry != NULL) {
+        image_cache_t *cache = registry->cache;
+
+        if (cache != NULL) {
+            for (int i = 0; i < cache->count; i++) {
+                cache_entry_t *entry = &cache->content[i];
+
+                if (entry->qr != NULL)
+                    cacheClearItem(entry, 0);
+            }
+        }
+
+        registry = registry->next;
+    }
+
+    ioRemoveRequestsWithHandler(IO_CACHE_LOAD_ART, &cacheDropQueuedImage);
 }
 
 GSTEXTURE *cacheGetTexture(image_cache_t *cache, item_list_t *list, int *cacheId, int *UID, char *value)

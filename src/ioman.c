@@ -251,7 +251,7 @@ int ioPutRequest(int type, void *data)
     return IO_OK;
 }
 
-int ioRemoveRequests(int type)
+static int ioRemoveRequestsInternal(int type, io_request_handler_t cleanup)
 {
     // lock the deletion sema and the queue end sema as well
     WaitSema(gProcSemaId);
@@ -275,6 +275,8 @@ int ioRemoveRequests(int type)
                 gReqEnd = last;
 
             count++;
+            if (cleanup != NULL)
+                cleanup(req->data);
             free(req);
             if (gReqCount > 0)
                 gReqCount--;
@@ -290,6 +292,16 @@ int ioRemoveRequests(int type)
     SignalSema(gProcSemaId);
 
     return count;
+}
+
+int ioRemoveRequests(int type)
+{
+    return ioRemoveRequestsInternal(type, NULL);
+}
+
+int ioRemoveRequestsWithHandler(int type, io_request_handler_t cleanup)
+{
+    return ioRemoveRequestsInternal(type, cleanup);
 }
 
 void ioEnd(void)
