@@ -148,11 +148,25 @@ static void menuDeleteGame(submenu_list_t **submenu)
 
 static void _menuLoadConfig()
 {
+    item_list_t *list = NULL;
+    config_set_t *loadedConfig = NULL;
+    int configId = -1;
+
     WaitSema(menuSemaId);
-    if (!itemConfig) {
-        item_list_t *list = selected_item->item->userdata;
-        itemConfig = list->itemGetConfig(list, itemConfigId);
+    if (!itemConfig && selected_item != NULL && selected_item->item->current != NULL && itemConfigId >= 0) {
+        list = selected_item->item->userdata;
+        configId = itemConfigId;
     }
+    SignalSema(menuSemaId);
+
+    if (list != NULL)
+        loadedConfig = list->itemGetConfig(list, configId);
+
+    WaitSema(menuSemaId);
+    if (!itemConfig && loadedConfig != NULL && itemConfigId == configId)
+        itemConfig = loadedConfig;
+    else if (loadedConfig != NULL)
+        configFree(loadedConfig);
     actionStatus = 0;
     SignalSema(menuSemaId);
 }

@@ -15,6 +15,7 @@
 
 static int appForceUpdate = 1;
 static int appItemCount = 0;
+static char appStartupPath[256];
 
 static config_set_t *configApps;
 static app_info_t *appsList;
@@ -305,9 +306,10 @@ static char *appGetItemStartup(item_list_t *itemList, int id)
 {
     if (appsList[id].legacy) {
         struct config_value_t *cur = appGetConfigValue(id);
-        return appGetELFName(cur->val);
+        return cur->val;
     } else {
-        return appsList[id].boot;
+        snprintf(appStartupPath, sizeof(appStartupPath), "%s/%s", appsList[id].path, appsList[id].boot);
+        return appStartupPath;
     }
 }
 
@@ -457,14 +459,11 @@ static config_set_t *appGetConfig(item_list_t *itemList, int id)
 
 static int appGetImage(item_list_t *itemList, char *folder, int isRelative, char *value, char *suffix, GSTEXTURE *resultTex, short psm)
 {
-    char device[8], *startup;
+    char device[8] = "";
+    char *startup;
 
     startup = appGetBoot(device, sizeof(device), value);
-
-    if (!strcmp(folder, "ART"))
-        return oplGetAppImage(device, folder, isRelative, startup, suffix, resultTex, psm);
-    else
-        return oplGetAppImage(device, folder, isRelative, value, suffix, resultTex, psm);
+    return oplGetAppImage(device[0] != '\0' ? device : NULL, folder, isRelative, startup, suffix, resultTex, psm);
 }
 
 static int appGetTextId(item_list_t *itemList)
