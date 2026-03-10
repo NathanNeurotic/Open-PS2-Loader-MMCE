@@ -977,9 +977,6 @@ int bdmUpdateDeviceData(item_list_t *itemList)
 
             if (deviceResult < 0) {
                 LOG("Mass device: %d driver %s failed to report device number: %d, using %s\n", itemList->mode, pDeviceData->bdmDriver, deviceResult, pDeviceData->bdmDeviceRoot);
-            } else {
-                bdmResolveDeviceRoot(pDeviceData->bdmDeviceRoot, sizeof(pDeviceData->bdmDeviceRoot), pDeviceData->bdmDriver, pDeviceData->massDeviceIndex, itemList->mode);
-                bdmBuildGamePrefix(pDeviceData->bdmPrefix, sizeof(pDeviceData->bdmPrefix), pDeviceData->bdmDeviceRoot);
             }
         }
 
@@ -988,9 +985,9 @@ int bdmUpdateDeviceData(item_list_t *itemList)
         }
 
         if (pDeviceData->bdmDeviceType == BDM_TYPE_ATA)
-            LOG("Mass device: %d (%d) ATA device %s (root %s)\n", itemList->mode, pDeviceData->massDeviceIndex, pDeviceData->bdmPrefix, pDeviceData->bdmDeviceRoot);
+            LOG("Mass device: %d (%d) ATA device %s (compat root %s)\n", itemList->mode, pDeviceData->massDeviceIndex, pDeviceData->bdmPrefix, pDeviceData->bdmDeviceRoot);
         else if (pDeviceData->bdmDriver[0] != '\0')
-            LOG("Mass device: %d (%d) %s -> %s (root %s)\n", itemList->mode, pDeviceData->massDeviceIndex, pDeviceData->bdmPrefix, pDeviceData->bdmDriver, pDeviceData->bdmDeviceRoot);
+            LOG("Mass device: %d (%d) %s -> %s (compat root %s)\n", itemList->mode, pDeviceData->massDeviceIndex, pDeviceData->bdmPrefix, pDeviceData->bdmDriver, pDeviceData->bdmDeviceRoot);
         else
             LOG("Mass device: %d using generic BDM path %s\n", itemList->mode, pDeviceData->bdmPrefix);
 

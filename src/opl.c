@@ -1860,14 +1860,14 @@ static void autoLaunchBDMGame(char *argv[])
                 selectedMassSlot = i;
                 snprintf(gAutoLaunchDeviceData->bdmDriver, sizeof(gAutoLaunchDeviceData->bdmDriver), "%s", detectedDriver);
                 gAutoLaunchDeviceData->massDeviceIndex = detectedDeviceIndex;
-                bdmResolveDeviceRoot(apaDevicePrefix, sizeof(apaDevicePrefix), detectedDriver, detectedDeviceIndex, i);
+                snprintf(apaDevicePrefix, sizeof(apaDevicePrefix), "mass%d:", i);
             }
 
             if (!strcmp(detectedDriver, "ata") && strlen(detectedDriver) == 3) {
                 selectedMassSlot = i;
                 snprintf(gAutoLaunchDeviceData->bdmDriver, sizeof(gAutoLaunchDeviceData->bdmDriver), "%s", detectedDriver);
                 gAutoLaunchDeviceData->massDeviceIndex = detectedDeviceIndex;
-                bdmResolveDeviceRoot(apaDevicePrefix, sizeof(apaDevicePrefix), detectedDriver, detectedDeviceIndex, i);
+                snprintf(apaDevicePrefix, sizeof(apaDevicePrefix), "mass%d:", i);
                 break; // Exit the loop if "ata" device is found
             }
         } else {
