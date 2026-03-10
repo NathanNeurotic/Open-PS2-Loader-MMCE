@@ -17,6 +17,7 @@
 #include "include/system.h"
 #include "include/ioman.h"
 #include "include/sound.h"
+#include "include/texcache.h"
 #include <assert.h>
 
 enum MENU_IDs {
@@ -79,6 +80,11 @@ static submenu_list_t *appMenuCurrent;
 static s32 menuSemaId;
 static s32 menuListSemaId = -1;
 static ee_sema_t menuSema;
+
+static void menuInvalidateArtSelection(void)
+{
+    cacheAdvanceGeneration();
+}
 
 static void menuRenameGame(submenu_list_t **submenu)
 {
@@ -387,6 +393,8 @@ static void refreshMenuPosition(void)
     } else {
         selected_item = cur;
     }
+
+    menuInvalidateArtSelection();
 }
 
 void submenuRebuildCache(submenu_list_t *submenu)
@@ -612,6 +620,7 @@ static void menuNextH()
     if (next != NULL) {
         selected_item = next;
         itemConfigId = -1;
+        menuInvalidateArtSelection();
         sfxPlay(SFX_CURSOR);
     }
 }
@@ -625,6 +634,7 @@ static void menuPrevH()
     if (prev != NULL) {
         selected_item = prev;
         itemConfigId = -1;
+        menuInvalidateArtSelection();
         sfxPlay(SFX_CURSOR);
     }
 }
@@ -639,6 +649,7 @@ static void menuFirstPage()
 
         selected_item->item->current = selected_item->item->submenu;
         selected_item->item->pagestart = selected_item->item->current;
+        menuInvalidateArtSelection();
     }
 }
 
@@ -659,6 +670,7 @@ static void menuLastPage()
             cur = cur->prev;
 
         selected_item->item->pagestart = cur;
+        menuInvalidateArtSelection();
     }
 }
 
@@ -669,6 +681,7 @@ static void menuNextV()
     if (cur && cur->next) {
         selected_item->item->current = cur->next;
         sfxPlay(SFX_CURSOR);
+        menuInvalidateArtSelection();
 
         // if the current item is beyond the page start, move the page start one page down
         cur = selected_item->item->pagestart;
@@ -699,6 +712,8 @@ static void menuPrevV()
             while (--itms && selected_item->item->pagestart->prev)
                 selected_item->item->pagestart = selected_item->item->pagestart->prev;
         }
+
+        menuInvalidateArtSelection();
     } else { // wrap to end
         menuLastPage();
     }
@@ -717,6 +732,7 @@ static void menuNextPage()
 
         selected_item->item->current = cur;
         selected_item->item->pagestart = selected_item->item->current;
+        menuInvalidateArtSelection();
     } else { // wrap to start
         menuFirstPage();
     }
@@ -735,6 +751,7 @@ static void menuPrevPage()
 
         selected_item->item->current = cur;
         selected_item->item->pagestart = selected_item->item->current;
+        menuInvalidateArtSelection();
     } else { // wrap to end
         menuLastPage();
     }
@@ -747,6 +764,7 @@ void menuSetSelectedItem(menu_item_t *item)
     while (itm) {
         if (itm->item == item) {
             selected_item = itm;
+            menuInvalidateArtSelection();
             return;
         }
 

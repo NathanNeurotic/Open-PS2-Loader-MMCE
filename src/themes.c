@@ -9,6 +9,7 @@
 #include "include/lang.h"
 #include "include/pad.h"
 #include "include/sound.h"
+#include "include/texcache.h"
 
 #define MENU_POS_V     50
 #define HINT_HEIGHT    32
@@ -1382,6 +1383,7 @@ static void thmLoad(const char *themePath)
         for (i = ELF_FORMAT; i <= VMODE_PAL; i++)
             thmLoadResource(&newT->textures[i], i, NULL, GS_PSM_CT32, 1);
 
+    cacheCancelPendingImageLoads();
     gTheme = newT;
     thmFree(curT);
 }
@@ -1517,6 +1519,7 @@ char *thmGetFilePath(int themeID)
 
 void thmEnd(void)
 {
+    cacheCancelPendingImageLoads();
     thmFree(gTheme);
 
     int i = 0;

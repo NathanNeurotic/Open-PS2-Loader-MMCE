@@ -88,6 +88,9 @@ void rmInvalidateTexture(GSTEXTURE *txt);
 /** Unload texture from texture manager, performance optimization */
 void rmUnloadTexture(GSTEXTURE *txt);
 
+/** Uploads a texture to VRAM without drawing it. */
+void rmPrimeTexture(GSTEXTURE *txt);
+
 void rmDrawQuad(rm_quad_t *q);
 
 /** Queues a specified pixmap (tinted with colour) to be rendered on specified position */

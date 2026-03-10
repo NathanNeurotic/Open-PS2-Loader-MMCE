@@ -22,6 +22,7 @@
 #include "include/cheatman.h"
 #include "include/sound.h"
 #include "include/guigame.h"
+#include "include/texcache.h"
 
 #include <limits.h>
 #include <stdlib.h>
@@ -1085,6 +1086,7 @@ static void guiHandleOp(struct gui_update_t *item)
             item->menu.menu->submenu = NULL;
             item->menu.menu->current = NULL;
             item->menu.menu->pagestart = NULL;
+            cacheAdvanceGeneration();
             break;
 
         case GUI_OP_SORT:
@@ -1095,6 +1097,7 @@ static void guiHandleOp(struct gui_update_t *item)
                 item->menu.menu->current = item->menu.menu->submenu;
 
             item->menu.menu->pagestart = item->menu.menu->current;
+            cacheAdvanceGeneration();
             break;
 
         case GUI_OP_ADD_HINT:
@@ -1532,6 +1535,8 @@ static void guiReadPads()
 // screen handlers. Fade transition code written by Maximus32
 static void guiShow()
 {
+    cachePrimeReadyTexture();
+
     // is there a transmission effect going on or are
     // we in a normal rendering state?
     if (screenHandlerTarget) {
@@ -1658,6 +1663,8 @@ void guiSwitchScreen(int target)
     if (screenHandlerTarget != NULL) {
         return;
     }
+
+    cacheAdvanceGeneration();
     sfxPlay(SFX_TRANSITION);
     transIndex = 0;
     screenHandlerTarget = &screenHandlers[target];

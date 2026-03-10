@@ -3,6 +3,15 @@
 
 #include "include/iosupport.h"
 
+typedef enum {
+    CACHE_ENTRY_STATE_EMPTY = 0,
+    CACHE_ENTRY_STATE_QUEUED,
+    CACHE_ENTRY_STATE_READY,
+    CACHE_ENTRY_STATE_PRIMED,
+    CACHE_ENTRY_STATE_DISPLAYABLE,
+    CACHE_ENTRY_STATE_FAILED,
+} cache_entry_state_t;
+
 /// A single cache entry...
 typedef struct
 {
@@ -16,6 +25,9 @@ typedef struct
     int lastUsed;
 
     int UID;
+    int primeFrame;
+    unsigned int generation;
+    unsigned char state;
 } cache_entry_t;
 
 
@@ -58,6 +70,14 @@ void cacheDestroyCache(image_cache_t *cache);
 /** Cancels any queued art loads that have not started yet.
  */
 void cacheCancelPendingImageLoads(void);
+
+/** Advances the active art generation and invalidates stale hidden art without flushing loaded textures.
+ */
+void cacheAdvanceGeneration(void);
+
+/** Promotes at most one ready texture into VRAM per frame and exposes previously primed textures on the following frame.
+ */
+void cachePrimeReadyTexture(void);
 
 GSTEXTURE *cacheGetTexture(image_cache_t *cache, item_list_t *list, int *cacheId, int *UID, char *value);
 

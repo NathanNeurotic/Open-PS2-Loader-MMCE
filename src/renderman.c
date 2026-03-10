@@ -97,6 +97,12 @@ void rmUnloadTexture(GSTEXTURE *txt)
     gsKit_TexManager_free(gsGlobal, txt);
 }
 
+void rmPrimeTexture(GSTEXTURE *txt)
+{
+    if (txt != NULL && txt->Mem != NULL)
+        gsKit_TexManager_bind(gsGlobal, txt);
+}
+
 void rmStartFrame(void)
 {
     if (hires == 0)
