@@ -41,8 +41,6 @@ enum INTERNAL_TEXTURE {
     R1_ICON,
     R2_ICON,
     R3_ICON, */
-    MAIN_BG,
-    INFO_BG,
     COVER_DEFAULT,
     DISC_DEFAULT,
     SCREEN_DEFAULT,
