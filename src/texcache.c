@@ -5,6 +5,8 @@
 #include "include/util.h"
 #include "include/renderman.h"
 
+#include <kernel.h>
+
 typedef struct load_image_request
 {
     struct load_image_request *next;
