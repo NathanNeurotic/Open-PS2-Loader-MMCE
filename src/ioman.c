@@ -9,7 +9,6 @@
 #include <sio.h>
 #endif
 
-#define MAX_IO_REQUESTS 64
 #define MAX_IO_HANDLERS 64
 
 extern void *_gp;
@@ -37,7 +36,7 @@ struct io_handler_t
 static struct io_request_t *gReqList;
 static struct io_request_t *gReqEnd;
 
-// Total number of queued requests (bounded by MAX_IO_REQUESTS).
+// Total number of queued requests currently stored in the list.
 static int gReqCount;
 
 static struct io_handler_t gRequestHandlers[MAX_IO_HANDLERS];
@@ -219,11 +218,6 @@ int ioPutRequest(int type, void *data)
         return IO_ERR_INVALID_HANDLER;
 
     WaitSema(gEndSemaId);
-
-    if (gReqCount >= MAX_IO_REQUESTS) {
-        SignalSema(gEndSemaId);
-        return IO_ERR_TOO_MANY_REQUESTS;
-    }
 
     // We don't have to lock the tip of the queue...
     // If it exists, it won't be touched, if it does not exist, it is not being processed
