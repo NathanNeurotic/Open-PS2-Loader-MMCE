@@ -188,6 +188,20 @@ static void bdmEventHandler(void *packet, void *opt)
     BdmGeneration++;
 }
 
+static int bdmShouldQueueModuleLoad(void)
+{
+    if (gEnableUSB && !iUSBModLoaded)
+        return 1;
+    if (gEnableILK && !iLinkModLoaded)
+        return 1;
+    if (gEnableMX4SIO && !mx4sioModLoaded)
+        return 1;
+    if (gEnableBdmHDD && !hddModLoaded)
+        return 1;
+
+    return 0;
+}
+
 static void bdmLoadBlockDeviceModules(void)
 {
     WaitSema(bdmLoadModuleLock);
@@ -257,6 +271,7 @@ static void bdmInit(item_list_t *itemList)
     pDeviceData->bdmModifiedDVDPrev = 0;
     pDeviceData->bdmGameCount = 0;
     pDeviceData->bdmGames = NULL;
+    pDeviceData->FoldersCreated = 0;
     configGetInt(configGetByType(CONFIG_OPL), "usb_frames_delay", &itemList->delay);
     bdmLoadModules();
     itemList->enabled = 1;
@@ -276,8 +291,6 @@ static int bdmNeedsUpdate(item_list_t *itemList)
         return 0;
 
     bdm_device_data_t *pDeviceData = (bdm_device_data_t *)itemList->priv;
-
-    ioPutRequest(IO_CUSTOM_SIMPLEACTION, &bdmLoadBlockDeviceModules);
 
     // Check for forced refresh from deleting or renaming a game.
     if (pDeviceData->ForceRefresh != 0) {
@@ -314,9 +327,16 @@ static int bdmNeedsUpdate(item_list_t *itemList)
             pOwner->menuItem.visible = 0;
     }
 
-    if (pDeviceData->bdmULSizePrev != -2 && pDeviceData->bdmDeviceTick == BdmGeneration)
-        return 0;
+    if (pDeviceData->bdmDeviceTick == BdmGeneration) {
+        if (pOwner != NULL && pOwner->menuItem.visible == 0)
+            return 0;
+        if (pDeviceData->bdmULSizePrev != -2)
+            return 0;
+    }
     pDeviceData->bdmDeviceTick = BdmGeneration;
+
+    if (bdmShouldQueueModuleLoad())
+        ioPutRequest(IO_CUSTOM_SIMPLEACTION, &bdmLoadBlockDeviceModules);
 
     // Check if the device has been connected or removed.
     if ((result = bdmUpdateDeviceData(itemList)) == 0)
@@ -328,6 +348,11 @@ static int bdmNeedsUpdate(item_list_t *itemList)
         return result;
     } else if (result == 1)
         sfxPlay(SFX_BD_CONNECT);
+
+    if (!pDeviceData->FoldersCreated) {
+        sbCreateFolders(pDeviceData->bdmPrefix, 1);
+        pDeviceData->FoldersCreated = 1;
+    }
 
     sprintf(path, "%sCD", pDeviceData->bdmPrefix);
     if (stat(path, &st) != 0)
@@ -361,8 +386,6 @@ static int bdmNeedsUpdate(item_list_t *itemList)
         if (lngAddLanguages(path, "/", itemList->mode) > 0)
             pDeviceData->LanguagesLoaded = 1;
     }
-
-    sbCreateFolders(pDeviceData->bdmPrefix, 1);
 
     return result;
 }
@@ -917,6 +940,7 @@ int bdmUpdateDeviceData(item_list_t *itemList)
     if (dir >= 0 && (visible == 0 || pDeviceData->bdmDeviceRoot[0] == '\0' || pDeviceData->bdmDriver[0] == '\0' || pDeviceData->bdmDeviceType == BDM_TYPE_UNKNOWN)) {
         snprintf(pDeviceData->bdmDeviceRoot, sizeof(pDeviceData->bdmDeviceRoot), "mass%d:", itemList->mode);
         bdmBuildGamePrefix(pDeviceData->bdmPrefix, sizeof(pDeviceData->bdmPrefix), pDeviceData->bdmDeviceRoot);
+        pDeviceData->FoldersCreated = 0;
 
         memset(pDeviceData->bdmDriver, 0, sizeof(pDeviceData->bdmDriver));
         pDeviceData->massDeviceIndex = -1;
@@ -973,6 +997,7 @@ int bdmUpdateDeviceData(item_list_t *itemList)
             ((opl_io_module_t *)itemList->owner)->menuItem.visible = 0;
         }
 
+        pDeviceData->FoldersCreated = 0;
         LOG("Mass device: %d (%d) disconnected\n", itemList->mode, pDeviceData->massDeviceIndex);
         return -1;
     }

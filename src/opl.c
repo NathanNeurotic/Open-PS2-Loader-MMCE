@@ -738,6 +738,14 @@ static void menuUpdateHook()
     // if timer exceeds some threshold, schedule updates of the available input sources
     frameCounter++;
 
+    // Keep background refresh work out of the shared IO queue while the user is actively navigating.
+    if (guiInactiveFrames < MENU_MIN_INACTIVE_FRAMES)
+        return;
+
+    // Let the current queue drain before adding background refresh work.
+    if (ioHasPendingRequests())
+        return;
+
     // schedule updates of all the list handlers
     if (gAutoRefresh) {
         for (i = 0; i < MODE_COUNT; i++) {
