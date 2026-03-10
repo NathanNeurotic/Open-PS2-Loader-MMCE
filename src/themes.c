@@ -1522,7 +1522,6 @@ char *thmGetFilePath(int themeID)
 
 void thmEnd(void)
 {
-    cacheCancelPendingImageLoads();
     thmFree(gTheme);
 
     int i = 0;

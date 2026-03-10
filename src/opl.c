@@ -276,7 +276,6 @@ static void itemExecSelect(struct menu_item *curMenu)
         if (support->enabled) {
             if (curMenu->current) {
                 config_set_t *configSet = menuLoadConfig();
-                cacheCancelPendingImageLoads();
                 support->itemLaunch(support, curMenu->current->item.id, configSet);
             }
         } else {
@@ -1504,12 +1503,6 @@ void deinit(int exception, int modeSelected)
 #endif
     unloadPads();
 
-    // Art requests run on a dedicated worker and may still be reading support-owned
-    // state (for example BDM device data or APP lists). Drain and stop that worker
-    // before any support cleanup frees those structures.
-    thmEnd();
-    cacheEnd();
-
     deinitAllSupport(exception, modeSelected);
 
     audioEnd();
@@ -1517,6 +1510,7 @@ void deinit(int exception, int modeSelected)
     guiEnd();
     menuEnd();
     lngEnd();
+    thmEnd();
     rmEnd();
     configEnd();
 }
