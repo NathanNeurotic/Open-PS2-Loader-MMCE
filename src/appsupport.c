@@ -16,6 +16,7 @@
 static int appForceUpdate = 1;
 static int appItemCount = 0;
 static char appStartupPath[256];
+static char appResolvedStartupPath[256];
 
 static config_set_t *configApps;
 static app_info_t *appsList;
@@ -104,17 +105,45 @@ static const char *appBuildStartupPath(const char *path, const char *boot)
     return boot;
 }
 
+static const char *appResolveLegacyMassStartup(const char *startup)
+{
+    int fd;
+    const char *suffix;
+
+    if (startup == NULL)
+        return NULL;
+
+    if (strncmp(startup, "mass?:", 6) == 0)
+        suffix = startup + 6;
+    else if (strncmp(startup, "mass:", 5) == 0)
+        suffix = startup + 5;
+    else
+        return startup;
+
+    for (int i = 0; i < MAX_BDM_DEVICES; i++) {
+        snprintf(appResolvedStartupPath, sizeof(appResolvedStartupPath), "mass%d:%s", i, suffix);
+
+        fd = open(appResolvedStartupPath, O_RDONLY);
+        if (fd >= 0) {
+            close(fd);
+            return appResolvedStartupPath;
+        }
+    }
+
+    return startup;
+}
+
 static const char *appFindSourcePath(const char *startup)
 {
     if (startup == NULL)
         return NULL;
 
     if (strchr(startup, ':') != NULL || strchr(startup, '/') != NULL)
-        return startup;
+        return appResolveLegacyMassStartup(startup);
 
     for (int i = 0; i < appItemCount; i++) {
         if (strcmp(appsList[i].boot, startup) == 0) {
-            return appBuildStartupPath(appsList[i].path, appsList[i].boot);
+            return appResolveLegacyMassStartup(appBuildStartupPath(appsList[i].path, appsList[i].boot));
         }
     }
 
@@ -327,7 +356,7 @@ static int appGetItemNameLength(item_list_t *itemList, int id)
    The path is used immediately, before a subsequent call to appGetItemStartup(). */
 static char *appGetItemStartup(item_list_t *itemList, int id)
 {
-    return (char *)appBuildStartupPath(appsList[id].path, appsList[id].boot);
+    return (char *)appResolveLegacyMassStartup(appBuildStartupPath(appsList[id].path, appsList[id].boot));
 }
 
 static void appDeleteItem(item_list_t *itemList, int id)
@@ -479,6 +508,9 @@ static int appGetImage(item_list_t *itemList, char *folder, int isRelative, char
     char device[BDM_DEVICE_ROOT_MAX] = "";
     char *startup;
     const char *sourcePath = appFindSourcePath(value);
+
+    if (sourcePath == NULL)
+        return -1;
 
     startup = appGetBoot(device, sizeof(device), (char *)sourcePath);
     if (!strcmp(folder, "ART"))

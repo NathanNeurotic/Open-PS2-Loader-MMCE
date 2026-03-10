@@ -233,13 +233,16 @@ int sfxGetSoundDuration(int id)
 
 void sfxPlay(int id)
 {
+    int channel;
+
     if (!audio_initialized) {
         LOG("SFX: %s: ERROR: not initialized!\n", __FUNCTION__);
         return;
     }
 
     if (gEnableSFX) {
-        audsrv_ch_play_adpcm(id, &sfx[id]);
+        channel = (id == SFX_CURSOR) ? -1 : id;
+        audsrv_ch_play_adpcm(channel, &sfx[id]);
     }
 }
 
@@ -366,15 +369,14 @@ static void bgmThread(void *arg)
 
 static void bgmIoThread(void *arg)
 {
-    int partsToRead, decodeTotal, bitStream, i;
+    int decodeTotal, bitStream;
 
     bgmIoThreadRunning = 1;
     do {
         WaitSema(inSema);
-        partsToRead = 1;
 
-        while ((wrPtr + partsToRead < BGM_RING_BUFFER_COUNT) && (PollSema(inSema) == 0))
-            partsToRead++;
+        if (terminateFlag || !gEnableBGM)
+            break;
 
         decodeTotal = BGM_RING_BUFFER_SIZE;
         int bufferPtr = 0;
@@ -391,9 +393,8 @@ static void bgmIoThread(void *arg)
                 ov_pcm_seek(vorbisFile, 0);
         } while (decodeTotal > 0);
 
-        wrPtr = (wrPtr + partsToRead) % BGM_RING_BUFFER_COUNT;
-        for (i = 0; i < partsToRead; i++)
-            SignalSema(outSema);
+        wrPtr = (wrPtr + 1) % BGM_RING_BUFFER_COUNT;
+        SignalSema(outSema);
         WakeupThread(bgmThreadID);
     } while (!terminateFlag && gEnableBGM);
 
@@ -603,6 +604,7 @@ void bgmStop(void)
     LOG("BGM: terminating threads...\n");
 
     terminateFlag = 1;
+    SignalSema(inSema);
     WakeupThread(bgmThreadID);
 
     threadId = GetThreadId();

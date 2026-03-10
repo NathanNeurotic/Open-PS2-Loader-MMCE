@@ -36,15 +36,35 @@ int bdmUpdateDeviceData(item_list_t *itemList);
 
 static unsigned int BdmGeneration = 0;
 
+static int bdmDriverIsUSB(const char *driverName)
+{
+    return driverName != NULL && strcmp(driverName, "usb") == 0;
+}
+
+static int bdmDriverIsIlink(const char *driverName)
+{
+    return driverName != NULL && (strcmp(driverName, "sd") == 0 || strcmp(driverName, "ilink") == 0);
+}
+
+static int bdmDriverIsMx4sio(const char *driverName)
+{
+    return driverName != NULL && (strcmp(driverName, "sdc") == 0 || strcmp(driverName, "mx4sio") == 0);
+}
+
+static int bdmDriverIsATA(const char *driverName)
+{
+    return driverName != NULL && strcmp(driverName, "ata") == 0;
+}
+
 static int bdmDetermineDeviceType(const char *driverName)
 {
-    if (!strcmp(driverName, "usb"))
+    if (bdmDriverIsUSB(driverName))
         return BDM_TYPE_USB;
-    if (!strcmp(driverName, "sd") && strlen(driverName) == 2)
+    if (bdmDriverIsIlink(driverName))
         return BDM_TYPE_ILINK;
-    if (!strcmp(driverName, "sdc") && strlen(driverName) == 3)
+    if (bdmDriverIsMx4sio(driverName))
         return BDM_TYPE_SDC;
-    if (!strcmp(driverName, "ata") && strlen(driverName) == 3)
+    if (bdmDriverIsATA(driverName))
         return BDM_TYPE_ATA;
 
     return BDM_TYPE_UNKNOWN;
@@ -52,13 +72,13 @@ static int bdmDetermineDeviceType(const char *driverName)
 
 static const char *bdmGetTypedPathForDriver(const char *driverName)
 {
-    if (!strcmp(driverName, "usb"))
+    if (bdmDriverIsUSB(driverName))
         return "usb";
-    if (!strcmp(driverName, "sd") && strlen(driverName) == 2)
+    if (bdmDriverIsIlink(driverName))
         return "ilink";
-    if (!strcmp(driverName, "sdc") && strlen(driverName) == 3)
+    if (bdmDriverIsMx4sio(driverName))
         return "mx4sio";
-    if (!strcmp(driverName, "ata") && strlen(driverName) == 3)
+    if (bdmDriverIsATA(driverName))
         return "ata";
 
     return NULL;
@@ -563,7 +583,7 @@ void bdmLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
 
     void *irx = NULL;
     int irx_size = 0;
-    if (!strcmp(pDeviceData->bdmDriver, "ata") && strlen(pDeviceData->bdmDriver) == 3) {
+    if (bdmDriverIsATA(pDeviceData->bdmDriver)) {
         irx = &bdm_ata_cdvdman_irx;
         irx_size = size_bdm_ata_cdvdman_irx;
     } else {
@@ -669,7 +689,7 @@ void bdmLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
     snprintf(bdmCurrentDriver, sizeof(bdmCurrentDriver), "%s", pDeviceData->bdmDriver);
     bdmSetLaunchDeviceBinding(settings, bdmCurrentDriver, pDeviceData->massDeviceIndex);
 
-    if (!strcmp(bdmCurrentDriver, "ata") && strlen(bdmCurrentDriver) == 3) {
+    if (bdmDriverIsATA(bdmCurrentDriver)) {
         // Get DMA settings for ATA mode.
         int dmaType = 0, dmaMode = 7;
 
@@ -708,16 +728,16 @@ void bdmLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
     }
 
     LOG("bdm pre sysLaunchLoaderElf\n");
-    if (!strcmp(bdmCurrentDriver, "usb")) {
+    if (bdmDriverIsUSB(bdmCurrentDriver)) {
         settings->common.fakemodule_flags |= FAKE_MODULE_FLAG_USBD;
         sysLaunchLoaderElf(filename, "BDM_USB_MODE", irx_size, irx, size_mcemu_irx, bdm_mcemu_irx, EnablePS2Logo, compatmask);
-    } else if (!strcmp(bdmCurrentDriver, "sd") && strlen(bdmCurrentDriver) == 2) {
+    } else if (bdmDriverIsIlink(bdmCurrentDriver)) {
         settings->common.fakemodule_flags |= 0 /* TODO! fake ilinkman ? */;
         sysLaunchLoaderElf(filename, "BDM_ILK_MODE", irx_size, irx, size_mcemu_irx, bdm_mcemu_irx, EnablePS2Logo, compatmask);
-    } else if (!strcmp(bdmCurrentDriver, "sdc") && strlen(bdmCurrentDriver) == 3) {
+    } else if (bdmDriverIsMx4sio(bdmCurrentDriver)) {
         settings->common.fakemodule_flags |= 0;
         sysLaunchLoaderElf(filename, "BDM_M4S_MODE", irx_size, irx, size_mcemu_irx, bdm_mcemu_irx, EnablePS2Logo, compatmask);
-    } else if (!strcmp(bdmCurrentDriver, "ata") && strlen(bdmCurrentDriver) == 3) {
+    } else if (bdmDriverIsATA(bdmCurrentDriver)) {
         settings->common.fakemodule_flags |= FAKE_MODULE_FLAG_DEV9;
         settings->common.fakemodule_flags |= FAKE_MODULE_FLAG_ATAD;
         sysLaunchLoaderElf(filename, "BDM_ATA_MODE", irx_size, irx, size_mcemu_irx, bdm_mcemu_irx, EnablePS2Logo, compatmask);
@@ -749,13 +769,13 @@ static int bdmGetTextId(item_list_t *itemList)
 
     bdm_device_data_t *pDeviceData = (bdm_device_data_t *)itemList->priv;
 
-    if (!strcmp(pDeviceData->bdmDriver, "usb"))
+    if (bdmDriverIsUSB(pDeviceData->bdmDriver))
         mode = _STR_USB_GAMES;
-    else if (!strcmp(pDeviceData->bdmDriver, "sd") && strlen(pDeviceData->bdmDriver) == 2)
+    else if (bdmDriverIsIlink(pDeviceData->bdmDriver))
         mode = _STR_ILINK_GAMES;
-    else if (!strcmp(pDeviceData->bdmDriver, "sdc") && strlen(pDeviceData->bdmDriver) == 3)
+    else if (bdmDriverIsMx4sio(pDeviceData->bdmDriver))
         mode = _STR_MX4SIO_GAMES;
-    else if (!strcmp(pDeviceData->bdmDriver, "ata") && strlen(pDeviceData->bdmDriver) == 3)
+    else if (bdmDriverIsATA(pDeviceData->bdmDriver))
         mode = _STR_HDD_GAMES;
 
     return mode;
@@ -767,13 +787,13 @@ static int bdmGetIconId(item_list_t *itemList)
 
     bdm_device_data_t *pDeviceData = (bdm_device_data_t *)itemList->priv;
 
-    if (!strcmp(pDeviceData->bdmDriver, "usb"))
+    if (bdmDriverIsUSB(pDeviceData->bdmDriver))
         mode = USB_ICON;
-    else if (!strcmp(pDeviceData->bdmDriver, "sd") && strlen(pDeviceData->bdmDriver) == 2)
+    else if (bdmDriverIsIlink(pDeviceData->bdmDriver))
         mode = ILINK_ICON;
-    else if (!strcmp(pDeviceData->bdmDriver, "sdc") && strlen(pDeviceData->bdmDriver) == 3)
+    else if (bdmDriverIsMx4sio(pDeviceData->bdmDriver))
         mode = MX4SIO_ICON;
-    else if (!strcmp(pDeviceData->bdmDriver, "ata") && strlen(pDeviceData->bdmDriver) == 3)
+    else if (bdmDriverIsATA(pDeviceData->bdmDriver))
         mode = HDD_BD_ICON;
 
     return mode;
