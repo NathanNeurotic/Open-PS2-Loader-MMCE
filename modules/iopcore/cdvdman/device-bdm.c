@@ -28,6 +28,17 @@ extern struct irx_export_table _exp_bdm;
 extern struct irx_export_table _exp_atad;
 #endif
 
+static int bdm_matches_launch_device(const struct block_device *bd)
+{
+    if (bd == NULL || bd->devNr != cdvdman_settings.bdDeviceId)
+        return 0;
+
+    if (cdvdman_settings.bdDeviceDriver[0] == '\0')
+        return 1;
+
+    return (bd->path != NULL) && (strcmp(bd->path, cdvdman_settings.bdDeviceDriver) == 0);
+}
+
 //
 // BDM exported functions
 //
@@ -36,7 +47,7 @@ void bdm_connect_bd(struct block_device *bd)
 {
     DPRINTF("connecting device %s%dp%d\n", bd->name, bd->devNr, bd->parNr);
 
-    if (g_bd == NULL && bd->devNr == cdvdman_settings.bdDeviceId) {
+    if (g_bd == NULL && bdm_matches_launch_device(bd)) {
         DPRINTF("attaching to %s%dp%d\n", bd->name, bd->devNr, bd->parNr);
         g_bd = bd;
         g_bd_sectors_per_sector = (2048 / bd->sectorSize);
@@ -49,7 +60,7 @@ void bdm_disconnect_bd(struct block_device *bd)
 {
     DPRINTF("disconnecting device %s%dp%d\n", bd->name, bd->devNr, bd->parNr);
 
-    if (bd->devNr == cdvdman_settings.bdDeviceId) {
+    if (bdm_matches_launch_device(bd)) {
         DPRINTF("detatching from %s%dp%d\n", bd->name, bd->devNr, bd->parNr);
 
         // Lock usage of block device

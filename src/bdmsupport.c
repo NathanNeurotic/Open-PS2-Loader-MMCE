@@ -64,6 +64,17 @@ static const char *bdmGetTypedPathForDriver(const char *driverName)
     return NULL;
 }
 
+static void bdmSetLaunchDeviceBinding(struct cdvdman_settings_bdm *settings, const char *driverName, int deviceIndex)
+{
+    const char *typedPath = bdmGetTypedPathForDriver(driverName);
+
+    settings->bdDeviceId = deviceIndex;
+    if (typedPath != NULL)
+        snprintf(settings->bdDeviceDriver, sizeof(settings->bdDeviceDriver), "%s", typedPath);
+    else
+        settings->bdDeviceDriver[0] = '\0';
+}
+
 static void bdmBuildGamePrefix(char *target, int targetLength, const char *deviceRoot)
 {
     if (gBDMPrefix[0] != '\0')
@@ -654,7 +665,7 @@ void bdmLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
     // deinit will free per device data.. copy driver name before free to compare for launch
     char bdmCurrentDriver[32];
     snprintf(bdmCurrentDriver, sizeof(bdmCurrentDriver), "%s", pDeviceData->bdmDriver);
-    settings->bdDeviceId = pDeviceData->massDeviceIndex;
+    bdmSetLaunchDeviceBinding(settings, bdmCurrentDriver, pDeviceData->massDeviceIndex);
 
     if (!strcmp(bdmCurrentDriver, "ata") && strlen(bdmCurrentDriver) == 3) {
         // Get DMA settings for ATA mode.

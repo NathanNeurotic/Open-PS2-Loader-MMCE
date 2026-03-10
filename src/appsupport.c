@@ -75,7 +75,7 @@ static float appGetELFSize(char *path)
 
 static char *appGetBoot(char *device, int max, char *path)
 {
-    char *pos, *filenamesep;
+    char *pos;
 
     // Looking for the boot device & filename from the path
     pos = strrchr(path, ':');
@@ -87,15 +87,26 @@ static char *appGetBoot(char *device, int max, char *path)
         device[len] = '\0';
     }
 
-    filenamesep = strchr(path, '/');
-    if (filenamesep != NULL)
-        return filenamesep + 1;
+    return appGetELFName(path);
+}
 
-    if (pos) {
-        return pos + 1;
+static const char *appFindSourcePath(const char *startup)
+{
+    for (int i = 0; i < appItemCount; i++) {
+        if (strcmp(appsList[i].boot, startup) == 0) {
+            if (strchr(appsList[i].boot, ':') != NULL || strchr(appsList[i].boot, '/') != NULL)
+                return appsList[i].boot;
+
+            if (appsList[i].path[0] != '\0') {
+                snprintf(appStartupPath, sizeof(appStartupPath), "%s/%s", appsList[i].path, appsList[i].boot);
+                return appStartupPath;
+            }
+
+            return appsList[i].boot;
+        }
     }
 
-    return path;
+    return startup;
 }
 
 void appInit(item_list_t *itemList)
@@ -304,13 +315,7 @@ static int appGetItemNameLength(item_list_t *itemList, int id)
    The path is used immediately, before a subsequent call to appGetItemStartup(). */
 static char *appGetItemStartup(item_list_t *itemList, int id)
 {
-    if (appsList[id].legacy) {
-        struct config_value_t *cur = appGetConfigValue(id);
-        return cur->val;
-    } else {
-        snprintf(appStartupPath, sizeof(appStartupPath), "%s/%s", appsList[id].path, appsList[id].boot);
-        return appStartupPath;
-    }
+    return appsList[id].boot;
 }
 
 static void appDeleteItem(item_list_t *itemList, int id)
@@ -461,9 +466,13 @@ static int appGetImage(item_list_t *itemList, char *folder, int isRelative, char
 {
     char device[8] = "";
     char *startup;
+    const char *sourcePath = appFindSourcePath(value);
 
-    startup = appGetBoot(device, sizeof(device), value);
-    return oplGetAppImage(device[0] != '\0' ? device : NULL, folder, isRelative, startup, suffix, resultTex, psm);
+    startup = appGetBoot(device, sizeof(device), (char *)sourcePath);
+    if (!strcmp(folder, "ART"))
+        return oplGetAppImage(device[0] != '\0' ? device : NULL, folder, isRelative, startup, suffix, resultTex, psm);
+    else
+        return oplGetAppImage(device[0] != '\0' ? device : NULL, folder, isRelative, value, suffix, resultTex, psm);
 }
 
 static int appGetTextId(item_list_t *itemList)
