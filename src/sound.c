@@ -377,7 +377,7 @@ static void bgmThread(void *arg)
     while (!terminateFlag) {
         SleepThread();
 
-        while (PollSema(outSema) == 0) {
+        while (PollSema(outSema) == outSema) {
             audsrv_wait_audio(BGM_RING_BUFFER_SIZE);
             audsrv_play_audio(bgmBuffer[rdPtr], BGM_RING_BUFFER_SIZE);
             rdPtr = (rdPtr + 1) % BGM_RING_BUFFER_COUNT;
