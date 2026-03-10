@@ -346,7 +346,7 @@ static void bgmThread(void *arg)
     while (!terminateFlag) {
         SleepThread();
 
-        while (PollSema(outSema) == outSema) {
+        while (PollSema(outSema) == 0) {
             audsrv_wait_audio(BGM_RING_BUFFER_SIZE);
             audsrv_play_audio(bgmBuffer[rdPtr], BGM_RING_BUFFER_SIZE);
             rdPtr = (rdPtr + 1) % BGM_RING_BUFFER_COUNT;
@@ -373,7 +373,7 @@ static void bgmIoThread(void *arg)
         WaitSema(inSema);
         partsToRead = 1;
 
-        while ((wrPtr + partsToRead < BGM_RING_BUFFER_COUNT) && (PollSema(inSema) == inSema))
+        while ((wrPtr + partsToRead < BGM_RING_BUFFER_COUNT) && (PollSema(inSema) == 0))
             partsToRead++;
 
         decodeTotal = BGM_RING_BUFFER_SIZE;
