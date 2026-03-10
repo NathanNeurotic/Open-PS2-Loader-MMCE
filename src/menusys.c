@@ -949,10 +949,13 @@ void menuHandleInputMenu()
     }
 }
 
-static void menuRenderElements(theme_element_t *elem)
+static void menuRenderElements(theme_elems_t *elems)
 {
     // selected_item can't be NULL here as we only allow to switch to "Main" rendering when there is at least one device activated
-    _menuRequestConfig();
+    theme_element_t *elem = elems->first;
+
+    if (elems->needsItemConfig)
+        _menuRequestConfig();
 
     WaitSema(menuSemaId);
 
@@ -970,10 +973,10 @@ void menuRenderMain(void)
     item_list_t *list = selected_item->item->userdata;
 
     if (list->mode == APP_MODE) {
-        menuRenderElements(gTheme->appsMainElems.first);
+        menuRenderElements(&gTheme->appsMainElems);
         gTheme->itemsList = gTheme->appsItemsList;
     } else {
-        menuRenderElements(gTheme->mainElems.first);
+        menuRenderElements(&gTheme->mainElems);
         gTheme->itemsList = gTheme->gamesItemsList;
     }
 }
@@ -1027,10 +1030,10 @@ void menuRenderInfo(void)
     item_list_t *list = selected_item->item->userdata;
 
     if (list->mode == APP_MODE) {
-        menuRenderElements(gTheme->appsInfoElems.first);
+        menuRenderElements(&gTheme->appsInfoElems);
         gTheme->itemsList = gTheme->appsItemsList;
     } else {
-        menuRenderElements(gTheme->infoElems.first);
+        menuRenderElements(&gTheme->infoElems);
         gTheme->itemsList = gTheme->gamesItemsList;
     }
 }

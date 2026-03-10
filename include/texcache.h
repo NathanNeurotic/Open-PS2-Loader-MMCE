@@ -11,6 +11,12 @@ typedef struct
     // NULL not queued, otherwise queue request record
     void *qr;
 
+    // Cache entry state managed by texcache.c.
+    int state;
+
+    // Frame on which the texture was primed into VRAM.
+    int primeFrame;
+
     // frame counter the icon was used the last time - oldest get rewritten first in case new icon is requested and cache is full. negative numbers mean
     // slot is free and can be used right now
     int lastUsed;
@@ -33,6 +39,8 @@ typedef struct
     char *suffix;
 
     int nextUID;
+    int activeRequests;
+    int destroying;
 
     /// the cache entries itself
     cache_entry_t *content;
@@ -62,9 +70,13 @@ void cacheCancelPendingImageLoads(void);
  */
 void cacheAdvanceGeneration(void);
 
-/** Compatibility no-op. Textures are uploaded on first draw again.
+/** Uploads at most one ready texture to VRAM for use on a later frame.
  */
 void cachePrimeReadyTexture(void);
+
+/** Returns nonzero while art decode or prime work is still pending.
+ */
+int cacheHasPendingArt(void);
 
 GSTEXTURE *cacheGetTexture(image_cache_t *cache, item_list_t *list, int *cacheId, int *UID, char *value);
 

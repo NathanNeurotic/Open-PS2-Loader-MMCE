@@ -1022,15 +1022,18 @@ static int addGUIElem(const char *themePath, config_set_t *themeConfig, theme_t 
         configGetStr(themeConfig, elemProp, &type);
         if (type) {
             if (!strcmp(elementsType[ELEM_TYPE_ATTRIBUTE_TEXT], type)) {
+                elems->needsItemConfig = 1;
                 elem = initBasic(themePath, themeConfig, theme, name, ELEM_TYPE_ATTRIBUTE_TEXT, 0, 0, ALIGN_CENTER, DIM_UNDEF, DIM_UNDEF, SCALING_RATIO, theme->textColor, theme->fonts[0]);
                 initAttributeText(themePath, themeConfig, theme, elem, name);
             } else if (!strcmp(elementsType[ELEM_TYPE_STATIC_TEXT], type)) {
                 elem = initBasic(themePath, themeConfig, theme, name, ELEM_TYPE_STATIC_TEXT, 0, 0, ALIGN_CENTER, DIM_UNDEF, DIM_UNDEF, SCALING_RATIO, theme->textColor, theme->fonts[0]);
                 initStaticText(themePath, themeConfig, theme, elem, name);
             } else if (!strcmp(elementsType[ELEM_TYPE_GAME_COUNT_TEXT], type)) {
+                elems->needsItemConfig = 1;
                 elem = initBasic(themePath, themeConfig, theme, name, ELEM_TYPE_STATIC_TEXT, 0, 0, ALIGN_CENTER, DIM_UNDEF, DIM_UNDEF, SCALING_RATIO, theme->textColor, theme->fonts[0]);
                 initGameCountText(themePath, themeConfig, theme, elem, name);
             } else if (!strcmp(elementsType[ELEM_TYPE_ATTRIBUTE_IMAGE], type)) {
+                elems->needsItemConfig = 1;
                 elem = initBasic(themePath, themeConfig, theme, name, ELEM_TYPE_ATTRIBUTE_IMAGE, 0, 0, ALIGN_CENTER, DIM_UNDEF, DIM_UNDEF, SCALING_RATIO, gDefaultCol, theme->fonts[0]);
                 initAttributeImage(themePath, themeConfig, theme, elem, name);
             } else if (!strcmp(elementsType[ELEM_TYPE_GAME_IMAGE], type)) {

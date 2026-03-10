@@ -746,6 +746,9 @@ static void menuUpdateHook()
     if (ioHasPendingRequests())
         return;
 
+    if (cacheHasPendingArt())
+        return;
+
     // schedule updates of all the list handlers
     if (gAutoRefresh) {
         for (i = 0; i < MODE_COUNT; i++) {
@@ -1509,6 +1512,7 @@ void deinit(int exception, int modeSelected)
     menuEnd();
     lngEnd();
     thmEnd();
+    cacheEnd();
     rmEnd();
     configEnd();
 }

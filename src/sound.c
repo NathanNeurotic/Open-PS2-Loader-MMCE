@@ -582,6 +582,7 @@ void bgmStart(void)
         audsrvFmt.bits = 16;
 
         audsrv_set_format(&audsrvFmt);
+        audsrv_set_volume(gBGMVolume);
 
         bgmIsPlaying = 1;
 

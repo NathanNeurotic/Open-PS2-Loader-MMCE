@@ -1535,8 +1535,6 @@ static void guiReadPads()
 // screen handlers. Fade transition code written by Maximus32
 static void guiShow()
 {
-    cachePrimeReadyTexture();
-
     // is there a transmission effect going on or are
     // we in a normal rendering state?
     if (screenHandlerTarget) {
@@ -1608,6 +1606,8 @@ void guiIntroLoop(void)
 
         if (!screenHandlerTarget && screenHandler)
             screenHandler->handleInput();
+
+        cachePrimeReadyTexture();
     }
 }
 
@@ -1646,6 +1646,8 @@ void guiMainLoop(void)
         // done here so we can use renderman if needed
         if (!screenHandlerTarget && screenHandler)
             screenHandler->handleInput();
+
+        cachePrimeReadyTexture();
 
         if (gFrameHook)
             gFrameHook();
