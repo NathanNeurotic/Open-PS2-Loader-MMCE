@@ -11,10 +11,7 @@ typedef struct
     image_cache_t *cache;
     cache_entry_t *entry;
     item_list_t *list;
-    // only for comparison if the deferred action is still valid
     int cacheUID;
-    unsigned int generation;
-    GSTEXTURE texture;
     char *value;
 } load_image_request_t;
 
@@ -25,16 +22,8 @@ typedef struct cache_registry_entry
 } cache_registry_entry_t;
 
 static cache_registry_entry_t *gCacheRegistry = NULL;
-static image_cache_t *gPrimeCursorCache = NULL;
-static unsigned int gCacheGeneration = 1;
-static int gCacheInitialized = 0;
 
 static void cacheClearItem(cache_entry_t *item, int freeTxt);
-
-static int cacheIsRequestValid(const load_image_request_t *req)
-{
-    return req != NULL && req->entry != NULL && req->cache != NULL && req->list != NULL && req->cacheUID == req->entry->UID && req->generation == req->entry->generation;
-}
 
 static void cacheRegister(image_cache_t *cache)
 {
@@ -46,9 +35,6 @@ static void cacheRegister(image_cache_t *cache)
     entry->cache = cache;
     entry->next = gCacheRegistry;
     gCacheRegistry = entry;
-
-    if (gPrimeCursorCache == NULL)
-        gPrimeCursorCache = cache;
 }
 
 static void cacheUnregister(image_cache_t *cache)
@@ -58,9 +44,6 @@ static void cacheUnregister(image_cache_t *cache)
 
     while (entry != NULL) {
         if (entry->cache == cache) {
-            if (gPrimeCursorCache == cache)
-                gPrimeCursorCache = NULL;
-
             if (previous != NULL)
                 previous->next = entry->next;
             else
@@ -75,7 +58,7 @@ static void cacheUnregister(image_cache_t *cache)
     }
 }
 
-static void cacheClearHiddenEntries(int freeQueuedRequests)
+static void cacheClearQueuedRequests(void)
 {
     cache_registry_entry_t *registry = gCacheRegistry;
 
@@ -86,13 +69,10 @@ static void cacheClearHiddenEntries(int freeQueuedRequests)
             for (int i = 0; i < cache->count; i++) {
                 cache_entry_t *entry = &cache->content[i];
 
-                if ((entry->state == CACHE_ENTRY_STATE_EMPTY) || (entry->state == CACHE_ENTRY_STATE_DISPLAYABLE))
-                    continue;
-
-                if (freeQueuedRequests && entry->qr != NULL)
+                if (entry->qr != NULL) {
                     free(entry->qr);
-
-                cacheClearItem(entry, 1);
+                    cacheClearItem(entry, 1);
+                }
             }
         }
 
@@ -100,97 +80,60 @@ static void cacheClearHiddenEntries(int freeQueuedRequests)
     }
 }
 
-static void cachePromotePrimedEntries(void)
+static void cacheReleaseRequest(load_image_request_t *req, int markFailed)
 {
-    cache_registry_entry_t *registry = gCacheRegistry;
+    if (req == NULL)
+        return;
 
-    while (registry != NULL) {
-        image_cache_t *cache = registry->cache;
+    if (req->entry != NULL && req->entry->qr == req) {
+        req->entry->qr = NULL;
 
-        if (cache != NULL) {
-            for (int i = 0; i < cache->count; i++) {
-                cache_entry_t *entry = &cache->content[i];
-
-                if (entry->state == CACHE_ENTRY_STATE_PRIMED && entry->primeFrame < guiFrameId)
-                    entry->state = CACHE_ENTRY_STATE_DISPLAYABLE;
-            }
-        }
-
-        registry = registry->next;
-    }
-}
-
-static int cachePrimeCache(image_cache_t *cache)
-{
-    for (int i = 0; i < cache->count; i++) {
-        cache_entry_t *entry = &cache->content[i];
-
-        if (entry->state == CACHE_ENTRY_STATE_READY) {
-            rmPrimeTexture(&entry->texture);
-            entry->state = CACHE_ENTRY_STATE_PRIMED;
-            entry->primeFrame = guiFrameId;
-            gPrimeCursorCache = cache;
-            return 1;
-        }
+        if (markFailed)
+            req->entry->lastUsed = 0;
     }
 
-    return 0;
+    free(req);
 }
 
-// Io handled action...
 static void cacheLoadImage(void *data)
 {
     load_image_request_t *req = data;
 
-    // Safeguards...
-    if (!cacheIsRequestValid(req)) {
-        if (req)
-            free(req);
+    if (req == NULL || req->entry == NULL || req->cache == NULL) {
+        cacheReleaseRequest(req, 0);
         return;
     }
 
-    // seems okay. we can proceed
-    memset(&req->texture, 0, sizeof(req->texture));
-
-    if (req->list->itemGetImage(req->list, req->cache->prefix, req->cache->isPrefixRelative, req->value, req->cache->suffix, &req->texture, GS_PSM_CT24) < 0) {
-        if (cacheIsRequestValid(req)) {
-            req->entry->lastUsed = 0;
-            req->entry->state = CACHE_ENTRY_STATE_FAILED;
-            req->entry->primeFrame = -1;
-            req->entry->qr = NULL;
-        } else {
-            texFree(&req->texture);
-        }
-
-        free(req);
+    item_list_t *handler = req->list;
+    if (handler == NULL) {
+        cacheReleaseRequest(req, 1);
         return;
     }
 
-    if (!cacheIsRequestValid(req)) {
-        texFree(&req->texture);
-        free(req);
+    if (req->cacheUID != req->entry->UID) {
+        cacheReleaseRequest(req, 0);
         return;
     }
 
-    req->entry->texture = req->texture;
-    req->entry->lastUsed = guiFrameId;
-    req->entry->state = CACHE_ENTRY_STATE_READY;
-    req->entry->primeFrame = -1;
+    GSTEXTURE *texture = &req->entry->texture;
+    texFree(texture);
+
+    if (handler->itemGetImage(handler, req->cache->prefix, req->cache->isPrefixRelative, req->value, req->cache->suffix, texture, GS_PSM_CT24) < 0)
+        req->entry->lastUsed = 0;
+    else
+        req->entry->lastUsed = guiFrameId;
+
     req->entry->qr = NULL;
-
     free(req);
 }
 
 void cacheInit()
 {
-    gCacheInitialized = 1;
     ioRegisterHandler(IO_CACHE_LOAD_ART, &cacheLoadImage);
 }
 
 void cacheEnd()
 {
-    gCacheInitialized = 0;
-    // nothing to do... others have to destroy the cache via cacheDestroyCache
 }
 
 static void cacheClearItem(cache_entry_t *item, int freeTxt)
@@ -207,36 +150,54 @@ static void cacheClearItem(cache_entry_t *item, int freeTxt)
     item->texture.Vram = 0;
     item->texture.Clut = NULL;
     item->texture.VramClut = 0;
-    item->texture.ClutStorageMode = GS_CLUT_STORAGE_CSM1; // Default
+    item->texture.ClutStorageMode = GS_CLUT_STORAGE_CSM1;
     item->qr = NULL;
     item->lastUsed = -1;
     item->UID = 0;
-    item->primeFrame = -1;
-    item->generation = 0;
-    item->state = CACHE_ENTRY_STATE_EMPTY;
 }
 
 image_cache_t *cacheInitCache(int userId, const char *prefix, int isPrefixRelative, const char *suffix, int count)
 {
-    image_cache_t *cache = (image_cache_t *)malloc(sizeof(image_cache_t));
+    image_cache_t *cache = malloc(sizeof(image_cache_t));
+
+    if (cache == NULL)
+        return NULL;
+
+    memset(cache, 0, sizeof(image_cache_t));
     cache->userId = userId;
     cache->count = count;
-    cache->prefix = NULL;
-    int length;
-    if (prefix) {
-        length = strlen(prefix) + 1;
-        cache->prefix = (char *)malloc(length * sizeof(char));
+
+    if (prefix != NULL) {
+        int length = strlen(prefix) + 1;
+        cache->prefix = malloc(length * sizeof(char));
+        if (cache->prefix == NULL) {
+            free(cache);
+            return NULL;
+        }
         memcpy(cache->prefix, prefix, length);
     }
-    cache->isPrefixRelative = isPrefixRelative;
-    length = strlen(suffix) + 1;
-    cache->suffix = (char *)malloc(length * sizeof(char));
-    memcpy(cache->suffix, suffix, length);
-    cache->nextUID = 1;
-    cache->content = (cache_entry_t *)malloc(count * sizeof(cache_entry_t));
 
-    int i;
-    for (i = 0; i < count; ++i)
+    cache->isPrefixRelative = isPrefixRelative;
+
+    int length = strlen(suffix) + 1;
+    cache->suffix = malloc(length * sizeof(char));
+    if (cache->suffix == NULL) {
+        free(cache->prefix);
+        free(cache);
+        return NULL;
+    }
+    memcpy(cache->suffix, suffix, length);
+
+    cache->nextUID = 1;
+    cache->content = malloc(count * sizeof(cache_entry_t));
+    if (cache->content == NULL) {
+        free(cache->prefix);
+        free(cache->suffix);
+        free(cache);
+        return NULL;
+    }
+
+    for (int i = 0; i < count; ++i)
         cacheClearItem(&cache->content[i], 0);
 
     cacheRegister(cache);
@@ -246,10 +207,17 @@ image_cache_t *cacheInitCache(int userId, const char *prefix, int isPrefixRelati
 
 void cacheDestroyCache(image_cache_t *cache)
 {
+    if (cache == NULL)
+        return;
+
     cacheUnregister(cache);
 
-    int i;
-    for (i = 0; i < cache->count; ++i) {
+    for (int i = 0; i < cache->count; ++i) {
+        if (cache->content[i].qr != NULL) {
+            free(cache->content[i].qr);
+            cache->content[i].qr = NULL;
+        }
+
         cacheClearItem(&cache->content[i], 1);
     }
 
@@ -261,50 +229,16 @@ void cacheDestroyCache(image_cache_t *cache)
 
 void cacheCancelPendingImageLoads(void)
 {
-    if (!gCacheInitialized)
-        return;
-
-    gPrimeCursorCache = NULL;
     ioRemoveRequests(IO_CACHE_LOAD_ART);
-    cacheClearHiddenEntries(1);
+    cacheClearQueuedRequests();
 }
 
 void cacheAdvanceGeneration(void)
 {
-    if (!gCacheInitialized)
-        return;
-
-    gCacheGeneration++;
-    if (gCacheGeneration == 0)
-        gCacheGeneration = 1;
-
-    gPrimeCursorCache = NULL;
-    cacheClearHiddenEntries(0);
 }
 
 void cachePrimeReadyTexture(void)
 {
-    if (!gCacheInitialized)
-        return;
-
-    cachePromotePrimedEntries();
-
-    if (gCacheRegistry == NULL)
-        return;
-
-    cache_registry_entry_t *cursor = gCacheRegistry;
-    while (cursor != NULL && cursor->cache != gPrimeCursorCache)
-        cursor = cursor->next;
-
-    cache_registry_entry_t *entry = (cursor != NULL && cursor->next != NULL) ? cursor->next : gCacheRegistry;
-    cache_registry_entry_t *start = entry;
-
-    do {
-        if (entry != NULL && cachePrimeCache(entry->cache))
-            return;
-
-        entry = (entry != NULL && entry->next != NULL) ? entry->next : gCacheRegistry;
-    } while (entry != NULL && entry != start);
 }
 
 GSTEXTURE *cacheGetTexture(image_cache_t *cache, item_list_t *list, int *cacheId, int *UID, char *value)
@@ -314,9 +248,9 @@ GSTEXTURE *cacheGetTexture(image_cache_t *cache, item_list_t *list, int *cacheId
     } else if (*cacheId != -1) {
         cache_entry_t *entry = &cache->content[*cacheId];
         if (entry->UID == *UID) {
-            if ((entry->state == CACHE_ENTRY_STATE_QUEUED) || (entry->state == CACHE_ENTRY_STATE_READY) || (entry->state == CACHE_ENTRY_STATE_PRIMED))
+            if (entry->qr != NULL)
                 return NULL;
-            else if (entry->state == CACHE_ENTRY_STATE_FAILED) {
+            else if (entry->lastUsed == 0) {
                 *cacheId = -2;
                 return NULL;
             } else {
@@ -328,46 +262,41 @@ GSTEXTURE *cacheGetTexture(image_cache_t *cache, item_list_t *list, int *cacheId
         *cacheId = -1;
     }
 
-    // under the cache pre-delay (to avoid filling cache while moving around)
     if (guiInactiveFrames < list->delay)
         return NULL;
 
     cache_entry_t *currEntry, *oldestEntry = NULL;
-    int i, rtime = guiFrameId;
+    int rtime = guiFrameId;
 
-    for (i = 0; i < cache->count; i++) {
+    for (int i = 0; i < cache->count; i++) {
         currEntry = &cache->content[i];
-        if ((!currEntry->qr) && (currEntry->lastUsed < rtime)) {
+        if (currEntry->qr == NULL && currEntry->lastUsed < rtime) {
             oldestEntry = currEntry;
             rtime = currEntry->lastUsed;
             *cacheId = i;
         }
     }
 
-    if (oldestEntry) {
+    if (oldestEntry != NULL) {
         load_image_request_t *req = malloc(sizeof(load_image_request_t) + strlen(value) + 1);
+
         if (req == NULL)
             return NULL;
 
-        memset(req, 0, sizeof(load_image_request_t));
         req->cache = cache;
         req->entry = oldestEntry;
         req->list = list;
         req->value = (char *)req + sizeof(load_image_request_t);
         strcpy(req->value, value);
         req->cacheUID = cache->nextUID;
-        req->generation = gCacheGeneration;
 
         cacheClearItem(oldestEntry, 1);
         oldestEntry->qr = req;
         oldestEntry->UID = cache->nextUID;
-        oldestEntry->generation = gCacheGeneration;
-        oldestEntry->state = CACHE_ENTRY_STATE_QUEUED;
 
         *UID = cache->nextUID++;
 
         if (ioPutRequest(IO_CACHE_LOAD_ART, req) != IO_OK) {
-            // Queue is full or IO is blocked. Drop request and free the cache slot.
             cacheClearItem(oldestEntry, 0);
             free(req);
             *cacheId = -1;
