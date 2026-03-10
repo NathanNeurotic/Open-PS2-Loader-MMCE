@@ -70,6 +70,22 @@ static struct sfxEffect sfx_files[SFX_COUNT] = {
 static struct audsrv_adpcm_t sfx[SFX_COUNT];
 static int audio_initialized = 0;
 
+#define CURSOR_SFX_CHANNEL_BASE  SFX_COUNT
+#define CURSOR_SFX_CHANNEL_COUNT 6
+
+static int cursorChannelIndex = 0;
+
+static int sfxGetCursorChannel(int slot)
+{
+    return CURSOR_SFX_CHANNEL_BASE + slot;
+}
+
+static void sfxSetCursorChannelsVolume(int volume)
+{
+    for (int i = 0; i < CURSOR_SFX_CHANNEL_COUNT; i++)
+        audsrv_adpcm_set_volume_and_pan(sfxGetCursorChannel(i), volume, 0);
+}
+
 // Returns 0 if the specified file was read. The sfxEffect structure will not be updated unless the file is successfully read.
 static int sfxRead(const char *full_path, struct sfxEffect *sfx)
 {
@@ -179,6 +195,7 @@ int sfxInit(int bootSnd)
     }
 
     audsrv_adpcm_init();
+    cursorChannelIndex = 0;
     sfxInitDefaults();
     audioSetVolume();
 
@@ -241,8 +258,19 @@ void sfxPlay(int id)
     }
 
     if (gEnableSFX) {
-        channel = (id == SFX_CURSOR) ? -1 : id;
-        audsrv_ch_play_adpcm(channel, &sfx[id]);
+        if (id == SFX_CURSOR) {
+            int chosenSlot = cursorChannelIndex;
+
+            cursorChannelIndex = (cursorChannelIndex + 1) % CURSOR_SFX_CHANNEL_COUNT;
+            channel = sfxGetCursorChannel(chosenSlot);
+
+            // Cut off any prior cursor tick tails so the next navigation sound feels immediate.
+            sfxSetCursorChannelsVolume(0);
+            audsrv_adpcm_set_volume_and_pan(channel, gSFXVolume, 0);
+            audsrv_ch_play_adpcm(channel, &sfx[id]);
+        } else {
+            audsrv_ch_play_adpcm(id, &sfx[id]);
+        }
     }
 }
 
@@ -683,6 +711,7 @@ void audioSetVolume(void)
     for (i = 1; i < SFX_COUNT; i++)
         audsrv_adpcm_set_volume(i, gSFXVolume);
 
+    sfxSetCursorChannelsVolume(gSFXVolume);
     audsrv_adpcm_set_volume(0, gBootSndVolume);
     audsrv_set_volume(gBGMVolume);
 }
