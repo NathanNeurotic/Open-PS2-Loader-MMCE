@@ -5,8 +5,6 @@
 #include "include/util.h"
 #include "include/renderman.h"
 
-#include <thbase.h>
-
 typedef struct load_image_request
 {
     struct load_image_request *next;
@@ -251,7 +249,7 @@ static void cacheWaitForAllRequests(void)
         if (!pending)
             break;
 
-        DelayThread(1000);
+        delay(1);
     }
 }
 
@@ -267,7 +265,7 @@ static void cacheWaitForCacheRequests(image_cache_t *cache)
         if (!pending)
             break;
 
-        DelayThread(1000);
+        delay(1);
     }
 }
 
@@ -412,7 +410,7 @@ void cacheEnd()
     WakeupThread(gArtThreadId);
 
     while (gArtRunning)
-        DelayThread(1000);
+        delay(1);
 
     if (gArtSemaId >= 0) {
         DeleteSema(gArtSemaId);
