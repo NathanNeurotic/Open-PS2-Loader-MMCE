@@ -90,19 +90,31 @@ static char *appGetBoot(char *device, int max, char *path)
     return appGetELFName(path);
 }
 
+static const char *appBuildStartupPath(const char *path, const char *boot)
+{
+    if (path[0] != '\0') {
+        const char *leaf = appGetELFName((char *)path);
+        if (strcmp(path, boot) == 0 || (leaf != path && strcmp(leaf, boot) == 0))
+            return path;
+
+        snprintf(appStartupPath, sizeof(appStartupPath), "%s/%s", path, boot);
+        return appStartupPath;
+    }
+
+    return boot;
+}
+
 static const char *appFindSourcePath(const char *startup)
 {
+    if (startup == NULL)
+        return NULL;
+
+    if (strchr(startup, ':') != NULL || strchr(startup, '/') != NULL)
+        return startup;
+
     for (int i = 0; i < appItemCount; i++) {
         if (strcmp(appsList[i].boot, startup) == 0) {
-            if (strchr(appsList[i].boot, ':') != NULL || strchr(appsList[i].boot, '/') != NULL)
-                return appsList[i].boot;
-
-            if (appsList[i].path[0] != '\0') {
-                snprintf(appStartupPath, sizeof(appStartupPath), "%s/%s", appsList[i].path, appsList[i].boot);
-                return appStartupPath;
-            }
-
-            return appsList[i].boot;
+            return appBuildStartupPath(appsList[i].path, appsList[i].boot);
         }
     }
 
@@ -194,7 +206,7 @@ static int addAppsLegacyList(struct app_info_linked **appsLinkedList)
             strncpy(app->app.boot, cur->val, APP_BOOT_MAX + 1);
             app->app.boot[APP_BOOT_MAX] = '\0';
             strncpy(app->app.path, cur->val, APP_PATH_MAX + 1);
-            app->app.path[APP_BOOT_MAX] = '\0';
+            app->app.path[APP_PATH_MAX] = '\0';
         }
 
         app->app.legacy = 1;
@@ -315,7 +327,7 @@ static int appGetItemNameLength(item_list_t *itemList, int id)
    The path is used immediately, before a subsequent call to appGetItemStartup(). */
 static char *appGetItemStartup(item_list_t *itemList, int id)
 {
-    return appsList[id].boot;
+    return (char *)appBuildStartupPath(appsList[id].path, appsList[id].boot);
 }
 
 static void appDeleteItem(item_list_t *itemList, int id)
@@ -464,7 +476,7 @@ static config_set_t *appGetConfig(item_list_t *itemList, int id)
 
 static int appGetImage(item_list_t *itemList, char *folder, int isRelative, char *value, char *suffix, GSTEXTURE *resultTex, short psm)
 {
-    char device[8] = "";
+    char device[BDM_DEVICE_ROOT_MAX] = "";
     char *startup;
     const char *sourcePath = appFindSourcePath(value);
 

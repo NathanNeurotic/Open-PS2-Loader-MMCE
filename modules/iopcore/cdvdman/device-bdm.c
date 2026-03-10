@@ -30,13 +30,22 @@ extern struct irx_export_table _exp_atad;
 
 static int bdm_matches_launch_device(const struct block_device *bd)
 {
-    if (bd == NULL || bd->devNr != cdvdman_settings.bdDeviceId)
+    if (bd == NULL)
         return 0;
 
     if (cdvdman_settings.bdDeviceDriver[0] == '\0')
-        return 1;
+        return bd->devNr == cdvdman_settings.bdDeviceId;
 
-    return (bd->name != NULL) && (strncmp(bd->name, cdvdman_settings.bdDeviceDriver, sizeof(cdvdman_settings.bdDeviceDriver)) == 0);
+#ifdef USE_BDM_ATA
+    /* The ATA-specific BDM cdvdman only ever exposes a single synthetic "ata"
+       block device from atad.c, so binding by driver token is sufficient. */
+    if (bd->name != NULL && strncmp(bd->name, "ata", sizeof(cdvdman_settings.bdDeviceDriver)) == 0)
+        return strncmp(cdvdman_settings.bdDeviceDriver, "ata", sizeof(cdvdman_settings.bdDeviceDriver)) == 0;
+#endif
+
+    return (bd->devNr == cdvdman_settings.bdDeviceId) &&
+           (bd->name != NULL) &&
+           (strncmp(bd->name, cdvdman_settings.bdDeviceDriver, sizeof(cdvdman_settings.bdDeviceDriver)) == 0);
 }
 
 //
