@@ -229,7 +229,9 @@ void cacheDestroyCache(image_cache_t *cache)
 
 void cacheCancelPendingImageLoads(void)
 {
-    ioRemoveRequests(IO_CACHE_LOAD_ART);
+    if (ioIsRunning())
+        ioRemoveRequests(IO_CACHE_LOAD_ART);
+
     cacheClearQueuedRequests();
 }
 

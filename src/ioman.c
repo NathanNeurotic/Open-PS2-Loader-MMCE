@@ -295,6 +295,11 @@ void ioEnd(void)
     WakeupThread(gIOThreadId);
 }
 
+int ioIsRunning(void)
+{
+    return isIORunning;
+}
+
 int ioGetPendingRequestCount(void)
 {
     int count = 0;
