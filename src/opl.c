@@ -1836,6 +1836,9 @@ static void autoLaunchBDMGame(char *argv[])
 
     gAutoLaunchDeviceData = malloc(sizeof(bdm_device_data_t));
     memset(gAutoLaunchDeviceData, 0, sizeof(bdm_device_data_t));
+    gAutoLaunchDeviceData->bdmDeviceType = BDM_TYPE_UNKNOWN;
+    gAutoLaunchDeviceData->bdmHddIsLBA48 = -1;
+    gAutoLaunchDeviceData->ataHighestUDMAMode = -1;
 
     char apaDevicePrefix[BDM_DEVICE_ROOT_MAX] = {0};
     int selectedMassSlot = -1;
@@ -1865,7 +1868,6 @@ static void autoLaunchBDMGame(char *argv[])
                 snprintf(gAutoLaunchDeviceData->bdmDriver, sizeof(gAutoLaunchDeviceData->bdmDriver), "%s", detectedDriver);
                 gAutoLaunchDeviceData->massDeviceIndex = detectedDeviceIndex;
                 bdmResolveDeviceRoot(apaDevicePrefix, sizeof(apaDevicePrefix), detectedDriver, detectedDeviceIndex, i);
-                bdmResolveLBA_UDMA(gAutoLaunchDeviceData);
                 break; // Exit the loop if "ata" device is found
             }
         } else {

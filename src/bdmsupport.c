@@ -282,6 +282,9 @@ static void bdmInit(item_list_t *itemList)
     pDeviceData->bdmGameCount = 0;
     pDeviceData->bdmGames = NULL;
     pDeviceData->FoldersCreated = 0;
+    pDeviceData->bdmDeviceType = BDM_TYPE_UNKNOWN;
+    pDeviceData->bdmHddIsLBA48 = -1;
+    pDeviceData->ataHighestUDMAMode = -1;
     configGetInt(configGetByType(CONFIG_OPL), "usb_frames_delay", &itemList->delay);
     bdmLoadModules();
     itemList->enabled = 1;
@@ -669,6 +672,10 @@ void bdmLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
     if (!strcmp(bdmCurrentDriver, "ata") && strlen(bdmCurrentDriver) == 3) {
         // Get DMA settings for ATA mode.
         int dmaType = 0, dmaMode = 7;
+
+        if (pDeviceData->bdmHddIsLBA48 < 0 || pDeviceData->ataHighestUDMAMode < 0)
+            bdmResolveLBA_UDMA(pDeviceData);
+
         configGetInt(configSet, CONFIG_ITEM_DMA, &dmaMode);
 
         // Set DMA mode and spindown time.
@@ -921,9 +928,6 @@ void bdmResolveLBA_UDMA(bdm_device_data_t *pDeviceData)
         LOG("Mass device %d supports up to UDMA mode %d, limiting to UDMA 4\n", pDeviceData->massDeviceIndex, pDeviceData->ataHighestUDMAMode);
         pDeviceData->ataHighestUDMAMode = 4;
     }
-
-    // Set the UDMA mode to highest available.
-    hddSetTransferMode(0x40, pDeviceData->ataHighestUDMAMode);
 }
 
 int bdmUpdateDeviceData(item_list_t *itemList)
@@ -955,6 +959,8 @@ int bdmUpdateDeviceData(item_list_t *itemList)
         memset(pDeviceData->bdmDriver, 0, sizeof(pDeviceData->bdmDriver));
         pDeviceData->massDeviceIndex = -1;
         pDeviceData->bdmDeviceType = BDM_TYPE_UNKNOWN;
+        pDeviceData->bdmHddIsLBA48 = -1;
+        pDeviceData->ataHighestUDMAMode = -1;
 
         // Get the name of the underlying device driver that backs the fat fs.
         driverResult = fileXioIoctl2(dir, USBMASS_IOCTL_GET_DRIVERNAME, NULL, 0, pDeviceData->bdmDriver, sizeof(pDeviceData->bdmDriver) - 1);
@@ -981,11 +987,9 @@ int bdmUpdateDeviceData(item_list_t *itemList)
             itemList->flags = MODE_FLAG_COMPAT_DMA;
         }
 
-        // If the device is backed by the ATA driver then get the supported LBA size for the drive.
-        if (pDeviceData->bdmDeviceType == BDM_TYPE_ATA) {
-            bdmResolveLBA_UDMA(pDeviceData);
-            LOG("Mass device: %d (%d LBA%d UDMA%d) %s -> %s (root %s)\n", itemList->mode, pDeviceData->massDeviceIndex, (pDeviceData->bdmHddIsLBA48 == 1 ? 48 : 28), pDeviceData->ataHighestUDMAMode, pDeviceData->bdmPrefix, pDeviceData->bdmDriver, pDeviceData->bdmDeviceRoot);
-        } else if (pDeviceData->bdmDriver[0] != '\0')
+        if (pDeviceData->bdmDeviceType == BDM_TYPE_ATA)
+            LOG("Mass device: %d (%d) ATA device %s (root %s)\n", itemList->mode, pDeviceData->massDeviceIndex, pDeviceData->bdmPrefix, pDeviceData->bdmDeviceRoot);
+        else if (pDeviceData->bdmDriver[0] != '\0')
             LOG("Mass device: %d (%d) %s -> %s (root %s)\n", itemList->mode, pDeviceData->massDeviceIndex, pDeviceData->bdmPrefix, pDeviceData->bdmDriver, pDeviceData->bdmDeviceRoot);
         else
             LOG("Mass device: %d using generic BDM path %s\n", itemList->mode, pDeviceData->bdmPrefix);
