@@ -5,7 +5,7 @@
 #include "include/util.h"
 #include "include/renderman.h"
 
-#include <kernel.h>
+#include <thbase.h>
 
 typedef struct load_image_request
 {
