@@ -24,6 +24,7 @@ typedef struct cache_registry_entry
 static cache_registry_entry_t *gCacheRegistry = NULL;
 
 static void cacheClearItem(cache_entry_t *item, int freeTxt);
+static void cacheResetTextureState(GSTEXTURE *texture);
 
 static void cacheRegister(image_cache_t *cache)
 {
@@ -95,9 +96,33 @@ static void cacheReleaseRequest(load_image_request_t *req, int markFailed)
     free(req);
 }
 
+static void cacheInvalidatePendingRequests(void)
+{
+    cache_registry_entry_t *registry = gCacheRegistry;
+
+    while (registry != NULL) {
+        image_cache_t *cache = registry->cache;
+
+        if (cache != NULL) {
+            for (int i = 0; i < cache->count; i++) {
+                cache_entry_t *entry = &cache->content[i];
+
+                if (entry->qr != NULL) {
+                    entry->qr = NULL;
+                    entry->lastUsed = -1;
+                    entry->UID = cache->nextUID++;
+                }
+            }
+        }
+
+        registry = registry->next;
+    }
+}
+
 static void cacheLoadImage(void *data)
 {
     load_image_request_t *req = data;
+    int result;
 
     if (req == NULL || req->entry == NULL || req->cache == NULL) {
         cacheReleaseRequest(req, 0);
@@ -117,13 +142,26 @@ static void cacheLoadImage(void *data)
 
     GSTEXTURE *texture = &req->entry->texture;
     texFree(texture);
+    cacheResetTextureState(texture);
 
-    if (handler->itemGetImage(handler, req->cache->prefix, req->cache->isPrefixRelative, req->value, req->cache->suffix, texture, GS_PSM_CT24) < 0)
-        req->entry->lastUsed = 0;
-    else
-        req->entry->lastUsed = guiFrameId;
+    result = handler->itemGetImage(handler, req->cache->prefix, req->cache->isPrefixRelative, req->value, req->cache->suffix, texture, GS_PSM_CT24);
 
-    req->entry->qr = NULL;
+    if (req->cacheUID != req->entry->UID) {
+        texFree(texture);
+        cacheResetTextureState(texture);
+        cacheReleaseRequest(req, 0);
+        return;
+    }
+
+    if (req->entry->qr == req) {
+        if (result < 0)
+            req->entry->lastUsed = 0;
+        else
+            req->entry->lastUsed = guiFrameId;
+
+        req->entry->qr = NULL;
+    }
+
     free(req);
 }
 
@@ -146,14 +184,16 @@ static void cacheClearItem(cache_entry_t *item, int freeTxt)
     }
 
     memset(item, 0, sizeof(cache_entry_t));
-    item->texture.Mem = NULL;
-    item->texture.Vram = 0;
-    item->texture.Clut = NULL;
-    item->texture.VramClut = 0;
-    item->texture.ClutStorageMode = GS_CLUT_STORAGE_CSM1;
+    cacheResetTextureState(&item->texture);
     item->qr = NULL;
     item->lastUsed = -1;
     item->UID = 0;
+}
+
+static void cacheResetTextureState(GSTEXTURE *texture)
+{
+    memset(texture, 0, sizeof(*texture));
+    texture->ClutStorageMode = GS_CLUT_STORAGE_CSM1;
 }
 
 image_cache_t *cacheInitCache(int userId, const char *prefix, int isPrefixRelative, const char *suffix, int count)
@@ -237,6 +277,7 @@ void cacheCancelPendingImageLoads(void)
 
 void cacheAdvanceGeneration(void)
 {
+    cacheInvalidatePendingRequests();
 }
 
 void cachePrimeReadyTexture(void)
@@ -263,9 +304,6 @@ GSTEXTURE *cacheGetTexture(image_cache_t *cache, item_list_t *list, int *cacheId
 
         *cacheId = -1;
     }
-
-    if (guiInactiveFrames < list->delay)
-        return NULL;
 
     cache_entry_t *currEntry, *oldestEntry = NULL;
     int rtime = guiFrameId;

@@ -58,7 +58,7 @@ void cacheDestroyCache(image_cache_t *cache);
  */
 void cacheCancelPendingImageLoads(void);
 
-/** Compatibility no-op. Art cache now follows the classic queue-only behavior.
+/** Invalidates queued art loads without blocking on the IO worker.
  */
 void cacheAdvanceGeneration(void);
 
