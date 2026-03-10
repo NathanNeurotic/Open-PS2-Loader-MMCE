@@ -36,7 +36,7 @@ static int bdm_matches_launch_device(const struct block_device *bd)
     if (cdvdman_settings.bdDeviceDriver[0] == '\0')
         return 1;
 
-    return (bd->path != NULL) && (strcmp(bd->path, cdvdman_settings.bdDeviceDriver) == 0);
+    return (bd->name != NULL) && (strcmp(bd->name, cdvdman_settings.bdDeviceDriver) == 0);
 }
 
 //

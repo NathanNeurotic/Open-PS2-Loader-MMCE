@@ -81,7 +81,7 @@ struct cdvdman_settings_bdm
     // Device ID of the block device to bind to.
     u32 bdDeviceId;
 
-    // Device path prefix of the block device to bind to (e.g. "usb", "mx4sio", "ata").
+    // Underlying BDM driver name of the block device to bind to (e.g. "usb", "sdc", "sd", "ata").
     char bdDeviceDriver[16];
 
     // Indicates the supported LBA size of the HDD (1 for LBA48, 0 for LBA28).

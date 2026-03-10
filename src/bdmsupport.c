@@ -66,11 +66,10 @@ static const char *bdmGetTypedPathForDriver(const char *driverName)
 
 static void bdmSetLaunchDeviceBinding(struct cdvdman_settings_bdm *settings, const char *driverName, int deviceIndex)
 {
-    const char *typedPath = bdmGetTypedPathForDriver(driverName);
-
     settings->bdDeviceId = deviceIndex;
-    if (typedPath != NULL)
-        snprintf(settings->bdDeviceDriver, sizeof(settings->bdDeviceDriver), "%s", typedPath);
+    // Match the IOP-side block device by its exported driver token, not the EE typed mount alias.
+    if (driverName != NULL && driverName[0] != '\0')
+        snprintf(settings->bdDeviceDriver, sizeof(settings->bdDeviceDriver), "%s", driverName);
     else
         settings->bdDeviceDriver[0] = '\0';
 }
