@@ -16,7 +16,7 @@ jobs:
       run:  apk add build-base git zip cdrkit
 
     - name: git checkout
-      uses: actions/checkout@v3
+      uses: actions/checkout@v5
 
     - run: |
         git config --global --add safe.directory "$GITHUB_WORKSPACE"
@@ -28,7 +28,7 @@ jobs:
           make iso
 
     - name: Upload release artifact ISO
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v6
       with:
         name: OPLTESTISO
         path: |
