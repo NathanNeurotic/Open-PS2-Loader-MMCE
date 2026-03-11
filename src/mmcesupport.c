@@ -61,6 +61,7 @@ void mmceLoadModules(void)
 void mmceInit(item_list_t *itemList)
 {
     LOG("MMCESUPPORT Init\n");
+    mmcePrefix[0] = '\0';
     mmceULSizePrev = -2;
     mmceModifiedCDPrev = 0;
     mmceModifiedDVDPrev = 0;
@@ -71,13 +72,7 @@ void mmceInit(item_list_t *itemList)
     mmceGameList.updateDelay = -1; //No automatic updates
 
     mmceLoadModules();
-
-    if (gMMCESlot == 0)
-        sprintf(mmcePrefix, "mmce0:/");
-    else if (gMMCESlot == 1)
-        sprintf(mmcePrefix, "mmce1:/");
-    else if (gMMCESlot == 2)
-        mmceDetectSlot();
+    mmceSetPrefix();
 
     mmceGameList.enabled = 1;
 }

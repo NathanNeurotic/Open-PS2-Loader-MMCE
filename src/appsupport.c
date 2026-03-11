@@ -31,6 +31,7 @@ struct app_info_linked
 static item_list_t appItemList;
 
 static void appFreeList(void);
+static void appFreeLinkedList(struct app_info_linked *appsLinkedList);
 static void appSetResolvedStartup(app_info_t *app);
 
 static struct config_value_t *appGetConfigValue(int id)
@@ -314,7 +315,8 @@ static int appScanCallback(const char *path, config_set_t *appConfig, void *arg)
 
 static int appUpdateItemList(item_list_t *itemList)
 {
-    struct app_info_linked *appsLinkedList, *appNext;
+    struct app_info_linked *appsLinkedList;
+    struct app_info_linked *appsLinkedListHead;
 
     appFreeList();
 
@@ -325,6 +327,7 @@ static int appUpdateItemList(item_list_t *itemList)
 
     // Scan devices for apps.
     appItemCount += oplScanApps(&appScanCallback, &appsLinkedList);
+    appsLinkedListHead = appsLinkedList;
 
     // Generate apps list
     if (appItemCount > 0) {
@@ -332,27 +335,36 @@ static int appUpdateItemList(item_list_t *itemList)
 
         if (appsList != NULL) {
             int i;
-            for (i = 0; appsLinkedList != NULL; i++) { // appsLinkedList contains items in reverse order.
-                memcpy(&appsList[appItemCount - i - 1], &appsLinkedList->app, sizeof(app_info_t));
+            struct app_info_linked *app = appsLinkedList;
 
-                appNext = appsLinkedList->next;
-                free(appsLinkedList);
-                appsLinkedList = appNext;
-            }
+            for (i = 0; app != NULL; i++, app = app->next) // appsLinkedList contains items in reverse order.
+                memcpy(&appsList[appItemCount - i - 1], &app->app, sizeof(app_info_t));
         } else {
             LOG("APPSUPPORT unable to allocate memory.\n");
             appItemCount = 0;
         }
     }
 
+    appFreeLinkedList(appsLinkedListHead);
+
     LOG("APPSUPPORT %d apps loaded\n", appItemCount);
 
     return appItemCount;
 }
 
+static void appFreeLinkedList(struct app_info_linked *appsLinkedList)
+{
+    while (appsLinkedList != NULL) {
+        struct app_info_linked *appNext = appsLinkedList->next;
+        free(appsLinkedList);
+        appsLinkedList = appNext;
+    }
+}
+
 static void appFreeList(void)
 {
     if (appsList != NULL) {
+        free(appsList);
         appsList = NULL;
         appItemCount = 0;
     }

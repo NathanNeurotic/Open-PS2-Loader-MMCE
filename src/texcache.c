@@ -46,6 +46,7 @@ static int gArtTerminate = 0;
 static int gArtRunning = 0;
 static int gArtQueuedCount = 0;
 static int gArtActiveCount = 0;
+static int gCacheGeneration = 1;
 
 static load_image_request_t *gArtReqList = NULL;
 static load_image_request_t *gArtReqEnd = NULL;
@@ -370,6 +371,7 @@ void cacheInit()
     gArtTerminate = 0;
     gArtQueuedCount = 0;
     gArtActiveCount = 0;
+    gCacheGeneration = 1;
     gArtReqList = NULL;
     gArtReqEnd = NULL;
 
@@ -527,6 +529,9 @@ void cacheAdvanceGeneration(void)
 {
     cacheLock();
     cacheInvalidatePendingRequestsLocked(1);
+    gCacheGeneration++;
+    if (gCacheGeneration <= 0)
+        gCacheGeneration = 1;
     cacheUnlock();
 }
 
@@ -586,10 +591,20 @@ GSTEXTURE *cacheGetTexture(image_cache_t *cache, item_list_t *list, int *cacheId
     int oldestEntryId = -1;
     int rtime = guiFrameId;
 
-    if (*cacheId == -2 || cache == NULL || cache->destroying)
+    if (cache == NULL || cache->destroying)
         return NULL;
 
     cacheLock();
+
+    if (*cacheId == -2) {
+        if (*UID == gCacheGeneration) {
+            cacheUnlock();
+            return NULL;
+        }
+
+        *cacheId = -1;
+        *UID = -1;
+    }
 
     if (*cacheId != -1) {
         entry = &cache->content[*cacheId];
@@ -617,6 +632,7 @@ GSTEXTURE *cacheGetTexture(image_cache_t *cache, item_list_t *list, int *cacheId
                     return result;
                 case CACHE_ENTRY_FAILED:
                     *cacheId = -2;
+                    *UID = gCacheGeneration;
                     cacheUnlock();
                     return NULL;
                 default:
