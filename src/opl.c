@@ -496,6 +496,9 @@ int oplGetAppImage(const char *device, char *folder, int isRelative, char *value
 
             return -1;
         }
+
+        if (strncmp(device, "mc", 2) == 0)
+            return -1;
     }
 
     // Fall back to cross-device probing only when the app's source device could not be resolved.
