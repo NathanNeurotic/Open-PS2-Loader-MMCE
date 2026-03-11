@@ -40,6 +40,7 @@ typedef struct
 
     int nextUID;
     int activeRequests;
+    int queuedPrefetchRequests;
     int destroying;
 
     /// the cache entries itself
@@ -83,5 +84,6 @@ void cachePrimeReadyTexture(void);
 int cacheHasPendingArt(void);
 
 GSTEXTURE *cacheGetTexture(image_cache_t *cache, item_list_t *list, int *cacheId, int *UID, char *value);
+GSTEXTURE *cachePrefetchTexture(image_cache_t *cache, item_list_t *list, int *cacheId, int *UID, char *value);
 
 #endif

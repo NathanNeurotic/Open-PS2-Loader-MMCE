@@ -555,10 +555,18 @@ static GSTEXTURE *getGameImageTexture(image_cache_t *cache, void *support, struc
 
 static void prefetchGameImageTexture(image_cache_t *cache, void *support, struct submenu_list *item, int minInactiveFrames)
 {
+    item_list_t *list;
+    char *startup;
+
     if (cache == NULL || item == NULL || guiInactiveFrames < minInactiveFrames)
         return;
 
-    getGameImageTexture(cache, support, &item->item);
+    list = (item_list_t *)support;
+    if (list == NULL)
+        return;
+
+    startup = list->itemGetStartup(list, item->item.id);
+    cachePrefetchTexture(cache, list, &item->item.cache_id[cache->userId], &item->item.cache_uid[cache->userId], startup);
 }
 
 static void prefetchAdjacentGameImages(image_cache_t *cache, void *support, struct submenu_list *item, int distance, int minInactiveFrames)

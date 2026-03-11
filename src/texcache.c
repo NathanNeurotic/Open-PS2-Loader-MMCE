@@ -12,6 +12,7 @@ typedef struct load_image_request
     cache_entry_t *entry;
     item_list_t *list;
     int cacheUID;
+    unsigned char priority;
     GSTEXTURE texture;
     char *value;
 } load_image_request_t;
@@ -32,6 +33,11 @@ enum {
     CACHE_ENTRY_FAILED
 };
 
+enum {
+    CACHE_REQ_PRIORITY_INTERACTIVE = 0,
+    CACHE_REQ_PRIORITY_PREFETCH
+};
+
 extern void *_gp;
 
 #define CACHE_THREAD_STACK_SIZE (96 * 1024)
@@ -48,8 +54,10 @@ static int gArtQueuedCount = 0;
 static int gArtActiveCount = 0;
 static int gCacheGeneration = 1;
 
-static load_image_request_t *gArtReqList = NULL;
-static load_image_request_t *gArtReqEnd = NULL;
+static load_image_request_t *gArtInteractiveReqList = NULL;
+static load_image_request_t *gArtInteractiveReqEnd = NULL;
+static load_image_request_t *gArtPrefetchReqList = NULL;
+static load_image_request_t *gArtPrefetchReqEnd = NULL;
 static cache_registry_entry_t *gCacheRegistry = NULL;
 
 static void cacheClearItem(cache_entry_t *item, int freeTxt);
@@ -135,37 +143,68 @@ static void cacheReleaseRequestLocked(load_image_request_t *req)
     free(req);
 }
 
+static load_image_request_t **cacheGetQueueHead(unsigned char priority)
+{
+    return priority == CACHE_REQ_PRIORITY_PREFETCH ? &gArtPrefetchReqList : &gArtInteractiveReqList;
+}
+
+static load_image_request_t **cacheGetQueueTail(unsigned char priority)
+{
+    return priority == CACHE_REQ_PRIORITY_PREFETCH ? &gArtPrefetchReqEnd : &gArtInteractiveReqEnd;
+}
+
+static int cacheGetPrefetchLimit(const image_cache_t *cache)
+{
+    if (cache == NULL || cache->count <= 1)
+        return 0;
+
+    return cache->count - 1 < 4 ? cache->count - 1 : 4;
+}
+
 static void cacheEnqueueRequestLocked(load_image_request_t *req)
 {
+    load_image_request_t **head;
+    load_image_request_t **tail;
+
     req->next = NULL;
+    head = cacheGetQueueHead(req->priority);
+    tail = cacheGetQueueTail(req->priority);
 
-    if (gArtReqEnd != NULL)
-        gArtReqEnd->next = req;
+    if (*tail != NULL)
+        (*tail)->next = req;
     else
-        gArtReqList = req;
+        *head = req;
 
-    gArtReqEnd = req;
+    *tail = req;
     gArtQueuedCount++;
+
+    if (req->priority == CACHE_REQ_PRIORITY_PREFETCH && req->cache != NULL)
+        req->cache->queuedPrefetchRequests++;
 }
 
 static int cacheRemoveQueuedRequestLocked(load_image_request_t *target)
 {
-    load_image_request_t *req = gArtReqList;
+    load_image_request_t *req = *cacheGetQueueHead(target->priority);
     load_image_request_t *previous = NULL;
+    load_image_request_t **head = cacheGetQueueHead(target->priority);
+    load_image_request_t **tail = cacheGetQueueTail(target->priority);
 
     while (req != NULL) {
         if (req == target) {
             if (previous != NULL)
                 previous->next = req->next;
             else
-                gArtReqList = req->next;
+                *head = req->next;
 
-            if (gArtReqEnd == req)
-                gArtReqEnd = previous;
+            if (*tail == req)
+                *tail = previous;
 
             req->next = NULL;
             if (gArtQueuedCount > 0)
                 gArtQueuedCount--;
+
+            if (req->priority == CACHE_REQ_PRIORITY_PREFETCH && req->cache != NULL && req->cache->queuedPrefetchRequests > 0)
+                req->cache->queuedPrefetchRequests--;
 
             return 1;
         }
@@ -175,6 +214,18 @@ static int cacheRemoveQueuedRequestLocked(load_image_request_t *target)
     }
 
     return 0;
+}
+
+static void cachePromoteQueuedRequestLocked(load_image_request_t *req)
+{
+    if (req == NULL || req->priority != CACHE_REQ_PRIORITY_PREFETCH)
+        return;
+
+    if (!cacheRemoveQueuedRequestLocked(req))
+        return;
+
+    req->priority = CACHE_REQ_PRIORITY_INTERACTIVE;
+    cacheEnqueueRequestLocked(req);
 }
 
 static void cacheInvalidateEntryLocked(cache_entry_t *entry, int freeTxt, int preserveLoaded)
@@ -277,22 +328,70 @@ static void cacheWaitForCacheRequests(image_cache_t *cache)
     }
 }
 
+static load_image_request_t *cacheFindQueuedRequestLocked(image_cache_t *cache, char *value)
+{
+    load_image_request_t *req;
+
+    for (req = gArtInteractiveReqList; req != NULL; req = req->next) {
+        if (req->cache == cache && strcmp(req->value, value) == 0)
+            return req;
+    }
+
+    for (req = gArtPrefetchReqList; req != NULL; req = req->next) {
+        if (req->cache == cache && strcmp(req->value, value) == 0)
+            return req;
+    }
+
+    return NULL;
+}
+
+static cache_entry_t *cacheFindLoadingEntryLocked(image_cache_t *cache, char *value, int *entryId)
+{
+    for (int i = 0; i < cache->count; i++) {
+        cache_entry_t *entry = &cache->content[i];
+        load_image_request_t *req;
+
+        if (entry->state != CACHE_ENTRY_LOADING || entry->qr == NULL)
+            continue;
+
+        req = (load_image_request_t *)entry->qr;
+        if (req->cache == cache && strcmp(req->value, value) == 0) {
+            if (entryId != NULL)
+                *entryId = i;
+            return entry;
+        }
+    }
+
+    return NULL;
+}
+
 static load_image_request_t *cacheDequeueRequest(void)
 {
     load_image_request_t *req = NULL;
 
     cacheLock();
 
-    if (gArtReqList != NULL) {
-        req = gArtReqList;
-        gArtReqList = req->next;
+    if (gArtInteractiveReqList != NULL) {
+        req = gArtInteractiveReqList;
+        gArtInteractiveReqList = req->next;
         req->next = NULL;
 
-        if (gArtReqEnd == req)
-            gArtReqEnd = NULL;
+        if (gArtInteractiveReqEnd == req)
+            gArtInteractiveReqEnd = NULL;
+    } else if (gArtPrefetchReqList != NULL) {
+        req = gArtPrefetchReqList;
+        gArtPrefetchReqList = req->next;
+        req->next = NULL;
 
+        if (gArtPrefetchReqEnd == req)
+            gArtPrefetchReqEnd = NULL;
+    }
+
+    if (req != NULL) {
         if (gArtQueuedCount > 0)
             gArtQueuedCount--;
+        if (req->priority == CACHE_REQ_PRIORITY_PREFETCH && req->cache != NULL && req->cache->queuedPrefetchRequests > 0)
+            req->cache->queuedPrefetchRequests--;
         gArtActiveCount++;
 
         if (req->entry != NULL && req->entry->qr == req && req->entry->state == CACHE_ENTRY_QUEUED)
@@ -379,8 +478,10 @@ void cacheInit()
     gArtQueuedCount = 0;
     gArtActiveCount = 0;
     gCacheGeneration = 1;
-    gArtReqList = NULL;
-    gArtReqEnd = NULL;
+    gArtInteractiveReqList = NULL;
+    gArtInteractiveReqEnd = NULL;
+    gArtPrefetchReqList = NULL;
+    gArtPrefetchReqEnd = NULL;
 
     gArtSema.init_count = 1;
     gArtSema.max_count = 1;
@@ -594,16 +695,17 @@ int cacheHasPendingArt(void)
     return pending;
 }
 
-GSTEXTURE *cacheGetTexture(image_cache_t *cache, item_list_t *list, int *cacheId, int *UID, char *value)
+static GSTEXTURE *cacheGetTextureInternal(image_cache_t *cache, item_list_t *list, int *cacheId, int *UID, char *value, unsigned char priority)
 {
     cache_entry_t *entry;
     cache_entry_t *oldestEntry = NULL;
     load_image_request_t *req;
     GSTEXTURE *result = NULL;
     int oldestEntryId = -1;
+    int loadingEntryId = -1;
     int rtime = guiFrameId;
 
-    if (cache == NULL || cache->destroying)
+    if (cache == NULL || cache->destroying || value == NULL || value[0] == '\0')
         return NULL;
 
     cacheLock();
@@ -623,6 +725,10 @@ GSTEXTURE *cacheGetTexture(image_cache_t *cache, item_list_t *list, int *cacheId
         if (entry->UID == *UID) {
             switch (entry->state) {
                 case CACHE_ENTRY_QUEUED:
+                    if (priority == CACHE_REQ_PRIORITY_INTERACTIVE && entry->qr != NULL)
+                        cachePromoteQueuedRequestLocked((load_image_request_t *)entry->qr);
+                    cacheUnlock();
+                    return NULL;
                 case CACHE_ENTRY_LOADING:
                     cacheUnlock();
                     return NULL;
@@ -666,6 +772,30 @@ GSTEXTURE *cacheGetTexture(image_cache_t *cache, item_list_t *list, int *cacheId
         return NULL;
     }
 
+    req = cacheFindQueuedRequestLocked(cache, value);
+    if (req != NULL && req->entry != NULL) {
+        if (priority == CACHE_REQ_PRIORITY_INTERACTIVE)
+            cachePromoteQueuedRequestLocked(req);
+
+        *cacheId = req->entry - cache->content;
+        *UID = req->entry->UID;
+        cacheUnlock();
+        return NULL;
+    }
+
+    entry = cacheFindLoadingEntryLocked(cache, value, &loadingEntryId);
+    if (entry != NULL) {
+        *cacheId = loadingEntryId;
+        *UID = entry->UID;
+        cacheUnlock();
+        return NULL;
+    }
+
+    if (priority == CACHE_REQ_PRIORITY_PREFETCH && cache->queuedPrefetchRequests >= cacheGetPrefetchLimit(cache)) {
+        cacheUnlock();
+        return NULL;
+    }
+
     for (int i = 0; i < cache->count; i++) {
         entry = &cache->content[i];
         if ((entry->state == CACHE_ENTRY_FREE || entry->state == CACHE_ENTRY_DISPLAYABLE || entry->state == CACHE_ENTRY_FAILED) && entry->lastUsed < rtime) {
@@ -692,6 +822,7 @@ GSTEXTURE *cacheGetTexture(image_cache_t *cache, item_list_t *list, int *cacheId
     req->cache = cache;
     req->entry = oldestEntry;
     req->list = list;
+    req->priority = priority;
     req->value = (char *)req + sizeof(load_image_request_t);
     strcpy(req->value, value);
     req->cacheUID = cache->nextUID;
@@ -711,4 +842,14 @@ GSTEXTURE *cacheGetTexture(image_cache_t *cache, item_list_t *list, int *cacheId
     WakeupThread(gArtThreadId);
 
     return NULL;
+}
+
+GSTEXTURE *cacheGetTexture(image_cache_t *cache, item_list_t *list, int *cacheId, int *UID, char *value)
+{
+    return cacheGetTextureInternal(cache, list, cacheId, UID, value, CACHE_REQ_PRIORITY_INTERACTIVE);
+}
+
+GSTEXTURE *cachePrefetchTexture(image_cache_t *cache, item_list_t *list, int *cacheId, int *UID, char *value)
+{
+    return cacheGetTextureInternal(cache, list, cacheId, UID, value, CACHE_REQ_PRIORITY_PREFETCH);
 }
