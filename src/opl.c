@@ -488,14 +488,17 @@ int oplGetAppImage(const char *device, char *folder, int isRelative, char *value
         if (elfbootmode >= 0) {
             listSupport = list_support[elfbootmode].support;
 
-            if ((listSupport != NULL) && (listSupport->enabled)) {
-                if (listSupport->itemGetImage(listSupport, folder, isRelative, value, suffix, resultTex, psm) >= 0)
-                    return 0;
-            }
+            /* App page items already know which backend they came from. Searching other
+               active devices on a miss serializes slow failures through the single art
+               worker and makes app artwork appear to hang for a long time. */
+            if ((listSupport != NULL) && (listSupport->enabled))
+                return listSupport->itemGetImage(listSupport, folder, isRelative, value, suffix, resultTex, psm);
+
+            return -1;
         }
     }
 
-    // We search on ever devices from fatest to slowest.
+    // Fall back to cross-device probing only when the app's source device could not be resolved.
     for (remaining = MODE_COUNT, priority = 0; remaining > 0 && priority < 4; priority++) {
         for (i = 0; i < MODE_COUNT; i++) {
             listSupport = list_support[i].support;
