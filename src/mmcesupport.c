@@ -28,6 +28,47 @@ static base_game_info_t *mmceGames;
 // forward declaration
 static item_list_t mmceGameList;
 
+static void mmceGetDeviceRoot(char *root, size_t size)
+{
+    const char *separator = strstr(mmcePrefix, ":/");
+    size_t length;
+
+    if (root == NULL || size == 0)
+        return;
+
+    if (separator != NULL) {
+        length = (size_t)(separator - mmcePrefix) + 2;
+        if (length >= size)
+            length = size - 1;
+
+        memcpy(root, mmcePrefix, length);
+        root[length] = '\0';
+        return;
+    }
+
+    if (gMMCESlot == 0)
+        snprintf(root, size, "mmce0:/");
+    else if (gMMCESlot == 1)
+        snprintf(root, size, "mmce1:/");
+    else
+        root[0] = '\0';
+}
+
+static int mmceTryLoadImage(const char *prefix, char *folder, int isRelative, char *value, char *suffix, GSTEXTURE *resultTex)
+{
+    char path[256];
+
+    if ((prefix == NULL || prefix[0] == '\0') && isRelative)
+        return -1;
+
+    if (isRelative)
+        snprintf(path, sizeof(path), "%s%s/%s_%s", prefix, folder, value, suffix);
+    else
+        snprintf(path, sizeof(path), "%s%s_%s", folder, value, suffix);
+
+    return texDiscoverLoad(resultTex, path, -1);
+}
+
 int mmceDetectSlot(void)
 {
     int ret = -1;
@@ -373,12 +414,30 @@ static config_set_t *mmceGetConfig(item_list_t *itemList, int id)
 
 static int mmceGetImage(item_list_t *itemList, char *folder, int isRelative, char *value, char *suffix, GSTEXTURE *resultTex, short psm)
 {
-    char path[256];
-    if (isRelative)
-        snprintf(path, sizeof(path), "%s%s/%s_%s", mmcePrefix, folder, value, suffix);
-    else
-        snprintf(path, sizeof(path), "%s%s_%s", folder, value, suffix);
-    return texDiscoverLoad(resultTex, path, -1);
+    char previousPrefix[sizeof(mmcePrefix)];
+    char deviceRoot[sizeof(mmcePrefix)];
+    int result;
+
+    result = mmceTryLoadImage(mmcePrefix, folder, isRelative, value, suffix, resultTex);
+    if (result >= 0 || !isRelative)
+        return result;
+
+    if (gMMCESlot == 2) {
+        strncpy(previousPrefix, mmcePrefix, sizeof(previousPrefix));
+        previousPrefix[sizeof(previousPrefix) - 1] = '\0';
+
+        if (mmceDetectSlot() >= 0 && strcmp(previousPrefix, mmcePrefix) != 0) {
+            result = mmceTryLoadImage(mmcePrefix, folder, isRelative, value, suffix, resultTex);
+            if (result >= 0)
+                return result;
+        }
+    }
+
+    mmceGetDeviceRoot(deviceRoot, sizeof(deviceRoot));
+    if (deviceRoot[0] != '\0' && strcmp(deviceRoot, mmcePrefix) != 0)
+        return mmceTryLoadImage(deviceRoot, folder, isRelative, value, suffix, resultTex);
+
+    return result;
 }
 
 static int mmceGetTextId(item_list_t *itemList)

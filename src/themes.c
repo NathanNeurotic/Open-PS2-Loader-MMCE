@@ -553,11 +553,25 @@ static GSTEXTURE *getGameImageTexture(image_cache_t *cache, void *support, struc
     return NULL;
 }
 
+static void prefetchGameImageTexture(image_cache_t *cache, void *support, struct submenu_list *item)
+{
+    if (cache == NULL || item == NULL || guiInactiveFrames < MENU_MIN_INACTIVE_FRAMES)
+        return;
+
+    getGameImageTexture(cache, support, &item->item);
+}
+
 static void drawGameImage(struct menu_list *menu, struct submenu_list *item, config_set_t *config, struct theme_element *elem)
 {
     mutable_image_t *gameImage = (mutable_image_t *)elem->extended;
     if (item) {
         GSTEXTURE *texture = getGameImageTexture(gameImage->cache, menu->item->userdata, &item->item);
+
+        if (gameImage->cache != NULL && gameImage->cache->suffix != NULL && strcmp(gameImage->cache->suffix, "COV") == 0) {
+            prefetchGameImageTexture(gameImage->cache, menu->item->userdata, item->next);
+            prefetchGameImageTexture(gameImage->cache, menu->item->userdata, item->prev);
+        }
+
         if (!texture || !texture->Mem) {
             if (gameImage->defaultTexture)
                 texture = &gameImage->defaultTexture->source;
