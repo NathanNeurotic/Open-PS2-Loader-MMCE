@@ -553,12 +553,31 @@ static GSTEXTURE *getGameImageTexture(image_cache_t *cache, void *support, struc
     return NULL;
 }
 
-static void prefetchGameImageTexture(image_cache_t *cache, void *support, struct submenu_list *item)
+static void prefetchGameImageTexture(image_cache_t *cache, void *support, struct submenu_list *item, int minInactiveFrames)
 {
-    if (cache == NULL || item == NULL || guiInactiveFrames < MENU_MIN_INACTIVE_FRAMES)
+    if (cache == NULL || item == NULL || guiInactiveFrames < minInactiveFrames)
         return;
 
     getGameImageTexture(cache, support, &item->item);
+}
+
+static void prefetchAdjacentGameImages(image_cache_t *cache, void *support, struct submenu_list *item, int distance, int minInactiveFrames)
+{
+    struct submenu_list *nextItem = item;
+    struct submenu_list *prevItem = item;
+
+    if (item == NULL || distance <= 0)
+        return;
+
+    for (int i = 0; i < distance; i++) {
+        if (nextItem != NULL)
+            nextItem = nextItem->next;
+        if (prevItem != NULL)
+            prevItem = prevItem->prev;
+
+        prefetchGameImageTexture(cache, support, nextItem, minInactiveFrames);
+        prefetchGameImageTexture(cache, support, prevItem, minInactiveFrames);
+    }
 }
 
 static void drawGameImage(struct menu_list *menu, struct submenu_list *item, config_set_t *config, struct theme_element *elem)
@@ -568,8 +587,10 @@ static void drawGameImage(struct menu_list *menu, struct submenu_list *item, con
         GSTEXTURE *texture = getGameImageTexture(gameImage->cache, menu->item->userdata, &item->item);
 
         if (gameImage->cache != NULL && gameImage->cache->suffix != NULL && strcmp(gameImage->cache->suffix, "COV") == 0) {
-            prefetchGameImageTexture(gameImage->cache, menu->item->userdata, item->next);
-            prefetchGameImageTexture(gameImage->cache, menu->item->userdata, item->prev);
+            item_list_t *list = (item_list_t *)menu->item->userdata;
+            int prefetchDistance = (list != NULL && list->mode == APP_MODE) ? 4 : 1;
+            int prefetchInactiveFrames = (list != NULL && list->mode == APP_MODE) ? 2 : MENU_MIN_INACTIVE_FRAMES;
+            prefetchAdjacentGameImages(gameImage->cache, menu->item->userdata, item, prefetchDistance, prefetchInactiveFrames);
         }
 
         if (!texture || !texture->Mem) {

@@ -70,6 +70,10 @@ void cacheCancelPendingImageLoads(void);
  */
 void cacheAdvanceGeneration(void);
 
+/** Advances the failure-retry generation without canceling queued art loads.
+ */
+void cacheBumpGeneration(void);
+
 /** Uploads at most one ready texture to VRAM for use on a later frame.
  */
 void cachePrimeReadyTexture(void);

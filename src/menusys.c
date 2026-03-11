@@ -86,6 +86,17 @@ static void menuInvalidateArtSelection(void)
     cacheAdvanceGeneration();
 }
 
+static void menuAdvanceArtSelectionOnMove(void)
+{
+    item_list_t *support = selected_item != NULL ? (item_list_t *)selected_item->item->userdata : NULL;
+
+    /* Keep adjacent APP cover prefetch alive while moving through the list. */
+    if (support != NULL && support->mode == APP_MODE)
+        cacheBumpGeneration();
+    else
+        cacheAdvanceGeneration();
+}
+
 static void menuRenameGame(submenu_list_t **submenu)
 {
     if (!selected_item->item->current) {
@@ -695,7 +706,7 @@ static void menuNextV()
     if (cur && cur->next) {
         selected_item->item->current = cur->next;
         sfxPlay(SFX_CURSOR);
-        menuInvalidateArtSelection();
+        menuAdvanceArtSelectionOnMove();
 
         // if the current item is beyond the page start, move the page start one page down
         cur = selected_item->item->pagestart;
@@ -727,7 +738,7 @@ static void menuPrevV()
                 selected_item->item->pagestart = selected_item->item->pagestart->prev;
         }
 
-        menuInvalidateArtSelection();
+        menuAdvanceArtSelectionOnMove();
     } else { // wrap to end
         menuLastPage();
     }

@@ -55,6 +55,13 @@ static cache_registry_entry_t *gCacheRegistry = NULL;
 static void cacheClearItem(cache_entry_t *item, int freeTxt);
 static void cacheResetTextureState(GSTEXTURE *texture);
 
+static void cacheNextGenerationLocked(void)
+{
+    gCacheGeneration++;
+    if (gCacheGeneration <= 0)
+        gCacheGeneration = 1;
+}
+
 static void cacheLock(void)
 {
     if (gArtSemaId >= 0)
@@ -529,9 +536,14 @@ void cacheAdvanceGeneration(void)
 {
     cacheLock();
     cacheInvalidatePendingRequestsLocked(1);
-    gCacheGeneration++;
-    if (gCacheGeneration <= 0)
-        gCacheGeneration = 1;
+    cacheNextGenerationLocked();
+    cacheUnlock();
+}
+
+void cacheBumpGeneration(void)
+{
+    cacheLock();
+    cacheNextGenerationLocked();
     cacheUnlock();
 }
 
@@ -612,9 +624,14 @@ GSTEXTURE *cacheGetTexture(image_cache_t *cache, item_list_t *list, int *cacheId
             switch (entry->state) {
                 case CACHE_ENTRY_QUEUED:
                 case CACHE_ENTRY_LOADING:
-                case CACHE_ENTRY_READY:
                     cacheUnlock();
                     return NULL;
+                case CACHE_ENTRY_READY:
+                    entry->state = CACHE_ENTRY_DISPLAYABLE;
+                    entry->lastUsed = guiFrameId;
+                    result = &entry->texture;
+                    cacheUnlock();
+                    return result;
                 case CACHE_ENTRY_PRIMED:
                     if (entry->primeFrame == guiFrameId) {
                         cacheUnlock();
