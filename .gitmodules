@@ -1,0 +1,3 @@
+[submodule "ps2-packer"]
+	path = ps2-packer
+	url = https://github.com/ps2dev/ps2-packer
