@@ -31,6 +31,7 @@ struct app_info_linked
 static item_list_t appItemList;
 
 static void appFreeList(void);
+static void appSetResolvedStartup(app_info_t *app);
 
 static struct config_value_t *appGetConfigValue(int id)
 {
@@ -143,11 +144,29 @@ static const char *appFindSourcePath(const char *startup)
 
     for (int i = 0; i < appItemCount; i++) {
         if (strcmp(appsList[i].boot, startup) == 0) {
-            return appResolveLegacyMassStartup(appBuildStartupPath(appsList[i].path, appsList[i].boot));
+            return appsList[i].startup;
         }
     }
 
     return startup;
+}
+
+static void appSetResolvedStartup(app_info_t *app)
+{
+    const char *startup;
+
+    if (app == NULL) {
+        return;
+    }
+
+    startup = appResolveLegacyMassStartup(appBuildStartupPath(app->path, app->boot));
+    if (startup == NULL) {
+        app->startup[0] = '\0';
+        return;
+    }
+
+    strncpy(app->startup, startup, APP_STARTUP_MAX);
+    app->startup[APP_STARTUP_MAX] = '\0';
 }
 
 void appInit(item_list_t *itemList)
@@ -239,6 +258,7 @@ static int addAppsLegacyList(struct app_info_linked **appsLinkedList)
         }
 
         app->app.legacy = 1;
+        appSetResolvedStartup(&app->app);
         count++;
         cur = cur->next;
     }
@@ -282,6 +302,7 @@ static int appScanCallback(const char *path, config_set_t *appConfig, void *arg)
         } else
             app->app.argv1[0] = '\0';
         app->app.legacy = 0;
+        appSetResolvedStartup(&app->app);
         return 0;
     } else {
         LOG("APPSUPPORT item has no boot/title.\n");
@@ -356,7 +377,7 @@ static int appGetItemNameLength(item_list_t *itemList, int id)
    The path is used immediately, before a subsequent call to appGetItemStartup(). */
 static char *appGetItemStartup(item_list_t *itemList, int id)
 {
-    return (char *)appResolveLegacyMassStartup(appBuildStartupPath(appsList[id].path, appsList[id].boot));
+    return appsList[id].startup;
 }
 
 static void appDeleteItem(item_list_t *itemList, int id)
