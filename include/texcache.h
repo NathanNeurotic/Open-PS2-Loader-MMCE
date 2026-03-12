@@ -75,6 +75,10 @@ void cacheAdvanceGeneration(void);
  */
 void cacheBumpGeneration(void);
 
+/** Invalidates stale interactive art loads while keeping queued prefetch work.
+ */
+void cacheAdvanceGenerationPreservePrefetch(void);
+
 /** Uploads at most one ready texture to VRAM for use on a later frame.
  */
 void cachePrimeReadyTexture(void);

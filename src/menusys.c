@@ -90,9 +90,9 @@ static void menuAdvanceArtSelectionOnMove(void)
 {
     item_list_t *support = selected_item != NULL ? (item_list_t *)selected_item->item->userdata : NULL;
 
-    /* Keep adjacent APP cover prefetch alive while moving through the list. */
+    /* Keep APP prefetch, but drop stale interactive work from prior selections. */
     if (support != NULL && support->mode == APP_MODE)
-        cacheBumpGeneration();
+        cacheAdvanceGenerationPreservePrefetch();
     else
         cacheAdvanceGeneration();
 }

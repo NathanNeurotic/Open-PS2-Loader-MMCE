@@ -166,20 +166,32 @@ static int cacheGetPrefetchLimit(const image_cache_t *cache)
     return cache->count - 1 < 4 ? cache->count - 1 : 4;
 }
 
+static int cacheGetBaseDelay(const item_list_t *list)
+{
+    if (list != NULL && list->delay >= MENU_MIN_INACTIVE_FRAMES)
+        return list->delay;
+
+    return MENU_MIN_INACTIVE_FRAMES;
+}
+
 static int cacheGetInteractiveDelay(const item_list_t *list)
 {
-    if (list != NULL && (list->mode == APP_MODE || list->mode == MMCE_MODE))
-        return CACHE_SLOW_MODE_INTERACTIVE_DELAY;
+    int delay = cacheGetBaseDelay(list);
 
-    return 1;
+    if (list != NULL && (list->mode == APP_MODE || list->mode == MMCE_MODE) && delay < CACHE_SLOW_MODE_INTERACTIVE_DELAY)
+        delay = CACHE_SLOW_MODE_INTERACTIVE_DELAY;
+
+    return delay;
 }
 
 static int cacheGetPrefetchDelay(const item_list_t *list)
 {
-    if (list != NULL && list->mode == APP_MODE)
-        return CACHE_APP_PREFETCH_DELAY;
+    int delay = cacheGetBaseDelay(list);
 
-    return MENU_MIN_INACTIVE_FRAMES;
+    if (list != NULL && list->mode == APP_MODE && delay < CACHE_APP_PREFETCH_DELAY)
+        delay = CACHE_APP_PREFETCH_DELAY;
+
+    return delay;
 }
 
 static int cacheHasPendingInteractiveArtLocked(void)
@@ -293,6 +305,42 @@ static void cacheInvalidatePendingRequestsLocked(int preserveLoaded)
         if (cache != NULL && !cache->destroying) {
             for (int i = 0; i < cache->count; i++)
                 cacheInvalidateEntryLocked(&cache->content[i], 1, preserveLoaded);
+        }
+
+        registry = registry->next;
+    }
+}
+
+static void cacheInvalidateInteractiveRequestsLocked(void)
+{
+    cache_registry_entry_t *registry = gCacheRegistry;
+
+    while (registry != NULL) {
+        image_cache_t *cache = registry->cache;
+
+        if (cache != NULL && !cache->destroying) {
+            for (int i = 0; i < cache->count; i++) {
+                cache_entry_t *entry = &cache->content[i];
+                load_image_request_t *req = entry->qr;
+
+                if (req == NULL || req->priority != CACHE_REQ_PRIORITY_INTERACTIVE)
+                    continue;
+
+                switch (entry->state) {
+                    case CACHE_ENTRY_QUEUED:
+                        entry->qr = NULL;
+                        if (cacheRemoveQueuedRequestLocked(req))
+                            cacheReleaseRequestLocked(req);
+                        cacheClearItem(entry, 1);
+                        break;
+                    case CACHE_ENTRY_LOADING:
+                        entry->qr = NULL;
+                        cacheClearItem(entry, 1);
+                        break;
+                    default:
+                        break;
+                }
+            }
         }
 
         registry = registry->next;
@@ -677,6 +725,14 @@ void cacheAdvanceGeneration(void)
 void cacheBumpGeneration(void)
 {
     cacheLock();
+    cacheNextGenerationLocked();
+    cacheUnlock();
+}
+
+void cacheAdvanceGenerationPreservePrefetch(void)
+{
+    cacheLock();
+    cacheInvalidateInteractiveRequestsLocked();
     cacheNextGenerationLocked();
     cacheUnlock();
 }
