@@ -286,6 +286,16 @@ static app_info_t *appLookupByStartup(const char *startup)
     return NULL;
 }
 
+int appGetArtMode(const char *startup)
+{
+    app_info_t *app = appLookupByStartup(startup);
+
+    if (app == NULL || app->artDevice[0] == '\0')
+        return -1;
+
+    return oplPath2Mode(app->artDevice);
+}
+
 void appInit(item_list_t *itemList)
 {
     LOG("APPSUPPORT Init\n");

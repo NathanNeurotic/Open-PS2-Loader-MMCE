@@ -198,8 +198,12 @@ static void _menuSaveConfig()
 
 static void _menuRequestConfig()
 {
+    int shouldQueueLoad = 0;
+
     WaitSema(menuSemaId);
-    if (selected_item->item->current != NULL && itemConfigId != selected_item->item->current->item.id) {
+    if (selected_item == NULL || selected_item->item == NULL || selected_item->item->current == NULL) {
+        actionStatus = 0;
+    } else if (itemConfigId != selected_item->item->current->item.id) {
         if (itemConfig) {
             configFree(itemConfig);
             itemConfig = NULL;
@@ -207,12 +211,20 @@ static void _menuRequestConfig()
         item_list_t *list = selected_item->item->userdata;
         if (itemConfigId == -1 || guiInactiveFrames >= list->delay) {
             itemConfigId = selected_item->item->current->item.id;
-            ioPutRequest(IO_CUSTOM_SIMPLEACTION, &_menuLoadConfig);
+            shouldQueueLoad = 1;
         }
-    } else if (itemConfig)
+    } else if (itemConfig == NULL && actionStatus != 0) {
+        shouldQueueLoad = 1;
+    } else
         actionStatus = 0;
 
     SignalSema(menuSemaId);
+
+    if (shouldQueueLoad && ioPutRequest(IO_CUSTOM_SIMPLEACTION, &_menuLoadConfig) != IO_OK) {
+        WaitSema(menuSemaId);
+        actionStatus = 0;
+        SignalSema(menuSemaId);
+    }
 }
 
 config_set_t *menuLoadConfig()

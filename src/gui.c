@@ -1746,7 +1746,10 @@ int guiMsgBox(const char *text, int addAccept, struct UIItem *ui)
 
 void guiHandleDeferedIO(int *ptr, const char *message, int type, void *data)
 {
-    ioPutRequest(type, data);
+    if (ioPutRequest(type, data) != IO_OK) {
+        *ptr = 0;
+        return;
+    }
 
     while (*ptr)
         guiRenderTextScreen(message);
@@ -1754,7 +1757,10 @@ void guiHandleDeferedIO(int *ptr, const char *message, int type, void *data)
 
 void guiGameHandleDeferedIO(int *ptr, struct UIItem *ui, int type, void *data)
 {
-    ioPutRequest(type, data);
+    if (ioPutRequest(type, data) != IO_OK) {
+        *ptr = 0;
+        return;
+    }
 
     while (*ptr) {
         guiStartFrame();

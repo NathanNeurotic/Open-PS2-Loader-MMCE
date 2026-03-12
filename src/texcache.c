@@ -1,4 +1,5 @@
 #include "include/opl.h"
+#include "include/appsupport.h"
 #include "include/texcache.h"
 #include "include/textures.h"
 #include "include/gui.h"
@@ -166,6 +167,24 @@ static int cacheGetPrefetchLimit(const image_cache_t *cache)
     return cache->count - 1 < 4 ? cache->count - 1 : 4;
 }
 
+static int cacheGetEffectiveMode(const item_list_t *list, const char *value)
+{
+    int mode;
+
+    if (list == NULL)
+        return -1;
+
+    mode = list->mode;
+    if (mode == APP_MODE && value != NULL) {
+        int artMode = appGetArtMode(value);
+
+        if (artMode >= 0)
+            mode = artMode;
+    }
+
+    return mode;
+}
+
 static int cacheGetBaseDelay(const item_list_t *list)
 {
     if (list != NULL && list->delay >= MENU_MIN_INACTIVE_FRAMES)
@@ -174,21 +193,23 @@ static int cacheGetBaseDelay(const item_list_t *list)
     return MENU_MIN_INACTIVE_FRAMES;
 }
 
-static int cacheGetInteractiveDelay(const item_list_t *list)
+static int cacheGetInteractiveDelay(const item_list_t *list, const char *value)
 {
     int delay = cacheGetBaseDelay(list);
+    int mode = cacheGetEffectiveMode(list, value);
 
-    if (list != NULL && (list->mode == APP_MODE || list->mode == MMCE_MODE) && delay < CACHE_SLOW_MODE_INTERACTIVE_DELAY)
+    if ((mode == APP_MODE || mode == MMCE_MODE) && delay < CACHE_SLOW_MODE_INTERACTIVE_DELAY)
         delay = CACHE_SLOW_MODE_INTERACTIVE_DELAY;
 
     return delay;
 }
 
-static int cacheGetPrefetchDelay(const item_list_t *list)
+static int cacheGetPrefetchDelay(const item_list_t *list, const char *value)
 {
     int delay = cacheGetBaseDelay(list);
+    int mode = cacheGetEffectiveMode(list, value);
 
-    if (list != NULL && list->mode == APP_MODE && delay < CACHE_APP_PREFETCH_DELAY)
+    if (mode == APP_MODE && delay < CACHE_APP_PREFETCH_DELAY)
         delay = CACHE_APP_PREFETCH_DELAY;
 
     return delay;
@@ -873,12 +894,14 @@ static GSTEXTURE *cacheGetTextureInternal(image_cache_t *cache, item_list_t *lis
     }
 
     if (priority == CACHE_REQ_PRIORITY_INTERACTIVE) {
-        if (guiInactiveFrames < cacheGetInteractiveDelay(list)) {
+        if (guiInactiveFrames < cacheGetInteractiveDelay(list, value)) {
             cacheUnlock();
             return NULL;
         }
     } else {
-        if (list == NULL || list->mode == MMCE_MODE || guiInactiveFrames < cacheGetPrefetchDelay(list)) {
+        int effectiveMode = cacheGetEffectiveMode(list, value);
+
+        if (list == NULL || effectiveMode == MMCE_MODE || guiInactiveFrames < cacheGetPrefetchDelay(list, value)) {
             cacheUnlock();
             return NULL;
         }
