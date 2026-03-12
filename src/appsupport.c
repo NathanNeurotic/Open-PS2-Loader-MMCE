@@ -17,6 +17,8 @@ static int appForceUpdate = 1;
 static int appItemCount = 0;
 static char appStartupPath[256];
 static char appResolvedStartupPath[256];
+static int *appArtLookupTable;
+static int appArtLookupTableSize = 0;
 
 static config_set_t *configApps;
 static app_info_t *appsList;
@@ -31,7 +33,11 @@ struct app_info_linked
 static item_list_t appItemList;
 
 static void appFreeList(void);
+static void appFreeArtLookup(void);
+static int appBuildArtLookup(void);
 static void appFreeLinkedList(struct app_info_linked *appsLinkedList);
+static app_info_t *appLookupByStartup(const char *startup);
+static void appSetArtSource(app_info_t *app);
 static void appSetResolvedStartup(app_info_t *app);
 
 static struct config_value_t *appGetConfigValue(int id)
@@ -93,6 +99,18 @@ static char *appGetBoot(char *device, int max, char *path)
     return appGetELFName(path);
 }
 
+static unsigned int appHashStartup(const char *value)
+{
+    unsigned int hash = 5381;
+
+    while (value != NULL && *value != '\0') {
+        hash = ((hash << 5) + hash) ^ (unsigned char)*value;
+        value++;
+    }
+
+    return hash;
+}
+
 static const char *appBuildStartupPath(const char *path, const char *boot)
 {
     if (path[0] != '\0') {
@@ -152,6 +170,26 @@ static const char *appFindSourcePath(const char *startup)
     return startup;
 }
 
+static void appSetArtSource(app_info_t *app)
+{
+    char *artLookup;
+
+    if (app == NULL)
+        return;
+
+    app->artDevice[0] = '\0';
+    app->artLookup[0] = '\0';
+
+    if (app->startup[0] == '\0')
+        return;
+
+    artLookup = appGetBoot(app->artDevice, sizeof(app->artDevice), app->startup);
+    if (artLookup != NULL) {
+        strncpy(app->artLookup, artLookup, APP_BOOT_MAX + 1);
+        app->artLookup[APP_BOOT_MAX] = '\0';
+    }
+}
+
 static void appSetResolvedStartup(app_info_t *app)
 {
     const char *startup;
@@ -163,11 +201,89 @@ static void appSetResolvedStartup(app_info_t *app)
     startup = appResolveLegacyMassStartup(appBuildStartupPath(app->path, app->boot));
     if (startup == NULL) {
         app->startup[0] = '\0';
+        appSetArtSource(app);
         return;
     }
 
     strncpy(app->startup, startup, APP_STARTUP_MAX);
     app->startup[APP_STARTUP_MAX] = '\0';
+    appSetArtSource(app);
+}
+
+static void appFreeArtLookup(void)
+{
+    if (appArtLookupTable != NULL) {
+        free(appArtLookupTable);
+        appArtLookupTable = NULL;
+    }
+
+    appArtLookupTableSize = 0;
+}
+
+static int appBuildArtLookup(void)
+{
+    int size;
+
+    appFreeArtLookup();
+
+    if (appsList == NULL || appItemCount <= 0)
+        return 0;
+
+    size = 1;
+    while (size < appItemCount * 2)
+        size <<= 1;
+
+    if (size < 2)
+        size = 2;
+
+    appArtLookupTable = malloc(size * sizeof(int));
+    if (appArtLookupTable == NULL)
+        return -1;
+
+    for (int i = 0; i < size; i++)
+        appArtLookupTable[i] = -1;
+
+    for (int i = 0; i < appItemCount; i++) {
+        unsigned int slot;
+
+        if (appsList[i].startup[0] == '\0')
+            continue;
+
+        slot = appHashStartup(appsList[i].startup) & (size - 1);
+        while (appArtLookupTable[slot] != -1)
+            slot = (slot + 1) & (size - 1);
+
+        appArtLookupTable[slot] = i;
+    }
+
+    appArtLookupTableSize = size;
+    return 0;
+}
+
+static app_info_t *appLookupByStartup(const char *startup)
+{
+    if (startup == NULL || appsList == NULL)
+        return NULL;
+
+    if (appArtLookupTable != NULL && appArtLookupTableSize > 0) {
+        unsigned int slot = appHashStartup(startup) & (appArtLookupTableSize - 1);
+
+        while (appArtLookupTable[slot] != -1) {
+            int index = appArtLookupTable[slot];
+
+            if (!strcmp(appsList[index].startup, startup))
+                return &appsList[index];
+
+            slot = (slot + 1) & (appArtLookupTableSize - 1);
+        }
+    }
+
+    for (int i = 0; i < appItemCount; i++) {
+        if (!strcmp(appsList[i].startup, startup))
+            return &appsList[i];
+    }
+
+    return NULL;
 }
 
 void appInit(item_list_t *itemList)
@@ -345,6 +461,9 @@ static int appUpdateItemList(item_list_t *itemList)
         }
     }
 
+    if (appBuildArtLookup() < 0)
+        LOG("APPSUPPORT unable to allocate art lookup table.\n");
+
     appFreeLinkedList(appsLinkedListHead);
 
     LOG("APPSUPPORT %d apps loaded\n", appItemCount);
@@ -363,11 +482,14 @@ static void appFreeLinkedList(struct app_info_linked *appsLinkedList)
 
 static void appFreeList(void)
 {
+    appFreeArtLookup();
+
     if (appsList != NULL) {
         free(appsList);
         appsList = NULL;
-        appItemCount = 0;
     }
+
+    appItemCount = 0;
 }
 
 static int appGetItemCount(item_list_t *itemList)
@@ -538,10 +660,20 @@ static config_set_t *appGetConfig(item_list_t *itemList, int id)
 
 static int appGetImage(item_list_t *itemList, char *folder, int isRelative, char *value, char *suffix, GSTEXTURE *resultTex, short psm)
 {
-    char device[BDM_DEVICE_ROOT_MAX] = "";
+    app_info_t *app;
+    char device[APP_ART_DEVICE_MAX] = "";
     char *startup;
-    const char *sourcePath = appFindSourcePath(value);
+    const char *sourcePath;
 
+    app = appLookupByStartup(value);
+    if (app != NULL) {
+        if (!strcmp(folder, "ART"))
+            return oplGetAppImage(app->artDevice[0] != '\0' ? app->artDevice : NULL, folder, isRelative, app->artLookup[0] != '\0' ? app->artLookup : app->boot, suffix, resultTex, psm);
+        else
+            return oplGetAppImage(app->artDevice[0] != '\0' ? app->artDevice : NULL, folder, isRelative, value, suffix, resultTex, psm);
+    }
+
+    sourcePath = appFindSourcePath(value);
     if (sourcePath == NULL)
         return -1;
 

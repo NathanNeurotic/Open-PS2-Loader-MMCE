@@ -83,6 +83,10 @@ void cachePrimeReadyTexture(void);
  */
 int cacheHasPendingArt(void);
 
+/** Returns nonzero while any interactive art request is queued or actively decoding.
+ */
+int cacheHasPendingInteractiveArt(void);
+
 GSTEXTURE *cacheGetTexture(image_cache_t *cache, item_list_t *list, int *cacheId, int *UID, char *value);
 GSTEXTURE *cachePrefetchTexture(image_cache_t *cache, item_list_t *list, int *cacheId, int *UID, char *value);
 

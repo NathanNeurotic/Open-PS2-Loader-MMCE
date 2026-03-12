@@ -38,6 +38,10 @@ enum {
     CACHE_REQ_PRIORITY_PREFETCH
 };
 
+#define CACHE_SLOW_MODE_INTERACTIVE_DELAY 4
+#define CACHE_APP_PREFETCH_DELAY         10
+#define CACHE_PRIME_IDLE_DELAY           12
+
 extern void *_gp;
 
 #define CACHE_THREAD_STACK_SIZE (96 * 1024)
@@ -52,6 +56,7 @@ static int gArtTerminate = 0;
 static int gArtRunning = 0;
 static int gArtQueuedCount = 0;
 static int gArtActiveCount = 0;
+static int gArtInteractiveActiveCount = 0;
 static int gCacheGeneration = 1;
 
 static load_image_request_t *gArtInteractiveReqList = NULL;
@@ -159,6 +164,27 @@ static int cacheGetPrefetchLimit(const image_cache_t *cache)
         return 0;
 
     return cache->count - 1 < 4 ? cache->count - 1 : 4;
+}
+
+static int cacheGetInteractiveDelay(const item_list_t *list)
+{
+    if (list != NULL && (list->mode == APP_MODE || list->mode == MMCE_MODE))
+        return CACHE_SLOW_MODE_INTERACTIVE_DELAY;
+
+    return 1;
+}
+
+static int cacheGetPrefetchDelay(const item_list_t *list)
+{
+    if (list != NULL && list->mode == APP_MODE)
+        return CACHE_APP_PREFETCH_DELAY;
+
+    return MENU_MIN_INACTIVE_FRAMES;
+}
+
+static int cacheHasPendingInteractiveArtLocked(void)
+{
+    return gArtInteractiveReqList != NULL || gArtInteractiveActiveCount > 0;
 }
 
 static void cacheEnqueueRequestLocked(load_image_request_t *req)
@@ -393,6 +419,8 @@ static load_image_request_t *cacheDequeueRequest(void)
         if (req->priority == CACHE_REQ_PRIORITY_PREFETCH && req->cache != NULL && req->cache->queuedPrefetchRequests > 0)
             req->cache->queuedPrefetchRequests--;
         gArtActiveCount++;
+        if (req->priority == CACHE_REQ_PRIORITY_INTERACTIVE)
+            gArtInteractiveActiveCount++;
 
         if (req->entry != NULL && req->entry->qr == req && req->entry->state == CACHE_ENTRY_QUEUED)
             req->entry->state = CACHE_ENTRY_LOADING;
@@ -424,6 +452,8 @@ static void cacheCompleteRequest(load_image_request_t *req, int result)
 
     if (gArtActiveCount > 0)
         gArtActiveCount--;
+    if (req->priority == CACHE_REQ_PRIORITY_INTERACTIVE && gArtInteractiveActiveCount > 0)
+        gArtInteractiveActiveCount--;
 
     cacheReleaseRequestLocked(req);
     cacheUnlock();
@@ -437,6 +467,8 @@ static void cacheLoadImage(load_image_request_t *req)
         cacheLock();
         if (gArtActiveCount > 0)
             gArtActiveCount--;
+        if (req != NULL && req->priority == CACHE_REQ_PRIORITY_INTERACTIVE && gArtInteractiveActiveCount > 0)
+            gArtInteractiveActiveCount--;
         cacheReleaseRequestLocked(req);
         cacheUnlock();
         return;
@@ -477,6 +509,7 @@ void cacheInit()
     gArtTerminate = 0;
     gArtQueuedCount = 0;
     gArtActiveCount = 0;
+    gArtInteractiveActiveCount = 0;
     gCacheGeneration = 1;
     gArtInteractiveReqList = NULL;
     gArtInteractiveReqEnd = NULL;
@@ -653,10 +686,15 @@ void cachePrimeReadyTexture(void)
     GSTEXTURE *texture = NULL;
     cache_registry_entry_t *registry;
 
-    if (guiInactiveFrames <= 0)
+    if (guiInactiveFrames < CACHE_PRIME_IDLE_DELAY)
         return;
 
     cacheLock();
+
+    if (cacheHasPendingInteractiveArtLocked()) {
+        cacheUnlock();
+        return;
+    }
 
     registry = gCacheRegistry;
     while (registry != NULL && texture == NULL) {
@@ -690,6 +728,17 @@ int cacheHasPendingArt(void)
 
     cacheLock();
     pending = (gArtQueuedCount > 0) || (gArtActiveCount > 0) || cacheHasReadyEntriesLocked();
+    cacheUnlock();
+
+    return pending;
+}
+
+int cacheHasPendingInteractiveArt(void)
+{
+    int pending;
+
+    cacheLock();
+    pending = cacheHasPendingInteractiveArtLocked();
     cacheUnlock();
 
     return pending;
@@ -767,9 +816,21 @@ static GSTEXTURE *cacheGetTextureInternal(image_cache_t *cache, item_list_t *lis
         }
     }
 
-    if (guiInactiveFrames <= 0) {
-        cacheUnlock();
-        return NULL;
+    if (priority == CACHE_REQ_PRIORITY_INTERACTIVE) {
+        if (guiInactiveFrames < cacheGetInteractiveDelay(list)) {
+            cacheUnlock();
+            return NULL;
+        }
+    } else {
+        if (list == NULL || list->mode == MMCE_MODE || guiInactiveFrames < cacheGetPrefetchDelay(list)) {
+            cacheUnlock();
+            return NULL;
+        }
+
+        if (list->mode == APP_MODE && cacheHasPendingInteractiveArtLocked()) {
+            cacheUnlock();
+            return NULL;
+        }
     }
 
     req = cacheFindQueuedRequestLocked(cache, value);

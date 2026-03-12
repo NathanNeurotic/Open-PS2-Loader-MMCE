@@ -19,6 +19,8 @@
 #include <fileXio_rpc.h> // fileXioIoctl, fileXioDevctl
 
 static char mmcePrefix[40]; // Contains the full path to the folder where all the games are.
+static char mmceArtPrimary[40];
+static char mmceArtFallback[40];
 static int mmceULSizePrev = -2;
 static time_t mmceModifiedCDPrev;
 static time_t mmceModifiedDVDPrev;
@@ -52,6 +54,23 @@ static void mmceGetDeviceRoot(char *root, size_t size)
         snprintf(root, size, "mmce1:/");
     else
         root[0] = '\0';
+}
+
+static void mmceRefreshArtRoots(void)
+{
+    char deviceRoot[sizeof(mmcePrefix)];
+
+    mmceArtPrimary[0] = '\0';
+    mmceArtFallback[0] = '\0';
+
+    if (mmcePrefix[0] == '\0')
+        return;
+
+    snprintf(mmceArtPrimary, sizeof(mmceArtPrimary), "%s", mmcePrefix);
+
+    mmceGetDeviceRoot(deviceRoot, sizeof(deviceRoot));
+    if (deviceRoot[0] != '\0' && strcmp(deviceRoot, mmceArtPrimary) != 0)
+        snprintf(mmceArtFallback, sizeof(mmceArtFallback), "%s", deviceRoot);
 }
 
 static int mmceTryLoadImage(const char *prefix, char *folder, int isRelative, char *value, char *suffix, GSTEXTURE *resultTex)
@@ -90,6 +109,8 @@ void mmceSetPrefix(void)
         sprintf(mmcePrefix, "mmce1:/%s", gMMCEPrefix);
     else if (gMMCESlot == 2)
         (void)mmceDetectSlot();
+
+    mmceRefreshArtRoots();
 }
 
 void mmceLoadModules(void)
@@ -103,6 +124,8 @@ void mmceInit(item_list_t *itemList)
 {
     LOG("MMCESUPPORT Init\n");
     mmcePrefix[0] = '\0';
+    mmceArtPrimary[0] = '\0';
+    mmceArtFallback[0] = '\0';
     mmceULSizePrev = -2;
     mmceModifiedCDPrev = 0;
     mmceModifiedDVDPrev = 0;
@@ -414,28 +437,14 @@ static config_set_t *mmceGetConfig(item_list_t *itemList, int id)
 
 static int mmceGetImage(item_list_t *itemList, char *folder, int isRelative, char *value, char *suffix, GSTEXTURE *resultTex, short psm)
 {
-    char previousPrefix[sizeof(mmcePrefix)];
-    char deviceRoot[sizeof(mmcePrefix)];
     int result;
 
-    result = mmceTryLoadImage(mmcePrefix, folder, isRelative, value, suffix, resultTex);
+    result = mmceTryLoadImage(mmceArtPrimary, folder, isRelative, value, suffix, resultTex);
     if (result >= 0 || !isRelative)
         return result;
 
-    if (gMMCESlot == 2) {
-        strncpy(previousPrefix, mmcePrefix, sizeof(previousPrefix));
-        previousPrefix[sizeof(previousPrefix) - 1] = '\0';
-
-        if (mmceDetectSlot() >= 0 && strcmp(previousPrefix, mmcePrefix) != 0) {
-            result = mmceTryLoadImage(mmcePrefix, folder, isRelative, value, suffix, resultTex);
-            if (result >= 0)
-                return result;
-        }
-    }
-
-    mmceGetDeviceRoot(deviceRoot, sizeof(deviceRoot));
-    if (deviceRoot[0] != '\0' && strcmp(deviceRoot, mmcePrefix) != 0)
-        return mmceTryLoadImage(deviceRoot, folder, isRelative, value, suffix, resultTex);
+    if (mmceArtFallback[0] != '\0')
+        return mmceTryLoadImage(mmceArtFallback, folder, isRelative, value, suffix, resultTex);
 
     return result;
 }
