@@ -1504,7 +1504,7 @@ void deinit(int exception, int modeSelected)
     // block all io ops, wait for the ones still running to finish
     ioBlockOps(1);
     guiExecDeferredOps();
-    cacheEnd();
+    cacheEnd(modeSelected == IO_MODE_SELECTED_ALL || modeSelected == IO_MODE_SELECTED_NONE);
 
 #ifdef PADEMU
     ds34usb_reset();

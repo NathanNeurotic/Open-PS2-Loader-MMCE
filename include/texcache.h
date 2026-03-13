@@ -53,7 +53,7 @@ void cacheInit();
 
 /** Terminates the cache. Does nothing currently. Users of this code have to destroy caches via cacheDestroyCache
  */
-void cacheEnd();
+void cacheEnd(int forceStop);
 
 /** Initializes a single cache
  */

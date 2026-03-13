@@ -60,6 +60,7 @@ static ee_sema_t gArtSema;
 
 static int gArtTerminate = 0;
 static int gArtRunning = 0;
+static int gArtShutdownAbandoned = 0;
 static int gArtQueuedCount = 0;
 static int gArtActiveCount = 0;
 static int gArtInteractiveActiveCount = 0;
@@ -593,6 +594,7 @@ void cacheInit()
         return;
 
     gArtTerminate = 0;
+    gArtShutdownAbandoned = 0;
     gArtQueuedCount = 0;
     gArtActiveCount = 0;
     gArtInteractiveActiveCount = 0;
@@ -628,7 +630,7 @@ void cacheInit()
     StartThread(gArtThreadId, NULL);
 }
 
-void cacheEnd()
+void cacheEnd(int forceStop)
 {
     if (!gArtRunning)
         return;
@@ -645,10 +647,15 @@ void cacheEnd()
     for (int i = 0; gArtRunning && i < CACHE_END_WAIT_TICKS; i++)
         delay(1);
 
-    if (gArtRunning && gArtThreadId >= 0) {
+    if (gArtRunning && gArtThreadId >= 0 && forceStop) {
         TerminateThread(gArtThreadId);
         DeleteThread(gArtThreadId);
         gArtRunning = 0;
+    }
+
+    if (gArtRunning) {
+        gArtShutdownAbandoned = 1;
+        return;
     }
 
     if (gArtSemaId >= 0) {
@@ -743,6 +750,9 @@ void cacheDestroyCache(image_cache_t *cache)
     }
 
     cacheUnlock();
+
+    if (gArtShutdownAbandoned)
+        return;
 
     cacheWaitForCacheRequests(cache);
     cacheUnregister(cache);
