@@ -6,6 +6,8 @@
 #include "include/util.h"
 #include "include/renderman.h"
 
+#include <kernel.h>
+
 typedef struct load_image_request
 {
     struct load_image_request *next;
@@ -40,8 +42,11 @@ enum {
 };
 
 #define CACHE_SLOW_MODE_INTERACTIVE_DELAY 4
+#define CACHE_APP_INTERACTIVE_MAX_DELAY    10
 #define CACHE_APP_PREFETCH_DELAY          10
 #define CACHE_PRIME_IDLE_DELAY            12
+#define CACHE_THREAD_PRIORITY             0x40
+#define CACHE_END_WAIT_TICKS              120
 
 extern void *_gp;
 
@@ -200,6 +205,9 @@ static int cacheGetInteractiveDelay(const item_list_t *list, const char *value)
 
     if ((mode == APP_MODE || mode == MMCE_MODE) && delay < CACHE_SLOW_MODE_INTERACTIVE_DELAY)
         delay = CACHE_SLOW_MODE_INTERACTIVE_DELAY;
+
+    if (mode == APP_MODE && delay > CACHE_APP_INTERACTIVE_MAX_DELAY)
+        delay = CACHE_APP_INTERACTIVE_MAX_DELAY;
 
     return delay;
 }
@@ -388,12 +396,12 @@ static int cacheHasReadyEntriesLocked(void)
     return 0;
 }
 
-static void cacheWaitForAllRequests(void)
+static int cacheWaitForAllRequestsTimed(int timeoutTicks)
 {
     if (!gArtRunning)
-        return;
+        return 1;
 
-    while (1) {
+    while (timeoutTicks != 0) {
         int pending;
 
         cacheLock();
@@ -401,10 +409,19 @@ static void cacheWaitForAllRequests(void)
         cacheUnlock();
 
         if (!pending)
-            break;
+            return 1;
 
         delay(1);
+        if (timeoutTicks > 0)
+            timeoutTicks--;
     }
+
+    return 0;
+}
+
+static void cacheWaitForAllRequests(void)
+{
+    (void)cacheWaitForAllRequestsTimed(-1);
 }
 
 static void cacheWaitForCacheRequests(image_cache_t *cache)
@@ -598,7 +615,7 @@ void cacheInit()
     gArtThread.gp_reg = &_gp;
     gArtThread.func = &cacheWorkerThread;
     gArtThread.stack = gArtThreadStack;
-    gArtThread.initial_priority = 32;
+    gArtThread.initial_priority = CACHE_THREAD_PRIORITY;
 
     gArtThreadId = CreateThread(&gArtThread);
     if (gArtThreadId < 0) {
@@ -616,13 +633,23 @@ void cacheEnd()
     if (!gArtRunning)
         return;
 
-    cacheCancelPendingImageLoads();
+    cacheLock();
+    cacheInvalidatePendingRequestsLocked(0);
+    cacheUnlock();
+
+    (void)cacheWaitForAllRequestsTimed(CACHE_END_WAIT_TICKS);
 
     gArtTerminate = 1;
     WakeupThread(gArtThreadId);
 
-    while (gArtRunning)
+    for (int i = 0; gArtRunning && i < CACHE_END_WAIT_TICKS; i++)
         delay(1);
+
+    if (gArtRunning && gArtThreadId >= 0) {
+        TerminateThread(gArtThreadId);
+        DeleteThread(gArtThreadId);
+        gArtRunning = 0;
+    }
 
     if (gArtSemaId >= 0) {
         DeleteSema(gArtSemaId);
