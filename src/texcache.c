@@ -40,8 +40,8 @@ enum {
 };
 
 #define CACHE_SLOW_MODE_INTERACTIVE_DELAY 4
-#define CACHE_APP_PREFETCH_DELAY         10
-#define CACHE_PRIME_IDLE_DELAY           12
+#define CACHE_APP_PREFETCH_DELAY          10
+#define CACHE_PRIME_IDLE_DELAY            12
 
 extern void *_gp;
 

@@ -11,9 +11,9 @@
 #include "include/sound.h"
 #include "include/texcache.h"
 
-#define MENU_POS_V     50
-#define HINT_HEIGHT    32
-#define DECORATOR_SIZE 20
+#define MENU_POS_V               50
+#define HINT_HEIGHT              32
+#define DECORATOR_SIZE           20
 #define APP_PREFETCH_IDLE_FRAMES 10
 
 extern const char conf_theme_OPL_cfg;
