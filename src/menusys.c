@@ -159,16 +159,21 @@ static void menuDeleteGame(submenu_list_t **submenu)
 
 static void _menuLoadConfig()
 {
+    int blockingLoad = 0;
     item_list_t *list = NULL;
     config_set_t *loadedConfig = NULL;
     int configId = -1;
 
     WaitSema(menuSemaId);
+    blockingLoad = actionStatus != 0;
     if (!itemConfig && selected_item != NULL && selected_item->item->current != NULL && itemConfigId >= 0) {
         list = selected_item->item->userdata;
         configId = itemConfigId;
     }
     SignalSema(menuSemaId);
+
+    if (blockingLoad)
+        cacheCancelPendingImageLoads();
 
     if (list != NULL)
         loadedConfig = list->itemGetConfig(list, configId);
@@ -991,7 +996,7 @@ static void menuRenderElements(theme_elems_t *elems)
     // selected_item can't be NULL here as we only allow to switch to "Main" rendering when there is at least one device activated
     theme_element_t *elem = elems->first;
 
-    if (elems->needsItemConfig)
+    if (elems->needsItemConfig && !cacheHasPendingInteractiveArt())
         _menuRequestConfig();
 
     WaitSema(menuSemaId);
