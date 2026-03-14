@@ -173,7 +173,7 @@ static void _menuLoadConfig()
     SignalSema(menuSemaId);
 
     if (blockingLoad)
-        cacheCancelPendingImageLoads();
+        (void)cacheCancelPendingImageLoadsTimed(MENU_MIN_INACTIVE_FRAMES);
 
     if (list != NULL)
         loadedConfig = list->itemGetConfig(list, configId);

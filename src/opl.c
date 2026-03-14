@@ -279,7 +279,7 @@ static void itemExecSelect(struct menu_item *curMenu)
                 support->itemLaunch(support, curMenu->current->item.id, configSet);
             }
         } else {
-            cacheCancelPendingImageLoads();
+            (void)cacheCancelPendingImageLoadsTimed(MENU_MIN_INACTIVE_FRAMES);
 
             // If we're trying to enable BDM support we need to enable it for all BDM menu slots.
             if (support->mode == BDM_MODE) {

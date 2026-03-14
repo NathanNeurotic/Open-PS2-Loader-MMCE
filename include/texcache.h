@@ -67,6 +67,10 @@ void cacheDestroyCache(image_cache_t *cache);
  */
 void cacheCancelPendingImageLoads(void);
 
+/** Cancels queued art loads and waits up to timeoutTicks for active loads to drain.
+ */
+int cacheCancelPendingImageLoadsTimed(int timeoutTicks);
+
 /** Invalidates queued art loads without blocking on the IO worker.
  */
 void cacheAdvanceGeneration(void);

@@ -41,12 +41,14 @@ enum {
     CACHE_REQ_PRIORITY_PREFETCH
 };
 
-#define CACHE_SLOW_MODE_INTERACTIVE_DELAY 4
+#define CACHE_SLOW_MODE_INTERACTIVE_DELAY  4
+#define CACHE_MMCE_INTERACTIVE_MAX_DELAY   12
 #define CACHE_APP_INTERACTIVE_MAX_DELAY    10
-#define CACHE_APP_PREFETCH_DELAY          10
-#define CACHE_PRIME_IDLE_DELAY            12
-#define CACHE_THREAD_PRIORITY             0x40
-#define CACHE_END_WAIT_TICKS              120
+#define CACHE_APP_PREFETCH_DELAY           10
+#define CACHE_PRIME_IDLE_DELAY             12
+#define CACHE_THREAD_PRIORITY              0x40
+#define CACHE_END_WAIT_TICKS_FORCE         120
+#define CACHE_END_WAIT_TICKS_SOFT          15
 
 extern void *_gp;
 
@@ -207,8 +209,11 @@ static int cacheGetInteractiveDelay(const item_list_t *list, const char *value)
     if ((mode == APP_MODE || mode == MMCE_MODE) && delay < CACHE_SLOW_MODE_INTERACTIVE_DELAY)
         delay = CACHE_SLOW_MODE_INTERACTIVE_DELAY;
 
-    if (mode == APP_MODE && delay > CACHE_APP_INTERACTIVE_MAX_DELAY)
+    if (list != NULL && list->mode == APP_MODE && delay > CACHE_APP_INTERACTIVE_MAX_DELAY)
         delay = CACHE_APP_INTERACTIVE_MAX_DELAY;
+
+    if (mode == MMCE_MODE && delay > CACHE_MMCE_INTERACTIVE_MAX_DELAY)
+        delay = CACHE_MMCE_INTERACTIVE_MAX_DELAY;
 
     return delay;
 }
@@ -632,6 +637,8 @@ void cacheInit()
 
 void cacheEnd(int forceStop)
 {
+    int waitTicks = forceStop ? CACHE_END_WAIT_TICKS_FORCE : CACHE_END_WAIT_TICKS_SOFT;
+
     if (!gArtRunning)
         return;
 
@@ -639,12 +646,12 @@ void cacheEnd(int forceStop)
     cacheInvalidatePendingRequestsLocked(0);
     cacheUnlock();
 
-    (void)cacheWaitForAllRequestsTimed(CACHE_END_WAIT_TICKS);
+    (void)cacheWaitForAllRequestsTimed(waitTicks);
 
     gArtTerminate = 1;
     WakeupThread(gArtThreadId);
 
-    for (int i = 0; gArtRunning && i < CACHE_END_WAIT_TICKS; i++)
+    for (int i = 0; gArtRunning && i < waitTicks; i++)
         delay(1);
 
     if (gArtRunning && gArtThreadId >= 0 && forceStop) {
@@ -765,11 +772,16 @@ void cacheDestroyCache(image_cache_t *cache)
 
 void cacheCancelPendingImageLoads(void)
 {
+    (void)cacheCancelPendingImageLoadsTimed(-1);
+}
+
+int cacheCancelPendingImageLoadsTimed(int timeoutTicks)
+{
     cacheLock();
     cacheInvalidatePendingRequestsLocked(0);
     cacheUnlock();
 
-    cacheWaitForAllRequests();
+    return cacheWaitForAllRequestsTimed(timeoutTicks);
 }
 
 void cacheAdvanceGeneration(void)
