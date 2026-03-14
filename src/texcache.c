@@ -967,6 +967,11 @@ static GSTEXTURE *cacheGetTextureInternal(image_cache_t *cache, item_list_t *lis
         return NULL;
     }
 
+    if (priority == CACHE_REQ_PRIORITY_INTERACTIVE && cacheGetEffectiveMode(list, value) == MMCE_MODE && (gArtActiveCount > 0 || gArtQueuedCount > 0)) {
+        cacheUnlock();
+        return NULL;
+    }
+
     if (priority == CACHE_REQ_PRIORITY_PREFETCH && cache->queuedPrefetchRequests >= cacheGetPrefetchLimit(cache)) {
         cacheUnlock();
         return NULL;
