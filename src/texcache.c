@@ -2,6 +2,7 @@
 #include "include/appsupport.h"
 #include "include/texcache.h"
 #include "include/textures.h"
+#include "include/ioman.h"
 #include "include/gui.h"
 #include "include/util.h"
 #include "include/renderman.h"
@@ -46,23 +47,13 @@ enum {
 #define CACHE_APP_INTERACTIVE_MAX_DELAY   10
 #define CACHE_APP_PREFETCH_DELAY          10
 #define CACHE_PRIME_IDLE_DELAY            12
-#define CACHE_THREAD_PRIORITY             0x40
-#define CACHE_END_WAIT_TICKS_FORCE        120
-#define CACHE_END_WAIT_TICKS_SOFT         15
+#define CACHE_END_WAIT_TICKS              15
 
-extern void *_gp;
-
-#define CACHE_THREAD_STACK_SIZE (96 * 1024)
-
-static u8 gArtThreadStack[CACHE_THREAD_STACK_SIZE] ALIGNED(16);
-static ee_thread_t gArtThread;
-static s32 gArtThreadId = -1;
 static s32 gArtSemaId = -1;
 static ee_sema_t gArtSema;
 
-static int gArtTerminate = 0;
 static int gArtRunning = 0;
-static int gArtShutdownAbandoned = 0;
+static int gArtDispatchQueued = 0;
 static int gArtQueuedCount = 0;
 static int gArtActiveCount = 0;
 static int gArtInteractiveActiveCount = 0;
@@ -76,6 +67,7 @@ static cache_registry_entry_t *gCacheRegistry = NULL;
 
 static void cacheClearItem(cache_entry_t *item, int freeTxt);
 static void cacheResetTextureState(GSTEXTURE *texture);
+static void cacheScheduleDispatchLocked(void);
 
 static void cacheNextGenerationLocked(void)
 {
@@ -232,6 +224,15 @@ static int cacheGetPrefetchDelay(const item_list_t *list, const char *value)
 static int cacheHasPendingInteractiveArtLocked(void)
 {
     return gArtInteractiveReqList != NULL || gArtInteractiveActiveCount > 0;
+}
+
+static void cacheScheduleDispatchLocked(void)
+{
+    if (!gArtRunning || gArtDispatchQueued || gArtQueuedCount <= 0)
+        return;
+
+    if (ioPutRequest(IO_CACHE_LOAD_ART, NULL) == IO_OK)
+        gArtDispatchQueued = 1;
 }
 
 static void cacheEnqueueRequestLocked(load_image_request_t *req)
@@ -425,11 +426,6 @@ static int cacheWaitForAllRequestsTimed(int timeoutTicks)
     return 0;
 }
 
-static void cacheWaitForAllRequests(void)
-{
-    (void)cacheWaitForAllRequestsTimed(-1);
-}
-
 static void cacheWaitForCacheRequests(image_cache_t *cache)
 {
     while (1) {
@@ -570,36 +566,33 @@ static void cacheLoadImage(load_image_request_t *req)
     cacheCompleteRequest(req, result);
 }
 
-static void cacheWorkerThread(void *arg)
+static void cacheDispatchNextRequest(void *arg)
 {
+    load_image_request_t *req;
+
     (void)arg;
 
-    while (!gArtTerminate) {
-        load_image_request_t *req;
-
-        SleepThread();
-
-        if (gArtTerminate)
-            break;
-
-        while (!gArtTerminate && (req = cacheDequeueRequest()) != NULL)
-            cacheLoadImage(req);
-    }
-
     cacheLock();
-    gArtRunning = 0;
+    gArtDispatchQueued = 0;
     cacheUnlock();
 
-    ExitDeleteThread();
+    req = cacheDequeueRequest();
+    if (req != NULL)
+        cacheLoadImage(req);
+
+    cacheLock();
+    cacheScheduleDispatchLocked();
+    cacheUnlock();
 }
 
 void cacheInit()
 {
+    int ioResult;
+
     if (gArtRunning)
         return;
 
-    gArtTerminate = 0;
-    gArtShutdownAbandoned = 0;
+    gArtDispatchQueued = 0;
     gArtQueuedCount = 0;
     gArtActiveCount = 0;
     gArtInteractiveActiveCount = 0;
@@ -617,60 +610,36 @@ void cacheInit()
     if (gArtSemaId < 0)
         return;
 
-    gArtThread.attr = 0;
-    gArtThread.stack_size = CACHE_THREAD_STACK_SIZE;
-    gArtThread.gp_reg = &_gp;
-    gArtThread.func = &cacheWorkerThread;
-    gArtThread.stack = gArtThreadStack;
-    gArtThread.initial_priority = CACHE_THREAD_PRIORITY;
-
-    gArtThreadId = CreateThread(&gArtThread);
-    if (gArtThreadId < 0) {
+    ioResult = ioRegisterHandler(IO_CACHE_LOAD_ART, &cacheDispatchNextRequest);
+    if (ioResult != IO_OK && ioResult != IO_ERR_DUPLICIT_HANDLER) {
         DeleteSema(gArtSemaId);
         gArtSemaId = -1;
         return;
     }
 
     gArtRunning = 1;
-    StartThread(gArtThreadId, NULL);
 }
 
 void cacheEnd(int forceStop)
 {
-    int waitTicks = forceStop ? CACHE_END_WAIT_TICKS_FORCE : CACHE_END_WAIT_TICKS_SOFT;
+    (void)forceStop;
 
     if (!gArtRunning)
         return;
 
     cacheLock();
     cacheInvalidatePendingRequestsLocked(0);
+    gArtDispatchQueued = 0;
     cacheUnlock();
 
-    (void)cacheWaitForAllRequestsTimed(waitTicks);
-
-    gArtTerminate = 1;
-    WakeupThread(gArtThreadId);
-
-    for (int i = 0; gArtRunning && i < waitTicks; i++)
-        delay(1);
-
-    if (gArtRunning && gArtThreadId >= 0 && forceStop) {
-        TerminateThread(gArtThreadId);
-        DeleteThread(gArtThreadId);
-        gArtRunning = 0;
-    }
-
-    if (gArtRunning) {
-        gArtShutdownAbandoned = 1;
-        return;
-    }
+    (void)cacheWaitForAllRequestsTimed(CACHE_END_WAIT_TICKS);
 
     if (gArtSemaId >= 0) {
         DeleteSema(gArtSemaId);
         gArtSemaId = -1;
     }
 
-    gArtThreadId = -1;
+    gArtRunning = 0;
 }
 
 static void cacheClearItem(cache_entry_t *item, int freeTxt)
@@ -757,9 +726,6 @@ void cacheDestroyCache(image_cache_t *cache)
     }
 
     cacheUnlock();
-
-    if (gArtShutdownAbandoned)
-        return;
 
     cacheWaitForCacheRequests(cache);
     cacheUnregister(cache);
@@ -884,6 +850,9 @@ static GSTEXTURE *cacheGetTextureInternal(image_cache_t *cache, item_list_t *lis
         return NULL;
 
     cacheLock();
+
+    if (gArtQueuedCount > 0 && !gArtDispatchQueued)
+        cacheScheduleDispatchLocked();
 
     if (*cacheId == -2) {
         if (*UID == gCacheGeneration) {
@@ -1026,9 +995,8 @@ static GSTEXTURE *cacheGetTextureInternal(image_cache_t *cache, item_list_t *lis
 
     cache->activeRequests++;
     cacheEnqueueRequestLocked(req);
+    cacheScheduleDispatchLocked();
     cacheUnlock();
-
-    WakeupThread(gArtThreadId);
 
     return NULL;
 }
