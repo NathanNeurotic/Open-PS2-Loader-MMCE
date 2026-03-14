@@ -1,5 +1,6 @@
 #include "include/opl.h"
 #include "include/appsupport.h"
+#include "include/mmcesupport.h"
 #include "include/pad.h"
 #include "include/texcache.h"
 #include "include/textures.h"
@@ -81,6 +82,7 @@ static cache_registry_entry_t *gCacheRegistry = NULL;
 static void cacheClearItem(cache_entry_t *item, int freeTxt);
 static void cacheResetTextureState(GSTEXTURE *texture);
 static void cacheResetRequestTrackingLocked(void);
+static void cacheRequeueRequestLocked(load_image_request_t *req);
 
 static void cacheNextGenerationLocked(void)
 {
@@ -275,6 +277,12 @@ static int cacheHasQueuedInteractiveModeLocked(int mode)
     return 0;
 }
 
+static int cacheHasActiveInteractiveModeLocked(int mode)
+{
+    return gArtCurrentReq != NULL && gArtCurrentReq->priority == CACHE_REQ_PRIORITY_INTERACTIVE &&
+           gArtCurrentReq->effectiveMode == mode;
+}
+
 static int cacheIsNavigationActive(void)
 {
     return getKey(KEY_LEFT) || getKey(KEY_RIGHT) || getKey(KEY_UP) || getKey(KEY_DOWN) || getKey(KEY_L1) || getKey(KEY_R1);
@@ -282,9 +290,9 @@ static int cacheIsNavigationActive(void)
 
 static int cacheShouldDeferInteractiveArtOnInput(const item_list_t *list, const char *value)
 {
-    (void)value;
+    int effectiveMode = cacheGetEffectiveMode(list, value);
 
-    if (list != NULL && list->mode == APP_MODE)
+    if ((list != NULL && list->mode == APP_MODE) || effectiveMode == MMCE_MODE)
         return cacheIsNavigationActive();
 
     return 0;
@@ -355,6 +363,30 @@ static void cachePromoteQueuedRequestLocked(load_image_request_t *req)
 
     req->priority = CACHE_REQ_PRIORITY_INTERACTIVE;
     cacheEnqueueRequestLocked(req);
+}
+
+static void cacheRequeueRequestLocked(load_image_request_t *req)
+{
+    if (req == NULL)
+        return;
+
+    if (gArtCurrentReq == req)
+        gArtCurrentReq = NULL;
+
+    if (gArtActiveCount > 0)
+        gArtActiveCount--;
+    if (req->priority == CACHE_REQ_PRIORITY_INTERACTIVE && gArtInteractiveActiveCount > 0)
+        gArtInteractiveActiveCount--;
+
+    if (req->entry != NULL && req->entry->qr == req && req->entry->UID == req->cacheUID &&
+        req->cache != NULL && !req->cache->destroying) {
+        req->entry->state = CACHE_ENTRY_QUEUED;
+        req->entry->primeFrame = -1;
+        cacheEnqueueRequestLocked(req);
+        return;
+    }
+
+    cacheReleaseRequestLocked(req);
 }
 
 static void cacheInvalidateEntryLocked(cache_entry_t *entry, int freeTxt, int preserveLoaded)
@@ -620,6 +652,14 @@ static void cacheLoadImage(load_image_request_t *req)
             gArtInteractiveActiveCount--;
         cacheReleaseRequestLocked(req);
         cacheUnlock();
+        return;
+    }
+
+    if (req->effectiveMode == MMCE_MODE && !mmceIsReadyForArt()) {
+        cacheLock();
+        cacheRequeueRequestLocked(req);
+        cacheUnlock();
+        delay(1);
         return;
     }
 
@@ -1051,7 +1091,8 @@ static GSTEXTURE *cacheGetTextureInternal(image_cache_t *cache, item_list_t *lis
         return NULL;
     }
 
-    if (priority == CACHE_REQ_PRIORITY_INTERACTIVE && effectiveMode == MMCE_MODE && cacheHasQueuedInteractiveModeLocked(MMCE_MODE)) {
+    if (priority == CACHE_REQ_PRIORITY_INTERACTIVE && effectiveMode == MMCE_MODE &&
+        (cacheHasActiveInteractiveModeLocked(MMCE_MODE) || cacheHasQueuedInteractiveModeLocked(MMCE_MODE))) {
         cacheUnlock();
         return NULL;
     }

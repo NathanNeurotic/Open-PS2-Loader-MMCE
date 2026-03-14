@@ -6,6 +6,7 @@
 #include "include/util.h"
 #include "include/themes.h"
 #include "include/textures.h"
+#include "include/texcache.h"
 #include "include/ioman.h"
 #include "include/system.h"
 #include "include/extern_irx.h"
@@ -88,6 +89,20 @@ static int mmceTryLoadImage(const char *prefix, char *folder, int isRelative, ch
         snprintf(path, sizeof(path), "%s%s_%s", folder, value, suffix);
 
     return texDiscoverLoad(resultTex, path, -1);
+}
+
+int mmceIsReadyForArt(void)
+{
+    int status;
+
+    if (mmcePrefix[0] == '\0')
+        return 0;
+
+    status = fileXioDevctl(mmcePrefix, 0x2, NULL, 0, NULL, 0);
+    if (status < 0)
+        return 0;
+
+    return (status & 1) == 0;
 }
 
 int mmceDetectSlot(void)
@@ -276,6 +291,8 @@ void mmceLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
     else
         game = gAutoLaunchBDMGame;
 
+    (void)cacheCancelPendingImageLoadsTimed(MENU_MIN_INACTIVE_FRAMES);
+
     void *irx = &mmce_cdvdman_irx;
     int irx_size = size_mmce_cdvdman_irx;
     compatmask = sbPrepare(game, configSet, irx_size, irx, &index);
@@ -425,8 +442,10 @@ void mmceLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
     //mcReset();
     //mcInit(MC_TYPE_XMC);
 
-    if (gAutoLaunchBDMGame == NULL)
+    if (gAutoLaunchBDMGame == NULL) {
+        cacheEnd(1);
         deinit(NO_EXCEPTION, MMCE_MODE); // CAREFUL: deinit will call mmceCleanUp, so mmceGames/game will be freed
+    }
 
     /* No autolaunch yet
     else {
