@@ -8,6 +8,7 @@
 #include "include/renderman.h"
 
 #include <kernel.h>
+#include <fileXio_rpc.h>
 
 typedef struct load_image_request
 {
@@ -43,7 +44,6 @@ enum {
 };
 
 #define CACHE_SLOW_MODE_INTERACTIVE_DELAY 4
-#define CACHE_MMCE_PAGE_INTERACTIVE_DELAY 20
 #define CACHE_MMCE_INTERACTIVE_MAX_DELAY  12
 #define CACHE_APP_INTERACTIVE_MAX_DELAY   10
 #define CACHE_APP_PREFETCH_DELAY          10
@@ -187,6 +187,20 @@ static int cacheGetEffectiveMode(const item_list_t *list, const char *value)
     return mode;
 }
 
+static int cacheIsMMCEReady(const item_list_t *list)
+{
+    char *prefix;
+
+    if (list == NULL || list->mode != MMCE_MODE || list->itemGetPrefix == NULL)
+        return 1;
+
+    prefix = list->itemGetPrefix((item_list_t *)list);
+    if (prefix == NULL || prefix[0] == '\0')
+        return 0;
+
+    return (fileXioDevctl(prefix, 0x2, NULL, 0, NULL, 0) & 1) == 0;
+}
+
 static int cacheGetBaseDelay(const item_list_t *list)
 {
     if (list != NULL && list->delay >= MENU_MIN_INACTIVE_FRAMES)
@@ -208,9 +222,6 @@ static int cacheGetInteractiveDelay(const item_list_t *list, const char *value)
 
     if (mode == MMCE_MODE && (list == NULL || list->mode != MMCE_MODE) && delay > CACHE_MMCE_INTERACTIVE_MAX_DELAY)
         delay = CACHE_MMCE_INTERACTIVE_MAX_DELAY;
-
-    if (list != NULL && list->mode == MMCE_MODE && delay < CACHE_MMCE_PAGE_INTERACTIVE_DELAY)
-        delay = CACHE_MMCE_PAGE_INTERACTIVE_DELAY;
 
     return delay;
 }
@@ -934,6 +945,11 @@ static GSTEXTURE *cacheGetTextureInternal(image_cache_t *cache, item_list_t *lis
     }
 
     if (priority == CACHE_REQ_PRIORITY_INTERACTIVE) {
+        if (list != NULL && list->mode == MMCE_MODE && !cacheIsMMCEReady(list)) {
+            cacheUnlock();
+            return NULL;
+        }
+
         if (guiInactiveFrames < cacheGetInteractiveDelay(list, value)) {
             cacheUnlock();
             return NULL;
