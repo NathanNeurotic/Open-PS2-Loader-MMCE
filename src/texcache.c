@@ -1,5 +1,6 @@
 #include "include/opl.h"
 #include "include/appsupport.h"
+#include "include/pad.h"
 #include "include/texcache.h"
 #include "include/textures.h"
 #include "include/gui.h"
@@ -68,6 +69,7 @@ static int gArtQueuedCount = 0;
 static int gArtActiveCount = 0;
 static int gArtInteractiveActiveCount = 0;
 static int gCacheGeneration = 1;
+static load_image_request_t *gArtCurrentReq = NULL;
 
 static load_image_request_t *gArtInteractiveReqList = NULL;
 static load_image_request_t *gArtInteractiveReqEnd = NULL;
@@ -77,6 +79,7 @@ static cache_registry_entry_t *gCacheRegistry = NULL;
 
 static void cacheClearItem(cache_entry_t *item, int freeTxt);
 static void cacheResetTextureState(GSTEXTURE *texture);
+static void cacheResetRequestTrackingLocked(void);
 
 static void cacheNextGenerationLocked(void)
 {
@@ -158,6 +161,30 @@ static void cacheReleaseRequestLocked(load_image_request_t *req)
     free(req);
 }
 
+static void cacheResetRequestTrackingLocked(void)
+{
+    cache_registry_entry_t *registry = gCacheRegistry;
+
+    gArtInteractiveReqList = NULL;
+    gArtInteractiveReqEnd = NULL;
+    gArtPrefetchReqList = NULL;
+    gArtPrefetchReqEnd = NULL;
+    gArtQueuedCount = 0;
+    gArtActiveCount = 0;
+    gArtInteractiveActiveCount = 0;
+
+    while (registry != NULL) {
+        image_cache_t *cache = registry->cache;
+
+        if (cache != NULL) {
+            cache->activeRequests = 0;
+            cache->queuedPrefetchRequests = 0;
+        }
+
+        registry = registry->next;
+    }
+}
+
 static load_image_request_t **cacheGetQueueHead(unsigned char priority)
 {
     return priority == CACHE_REQ_PRIORITY_PREFETCH ? &gArtPrefetchReqList : &gArtInteractiveReqList;
@@ -233,6 +260,21 @@ static int cacheGetPrefetchDelay(const item_list_t *list, const char *value)
 static int cacheHasPendingInteractiveArtLocked(void)
 {
     return gArtInteractiveReqList != NULL || gArtInteractiveActiveCount > 0;
+}
+
+static int cacheIsNavigationActive(void)
+{
+    return getKey(KEY_LEFT) || getKey(KEY_RIGHT) || getKey(KEY_UP) || getKey(KEY_DOWN) || getKey(KEY_L1) || getKey(KEY_R1);
+}
+
+static int cacheShouldDeferInteractiveArtOnInput(const item_list_t *list, const char *value)
+{
+    int effectiveMode = cacheGetEffectiveMode(list, value);
+
+    if ((list != NULL && list->mode == APP_MODE) || effectiveMode == MMCE_MODE)
+        return cacheIsNavigationActive();
+
+    return 0;
 }
 
 static void cacheEnqueueRequestLocked(load_image_request_t *req)
@@ -509,6 +551,7 @@ static load_image_request_t *cacheDequeueRequest(void)
         gArtActiveCount++;
         if (req->priority == CACHE_REQ_PRIORITY_INTERACTIVE)
             gArtInteractiveActiveCount++;
+        gArtCurrentReq = req;
 
         if (req->entry != NULL && req->entry->qr == req && req->entry->state == CACHE_ENTRY_QUEUED)
             req->entry->state = CACHE_ENTRY_LOADING;
@@ -522,6 +565,9 @@ static load_image_request_t *cacheDequeueRequest(void)
 static void cacheCompleteRequest(load_image_request_t *req, int result)
 {
     cacheLock();
+
+    if (gArtCurrentReq == req)
+        gArtCurrentReq = NULL;
 
     if (req->entry != NULL && req->entry->qr == req && req->entry->UID == req->cacheUID && req->cache != NULL && !req->cache->destroying) {
         req->entry->qr = NULL;
@@ -553,6 +599,8 @@ static void cacheLoadImage(load_image_request_t *req)
 
     if (req == NULL || req->cache == NULL || req->list == NULL || req->entry == NULL) {
         cacheLock();
+        if (gArtCurrentReq == req)
+            gArtCurrentReq = NULL;
         if (gArtActiveCount > 0)
             gArtActiveCount--;
         if (req != NULL && req->priority == CACHE_REQ_PRIORITY_INTERACTIVE && gArtInteractiveActiveCount > 0)
@@ -665,6 +713,15 @@ void cacheEnd(int forceStop)
         DeleteSema(gArtSemaId);
         gArtSemaId = -1;
     }
+
+    cacheLock();
+    if (gArtCurrentReq != NULL) {
+        load_image_request_t *req = gArtCurrentReq;
+        gArtCurrentReq = NULL;
+        cacheReleaseRequestLocked(req);
+    }
+    cacheResetRequestTrackingLocked();
+    cacheUnlock();
 
     gArtThreadId = -1;
 }
@@ -939,6 +996,11 @@ static GSTEXTURE *cacheGetTextureInternal(image_cache_t *cache, item_list_t *lis
     }
 
     if (priority == CACHE_REQ_PRIORITY_INTERACTIVE) {
+        if (cacheShouldDeferInteractiveArtOnInput(list, value)) {
+            cacheUnlock();
+            return NULL;
+        }
+
         if (guiInactiveFrames < cacheGetInteractiveDelay(list, value)) {
             cacheUnlock();
             return NULL;

@@ -90,6 +90,11 @@ static void menuAdvanceArtSelectionOnMove(void)
 {
     item_list_t *support = selected_item != NULL ? (item_list_t *)selected_item->item->userdata : NULL;
 
+    if (support != NULL && support->mode == MMCE_MODE && cacheHasPendingInteractiveArt()) {
+        cacheEnd(1);
+        cacheInit();
+    }
+
     /* Keep APP prefetch, but drop stale interactive work from prior selections. */
     if (support != NULL && support->mode == APP_MODE)
         cacheAdvanceGenerationPreservePrefetch();
@@ -264,6 +269,11 @@ static config_set_t *menuLoadConfigDirectInternal(void)
 
     if (result != NULL || list == NULL || configId < 0)
         return result;
+
+    if (list->mode == MMCE_MODE) {
+        cacheEnd(1);
+        cacheInit();
+    }
 
     (void)cacheCancelPendingImageLoadsTimed(MENU_MIN_INACTIVE_FRAMES);
     loadedConfig = list->itemGetConfig(list, configId);
