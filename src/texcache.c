@@ -4,11 +4,11 @@
 #include "include/textures.h"
 #include "include/ioman.h"
 #include "include/gui.h"
+#include "include/mmcesupport.h"
 #include "include/util.h"
 #include "include/renderman.h"
 
 #include <kernel.h>
-#include <fileXio_rpc.h>
 
 typedef struct load_image_request
 {
@@ -185,20 +185,6 @@ static int cacheGetEffectiveMode(const item_list_t *list, const char *value)
     }
 
     return mode;
-}
-
-static int cacheIsMMCEReady(const item_list_t *list)
-{
-    char *prefix;
-
-    if (list == NULL || list->mode != MMCE_MODE || list->itemGetPrefix == NULL)
-        return 1;
-
-    prefix = list->itemGetPrefix((item_list_t *)list);
-    if (prefix == NULL || prefix[0] == '\0')
-        return 0;
-
-    return (fileXioDevctl(prefix, 0x2, NULL, 0, NULL, 0) & 1) == 0;
 }
 
 static int cacheGetBaseDelay(const item_list_t *list)
@@ -945,7 +931,7 @@ static GSTEXTURE *cacheGetTextureInternal(image_cache_t *cache, item_list_t *lis
     }
 
     if (priority == CACHE_REQ_PRIORITY_INTERACTIVE) {
-        if (list != NULL && list->mode == MMCE_MODE && !cacheIsMMCEReady(list)) {
+        if (list != NULL && list->mode == MMCE_MODE && !mmceIsReady()) {
             cacheUnlock();
             return NULL;
         }

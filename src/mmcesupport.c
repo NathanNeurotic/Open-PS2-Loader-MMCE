@@ -88,6 +88,14 @@ static int mmceTryLoadImage(const char *prefix, char *folder, int isRelative, ch
     return texDiscoverLoad(resultTex, path, -1);
 }
 
+int mmceIsReady(void)
+{
+    if (mmcePrefix[0] == '\0')
+        return 0;
+
+    return (fileXioDevctl(mmcePrefix, 0x2, NULL, 0, NULL, 0) & 1) == 0;
+}
+
 int mmceDetectSlot(void)
 {
     int ret = -1;

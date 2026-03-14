@@ -2,7 +2,8 @@
 #define __MENUSYS_H
 
 #include "include/config.h"
-#include "include/dia.h"
+
+struct UIItem;
 
 /// a single submenu item
 typedef struct submenu_item
