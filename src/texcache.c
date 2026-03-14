@@ -47,6 +47,7 @@ enum {
 #define CACHE_APP_INTERACTIVE_MAX_DELAY   10
 #define CACHE_APP_PREFETCH_DELAY          10
 #define CACHE_PRIME_IDLE_DELAY            12
+#define CACHE_ART_IO_PRIORITY             0x40
 #define CACHE_END_WAIT_TICKS              15
 
 static s32 gArtSemaId = -1;
@@ -568,6 +569,7 @@ static void cacheLoadImage(load_image_request_t *req)
 
 static void cacheDispatchNextRequest(void *arg)
 {
+    int restorePriority = -1;
     load_image_request_t *req;
 
     (void)arg;
@@ -577,8 +579,24 @@ static void cacheDispatchNextRequest(void *arg)
     cacheUnlock();
 
     req = cacheDequeueRequest();
-    if (req != NULL)
+    if (req != NULL) {
+        int effectiveMode = cacheGetEffectiveMode(req->list, req->value);
+
+        if ((req->list != NULL && req->list->mode == APP_MODE) || effectiveMode == MMCE_MODE) {
+            ee_thread_status_t status;
+            int threadId = GetThreadId();
+
+            if (ReferThreadStatus(threadId, &status) == 0 && status.current_priority < CACHE_ART_IO_PRIORITY) {
+                restorePriority = status.current_priority;
+                ChangeThreadPriority(threadId, CACHE_ART_IO_PRIORITY);
+            }
+        }
+
         cacheLoadImage(req);
+    }
+
+    if (restorePriority >= 0)
+        ChangeThreadPriority(GetThreadId(), restorePriority);
 
     cacheLock();
     cacheScheduleDispatchLocked();

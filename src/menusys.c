@@ -232,12 +232,65 @@ static void _menuRequestConfig()
     }
 }
 
+static config_set_t *menuLoadConfigDirectInternal(void)
+{
+    config_set_t *loadedConfig = NULL;
+    config_set_t *result = NULL;
+    item_list_t *list = NULL;
+    int configId = -1;
+
+    WaitSema(menuSemaId);
+    if (selected_item != NULL && selected_item->item != NULL && selected_item->item->current != NULL) {
+        list = selected_item->item->userdata;
+        configId = selected_item->item->current->item.id;
+
+        if (itemConfigId == configId && itemConfig != NULL) {
+            result = itemConfig;
+        } else {
+            if (itemConfig != NULL) {
+                configFree(itemConfig);
+                itemConfig = NULL;
+            }
+            itemConfigId = configId;
+        }
+    } else {
+        if (itemConfig != NULL) {
+            configFree(itemConfig);
+            itemConfig = NULL;
+        }
+        itemConfigId = -1;
+    }
+    SignalSema(menuSemaId);
+
+    if (result != NULL || list == NULL || configId < 0)
+        return result;
+
+    (void)cacheCancelPendingImageLoadsTimed(MENU_MIN_INACTIVE_FRAMES);
+    loadedConfig = list->itemGetConfig(list, configId);
+
+    WaitSema(menuSemaId);
+    if (itemConfigId == configId && itemConfig == NULL)
+        itemConfig = loadedConfig;
+    else if (loadedConfig != NULL)
+        configFree(loadedConfig);
+    result = itemConfig;
+    SignalSema(menuSemaId);
+
+    return result;
+}
+
 config_set_t *menuLoadConfig()
 {
     actionStatus = 1;
     itemConfigId = -1;
     guiHandleDeferedIO(&actionStatus, _l(_STR_LOADING_SETTINGS), IO_CUSTOM_SIMPLEACTION, &_menuRequestConfig);
     return itemConfig;
+}
+
+config_set_t *menuLoadConfigDirect(void)
+{
+    actionStatus = 0;
+    return menuLoadConfigDirectInternal();
 }
 
 // we don't want a pop up when transitioning to or refreshing Game Menu gui.

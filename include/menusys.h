@@ -98,6 +98,7 @@ void submenuSort(submenu_list_t **submenu);
 char *submenuItemGetText(submenu_item_t *it);
 char *menuItemGetText(menu_item_t *it);
 config_set_t *menuLoadConfig();
+config_set_t *menuLoadConfigDirect(void);
 config_set_t *gameMenuLoadConfig(struct UIItem *ui);
 void menuSaveConfig();
 

@@ -275,7 +275,7 @@ static void itemExecSelect(struct menu_item *curMenu)
     if (support) {
         if (support->enabled) {
             if (curMenu->current) {
-                config_set_t *configSet = menuLoadConfig();
+                config_set_t *configSet = menuLoadConfigDirect();
                 support->itemLaunch(support, curMenu->current->item.id, configSet);
             }
         } else {
