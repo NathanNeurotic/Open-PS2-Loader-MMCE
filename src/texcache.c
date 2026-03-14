@@ -70,6 +70,7 @@ static cache_registry_entry_t *gCacheRegistry = NULL;
 static void cacheClearItem(cache_entry_t *item, int freeTxt);
 static void cacheResetTextureState(GSTEXTURE *texture);
 static void cacheScheduleDispatchLocked(void);
+static void cacheRequeueRequestLocked(load_image_request_t *req);
 
 static void cacheNextGenerationLocked(void)
 {
@@ -549,6 +550,27 @@ static void cacheCompleteRequest(load_image_request_t *req, int result)
     cacheUnlock();
 }
 
+static void cacheRequeueRequestLocked(load_image_request_t *req)
+{
+    if (req == NULL) {
+        return;
+    }
+
+    if (gArtActiveCount > 0)
+        gArtActiveCount--;
+    if (req->priority == CACHE_REQ_PRIORITY_INTERACTIVE && gArtInteractiveActiveCount > 0)
+        gArtInteractiveActiveCount--;
+
+    if (req->entry != NULL && req->entry->qr == req && req->entry->UID == req->cacheUID && req->cache != NULL && !req->cache->destroying) {
+        req->entry->state = CACHE_ENTRY_QUEUED;
+        req->entry->primeFrame = -1;
+        cacheEnqueueRequestLocked(req);
+        return;
+    }
+
+    cacheReleaseRequestLocked(req);
+}
+
 static void cacheLoadImage(load_image_request_t *req)
 {
     int result = -1;
@@ -571,6 +593,7 @@ static void cacheLoadImage(load_image_request_t *req)
 static void cacheDispatchNextRequest(void *arg)
 {
     int restorePriority = -1;
+    int effectiveMode = -1;
     load_image_request_t *req;
 
     (void)arg;
@@ -581,9 +604,16 @@ static void cacheDispatchNextRequest(void *arg)
 
     req = cacheDequeueRequest();
     if (req != NULL) {
-        int effectiveMode = cacheGetEffectiveMode(req->list, req->value);
+        effectiveMode = cacheGetEffectiveMode(req->list, req->value);
 
-        if ((req->list != NULL && req->list->mode == APP_MODE) || effectiveMode == MMCE_MODE) {
+        if (effectiveMode == MMCE_MODE && !mmceIsReady()) {
+            cacheLock();
+            cacheRequeueRequestLocked(req);
+            cacheUnlock();
+            return;
+        }
+
+        if (effectiveMode == MMCE_MODE) {
             ee_thread_status_t status;
             int threadId = GetThreadId();
 
@@ -931,11 +961,6 @@ static GSTEXTURE *cacheGetTextureInternal(image_cache_t *cache, item_list_t *lis
     }
 
     if (priority == CACHE_REQ_PRIORITY_INTERACTIVE) {
-        if (list != NULL && list->mode == MMCE_MODE && !mmceIsReady()) {
-            cacheUnlock();
-            return NULL;
-        }
-
         if (guiInactiveFrames < cacheGetInteractiveDelay(list, value)) {
             cacheUnlock();
             return NULL;
