@@ -478,46 +478,30 @@ int oplPath2Mode(const char *path)
     return -1;
 }
 
-int oplGetAppImage(const char *device, char *folder, int isRelative, char *value, char *suffix, GSTEXTURE *resultTex, short psm)
+int oplGetAppImageByMode(int mode, char *folder, int isRelative, char *value, char *suffix, GSTEXTURE *resultTex, short psm)
 {
-    int i, remaining, elfbootmode;
-    char priority;
     item_list_t *listSupport;
 
-    elfbootmode = -1;
-    if (device != NULL) {
-        elfbootmode = oplPath2Mode(device);
-        if (elfbootmode >= 0) {
-            listSupport = list_support[elfbootmode].support;
+    if (mode < 0 || mode >= MODE_COUNT)
+        return -1;
 
-            /* App page items already know which backend they came from. Searching other
-               active devices on a miss serializes slow failures through the single art
-               worker and makes app artwork appear to hang for a long time. */
-            if ((listSupport != NULL) && (listSupport->enabled))
-                return listSupport->itemGetImage(listSupport, folder, isRelative, value, suffix, resultTex, psm);
+    listSupport = list_support[mode].support;
+    if ((listSupport != NULL) && (listSupport->enabled))
+        return listSupport->itemGetImage(listSupport, folder, isRelative, value, suffix, resultTex, psm);
 
-            return -1;
-        }
+    return -1;
+}
 
-        if (strncmp(device, "mc", 2) == 0)
-            return -1;
-    }
+int oplGetAppImage(const char *device, char *folder, int isRelative, char *value, char *suffix, GSTEXTURE *resultTex, short psm)
+{
+    int mode;
 
-    // Fall back to cross-device probing only when the app's source device could not be resolved.
-    for (remaining = MODE_COUNT, priority = 0; remaining > 0 && priority < 4; priority++) {
-        for (i = 0; i < MODE_COUNT; i++) {
-            listSupport = list_support[i].support;
+    if (device == NULL)
+        return -1;
 
-            if (i == elfbootmode)
-                continue;
-
-            if ((listSupport != NULL) && (listSupport->enabled) && (listSupport->appsPriority == priority)) {
-                if (listSupport->itemGetImage(listSupport, folder, isRelative, value, suffix, resultTex, psm) >= 0)
-                    return 0;
-                remaining--;
-            }
-        }
-    }
+    mode = oplPath2Mode(device);
+    if (mode >= 0)
+        return oplGetAppImageByMode(mode, folder, isRelative, value, suffix, resultTex, psm);
 
     return -1;
 }
@@ -872,9 +856,7 @@ static void _loadConfig()
             configGetInt(configOPL, CONFIG_OPL_MMCE_MODE, &gMMCEStartMode);
             configGetInt(configOPL, CONFIG_OPL_MMCE_SLOT, &gMMCESlot);
             configGetInt(configOPL, CONFIG_OPL_MMCEIGR_SLOT, &gMMCEIGRSlot);
-#ifdef __DEBUG
             configGetInt(configOPL, CONFIG_OPL_MMCE_GAMEID, &gMMCEEnableGameID);
-#endif
             configGetInt(configOPL, CONFIG_OPL_MMCE_WAIT_CYCLES, &gMMCEAckWaitCycles);
             configGetInt(configOPL, CONFIG_OPL_MMCE_USE_ALARMS, &gMMCEUseAlarms);
             configGetInt(configOPL, CONFIG_OPL_ENABLE_USB, &gEnableUSB);
@@ -971,9 +953,7 @@ static void _saveConfig()
         configSetInt(configOPL, CONFIG_OPL_MMCE_MODE, gMMCEStartMode);
         configSetInt(configOPL, CONFIG_OPL_MMCE_SLOT, gMMCESlot);
         configSetInt(configOPL, CONFIG_OPL_MMCEIGR_SLOT, gMMCEIGRSlot);
-#ifdef __DEBUG
         configSetInt(configOPL, CONFIG_OPL_MMCE_GAMEID, gMMCEEnableGameID);
-#endif
         configSetInt(configOPL, CONFIG_OPL_MMCE_WAIT_CYCLES, gMMCEAckWaitCycles);
         configSetInt(configOPL, CONFIG_OPL_MMCE_USE_ALARMS, gMMCEUseAlarms);
         configSetInt(configOPL, CONFIG_OPL_BDM_CACHE, bdmCacheSize);
@@ -1625,9 +1605,7 @@ static void setDefaults(void)
 
     gMMCESlot = 2; //Default to first Auto slot
     gMMCEIGRSlot = 3;
-#ifdef __DEBUG
     gMMCEEnableGameID = 1;
-#endif
     gMMCEAckWaitCycles = 5;
     gMMCEUseAlarms = 1;
 

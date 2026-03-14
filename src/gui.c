@@ -870,17 +870,13 @@ void guiShowMMCEConfig()
 
     diaSetString(diaMMCEConfig, CFG_MMCEPREFIX, gMMCEPrefix);
 
-#ifdef __DEBUG
     diaSetInt(diaMMCEConfig, CFG_MMCEGAMEID, gMMCEEnableGameID);
-#endif
 
     ret = diaExecuteDialog(diaMMCEConfig, -1, 1, NULL);
     if (ret) {
         diaGetInt(diaMMCEConfig, CFG_MMCEMODE, &gMMCEStartMode);
         diaGetInt(diaMMCEConfig, CFG_MMCESLOT, &gMMCESlot);
-#ifdef __DEBUG
         diaGetInt(diaMMCEConfig, CFG_MMCEGAMEID, &gMMCEEnableGameID);
-#endif
         diaGetInt(diaMMCEConfig, CFG_MMCEIGRSLOT, &gMMCEIGRSlot);
 
         diaGetInt(diaMMCEConfig, CFG_MMCE_WAIT_CYCLES, &gMMCEAckWaitCycles);

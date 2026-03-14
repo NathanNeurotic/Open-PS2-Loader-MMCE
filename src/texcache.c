@@ -16,6 +16,7 @@ typedef struct load_image_request
     cache_entry_t *entry;
     item_list_t *list;
     int cacheUID;
+    int effectiveMode;
     unsigned char priority;
     GSTEXTURE texture;
     char *value;
@@ -260,6 +261,18 @@ static int cacheGetPrefetchDelay(const item_list_t *list, const char *value)
 static int cacheHasPendingInteractiveArtLocked(void)
 {
     return gArtInteractiveReqList != NULL || gArtInteractiveActiveCount > 0;
+}
+
+static int cacheHasQueuedInteractiveModeLocked(int mode)
+{
+    load_image_request_t *req;
+
+    for (req = gArtInteractiveReqList; req != NULL; req = req->next) {
+        if (req->effectiveMode == mode)
+            return 1;
+    }
+
+    return 0;
 }
 
 static int cacheIsNavigationActive(void)
@@ -929,6 +942,7 @@ static GSTEXTURE *cacheGetTextureInternal(image_cache_t *cache, item_list_t *lis
     cache_entry_t *oldestEntry = NULL;
     load_image_request_t *req;
     GSTEXTURE *result = NULL;
+    int effectiveMode;
     int oldestEntryId = -1;
     int loadingEntryId = -1;
     int rtime = guiFrameId;
@@ -937,6 +951,7 @@ static GSTEXTURE *cacheGetTextureInternal(image_cache_t *cache, item_list_t *lis
         return NULL;
 
     cacheLock();
+    effectiveMode = cacheGetEffectiveMode(list, value);
 
     if (*cacheId == -2) {
         if (*UID == gCacheGeneration) {
@@ -1006,8 +1021,6 @@ static GSTEXTURE *cacheGetTextureInternal(image_cache_t *cache, item_list_t *lis
             return NULL;
         }
     } else {
-        int effectiveMode = cacheGetEffectiveMode(list, value);
-
         if (list == NULL || effectiveMode == MMCE_MODE || guiInactiveFrames < cacheGetPrefetchDelay(list, value)) {
             cacheUnlock();
             return NULL;
@@ -1038,7 +1051,7 @@ static GSTEXTURE *cacheGetTextureInternal(image_cache_t *cache, item_list_t *lis
         return NULL;
     }
 
-    if (priority == CACHE_REQ_PRIORITY_INTERACTIVE && cacheGetEffectiveMode(list, value) == MMCE_MODE && (gArtActiveCount > 0 || gArtQueuedCount > 0)) {
+    if (priority == CACHE_REQ_PRIORITY_INTERACTIVE && effectiveMode == MMCE_MODE && cacheHasQueuedInteractiveModeLocked(MMCE_MODE)) {
         cacheUnlock();
         return NULL;
     }
@@ -1074,6 +1087,7 @@ static GSTEXTURE *cacheGetTextureInternal(image_cache_t *cache, item_list_t *lis
     req->cache = cache;
     req->entry = oldestEntry;
     req->list = list;
+    req->effectiveMode = effectiveMode;
     req->priority = priority;
     req->value = (char *)req + sizeof(load_image_request_t);
     strcpy(req->value, value);

@@ -153,23 +153,6 @@ static const char *appResolveLegacyMassStartup(const char *startup)
     return startup;
 }
 
-static const char *appFindSourcePath(const char *startup)
-{
-    if (startup == NULL)
-        return NULL;
-
-    if (strchr(startup, ':') != NULL || strchr(startup, '/') != NULL)
-        return appResolveLegacyMassStartup(startup);
-
-    for (int i = 0; i < appItemCount; i++) {
-        if (strcmp(appsList[i].boot, startup) == 0) {
-            return appsList[i].startup;
-        }
-    }
-
-    return startup;
-}
-
 static void appSetArtSource(app_info_t *app)
 {
     char *artLookup;
@@ -179,6 +162,7 @@ static void appSetArtSource(app_info_t *app)
 
     app->artDevice[0] = '\0';
     app->artLookup[0] = '\0';
+    app->artMode = -1;
 
     if (app->startup[0] == '\0')
         return;
@@ -188,6 +172,9 @@ static void appSetArtSource(app_info_t *app)
         strncpy(app->artLookup, artLookup, APP_BOOT_MAX + 1);
         app->artLookup[APP_BOOT_MAX] = '\0';
     }
+
+    if (app->artDevice[0] != '\0')
+        app->artMode = oplPath2Mode(app->artDevice);
 }
 
 static void appSetResolvedStartup(app_info_t *app)
@@ -290,10 +277,10 @@ int appGetArtMode(const char *startup)
 {
     app_info_t *app = appLookupByStartup(startup);
 
-    if (app == NULL || app->artDevice[0] == '\0')
+    if (app == NULL)
         return -1;
 
-    return oplPath2Mode(app->artDevice);
+    return app->artMode;
 }
 
 void appInit(item_list_t *itemList)
@@ -671,27 +658,15 @@ static config_set_t *appGetConfig(item_list_t *itemList, int id)
 static int appGetImage(item_list_t *itemList, char *folder, int isRelative, char *value, char *suffix, GSTEXTURE *resultTex, short psm)
 {
     app_info_t *app;
-    char device[APP_ART_DEVICE_MAX] = "";
-    char *startup;
-    const char *sourcePath;
 
     app = appLookupByStartup(value);
-    if (app != NULL) {
-        if (!strcmp(folder, "ART"))
-            return oplGetAppImage(app->artDevice[0] != '\0' ? app->artDevice : NULL, folder, isRelative, app->artLookup[0] != '\0' ? app->artLookup : app->boot, suffix, resultTex, psm);
-        else
-            return oplGetAppImage(app->artDevice[0] != '\0' ? app->artDevice : NULL, folder, isRelative, value, suffix, resultTex, psm);
-    }
-
-    sourcePath = appFindSourcePath(value);
-    if (sourcePath == NULL)
+    if (app == NULL || app->artMode < 0)
         return -1;
 
-    startup = appGetBoot(device, sizeof(device), (char *)sourcePath);
     if (!strcmp(folder, "ART"))
-        return oplGetAppImage(device[0] != '\0' ? device : NULL, folder, isRelative, startup, suffix, resultTex, psm);
-    else
-        return oplGetAppImage(device[0] != '\0' ? device : NULL, folder, isRelative, value, suffix, resultTex, psm);
+        return oplGetAppImageByMode(app->artMode, folder, isRelative, app->artLookup[0] != '\0' ? app->artLookup : app->boot, suffix, resultTex, psm);
+
+    return oplGetAppImageByMode(app->artMode, folder, isRelative, value, suffix, resultTex, psm);
 }
 
 static int appGetTextId(item_list_t *itemList)

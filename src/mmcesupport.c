@@ -27,6 +27,8 @@ static time_t mmceModifiedDVDPrev;
 static int mmceGameCount = 0;
 static base_game_info_t *mmceGames;
 
+#define MMCE_GAMEID_WAIT_TICKS 120
+
 // forward declaration
 static item_list_t mmceGameList;
 
@@ -133,7 +135,7 @@ void mmceInit(item_list_t *itemList)
     mmceGames = NULL;
 
     configGetInt(configGetByType(CONFIG_OPL), "usb_frames_delay", &mmceGameList.delay);
-    mmceGameList.updateDelay = -1; //No automatic updates
+    mmceGameList.updateDelay = MMCE_MODE_UPDATE_DELAY;
 
     mmceLoadModules();
     mmceSetPrefix();
@@ -159,6 +161,13 @@ static int mmceNeedsUpdate(item_list_t *itemList)
 
     //Hacky: check if slot was changed, update prefix if needed
     mmceSetPrefix();
+
+    if (mmcePrefix[0] == '\0') {
+        mmceGameList.updateDelay = MMCE_MODE_UPDATE_DELAY;
+        return (mmceGameCount > 0);
+    }
+
+    mmceGameList.updateDelay = MENU_UPD_DELAY_NOUPDATE;
 
     if (mmceULSizePrev == -2)
         result = 1;
@@ -205,6 +214,9 @@ static int mmceNeedsUpdate(item_list_t *itemList)
 
 static int mmceUpdateGameList(item_list_t *itemList)
 {
+    if (mmcePrefix[0] == '\0')
+        return mmceGameCount;
+
     sbReadList(&mmceGames, mmcePrefix, &mmceULSizePrev, &mmceGameCount);
     return mmceGameCount;
 }
@@ -391,15 +403,19 @@ void mmceLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
     LOG("start: %s\n", game->startup);
 
     // Set GameID and only wait for readiness when that feature is enabled.
-    if (gMMCEEnableGameID) {
+    if (gMMCEEnableGameID && fileXioDevctl(mmcePrefix, 0x8, game->startup, (strlen(game->startup) + 1), NULL, 0) >= 0) {
         // Send GameID to MMCE
-        fileXioDevctl(mmcePrefix, 0x8, game->startup, (strlen(game->startup) + 1), NULL, 0);
+        for (int i = 0; i < MMCE_GAMEID_WAIT_TICKS; i++) {
+            int status;
 
-        for (int i = 0; i < 120; i++) {
             delay(1);
 
             // Poll MMCE status until busy bit is clear
-            if ((fileXioDevctl(mmcePrefix, 0x2, NULL, 0, NULL, 0) & 1) == 0) {
+            status = fileXioDevctl(mmcePrefix, 0x2, NULL, 0, NULL, 0);
+            if (status < 0)
+                break;
+
+            if ((status & 1) == 0) {
                 LOG("Set MMCE GameID to: %s\n", game->startup);
                 break;
             }

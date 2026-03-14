@@ -26,6 +26,7 @@ typedef struct
     char startup[APP_STARTUP_MAX + 1];
     char artDevice[APP_ART_DEVICE_MAX];
     char artLookup[APP_BOOT_MAX + 1];
+    int artMode;
     char argv1[APP_ARGV1_MAX + 1];
     u8 legacy;
 } app_info_t;
