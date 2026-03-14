@@ -269,9 +269,9 @@ static int cacheIsNavigationActive(void)
 
 static int cacheShouldDeferInteractiveArtOnInput(const item_list_t *list, const char *value)
 {
-    int effectiveMode = cacheGetEffectiveMode(list, value);
+    (void)value;
 
-    if ((list != NULL && list->mode == APP_MODE) || effectiveMode == MMCE_MODE)
+    if (list != NULL && list->mode == APP_MODE)
         return cacheIsNavigationActive();
 
     return 0;

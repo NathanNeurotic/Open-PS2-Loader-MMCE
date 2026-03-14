@@ -390,16 +390,13 @@ void mmceLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
     LOG("name: %s\n", game->name);
     LOG("start: %s\n", game->startup);
 
-    //Set gameid and poll card until ready
-#ifdef __DEBUG
+    // Set GameID and only wait for readiness when that feature is enabled.
     if (gMMCEEnableGameID) {
-#endif
-
         // Send GameID to MMCE
         fileXioDevctl(mmcePrefix, 0x8, game->startup, (strlen(game->startup) + 1), NULL, 0);
 
-        for (int i = 0; i < 15; i++) {
-            sleep(1);
+        for (int i = 0; i < 120; i++) {
+            delay(1);
 
             // Poll MMCE status until busy bit is clear
             if ((fileXioDevctl(mmcePrefix, 0x2, NULL, 0, NULL, 0) & 1) == 0) {
@@ -407,9 +404,7 @@ void mmceLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
                 break;
             }
         }
-#ifdef __DEBUG
     }
-#endif
 
     //mcReset();
     //mcInit(MC_TYPE_XMC);
