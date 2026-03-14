@@ -81,6 +81,8 @@ static s32 menuSemaId;
 static s32 menuListSemaId = -1;
 static ee_sema_t menuSema;
 
+#define MENU_MMCE_CONFIG_IDLE_FRAMES 20
+
 static void menuInvalidateArtSelection(void)
 {
     cacheAdvanceGeneration();
@@ -265,10 +267,7 @@ static config_set_t *menuLoadConfigDirectInternal(void)
     if (result != NULL || list == NULL || configId < 0)
         return result;
 
-    if (list->mode == MMCE_MODE)
-        cacheCancelPendingImageLoads();
-    else
-        (void)cacheCancelPendingImageLoadsTimed(MENU_MIN_INACTIVE_FRAMES);
+    (void)cacheCancelPendingImageLoadsTimed(MENU_MIN_INACTIVE_FRAMES);
     loadedConfig = list->itemGetConfig(list, configId);
 
     WaitSema(menuSemaId);
@@ -1051,8 +1050,10 @@ static void menuRenderElements(theme_elems_t *elems)
 {
     // selected_item can't be NULL here as we only allow to switch to "Main" rendering when there is at least one device activated
     theme_element_t *elem = elems->first;
+    item_list_t *list = selected_item != NULL && selected_item->item != NULL ? selected_item->item->userdata : NULL;
 
-    if (elems->needsItemConfig && !cacheHasPendingInteractiveArt())
+    if (elems->needsItemConfig && !cacheHasPendingInteractiveArt() &&
+        (list == NULL || list->mode != MMCE_MODE || guiInactiveFrames >= MENU_MMCE_CONFIG_IDLE_FRAMES))
         _menuRequestConfig();
 
     WaitSema(menuSemaId);

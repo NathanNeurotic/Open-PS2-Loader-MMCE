@@ -43,6 +43,7 @@ enum {
 };
 
 #define CACHE_SLOW_MODE_INTERACTIVE_DELAY 4
+#define CACHE_MMCE_PAGE_INTERACTIVE_DELAY 20
 #define CACHE_MMCE_INTERACTIVE_MAX_DELAY  12
 #define CACHE_APP_INTERACTIVE_MAX_DELAY   10
 #define CACHE_APP_PREFETCH_DELAY          10
@@ -205,8 +206,11 @@ static int cacheGetInteractiveDelay(const item_list_t *list, const char *value)
     if (list != NULL && list->mode == APP_MODE && delay > CACHE_APP_INTERACTIVE_MAX_DELAY)
         delay = CACHE_APP_INTERACTIVE_MAX_DELAY;
 
-    if (mode == MMCE_MODE && delay > CACHE_MMCE_INTERACTIVE_MAX_DELAY)
+    if (mode == MMCE_MODE && (list == NULL || list->mode != MMCE_MODE) && delay > CACHE_MMCE_INTERACTIVE_MAX_DELAY)
         delay = CACHE_MMCE_INTERACTIVE_MAX_DELAY;
+
+    if (list != NULL && list->mode == MMCE_MODE && delay < CACHE_MMCE_PAGE_INTERACTIVE_DELAY)
+        delay = CACHE_MMCE_PAGE_INTERACTIVE_DELAY;
 
     return delay;
 }
