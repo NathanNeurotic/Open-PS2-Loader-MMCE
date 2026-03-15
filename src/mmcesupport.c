@@ -481,7 +481,7 @@ static int mmceGetImage(item_list_t *itemList, char *folder, int isRelative, cha
     int result;
 
     result = mmceTryLoadImage(mmceArtPrimary, folder, isRelative, value, suffix, resultTex);
-    if (result >= 0 || !isRelative)
+    if (result >= 0 || !isRelative || result == ERR_LOAD_ABORTED)
         return result;
 
     if (mmceArtFallback[0] != '\0')

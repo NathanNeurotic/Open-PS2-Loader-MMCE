@@ -240,6 +240,7 @@ static void IGR_Thread(void *arg)
             if ((config->MMCEIGRSettings & 2))
                 slots[1] = '1';
 
+            LoadOPLModule(OPL_MODULE_ID_MMCEDRV, 0, 0, NULL);
             LoadOPLModule(OPL_MODULE_ID_MMCEIGR, 0, sizeof(slots), slots);
         }
 

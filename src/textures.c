@@ -601,6 +601,7 @@ int texLoadInternal(GSTEXTURE *texture, int texId)
 int texDiscoverLoad(GSTEXTURE *texture, const char *path, int texId)
 {
     char filePath[256];
+    int result;
 
     LOG("texDiscoverLoad(%s)\n", path);
 
@@ -609,5 +610,7 @@ int texDiscoverLoad(GSTEXTURE *texture, const char *path, int texId)
     else
         snprintf(filePath, sizeof(filePath), "%s.%s", path, "png");
 
-    return (texLoad(texture, filePath) >= 0) ? 0 : ERR_BAD_FILE;
+    result = texLoad(texture, filePath);
+
+    return result >= 0 ? 0 : result;
 }

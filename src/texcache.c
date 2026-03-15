@@ -1075,7 +1075,7 @@ int cacheHasPendingArt(void)
     int pending;
 
     cacheLock();
-    pending = (gArtQueuedCount > 0) || (gArtActiveCount > 0) || cacheHasReadyEntriesLocked();
+    pending = (gArtQueuedCount > 0) || (gArtActiveCount > 0);
     cacheUnlock();
 
     return pending;

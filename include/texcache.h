@@ -91,7 +91,7 @@ void cacheAdvanceGenerationPreservePrefetch(void);
  */
 void cachePrimeReadyTexture(void);
 
-/** Returns nonzero while art decode or prime work is still pending.
+/** Returns nonzero while art IO or decode work is still in flight.
  */
 int cacheHasPendingArt(void);
 
