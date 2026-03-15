@@ -1103,7 +1103,9 @@ static GSTEXTURE *cacheGetTextureInternal(image_cache_t *cache, item_list_t *lis
 
     for (int i = 0; i < cache->count; i++) {
         entry = &cache->content[i];
-        if ((entry->state == CACHE_ENTRY_FREE || entry->state == CACHE_ENTRY_DISPLAYABLE || entry->state == CACHE_ENTRY_FAILED) && entry->lastUsed < rtime) {
+        if ((entry->state == CACHE_ENTRY_FREE || entry->state == CACHE_ENTRY_READY || entry->state == CACHE_ENTRY_PRIMED ||
+             entry->state == CACHE_ENTRY_DISPLAYABLE || entry->state == CACHE_ENTRY_FAILED) &&
+            entry->lastUsed < rtime) {
             oldestEntry = entry;
             oldestEntryId = i;
             rtime = entry->lastUsed;

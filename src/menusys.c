@@ -265,7 +265,11 @@ static config_set_t *menuLoadConfigDirectInternal(void)
     if (result != NULL || list == NULL || configId < 0)
         return result;
 
-    (void)cacheCancelPendingImageLoadsTimed(MENU_MIN_INACTIVE_FRAMES);
+    if (list->mode == MMCE_MODE) {
+        cacheEnd(1);
+        cacheInit();
+    } else
+        (void)cacheCancelPendingImageLoadsTimed(MENU_MIN_INACTIVE_FRAMES);
     loadedConfig = list->itemGetConfig(list, configId);
 
     WaitSema(menuSemaId);
