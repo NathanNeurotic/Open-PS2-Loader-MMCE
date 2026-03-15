@@ -290,30 +290,6 @@ static load_image_request_t *cacheFindQueuedInteractiveModeLocked(int mode)
     return NULL;
 }
 
-static int cacheHasActiveInteractiveModeLocked(int mode)
-{
-    return gArtCurrentReq != NULL && gArtCurrentReq->priority == CACHE_REQ_PRIORITY_INTERACTIVE &&
-           gArtCurrentReq->effectiveMode == mode;
-}
-
-static void cacheDropQueuedRequestLocked(load_image_request_t *req)
-{
-    cache_entry_t *entry;
-
-    if (req == NULL)
-        return;
-
-    entry = req->entry;
-    if (entry != NULL && entry->qr == req) {
-        entry->qr = NULL;
-        if (entry->state == CACHE_ENTRY_QUEUED)
-            cacheClearItem(entry, 1);
-    }
-
-    if (cacheRemoveQueuedRequestLocked(req))
-        cacheReleaseRequestLocked(req);
-}
-
 static int cacheIsNavigationActive(void)
 {
     return getKey(KEY_LEFT) || getKey(KEY_RIGHT) || getKey(KEY_UP) || getKey(KEY_DOWN) || getKey(KEY_L1) || getKey(KEY_R1);
@@ -382,6 +358,24 @@ static int cacheRemoveQueuedRequestLocked(load_image_request_t *target)
     }
 
     return 0;
+}
+
+static void cacheDropQueuedRequestLocked(load_image_request_t *req)
+{
+    cache_entry_t *entry;
+
+    if (req == NULL)
+        return;
+
+    entry = req->entry;
+    if (entry != NULL && entry->qr == req) {
+        entry->qr = NULL;
+        if (entry->state == CACHE_ENTRY_QUEUED)
+            cacheClearItem(entry, 1);
+    }
+
+    if (cacheRemoveQueuedRequestLocked(req))
+        cacheReleaseRequestLocked(req);
 }
 
 static void cachePromoteQueuedRequestLocked(load_image_request_t *req)
