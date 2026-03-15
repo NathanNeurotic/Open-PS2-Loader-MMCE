@@ -33,6 +33,21 @@ static base_game_info_t *mmceGames;
 // forward declaration
 static item_list_t mmceGameList;
 
+static int mmceHasArtFolder(const char *prefix)
+{
+    char path[sizeof(mmcePrefix) + 4];
+    struct stat st;
+
+    if (prefix == NULL || prefix[0] == '\0')
+        return 0;
+
+    snprintf(path, sizeof(path), "%sART", prefix);
+    if (stat(path, &st) != 0)
+        return 0;
+
+    return S_ISDIR(st.st_mode);
+}
+
 static void mmceGetDeviceRoot(char *root, size_t size)
 {
     const char *separator = strstr(mmcePrefix, ":/");
@@ -62,6 +77,8 @@ static void mmceGetDeviceRoot(char *root, size_t size)
 static void mmceRefreshArtRoots(void)
 {
     char deviceRoot[sizeof(mmcePrefix)];
+    int primaryHasArt;
+    int fallbackHasArt;
 
     mmceArtPrimary[0] = '\0';
     mmceArtFallback[0] = '\0';
@@ -74,6 +91,16 @@ static void mmceRefreshArtRoots(void)
     mmceGetDeviceRoot(deviceRoot, sizeof(deviceRoot));
     if (deviceRoot[0] != '\0' && strcmp(deviceRoot, mmceArtPrimary) != 0)
         snprintf(mmceArtFallback, sizeof(mmceArtFallback), "%s", deviceRoot);
+
+    primaryHasArt = mmceHasArtFolder(mmceArtPrimary);
+    fallbackHasArt = mmceHasArtFolder(mmceArtFallback);
+    if (!primaryHasArt && fallbackHasArt) {
+        char primary[sizeof(mmceArtPrimary)];
+
+        snprintf(primary, sizeof(primary), "%s", mmceArtPrimary);
+        snprintf(mmceArtPrimary, sizeof(mmceArtPrimary), "%s", mmceArtFallback);
+        snprintf(mmceArtFallback, sizeof(mmceArtFallback), "%s", primary);
+    }
 }
 
 static int mmceTryLoadImage(const char *prefix, char *folder, int isRelative, char *value, char *suffix, GSTEXTURE *resultTex)

@@ -235,6 +235,9 @@ static int cacheGetInteractiveDelay(const item_list_t *list, const char *value)
     int delay = cacheGetBaseDelay(list);
     int mode = cacheGetEffectiveMode(list, value);
 
+    if (list != NULL && list->mode == APP_MODE && mode != MMCE_MODE)
+        return 0;
+
     if ((mode == APP_MODE || mode == MMCE_MODE) && delay < CACHE_SLOW_MODE_INTERACTIVE_DELAY)
         delay = CACHE_SLOW_MODE_INTERACTIVE_DELAY;
 
@@ -275,10 +278,40 @@ static int cacheHasQueuedInteractiveModeLocked(int mode)
     return 0;
 }
 
+static load_image_request_t *cacheFindQueuedInteractiveModeLocked(int mode)
+{
+    load_image_request_t *req;
+
+    for (req = gArtInteractiveReqList; req != NULL; req = req->next) {
+        if (req->effectiveMode == mode)
+            return req;
+    }
+
+    return NULL;
+}
+
 static int cacheHasActiveInteractiveModeLocked(int mode)
 {
     return gArtCurrentReq != NULL && gArtCurrentReq->priority == CACHE_REQ_PRIORITY_INTERACTIVE &&
            gArtCurrentReq->effectiveMode == mode;
+}
+
+static void cacheDropQueuedRequestLocked(load_image_request_t *req)
+{
+    cache_entry_t *entry;
+
+    if (req == NULL)
+        return;
+
+    entry = req->entry;
+    if (entry != NULL && entry->qr == req) {
+        entry->qr = NULL;
+        if (entry->state == CACHE_ENTRY_QUEUED)
+            cacheClearItem(entry, 1);
+    }
+
+    if (cacheRemoveQueuedRequestLocked(req))
+        cacheReleaseRequestLocked(req);
 }
 
 static int cacheIsNavigationActive(void)
@@ -1057,10 +1090,16 @@ static GSTEXTURE *cacheGetTextureInternal(image_cache_t *cache, item_list_t *lis
         return NULL;
     }
 
-    if (priority == CACHE_REQ_PRIORITY_INTERACTIVE && effectiveMode == MMCE_MODE &&
-        (cacheHasActiveInteractiveModeLocked(MMCE_MODE) || cacheHasQueuedInteractiveModeLocked(MMCE_MODE))) {
-        cacheUnlock();
-        return NULL;
+    if (priority == CACHE_REQ_PRIORITY_INTERACTIVE && effectiveMode == MMCE_MODE) {
+        load_image_request_t *queuedMmceReq = cacheFindQueuedInteractiveModeLocked(MMCE_MODE);
+
+        if (queuedMmceReq != NULL && (queuedMmceReq->cache != cache || strcmp(queuedMmceReq->value, value) != 0))
+            cacheDropQueuedRequestLocked(queuedMmceReq);
+
+        if (cacheHasQueuedInteractiveModeLocked(MMCE_MODE)) {
+            cacheUnlock();
+            return NULL;
+        }
     }
 
     if (priority == CACHE_REQ_PRIORITY_PREFETCH && cache->queuedPrefetchRequests >= cacheGetPrefetchLimit(cache)) {
