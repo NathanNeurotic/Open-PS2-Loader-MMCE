@@ -463,7 +463,6 @@ void mmceLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
     //mcInit(MC_TYPE_XMC);
 
     if (gAutoLaunchBDMGame == NULL) {
-        cacheEnd(1);
         deinit(NO_EXCEPTION, MMCE_MODE); // CAREFUL: deinit will call mmceCleanUp, so mmceGames/game will be freed
     }
 

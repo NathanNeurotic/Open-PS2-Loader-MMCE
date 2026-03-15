@@ -19,6 +19,7 @@ typedef struct load_image_request
     int effectiveMode;
     unsigned char priority;
     GSTEXTURE texture;
+    GSTEXTURE displacedTexture;
     char *value;
 } load_image_request_t;
 
@@ -81,6 +82,18 @@ static cache_registry_entry_t *gCacheRegistry = NULL;
 static void cacheClearItem(cache_entry_t *item, int freeTxt);
 static void cacheResetTextureState(GSTEXTURE *texture);
 static void cacheResetRequestTrackingLocked(void);
+
+static void cacheReleaseTexture(GSTEXTURE *texture)
+{
+    if (texture == NULL)
+        return;
+
+    if (texture->Mem != NULL)
+        rmUnloadTexture(texture);
+
+    texFree(texture);
+    cacheResetTextureState(texture);
+}
 
 static void cacheNextGenerationLocked(void)
 {
@@ -153,8 +166,8 @@ static void cacheReleaseRequestLocked(load_image_request_t *req)
     if (req == NULL)
         return;
 
-    texFree(&req->texture);
-    cacheResetTextureState(&req->texture);
+    cacheReleaseTexture(&req->texture);
+    cacheReleaseTexture(&req->displacedTexture);
 
     if (req->cache != NULL && req->cache->activeRequests > 0)
         req->cache->activeRequests--;
@@ -1125,6 +1138,7 @@ static GSTEXTURE *cacheGetTextureInternal(image_cache_t *cache, item_list_t *lis
 
     memset(req, 0, sizeof(load_image_request_t));
     cacheResetTextureState(&req->texture);
+    cacheResetTextureState(&req->displacedTexture);
 
     req->cache = cache;
     req->entry = oldestEntry;
@@ -1135,7 +1149,12 @@ static GSTEXTURE *cacheGetTextureInternal(image_cache_t *cache, item_list_t *lis
     strcpy(req->value, value);
     req->cacheUID = cache->nextUID;
 
-    cacheClearItem(oldestEntry, 1);
+    req->displacedTexture = oldestEntry->texture;
+    cacheResetTextureState(&oldestEntry->texture);
+    oldestEntry->qr = NULL;
+    oldestEntry->primeFrame = -1;
+    oldestEntry->lastUsed = -1;
+    oldestEntry->UID = 0;
     oldestEntry->qr = req;
     oldestEntry->state = CACHE_ENTRY_QUEUED;
     oldestEntry->UID = cache->nextUID;
