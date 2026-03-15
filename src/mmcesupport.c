@@ -304,7 +304,7 @@ void mmceLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
     else
         game = gAutoLaunchBDMGame;
 
-    (void)cacheCancelPendingImageLoadsTimed(MENU_MIN_INACTIVE_FRAMES);
+    (void)cacheAbortMmceImageLoadsTimed(MENU_MIN_INACTIVE_FRAMES);
 
     void *irx = &mmce_cdvdman_irx;
     int irx_size = size_mmce_cdvdman_irx;
@@ -455,10 +455,8 @@ void mmceLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
     //mcReset();
     //mcInit(MC_TYPE_XMC);
 
-    if (gAutoLaunchBDMGame == NULL) {
-        cacheEnd(1);
+    if (gAutoLaunchBDMGame == NULL)
         deinit(NO_EXCEPTION, MMCE_MODE); // CAREFUL: deinit will call mmceCleanUp, so mmceGames/game will be freed
-    }
 
     /* No autolaunch yet
     else {
@@ -487,7 +485,7 @@ static int mmceGetImage(item_list_t *itemList, char *folder, int isRelative, cha
         return result;
 
     if (mmceArtFallback[0] != '\0')
-        return mmceTryLoadImage(mmceArtFallback, folder, isRelative, value, suffix, resultTex);
+        result = mmceTryLoadImage(mmceArtFallback, folder, isRelative, value, suffix, resultTex);
 
     return result;
 }

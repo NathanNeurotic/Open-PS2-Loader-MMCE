@@ -2,6 +2,7 @@
 #include "include/textures.h"
 #include "include/util.h"
 #include "include/ioman.h"
+#include <kernel.h>
 #include <png.h>
 
 extern void *load0_png;
@@ -106,6 +107,7 @@ extern void *apps_case_png;
 
 // Not related to screen size, just to limit at some point
 static int maxSize = 720 * 512 * 4;
+#define TEX_FILE_READER_BUFFER_SIZE (16 * 1024)
 
 typedef struct
 {
@@ -131,6 +133,8 @@ typedef struct
 } png_texture_t;
 
 static png_texture_t pngTexture;
+static volatile int *gTexAbortFlag;
+static int gTexAbortThreadId = -1;
 
 static texture_t internalDefault[TEXTURES_COUNT] = {
     {LOAD0_ICON, "load0", &load0_png},
@@ -290,7 +294,7 @@ typedef struct
     int fd;
     int position;
     int length;
-    unsigned char buffer[4096];
+    unsigned char buffer[TEX_FILE_READER_BUFFER_SIZE];
 } tex_file_reader_t;
 
 static int texEnd(png_structp pngPtr, png_infop infoPtr, void *pFileBuffer, int fd, int status)
@@ -305,6 +309,17 @@ static int texEnd(png_structp pngPtr, png_infop infoPtr, void *pFileBuffer, int 
         close(fd);
 
     return status;
+}
+
+static int texLoadAbortRequested(void)
+{
+    return gTexAbortFlag != NULL && gTexAbortThreadId == GetThreadId() && *gTexAbortFlag != 0;
+}
+
+void texSetLoadAbortFlag(volatile int *abortRequested)
+{
+    gTexAbortFlag = abortRequested;
+    gTexAbortThreadId = abortRequested != NULL ? GetThreadId() : -1;
 }
 
 static void texReadMemFunction(png_structp pngPtr, png_bytep data, png_size_t length)
@@ -323,7 +338,13 @@ static void texReadFileFunction(png_structp pngPtr, png_bytep data, png_size_t l
         int available;
         int chunk;
 
+        if (texLoadAbortRequested())
+            png_error(pngPtr, "png read aborted");
+
         if (reader->position >= reader->length) {
+            if (texLoadAbortRequested())
+                png_error(pngPtr, "png read aborted");
+
             reader->length = read(reader->fd, reader->buffer, sizeof(reader->buffer));
             reader->position = 0;
 
@@ -339,11 +360,6 @@ static void texReadFileFunction(png_structp pngPtr, png_bytep data, png_size_t l
         length -= chunk;
         reader->position += chunk;
     }
-}
-
-static int texShouldUseMemoryReader(const char *filePath)
-{
-    return filePath != NULL && (!strncmp(filePath, "mmce0:", 6) || !strncmp(filePath, "mmce1:", 6));
 }
 
 static void texPrepareClut(GSTEXTURE *texture, int clutEntries)
@@ -436,6 +452,12 @@ static int texReadData(GSTEXTURE *texture, png_structp pngPtr, png_infop infoPtr
     }
 
     for (int row = 0; row < texture->Height; row++) {
+        if (texLoadAbortRequested()) {
+            free(rowBuffer);
+            texFree(texture);
+            return ERR_LOAD_ABORTED;
+        }
+
         png_read_row(pngPtr, rowBuffer, NULL);
         texPngReadRow(texture, rowBuffer, row);
     }
@@ -464,47 +486,14 @@ static int texLoadAll(GSTEXTURE *texture, const char *filePath, int texId)
     texPrepare(texture);
 
     if (filePath) {
-        if (texShouldUseMemoryReader(filePath)) {
-            int fileSize;
+        fd = open(filePath, O_RDONLY, 0);
+        if (fd < 0)
+            return ERR_BAD_FILE;
 
-            fd = open(filePath, O_RDONLY, 0);
-            if (fd < 0)
-                return ERR_BAD_FILE;
-
-            fileSize = lseek(fd, 0, SEEK_END);
-            if (fileSize <= 0 || lseek(fd, 0, SEEK_SET) < 0) {
-                close(fd);
-                return ERR_BAD_FILE;
-            }
-
-            pFileBuffer = malloc(fileSize);
-            if (pFileBuffer == NULL) {
-                close(fd);
-                return ERR_BAD_FILE;
-            }
-
-            if (read(fd, pFileBuffer, fileSize) != fileSize) {
-                LOG("texLoadAll: failed to read file %s\n", filePath);
-                free(pFileBuffer);
-                close(fd);
-                return ERR_BAD_FILE;
-            }
-
-            close(fd);
-            fd = -1;
-            PngFileBufferPtr = pFileBuffer;
-            readData = &PngFileBufferPtr;
-            readFunction = &texReadMemFunction;
-        } else {
-            fd = open(filePath, O_RDONLY, 0);
-            if (fd < 0)
-                return ERR_BAD_FILE;
-
-            memset(&fileReader, 0, sizeof(fileReader));
-            fileReader.fd = fd;
-            readData = &fileReader;
-            readFunction = &texReadFileFunction;
-        }
+        memset(&fileReader, 0, sizeof(fileReader));
+        fileReader.fd = fd;
+        readData = &fileReader;
+        readFunction = &texReadFileFunction;
     } else {
         if (texId == -1 || !internalDefault[texId].texture)
             return ERR_BAD_FILE;
@@ -522,8 +511,11 @@ static int texLoadAll(GSTEXTURE *texture, const char *filePath, int texId)
     if (!infoPtr)
         return texEnd(pngPtr, infoPtr, pFileBuffer, fd, ERR_INFO_STRUCT);
 
-    if (setjmp(png_jmpbuf(pngPtr)))
-        return texEnd(pngPtr, infoPtr, pFileBuffer, fd, ERR_SET_JMP);
+    if (setjmp(png_jmpbuf(pngPtr))) {
+        if (texLoadAbortRequested())
+            texFree(texture);
+        return texEnd(pngPtr, infoPtr, pFileBuffer, fd, texLoadAbortRequested() ? ERR_LOAD_ABORTED : ERR_SET_JMP);
+    }
 
     png_set_read_fn(pngPtr, readData, readFunction);
     png_set_sig_bytes(pngPtr, 0);

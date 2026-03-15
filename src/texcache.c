@@ -17,8 +17,10 @@ typedef struct load_image_request
     item_list_t *list;
     int cacheUID;
     int effectiveMode;
+    volatile int abortRequested;
     unsigned char priority;
     GSTEXTURE texture;
+    GSTEXTURE displacedTexture;
     char *value;
 } load_image_request_t;
 
@@ -76,11 +78,13 @@ static load_image_request_t *gArtInteractiveReqList = NULL;
 static load_image_request_t *gArtInteractiveReqEnd = NULL;
 static load_image_request_t *gArtPrefetchReqList = NULL;
 static load_image_request_t *gArtPrefetchReqEnd = NULL;
+static load_image_request_t *gArtCleanupReqList = NULL;
 static cache_registry_entry_t *gCacheRegistry = NULL;
 
 static void cacheClearItem(cache_entry_t *item, int freeTxt);
 static void cacheResetTextureState(GSTEXTURE *texture);
 static void cacheResetRequestTrackingLocked(void);
+static void cacheWakeWorker(void);
 
 static void cacheNextGenerationLocked(void)
 {
@@ -148,18 +152,62 @@ static void cacheResetTextureState(GSTEXTURE *texture)
     texture->ClutStorageMode = GS_CLUT_STORAGE_CSM1;
 }
 
-static void cacheReleaseRequestLocked(load_image_request_t *req)
+static void cacheReleaseTexture(GSTEXTURE *texture)
+{
+    if (texture == NULL)
+        return;
+
+    if (texture->Mem != NULL)
+        rmUnloadTexture(texture);
+
+    texFree(texture);
+    cacheResetTextureState(texture);
+}
+
+static void cacheFreeRequest(load_image_request_t *req)
 {
     if (req == NULL)
         return;
 
-    texFree(&req->texture);
-    cacheResetTextureState(&req->texture);
-
-    if (req->cache != NULL && req->cache->activeRequests > 0)
-        req->cache->activeRequests--;
-
+    cacheReleaseTexture(&req->texture);
+    cacheReleaseTexture(&req->displacedTexture);
     free(req);
+}
+
+static void cacheFinalizeRequestLocked(load_image_request_t *req)
+{
+    if (req != NULL && req->cache != NULL && req->cache->activeRequests > 0)
+        req->cache->activeRequests--;
+}
+
+static void cacheQueueCleanupRequestLocked(load_image_request_t *req)
+{
+    if (req == NULL)
+        return;
+
+    req->next = gArtCleanupReqList;
+    gArtCleanupReqList = req;
+}
+
+static void cacheProcessCleanupRequests(void)
+{
+    while (1) {
+        load_image_request_t *req;
+
+        cacheLock();
+        req = gArtCleanupReqList;
+        if (req != NULL) {
+            gArtCleanupReqList = req->next;
+            req->next = NULL;
+            cacheFinalizeRequestLocked(req);
+        }
+        cacheUnlock();
+
+        if (req == NULL)
+            break;
+
+        cacheFreeRequest(req);
+    }
 }
 
 static void cacheResetRequestTrackingLocked(void)
@@ -173,6 +221,15 @@ static void cacheResetRequestTrackingLocked(void)
     gArtQueuedCount = 0;
     gArtActiveCount = 0;
     gArtInteractiveActiveCount = 0;
+
+    while (gArtCleanupReqList != NULL) {
+        load_image_request_t *req = gArtCleanupReqList;
+
+        gArtCleanupReqList = req->next;
+        req->next = NULL;
+        cacheFinalizeRequestLocked(req);
+        cacheFreeRequest(req);
+    }
 
     while (registry != NULL) {
         image_cache_t *cache = registry->cache;
@@ -290,19 +347,14 @@ static load_image_request_t *cacheFindQueuedInteractiveModeLocked(int mode)
     return NULL;
 }
 
-static int cacheIsNavigationActive(void)
+static int cacheHasActiveInteractiveModeLocked(int mode)
 {
-    return getKey(KEY_LEFT) || getKey(KEY_RIGHT) || getKey(KEY_UP) || getKey(KEY_DOWN) || getKey(KEY_L1) || getKey(KEY_R1);
+    return gArtCurrentReq != NULL && gArtCurrentReq->priority == CACHE_REQ_PRIORITY_INTERACTIVE && gArtCurrentReq->effectiveMode == mode;
 }
 
-static int cacheShouldDeferInteractiveArtOnInput(const item_list_t *list, const char *value)
+static int cacheIsAbortableMmceRequest(const load_image_request_t *req)
 {
-    int effectiveMode = cacheGetEffectiveMode(list, value);
-
-    if (effectiveMode == MMCE_MODE)
-        return cacheIsNavigationActive();
-
-    return 0;
+    return req != NULL && req->priority == CACHE_REQ_PRIORITY_INTERACTIVE && req->effectiveMode == MMCE_MODE;
 }
 
 static void cacheEnqueueRequestLocked(load_image_request_t *req)
@@ -371,11 +423,11 @@ static void cacheDropQueuedRequestLocked(load_image_request_t *req)
     if (entry != NULL && entry->qr == req) {
         entry->qr = NULL;
         if (entry->state == CACHE_ENTRY_QUEUED)
-            cacheClearItem(entry, 1);
+            cacheClearItem(entry, 0);
     }
 
     if (cacheRemoveQueuedRequestLocked(req))
-        cacheReleaseRequestLocked(req);
+        cacheQueueCleanupRequestLocked(req);
 }
 
 static void cachePromoteQueuedRequestLocked(load_image_request_t *req)
@@ -398,12 +450,16 @@ static void cacheInvalidateEntryLocked(cache_entry_t *entry, int freeTxt, int pr
         case CACHE_ENTRY_QUEUED:
             entry->qr = NULL;
             if (req != NULL && cacheRemoveQueuedRequestLocked(req))
-                cacheReleaseRequestLocked(req);
-            cacheClearItem(entry, freeTxt);
+                cacheQueueCleanupRequestLocked(req);
+            cacheClearItem(entry, 0);
             break;
         case CACHE_ENTRY_LOADING:
-            entry->qr = NULL;
-            cacheClearItem(entry, freeTxt);
+            if (cacheIsAbortableMmceRequest(req))
+                req->abortRequested = 1;
+            else {
+                entry->qr = NULL;
+                cacheClearItem(entry, 0);
+            }
             break;
         case CACHE_ENTRY_READY:
         case CACHE_ENTRY_PRIMED:
@@ -454,12 +510,16 @@ static void cacheInvalidateInteractiveRequestsLocked(void)
                     case CACHE_ENTRY_QUEUED:
                         entry->qr = NULL;
                         if (cacheRemoveQueuedRequestLocked(req))
-                            cacheReleaseRequestLocked(req);
-                        cacheClearItem(entry, 1);
+                            cacheQueueCleanupRequestLocked(req);
+                        cacheClearItem(entry, 0);
                         break;
                     case CACHE_ENTRY_LOADING:
-                        entry->qr = NULL;
-                        cacheClearItem(entry, 1);
+                        if (cacheIsAbortableMmceRequest(req))
+                            req->abortRequested = 1;
+                        else {
+                            entry->qr = NULL;
+                            cacheClearItem(entry, 0);
+                        }
                         break;
                     default:
                         break;
@@ -619,7 +679,9 @@ static void cacheCompleteRequest(load_image_request_t *req, int result)
         req->entry->qr = NULL;
         req->entry->primeFrame = -1;
 
-        if (result < 0 || req->texture.Mem == NULL) {
+        if (result == ERR_LOAD_ABORTED) {
+            cacheClearItem(req->entry, 0);
+        } else if (result < 0 || req->texture.Mem == NULL) {
             req->entry->lastUsed = 0;
             req->entry->state = CACHE_ENTRY_FAILED;
         } else {
@@ -635,8 +697,9 @@ static void cacheCompleteRequest(load_image_request_t *req, int result)
     if (req->priority == CACHE_REQ_PRIORITY_INTERACTIVE && gArtInteractiveActiveCount > 0)
         gArtInteractiveActiveCount--;
 
-    cacheReleaseRequestLocked(req);
+    cacheFinalizeRequestLocked(req);
     cacheUnlock();
+    cacheFreeRequest(req);
 }
 
 static void cacheLoadImage(load_image_request_t *req)
@@ -651,12 +714,20 @@ static void cacheLoadImage(load_image_request_t *req)
             gArtActiveCount--;
         if (req != NULL && req->priority == CACHE_REQ_PRIORITY_INTERACTIVE && gArtInteractiveActiveCount > 0)
             gArtInteractiveActiveCount--;
-        cacheReleaseRequestLocked(req);
         cacheUnlock();
+        cacheFreeRequest(req);
         return;
     }
 
+    if (req->abortRequested) {
+        cacheCompleteRequest(req, ERR_LOAD_ABORTED);
+        return;
+    }
+
+    texSetLoadAbortFlag(&req->abortRequested);
     result = req->list->itemGetImage(req->list, req->cache->prefix, req->cache->isPrefixRelative, req->value, req->cache->suffix, &req->texture, GS_PSM_CT24);
+    texSetLoadAbortFlag(NULL);
+
     cacheCompleteRequest(req, result);
 }
 
@@ -672,8 +743,12 @@ static void cacheWorkerThread(void *arg)
         if (gArtTerminate)
             break;
 
-        while (!gArtTerminate && (req = cacheDequeueRequest()) != NULL)
+        cacheProcessCleanupRequests();
+
+        while (!gArtTerminate && (req = cacheDequeueRequest()) != NULL) {
             cacheLoadImage(req);
+            cacheProcessCleanupRequests();
+        }
     }
 
     cacheLock();
@@ -764,7 +839,8 @@ void cacheEnd(int forceStop)
     if (gArtCurrentReq != NULL) {
         load_image_request_t *req = gArtCurrentReq;
         gArtCurrentReq = NULL;
-        cacheReleaseRequestLocked(req);
+        cacheFinalizeRequestLocked(req);
+        cacheFreeRequest(req);
     }
     cacheResetRequestTrackingLocked();
     cacheUnlock();
@@ -856,6 +932,7 @@ void cacheDestroyCache(image_cache_t *cache)
     }
 
     cacheUnlock();
+    cacheWakeWorker();
 
     if (gArtShutdownAbandoned)
         return;
@@ -869,6 +946,12 @@ void cacheDestroyCache(image_cache_t *cache)
     free(cache);
 }
 
+static void cacheWakeWorker(void)
+{
+    if (gArtRunning && gArtThreadId >= 0)
+        WakeupThread(gArtThreadId);
+}
+
 void cacheCancelPendingImageLoads(void)
 {
     (void)cacheCancelPendingImageLoadsTimed(-1);
@@ -880,7 +963,43 @@ int cacheCancelPendingImageLoadsTimed(int timeoutTicks)
     cacheInvalidatePendingRequestsLocked(0);
     cacheUnlock();
 
+    cacheWakeWorker();
     return cacheWaitForAllRequestsTimed(timeoutTicks);
+}
+
+int cacheAbortMmceImageLoadsTimed(int timeoutTicks)
+{
+    cacheLock();
+
+    if (gArtCurrentReq != NULL && cacheIsAbortableMmceRequest(gArtCurrentReq))
+        gArtCurrentReq->abortRequested = 1;
+
+    for (load_image_request_t *req = gArtInteractiveReqList, *next; req != NULL; req = next) {
+        next = req->next;
+        if (req->effectiveMode == MMCE_MODE)
+            cacheDropQueuedRequestLocked(req);
+    }
+
+    cacheUnlock();
+
+    cacheWakeWorker();
+
+    while (timeoutTicks != 0) {
+        int pending;
+
+        cacheLock();
+        pending = cacheHasActiveInteractiveModeLocked(MMCE_MODE) || cacheHasQueuedInteractiveModeLocked(MMCE_MODE);
+        cacheUnlock();
+
+        if (!pending)
+            return 1;
+
+        delay(1);
+        if (timeoutTicks > 0)
+            timeoutTicks--;
+    }
+
+    return 0;
 }
 
 void cacheAdvanceGeneration(void)
@@ -889,6 +1008,8 @@ void cacheAdvanceGeneration(void)
     cacheInvalidatePendingRequestsLocked(1);
     cacheNextGenerationLocked();
     cacheUnlock();
+
+    cacheWakeWorker();
 }
 
 void cacheBumpGeneration(void)
@@ -904,6 +1025,8 @@ void cacheAdvanceGenerationPreservePrefetch(void)
     cacheInvalidateInteractiveRequestsLocked();
     cacheNextGenerationLocked();
     cacheUnlock();
+
+    cacheWakeWorker();
 }
 
 void cachePrimeReadyTexture(void)
@@ -1044,11 +1167,6 @@ static GSTEXTURE *cacheGetTextureInternal(image_cache_t *cache, item_list_t *lis
     }
 
     if (priority == CACHE_REQ_PRIORITY_INTERACTIVE) {
-        if (cacheShouldDeferInteractiveArtOnInput(list, value)) {
-            cacheUnlock();
-            return NULL;
-        }
-
         if (guiInactiveFrames < cacheGetInteractiveDelay(list, value)) {
             cacheUnlock();
             return NULL;
@@ -1123,6 +1241,7 @@ static GSTEXTURE *cacheGetTextureInternal(image_cache_t *cache, item_list_t *lis
 
     memset(req, 0, sizeof(load_image_request_t));
     cacheResetTextureState(&req->texture);
+    cacheResetTextureState(&req->displacedTexture);
 
     req->cache = cache;
     req->entry = oldestEntry;
@@ -1133,9 +1252,12 @@ static GSTEXTURE *cacheGetTextureInternal(image_cache_t *cache, item_list_t *lis
     strcpy(req->value, value);
     req->cacheUID = cache->nextUID;
 
-    cacheClearItem(oldestEntry, 1);
+    req->displacedTexture = oldestEntry->texture;
+    cacheResetTextureState(&oldestEntry->texture);
     oldestEntry->qr = req;
     oldestEntry->state = CACHE_ENTRY_QUEUED;
+    oldestEntry->primeFrame = -1;
+    oldestEntry->lastUsed = -1;
     oldestEntry->UID = cache->nextUID;
 
     *cacheId = oldestEntryId;
