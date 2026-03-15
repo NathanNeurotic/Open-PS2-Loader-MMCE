@@ -312,10 +312,23 @@ static int cacheShouldDeferInteractiveArtOnInput(const item_list_t *list, const 
 {
     int effectiveMode = cacheGetEffectiveMode(list, value);
 
-    if (effectiveMode == MMCE_MODE)
+    if (list != NULL && list->mode == MMCE_MODE && effectiveMode == MMCE_MODE)
         return cacheIsNavigationActive();
 
     return 0;
+}
+
+static int cacheGetLoadThreadPriority(const load_image_request_t *req)
+{
+    if (req != NULL && req->list != NULL) {
+        if (req->list->mode == MMCE_MODE && req->effectiveMode == MMCE_MODE)
+            return 90;
+
+        if (req->list->mode == APP_MODE)
+            return 0x38;
+    }
+
+    return CACHE_THREAD_PRIORITY;
 }
 
 static void cacheEnqueueRequestLocked(load_image_request_t *req)
@@ -654,6 +667,10 @@ static void cacheCompleteRequest(load_image_request_t *req, int result)
 
 static void cacheLoadImage(load_image_request_t *req)
 {
+    ee_thread_status_t status;
+    int threadId;
+    int loadPriority;
+    int originalPriority = -1;
     int result = -1;
 
     if (req == NULL || req->cache == NULL || req->list == NULL || req->entry == NULL) {
@@ -669,7 +686,20 @@ static void cacheLoadImage(load_image_request_t *req)
         return;
     }
 
+    threadId = GetThreadId();
+    loadPriority = cacheGetLoadThreadPriority(req);
+    memset(&status, 0, sizeof(status));
+    if (ReferThreadStatus(threadId, &status) == 0) {
+        originalPriority = status.current_priority;
+        if (originalPriority != loadPriority)
+            ChangeThreadPriority(threadId, loadPriority);
+    }
+
     result = req->list->itemGetImage(req->list, req->cache->prefix, req->cache->isPrefixRelative, req->value, req->cache->suffix, &req->texture, GS_PSM_CT24);
+
+    if (originalPriority >= 0 && originalPriority != loadPriority)
+        ChangeThreadPriority(threadId, originalPriority);
+
     cacheCompleteRequest(req, result);
 }
 
