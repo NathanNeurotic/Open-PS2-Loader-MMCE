@@ -108,6 +108,7 @@ extern void *apps_case_png;
 // Not related to screen size, just to limit at some point
 static int maxSize = 720 * 512 * 4;
 #define TEX_FILE_READER_BUFFER_SIZE (16 * 1024)
+#define TEX_MMCE_STAGE_READ_SIZE    2048
 
 typedef struct
 {
@@ -362,6 +363,54 @@ static void texReadFileFunction(png_structp pngPtr, png_bytep data, png_size_t l
     }
 }
 
+static int texShouldStageExternalFileInMemory(const char *filePath)
+{
+    return filePath != NULL && (!strncmp(filePath, "mmce0:", 6) || !strncmp(filePath, "mmce1:", 6));
+}
+
+static int texStageExternalFileIntoMemory(int fd, void **buffer)
+{
+    int fileSize;
+    int bytesRead;
+    unsigned char *fileBuffer;
+
+    if (buffer == NULL)
+        return ERR_BAD_FILE;
+
+    fileSize = lseek(fd, 0, SEEK_END);
+    if (fileSize <= 0 || lseek(fd, 0, SEEK_SET) < 0)
+        return ERR_BAD_FILE;
+
+    fileBuffer = malloc(fileSize);
+    if (fileBuffer == NULL)
+        return ERR_BAD_FILE;
+
+    bytesRead = 0;
+    while (bytesRead < fileSize) {
+        int chunkSize = fileSize - bytesRead;
+        int result;
+
+        if (chunkSize > TEX_MMCE_STAGE_READ_SIZE)
+            chunkSize = TEX_MMCE_STAGE_READ_SIZE;
+
+        if (texLoadAbortRequested()) {
+            free(fileBuffer);
+            return ERR_LOAD_ABORTED;
+        }
+
+        result = read(fd, fileBuffer + bytesRead, chunkSize);
+        if (result <= 0) {
+            free(fileBuffer);
+            return ERR_BAD_FILE;
+        }
+
+        bytesRead += result;
+    }
+
+    *buffer = fileBuffer;
+    return 0;
+}
+
 static void texPrepareClut(GSTEXTURE *texture, int clutEntries)
 {
     png_clut_t *clut = (png_clut_t *)texture->Clut;
@@ -490,10 +539,22 @@ static int texLoadAll(GSTEXTURE *texture, const char *filePath, int texId)
         if (fd < 0)
             return ERR_BAD_FILE;
 
-        memset(&fileReader, 0, sizeof(fileReader));
-        fileReader.fd = fd;
-        readData = &fileReader;
-        readFunction = &texReadFileFunction;
+        if (texShouldStageExternalFileInMemory(filePath)) {
+            result = texStageExternalFileIntoMemory(fd, &pFileBuffer);
+            close(fd);
+            fd = -1;
+            if (result < 0)
+                return result;
+
+            PngFileBufferPtr = pFileBuffer;
+            readData = &PngFileBufferPtr;
+            readFunction = &texReadMemFunction;
+        } else {
+            memset(&fileReader, 0, sizeof(fileReader));
+            fileReader.fd = fd;
+            readData = &fileReader;
+            readFunction = &texReadFileFunction;
+        }
     } else {
         if (texId == -1 || !internalDefault[texId].texture)
             return ERR_BAD_FILE;

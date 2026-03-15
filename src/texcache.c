@@ -262,6 +262,11 @@ static int cacheGetPrefetchLimit(const image_cache_t *cache)
     return cache->count - 1 < 4 ? cache->count - 1 : 4;
 }
 
+static int cacheShouldPreferLoadedVictim(const image_cache_t *cache, unsigned char priority, int effectiveMode)
+{
+    return cache != NULL && priority == CACHE_REQ_PRIORITY_INTERACTIVE && effectiveMode == MMCE_MODE && cache->suffix != NULL && strcmp(cache->suffix, "COV") == 0;
+}
+
 static int cacheGetEffectiveMode(const item_list_t *list, const char *value)
 {
     int mode;
@@ -1258,12 +1263,26 @@ static GSTEXTURE *cacheGetTextureInternal(image_cache_t *cache, item_list_t *lis
         return NULL;
     }
 
-    for (int i = 0; i < cache->count; i++) {
-        entry = &cache->content[i];
-        if ((entry->state == CACHE_ENTRY_FREE || entry->state == CACHE_ENTRY_READY || entry->state == CACHE_ENTRY_PRIMED || entry->state == CACHE_ENTRY_DISPLAYABLE || entry->state == CACHE_ENTRY_FAILED) && entry->lastUsed < rtime) {
-            oldestEntry = entry;
-            oldestEntryId = i;
-            rtime = entry->lastUsed;
+    if (cacheShouldPreferLoadedVictim(cache, priority, effectiveMode)) {
+        for (int i = 0; i < cache->count; i++) {
+            entry = &cache->content[i];
+            if ((entry->state == CACHE_ENTRY_READY || entry->state == CACHE_ENTRY_PRIMED || entry->state == CACHE_ENTRY_DISPLAYABLE || entry->state == CACHE_ENTRY_FAILED) && entry->lastUsed < rtime) {
+                oldestEntry = entry;
+                oldestEntryId = i;
+                rtime = entry->lastUsed;
+            }
+        }
+    }
+
+    if (oldestEntry == NULL) {
+        rtime = guiFrameId;
+        for (int i = 0; i < cache->count; i++) {
+            entry = &cache->content[i];
+            if ((entry->state == CACHE_ENTRY_FREE || entry->state == CACHE_ENTRY_READY || entry->state == CACHE_ENTRY_PRIMED || entry->state == CACHE_ENTRY_DISPLAYABLE || entry->state == CACHE_ENTRY_FAILED) && entry->lastUsed < rtime) {
+                oldestEntry = entry;
+                oldestEntryId = i;
+                rtime = entry->lastUsed;
+            }
         }
     }
 
