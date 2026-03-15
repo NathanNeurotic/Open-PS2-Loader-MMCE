@@ -353,9 +353,19 @@ static int cacheHasActiveInteractiveModeLocked(int mode)
     return gArtCurrentReq != NULL && gArtCurrentReq->priority == CACHE_REQ_PRIORITY_INTERACTIVE && gArtCurrentReq->effectiveMode == mode;
 }
 
+static int cacheIsNavigationActive(void)
+{
+    return getKey(KEY_LEFT) || getKey(KEY_RIGHT) || getKey(KEY_UP) || getKey(KEY_DOWN) || getKey(KEY_L1) || getKey(KEY_R1);
+}
+
 static int cacheIsAbortableMmceRequest(const load_image_request_t *req)
 {
     return req != NULL && req->priority == CACHE_REQ_PRIORITY_INTERACTIVE && req->effectiveMode == MMCE_MODE;
+}
+
+static int cacheShouldDeferInteractiveArtOnInput(const item_list_t *list, const char *value)
+{
+    return cacheGetEffectiveMode(list, value) == MMCE_MODE && cacheIsNavigationActive();
 }
 
 static int cacheShouldDiscardCompletedRequestLocked(const load_image_request_t *req)
@@ -1191,6 +1201,11 @@ static GSTEXTURE *cacheGetTextureInternal(image_cache_t *cache, item_list_t *lis
     }
 
     if (priority == CACHE_REQ_PRIORITY_INTERACTIVE) {
+        if (cacheShouldDeferInteractiveArtOnInput(list, value)) {
+            cacheUnlock();
+            return NULL;
+        }
+
         if (guiInactiveFrames < cacheGetInteractiveDelay(list, value)) {
             cacheUnlock();
             return NULL;
