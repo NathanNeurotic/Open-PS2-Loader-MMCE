@@ -71,10 +71,6 @@ void cacheCancelPendingImageLoads(void);
  */
 int cacheCancelPendingImageLoadsTimed(int timeoutTicks);
 
-/** Cancels queued MMCE-backed art and waits up to timeoutTicks for an active MMCE-backed load to abort.
- */
-int cacheAbortMmceImageLoadsTimed(int timeoutTicks);
-
 /** Invalidates queued art loads without blocking on the IO worker.
  */
 void cacheAdvanceGeneration(void);

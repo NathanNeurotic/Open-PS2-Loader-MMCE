@@ -28,8 +28,7 @@ static time_t mmceModifiedDVDPrev;
 static int mmceGameCount = 0;
 static base_game_info_t *mmceGames;
 
-#define MMCE_GAMEID_WAIT_TICKS    120
-#define MMCE_ART_ABORT_WAIT_TICKS 60
+#define MMCE_GAMEID_WAIT_TICKS 120
 
 // forward declaration
 static item_list_t mmceGameList;
@@ -104,11 +103,7 @@ static void mmceRefreshArtRoots(void)
         primaryHasArt = 1;
     }
 
-    /* Resolve MMCE art to one concrete root up front so per-cover loads behave
-       like the stable backends instead of probing both roots on every miss. */
-    if (primaryHasArt)
-        mmceArtFallback[0] = '\0';
-    else if (!fallbackHasArt)
+    if (primaryHasArt || !fallbackHasArt)
         mmceArtFallback[0] = '\0';
 }
 
@@ -314,7 +309,7 @@ void mmceLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
     else
         game = gAutoLaunchBDMGame;
 
-    (void)cacheAbortMmceImageLoadsTimed(MMCE_ART_ABORT_WAIT_TICKS);
+    (void)cacheCancelPendingImageLoadsTimed(MENU_MIN_INACTIVE_FRAMES);
 
     void *irx = &mmce_cdvdman_irx;
     int irx_size = size_mmce_cdvdman_irx;
@@ -467,8 +462,10 @@ void mmceLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
     //mcReset();
     //mcInit(MC_TYPE_XMC);
 
-    if (gAutoLaunchBDMGame == NULL)
+    if (gAutoLaunchBDMGame == NULL) {
+        cacheEnd(1);
         deinit(NO_EXCEPTION, MMCE_MODE); // CAREFUL: deinit will call mmceCleanUp, so mmceGames/game will be freed
+    }
 
     /* No autolaunch yet
     else {
@@ -493,11 +490,11 @@ static int mmceGetImage(item_list_t *itemList, char *folder, int isRelative, cha
     int result;
 
     result = mmceTryLoadImage(mmceArtPrimary, folder, isRelative, value, suffix, resultTex);
-    if (result >= 0 || !isRelative || result == ERR_LOAD_ABORTED)
+    if (result >= 0 || !isRelative)
         return result;
 
     if (mmceArtFallback[0] != '\0')
-        result = mmceTryLoadImage(mmceArtFallback, folder, isRelative, value, suffix, resultTex);
+        return mmceTryLoadImage(mmceArtFallback, folder, isRelative, value, suffix, resultTex);
 
     return result;
 }
