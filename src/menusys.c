@@ -54,6 +54,8 @@ enum GAME_MENU_IDs {
     GAME_DELETE_GAME,
 };
 
+#define MMCE_ART_ABORT_WAIT_TICKS 60
+
 // global menu variables
 static menu_list_t *menu;
 static menu_list_t *selected_item;
@@ -266,7 +268,7 @@ static config_set_t *menuLoadConfigDirectInternal(void)
         return result;
 
     if (list->mode == MMCE_MODE)
-        (void)cacheAbortMmceImageLoadsTimed(MENU_MIN_INACTIVE_FRAMES);
+        (void)cacheAbortMmceImageLoadsTimed(MMCE_ART_ABORT_WAIT_TICKS);
     else
         (void)cacheCancelPendingImageLoadsTimed(MENU_MIN_INACTIVE_FRAMES);
     loadedConfig = list->itemGetConfig(list, configId);

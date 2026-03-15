@@ -58,6 +58,7 @@ static ee_sema_t gQueueSema;
 
 static int isIOBlocked = 0;
 static int isIORunning = 0;
+static volatile int gIOActiveCount = 0;
 
 int ioRegisterHandler(int type, io_request_handler_t handler)
 {
@@ -130,7 +131,10 @@ static void ioWorkerThread(void *arg)
                 break;
 
             struct io_request_t *req = gReqList;
+            gIOActiveCount++;
             ioProcessRequest(req);
+            if (gIOActiveCount > 0)
+                gIOActiveCount--;
 
             // lock the queue tip as well now
             WaitSema(gEndSemaId);
@@ -182,6 +186,7 @@ void ioInit(void)
     gReqList = NULL;
     gReqEnd = NULL;
     gReqCount = 0;
+    gIOActiveCount = 0;
 
     gIOThreadId = 0;
 
@@ -302,7 +307,7 @@ int ioIsRunning(void)
 
 int ioGetPendingRequestCount(void)
 {
-    int count = 0;
+    int count = gIOActiveCount;
 
     struct io_request_t *req = gReqList;
 
@@ -320,7 +325,7 @@ int ioGetPendingRequestCount(void)
 
 int ioHasPendingRequests(void)
 {
-    return gReqList != NULL ? 1 : 0;
+    return (gReqList != NULL || gIOActiveCount > 0) ? 1 : 0;
 }
 
 #ifdef __EESIO_DEBUG

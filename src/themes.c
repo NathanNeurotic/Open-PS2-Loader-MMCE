@@ -1058,6 +1058,35 @@ static void validateItemsList(const char *themePath, config_set_t *themeConfig, 
     }
 }
 
+static int isDecoratorCoverCache(theme_element_t *list, image_cache_t *cache)
+{
+    items_list_t *itemsList;
+
+    if (list == NULL || list->extended == NULL || cache == NULL)
+        return 0;
+
+    itemsList = (items_list_t *)list->extended;
+    return itemsList->decoratorImage != NULL && itemsList->decoratorImage->cache == cache;
+}
+
+static void clampSelectedCoverCaches(theme_t *theme, theme_elems_t *elems)
+{
+    theme_element_t *elem = elems->first;
+
+    while (elem != NULL) {
+        if (elem->type == ELEM_TYPE_GAME_IMAGE) {
+            mutable_image_t *gameImage = (mutable_image_t *)elem->extended;
+
+            if (gameImage != NULL && gameImage->cache != NULL && gameImage->cache->suffix != NULL && strcmp(gameImage->cache->suffix, "COV") == 0 &&
+                !isDecoratorCoverCache(theme->gamesItemsList, gameImage->cache) && !isDecoratorCoverCache(theme->appsItemsList, gameImage->cache)) {
+                gameImage->cache->count = 1;
+            }
+        }
+
+        elem = elem->next;
+    }
+}
+
 static void validateGUIElems(const char *themePath, config_set_t *themeConfig, theme_t *theme)
 {
     // 1. check we have a valid Background elements
@@ -1067,6 +1096,12 @@ static void validateGUIElems(const char *themePath, config_set_t *themeConfig, t
     // 2. check we have a valid ItemsList element, and link its decorator to the target element
     validateItemsList(themePath, themeConfig, theme, theme->gamesItemsList, &theme->mainElems);
     validateItemsList(themePath, themeConfig, theme, theme->appsItemsList, &theme->appsMainElems);
+
+    // Selected-cover caches do not need history unless a real items list decorator uses them.
+    clampSelectedCoverCaches(theme, &theme->mainElems);
+    clampSelectedCoverCaches(theme, &theme->infoElems);
+    clampSelectedCoverCaches(theme, &theme->appsMainElems);
+    clampSelectedCoverCaches(theme, &theme->appsInfoElems);
 }
 
 static int addGUIElem(const char *themePath, config_set_t *themeConfig, theme_t *theme, theme_elems_t *elems, const char *type, const char *name)
