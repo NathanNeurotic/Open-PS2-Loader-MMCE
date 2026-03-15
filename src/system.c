@@ -534,7 +534,7 @@ static unsigned int sendIrxKernelRAM(const char *startup, const char *mode_str, 
         irxptr_tab[modcount++].ptr = (void *)mcemu_irx;
     }
 
-    if (modules & CORE_IRX_MMCE) {
+    if ((modules & CORE_IRX_MMCE) || gMMCEIGRSlot != 0) {
         irxptr_tab[modcount].info = size_mmcedrv_irx | SET_OPL_MOD_ID(OPL_MODULE_ID_MMCEDRV);
         irxptr_tab[modcount++].ptr = (void *)mmcedrv_irx;
     }

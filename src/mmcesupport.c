@@ -100,7 +100,15 @@ static void mmceRefreshArtRoots(void)
         snprintf(primary, sizeof(primary), "%s", mmceArtPrimary);
         snprintf(mmceArtPrimary, sizeof(mmceArtPrimary), "%s", mmceArtFallback);
         snprintf(mmceArtFallback, sizeof(mmceArtFallback), "%s", primary);
+        primaryHasArt = 1;
     }
+
+    /* Resolve MMCE art to one concrete root up front so per-cover loads behave
+       like the stable backends instead of probing both roots on every miss. */
+    if (primaryHasArt)
+        mmceArtFallback[0] = '\0';
+    else if (!fallbackHasArt)
+        mmceArtFallback[0] = '\0';
 }
 
 static int mmceTryLoadImage(const char *prefix, char *folder, int isRelative, char *value, char *suffix, GSTEXTURE *resultTex)
