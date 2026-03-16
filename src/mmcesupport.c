@@ -15,6 +15,7 @@
 #include "../ee_core/include/coreconfig.h"
 #include <usbhdfsd-common.h>
 
+#include <kernel.h>
 #include <ps2sdkapi.h>
 #define NEWLIB_PORT_AWARE
 #include <fileXio_rpc.h> // fileXioIoctl, fileXioDevctl
@@ -445,7 +446,7 @@ void mmceLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
         for (int i = 0; i < MMCE_GAMEID_WAIT_TICKS; i++) {
             int status;
 
-            delay(1);
+            nopdelay();
 
             // Poll MMCE status until busy bit is clear
             status = fileXioDevctl(mmceDevice, 0x2, NULL, 0, NULL, 0);
