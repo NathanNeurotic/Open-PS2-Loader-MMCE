@@ -1,5 +1,6 @@
 #include "include/opl.h"
 #include "include/appsupport.h"
+#include "include/mmcesupport.h"
 #include "include/pad.h"
 #include "include/texcache.h"
 #include "include/textures.h"
@@ -1245,6 +1246,11 @@ static GSTEXTURE *cacheGetTextureInternal(image_cache_t *cache, item_list_t *lis
     }
 
     if (priority == CACHE_REQ_PRIORITY_INTERACTIVE) {
+        if (list != NULL && list->mode == MMCE_MODE && !mmceIsReady()) {
+            cacheUnlock();
+            return NULL;
+        }
+
         if (cacheShouldDeferInteractiveArtOnInput(list, value)) {
             cacheUnlock();
             return NULL;
