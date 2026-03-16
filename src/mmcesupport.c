@@ -29,7 +29,8 @@ static time_t mmceModifiedDVDPrev;
 static int mmceGameCount = 0;
 static base_game_info_t *mmceGames;
 
-#define MMCE_GAMEID_WAIT_TICKS 120
+#define MMCE_GAMEID_WAIT_TICKS    120
+#define MMCE_ART_ABORT_WAIT_TICKS 60
 
 // forward declaration
 static item_list_t mmceGameList;
@@ -121,14 +122,6 @@ static int mmceTryLoadImage(const char *prefix, char *folder, int isRelative, ch
         snprintf(path, sizeof(path), "%s%s_%s", folder, value, suffix);
 
     return texDiscoverLoad(resultTex, path, -1);
-}
-
-int mmceIsReady(void)
-{
-    if (mmcePrefix[0] == '\0')
-        return 0;
-
-    return (fileXioDevctl(mmcePrefix, 0x2, NULL, 0, NULL, 0) & 1) == 0;
 }
 
 int mmceDetectSlot(void)
@@ -318,7 +311,7 @@ void mmceLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
     else
         game = gAutoLaunchBDMGame;
 
-    if (!cacheAbortMmceImageLoadsTimed(MENU_MIN_INACTIVE_FRAMES)) {
+    if (!cacheAbortMmceImageLoadsTimed(MMCE_ART_ABORT_WAIT_TICKS)) {
         cacheEnd(1);
         cacheInit();
     }

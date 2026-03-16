@@ -81,6 +81,7 @@ static s32 menuSemaId;
 static s32 menuListSemaId = -1;
 static ee_sema_t menuSema;
 
+#define MENU_MMCE_ART_ABORT_WAIT_TICKS 60
 #define MENU_MMCE_CONFIG_IDLE_FRAMES 20
 
 static void menuInvalidateArtSelection(void)
@@ -268,7 +269,7 @@ static config_set_t *menuLoadConfigDirectInternal(void)
         return result;
 
     if (list->mode == MMCE_MODE) {
-        if (!cacheAbortMmceImageLoadsTimed(MENU_MIN_INACTIVE_FRAMES)) {
+        if (!cacheAbortMmceImageLoadsTimed(MENU_MMCE_ART_ABORT_WAIT_TICKS)) {
             cacheEnd(1);
             cacheInit();
         }

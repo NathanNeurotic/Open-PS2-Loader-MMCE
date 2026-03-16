@@ -1,6 +1,5 @@
 #include "include/opl.h"
 #include "include/appsupport.h"
-#include "include/mmcesupport.h"
 #include "include/pad.h"
 #include "include/texcache.h"
 #include "include/textures.h"
@@ -1170,6 +1169,48 @@ void cacheWakeInteractiveArtOnInputIdle(void)
         WakeupThread(gArtThreadId);
 }
 
+GSTEXTURE *cacheGetTextureIfReady(image_cache_t *cache, int *cacheId, int *UID)
+{
+    cache_entry_t *entry;
+    GSTEXTURE *result = NULL;
+
+    if (cache == NULL || cache->destroying || cacheId == NULL || UID == NULL || *cacheId < 0 || *cacheId >= cache->count)
+        return NULL;
+
+    cacheLock();
+
+    entry = &cache->content[*cacheId];
+    if (entry->UID == *UID) {
+        switch (entry->state) {
+            case CACHE_ENTRY_READY:
+                entry->state = CACHE_ENTRY_DISPLAYABLE;
+                entry->lastUsed = guiFrameId;
+                result = &entry->texture;
+                break;
+            case CACHE_ENTRY_PRIMED:
+                if (entry->primeFrame != guiFrameId) {
+                    entry->state = CACHE_ENTRY_DISPLAYABLE;
+                    entry->lastUsed = guiFrameId;
+                    result = &entry->texture;
+                }
+                break;
+            case CACHE_ENTRY_DISPLAYABLE:
+                entry->lastUsed = guiFrameId;
+                result = &entry->texture;
+                break;
+            default:
+                break;
+        }
+    } else {
+        *cacheId = -1;
+        *UID = -1;
+    }
+
+    cacheUnlock();
+
+    return result;
+}
+
 static GSTEXTURE *cacheGetTextureInternal(image_cache_t *cache, item_list_t *list, int *cacheId, int *UID, char *value, unsigned char priority)
 {
     cache_entry_t *entry;
@@ -1246,11 +1287,6 @@ static GSTEXTURE *cacheGetTextureInternal(image_cache_t *cache, item_list_t *lis
     }
 
     if (priority == CACHE_REQ_PRIORITY_INTERACTIVE) {
-        if (list != NULL && list->mode == MMCE_MODE && !mmceIsReady()) {
-            cacheUnlock();
-            return NULL;
-        }
-
         if (cacheShouldDeferInteractiveArtOnInput(list, value)) {
             cacheUnlock();
             return NULL;

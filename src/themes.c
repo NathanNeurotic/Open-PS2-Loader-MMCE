@@ -903,6 +903,7 @@ static void drawItemsList(struct menu_list *menu, struct submenu_list *item, con
 {
     if (item) {
         items_list_t *itemsList = (items_list_t *)elem->extended;
+        item_list_t *list = menu->item->userdata;
 
         int posX = elem->posX, posY = elem->posY;
         if (elem->aligned) {
@@ -920,7 +921,15 @@ static void drawItemsList(struct menu_list *menu, struct submenu_list *item, con
                 color = elem->color;
 
             if (itemsList->decoratorImage) {
-                GSTEXTURE *itemIconTex = getGameImageTexture(itemsList->decoratorImage->cache, menu->item->userdata, &ps->item);
+                GSTEXTURE *itemIconTex;
+
+                /* Avoid queuing fresh MMCE row-art for every visible item; only show rows that are already cached. */
+                if (list != NULL && list->mode == MMCE_MODE && ps != item && itemsList->decoratorImage->cache != NULL) {
+                    image_cache_t *cache = itemsList->decoratorImage->cache;
+                    itemIconTex = cacheGetTextureIfReady(cache, &ps->item.cache_id[cache->userId], &ps->item.cache_uid[cache->userId]);
+                } else
+                    itemIconTex = getGameImageTexture(itemsList->decoratorImage->cache, menu->item->userdata, &ps->item);
+
                 if (itemIconTex && itemIconTex->Mem)
                     rmDrawPixmap(itemIconTex, posX, posY, elem->aligned, DECORATOR_SIZE, DECORATOR_SIZE, elem->scaled, gDefaultCol);
                 else {
@@ -1080,8 +1089,7 @@ static void clampSelectedCoverCaches(theme_t *theme, theme_elems_t *elems)
             if (gameImage != NULL && gameImage->cache != NULL && gameImage->cache->suffix != NULL && strcmp(gameImage->cache->suffix, "COV") == 0 &&
                 !isDecoratorCoverCache(theme->gamesItemsList, gameImage->cache) && !isDecoratorCoverCache(theme->appsItemsList, gameImage->cache)) {
                 gameImage->cache->allowPrime = 0;
-                if (gameImage->cache->count < 2)
-                    gameImage->cache->count = 2;
+                gameImage->cache->count = 2;
             }
         }
 

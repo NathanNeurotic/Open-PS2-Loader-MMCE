@@ -104,6 +104,10 @@ int cacheHasPendingInteractiveArt(void);
  */
 void cacheWakeInteractiveArtOnInputIdle(void);
 
+/** Returns a texture only if the current cache slot is already ready; does not queue new IO.
+ */
+GSTEXTURE *cacheGetTextureIfReady(image_cache_t *cache, int *cacheId, int *UID);
+
 GSTEXTURE *cacheGetTexture(image_cache_t *cache, item_list_t *list, int *cacheId, int *UID, char *value);
 GSTEXTURE *cachePrefetchTexture(image_cache_t *cache, item_list_t *list, int *cacheId, int *UID, char *value);
 
