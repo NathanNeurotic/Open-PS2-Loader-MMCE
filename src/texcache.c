@@ -17,6 +17,7 @@ typedef struct load_image_request
     item_list_t *list;
     int cacheUID;
     int effectiveMode;
+    int generation;
     volatile int abortRequested;
     unsigned char priority;
     GSTEXTURE texture;
@@ -355,6 +356,11 @@ static load_image_request_t *cacheFindQueuedInteractiveModeLocked(int mode)
 static int cacheIsAbortableMmceRequest(load_image_request_t *req)
 {
     return req != NULL && req->priority == CACHE_REQ_PRIORITY_INTERACTIVE && req->effectiveMode == MMCE_MODE;
+}
+
+static int cacheShouldDiscardCompletedRequestLocked(load_image_request_t *req)
+{
+    return cacheIsAbortableMmceRequest(req) && req->generation != gCacheGeneration;
 }
 
 static int cacheIsNavigationActive(void)
@@ -712,7 +718,7 @@ static void cacheCompleteRequest(load_image_request_t *req, int result)
         req->entry->qr = NULL;
         req->entry->primeFrame = -1;
 
-        if (result == ERR_LOAD_ABORTED) {
+        if (result == ERR_LOAD_ABORTED || cacheShouldDiscardCompletedRequestLocked(req)) {
             cacheClearItem(req->entry, 0);
         } else if (result < 0 || req->texture.Mem == NULL) {
             req->entry->lastUsed = 0;
@@ -1312,6 +1318,7 @@ static GSTEXTURE *cacheGetTextureInternal(image_cache_t *cache, item_list_t *lis
     req->list = list;
     req->effectiveMode = effectiveMode;
     req->priority = priority;
+    req->generation = gCacheGeneration;
     req->value = (char *)req + sizeof(load_image_request_t);
     strcpy(req->value, value);
     req->cacheUID = cache->nextUID;
