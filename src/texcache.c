@@ -594,7 +594,7 @@ static int cacheWaitForAllRequestsTimed(int timeoutTicks)
         if (!pending)
             return 1;
 
-        nopdelay();
+        delay(1);
         if (timeoutTicks > 0)
             timeoutTicks--;
     }
@@ -614,7 +614,7 @@ static void cacheWaitForCacheRequests(image_cache_t *cache)
         if (!pending)
             break;
 
-        nopdelay();
+        delay(1);
     }
 }
 
@@ -868,7 +868,7 @@ void cacheEnd(int forceStop)
     WakeupThread(gArtThreadId);
 
     for (int i = 0; gArtRunning && i < waitTicks; i++)
-        nopdelay();
+        delay(1);
 
     if (gArtRunning && gArtThreadId >= 0 && forceStop) {
         TerminateThread(gArtThreadId);
@@ -1045,7 +1045,7 @@ int cacheAbortMmceImageLoadsTimed(int timeoutTicks)
         if (!pending)
             return 1;
 
-        nopdelay();
+        delay(1);
         if (timeoutTicks > 0)
             timeoutTicks--;
     }
