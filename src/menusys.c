@@ -1053,13 +1053,13 @@ void menuHandleInputMenu()
     }
 }
 
-static void menuRenderElements(theme_elems_t *elems)
+static void menuRenderElements(theme_elems_t *elems, int allowItemConfig, config_set_t *renderConfig)
 {
     // selected_item can't be NULL here as we only allow to switch to "Main" rendering when there is at least one device activated
     theme_element_t *elem = elems->first;
     item_list_t *list = selected_item != NULL && selected_item->item != NULL ? selected_item->item->userdata : NULL;
 
-    if (elems->needsItemConfig && !cacheHasPendingInteractiveArt() &&
+    if (allowItemConfig && elems->needsItemConfig && !cacheHasPendingInteractiveArt() &&
         (list == NULL || list->mode != MMCE_MODE || guiInactiveFrames >= MENU_MMCE_CONFIG_IDLE_FRAMES))
         _menuRequestConfig();
 
@@ -1067,7 +1067,7 @@ static void menuRenderElements(theme_elems_t *elems)
 
     while (elem) {
         if (elem->drawElem)
-            elem->drawElem(selected_item, selected_item->item->current, itemConfig, elem);
+            elem->drawElem(selected_item, selected_item->item->current, renderConfig, elem);
 
         elem = elem->next;
     }
@@ -1077,12 +1077,14 @@ static void menuRenderElements(theme_elems_t *elems)
 void menuRenderMain(void)
 {
     item_list_t *list = selected_item->item->userdata;
+    int allowItemConfig = !(list != NULL && list->mode == MMCE_MODE);
+    config_set_t *renderConfig = allowItemConfig ? itemConfig : NULL;
 
     if (list->mode == APP_MODE) {
-        menuRenderElements(&gTheme->appsMainElems);
+        menuRenderElements(&gTheme->appsMainElems, allowItemConfig, renderConfig);
         gTheme->itemsList = gTheme->appsItemsList;
     } else {
-        menuRenderElements(&gTheme->mainElems);
+        menuRenderElements(&gTheme->mainElems, allowItemConfig, renderConfig);
         gTheme->itemsList = gTheme->gamesItemsList;
     }
 }
@@ -1136,10 +1138,10 @@ void menuRenderInfo(void)
     item_list_t *list = selected_item->item->userdata;
 
     if (list->mode == APP_MODE) {
-        menuRenderElements(&gTheme->appsInfoElems);
+        menuRenderElements(&gTheme->appsInfoElems, 1, itemConfig);
         gTheme->itemsList = gTheme->appsItemsList;
     } else {
-        menuRenderElements(&gTheme->infoElems);
+        menuRenderElements(&gTheme->infoElems, 1, itemConfig);
         gTheme->itemsList = gTheme->gamesItemsList;
     }
 }

@@ -262,6 +262,12 @@ static int cacheGetPrefetchLimit(const image_cache_t *cache)
     return cache->count - 1 < 4 ? cache->count - 1 : 4;
 }
 
+static int cacheShouldPreferLoadedVictim(const image_cache_t *cache, unsigned char priority, int effectiveMode)
+{
+    return cache != NULL && priority == CACHE_REQ_PRIORITY_INTERACTIVE && effectiveMode == MMCE_MODE &&
+           cache->suffix != NULL && strcmp(cache->suffix, "COV") == 0;
+}
+
 static int cacheGetEffectiveMode(const item_list_t *list, const char *value)
 {
     int mode;
@@ -363,22 +369,6 @@ static int cacheIsAbortableMmceRequest(load_image_request_t *req)
 static int cacheShouldDiscardCompletedRequestLocked(load_image_request_t *req)
 {
     return cacheIsAbortableMmceRequest(req) && req->generation != gCacheGeneration;
-}
-
-static void cacheAbortActiveRequestLocked(load_image_request_t *req)
-{
-    cache_entry_t *entry;
-
-    if (req == NULL)
-        return;
-
-    req->abortRequested = 1;
-
-    entry = req->entry;
-    if (entry != NULL && entry->qr == req) {
-        entry->qr = NULL;
-        cacheClearItem(entry, 0);
-    }
 }
 
 static int cacheIsNavigationActive(void)
@@ -508,7 +498,7 @@ static void cacheInvalidateEntryLocked(cache_entry_t *entry, int freeTxt, int pr
             break;
         case CACHE_ENTRY_LOADING:
             if (cacheIsAbortableMmceRequest(req))
-                cacheAbortActiveRequestLocked(req);
+                req->abortRequested = 1;
             else {
                 entry->qr = NULL;
                 cacheClearItem(entry, freeTxt);
@@ -568,7 +558,7 @@ static void cacheInvalidateInteractiveRequestsLocked(void)
                         break;
                     case CACHE_ENTRY_LOADING:
                         if (cacheIsAbortableMmceRequest(req))
-                            cacheAbortActiveRequestLocked(req);
+                            req->abortRequested = 1;
                         else {
                             entry->qr = NULL;
                             cacheClearItem(entry, 1);
@@ -1052,7 +1042,7 @@ int cacheAbortMmceImageLoadsTimed(int timeoutTicks)
     cacheLock();
 
     if (gArtCurrentReq != NULL && cacheIsAbortableMmceRequest(gArtCurrentReq))
-        cacheAbortActiveRequestLocked(gArtCurrentReq);
+        gArtCurrentReq->abortRequested = 1;
 
     for (load_image_request_t *req = gArtInteractiveReqList, *next; req != NULL; req = next) {
         next = req->next;
@@ -1365,14 +1355,30 @@ static GSTEXTURE *cacheGetTextureInternal(image_cache_t *cache, item_list_t *lis
         return NULL;
     }
 
-    for (int i = 0; i < cache->count; i++) {
-        entry = &cache->content[i];
-        if ((entry->state == CACHE_ENTRY_FREE || entry->state == CACHE_ENTRY_READY || entry->state == CACHE_ENTRY_PRIMED ||
-             entry->state == CACHE_ENTRY_DISPLAYABLE || entry->state == CACHE_ENTRY_FAILED) &&
-            entry->lastUsed < rtime) {
-            oldestEntry = entry;
-            oldestEntryId = i;
-            rtime = entry->lastUsed;
+    if (cacheShouldPreferLoadedVictim(cache, priority, effectiveMode)) {
+        for (int i = 0; i < cache->count; i++) {
+            entry = &cache->content[i];
+            if ((entry->state == CACHE_ENTRY_READY || entry->state == CACHE_ENTRY_PRIMED ||
+                 entry->state == CACHE_ENTRY_DISPLAYABLE || entry->state == CACHE_ENTRY_FAILED) &&
+                entry->lastUsed < rtime) {
+                oldestEntry = entry;
+                oldestEntryId = i;
+                rtime = entry->lastUsed;
+            }
+        }
+    }
+
+    if (oldestEntry == NULL) {
+        rtime = guiFrameId;
+        for (int i = 0; i < cache->count; i++) {
+            entry = &cache->content[i];
+            if ((entry->state == CACHE_ENTRY_FREE || entry->state == CACHE_ENTRY_READY || entry->state == CACHE_ENTRY_PRIMED ||
+                 entry->state == CACHE_ENTRY_DISPLAYABLE || entry->state == CACHE_ENTRY_FAILED) &&
+                entry->lastUsed < rtime) {
+                oldestEntry = entry;
+                oldestEntryId = i;
+                rtime = entry->lastUsed;
+            }
         }
     }
 
