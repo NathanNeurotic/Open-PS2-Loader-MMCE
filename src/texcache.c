@@ -956,6 +956,7 @@ image_cache_t *cacheInitCache(int userId, const char *prefix, int isPrefixRelati
     }
 
     cache->nextUID = 1;
+    cache->allowPrime = 1;
     cache->content = malloc(count * sizeof(cache_entry_t));
     if (cache->content == NULL) {
         free(cache->prefix);
@@ -1105,7 +1106,7 @@ void cachePrimeReadyTexture(void)
     while (registry != NULL && texture == NULL) {
         image_cache_t *cache = registry->cache;
 
-        if (cache != NULL && !cache->destroying) {
+        if (cache != NULL && !cache->destroying && cache->allowPrime) {
             for (int i = 0; i < cache->count; i++) {
                 cache_entry_t *entry = &cache->content[i];
 

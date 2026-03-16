@@ -41,6 +41,7 @@ typedef struct
     int nextUID;
     int activeRequests;
     int queuedPrefetchRequests;
+    int allowPrime;
     int destroying;
 
     /// the cache entries itself
