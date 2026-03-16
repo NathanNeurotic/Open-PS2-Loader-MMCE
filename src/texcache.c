@@ -367,8 +367,8 @@ static int cacheShouldDiscardCompletedRequestLocked(load_image_request_t *req)
 
 static int cacheIsNavigationActive(void)
 {
-    return getKeyPressed(KEY_LEFT) || getKeyPressed(KEY_RIGHT) || getKeyPressed(KEY_UP) ||
-           getKeyPressed(KEY_DOWN) || getKeyPressed(KEY_L1) || getKeyPressed(KEY_R1);
+    return getKey(KEY_LEFT) || getKey(KEY_RIGHT) || getKey(KEY_UP) ||
+           getKey(KEY_DOWN) || getKey(KEY_L1) || getKey(KEY_R1);
 }
 
 static int cacheShouldDeferInteractiveArtOnInput(const item_list_t *list, const char *value)
@@ -710,17 +710,6 @@ static load_image_request_t *cacheDequeueRequest(void)
     return req;
 }
 
-static int cacheHasQueuedRequests(void)
-{
-    int pending;
-
-    cacheLock();
-    pending = gArtQueuedCount > 0;
-    cacheUnlock();
-
-    return pending;
-}
-
 static void cacheCompleteRequest(load_image_request_t *req, int result)
 {
     cacheLock();
@@ -817,13 +806,8 @@ static void cacheWorkerThread(void *arg)
         while (!gArtTerminate) {
             load_image_request_t *req = cacheDequeueRequest();
 
-            if (req == NULL) {
-                if (!cacheHasQueuedRequests())
-                    break;
-
-                delay(1);
-                continue;
-            }
+            if (req == NULL)
+                break;
 
             cacheLoadImage(req);
             cacheProcessCleanupRequests();
