@@ -143,5 +143,6 @@ int thmGetGuiValue(void);
 int thmFindGuiID(const char *theme);
 const char **thmGetGuiList(void);
 char *thmGetFilePath(int themeID);
+void thmSetMmceMainPageBrowseOnly(int enabled);
 
 #endif

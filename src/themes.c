@@ -24,6 +24,7 @@ theme_t *gTheme;
 static int screenWidth;
 static int screenHeight;
 static int guiThemeID = 0;
+static int gMmceMainPageBrowseOnly = 0;
 
 static int nThemes = 0;
 static theme_file_t themes[THM_MAX_FILES];
@@ -480,6 +481,8 @@ static mutable_image_t *initMutableImage(const char *themePath, config_set_t *th
         configGetStr(themeConfig, elemProp, &cachePattern);
         snprintf(elemProp, sizeof(elemProp), "%s_count", name);
         configGetInt(themeConfig, elemProp, &cacheCount);
+        if (cachePattern != NULL && strcmp(cachePattern, "COV") == 0 && cacheCount < 2)
+            cacheCount = 2;
         LOG("THEMES MutableImage %s: type: %s using cache pattern: %s count: %d\n", name, elementsType[type], cachePattern, cacheCount);
     }
 
@@ -554,6 +557,11 @@ static GSTEXTURE *getGameImageTexture(image_cache_t *cache, void *support, struc
     return NULL;
 }
 
+void thmSetMmceMainPageBrowseOnly(int enabled)
+{
+    gMmceMainPageBrowseOnly = enabled;
+}
+
 static int canPrefetchAdjacentGameImages(image_cache_t *cache, item_list_t *list, GSTEXTURE *selectedTexture)
 {
     if (cache == NULL || list == NULL || selectedTexture == NULL || selectedTexture->Mem == NULL)
@@ -610,8 +618,14 @@ static void drawGameImage(struct menu_list *menu, struct submenu_list *item, con
     mutable_image_t *gameImage = (mutable_image_t *)elem->extended;
     if (item) {
         item_list_t *list;
-        GSTEXTURE *texture = getGameImageTexture(gameImage->cache, menu->item->userdata, &item->item);
+        GSTEXTURE *texture;
         list = (item_list_t *)menu->item->userdata;
+
+        if (list != NULL && list->mode == MMCE_MODE && gMmceMainPageBrowseOnly && gameImage->cache != NULL &&
+            gameImage->cache->suffix != NULL && strcmp(gameImage->cache->suffix, "COV") != 0) {
+            texture = cacheGetTextureIfReady(gameImage->cache, &item->item.cache_id[gameImage->cache->userId], &item->item.cache_uid[gameImage->cache->userId]);
+        } else
+            texture = getGameImageTexture(gameImage->cache, menu->item->userdata, &item->item);
 
         if (gameImage->cache != NULL && gameImage->cache->suffix != NULL && strcmp(gameImage->cache->suffix, "COV") == 0 &&
             canPrefetchAdjacentGameImages(gameImage->cache, list, texture)) {
@@ -1180,8 +1194,6 @@ static void clampSelectedCoverCaches(theme_t *theme, theme_elems_t *elems)
             if (gameImage != NULL && gameImage->cache != NULL && gameImage->cache->suffix != NULL && strcmp(gameImage->cache->suffix, "COV") == 0 &&
                 !isDecoratorCoverCache(theme->gamesItemsList, gameImage->cache) && !isDecoratorCoverCache(theme->appsItemsList, gameImage->cache)) {
                 gameImage->cache->allowPrime = 0;
-                if (gameImage->cache->count < 2)
-                    gameImage->cache->count = 2;
             }
         }
 
