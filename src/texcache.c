@@ -48,7 +48,7 @@ enum {
 
 #define CACHE_SLOW_MODE_INTERACTIVE_DELAY 4
 #define CACHE_MMCE_INTERACTIVE_MAX_DELAY  12
-#define CACHE_APP_INTERACTIVE_MAX_DELAY   10
+#define CACHE_APP_INTERACTIVE_MAX_DELAY   4
 #define CACHE_APP_PREFETCH_DELAY          10
 #define CACHE_PRIME_IDLE_DELAY            12
 #define CACHE_THREAD_PRIORITY             0x40
@@ -293,8 +293,10 @@ static int cacheGetInteractiveDelay(const item_list_t *list, const char *value)
     int delay = cacheGetBaseDelay(list);
     int mode = cacheGetEffectiveMode(list, value);
 
-    if (list != NULL && list->mode == APP_MODE && mode != MMCE_MODE)
-        return 0;
+    if (list != NULL && list->mode == APP_MODE) {
+        if (mode != MMCE_MODE)
+            return 0;
+    }
 
     if ((mode == APP_MODE || mode == MMCE_MODE) && delay < CACHE_SLOW_MODE_INTERACTIVE_DELAY)
         delay = CACHE_SLOW_MODE_INTERACTIVE_DELAY;

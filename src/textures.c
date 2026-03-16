@@ -538,7 +538,7 @@ static int texLoadAll(GSTEXTURE *texture, const char *filePath, int texId)
             fd = -1;
             if (result < 0) {
                 LOG("texLoadAll: failed to stage file %s\n", filePath);
-                return ERR_BAD_FILE;
+                return result;
             }
             PngFileBufferPtr = pFileBuffer;
             readData = &PngFileBufferPtr;
