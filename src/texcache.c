@@ -710,6 +710,17 @@ static load_image_request_t *cacheDequeueRequest(void)
     return req;
 }
 
+static int cacheHasQueuedRequests(void)
+{
+    int pending;
+
+    cacheLock();
+    pending = gArtQueuedCount > 0;
+    cacheUnlock();
+
+    return pending;
+}
+
 static void cacheCompleteRequest(load_image_request_t *req, int result)
 {
     cacheLock();
@@ -806,8 +817,13 @@ static void cacheWorkerThread(void *arg)
         while (!gArtTerminate) {
             load_image_request_t *req = cacheDequeueRequest();
 
-            if (req == NULL)
-                break;
+            if (req == NULL) {
+                if (!cacheHasQueuedRequests())
+                    break;
+
+                delay(1);
+                continue;
+            }
 
             cacheLoadImage(req);
             cacheProcessCleanupRequests();

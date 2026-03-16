@@ -81,6 +81,8 @@ static s32 menuSemaId;
 static s32 menuListSemaId = -1;
 static ee_sema_t menuSema;
 
+#define MENU_MMCE_CONFIG_IDLE_FRAMES 20
+
 static void menuInvalidateArtSelection(void)
 {
     cacheAdvanceGeneration();
@@ -1056,7 +1058,8 @@ static void menuRenderElements(theme_elems_t *elems)
     theme_element_t *elem = elems->first;
     item_list_t *list = selected_item != NULL && selected_item->item != NULL ? selected_item->item->userdata : NULL;
 
-    if (elems->needsItemConfig && !cacheHasPendingInteractiveArt() && (list == NULL || list->mode != MMCE_MODE))
+    if (elems->needsItemConfig && !cacheHasPendingInteractiveArt() &&
+        (list == NULL || list->mode != MMCE_MODE || guiInactiveFrames >= MENU_MMCE_CONFIG_IDLE_FRAMES))
         _menuRequestConfig();
 
     WaitSema(menuSemaId);
