@@ -334,6 +334,11 @@ static int cacheHasQueuedInteractiveModeLocked(int mode)
     return 0;
 }
 
+static int cacheHasActiveInteractiveModeLocked(int mode)
+{
+    return gArtCurrentReq != NULL && gArtCurrentReq->priority == CACHE_REQ_PRIORITY_INTERACTIVE && gArtCurrentReq->effectiveMode == mode;
+}
+
 static load_image_request_t *cacheFindQueuedInteractiveModeLocked(int mode)
 {
     load_image_request_t *req;
@@ -1201,13 +1206,13 @@ static GSTEXTURE *cacheGetTextureInternal(image_cache_t *cache, item_list_t *lis
         return NULL;
     }
 
-    if (priority == CACHE_REQ_PRIORITY_INTERACTIVE && effectiveMode == MMCE_MODE) {
+    if (priority == CACHE_REQ_PRIORITY_INTERACTIVE && list != NULL && list->mode == MMCE_MODE && effectiveMode == MMCE_MODE) {
         load_image_request_t *queuedMmceReq = cacheFindQueuedInteractiveModeLocked(MMCE_MODE);
 
         if (queuedMmceReq != NULL && (queuedMmceReq->cache != cache || strcmp(queuedMmceReq->value, value) != 0))
             cacheDropQueuedRequestLocked(queuedMmceReq);
 
-        if (cacheHasQueuedInteractiveModeLocked(MMCE_MODE)) {
+        if (cacheHasActiveInteractiveModeLocked(MMCE_MODE) || cacheHasQueuedInteractiveModeLocked(MMCE_MODE)) {
             cacheUnlock();
             return NULL;
         }
