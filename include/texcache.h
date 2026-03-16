@@ -100,6 +100,10 @@ int cacheHasPendingArt(void);
  */
 int cacheHasPendingInteractiveArt(void);
 
+/** Wakes queued interactive art once navigation input becomes idle.
+ */
+void cacheWakeInteractiveArtOnInputIdle(void);
+
 GSTEXTURE *cacheGetTexture(image_cache_t *cache, item_list_t *list, int *cacheId, int *UID, char *value);
 GSTEXTURE *cachePrefetchTexture(image_cache_t *cache, item_list_t *list, int *cacheId, int *UID, char *value);
 

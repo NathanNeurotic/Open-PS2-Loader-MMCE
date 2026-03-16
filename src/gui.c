@@ -1523,8 +1523,13 @@ static void guiReadPads()
 {
     if (readPads())
         guiInactiveFrames = 0;
-    else
+    else {
+        int wasActive = (guiInactiveFrames == 0);
+
         guiInactiveFrames++;
+        if (wasActive)
+            cacheWakeInteractiveArtOnInputIdle();
+    }
 }
 
 // renders the screen and handles inputs. Also handles screen transitions between numerous
