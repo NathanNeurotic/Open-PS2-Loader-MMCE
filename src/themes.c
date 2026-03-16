@@ -923,8 +923,8 @@ static void drawItemsList(struct menu_list *menu, struct submenu_list *item, con
             if (itemsList->decoratorImage) {
                 GSTEXTURE *itemIconTex;
 
-                /* Avoid queuing fresh MMCE row-art for every visible item; only show rows that are already cached. */
-                if (list != NULL && list->mode == MMCE_MODE && ps != item && itemsList->decoratorImage->cache != NULL) {
+                /* MMCE main-page row art must never queue fresh IO; only use already-ready textures. */
+                if (list != NULL && list->mode == MMCE_MODE && itemsList->decoratorImage->cache != NULL) {
                     image_cache_t *cache = itemsList->decoratorImage->cache;
                     itemIconTex = cacheGetTextureIfReady(cache, &ps->item.cache_id[cache->userId], &ps->item.cache_uid[cache->userId]);
                 } else
