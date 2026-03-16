@@ -1078,6 +1078,97 @@ static int isDecoratorCoverCache(theme_element_t *list, image_cache_t *cache)
     return itemsList->decoratorImage != NULL && itemsList->decoratorImage->cache == cache;
 }
 
+static int isDecoratorCoverImage(theme_t *theme, mutable_image_t *gameImage)
+{
+    items_list_t *itemsList;
+
+    if (theme == NULL || gameImage == NULL)
+        return 0;
+
+    if (theme->gamesItemsList != NULL && theme->gamesItemsList->extended != NULL) {
+        itemsList = (items_list_t *)theme->gamesItemsList->extended;
+        if (itemsList->decoratorImage == gameImage)
+            return 1;
+    }
+
+    if (theme->appsItemsList != NULL && theme->appsItemsList->extended != NULL) {
+        itemsList = (items_list_t *)theme->appsItemsList->extended;
+        if (itemsList->decoratorImage == gameImage)
+            return 1;
+    }
+
+    return 0;
+}
+
+static image_cache_t *cloneImageCache(theme_t *theme, image_cache_t *source)
+{
+    image_cache_t *cache;
+
+    if (theme == NULL || source == NULL)
+        return NULL;
+
+    cache = cacheInitCache(theme->gameCacheCount++, source->prefix, source->isPrefixRelative, source->suffix, source->count);
+    if (cache != NULL)
+        cache->allowPrime = source->allowPrime;
+
+    return cache;
+}
+
+static void replaceSharedCoverCache(theme_t *theme, theme_elems_t *elems, image_cache_t *sourceCache, image_cache_t *replacementCache, int *replacementAssigned)
+{
+    theme_element_t *elem;
+
+    if (theme == NULL || elems == NULL || sourceCache == NULL || replacementCache == NULL || replacementAssigned == NULL)
+        return;
+
+    elem = elems->first;
+    while (elem != NULL) {
+        if (elem->type == ELEM_TYPE_GAME_IMAGE) {
+            mutable_image_t *gameImage = (mutable_image_t *)elem->extended;
+
+            if (gameImage != NULL && !isDecoratorCoverImage(theme, gameImage) && gameImage->cache == sourceCache) {
+                gameImage->cache = replacementCache;
+                gameImage->cacheLinked = *replacementAssigned ? 1 : 0;
+                *replacementAssigned = 1;
+            }
+        }
+
+        elem = elem->next;
+    }
+}
+
+static void splitDecoratorCoverCache(theme_t *theme, theme_element_t *list)
+{
+    items_list_t *itemsList;
+    image_cache_t *sourceCache;
+    image_cache_t *replacementCache;
+    int replacementAssigned;
+
+    if (theme == NULL || list == NULL || list->extended == NULL)
+        return;
+
+    itemsList = (items_list_t *)list->extended;
+    if (itemsList->decoratorImage == NULL || itemsList->decoratorImage->cache == NULL)
+        return;
+
+    sourceCache = itemsList->decoratorImage->cache;
+    if (sourceCache->suffix == NULL || strcmp(sourceCache->suffix, "COV") != 0)
+        return;
+
+    replacementCache = cloneImageCache(theme, sourceCache);
+    if (replacementCache == NULL)
+        return;
+
+    replacementAssigned = 0;
+    replaceSharedCoverCache(theme, &theme->mainElems, sourceCache, replacementCache, &replacementAssigned);
+    replaceSharedCoverCache(theme, &theme->infoElems, sourceCache, replacementCache, &replacementAssigned);
+    replaceSharedCoverCache(theme, &theme->appsMainElems, sourceCache, replacementCache, &replacementAssigned);
+    replaceSharedCoverCache(theme, &theme->appsInfoElems, sourceCache, replacementCache, &replacementAssigned);
+
+    if (!replacementAssigned)
+        cacheDestroyCache(replacementCache);
+}
+
 static void clampSelectedCoverCaches(theme_t *theme, theme_elems_t *elems)
 {
     theme_element_t *elem = elems->first;
@@ -1106,6 +1197,10 @@ static void validateGUIElems(const char *themePath, config_set_t *themeConfig, t
     // 2. check we have a valid ItemsList element, and link its decorator to the target element
     validateItemsList(themePath, themeConfig, theme, theme->gamesItemsList, &theme->mainElems);
     validateItemsList(themePath, themeConfig, theme, theme->appsItemsList, &theme->appsMainElems);
+
+    // Items-list decorator covers need their own cache; sharing with selected covers defeats MMCE cover clamping.
+    splitDecoratorCoverCache(theme, theme->gamesItemsList);
+    splitDecoratorCoverCache(theme, theme->appsItemsList);
 
     // Selected-cover caches do not need history unless a real items list decorator uses them.
     clampSelectedCoverCaches(theme, &theme->mainElems);
