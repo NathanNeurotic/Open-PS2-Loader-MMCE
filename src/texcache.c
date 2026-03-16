@@ -365,6 +365,22 @@ static int cacheShouldDiscardCompletedRequestLocked(load_image_request_t *req)
     return cacheIsAbortableMmceRequest(req) && req->generation != gCacheGeneration;
 }
 
+static void cacheAbortActiveRequestLocked(load_image_request_t *req)
+{
+    cache_entry_t *entry;
+
+    if (req == NULL)
+        return;
+
+    req->abortRequested = 1;
+
+    entry = req->entry;
+    if (entry != NULL && entry->qr == req) {
+        entry->qr = NULL;
+        cacheClearItem(entry, 0);
+    }
+}
+
 static int cacheIsNavigationActive(void)
 {
     return getKey(KEY_LEFT) || getKey(KEY_RIGHT) || getKey(KEY_UP) ||
@@ -492,7 +508,7 @@ static void cacheInvalidateEntryLocked(cache_entry_t *entry, int freeTxt, int pr
             break;
         case CACHE_ENTRY_LOADING:
             if (cacheIsAbortableMmceRequest(req))
-                req->abortRequested = 1;
+                cacheAbortActiveRequestLocked(req);
             else {
                 entry->qr = NULL;
                 cacheClearItem(entry, freeTxt);
@@ -552,7 +568,7 @@ static void cacheInvalidateInteractiveRequestsLocked(void)
                         break;
                     case CACHE_ENTRY_LOADING:
                         if (cacheIsAbortableMmceRequest(req))
-                            req->abortRequested = 1;
+                            cacheAbortActiveRequestLocked(req);
                         else {
                             entry->qr = NULL;
                             cacheClearItem(entry, 1);
@@ -1036,7 +1052,7 @@ int cacheAbortMmceImageLoadsTimed(int timeoutTicks)
     cacheLock();
 
     if (gArtCurrentReq != NULL && cacheIsAbortableMmceRequest(gArtCurrentReq))
-        gArtCurrentReq->abortRequested = 1;
+        cacheAbortActiveRequestLocked(gArtCurrentReq);
 
     for (load_image_request_t *req = gArtInteractiveReqList, *next; req != NULL; req = next) {
         next = req->next;

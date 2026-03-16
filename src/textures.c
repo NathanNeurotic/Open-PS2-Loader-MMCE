@@ -107,7 +107,7 @@ extern void *apps_case_png;
 
 // Not related to screen size, just to limit at some point
 static int maxSize = 720 * 512 * 4;
-#define TEX_MMCE_STAGE_READ_SIZE 2048
+#define TEX_MMCE_STAGE_READ_SIZE 4096
 
 typedef struct
 {
