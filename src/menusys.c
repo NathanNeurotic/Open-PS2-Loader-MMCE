@@ -82,7 +82,7 @@ static s32 menuListSemaId = -1;
 static ee_sema_t menuSema;
 
 #define MENU_MMCE_ART_ABORT_WAIT_TICKS 60
-#define MENU_MMCE_CONFIG_IDLE_FRAMES 20
+#define MENU_MMCE_CONFIG_IDLE_FRAMES   20
 
 static void menuInvalidateArtSelection(void)
 {
