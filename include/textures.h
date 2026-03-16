@@ -108,10 +108,12 @@ enum INTERNAL_TEXTURE {
 #define ERR_BAD_DIMENSION -5
 #define ERR_MISSING_ALPHA -6
 #define ERR_BAD_DEPTH     -7
+#define ERR_LOAD_ABORTED  -8
 
 int texLookupInternalTexId(const char *name);
 int texLoadInternal(GSTEXTURE *texture, int texId);
 int texDiscoverLoad(GSTEXTURE *texture, const char *path, int texId);
+void texSetLoadAbortFlag(volatile int *abortRequested);
 void texFree(GSTEXTURE *texture);
 
 #endif

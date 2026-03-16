@@ -17,6 +17,7 @@ typedef struct load_image_request
     item_list_t *list;
     int cacheUID;
     int effectiveMode;
+    volatile int abortRequested;
     unsigned char priority;
     GSTEXTURE texture;
     GSTEXTURE displacedTexture;
@@ -334,6 +335,11 @@ static int cacheHasQueuedInteractiveModeLocked(int mode)
     return 0;
 }
 
+static int cacheHasActiveInteractiveModeLocked(int mode)
+{
+    return gArtCurrentReq != NULL && gArtCurrentReq->priority == CACHE_REQ_PRIORITY_INTERACTIVE && gArtCurrentReq->effectiveMode == mode;
+}
+
 static load_image_request_t *cacheFindQueuedInteractiveModeLocked(int mode)
 {
     load_image_request_t *req;
@@ -344,6 +350,11 @@ static load_image_request_t *cacheFindQueuedInteractiveModeLocked(int mode)
     }
 
     return NULL;
+}
+
+static int cacheIsAbortableMmceRequest(load_image_request_t *req)
+{
+    return req != NULL && req->priority == CACHE_REQ_PRIORITY_INTERACTIVE && req->effectiveMode == MMCE_MODE;
 }
 
 static int cacheIsNavigationActive(void)
@@ -471,8 +482,12 @@ static void cacheInvalidateEntryLocked(cache_entry_t *entry, int freeTxt, int pr
             cacheClearItem(entry, freeTxt);
             break;
         case CACHE_ENTRY_LOADING:
-            entry->qr = NULL;
-            cacheClearItem(entry, freeTxt);
+            if (cacheIsAbortableMmceRequest(req))
+                req->abortRequested = 1;
+            else {
+                entry->qr = NULL;
+                cacheClearItem(entry, freeTxt);
+            }
             break;
         case CACHE_ENTRY_READY:
         case CACHE_ENTRY_PRIMED:
@@ -527,8 +542,12 @@ static void cacheInvalidateInteractiveRequestsLocked(void)
                         cacheClearItem(entry, 1);
                         break;
                     case CACHE_ENTRY_LOADING:
-                        entry->qr = NULL;
-                        cacheClearItem(entry, 1);
+                        if (cacheIsAbortableMmceRequest(req))
+                            req->abortRequested = 1;
+                        else {
+                            entry->qr = NULL;
+                            cacheClearItem(entry, 1);
+                        }
                         break;
                     default:
                         break;
@@ -693,7 +712,9 @@ static void cacheCompleteRequest(load_image_request_t *req, int result)
         req->entry->qr = NULL;
         req->entry->primeFrame = -1;
 
-        if (result < 0 || req->texture.Mem == NULL) {
+        if (result == ERR_LOAD_ABORTED) {
+            cacheClearItem(req->entry, 0);
+        } else if (result < 0 || req->texture.Mem == NULL) {
             req->entry->lastUsed = 0;
             req->entry->state = CACHE_ENTRY_FAILED;
         } else {
@@ -737,6 +758,11 @@ static void cacheLoadImage(load_image_request_t *req)
         return;
     }
 
+    if (req->abortRequested) {
+        cacheCompleteRequest(req, ERR_LOAD_ABORTED);
+        return;
+    }
+
     threadId = GetThreadId();
     loadPriority = cacheGetLoadThreadPriority(req);
     memset(&status, 0, sizeof(status));
@@ -746,7 +772,9 @@ static void cacheLoadImage(load_image_request_t *req)
             ChangeThreadPriority(threadId, loadPriority);
     }
 
+    texSetLoadAbortFlag(&req->abortRequested);
     result = req->list->itemGetImage(req->list, req->cache->prefix, req->cache->isPrefixRelative, req->value, req->cache->suffix, &req->texture, GS_PSM_CT24);
+    texSetLoadAbortFlag(NULL);
     cacheCompleteRequest(req, result);
     cacheProcessCleanupRequests();
 
@@ -988,6 +1016,41 @@ int cacheCancelPendingImageLoadsTimed(int timeoutTicks)
 
     cacheWakeWorker();
     return cacheWaitForAllRequestsTimed(timeoutTicks);
+}
+
+int cacheAbortMmceImageLoadsTimed(int timeoutTicks)
+{
+    cacheLock();
+
+    if (gArtCurrentReq != NULL && cacheIsAbortableMmceRequest(gArtCurrentReq))
+        gArtCurrentReq->abortRequested = 1;
+
+    for (load_image_request_t *req = gArtInteractiveReqList, *next; req != NULL; req = next) {
+        next = req->next;
+        if (req->effectiveMode == MMCE_MODE)
+            cacheDropQueuedRequestLocked(req);
+    }
+
+    cacheUnlock();
+
+    cacheWakeWorker();
+
+    while (timeoutTicks != 0) {
+        int pending;
+
+        cacheLock();
+        pending = cacheHasActiveInteractiveModeLocked(MMCE_MODE) || cacheHasQueuedInteractiveModeLocked(MMCE_MODE);
+        cacheUnlock();
+
+        if (!pending)
+            return 1;
+
+        delay(1);
+        if (timeoutTicks > 0)
+            timeoutTicks--;
+    }
+
+    return 0;
 }
 
 void cacheAdvanceGeneration(void)

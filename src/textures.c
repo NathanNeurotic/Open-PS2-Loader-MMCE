@@ -2,6 +2,7 @@
 #include "include/textures.h"
 #include "include/util.h"
 #include "include/ioman.h"
+#include <kernel.h>
 #include <png.h>
 
 extern void *load0_png;
@@ -132,6 +133,8 @@ typedef struct
 } png_texture_t;
 
 static png_texture_t pngTexture;
+static volatile int *gTexAbortFlag;
+static int gTexAbortThreadId = -1;
 
 static texture_t internalDefault[TEXTURES_COUNT] = {
     {LOAD0_ICON, "load0", &load0_png},
@@ -308,6 +311,17 @@ static int texEnd(png_structp pngPtr, png_infop infoPtr, void *pFileBuffer, int 
     return status;
 }
 
+static int texLoadAbortRequested(void)
+{
+    return gTexAbortFlag != NULL && gTexAbortThreadId == GetThreadId() && *gTexAbortFlag != 0;
+}
+
+void texSetLoadAbortFlag(volatile int *abortRequested)
+{
+    gTexAbortFlag = abortRequested;
+    gTexAbortThreadId = abortRequested != NULL ? GetThreadId() : -1;
+}
+
 static void texReadMemFunction(png_structp pngPtr, png_bytep data, png_size_t length)
 {
     void **PngBufferPtr = png_get_io_ptr(pngPtr);
@@ -370,6 +384,11 @@ static int texStageExternalFileIntoMemory(int fd, void **buffer)
 
         if (chunkSize > TEX_MMCE_STAGE_READ_SIZE)
             chunkSize = TEX_MMCE_STAGE_READ_SIZE;
+
+        if (texLoadAbortRequested()) {
+            free(fileBuffer);
+            return ERR_LOAD_ABORTED;
+        }
 
         result = read(fd, fileBuffer + bytesRead, chunkSize);
         if (result <= 0) {
@@ -474,6 +493,12 @@ static int texReadData(GSTEXTURE *texture, png_structp pngPtr, png_infop infoPtr
     }
 
     for (int row = 0; row < texture->Height; row++) {
+        if (texLoadAbortRequested()) {
+            free(rowBuffer);
+            texFree(texture);
+            return ERR_LOAD_ABORTED;
+        }
+
         png_read_row(pngPtr, rowBuffer, NULL);
         texPngReadRow(texture, rowBuffer, row);
     }
@@ -545,8 +570,11 @@ static int texLoadAll(GSTEXTURE *texture, const char *filePath, int texId)
     if (!infoPtr)
         return texEnd(pngPtr, infoPtr, pFileBuffer, fd, ERR_INFO_STRUCT);
 
-    if (setjmp(png_jmpbuf(pngPtr)))
-        return texEnd(pngPtr, infoPtr, pFileBuffer, fd, ERR_SET_JMP);
+    if (setjmp(png_jmpbuf(pngPtr))) {
+        if (texLoadAbortRequested())
+            texFree(texture);
+        return texEnd(pngPtr, infoPtr, pFileBuffer, fd, texLoadAbortRequested() ? ERR_LOAD_ABORTED : ERR_SET_JMP);
+    }
 
     png_set_read_fn(pngPtr, readData, readFunction);
     png_set_sig_bytes(pngPtr, 0);
@@ -632,6 +660,7 @@ int texLoadInternal(GSTEXTURE *texture, int texId)
 int texDiscoverLoad(GSTEXTURE *texture, const char *path, int texId)
 {
     char filePath[256];
+    int result;
 
     LOG("texDiscoverLoad(%s)\n", path);
 
@@ -640,5 +669,6 @@ int texDiscoverLoad(GSTEXTURE *texture, const char *path, int texId)
     else
         snprintf(filePath, sizeof(filePath), "%s.%s", path, "png");
 
-    return (texLoad(texture, filePath) >= 0) ? 0 : ERR_BAD_FILE;
+    result = texLoad(texture, filePath);
+    return (result >= 0) ? 0 : result;
 }
