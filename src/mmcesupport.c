@@ -310,7 +310,10 @@ void mmceLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
     else
         game = gAutoLaunchBDMGame;
 
-    (void)cacheAbortMmceImageLoadsTimed(MENU_MIN_INACTIVE_FRAMES);
+    if (!cacheAbortMmceImageLoadsTimed(MENU_MIN_INACTIVE_FRAMES)) {
+        cacheEnd(1);
+        cacheInit();
+    }
 
     void *irx = &mmce_cdvdman_irx;
     int irx_size = size_mmce_cdvdman_irx;

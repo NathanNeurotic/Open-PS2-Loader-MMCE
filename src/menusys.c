@@ -265,9 +265,12 @@ static config_set_t *menuLoadConfigDirectInternal(void)
     if (result != NULL || list == NULL || configId < 0)
         return result;
 
-    if (list->mode == MMCE_MODE)
-        (void)cacheAbortMmceImageLoadsTimed(MENU_MIN_INACTIVE_FRAMES);
-    else
+    if (list->mode == MMCE_MODE) {
+        if (!cacheAbortMmceImageLoadsTimed(MENU_MIN_INACTIVE_FRAMES)) {
+            cacheEnd(1);
+            cacheInit();
+        }
+    } else
         (void)cacheCancelPendingImageLoadsTimed(MENU_MIN_INACTIVE_FRAMES);
     loadedConfig = list->itemGetConfig(list, configId);
 

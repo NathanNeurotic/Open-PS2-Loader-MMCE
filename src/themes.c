@@ -1079,7 +1079,8 @@ static void clampSelectedCoverCaches(theme_t *theme, theme_elems_t *elems)
 
             if (gameImage != NULL && gameImage->cache != NULL && gameImage->cache->suffix != NULL && strcmp(gameImage->cache->suffix, "COV") == 0 &&
                 !isDecoratorCoverCache(theme->gamesItemsList, gameImage->cache) && !isDecoratorCoverCache(theme->appsItemsList, gameImage->cache)) {
-                gameImage->cache->count = 2;
+                if (gameImage->cache->count < 2)
+                    gameImage->cache->count = 2;
             }
         }
 
