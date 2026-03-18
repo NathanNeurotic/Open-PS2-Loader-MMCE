@@ -1044,10 +1044,16 @@ int cacheAbortMmceImageLoadsTimed(int timeoutTicks)
 {
     cacheLock();
 
-    if (gArtCurrentReq != NULL && cacheIsAbortableMmceRequest(gArtCurrentReq))
+    if (gArtCurrentReq != NULL && gArtCurrentReq->effectiveMode == MMCE_MODE)
         gArtCurrentReq->abortRequested = 1;
 
     for (load_image_request_t *req = gArtInteractiveReqList, *next; req != NULL; req = next) {
+        next = req->next;
+        if (req->effectiveMode == MMCE_MODE)
+            cacheDropQueuedRequestLocked(req);
+    }
+
+    for (load_image_request_t *req = gArtPrefetchReqList, *next; req != NULL; req = next) {
         next = req->next;
         if (req->effectiveMode == MMCE_MODE)
             cacheDropQueuedRequestLocked(req);
@@ -1061,7 +1067,7 @@ int cacheAbortMmceImageLoadsTimed(int timeoutTicks)
         int pending;
 
         cacheLock();
-        pending = cacheHasActiveInteractiveModeLocked(MMCE_MODE) || cacheHasQueuedInteractiveModeLocked(MMCE_MODE);
+        pending = gArtCurrentReq != NULL && gArtCurrentReq->effectiveMode == MMCE_MODE;
         cacheUnlock();
 
         if (!pending)
