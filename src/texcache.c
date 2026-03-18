@@ -1361,9 +1361,24 @@ static GSTEXTURE *cacheGetTextureInternal(image_cache_t *cache, item_list_t *lis
             return NULL;
         }
 
-        if (guiInactiveFrames < cacheGetInteractiveDelay(list, value)) {
-            cacheUnlock();
-            return NULL;
+        {
+            int delay = cacheGetInteractiveDelay(list, value);
+            /* In MMCE mode, give Cover art a 1-frame inactivity head start over
+             * other art types (Background, Screenshot, etc.).  The default theme
+             * draws Background (main0) before Cover (main5) every frame, so
+             * without this adjustment BG would always queue first and block COV
+             * with a potentially slow open() failure on cards that lack BG art.
+             * A single extra inactivity frame guarantees COV queues on frame N
+             * while BG/SCR are deferred to frame N+1, by which time COV is
+             * already in-flight and the MMCE one-at-a-time throttle keeps the
+             * others waiting naturally. */
+            if (effectiveMode == MMCE_MODE && cache->suffix != NULL &&
+                strcmp(cache->suffix, "COV") != 0)
+                delay++;
+            if (guiInactiveFrames < delay) {
+                cacheUnlock();
+                return NULL;
+            }
         }
     } else {
         if (list == NULL || effectiveMode == MMCE_MODE || guiInactiveFrames < cacheGetPrefetchDelay(list, value)) {
@@ -1404,20 +1419,8 @@ static GSTEXTURE *cacheGetTextureInternal(image_cache_t *cache, item_list_t *lis
     if (priority == CACHE_REQ_PRIORITY_INTERACTIVE && list != NULL && list->mode == MMCE_MODE && effectiveMode == MMCE_MODE) {
         load_image_request_t *queuedMmceReq = cacheFindQueuedInteractiveModeLocked(MMCE_MODE);
 
-        if (queuedMmceReq != NULL) {
-            /* Drop if the game changed, or if Cover art is requesting and the
-             * currently queued request is a non-Cover type for the same game.
-             * COV must load first so the user sees it without waiting for a
-             * slow BG/SCR open() that may fail.  Once COV is queued or active
-             * the throttle below blocks BG/SCR from re-queuing, preventing the
-             * cascade eviction that occurred with the original cache!=cache
-             * condition. */
-            int covPreempts = cache->suffix != NULL && strcmp(cache->suffix, "COV") == 0 &&
-                              (queuedMmceReq->cache->suffix == NULL ||
-                               strcmp(queuedMmceReq->cache->suffix, "COV") != 0);
-            if (strcmp(queuedMmceReq->value, value) != 0 || covPreempts)
-                cacheDropQueuedRequestLocked(queuedMmceReq);
-        }
+        if (queuedMmceReq != NULL && strcmp(queuedMmceReq->value, value) != 0)
+            cacheDropQueuedRequestLocked(queuedMmceReq);
 
         /* cacheHasActiveInteractiveModeLocked() checks gArtCurrentReq != NULL, so
          * dereferencing abortRequested is safe here while the cache lock is held. */
