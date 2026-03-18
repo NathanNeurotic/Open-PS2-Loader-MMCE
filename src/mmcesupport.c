@@ -29,7 +29,7 @@ static time_t mmceModifiedDVDPrev;
 static int mmceGameCount = 0;
 static base_game_info_t *mmceGames;
 
-#define MMCE_GAMEID_WAIT_TICKS    120
+#define MMCE_GAMEID_WAIT_TICKS 120
 
 // forward declaration
 static item_list_t mmceGameList;
