@@ -1077,16 +1077,13 @@ static void menuRenderElements(theme_elems_t *elems, int allowItemConfig, config
 void menuRenderMain(void)
 {
     item_list_t *list = selected_item->item->userdata;
-    int allowItemConfig = !(list != NULL && list->mode == MMCE_MODE);
-    config_set_t *renderConfig = allowItemConfig ? itemConfig : NULL;
-
-    thmSetMmceMainPageBrowseOnly(list != NULL && list->mode == MMCE_MODE);
+    config_set_t *renderConfig = itemConfig;
 
     if (list->mode == APP_MODE) {
-        menuRenderElements(&gTheme->appsMainElems, allowItemConfig, renderConfig);
+        menuRenderElements(&gTheme->appsMainElems, 1, renderConfig);
         gTheme->itemsList = gTheme->appsItemsList;
     } else {
-        menuRenderElements(&gTheme->mainElems, allowItemConfig, renderConfig);
+        menuRenderElements(&gTheme->mainElems, 1, renderConfig);
         gTheme->itemsList = gTheme->gamesItemsList;
     }
 }
@@ -1138,8 +1135,6 @@ void menuHandleInputMain()
 void menuRenderInfo(void)
 {
     item_list_t *list = selected_item->item->userdata;
-
-    thmSetMmceMainPageBrowseOnly(0);
 
     if (list->mode == APP_MODE) {
         menuRenderElements(&gTheme->appsInfoElems, 1, itemConfig);

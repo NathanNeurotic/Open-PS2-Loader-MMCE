@@ -264,8 +264,10 @@ static int cacheGetPrefetchLimit(const image_cache_t *cache)
 
 static int cacheShouldPreferLoadedVictim(const image_cache_t *cache, unsigned char priority, int effectiveMode)
 {
-    return cache != NULL && priority == CACHE_REQ_PRIORITY_INTERACTIVE && effectiveMode == MMCE_MODE &&
-           cache->suffix != NULL && strcmp(cache->suffix, "COV") == 0;
+    (void)cache;
+    (void)priority;
+    (void)effectiveMode;
+    return 0;
 }
 
 static int cacheGetEffectiveMode(const item_list_t *list, const char *value)
@@ -1303,7 +1305,7 @@ static GSTEXTURE *cacheGetTextureInternal(image_cache_t *cache, item_list_t *lis
             return NULL;
         }
     } else {
-        if (list == NULL || effectiveMode == MMCE_MODE || guiInactiveFrames < cacheGetPrefetchDelay(list, value)) {
+        if (list == NULL || guiInactiveFrames < cacheGetPrefetchDelay(list, value)) {
             cacheUnlock();
             return NULL;
         }
