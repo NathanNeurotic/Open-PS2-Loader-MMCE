@@ -178,8 +178,15 @@ static void _menuLoadConfig()
     if (blockingLoad)
         (void)cacheCancelPendingImageLoadsTimed(MENU_MIN_INACTIVE_FRAMES);
 
-    if (list != NULL)
+    if (list != NULL) {
+        if (list->mode == MMCE_MODE) {
+            if (!cacheAbortMmceImageLoadsTimed(MENU_MMCE_ART_ABORT_WAIT_TICKS)) {
+                cacheEnd(1);
+                cacheInit();
+            }
+        }
         loadedConfig = list->itemGetConfig(list, configId);
+    }
 
     WaitSema(menuSemaId);
     if (!itemConfig && loadedConfig != NULL && itemConfigId == configId)
