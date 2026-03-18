@@ -46,14 +46,15 @@ enum {
     CACHE_REQ_PRIORITY_PREFETCH
 };
 
-#define CACHE_SLOW_MODE_INTERACTIVE_DELAY 4
-#define CACHE_MMCE_INTERACTIVE_MAX_DELAY  12
-#define CACHE_APP_INTERACTIVE_MAX_DELAY   4
-#define CACHE_APP_PREFETCH_DELAY          10
-#define CACHE_PRIME_IDLE_DELAY            12
-#define CACHE_THREAD_PRIORITY             0x40
-#define CACHE_END_WAIT_TICKS_FORCE        120
-#define CACHE_END_WAIT_TICKS_SOFT         15
+#define CACHE_SLOW_MODE_INTERACTIVE_DELAY    4
+#define CACHE_MMCE_INTERACTIVE_MAX_DELAY     12
+#define CACHE_APP_INTERACTIVE_MAX_DELAY      4
+#define CACHE_APP_PREFETCH_DELAY             10
+#define CACHE_PRIME_IDLE_DELAY               12
+#define CACHE_THREAD_PRIORITY                0x40
+#define CACHE_MMCE_LOAD_THREAD_PRIORITY      90
+#define CACHE_END_WAIT_TICKS_FORCE           120
+#define CACHE_END_WAIT_TICKS_SOFT            15
 
 extern void *_gp;
 
@@ -116,6 +117,40 @@ static void cacheUnlock(void)
 {
     if (gArtSemaId >= 0)
         SignalSema(gArtSemaId);
+}
+
+/* Lower the calling thread's priority below CACHE_MMCE_LOAD_THREAD_PRIORITY so
+ * that the art worker thread (which runs at that priority during MMCE reads) can
+ * be scheduled and complete or respond to an abort request.  Without this, any
+ * higher-priority caller busy-waiting in the wait loops would starve the art
+ * thread, causing every timed abort to time out and eventually forcing
+ * TerminateThread, which kills the art thread mid-fileXio call and leaves the
+ * RPC channel in a broken state.
+ *
+ * Returns the caller's original priority (to be passed to cacheRestoreCallerPriority),
+ * or -1 if the priority was already low enough / could not be determined.
+ */
+static int cacheLowerCallerPriority(void)
+{
+    ee_thread_status_t status;
+    int callerPriority = -1;
+
+    memset(&status, 0, sizeof(status));
+    if (ReferThreadStatus(GetThreadId(), &status) == 0) {
+        callerPriority = status.current_priority;
+        if (callerPriority < CACHE_MMCE_LOAD_THREAD_PRIORITY + 1)
+            ChangeThreadPriority(GetThreadId(), CACHE_MMCE_LOAD_THREAD_PRIORITY + 1);
+        else
+            callerPriority = -1; /* already low enough, nothing to restore */
+    }
+
+    return callerPriority;
+}
+
+static void cacheRestoreCallerPriority(int savedPriority)
+{
+    if (savedPriority >= 0)
+        ChangeThreadPriority(GetThreadId(), savedPriority);
 }
 
 static void cacheRegister(image_cache_t *cache)
@@ -391,7 +426,7 @@ static int cacheGetLoadThreadPriority(const load_image_request_t *req)
 {
     if (req != NULL && req->list != NULL) {
         if (req->list->mode == MMCE_MODE && req->effectiveMode == MMCE_MODE)
-            return 90;
+            return CACHE_MMCE_LOAD_THREAD_PRIORITY;
 
         if (req->list->mode == APP_MODE)
             return 0x38;
@@ -596,8 +631,12 @@ static int cacheHasReadyEntriesLocked(void)
 
 static int cacheWaitForAllRequestsTimed(int timeoutTicks)
 {
+    int savedPriority;
+
     if (!gArtRunning)
         return 1;
+
+    savedPriority = cacheLowerCallerPriority();
 
     while (timeoutTicks != 0) {
         int pending;
@@ -606,19 +645,24 @@ static int cacheWaitForAllRequestsTimed(int timeoutTicks)
         pending = (gArtQueuedCount > 0) || (gArtActiveCount > 0);
         cacheUnlock();
 
-        if (!pending)
+        if (!pending) {
+            cacheRestoreCallerPriority(savedPriority);
             return 1;
+        }
 
         delay(1);
         if (timeoutTicks > 0)
             timeoutTicks--;
     }
 
+    cacheRestoreCallerPriority(savedPriority);
     return 0;
 }
 
 static void cacheWaitForCacheRequests(image_cache_t *cache)
 {
+    int savedPriority = cacheLowerCallerPriority();
+
     while (1) {
         int pending;
 
@@ -631,6 +675,8 @@ static void cacheWaitForCacheRequests(image_cache_t *cache)
 
         delay(1);
     }
+
+    cacheRestoreCallerPriority(savedPriority);
 }
 
 static load_image_request_t *cacheFindQueuedRequestLocked(image_cache_t *cache, char *value)
@@ -872,6 +918,7 @@ void cacheInit()
 void cacheEnd(int forceStop)
 {
     int waitTicks = forceStop ? CACHE_END_WAIT_TICKS_FORCE : CACHE_END_WAIT_TICKS_SOFT;
+    int savedPriority;
 
     if (!gArtRunning)
         return;
@@ -885,8 +932,10 @@ void cacheEnd(int forceStop)
     gArtTerminate = 1;
     WakeupThread(gArtThreadId);
 
+    savedPriority = cacheLowerCallerPriority();
     for (int i = 0; gArtRunning && i < waitTicks; i++)
         delay(1);
+    cacheRestoreCallerPriority(savedPriority);
 
     if (gArtRunning && gArtThreadId >= 0 && forceStop) {
         TerminateThread(gArtThreadId);
@@ -1039,6 +1088,8 @@ int cacheCancelPendingImageLoadsTimed(int timeoutTicks)
 
 int cacheAbortMmceImageLoadsTimed(int timeoutTicks)
 {
+    int savedPriority;
+
     cacheLock();
 
     if (gArtCurrentReq != NULL && cacheIsAbortableMmceRequest(gArtCurrentReq))
@@ -1054,6 +1105,8 @@ int cacheAbortMmceImageLoadsTimed(int timeoutTicks)
 
     cacheWakeWorker();
 
+    savedPriority = cacheLowerCallerPriority();
+
     while (timeoutTicks != 0) {
         int pending;
 
@@ -1061,14 +1114,17 @@ int cacheAbortMmceImageLoadsTimed(int timeoutTicks)
         pending = cacheHasActiveInteractiveModeLocked(MMCE_MODE) || cacheHasQueuedInteractiveModeLocked(MMCE_MODE);
         cacheUnlock();
 
-        if (!pending)
+        if (!pending) {
+            cacheRestoreCallerPriority(savedPriority);
             return 1;
+        }
 
         delay(1);
         if (timeoutTicks > 0)
             timeoutTicks--;
     }
 
+    cacheRestoreCallerPriority(savedPriority);
     return 0;
 }
 
