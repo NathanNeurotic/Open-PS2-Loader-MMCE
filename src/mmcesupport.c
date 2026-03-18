@@ -35,21 +35,6 @@ static base_game_info_t *mmceGames;
 // forward declaration
 static item_list_t mmceGameList;
 
-static int mmceHasArtFolder(const char *prefix)
-{
-    char path[sizeof(mmcePrefix) + 4];
-    struct stat st;
-
-    if (prefix == NULL || prefix[0] == '\0')
-        return 0;
-
-    snprintf(path, sizeof(path), "%sART", prefix);
-    if (stat(path, &st) != 0)
-        return 0;
-
-    return S_ISDIR(st.st_mode);
-}
-
 static void mmceGetDeviceRoot(char *root, size_t size)
 {
     const char *separator = strstr(mmcePrefix, ":/");
@@ -79,8 +64,7 @@ static void mmceGetDeviceRoot(char *root, size_t size)
 static void mmceRefreshArtRoots(void)
 {
     char deviceRoot[sizeof(mmcePrefix)];
-    int primaryHasArt;
-    int fallbackHasArt;
+    int len;
 
     mmceArtPrimary[0] = '\0';
     mmceArtFallback[0] = '\0';
@@ -88,25 +72,22 @@ static void mmceRefreshArtRoots(void)
     if (mmcePrefix[0] == '\0')
         return;
 
+    /* Ensure mmcePrefix always ends with '/' so path concatenation is correct
+     * (e.g. "mmce0:/CD" -> "mmce0:/CD/" prevents "mmce0:/CDART" paths). */
+    len = strlen(mmcePrefix);
+    if (len < (int)sizeof(mmcePrefix) - 1 && mmcePrefix[len - 1] != '/') {
+        mmcePrefix[len] = '/';
+        mmcePrefix[len + 1] = '\0';
+    }
+
     snprintf(mmceArtPrimary, sizeof(mmceArtPrimary), "%s", mmcePrefix);
 
+    /* Set a device-root fallback when games live in a sub-folder (e.g. mmce0:/CD/)
+     * so art placed at the device root (mmce0:/) is still found without blocking
+     * stat() calls to decide which path to prefer up-front. */
     mmceGetDeviceRoot(deviceRoot, sizeof(deviceRoot));
     if (deviceRoot[0] != '\0' && strcmp(deviceRoot, mmceArtPrimary) != 0)
         snprintf(mmceArtFallback, sizeof(mmceArtFallback), "%s", deviceRoot);
-
-    primaryHasArt = mmceHasArtFolder(mmceArtPrimary);
-    fallbackHasArt = mmceHasArtFolder(mmceArtFallback);
-    if (!primaryHasArt && fallbackHasArt) {
-        char primary[sizeof(mmceArtPrimary)];
-
-        snprintf(primary, sizeof(primary), "%s", mmceArtPrimary);
-        snprintf(mmceArtPrimary, sizeof(mmceArtPrimary), "%s", mmceArtFallback);
-        snprintf(mmceArtFallback, sizeof(mmceArtFallback), "%s", primary);
-        primaryHasArt = 1;
-    }
-
-    if (primaryHasArt || !fallbackHasArt)
-        mmceArtFallback[0] = '\0';
 }
 
 static int mmceTryLoadImage(const char *prefix, char *folder, int isRelative, char *value, char *suffix, GSTEXTURE *resultTex)
@@ -193,7 +174,7 @@ static int mmceNeedsUpdate(item_list_t *itemList)
     int result = 0;
     struct stat st;
 
-    //Hacky: check if slot was changed, update prefix if needed
+    // Hacky: check if slot was changed, update prefix if needed
     mmceSetPrefix();
 
     if (mmcePrefix[0] == '\0') {
@@ -418,7 +399,7 @@ void mmceLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
         strcpy(filename, game->startup);
 
 
-    //MMCEDRV settings
+    // MMCEDRV settings
     if (gMMCESlot == 0)
         settings->port = 2;
     else if (gMMCESlot == 1)
@@ -435,8 +416,8 @@ void mmceLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
     settings->ack_wait_cycles = gMMCEAckWaitCycles;
     settings->use_alarms = gMMCEUseAlarms;
 
-    //TEMP: The fd given by sd2psx is not the same one we see here on the EE
-    //and ps2sdk_get_iop_fd does not seem to return the right value either
+    // TEMP: The fd given by sd2psx is not the same one we see here on the EE
+    // and ps2sdk_get_iop_fd does not seem to return the right value either
     settings->iso_fd = fileXioIoctl2(iso_file, 0x80, NULL, 0, NULL, 0);
 
     LOG("name: %s\n", game->name);
@@ -464,8 +445,8 @@ void mmceLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
         }
     }
 
-    //mcReset();
-    //mcInit(MC_TYPE_XMC);
+    // mcReset();
+    // mcInit(MC_TYPE_XMC);
 
     if (gAutoLaunchBDMGame == NULL) {
         deinit(NO_EXCEPTION, MMCE_MODE); // CAREFUL: deinit will call mmceCleanUp, so mmceGames/game will be freed
@@ -540,7 +521,7 @@ static void mmceShutdown(item_list_t *itemList)
     }
 
     // As required by some (typically 2.5") HDDs, issue the SCSI STOP UNIT command to avoid causing an emergency park.
-    //fileXioDevctl("mass:", USBMASS_DEVCTL_STOP_ALL, NULL, 0, NULL, 0);
+    // fileXioDevctl("mass:", USBMASS_DEVCTL_STOP_ALL, NULL, 0, NULL, 0);
 }
 
 static int mmceCheckVMC(item_list_t *itemList, char *name, int createSize)
@@ -561,7 +542,7 @@ static item_list_t mmceGameList = {
 void mmceInitSemaphore()
 {
     // Create a semaphore so only one thread can load IOP modules at a time.
-    //if (mmceLoadModuleLock < 0) {
+    // if (mmceLoadModuleLock < 0) {
     //    mmceLoadModuleLock = sbCreateSemaphore();
     //}
 }

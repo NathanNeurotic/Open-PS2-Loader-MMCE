@@ -1344,7 +1344,10 @@ static GSTEXTURE *cacheGetTextureInternal(image_cache_t *cache, item_list_t *lis
         if (queuedMmceReq != NULL && (queuedMmceReq->cache != cache || strcmp(queuedMmceReq->value, value) != 0))
             cacheDropQueuedRequestLocked(queuedMmceReq);
 
-        if (cacheHasActiveInteractiveModeLocked(MMCE_MODE) || cacheHasQueuedInteractiveModeLocked(MMCE_MODE)) {
+        /* cacheHasActiveInteractiveModeLocked() checks gArtCurrentReq != NULL, so
+         * dereferencing abortRequested is safe here while the cache lock is held. */
+        if ((cacheHasActiveInteractiveModeLocked(MMCE_MODE) && !gArtCurrentReq->abortRequested) ||
+            cacheHasQueuedInteractiveModeLocked(MMCE_MODE)) {
             cacheUnlock();
             return NULL;
         }
