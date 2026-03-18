@@ -29,7 +29,12 @@ static int mmceGameCount = 0;
 static base_game_info_t *mmceGames;
 
 #define MMCE_GAMEID_WAIT_TICKS    120
-#define MMCE_ART_ABORT_WAIT_TICKS 60
+/* Allow up to 500 ms for the art thread to drain before resorting to
+ * TerminateThread.  The MMCE worker checks the abort flag between every
+ * 4 KB read chunk (~16 ms at typical card speeds), so 500 ms covers
+ * even very slow cards and avoids the fileXio RPC corruption that
+ * TerminateThread can cause mid-read. */
+#define MMCE_ART_ABORT_WAIT_TICKS 500
 
 // forward declaration
 static item_list_t mmceGameList;

@@ -81,7 +81,6 @@ static s32 menuSemaId;
 static s32 menuListSemaId = -1;
 static ee_sema_t menuSema;
 
-#define MENU_MMCE_ART_ABORT_WAIT_TICKS 60
 #define MENU_MMCE_CONFIG_IDLE_FRAMES   20
 
 static void menuInvalidateArtSelection(void)
@@ -269,10 +268,14 @@ static config_set_t *menuLoadConfigDirectInternal(void)
         return result;
 
     if (list->mode == MMCE_MODE) {
-        if (!cacheAbortMmceImageLoadsTimed(MENU_MMCE_ART_ABORT_WAIT_TICKS)) {
-            cacheEnd(1);
-            cacheInit();
-        }
+        /* Signal the art loader to abort, but do not block waiting for it to
+         * drain.  The MMCE config read that follows will simply be serialised
+         * behind the current art chunk in the IOP queue (typically ≤ 20 ms).
+         * A blocking wait here froze navigation for up to 60 ms on every
+         * CROSS/CIRCLE press and – if the abort timed out – triggered a
+         * TerminateThread that corrupted the fileXio RPC channel, causing art
+         * to stop loading for the rest of the session. */
+        cacheAbortMmceImageLoadsTimed(0);
     } else
         (void)cacheCancelPendingImageLoadsTimed(MENU_MIN_INACTIVE_FRAMES);
     loadedConfig = list->itemGetConfig(list, configId);
