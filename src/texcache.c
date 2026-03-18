@@ -1404,7 +1404,7 @@ static GSTEXTURE *cacheGetTextureInternal(image_cache_t *cache, item_list_t *lis
     if (priority == CACHE_REQ_PRIORITY_INTERACTIVE && list != NULL && list->mode == MMCE_MODE && effectiveMode == MMCE_MODE) {
         load_image_request_t *queuedMmceReq = cacheFindQueuedInteractiveModeLocked(MMCE_MODE);
 
-        if (queuedMmceReq != NULL && (queuedMmceReq->cache != cache || strcmp(queuedMmceReq->value, value) != 0))
+        if (queuedMmceReq != NULL && strcmp(queuedMmceReq->value, value) != 0)
             cacheDropQueuedRequestLocked(queuedMmceReq);
 
         /* cacheHasActiveInteractiveModeLocked() checks gArtCurrentReq != NULL, so
