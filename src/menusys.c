@@ -1083,8 +1083,6 @@ void menuRenderMain(void)
     int allowItemConfig = !(list != NULL && list->mode == MMCE_MODE);
     config_set_t *renderConfig = allowItemConfig ? itemConfig : NULL;
 
-    thmSetMmceMainPageBrowseOnly(list != NULL && list->mode == MMCE_MODE);
-
     if (list->mode == APP_MODE) {
         menuRenderElements(&gTheme->appsMainElems, allowItemConfig, renderConfig);
         gTheme->itemsList = gTheme->appsItemsList;
@@ -1141,8 +1139,6 @@ void menuHandleInputMain()
 void menuRenderInfo(void)
 {
     item_list_t *list = selected_item->item->userdata;
-
-    thmSetMmceMainPageBrowseOnly(0);
 
     if (list->mode == APP_MODE) {
         menuRenderElements(&gTheme->appsInfoElems, 1, itemConfig);

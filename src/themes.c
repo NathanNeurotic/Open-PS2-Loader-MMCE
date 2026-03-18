@@ -24,7 +24,6 @@ theme_t *gTheme;
 static int screenWidth;
 static int screenHeight;
 static int guiThemeID = 0;
-static int gMmceMainPageBrowseOnly = 0;
 
 static int nThemes = 0;
 static theme_file_t themes[THM_MAX_FILES];
@@ -557,11 +556,6 @@ static GSTEXTURE *getGameImageTexture(image_cache_t *cache, void *support, struc
     return NULL;
 }
 
-void thmSetMmceMainPageBrowseOnly(int enabled)
-{
-    gMmceMainPageBrowseOnly = enabled;
-}
-
 static int canPrefetchAdjacentGameImages(image_cache_t *cache, item_list_t *list, GSTEXTURE *selectedTexture)
 {
     if (cache == NULL || list == NULL || selectedTexture == NULL || selectedTexture->Mem == NULL)
@@ -621,11 +615,7 @@ static void drawGameImage(struct menu_list *menu, struct submenu_list *item, con
         GSTEXTURE *texture;
         list = (item_list_t *)menu->item->userdata;
 
-        if (list != NULL && list->mode == MMCE_MODE && gMmceMainPageBrowseOnly && gameImage->cache != NULL &&
-            gameImage->cache->suffix != NULL && strcmp(gameImage->cache->suffix, "COV") != 0) {
-            texture = cacheGetTextureIfReady(gameImage->cache, &item->item.cache_id[gameImage->cache->userId], &item->item.cache_uid[gameImage->cache->userId]);
-        } else
-            texture = getGameImageTexture(gameImage->cache, menu->item->userdata, &item->item);
+        texture = getGameImageTexture(gameImage->cache, menu->item->userdata, &item->item);
 
         if (gameImage->cache != NULL && gameImage->cache->suffix != NULL && strcmp(gameImage->cache->suffix, "COV") == 0 &&
             canPrefetchAdjacentGameImages(gameImage->cache, list, texture)) {
