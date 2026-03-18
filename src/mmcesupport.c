@@ -192,7 +192,7 @@ static int mmceNeedsUpdate(item_list_t *itemList)
     int result = 0;
     struct stat st;
 
-    //Hacky: check if slot was changed, update prefix if needed
+    // Hacky: check if slot was changed, update prefix if needed
     mmceSetPrefix();
 
     if (mmcePrefix[0] == '\0') {
@@ -412,7 +412,7 @@ void mmceLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
         strcpy(filename, game->startup);
 
 
-    //MMCEDRV settings
+    // MMCEDRV settings
     if (gMMCESlot == 0)
         settings->port = 2;
     else if (gMMCESlot == 1)
@@ -429,8 +429,8 @@ void mmceLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
     settings->ack_wait_cycles = gMMCEAckWaitCycles;
     settings->use_alarms = gMMCEUseAlarms;
 
-    //TEMP: The fd given by sd2psx is not the same one we see here on the EE
-    //and ps2sdk_get_iop_fd does not seem to return the right value either
+    // TEMP: The fd given by sd2psx is not the same one we see here on the EE
+    // and ps2sdk_get_iop_fd does not seem to return the right value either
     settings->iso_fd = fileXioIoctl2(iso_file, 0x80, NULL, 0, NULL, 0);
 
     LOG("name: %s\n", game->name);
@@ -458,8 +458,8 @@ void mmceLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
         }
     }
 
-    //mcReset();
-    //mcInit(MC_TYPE_XMC);
+    // mcReset();
+    // mcInit(MC_TYPE_XMC);
 
     if (gAutoLaunchBDMGame == NULL) {
         deinit(NO_EXCEPTION, MMCE_MODE); // CAREFUL: deinit will call mmceCleanUp, so mmceGames/game will be freed
@@ -534,7 +534,7 @@ static void mmceShutdown(item_list_t *itemList)
     }
 
     // As required by some (typically 2.5") HDDs, issue the SCSI STOP UNIT command to avoid causing an emergency park.
-    //fileXioDevctl("mass:", USBMASS_DEVCTL_STOP_ALL, NULL, 0, NULL, 0);
+    // fileXioDevctl("mass:", USBMASS_DEVCTL_STOP_ALL, NULL, 0, NULL, 0);
 }
 
 static int mmceCheckVMC(item_list_t *itemList, char *name, int createSize)
@@ -555,7 +555,7 @@ static item_list_t mmceGameList = {
 void mmceInitSemaphore()
 {
     // Create a semaphore so only one thread can load IOP modules at a time.
-    //if (mmceLoadModuleLock < 0) {
+    // if (mmceLoadModuleLock < 0) {
     //    mmceLoadModuleLock = sbCreateSemaphore();
     //}
 }
