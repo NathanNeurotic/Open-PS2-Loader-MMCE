@@ -1404,8 +1404,20 @@ static GSTEXTURE *cacheGetTextureInternal(image_cache_t *cache, item_list_t *lis
     if (priority == CACHE_REQ_PRIORITY_INTERACTIVE && list != NULL && list->mode == MMCE_MODE && effectiveMode == MMCE_MODE) {
         load_image_request_t *queuedMmceReq = cacheFindQueuedInteractiveModeLocked(MMCE_MODE);
 
-        if (queuedMmceReq != NULL && strcmp(queuedMmceReq->value, value) != 0)
-            cacheDropQueuedRequestLocked(queuedMmceReq);
+        if (queuedMmceReq != NULL) {
+            /* Drop if the game changed, or if Cover art is requesting and the
+             * currently queued request is a non-Cover type for the same game.
+             * COV must load first so the user sees it without waiting for a
+             * slow BG/SCR open() that may fail.  Once COV is queued or active
+             * the throttle below blocks BG/SCR from re-queuing, preventing the
+             * cascade eviction that occurred with the original cache!=cache
+             * condition. */
+            int covPreempts = cache->suffix != NULL && strcmp(cache->suffix, "COV") == 0 &&
+                              (queuedMmceReq->cache->suffix == NULL ||
+                               strcmp(queuedMmceReq->cache->suffix, "COV") != 0);
+            if (strcmp(queuedMmceReq->value, value) != 0 || covPreempts)
+                cacheDropQueuedRequestLocked(queuedMmceReq);
+        }
 
         /* cacheHasActiveInteractiveModeLocked() checks gArtCurrentReq != NULL, so
          * dereferencing abortRequested is safe here while the cache lock is held. */
