@@ -81,7 +81,7 @@ static s32 menuSemaId;
 static s32 menuListSemaId = -1;
 static ee_sema_t menuSema;
 
-#define MENU_MMCE_CONFIG_IDLE_FRAMES 20
+#define MENU_MMCE_CONFIG_IDLE_FRAMES   20
 
 static void menuInvalidateArtSelection(void)
 {

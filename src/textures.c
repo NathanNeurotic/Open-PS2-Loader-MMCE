@@ -358,7 +358,7 @@ static void texReadFileFunction(png_structp pngPtr, png_bytep data, png_size_t l
 
 static int texShouldUseMemoryReader(const char *filePath)
 {
-    return filePath != NULL && (!strncmp(filePath, "mmce0:", 6) || !strncmp(filePath, "mmce1:", 6));
+    return 0;
 }
 
 static int texStageExternalFileIntoMemory(int fd, void **buffer)

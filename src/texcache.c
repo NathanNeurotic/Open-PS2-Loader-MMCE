@@ -1024,7 +1024,6 @@ int cacheCancelPendingImageLoadsTimed(int timeoutTicks)
     return cacheWaitForAllRequestsTimed(timeoutTicks);
 }
 
-
 void cacheAdvanceGeneration(void)
 {
     cacheLock();
@@ -1290,7 +1289,6 @@ static GSTEXTURE *cacheGetTextureInternal(image_cache_t *cache, item_list_t *lis
         cacheUnlock();
         return NULL;
     }
-
 
     if (priority == CACHE_REQ_PRIORITY_PREFETCH && cache->queuedPrefetchRequests >= cacheGetPrefetchLimit(cache)) {
         cacheUnlock();

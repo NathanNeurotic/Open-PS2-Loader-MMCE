@@ -72,7 +72,6 @@ void cacheCancelPendingImageLoads(void);
  */
 int cacheCancelPendingImageLoadsTimed(int timeoutTicks);
 
-
 /** Invalidates queued art loads without blocking on the IO worker.
  */
 void cacheAdvanceGeneration(void);
