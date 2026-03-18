@@ -30,7 +30,6 @@ static int mmceGameCount = 0;
 static base_game_info_t *mmceGames;
 
 #define MMCE_GAMEID_WAIT_TICKS    120
-#define MMCE_ART_ABORT_WAIT_TICKS 60
 
 // forward declaration
 static item_list_t mmceGameList;
@@ -310,11 +309,6 @@ void mmceLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
         game = &mmceGames[id];
     else
         game = gAutoLaunchBDMGame;
-
-    if (!cacheAbortMmceImageLoadsTimed(MMCE_ART_ABORT_WAIT_TICKS)) {
-        cacheEnd(1);
-        cacheInit();
-    }
 
     void *irx = &mmce_cdvdman_irx;
     int irx_size = size_mmce_cdvdman_irx;

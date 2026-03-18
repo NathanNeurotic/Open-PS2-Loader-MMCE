@@ -47,7 +47,6 @@ enum {
 };
 
 #define CACHE_SLOW_MODE_INTERACTIVE_DELAY 4
-#define CACHE_MMCE_INTERACTIVE_MAX_DELAY  12
 #define CACHE_APP_INTERACTIVE_MAX_DELAY   4
 #define CACHE_APP_PREFETCH_DELAY          10
 #define CACHE_PRIME_IDLE_DELAY            12
@@ -264,8 +263,7 @@ static int cacheGetPrefetchLimit(const image_cache_t *cache)
 
 static int cacheShouldPreferLoadedVictim(const image_cache_t *cache, unsigned char priority, int effectiveMode)
 {
-    return cache != NULL && priority == CACHE_REQ_PRIORITY_INTERACTIVE && effectiveMode == MMCE_MODE &&
-           cache->suffix != NULL && strcmp(cache->suffix, "COV") == 0;
+    return 0;
 }
 
 static int cacheGetEffectiveMode(const item_list_t *list, const char *value)
@@ -304,14 +302,11 @@ static int cacheGetInteractiveDelay(const item_list_t *list, const char *value)
             return 0;
     }
 
-    if ((mode == APP_MODE || mode == MMCE_MODE) && delay < CACHE_SLOW_MODE_INTERACTIVE_DELAY)
+    if (mode == APP_MODE && delay < CACHE_SLOW_MODE_INTERACTIVE_DELAY)
         delay = CACHE_SLOW_MODE_INTERACTIVE_DELAY;
 
     if (list != NULL && list->mode == APP_MODE && delay > CACHE_APP_INTERACTIVE_MAX_DELAY)
         delay = CACHE_APP_INTERACTIVE_MAX_DELAY;
-
-    if (mode == MMCE_MODE && delay > CACHE_MMCE_INTERACTIVE_MAX_DELAY)
-        delay = CACHE_MMCE_INTERACTIVE_MAX_DELAY;
 
     return delay;
 }
@@ -363,12 +358,12 @@ static load_image_request_t *cacheFindQueuedInteractiveModeLocked(int mode)
 
 static int cacheIsAbortableMmceRequest(load_image_request_t *req)
 {
-    return req != NULL && req->priority == CACHE_REQ_PRIORITY_INTERACTIVE && req->effectiveMode == MMCE_MODE;
+    return 0;
 }
 
 static int cacheShouldDiscardCompletedRequestLocked(load_image_request_t *req)
 {
-    return cacheIsAbortableMmceRequest(req) && req->generation != gCacheGeneration;
+    return 0;
 }
 
 static int cacheIsNavigationActive(void)
@@ -379,20 +374,12 @@ static int cacheIsNavigationActive(void)
 
 static int cacheShouldDeferInteractiveArtOnInput(const item_list_t *list, const char *value)
 {
-    int effectiveMode = cacheGetEffectiveMode(list, value);
-
-    if (list != NULL && list->mode == MMCE_MODE && effectiveMode == MMCE_MODE)
-        return cacheIsNavigationActive();
-
     return 0;
 }
 
 static int cacheGetLoadThreadPriority(const load_image_request_t *req)
 {
     if (req != NULL && req->list != NULL) {
-        if (req->list->mode == MMCE_MODE && req->effectiveMode == MMCE_MODE)
-            return 90;
-
         if (req->list->mode == APP_MODE)
             return 0x38;
     }
@@ -1037,40 +1024,6 @@ int cacheCancelPendingImageLoadsTimed(int timeoutTicks)
     return cacheWaitForAllRequestsTimed(timeoutTicks);
 }
 
-int cacheAbortMmceImageLoadsTimed(int timeoutTicks)
-{
-    cacheLock();
-
-    if (gArtCurrentReq != NULL && cacheIsAbortableMmceRequest(gArtCurrentReq))
-        gArtCurrentReq->abortRequested = 1;
-
-    for (load_image_request_t *req = gArtInteractiveReqList, *next; req != NULL; req = next) {
-        next = req->next;
-        if (req->effectiveMode == MMCE_MODE)
-            cacheDropQueuedRequestLocked(req);
-    }
-
-    cacheUnlock();
-
-    cacheWakeWorker();
-
-    while (timeoutTicks != 0) {
-        int pending;
-
-        cacheLock();
-        pending = cacheHasActiveInteractiveModeLocked(MMCE_MODE) || cacheHasQueuedInteractiveModeLocked(MMCE_MODE);
-        cacheUnlock();
-
-        if (!pending)
-            return 1;
-
-        delay(1);
-        if (timeoutTicks > 0)
-            timeoutTicks--;
-    }
-
-    return 0;
-}
 
 void cacheAdvanceGeneration(void)
 {
@@ -1303,7 +1256,7 @@ static GSTEXTURE *cacheGetTextureInternal(image_cache_t *cache, item_list_t *lis
             return NULL;
         }
     } else {
-        if (list == NULL || effectiveMode == MMCE_MODE || guiInactiveFrames < cacheGetPrefetchDelay(list, value)) {
+        if (list == NULL || guiInactiveFrames < cacheGetPrefetchDelay(list, value)) {
             cacheUnlock();
             return NULL;
         }
@@ -1338,17 +1291,6 @@ static GSTEXTURE *cacheGetTextureInternal(image_cache_t *cache, item_list_t *lis
         return NULL;
     }
 
-    if (priority == CACHE_REQ_PRIORITY_INTERACTIVE && list != NULL && list->mode == MMCE_MODE && effectiveMode == MMCE_MODE) {
-        load_image_request_t *queuedMmceReq = cacheFindQueuedInteractiveModeLocked(MMCE_MODE);
-
-        if (queuedMmceReq != NULL && (queuedMmceReq->cache != cache || strcmp(queuedMmceReq->value, value) != 0))
-            cacheDropQueuedRequestLocked(queuedMmceReq);
-
-        if (cacheHasActiveInteractiveModeLocked(MMCE_MODE) || cacheHasQueuedInteractiveModeLocked(MMCE_MODE)) {
-            cacheUnlock();
-            return NULL;
-        }
-    }
 
     if (priority == CACHE_REQ_PRIORITY_PREFETCH && cache->queuedPrefetchRequests >= cacheGetPrefetchLimit(cache)) {
         cacheUnlock();
