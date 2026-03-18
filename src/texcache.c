@@ -957,6 +957,13 @@ void cacheEnd(int forceStop)
     if (gArtCurrentReq != NULL) {
         load_image_request_t *req = gArtCurrentReq;
         gArtCurrentReq = NULL;
+        /* If the art thread was TerminateThread'd while holding this request,
+         * its cache entry is still in CACHE_ENTRY_LOADING with entry->qr
+         * pointing to req (about to be freed).  Clear it now so the slot is
+         * returned to the LRU pool and the dangling pointer can't cause
+         * use-after-free in future cacheInvalidateEntryLocked calls. */
+        if (req->entry != NULL && req->entry->qr == req)
+            cacheClearItem(req->entry, 0);
         cacheFinalizeRequestLocked(req);
         cacheFreeRequest(req);
     }
