@@ -22,7 +22,6 @@
 
 static char mmcePrefix[40]; // Contains the full path to the folder where all the games are.
 static char mmceArtPrimary[40];
-static char mmceArtFallback[40];
 static int mmceULSizePrev = -2;
 static time_t mmceModifiedCDPrev;
 static time_t mmceModifiedDVDPrev;
@@ -63,11 +62,9 @@ static void mmceGetDeviceRoot(char *root, size_t size)
 
 static void mmceRefreshArtRoots(void)
 {
-    char deviceRoot[sizeof(mmcePrefix)];
     int len;
 
     mmceArtPrimary[0] = '\0';
-    mmceArtFallback[0] = '\0';
 
     if (mmcePrefix[0] == '\0')
         return;
@@ -81,13 +78,6 @@ static void mmceRefreshArtRoots(void)
     }
 
     snprintf(mmceArtPrimary, sizeof(mmceArtPrimary), "%s", mmcePrefix);
-
-    /* Set a device-root fallback when games live in a sub-folder (e.g. mmce0:/CD/)
-     * so art placed at the device root (mmce0:/) is still found without blocking
-     * stat() calls to decide which path to prefer up-front. */
-    mmceGetDeviceRoot(deviceRoot, sizeof(deviceRoot));
-    if (deviceRoot[0] != '\0' && strcmp(deviceRoot, mmceArtPrimary) != 0)
-        snprintf(mmceArtFallback, sizeof(mmceArtFallback), "%s", deviceRoot);
 }
 
 static int mmceTryLoadImage(const char *prefix, char *folder, int isRelative, char *value, char *suffix, GSTEXTURE *resultTex)
@@ -142,7 +132,6 @@ void mmceInit(item_list_t *itemList)
     LOG("MMCESUPPORT Init\n");
     mmcePrefix[0] = '\0';
     mmceArtPrimary[0] = '\0';
-    mmceArtFallback[0] = '\0';
     mmceULSizePrev = -2;
     mmceModifiedCDPrev = 0;
     mmceModifiedDVDPrev = 0;
@@ -472,16 +461,7 @@ static config_set_t *mmceGetConfig(item_list_t *itemList, int id)
 
 static int mmceGetImage(item_list_t *itemList, char *folder, int isRelative, char *value, char *suffix, GSTEXTURE *resultTex, short psm)
 {
-    int result;
-
-    result = mmceTryLoadImage(mmceArtPrimary, folder, isRelative, value, suffix, resultTex);
-    if (result >= 0 || result == ERR_LOAD_ABORTED || !isRelative)
-        return result;
-
-    if (mmceArtFallback[0] != '\0')
-        return mmceTryLoadImage(mmceArtFallback, folder, isRelative, value, suffix, resultTex);
-
-    return result;
+    return mmceTryLoadImage(mmceArtPrimary, folder, isRelative, value, suffix, resultTex);
 }
 
 static int mmceGetTextId(item_list_t *itemList)
