@@ -348,7 +348,7 @@ static int cacheHasQueuedInteractiveModeLocked(int mode)
 
 static int cacheHasActiveInteractiveModeLocked(int mode)
 {
-    return gArtCurrentReq != NULL && gArtCurrentReq->priority == CACHE_REQ_PRIORITY_INTERACTIVE && gArtCurrentReq->effectiveMode == mode;
+    return gArtCurrentReq != NULL && gArtCurrentReq->priority == CACHE_REQ_PRIORITY_INTERACTIVE && gArtCurrentReq->effectiveMode == mode && !gArtCurrentReq->abortRequested;
 }
 
 static load_image_request_t *cacheFindQueuedInteractiveModeLocked(int mode)
@@ -370,7 +370,8 @@ static int cacheIsAbortableMmceRequest(load_image_request_t *req)
 
 static int cacheShouldDiscardCompletedRequestLocked(load_image_request_t *req)
 {
-    return cacheIsAbortableMmceRequest(req) && req->generation != gCacheGeneration;
+    (void)req;
+    return 0;
 }
 
 static int cacheIsNavigationActive(void)
