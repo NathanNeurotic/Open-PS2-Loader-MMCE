@@ -22,7 +22,6 @@
 
 static char mmcePrefix[40]; // Contains the full path to the folder where all the games are.
 static char mmceArtPrimary[40];
-static char mmceArtFallback[40];
 static int mmceULSizePrev = -2;
 static time_t mmceModifiedCDPrev;
 static time_t mmceModifiedDVDPrev;
@@ -30,25 +29,15 @@ static int mmceGameCount = 0;
 static base_game_info_t *mmceGames;
 
 #define MMCE_GAMEID_WAIT_TICKS    120
-#define MMCE_ART_ABORT_WAIT_TICKS 60
+/* Allow up to 500 ms for the art thread to drain before resorting to
+ * TerminateThread.  The MMCE worker checks the abort flag between every
+ * 4 KB read chunk (~16 ms at typical card speeds), so 500 ms covers
+ * even very slow cards and avoids the fileXio RPC corruption that
+ * TerminateThread can cause mid-read. */
+#define MMCE_ART_ABORT_WAIT_TICKS 500
 
 // forward declaration
 static item_list_t mmceGameList;
-
-static int mmceHasArtFolder(const char *prefix)
-{
-    char path[sizeof(mmcePrefix) + 4];
-    struct stat st;
-
-    if (prefix == NULL || prefix[0] == '\0')
-        return 0;
-
-    snprintf(path, sizeof(path), "%sART", prefix);
-    if (stat(path, &st) != 0)
-        return 0;
-
-    return S_ISDIR(st.st_mode);
-}
 
 static void mmceGetDeviceRoot(char *root, size_t size)
 {
@@ -78,35 +67,22 @@ static void mmceGetDeviceRoot(char *root, size_t size)
 
 static void mmceRefreshArtRoots(void)
 {
-    char deviceRoot[sizeof(mmcePrefix)];
-    int primaryHasArt;
-    int fallbackHasArt;
+    int len;
 
     mmceArtPrimary[0] = '\0';
-    mmceArtFallback[0] = '\0';
 
     if (mmcePrefix[0] == '\0')
         return;
 
-    snprintf(mmceArtPrimary, sizeof(mmceArtPrimary), "%s", mmcePrefix);
-
-    mmceGetDeviceRoot(deviceRoot, sizeof(deviceRoot));
-    if (deviceRoot[0] != '\0' && strcmp(deviceRoot, mmceArtPrimary) != 0)
-        snprintf(mmceArtFallback, sizeof(mmceArtFallback), "%s", deviceRoot);
-
-    primaryHasArt = mmceHasArtFolder(mmceArtPrimary);
-    fallbackHasArt = mmceHasArtFolder(mmceArtFallback);
-    if (!primaryHasArt && fallbackHasArt) {
-        char primary[sizeof(mmceArtPrimary)];
-
-        snprintf(primary, sizeof(primary), "%s", mmceArtPrimary);
-        snprintf(mmceArtPrimary, sizeof(mmceArtPrimary), "%s", mmceArtFallback);
-        snprintf(mmceArtFallback, sizeof(mmceArtFallback), "%s", primary);
-        primaryHasArt = 1;
+    /* Ensure mmcePrefix always ends with '/' so path concatenation is correct
+     * (e.g. "mmce0:/CD" -> "mmce0:/CD/" prevents "mmce0:/CDART" paths). */
+    len = strlen(mmcePrefix);
+    if (len < (int)sizeof(mmcePrefix) - 1 && mmcePrefix[len - 1] != '/') {
+        mmcePrefix[len] = '/';
+        mmcePrefix[len + 1] = '\0';
     }
 
-    if (primaryHasArt || !fallbackHasArt)
-        mmceArtFallback[0] = '\0';
+    snprintf(mmceArtPrimary, sizeof(mmceArtPrimary), "%s", mmcePrefix);
 }
 
 static int mmceTryLoadImage(const char *prefix, char *folder, int isRelative, char *value, char *suffix, GSTEXTURE *resultTex)
@@ -161,7 +137,6 @@ void mmceInit(item_list_t *itemList)
     LOG("MMCESUPPORT Init\n");
     mmcePrefix[0] = '\0';
     mmceArtPrimary[0] = '\0';
-    mmceArtFallback[0] = '\0';
     mmceULSizePrev = -2;
     mmceModifiedCDPrev = 0;
     mmceModifiedDVDPrev = 0;
@@ -193,7 +168,7 @@ static int mmceNeedsUpdate(item_list_t *itemList)
     int result = 0;
     struct stat st;
 
-    //Hacky: check if slot was changed, update prefix if needed
+    // Hacky: check if slot was changed, update prefix if needed
     mmceSetPrefix();
 
     if (mmcePrefix[0] == '\0') {
@@ -418,7 +393,7 @@ void mmceLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
         strcpy(filename, game->startup);
 
 
-    //MMCEDRV settings
+    // MMCEDRV settings
     if (gMMCESlot == 0)
         settings->port = 2;
     else if (gMMCESlot == 1)
@@ -435,8 +410,8 @@ void mmceLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
     settings->ack_wait_cycles = gMMCEAckWaitCycles;
     settings->use_alarms = gMMCEUseAlarms;
 
-    //TEMP: The fd given by sd2psx is not the same one we see here on the EE
-    //and ps2sdk_get_iop_fd does not seem to return the right value either
+    // TEMP: The fd given by sd2psx is not the same one we see here on the EE
+    // and ps2sdk_get_iop_fd does not seem to return the right value either
     settings->iso_fd = fileXioIoctl2(iso_file, 0x80, NULL, 0, NULL, 0);
 
     LOG("name: %s\n", game->name);
@@ -464,8 +439,8 @@ void mmceLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
         }
     }
 
-    //mcReset();
-    //mcInit(MC_TYPE_XMC);
+    // mcReset();
+    // mcInit(MC_TYPE_XMC);
 
     if (gAutoLaunchBDMGame == NULL) {
         deinit(NO_EXCEPTION, MMCE_MODE); // CAREFUL: deinit will call mmceCleanUp, so mmceGames/game will be freed
@@ -491,16 +466,7 @@ static config_set_t *mmceGetConfig(item_list_t *itemList, int id)
 
 static int mmceGetImage(item_list_t *itemList, char *folder, int isRelative, char *value, char *suffix, GSTEXTURE *resultTex, short psm)
 {
-    int result;
-
-    result = mmceTryLoadImage(mmceArtPrimary, folder, isRelative, value, suffix, resultTex);
-    if (result >= 0 || result == ERR_LOAD_ABORTED || !isRelative)
-        return result;
-
-    if (mmceArtFallback[0] != '\0')
-        return mmceTryLoadImage(mmceArtFallback, folder, isRelative, value, suffix, resultTex);
-
-    return result;
+    return mmceTryLoadImage(mmceArtPrimary, folder, isRelative, value, suffix, resultTex);
 }
 
 static int mmceGetTextId(item_list_t *itemList)
@@ -540,7 +506,7 @@ static void mmceShutdown(item_list_t *itemList)
     }
 
     // As required by some (typically 2.5") HDDs, issue the SCSI STOP UNIT command to avoid causing an emergency park.
-    //fileXioDevctl("mass:", USBMASS_DEVCTL_STOP_ALL, NULL, 0, NULL, 0);
+    // fileXioDevctl("mass:", USBMASS_DEVCTL_STOP_ALL, NULL, 0, NULL, 0);
 }
 
 static int mmceCheckVMC(item_list_t *itemList, char *name, int createSize)
@@ -561,7 +527,7 @@ static item_list_t mmceGameList = {
 void mmceInitSemaphore()
 {
     // Create a semaphore so only one thread can load IOP modules at a time.
-    //if (mmceLoadModuleLock < 0) {
+    // if (mmceLoadModuleLock < 0) {
     //    mmceLoadModuleLock = sbCreateSemaphore();
     //}
 }
