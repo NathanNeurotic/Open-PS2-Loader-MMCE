@@ -85,15 +85,27 @@ static ee_sema_t menuSema;
 
 static void menuInvalidateArtSelection(void)
 {
-    cacheAdvanceGeneration();
+    item_list_t *support = selected_item != NULL ? (item_list_t *)selected_item->item->userdata : NULL;
+
+    /* For MMCE, preserve any already-READY art so it remains primeable (VRAM
+     * pre-upload via cachePrimeReadyTexture).  In-flight and queued MMCE IO is
+     * still aborted/dropped and the generation still advances, so stale art
+     * from a previous selection is never accepted.  cacheAdvanceGeneration is
+     * used for all other modes because it also drops prefetch work that would
+     * otherwise remain queued after a device or page switch. */
+    if (support != NULL && support->mode == MMCE_MODE)
+        cacheAdvanceGenerationPreservePrefetch();
+    else
+        cacheAdvanceGeneration();
 }
 
 static void menuAdvanceArtSelectionOnMove(void)
 {
     item_list_t *support = selected_item != NULL ? (item_list_t *)selected_item->item->userdata : NULL;
 
-    /* Keep APP prefetch, but drop stale interactive work from prior selections. */
-    if (support != NULL && support->mode == APP_MODE)
+    /* Keep APP prefetch and MMCE ready-art intact; only abort in-flight and
+     * queued interactive work from the prior selection. */
+    if (support != NULL && (support->mode == APP_MODE || support->mode == MMCE_MODE))
         cacheAdvanceGenerationPreservePrefetch();
     else
         cacheAdvanceGeneration();
