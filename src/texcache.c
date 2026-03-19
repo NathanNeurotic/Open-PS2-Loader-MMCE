@@ -46,15 +46,15 @@ enum {
     CACHE_REQ_PRIORITY_PREFETCH
 };
 
-#define CACHE_SLOW_MODE_INTERACTIVE_DELAY    4
-#define CACHE_MMCE_INTERACTIVE_MAX_DELAY     12
-#define CACHE_APP_INTERACTIVE_MAX_DELAY      4
-#define CACHE_APP_PREFETCH_DELAY             10
-#define CACHE_PRIME_IDLE_DELAY               12
-#define CACHE_THREAD_PRIORITY                0x40
-#define CACHE_MMCE_LOAD_THREAD_PRIORITY      90
-#define CACHE_END_WAIT_TICKS_FORCE           120
-#define CACHE_END_WAIT_TICKS_SOFT            15
+#define CACHE_SLOW_MODE_INTERACTIVE_DELAY 4
+#define CACHE_MMCE_INTERACTIVE_MAX_DELAY  12
+#define CACHE_APP_INTERACTIVE_MAX_DELAY   4
+#define CACHE_APP_PREFETCH_DELAY          10
+#define CACHE_PRIME_IDLE_DELAY            12
+#define CACHE_THREAD_PRIORITY             0x40
+#define CACHE_MMCE_LOAD_THREAD_PRIORITY   90
+#define CACHE_END_WAIT_TICKS_FORCE        120
+#define CACHE_END_WAIT_TICKS_SOFT         15
 
 extern void *_gp;
 
@@ -1417,18 +1417,13 @@ static GSTEXTURE *cacheGetTextureInternal(image_cache_t *cache, item_list_t *lis
     }
 
     if (priority == CACHE_REQ_PRIORITY_INTERACTIVE && list != NULL && list->mode == MMCE_MODE && effectiveMode == MMCE_MODE) {
+        /* Safety net: if a queued request for a different game somehow survived a
+         * generation advance, drop it now so the new game's art can queue cleanly.
+         * cacheAdvanceGeneration() normally handles this on every navigation event. */
         load_image_request_t *queuedMmceReq = cacheFindQueuedInteractiveModeLocked(MMCE_MODE);
 
         if (queuedMmceReq != NULL && strcmp(queuedMmceReq->value, value) != 0)
             cacheDropQueuedRequestLocked(queuedMmceReq);
-
-        /* cacheHasActiveInteractiveModeLocked() checks gArtCurrentReq != NULL, so
-         * dereferencing abortRequested is safe here while the cache lock is held. */
-        if ((cacheHasActiveInteractiveModeLocked(MMCE_MODE) && !gArtCurrentReq->abortRequested) ||
-            cacheHasQueuedInteractiveModeLocked(MMCE_MODE)) {
-            cacheUnlock();
-            return NULL;
-        }
     }
 
     if (priority == CACHE_REQ_PRIORITY_PREFETCH && cache->queuedPrefetchRequests >= cacheGetPrefetchLimit(cache)) {
