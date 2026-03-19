@@ -1417,18 +1417,13 @@ static GSTEXTURE *cacheGetTextureInternal(image_cache_t *cache, item_list_t *lis
     }
 
     if (priority == CACHE_REQ_PRIORITY_INTERACTIVE && list != NULL && list->mode == MMCE_MODE && effectiveMode == MMCE_MODE) {
+        /* Safety net: if a queued request for a different game somehow survived a
+         * generation advance, drop it now so the new game's art can queue cleanly.
+         * cacheAdvanceGeneration() normally handles this on every navigation event. */
         load_image_request_t *queuedMmceReq = cacheFindQueuedInteractiveModeLocked(MMCE_MODE);
 
         if (queuedMmceReq != NULL && strcmp(queuedMmceReq->value, value) != 0)
             cacheDropQueuedRequestLocked(queuedMmceReq);
-
-        /* cacheHasActiveInteractiveModeLocked() checks gArtCurrentReq != NULL, so
-         * dereferencing abortRequested is safe here while the cache lock is held. */
-        if ((cacheHasActiveInteractiveModeLocked(MMCE_MODE) && !gArtCurrentReq->abortRequested) ||
-            cacheHasQueuedInteractiveModeLocked(MMCE_MODE)) {
-            cacheUnlock();
-            return NULL;
-        }
     }
 
     if (priority == CACHE_REQ_PRIORITY_PREFETCH && cache->queuedPrefetchRequests >= cacheGetPrefetchLimit(cache)) {
