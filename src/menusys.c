@@ -85,15 +85,29 @@ static ee_sema_t menuSema;
 
 static void menuInvalidateArtSelection(void)
 {
-    cacheAdvanceGeneration();
+    item_list_t *support = selected_item != NULL ? (item_list_t *)selected_item->item->userdata : NULL;
+
+    /* For MMCE mode, preserve already-loaded (READY/PRIMED/DISPLAYABLE) art
+     * across navigation so that revisiting a game shows art instantly rather
+     * than reloading from the slow SD card.  In-flight and queued loads are
+     * still aborted and the generation is advanced so new requests are tied to
+     * the current selection.  For all other modes, fully invalidate so that
+     * stale art from the previous selection does not linger. */
+    if (support != NULL && support->mode == MMCE_MODE)
+        cacheAdvanceGenerationPreservePrefetch();
+    else
+        cacheAdvanceGeneration();
 }
 
 static void menuAdvanceArtSelectionOnMove(void)
 {
     item_list_t *support = selected_item != NULL ? (item_list_t *)selected_item->item->userdata : NULL;
 
-    /* Keep APP prefetch, but drop stale interactive work from prior selections. */
-    if (support != NULL && support->mode == APP_MODE)
+    /* For APP mode: keep prefetch, drop stale interactive requests.
+     * For MMCE mode: same loaded-art preservation as APP — the SD card is
+     * slow, so any art that already reached READY/PRIMED state should survive
+     * a navigation event rather than being discarded and reloaded. */
+    if (support != NULL && (support->mode == APP_MODE || support->mode == MMCE_MODE))
         cacheAdvanceGenerationPreservePrefetch();
     else
         cacheAdvanceGeneration();
