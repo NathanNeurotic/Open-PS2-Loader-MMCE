@@ -23,6 +23,20 @@ static u8 hires = 0;
 static u8 guiWakeupCount;
 static int vsync_id = -1;
 
+// Deferred VRAM unload: textures freed by the art worker thread are queued here
+// and released only after gsKit_finish() confirms the GS is no longer reading
+// those VRAM slots. Without this, the art worker could free a VRAM slot and a
+// new texture could be uploaded there mid-frame before the GS finishes, causing
+// full-screen visual artifacts during aggressive navigation.
+//
+// Sizing: one entry per cache slot that could be evicted in a single frame.
+// Typically 3 caches × up to 9 slots each = 27 max; 128 gives a large margin.
+#define RM_DEFERRED_UNLOAD_MAX 128
+static GSTEXTURE gDeferredUnloadBuf[RM_DEFERRED_UNLOAD_MAX];
+static int gDeferredUnloadCount = 0;
+static s32 gDeferredSema = -1;
+static ee_sema_t gDeferredSemaData;
+
 #define NUM_RM_VMODES 14
 #define RM_VMODE_AUTO 0
 
@@ -103,6 +117,64 @@ void rmPrimeTexture(GSTEXTURE *txt)
         gsKit_TexManager_bind(gsGlobal, txt);
 }
 
+// Queue a texture's VRAM slot for release on the next safe flush point (after
+// gsKit_finish()). Called from the art worker thread when evicting an old
+// texture, to avoid freeing VRAM that the GS may still be reading mid-frame.
+//
+// Initialization order: rmInit() always runs before cacheInit() starts the art
+// worker thread, so gDeferredSema is guaranteed valid by first use. The
+// sema-not-ready branch below is a startup safety net that should never fire.
+void rmDeferUnloadTexture(GSTEXTURE *txt)
+{
+    GSTEXTURE *slot;
+
+    if (txt == NULL)
+        return;
+
+    if (gDeferredSema < 0) {
+        // Semaphore not yet initialised (startup edge-case) - fall back to
+        // immediate free. The risk is low here since art is not yet loading.
+        gsKit_TexManager_free(gsGlobal, txt);
+        return;
+    }
+
+    WaitSema(gDeferredSema);
+
+    if (gDeferredUnloadCount < RM_DEFERRED_UNLOAD_MAX) {
+        slot = &gDeferredUnloadBuf[gDeferredUnloadCount++];
+        *slot = *txt;
+        // Clear EE RAM pointers - gsKit_TexManager_free only needs the VRAM
+        // address fields; the pixel data has already been freed by texFree().
+        slot->Mem = NULL;
+        slot->Clut = NULL;
+    } else {
+        // Buffer full: RM_DEFERRED_UNLOAD_MAX is sized to make this unreachable
+        // in practice. Free immediately so the slot is not permanently leaked.
+        // This still introduces the same race this mechanism is designed to
+        // prevent, but overflow is impossible under normal operating conditions.
+        gsKit_TexManager_free(gsGlobal, txt);
+    }
+
+    SignalSema(gDeferredSema);
+}
+
+// Release all VRAM slots that were queued by rmDeferUnloadTexture(). Must be
+// called from the render thread after gsKit_finish() has confirmed the GS is
+// idle, so that in-flight draw commands can no longer reference these slots.
+static void rmFlushDeferredUnloads(void)
+{
+    int i;
+
+    if (gDeferredSema < 0 || gDeferredUnloadCount == 0)
+        return;
+
+    WaitSema(gDeferredSema);
+    for (i = 0; i < gDeferredUnloadCount; i++)
+        gsKit_TexManager_free(gsGlobal, &gDeferredUnloadBuf[i]);
+    gDeferredUnloadCount = 0;
+    SignalSema(gDeferredSema);
+}
+
 void rmStartFrame(void)
 {
     if (hires == 0)
@@ -115,6 +187,7 @@ void rmEndFrame(void)
 {
     if (hires) {
         gsKit_hires_sync(gsGlobal);
+        rmFlushDeferredUnloads();
         gsKit_hires_flip(gsGlobal);
     } else {
         gsKit_set_finish(gsGlobal);
@@ -122,6 +195,11 @@ void rmEndFrame(void)
 
         // Wait for draw ops to finish
         gsKit_finish();
+
+        // Safe point: GS has finished reading all VRAM referenced by the
+        // submitted draw queue. Release any VRAM slots that the art worker
+        // deferred during the last frame to avoid mid-frame reuse artifacts.
+        rmFlushDeferredUnloads();
 
         if (!gsGlobal->FirstFrame) {
             SleepThread();
@@ -165,6 +243,14 @@ void rmInit()
 
     // Initialize the DMAC
     dmaKit_chan_init(DMA_CHANNEL_GIF);
+
+    // Create the deferred-unload semaphore once for the lifetime of the process.
+    if (gDeferredSema < 0) {
+        gDeferredSemaData.init_count = 1;
+        gDeferredSemaData.max_count = 1;
+        gDeferredSemaData.option = 0;
+        gDeferredSema = CreateSema(&gDeferredSemaData);
+    }
 
     rmSetMode(1);
 
@@ -269,6 +355,10 @@ void rmGetScreenExtents(int *w, int *h)
 
 void rmEnd(void)
 {
+    // Flush any pending deferred VRAM unloads before tearing down gsKit so
+    // that gsKit_TexManager_free is called while gsGlobal is still valid.
+    rmFlushDeferredUnloads();
+
     if (hires) {
         gsKit_hires_deinit_global(gsGlobal);
     } else {

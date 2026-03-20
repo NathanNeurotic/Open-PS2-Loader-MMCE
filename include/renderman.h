@@ -88,6 +88,12 @@ void rmInvalidateTexture(GSTEXTURE *txt);
 /** Unload texture from texture manager, performance optimization */
 void rmUnloadTexture(GSTEXTURE *txt);
 
+/** Deferred version of rmUnloadTexture for use from non-render threads.
+ * The VRAM slot is not released until rmEndFrame() calls rmFlushDeferredUnloads()
+ * after gsKit_finish(), preventing the GS from reading a reallocated VRAM slot
+ * and producing visual artifacts. */
+void rmDeferUnloadTexture(GSTEXTURE *txt);
+
 /** Uploads a texture to VRAM without drawing it. */
 void rmPrimeTexture(GSTEXTURE *txt);
 

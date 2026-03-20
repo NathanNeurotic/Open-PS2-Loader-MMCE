@@ -94,7 +94,7 @@ static void cacheReleaseTexture(GSTEXTURE *texture)
         return;
 
     if (texture->Mem != NULL)
-        rmUnloadTexture(texture);
+        rmDeferUnloadTexture(texture);
 
     texFree(texture);
     cacheResetTextureState(texture);
