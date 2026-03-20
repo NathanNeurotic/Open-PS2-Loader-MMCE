@@ -532,9 +532,18 @@ static void cacheInvalidateEntryLocked(cache_entry_t *entry, int freeTxt, int pr
             cacheClearItem(entry, freeTxt);
             break;
         case CACHE_ENTRY_LOADING:
-            if (cacheIsAbortableMmceRequest(req))
-                req->abortRequested = 1;
-            else {
+            /* Signal abort for every in-flight request so texReadData() exits
+             * its per-row loop quickly.  Without this, a non-MMCE PNG decode
+             * runs to completion in a tight CPU loop at the art-worker's
+             * priority; on the PS2 EE equal-priority threads are not
+             * time-sliced, so the render thread cannot run during that decode
+             * and the display appears frozen until the PNG finishes. */
+            req->abortRequested = 1;
+            if (!cacheIsAbortableMmceRequest(req)) {
+                /* For non-MMCE (and prefetch MMCE) requests, immediately
+                 * orphan the entry; the render thread reclaims the slot while
+                 * the art worker finishes its current file-read chunk and
+                 * then sees abortRequested in texReadData. */
                 entry->qr = NULL;
                 cacheClearItem(entry, freeTxt);
             }
@@ -592,9 +601,8 @@ static void cacheInvalidateInteractiveRequestsLocked(void)
                         cacheClearItem(entry, 1);
                         break;
                     case CACHE_ENTRY_LOADING:
-                        if (cacheIsAbortableMmceRequest(req))
-                            req->abortRequested = 1;
-                        else {
+                        req->abortRequested = 1;
+                        if (!cacheIsAbortableMmceRequest(req)) {
                             entry->qr = NULL;
                             cacheClearItem(entry, 1);
                         }

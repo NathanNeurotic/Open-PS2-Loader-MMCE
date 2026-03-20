@@ -164,14 +164,18 @@ void rmDeferUnloadTexture(GSTEXTURE *txt)
 static void rmFlushDeferredUnloads(void)
 {
     int i;
+    int count;
 
-    if (gDeferredSema < 0 || gDeferredUnloadCount == 0)
+    if (gDeferredSema < 0)
         return;
 
     WaitSema(gDeferredSema);
-    for (i = 0; i < gDeferredUnloadCount; i++)
-        gsKit_TexManager_free(gsGlobal, &gDeferredUnloadBuf[i]);
-    gDeferredUnloadCount = 0;
+    count = gDeferredUnloadCount;
+    if (count > 0) {
+        for (i = 0; i < count; i++)
+            gsKit_TexManager_free(gsGlobal, &gDeferredUnloadBuf[i]);
+        gDeferredUnloadCount = 0;
+    }
     SignalSema(gDeferredSema);
 }
 
