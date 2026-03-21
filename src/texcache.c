@@ -55,6 +55,14 @@ enum {
 #define CACHE_MMCE_LOAD_THREAD_PRIORITY   90
 #define CACHE_END_WAIT_TICKS_FORCE        120
 #define CACHE_END_WAIT_TICKS_SOFT         15
+/* Generous drain timeout used by cacheEnd() when an MMCE interactive request
+ * is active under a hard-stop (forceStop=true).  MMCE open() calls can take
+ * 200-400 ms on slow SD cards with large ART directories.  The normal
+ * CACHE_END_WAIT_TICKS_FORCE (120 ms) is shorter than a single slow open(),
+ * so without this guard TerminateThread fires while the worker is still
+ * inside an IOP call, corrupting the fileXio RPC channel for the rest of
+ * the OPL session and preventing exit/launch from working. */
+#define CACHE_MMCE_END_WAIT_TICKS         500
 
 extern void *_gp;
 
@@ -934,6 +942,7 @@ void cacheInit()
 void cacheEnd(int forceStop)
 {
     int waitTicks = forceStop ? CACHE_END_WAIT_TICKS_FORCE : CACHE_END_WAIT_TICKS_SOFT;
+    int drainWaitTicks;
     int savedPriority;
 
     if (!gArtRunning)
@@ -941,9 +950,22 @@ void cacheEnd(int forceStop)
 
     cacheLock();
     cacheInvalidatePendingRequestsLocked(0);
+    /* If we must terminate forcefully and an MMCE interactive request was just
+     * signalled to abort, use a generous drain timeout before falling back to
+     * TerminateThread.  MMCE open() calls can take several hundred milliseconds
+     * on slow SD cards with large ART directories; the normal 120 ms timeout
+     * may expire while the worker is still inside the IOP call, causing
+     * TerminateThread to corrupt the fileXio RPC channel and break subsequent
+     * exit/launch operations.  A 500 ms drain window covers all but the most
+     * extreme hardware without making normal shutdown noticeably slower (on
+     * fast paths the worker exits as soon as open() returns, typically ≤ 50 ms).
+     * Non-MMCE requests are always fast enough for the standard 120 ms path. */
+    drainWaitTicks = (forceStop && cacheHasActiveInteractiveModeLocked(MMCE_MODE))
+                         ? CACHE_MMCE_END_WAIT_TICKS
+                         : waitTicks;
     cacheUnlock();
 
-    (void)cacheWaitForAllRequestsTimed(waitTicks);
+    (void)cacheWaitForAllRequestsTimed(drainWaitTicks);
 
     gArtTerminate = 1;
     WakeupThread(gArtThreadId);
@@ -1134,6 +1156,16 @@ int cacheAbortMmceImageLoadsTimed(int timeoutTicks)
         int pending;
 
         cacheLock();
+        /* Re-issue the abort on each iteration: in the narrow window between
+         * the worker completing the original request and our initial drop of
+         * the queue, it may have dequeued the very next MMCE request and set
+         * gArtCurrentReq before we finished the drops.  That new request
+         * would then run without abort being set, holding an open() call for
+         * potentially hundreds of milliseconds.  Re-aborting here closes that
+         * race so every MMCE request that starts during our wait is signalled
+         * to stop as quickly as possible. */
+        if (gArtCurrentReq != NULL && cacheIsAbortableMmceRequest(gArtCurrentReq))
+            gArtCurrentReq->abortRequested = 1;
         pending = cacheHasActiveInteractiveModeLocked(MMCE_MODE) || cacheHasQueuedInteractiveModeLocked(MMCE_MODE);
         cacheUnlock();
 

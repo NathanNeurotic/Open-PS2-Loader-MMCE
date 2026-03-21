@@ -528,6 +528,14 @@ static int texLoadAll(GSTEXTURE *texture, const char *filePath, int texId)
 
     if (filePath) {
         if (texShouldUseMemoryReader(filePath)) {
+            /* Check the abort flag before issuing the IOP open() call.
+             * The abort may have been set in the narrow window between the
+             * pre-check in cacheLoadImage and this point.  Catching it here
+             * avoids starting a potentially slow open() that cannot be
+             * interrupted until the IOP responds, which can take 200-400 ms
+             * on slow SD cards with large ART directories. */
+            if (texLoadAbortRequested())
+                return ERR_LOAD_ABORTED;
             fd = open(filePath, O_RDONLY, 0);
             if (fd < 0)
                 return ERR_BAD_FILE;
