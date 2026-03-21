@@ -537,16 +537,26 @@ static void cacheInvalidateEntryLocked(cache_entry_t *entry, int freeTxt, int pr
              * runs to completion in a tight CPU loop at the art-worker's
              * priority; on the PS2 EE equal-priority threads are not
              * time-sliced, so the render thread cannot run during that decode
-             * and the display appears frozen until the PNG finishes. */
+             * and the display appears frozen until the PNG finishes.
+             *
+             * Orphan the entry immediately for all requests, including MMCE
+             * interactive ones.  Previously MMCE LOADING entries were kept
+             * alive until the abort drained, but that locked the single-slot
+             * BG and SCR caches for the entire duration of the in-flight
+             * open()/read() — up to hundreds of milliseconds on a slow card
+             * or for missing-art games.  With a 50+ game list and rapid
+             * navigation this caused BG/SCR to stop loading entirely
+             * ("no games would load").
+             *
+             * Safety: cacheCompleteRequest() checks entry->qr == req before
+             * touching the entry, so an orphaned-but-still-running request
+             * will simply discard its result when it finishes.  The abort
+             * flag ensures the worker exits the I/O loop as soon as possible;
+             * gArtCurrentReq and the active-count are still updated correctly
+             * so cacheAbortMmceImageLoadsTimed() continues to work. */
             req->abortRequested = 1;
-            if (!cacheIsAbortableMmceRequest(req)) {
-                /* For non-MMCE (and prefetch MMCE) requests, immediately
-                 * orphan the entry; the render thread reclaims the slot while
-                 * the art worker finishes its current file-read chunk and
-                 * then sees abortRequested in texReadData. */
-                entry->qr = NULL;
-                cacheClearItem(entry, freeTxt);
-            }
+            entry->qr = NULL;
+            cacheClearItem(entry, freeTxt);
             break;
         case CACHE_ENTRY_READY:
         case CACHE_ENTRY_PRIMED:
@@ -602,10 +612,8 @@ static void cacheInvalidateInteractiveRequestsLocked(void)
                         break;
                     case CACHE_ENTRY_LOADING:
                         req->abortRequested = 1;
-                        if (!cacheIsAbortableMmceRequest(req)) {
-                            entry->qr = NULL;
-                            cacheClearItem(entry, 1);
-                        }
+                        entry->qr = NULL;
+                        cacheClearItem(entry, 1);
                         break;
                     default:
                         break;
