@@ -52,4 +52,5 @@ void bdmResolveLBA_UDMA(bdm_device_data_t *pDeviceData);
 int bdmWaitForDevice(int deviceId, u32 timeoutMs);
 int bdmHDDIsPresent();
 
+int bdmFindPartition(char *target, const char *name, int write);
 #endif

@@ -863,3 +863,36 @@ int bdmHDDIsPresent()
     // ideally, we'd only have ata_device_identify
     return fileXioDevctl("xhdd0:", ATA_DEVCTL_GET_HIGHEST_UDMA_MODE, NULL, 0, NULL, 0) >= 0;
 }
+
+
+int bdmFindPartition(char *target, const char *name, int write)
+{
+    int i, fd;
+    char path[256];
+
+    for (i = 0; i < MAX_BDM_DEVICES; i++) {
+        if (gBDMPrefix[0] != '\0')
+            sprintf(path, "mass0:/", i, gBDMPrefix, name);
+        else
+            sprintf(path, "mass0:", i, name);
+        if (write)
+            fd = open(path, O_WRONLY | O_TRUNC | O_CREAT, 0666);
+        else
+            fd = open(path, O_RDONLY);
+
+        if (fd >= 0) {
+            if (gBDMPrefix[0] != '\0')
+                sprintf(target, "mass0:/", i, gBDMPrefix);
+            else
+                sprintf(target, "mass0:", i);
+            close(fd);
+            return 1;
+        }
+    }
+
+    if (gBDMPrefix[0] != '\0')
+        sprintf(target, "mass0:/", gBDMPrefix);
+    else
+        sprintf(target, "mass0:");
+    return 0;
+}
