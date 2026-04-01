@@ -786,6 +786,122 @@ void setErrorMessage(int strId)
 static int lscstatus = CONFIG_ALL;
 static int lscret = 0;
 
+static int checkLoadConfigBDM(int types)
+{
+    char path[64];
+    int value;
+    int bdm_result;
+    int is_hdd = 0;
+
+    // check USB
+    bdm_result = bdmFindPartition(path, "conf_opl.cfg", 0);
+    // if not on USB, check BDM HDD
+    if (bdm_result == 0) {
+        if (hddLoadModules() >= 0 && bdmHDDIsPresent()) {
+            // we can safely assume mass0 in this instance because this should be the only device if the previous checks failed...
+            // wait for up to 5 seconds for the HDD to spin up and become accessible...
+            if (!bdmWaitForDevice(0, 5000))
+                LOG("checkLoadConfigBDM: HDD check timeout!");
+
+            bdm_result = bdmFindPartition(path, "conf_opl.cfg", 0);
+            if (bdm_result)
+                is_hdd = 1;
+        }
+    }
+
+    if (bdm_result) {
+        configEnd();
+        configInit(path);
+        value = configReadMulti(types);
+        config_set_t *configOPL = configGetByType(CONFIG_OPL);
+        configSetInt(configOPL, CONFIG_OPL_BDM_MODE, START_MODE_AUTO);
+        if (is_hdd != 0) {
+            gEnableBdmHDD = 1;
+            configSetInt(configOPL, CONFIG_OPL_ENABLE_BDMHDD, gEnableBdmHDD);
+        }
+        return value;
+    }
+
+    return 0;
+}
+
+static int checkLoadConfigHDD(int types)
+{
+    int value;
+    char path[64];
+
+    hddLoadModules();
+    hddLoadSupportModules();
+
+    snprintf(path, sizeof(path), "%sconf_opl.cfg", gHDDPrefix);
+    value = open(path, O_RDONLY);
+    if (value >= 0) {
+        close(value);
+        configEnd();
+        configInit(gHDDPrefix);
+        value = configReadMulti(types);
+        config_set_t *configOPL = configGetByType(CONFIG_OPL);
+        configSetInt(configOPL, CONFIG_OPL_HDD_MODE, START_MODE_AUTO);
+        return value;
+    }
+
+    return 0;
+}
+
+// When this function is called, the current device for loading/saving config is the memory card.
+static int tryAlternateDevice(int types)
+{
+    char pwd[8];
+    int value;
+    DIR *dir;
+
+    getcwd(pwd, sizeof(pwd));
+
+    // First, try the device that OPL booted from.
+    if (!strncmp(pwd, "mass", 4) && (pwd[4] == ':' || pwd[5] == ':')) {
+        if ((value = checkLoadConfigBDM(types)) != 0)
+            return value;
+    } else if (!strncmp(pwd, "hdd", 3) && (pwd[3] == ':' || pwd[4] == ':')) {
+        if ((value = checkLoadConfigHDD(types)) != 0)
+            return value;
+    }
+
+    // Config was not found on the boot device. Check all supported devices.
+    //  Check USB device
+    if ((value = checkLoadConfigBDM(types)) != 0)
+        return value;
+    // Check HDD
+    if ((value = checkLoadConfigHDD(types)) != 0)
+        return value;
+
+    // At this point, the user has no loadable config files on any supported device, so try to find a device to save on.
+    // We don't want to get users into alternate mode for their very first launch of OPL (i.e no config file at all, but still want to save on MC)
+    // Check for a memory card inserted.
+    if (sysCheckMC() >= 0) {
+        configPrepareNotifications(gBaseMCDir);
+        showCfgPopup = 0;
+        return 0;
+    }
+    // No memory cards? Try a USB device...
+    dir = opendir("mass0:");
+    if (dir != NULL) {
+        closedir(dir);
+        configEnd();
+        configInit("mass0:");
+    } else {
+        // No? Check if the save location on the HDD is available.
+        dir = opendir(gHDDPrefix);
+        if (dir != NULL) {
+            closedir(dir);
+            configEnd();
+            configInit(gHDDPrefix);
+        }
+    }
+    showCfgPopup = 0;
+
+    return 0;
+}
+
 static void _loadConfig()
 {
     int value, themeID = -1, langID = -1;
@@ -909,6 +1025,84 @@ static void _loadConfig()
     lscret = result;
     lscstatus = 0;
     showCfgPopup = 1;
+}
+
+static int trySaveConfigBDM(int types)
+{
+    char path[64];
+    int bdm_result;
+
+    // check USB
+    bdm_result = bdmFindPartition(path, "conf_opl.cfg", 1);
+    // if not on USB, check BDM HDD
+    if (bdm_result == 0) {
+        if (hddLoadModules() >= 0 && bdmHDDIsPresent()) {
+            // we can safely assume mass0 in this instance because this should be the only device if the previous checks failed...
+            // wait for up to 5 seconds for the HDD to spin up and become accessible...
+            if (!bdmWaitForDevice(0, 5000))
+                LOG("trySaveConfigBDM: HDD check timeout!");
+
+            bdm_result = bdmFindPartition(path, "conf_opl.cfg", 1);
+        }
+    }
+
+    if (bdm_result) {
+        configSetMove(path);
+        return configWriteMulti(types);
+    }
+
+    return -ENOENT;
+}
+
+static int trySaveConfigHDD(int types)
+{
+    hddLoadModules();
+    // Check that the formatted & usable HDD is connected.
+    if (hddCheck() == 0) {
+        configSetMove(gHDDPrefix);
+        return configWriteMulti(types);
+    }
+
+    return -ENOENT;
+}
+
+static int trySaveConfigMC(int types)
+{
+    configSetMove(NULL);
+    return configWriteMulti(types);
+}
+
+static int trySaveAlternateDevice(int types)
+{
+    char pwd[8];
+    int value;
+
+    getcwd(pwd, sizeof(pwd));
+
+    // First, try the device that OPL booted from.
+    if (!strncmp(pwd, "mass", 4) && (pwd[4] == ':' || pwd[5] == ':')) {
+        if ((value = trySaveConfigBDM(types)) > 0)
+            return value;
+    } else if (!strncmp(pwd, "hdd", 3) && (pwd[3] == ':' || pwd[4] == ':')) {
+        if ((value = trySaveConfigHDD(types)) > 0)
+            return value;
+    }
+
+    // Config was not saved to the boot device. Try all supported devices.
+    // Try memory cards
+    if (sysCheckMC() >= 0) {
+        if ((value = trySaveConfigMC(types)) > 0)
+            return value;
+    }
+    // Try a USB device
+    if ((value = trySaveConfigBDM(types)) > 0)
+        return value;
+    // Try the HDD
+    if ((value = trySaveConfigHDD(types)) > 0)
+        return value;
+
+    // We tried everything, but...
+    return 0;
 }
 
 static void _saveConfig()
