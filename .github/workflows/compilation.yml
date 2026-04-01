@@ -7,16 +7,13 @@ on:
   repository_dispatch:
     types: [run_build]
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
   build:
     runs-on: ubuntu-latest
     container: ps2max/dev:v20250725-2
     steps:
       - name: git checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
@@ -57,7 +54,7 @@ jobs:
     container: ps2max/dev:v20250725-2
     steps:
       - name: git checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
@@ -86,7 +83,7 @@ jobs:
     needs: build-variants
     steps:
       - name: Download variant artifacts
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           pattern: OPNPS2LD-VARIANTS*
           path: merged-variants
@@ -103,7 +100,7 @@ jobs:
     container: ps2max/dev:v20250725-2
     steps:
       - name: git checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
@@ -128,13 +125,12 @@ jobs:
       fail-fast: false
       matrix:
         debug: [iopcore_debug, ingame_debug, eesio_debug, iopcore_ppctty_debug, ingame_ppctty_debug, DTL_T10000=1]
-        # container_commit: [":main", "@sha256:1f00689809455d43b520e4cd4eea00c6be56d71819ae38efc6b55b56464cbd1e"] Replace with desired docker image hash or tag
         container_commit: [":v20250725-2"]
     runs-on: ubuntu-latest
     container: ps2max/dev${{ matrix.container_commit }}
     steps:
       - name: git checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
@@ -152,7 +148,7 @@ jobs:
           make ${{ matrix.debug }} --trace
           mv opl.elf opl-${{ matrix.debug }}-${{ env.OPL_VERSION }}-${{ env.SHORT_COMMIT }}.elf
 
-      - name: Upload variants artifact ELF
+      - name: Upload debug artifact ELF
         uses: actions/upload-artifact@v6
         with:
           name: opl-${{ matrix.debug }}-${{ env.OPL_VERSION }}-${{ env.SHORT_COMMIT }}
@@ -163,7 +159,7 @@ jobs:
     needs: build-debug
     steps:
       - name: Download debug artifacts
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           pattern: opl-*
           path: merged-debug
@@ -176,7 +172,7 @@ jobs:
           path: merged-debug
 
   release:
-    needs: [build, build-variants, build-lang]
+    needs: [build, merge-variants, build-lang]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/master'
     env:
@@ -184,7 +180,7 @@ jobs:
       PASSWORD: ${{ secrets.PASSWORD }}
     steps:
       - name: git checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - run: git fetch --prune --unshallow
 
@@ -193,7 +189,7 @@ jobs:
           echo "OPL_VERSION=$(make oplversion)" >> "$GITHUB_ENV"
 
       - name: Download all artifacts
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
 
       - name: Prepare artifacts for release
         run: |
@@ -250,14 +246,14 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-#      - name: Upload pre-release to Mega
-#        if: github.ref == 'refs/heads/master' && env.USERNAME != null
-#        uses: Difegue/action-megacmd@master
-#        with:
-#          args: put -c OPNPS2LD.7z /OPL/Pre-Release/${{ env.OPL_VERSION }}/run_${{ github.run_number }}/
-#
-#      - name: Upload release to Mega
-#        if: startsWith(github.ref, 'refs/tags/v') && env.USERNAME != null
-#        uses: Difegue/action-megacmd@master
-#        with:
-#          args: put -c OPNPS2LD.7z /OPL/Release/${{ env.OPL_VERSION }}/
+      - name: Upload pre-release to Mega
+        if: github.ref == 'refs/heads/master' && env.USERNAME != null
+        uses: Difegue/action-megacmd@master
+        with:
+          args: put -c OPNPS2LD.7z /OPL/Pre-Release/${{ env.OPL_VERSION }}/run_${{ github.run_number }}/
+
+      - name: Upload release to Mega
+        if: startsWith(github.ref, 'refs/tags/v') && env.USERNAME != null
+        uses: Difegue/action-megacmd@master
+        with:
+          args: put -c OPNPS2LD.7z /OPL/Release/${{ env.OPL_VERSION }}/
