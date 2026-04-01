@@ -90,6 +90,7 @@ typedef struct
 {
     theme_element_t *first;
     theme_element_t *last;
+    unsigned char needsItemConfig;
 } theme_elems_t;
 
 typedef struct

@@ -15,6 +15,10 @@
 
 static int appForceUpdate = 1;
 static int appItemCount = 0;
+static char appStartupPath[256];
+static char appResolvedStartupPath[256];
+static int *appArtLookupTable;
+static int appArtLookupTableSize = 0;
 
 static config_set_t *configApps;
 static app_info_t *appsList;
@@ -29,6 +33,12 @@ struct app_info_linked
 static item_list_t appItemList;
 
 static void appFreeList(void);
+static void appFreeArtLookup(void);
+static int appBuildArtLookup(void);
+static void appFreeLinkedList(struct app_info_linked *appsLinkedList);
+static app_info_t *appLookupByStartup(const char *startup);
+static void appSetArtSource(app_info_t *app);
+static void appSetResolvedStartup(app_info_t *app);
 
 static struct config_value_t *appGetConfigValue(int id)
 {
@@ -74,7 +84,7 @@ static float appGetELFSize(char *path)
 
 static char *appGetBoot(char *device, int max, char *path)
 {
-    char *pos, *filenamesep;
+    char *pos;
 
     // Looking for the boot device & filename from the path
     pos = strrchr(path, ':');
@@ -86,15 +96,191 @@ static char *appGetBoot(char *device, int max, char *path)
         device[len] = '\0';
     }
 
-    filenamesep = strchr(path, '/');
-    if (filenamesep != NULL)
-        return filenamesep + 1;
+    return appGetELFName(path);
+}
 
-    if (pos) {
-        return pos + 1;
+static unsigned int appHashStartup(const char *value)
+{
+    unsigned int hash = 5381;
+
+    while (value != NULL && *value != '\0') {
+        hash = ((hash << 5) + hash) ^ (unsigned char)*value;
+        value++;
     }
 
-    return path;
+    return hash;
+}
+
+static const char *appBuildStartupPath(const char *path, const char *boot)
+{
+    if (path[0] != '\0') {
+        const char *leaf = appGetELFName((char *)path);
+        if (strcmp(path, boot) == 0 || (leaf != path && strcmp(leaf, boot) == 0))
+            return path;
+
+        snprintf(appStartupPath, sizeof(appStartupPath), "%s/%s", path, boot);
+        return appStartupPath;
+    }
+
+    return boot;
+}
+
+static const char *appResolveLegacyMassStartup(const char *startup)
+{
+    int fd;
+    const char *suffix;
+
+    if (startup == NULL)
+        return NULL;
+
+    if (strncmp(startup, "mass?:", 6) == 0)
+        suffix = startup + 6;
+    else if (strncmp(startup, "mass:", 5) == 0)
+        suffix = startup + 5;
+    else
+        return startup;
+
+    for (int i = 0; i < MAX_BDM_DEVICES; i++) {
+        snprintf(appResolvedStartupPath, sizeof(appResolvedStartupPath), "mass%d:%s", i, suffix);
+
+        fd = open(appResolvedStartupPath, O_RDONLY);
+        if (fd >= 0) {
+            close(fd);
+            return appResolvedStartupPath;
+        }
+    }
+
+    return startup;
+}
+
+static void appSetArtSource(app_info_t *app)
+{
+    char *artLookup;
+
+    if (app == NULL)
+        return;
+
+    app->artDevice[0] = '\0';
+    app->artLookup[0] = '\0';
+    app->artMode = -1;
+
+    if (app->startup[0] == '\0')
+        return;
+
+    artLookup = appGetBoot(app->artDevice, sizeof(app->artDevice), app->startup);
+    if (artLookup != NULL) {
+        strncpy(app->artLookup, artLookup, APP_BOOT_MAX + 1);
+        app->artLookup[APP_BOOT_MAX] = '\0';
+    }
+
+    if (app->artDevice[0] != '\0')
+        app->artMode = oplPath2Mode(app->artDevice);
+}
+
+static void appSetResolvedStartup(app_info_t *app)
+{
+    const char *startup;
+
+    if (app == NULL) {
+        return;
+    }
+
+    startup = appResolveLegacyMassStartup(appBuildStartupPath(app->path, app->boot));
+    if (startup == NULL) {
+        app->startup[0] = '\0';
+        appSetArtSource(app);
+        return;
+    }
+
+    strncpy(app->startup, startup, APP_STARTUP_MAX);
+    app->startup[APP_STARTUP_MAX] = '\0';
+    appSetArtSource(app);
+}
+
+static void appFreeArtLookup(void)
+{
+    if (appArtLookupTable != NULL) {
+        free(appArtLookupTable);
+        appArtLookupTable = NULL;
+    }
+
+    appArtLookupTableSize = 0;
+}
+
+static int appBuildArtLookup(void)
+{
+    int size;
+
+    appFreeArtLookup();
+
+    if (appsList == NULL || appItemCount <= 0)
+        return 0;
+
+    size = 1;
+    while (size < appItemCount * 2)
+        size <<= 1;
+
+    if (size < 2)
+        size = 2;
+
+    appArtLookupTable = malloc(size * sizeof(int));
+    if (appArtLookupTable == NULL)
+        return -1;
+
+    for (int i = 0; i < size; i++)
+        appArtLookupTable[i] = -1;
+
+    for (int i = 0; i < appItemCount; i++) {
+        unsigned int slot;
+
+        if (appsList[i].startup[0] == '\0')
+            continue;
+
+        slot = appHashStartup(appsList[i].startup) & (size - 1);
+        while (appArtLookupTable[slot] != -1)
+            slot = (slot + 1) & (size - 1);
+
+        appArtLookupTable[slot] = i;
+    }
+
+    appArtLookupTableSize = size;
+    return 0;
+}
+
+static app_info_t *appLookupByStartup(const char *startup)
+{
+    if (startup == NULL || appsList == NULL)
+        return NULL;
+
+    if (appArtLookupTable != NULL && appArtLookupTableSize > 0) {
+        unsigned int slot = appHashStartup(startup) & (appArtLookupTableSize - 1);
+
+        while (appArtLookupTable[slot] != -1) {
+            int index = appArtLookupTable[slot];
+
+            if (!strcmp(appsList[index].startup, startup))
+                return &appsList[index];
+
+            slot = (slot + 1) & (appArtLookupTableSize - 1);
+        }
+    }
+
+    for (int i = 0; i < appItemCount; i++) {
+        if (!strcmp(appsList[i].startup, startup))
+            return &appsList[i];
+    }
+
+    return NULL;
+}
+
+int appGetArtMode(const char *startup)
+{
+    app_info_t *app = appLookupByStartup(startup);
+
+    if (app == NULL)
+        return -1;
+
+    return app->artMode;
 }
 
 void appInit(item_list_t *itemList)
@@ -182,10 +368,11 @@ static int addAppsLegacyList(struct app_info_linked **appsLinkedList)
             strncpy(app->app.boot, cur->val, APP_BOOT_MAX + 1);
             app->app.boot[APP_BOOT_MAX] = '\0';
             strncpy(app->app.path, cur->val, APP_PATH_MAX + 1);
-            app->app.path[APP_BOOT_MAX] = '\0';
+            app->app.path[APP_PATH_MAX] = '\0';
         }
 
         app->app.legacy = 1;
+        appSetResolvedStartup(&app->app);
         count++;
         cur = cur->next;
     }
@@ -229,6 +416,7 @@ static int appScanCallback(const char *path, config_set_t *appConfig, void *arg)
         } else
             app->app.argv1[0] = '\0';
         app->app.legacy = 0;
+        appSetResolvedStartup(&app->app);
         return 0;
     } else {
         LOG("APPSUPPORT item has no boot/title.\n");
@@ -240,7 +428,8 @@ static int appScanCallback(const char *path, config_set_t *appConfig, void *arg)
 
 static int appUpdateItemList(item_list_t *itemList)
 {
-    struct app_info_linked *appsLinkedList, *appNext;
+    struct app_info_linked *appsLinkedList;
+    struct app_info_linked *appsLinkedListHead;
 
     appFreeList();
 
@@ -251,6 +440,7 @@ static int appUpdateItemList(item_list_t *itemList)
 
     // Scan devices for apps.
     appItemCount += oplScanApps(&appScanCallback, &appsLinkedList);
+    appsLinkedListHead = appsLinkedList;
 
     // Generate apps list
     if (appItemCount > 0) {
@@ -258,30 +448,45 @@ static int appUpdateItemList(item_list_t *itemList)
 
         if (appsList != NULL) {
             int i;
-            for (i = 0; appsLinkedList != NULL; i++) { // appsLinkedList contains items in reverse order.
-                memcpy(&appsList[appItemCount - i - 1], &appsLinkedList->app, sizeof(app_info_t));
+            struct app_info_linked *app = appsLinkedList;
 
-                appNext = appsLinkedList->next;
-                free(appsLinkedList);
-                appsLinkedList = appNext;
-            }
+            for (i = 0; app != NULL; i++, app = app->next) // appsLinkedList contains items in reverse order.
+                memcpy(&appsList[appItemCount - i - 1], &app->app, sizeof(app_info_t));
         } else {
             LOG("APPSUPPORT unable to allocate memory.\n");
             appItemCount = 0;
         }
     }
 
+    if (appBuildArtLookup() < 0)
+        LOG("APPSUPPORT unable to allocate art lookup table.\n");
+
+    appFreeLinkedList(appsLinkedListHead);
+
     LOG("APPSUPPORT %d apps loaded\n", appItemCount);
 
     return appItemCount;
 }
 
+static void appFreeLinkedList(struct app_info_linked *appsLinkedList)
+{
+    while (appsLinkedList != NULL) {
+        struct app_info_linked *appNext = appsLinkedList->next;
+        free(appsLinkedList);
+        appsLinkedList = appNext;
+    }
+}
+
 static void appFreeList(void)
 {
+    appFreeArtLookup();
+
     if (appsList != NULL) {
+        free(appsList);
         appsList = NULL;
-        appItemCount = 0;
     }
+
+    appItemCount = 0;
 }
 
 static int appGetItemCount(item_list_t *itemList)
@@ -303,12 +508,7 @@ static int appGetItemNameLength(item_list_t *itemList, int id)
    The path is used immediately, before a subsequent call to appGetItemStartup(). */
 static char *appGetItemStartup(item_list_t *itemList, int id)
 {
-    if (appsList[id].legacy) {
-        struct config_value_t *cur = appGetConfigValue(id);
-        return appGetELFName(cur->val);
-    } else {
-        return appsList[id].boot;
-    }
+    return appsList[id].startup;
 }
 
 static void appDeleteItem(item_list_t *itemList, int id)
@@ -378,7 +578,7 @@ static void appLaunchItem(item_list_t *itemList, int id, config_set_t *configSet
 
     // If legacy apps state mass? find the first connected mass device with the corresponding filename and set the unit number for launch.
     if (!strncmp("mass?", filename, 5)) {
-        for (int i = 0; i < BDM_MODE4; i++) {
+        for (int i = 0; i < MAX_BDM_DEVICES; i++) {
             filename[4] = i + '0';
             fd = open(filename, O_RDONLY);
             if (fd >= 0) {
@@ -457,14 +657,16 @@ static config_set_t *appGetConfig(item_list_t *itemList, int id)
 
 static int appGetImage(item_list_t *itemList, char *folder, int isRelative, char *value, char *suffix, GSTEXTURE *resultTex, short psm)
 {
-    char device[8], *startup;
+    app_info_t *app;
 
-    startup = appGetBoot(device, sizeof(device), value);
+    app = appLookupByStartup(value);
+    if (app == NULL || app->artMode < 0)
+        return -1;
 
     if (!strcmp(folder, "ART"))
-        return oplGetAppImage(device, folder, isRelative, startup, suffix, resultTex, psm);
-    else
-        return oplGetAppImage(device, folder, isRelative, value, suffix, resultTex, psm);
+        return oplGetAppImageByMode(app->artMode, folder, isRelative, app->artLookup[0] != '\0' ? app->artLookup : app->boot, suffix, resultTex, psm);
+
+    return oplGetAppImageByMode(app->artMode, folder, isRelative, value, suffix, resultTex, psm);
 }
 
 static int appGetTextId(item_list_t *itemList)

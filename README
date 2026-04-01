@@ -1,0 +1,22 @@
+-----------------------------------------------------------------------------
+
+  Copyright 2009-2010, Ifcaro & jimmikaelkael
+  Licenced under Academic Free License version 3.0
+  Review Open PS2 Loader README & LICENSE files for further details.
+
+-----------------------------------------------------------------------------
+
+Open PS2 Loader Official Translations (10 March 2026)
+
+HOW TO INSTALL:
+1. make sure you are running latest OPL
+2. transfer both the the LANGUAGE FILE (.lng) and the FONT FILE (.ttf/.otf) into your OPL directory of your memory card
+ a. IMPORTANT: Do not rename the files
+ b. NOTE: Some languages don't require a FONT file, so it won't be included
+3. run OPL
+4. go to OPL Settings
+5. open the Display settings page
+6. select your new language file
+7. press Ok at the bottom of the page
+8. then save your settings so next time you run OPL, it will load it with your preferred language file
+9. done!

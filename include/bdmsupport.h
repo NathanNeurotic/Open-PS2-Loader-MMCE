@@ -7,6 +7,9 @@
 
 #include "include/mcemu.h"
 
+#define BDM_DEVICE_ROOT_MAX 32
+#define BDM_PREFIX_MAX      96
+
 typedef struct
 {
     int active;       /* Activation flag */
@@ -15,7 +18,7 @@ typedef struct
     vmc_spec_t specs; /* Card specifications */
 } bdm_vmc_infos_t;
 
-#define MAX_BDM_DEVICES 5
+#define MAX_BDM_DEVICES BDM_MODE_COUNT
 
 #define BDM_TYPE_UNKNOWN -1
 #define BDM_TYPE_USB     0
@@ -25,8 +28,9 @@ typedef struct
 
 typedef struct
 {
-    int massDeviceIndex; // Underlying device index backing the mass fs partition, ex: usb0 = 0, usb1 = 1, etc.
-    char bdmPrefix[40];  // Contains the full path to the folder where all the games are.
+    int massDeviceIndex;                     // Underlying device index backing the block device. This is not the same as the typed-path unit.
+    char bdmDeviceRoot[BDM_DEVICE_ROOT_MAX]; // Device root used for filesystem access, currently the massN: compatibility root.
+    char bdmPrefix[BDM_PREFIX_MAX];          // Full path to the folder where all the games are.
     int bdmULSizePrev;
     time_t bdmModifiedCDPrev;
     time_t bdmModifiedDVDPrev;
@@ -39,6 +43,7 @@ typedef struct
     int ataHighestUDMAMode; // Highest UDMA mode supported by the HDD
     unsigned char ThemesLoaded;
     unsigned char LanguagesLoaded;
+    unsigned char FoldersCreated;
     unsigned char ForceRefresh;
 } bdm_device_data_t;
 
@@ -51,6 +56,7 @@ void bdmEnumerateDevices();
 void bdmResolveLBA_UDMA(bdm_device_data_t *pDeviceData);
 int bdmWaitForDevice(int deviceId, u32 timeoutMs);
 int bdmHDDIsPresent();
+int bdmResolveDeviceRoot(char *target, int targetLength, const char *driverName, int massDeviceIndex, int massSlot);
 
 int bdmFindPartition(char *target, const char *name, int write);
 #endif

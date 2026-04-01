@@ -9,10 +9,12 @@
 #include "include/lang.h"
 #include "include/pad.h"
 #include "include/sound.h"
+#include "include/texcache.h"
 
-#define MENU_POS_V     50
-#define HINT_HEIGHT    32
-#define DECORATOR_SIZE 20
+#define MENU_POS_V               50
+#define HINT_HEIGHT              32
+#define DECORATOR_SIZE           20
+#define APP_PREFETCH_IDLE_FRAMES 10
 
 extern const char conf_theme_OPL_cfg;
 extern u16 size_conf_theme_OPL_cfg;
@@ -478,6 +480,8 @@ static mutable_image_t *initMutableImage(const char *themePath, config_set_t *th
         configGetStr(themeConfig, elemProp, &cachePattern);
         snprintf(elemProp, sizeof(elemProp), "%s_count", name);
         configGetInt(themeConfig, elemProp, &cacheCount);
+        if (cachePattern != NULL && strcmp(cachePattern, "COV") == 0 && cacheCount < 2)
+            cacheCount = 2;
         LOG("THEMES MutableImage %s: type: %s using cache pattern: %s count: %d\n", name, elementsType[type], cachePattern, cacheCount);
     }
 
@@ -552,11 +556,73 @@ static GSTEXTURE *getGameImageTexture(image_cache_t *cache, void *support, struc
     return NULL;
 }
 
+static int canPrefetchAdjacentGameImages(image_cache_t *cache, item_list_t *list, GSTEXTURE *selectedTexture)
+{
+    if (cache == NULL || list == NULL || selectedTexture == NULL || selectedTexture->Mem == NULL)
+        return 0;
+
+    if (list->mode == MMCE_MODE)
+        return 0;
+
+    if (list->mode == APP_MODE) {
+        if (guiInactiveFrames < APP_PREFETCH_IDLE_FRAMES || cacheHasPendingInteractiveArt())
+            return 0;
+    }
+
+    return 1;
+}
+
+static void prefetchGameImageTexture(image_cache_t *cache, void *support, struct submenu_list *item, int minInactiveFrames)
+{
+    item_list_t *list;
+    char *startup;
+
+    if (cache == NULL || item == NULL || guiInactiveFrames < minInactiveFrames)
+        return;
+
+    list = (item_list_t *)support;
+    if (list == NULL)
+        return;
+
+    startup = list->itemGetStartup(list, item->item.id);
+    cachePrefetchTexture(cache, list, &item->item.cache_id[cache->userId], &item->item.cache_uid[cache->userId], startup);
+}
+
+static void prefetchAdjacentGameImages(image_cache_t *cache, void *support, struct submenu_list *item, int distance, int minInactiveFrames)
+{
+    struct submenu_list *nextItem = item;
+    struct submenu_list *prevItem = item;
+
+    if (item == NULL || distance <= 0)
+        return;
+
+    for (int i = 0; i < distance; i++) {
+        if (nextItem != NULL)
+            nextItem = nextItem->next;
+        if (prevItem != NULL)
+            prevItem = prevItem->prev;
+
+        prefetchGameImageTexture(cache, support, nextItem, minInactiveFrames);
+        prefetchGameImageTexture(cache, support, prevItem, minInactiveFrames);
+    }
+}
+
 static void drawGameImage(struct menu_list *menu, struct submenu_list *item, config_set_t *config, struct theme_element *elem)
 {
     mutable_image_t *gameImage = (mutable_image_t *)elem->extended;
     if (item) {
-        GSTEXTURE *texture = getGameImageTexture(gameImage->cache, menu->item->userdata, &item->item);
+        item_list_t *list;
+        GSTEXTURE *texture;
+        list = (item_list_t *)menu->item->userdata;
+
+        texture = getGameImageTexture(gameImage->cache, menu->item->userdata, &item->item);
+
+        if (gameImage->cache != NULL && gameImage->cache->suffix != NULL && strcmp(gameImage->cache->suffix, "COV") == 0 &&
+            canPrefetchAdjacentGameImages(gameImage->cache, list, texture)) {
+            int prefetchInactiveFrames = (list != NULL && list->mode == APP_MODE) ? APP_PREFETCH_IDLE_FRAMES : MENU_MIN_INACTIVE_FRAMES;
+            prefetchAdjacentGameImages(gameImage->cache, menu->item->userdata, item, 1, prefetchInactiveFrames);
+        }
+
         if (!texture || !texture->Mem) {
             if (gameImage->defaultTexture)
                 texture = &gameImage->defaultTexture->source;
@@ -841,6 +907,7 @@ static void drawItemsList(struct menu_list *menu, struct submenu_list *item, con
 {
     if (item) {
         items_list_t *itemsList = (items_list_t *)elem->extended;
+        item_list_t *list = menu->item->userdata;
 
         int posX = elem->posX, posY = elem->posY;
         if (elem->aligned) {
@@ -858,7 +925,15 @@ static void drawItemsList(struct menu_list *menu, struct submenu_list *item, con
                 color = elem->color;
 
             if (itemsList->decoratorImage) {
-                GSTEXTURE *itemIconTex = getGameImageTexture(itemsList->decoratorImage->cache, menu->item->userdata, &ps->item);
+                GSTEXTURE *itemIconTex;
+
+                /* MMCE main-page row art must never queue fresh IO; only use already-ready textures. */
+                if (list != NULL && list->mode == MMCE_MODE && itemsList->decoratorImage->cache != NULL) {
+                    image_cache_t *cache = itemsList->decoratorImage->cache;
+                    itemIconTex = cacheGetTextureIfReady(cache, &ps->item.cache_id[cache->userId], &ps->item.cache_uid[cache->userId]);
+                } else
+                    itemIconTex = getGameImageTexture(itemsList->decoratorImage->cache, menu->item->userdata, &ps->item);
+
                 if (itemIconTex && itemIconTex->Mem)
                     rmDrawPixmap(itemIconTex, posX, posY, elem->aligned, DECORATOR_SIZE, DECORATOR_SIZE, elem->scaled, gDefaultCol);
                 else {
@@ -996,6 +1071,126 @@ static void validateItemsList(const char *themePath, config_set_t *themeConfig, 
     }
 }
 
+static int isDecoratorCoverCache(theme_element_t *list, image_cache_t *cache)
+{
+    items_list_t *itemsList;
+
+    if (list == NULL || list->extended == NULL || cache == NULL)
+        return 0;
+
+    itemsList = (items_list_t *)list->extended;
+    return itemsList->decoratorImage != NULL && itemsList->decoratorImage->cache == cache;
+}
+
+static int isDecoratorCoverImage(theme_t *theme, mutable_image_t *gameImage)
+{
+    items_list_t *itemsList;
+
+    if (theme == NULL || gameImage == NULL)
+        return 0;
+
+    if (theme->gamesItemsList != NULL && theme->gamesItemsList->extended != NULL) {
+        itemsList = (items_list_t *)theme->gamesItemsList->extended;
+        if (itemsList->decoratorImage == gameImage)
+            return 1;
+    }
+
+    if (theme->appsItemsList != NULL && theme->appsItemsList->extended != NULL) {
+        itemsList = (items_list_t *)theme->appsItemsList->extended;
+        if (itemsList->decoratorImage == gameImage)
+            return 1;
+    }
+
+    return 0;
+}
+
+static image_cache_t *cloneImageCache(theme_t *theme, image_cache_t *source)
+{
+    image_cache_t *cache;
+
+    if (theme == NULL || source == NULL)
+        return NULL;
+
+    cache = cacheInitCache(theme->gameCacheCount++, source->prefix, source->isPrefixRelative, source->suffix, source->count);
+    if (cache != NULL)
+        cache->allowPrime = source->allowPrime;
+
+    return cache;
+}
+
+static void replaceSharedCoverCache(theme_t *theme, theme_elems_t *elems, image_cache_t *sourceCache, image_cache_t *replacementCache, int *replacementAssigned)
+{
+    theme_element_t *elem;
+
+    if (theme == NULL || elems == NULL || sourceCache == NULL || replacementCache == NULL || replacementAssigned == NULL)
+        return;
+
+    elem = elems->first;
+    while (elem != NULL) {
+        if (elem->type == ELEM_TYPE_GAME_IMAGE) {
+            mutable_image_t *gameImage = (mutable_image_t *)elem->extended;
+
+            if (gameImage != NULL && !isDecoratorCoverImage(theme, gameImage) && gameImage->cache == sourceCache) {
+                gameImage->cache = replacementCache;
+                gameImage->cacheLinked = *replacementAssigned ? 1 : 0;
+                *replacementAssigned = 1;
+            }
+        }
+
+        elem = elem->next;
+    }
+}
+
+static void splitDecoratorCoverCache(theme_t *theme, theme_element_t *list)
+{
+    items_list_t *itemsList;
+    image_cache_t *sourceCache;
+    image_cache_t *replacementCache;
+    int replacementAssigned;
+
+    if (theme == NULL || list == NULL || list->extended == NULL)
+        return;
+
+    itemsList = (items_list_t *)list->extended;
+    if (itemsList->decoratorImage == NULL || itemsList->decoratorImage->cache == NULL)
+        return;
+
+    sourceCache = itemsList->decoratorImage->cache;
+    if (sourceCache->suffix == NULL || strcmp(sourceCache->suffix, "COV") != 0)
+        return;
+
+    replacementCache = cloneImageCache(theme, sourceCache);
+    if (replacementCache == NULL)
+        return;
+
+    replacementAssigned = 0;
+    replaceSharedCoverCache(theme, &theme->mainElems, sourceCache, replacementCache, &replacementAssigned);
+    replaceSharedCoverCache(theme, &theme->infoElems, sourceCache, replacementCache, &replacementAssigned);
+    replaceSharedCoverCache(theme, &theme->appsMainElems, sourceCache, replacementCache, &replacementAssigned);
+    replaceSharedCoverCache(theme, &theme->appsInfoElems, sourceCache, replacementCache, &replacementAssigned);
+
+    if (!replacementAssigned)
+        cacheDestroyCache(replacementCache);
+}
+
+static void clampSelectedCoverCaches(theme_t *theme, theme_elems_t *elems)
+{
+    theme_element_t *elem = elems->first;
+
+    while (elem != NULL) {
+        if (elem->type == ELEM_TYPE_GAME_IMAGE) {
+            mutable_image_t *gameImage = (mutable_image_t *)elem->extended;
+
+            if (gameImage != NULL && gameImage->cache != NULL && gameImage->cache->suffix != NULL && strcmp(gameImage->cache->suffix, "COV") == 0 &&
+                !isDecoratorCoverCache(theme->gamesItemsList, gameImage->cache) && !isDecoratorCoverCache(theme->appsItemsList, gameImage->cache)) {
+                gameImage->cache->allowPrime = 0;
+            }
+        }
+
+        elem = elem->next;
+    }
+}
+
 static void validateGUIElems(const char *themePath, config_set_t *themeConfig, theme_t *theme)
 {
     // 1. check we have a valid Background elements
@@ -1005,6 +1200,16 @@ static void validateGUIElems(const char *themePath, config_set_t *themeConfig, t
     // 2. check we have a valid ItemsList element, and link its decorator to the target element
     validateItemsList(themePath, themeConfig, theme, theme->gamesItemsList, &theme->mainElems);
     validateItemsList(themePath, themeConfig, theme, theme->appsItemsList, &theme->appsMainElems);
+
+    // Items-list decorator covers need their own cache; sharing with selected covers defeats MMCE cover clamping.
+    splitDecoratorCoverCache(theme, theme->gamesItemsList);
+    splitDecoratorCoverCache(theme, theme->appsItemsList);
+
+    // Selected-cover caches do not need history unless a real items list decorator uses them.
+    clampSelectedCoverCaches(theme, &theme->mainElems);
+    clampSelectedCoverCaches(theme, &theme->infoElems);
+    clampSelectedCoverCaches(theme, &theme->appsMainElems);
+    clampSelectedCoverCaches(theme, &theme->appsInfoElems);
 }
 
 static int addGUIElem(const char *themePath, config_set_t *themeConfig, theme_t *theme, theme_elems_t *elems, const char *type, const char *name)
@@ -1021,15 +1226,18 @@ static int addGUIElem(const char *themePath, config_set_t *themeConfig, theme_t 
         configGetStr(themeConfig, elemProp, &type);
         if (type) {
             if (!strcmp(elementsType[ELEM_TYPE_ATTRIBUTE_TEXT], type)) {
+                elems->needsItemConfig = 1;
                 elem = initBasic(themePath, themeConfig, theme, name, ELEM_TYPE_ATTRIBUTE_TEXT, 0, 0, ALIGN_CENTER, DIM_UNDEF, DIM_UNDEF, SCALING_RATIO, theme->textColor, theme->fonts[0]);
                 initAttributeText(themePath, themeConfig, theme, elem, name);
             } else if (!strcmp(elementsType[ELEM_TYPE_STATIC_TEXT], type)) {
                 elem = initBasic(themePath, themeConfig, theme, name, ELEM_TYPE_STATIC_TEXT, 0, 0, ALIGN_CENTER, DIM_UNDEF, DIM_UNDEF, SCALING_RATIO, theme->textColor, theme->fonts[0]);
                 initStaticText(themePath, themeConfig, theme, elem, name);
             } else if (!strcmp(elementsType[ELEM_TYPE_GAME_COUNT_TEXT], type)) {
+                elems->needsItemConfig = 1;
                 elem = initBasic(themePath, themeConfig, theme, name, ELEM_TYPE_STATIC_TEXT, 0, 0, ALIGN_CENTER, DIM_UNDEF, DIM_UNDEF, SCALING_RATIO, theme->textColor, theme->fonts[0]);
                 initGameCountText(themePath, themeConfig, theme, elem, name);
             } else if (!strcmp(elementsType[ELEM_TYPE_ATTRIBUTE_IMAGE], type)) {
+                elems->needsItemConfig = 1;
                 elem = initBasic(themePath, themeConfig, theme, name, ELEM_TYPE_ATTRIBUTE_IMAGE, 0, 0, ALIGN_CENTER, DIM_UNDEF, DIM_UNDEF, SCALING_RATIO, gDefaultCol, theme->fonts[0]);
                 initAttributeImage(themePath, themeConfig, theme, elem, name);
             } else if (!strcmp(elementsType[ELEM_TYPE_GAME_IMAGE], type)) {
@@ -1382,6 +1590,7 @@ static void thmLoad(const char *themePath)
         for (i = ELF_FORMAT; i <= VMODE_PAL; i++)
             thmLoadResource(&newT->textures[i], i, NULL, GS_PSM_CT32, 1);
 
+    cacheCancelPendingImageLoads();
     gTheme = newT;
     thmFree(curT);
 }

@@ -1,0 +1,343 @@
+# German translation by ps2guy, LopoTRI, TnA, and WebSnke
+# For Open PS2 Loader v1.0.0 + betas - Official OPL Beta thread @https://www.psx-place.com/threads/open-ps2-loader-language-pack.20547/
+German
+Änderungen speichern
+Zurück
+Netzwerk
+Erweiterte Einstellungen
+<Keine Werte>
+Einstellungen gespeichert in %s
+Fehler: Schreiben der Einstellungen!
+Verlassen
+Einstellungen
+Menü
+BDM-Spiele
+HDD-Spiele
+ETH-Spiele
+Apps
+Theme
+Sprache
+Das System wird nun heruntergefahren.
+Zurück zum Browser?
+Aktualisierung abbrechen?
+%d: Festplatte nicht erkannt.
+%d: Festplatte nicht formatiert.
+%d: Fehler beim Starten des Netzwerks.
+%d: Kein Netzwerkadapter gefunden.
+%d: SMB-Server nicht erreichbar.
+%d: SMB-Anmeldung fehlgeschlagen.
+%d: SMB-Freigabe kann nicht geöffnet werden.
+%d: SMB-Freigaben können nicht gelistet werden.
+%d: Spiele können nicht gelistet werden.
+%d: DHCP-Server nicht verfügbar.
+%d: Keine Verbindung zum Netzwerk.
+Ein
+Aus
+Okay
+Select
+Abbruch
+Kreis
+Kreuz
+Spiele
+Spieleinstellungen
+Einstellungen zurücksetzen
+Scrollgeschwindigkeit
+Langsam
+Mittel
+Schnell
+Standardmenü
+Von Disc laden
+Bitte warten
+Fehler: Laden der Spiel-ID.
+Auto. Sortierung
+Fehler: Laden der Sprachdatei.
+Debug-Farben
+Kein Controller erkannt, warte…
+Cover-Art
+Breitbild
+Ausschalten
+Konfiguration wird geladen…
+Konfiguration wird gespeichert…
+Gerät starten
+Aktual.
+BDM-Startmodus
+Startmodus: HDD
+Startmodus: ETH
+Startmodus: Apps
+Auto.
+Manuell
+NBD-Server starten
+NBD-Server wird gestartet…
+NBD-Server läuft…
+Fehler: Starten des NBD-Server.
+NBD-Server wird gestoppt…
+IGR-Pfad
+Hintergrundfarbe
+Textfarbe
+- SMB-Server -
+IP-Typ
+Fest
+DHCP
+IP-Adresse
+Adresse
+Netzmaske
+Gateway
+DNS
+Port
+Freigabe
+Benutzer
+Passwort
+<leer>
+Typ
+IP
+NetBIOS
+Annehmen
+Element löschen?
+Umbenennen
+Löschen
+Start
+Anzeige
+Schreibvorgänge
+Letztes Spiel merken
+Select-Taste
+Fehler: Spiel fragmentiert!
+Fehler: Objekt kann nicht ausgeführt werden!
+Änderungen testen
+Leer = Anmeldung als Gast
+Genaue Lesegeschwindigkeit
+Synchron-Modus
+Syscalls aushängen
+Videos überspringen
+DVD-DL emulieren
+IGR deaktivieren
+Änderung der VMC Größe führt zu Reformatierung.
+Neu
+Start
+Ändern
+Abbruch
+Zurücksetzen
+Generische Nutzen
+VMC-Einstellungen
+Name
+Größe
+Status
+Fortschritt
+VMC-Datei existiert.
+Ungültige VMC Datei: Größe nicht Korrekt.
+VMC-Datei muss erstellt werden.
+Fehler: Zugriff auf VMC %s. Weiter mit MC in Port %d?
+Auto. aktualisieren
+Über
+Entwickler
+Qualitätskontrolle
+BDM-Präfix-Pfad
+ELF nach IGR Booten
+Wert in Minuten. 0 = Keine HDD Abschaltung
+Auto. HDD Abschaltung
+Videomodus
+Dialog
+Auswahl
+Farben zurücksetzen
+Info
+Eigene ELF
+Farbauswahl
+Erneut Verbinden
+Leer = Freigaben auflisten
+ETH Präfix Pfad
+Zurücktaste
+Leertaste
+Enter-Taste
+Modus
+VMC-Port 1
+VMC-Port 2
+Spiel-ID
+DMA-Modus
+V-Sync
+Modus 1
+Modus 2
+Modus 3
+Modus 4
+Modus 5
+Modus 6
+GSM konfigurieren
+Ethernet-Linkmodus
+100Mbit/s Full-Duplex
+100Mbit/s Half-Duplex
+10Mbit/s Full-Duplex
+10Mbit/s Half-Duplex
+GSM-Einstellungen
+GSM Selector
+Schaltet GSM ein/aus
+Benutzerdef. Videomodus aktiviert.
+H-POS
+Horizontale Position
+V-POS
+Vertikale Position
+Overscan
+Overscan anpassen
+FMVs überspringen
+FMV Sequenzen überspringen.
+Cheat-Einstellungen
+PS2RD Cheat-Engine
+PS2RD Cheat-Engine Spiele patchen lassen
+PS2RD Cheat-Engine-Modus
+Auto. oder Cheat Wählen
+Cheats Auto. Wählen
+Cheats wählen
+Fehler: Laden der Cheat Datei.
+Keine Cheats gefunden.
+Standardeinstellungen laden
+Netzwerk-Update
+Einstellungen überschreiben?
+Update fehlgeschlagen.
+Verbindung zu Update-Server fehlgeschlagen.
+Update beendet.
+Update abgebrochen.
+Einstellungen über Netzwerk laden?
+Benutzerdef. Einstellungen
+Standardeinstellungen geladen
+Auto. Start in %i s…
+Auto. Start
+Wert in Sekunden. 0 = Deaktiviert.
+PS2-Logo
+Wird für ein gültiges Disc-Logo angezeigt, das der Region der Konsole entspricht.
+PADEMU Konfigurieren
+Pad-Emulator-Einstellungen
+Pad-Emulator
+Pad-Emulator ein/aus
+Pad-Emulatormodus
+Pad-Emulatormodus wählen
+DualShock 3/4 USB
+DualShock 3/4 BT
+Anschluss Einstellungen:
+Port des Pad-Emulators für Einstellungen
+Emulation
+Pad-Emulator für Port ein/aus.
+Vibration
+Vibration für Port ein/aus.
+BT-Aadapter MAC-Adresse:
+DS-Controller Verbunden mit MAC-Adresse:
+Verbinden
+Verbinde DS-Controller
+Verbinde DS-Controller mit BT-Adapter MAC-Adresse.
+Nicht verbunden
+BT-Adapter-Informationen
+Mehr Informationen und unterstützte Funktionen zeigen.
+HCI-Version:
+LMP-Version:
+Hersteller-ID:
+Unterstützte Funktionen:
+Ja
+Nein
+BT-Adapter sollte voll mit DS-Controller kompatibel sein.
+BT-Adapter funktioniert evtl. nicht korrekt mit DS-Controller.
+Multitap-Emulation
+Multitap-Emulation ein/aus.
+Multitap-Emulation Port:
+Multitap-Emulation Port wählen.
+Gefälschte DS3s umgehen
+Einige gefälschte DS3s werden mit dieser Option umgangen.
+FIELD Flipping Emulation
+Fix für Spiele mit Progressive Video Modes (zB. 576p)
+Kindersicherung
+Passwort
+Leer = Keine Kindersicherung
+Kindersicherung Passwort eingeben
+Kindersicherung Passwort Falsch.
+Kindersicherung Deaktiviert.
+Build-Optionen:
+Fehler: Passwort nicht Verwendbar.
+VMC %s fragmentiert. Weiter mit MC in Port %d?
+Audio
+Soundeffekte
+Startupsound
+Soundeffekte-Lautstärke
+Lautstärke des Startupsounds
+Videoeinstellungen bestätigen?
+Spieleliste-Cache (HDD)
+Benachrichtigungen
+Config loaded from %s
+Theme loaded from %s
+Language loaded from %s
+%s partition mounted.
+Optionen
+Spiel Einstellungen Gespeichert.
+%s Einstellungen Entfernt.
+Überschreibt Kompatibilitäts Einstellungen
+Einstellungen Modus
+Global
+Pro Spiel
+Alle
+Einstellungen zum Entfernen Wählen.
+Support-Foren:
+Titel
+Genre
+Veröffentlichung
+Entwickler
+Beschreibung
+Block-Geräte
+Controller-Einstellungen
+Block-Gerätemanager ein/aus
+Block-Geräte ein/aus
+USB-Spiele
+iLink-Spiele
+MX4SIO-Spiele
+Configure PADMACRO
+Pad Macro Settings
+Pad macros
+Analog Slow-Down:
+Reichweite des Analogsticks bei Tastendruck verringern
+Linker Stick
+Rechter Stick
+Analoge Achse invertieren:
+Analogstick-Achse invertieren
+Tastengeschwindigkeit
+Wie schnell Taste gedrückt werden muss, wenn der Turbo aktiviert ist
+Während Taste gedrückt ist
+Mit Taste wechseln
+JAPANISCH
+ENGLISCH
+FRANZÖSISCH
+SPANISCH
+DEUTSCH
+ITALIENISCH
+NIEDERLÄNDISCH
+PORTUGIESISCH
+RUSSISCH
+KOREANISCH
+TRADITIONELLES CHINESISCH
+VEREINFACHTES CHINESISCH
+OSD-Einstellungen
+OSD-Sprache
+Force a custom language configuration
+Sprache ändern
+Screen Size
+Full Screen
+Video Mode
+System Default
+Hintergrundmusik
+Hintergrundmusik-Lautstärke
+Standardmusik
+Pfad zum Streamen von Musik für das interne Thema festlegen.
+High
+Low
+Analog X-Axis Sensitivity
+Analog Y-Axis Sensitivity
+Files found: %i
+Cheat Selection
+Only one HDD allowed, enabling locks APA or GPT.
+MMCE
+MMCE Games
+MMCE Start Mode
+MMCE Prefix Path
+MMCE Slot
+IGR Bootcard Slot(s)
+Switch to bootcard cmd will be sent to the selected slot(s) on IGR
+Advanced
+MMCE Settings
+Lock Sema Enqueuing Method
+THFIFO may help with compatibility but worsen performance
+Wait cycles after /ACK low
+Lower values may improve performance but result in instabilities
+Use timeout alarms
+OFF may help performance but can cause MMCE timeouts to result in freezes

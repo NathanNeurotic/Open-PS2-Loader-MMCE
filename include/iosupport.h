@@ -12,6 +12,9 @@ enum IO_MODES {
     BDM_MODE2,
     BDM_MODE3,
     BDM_MODE4,
+    BDM_MODE5,
+    BDM_MODE6,
+    BDM_MODE7,
     ETH_MODE,
     HDD_MODE,
     APP_MODE,
@@ -19,6 +22,9 @@ enum IO_MODES {
 
     MODE_COUNT
 };
+
+#define BDM_MODE_LAST  BDM_MODE7
+#define BDM_MODE_COUNT (BDM_MODE_LAST - BDM_MODE + 1)
 
 enum START_MODE {
     START_MODE_DISABLED = 0,

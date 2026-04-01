@@ -22,6 +22,7 @@
 #include "include/cheatman.h"
 #include "include/sound.h"
 #include "include/guigame.h"
+#include "include/texcache.h"
 
 #include <limits.h>
 #include <stdlib.h>
@@ -488,24 +489,18 @@ int guiDeviceTypeToIoMode(int deviceType)
 
 int guiIoModeToDeviceType(int ioMode)
 {
-    switch (ioMode) {
-        case BDM_MODE:
-        case BDM_MODE1:
-        case BDM_MODE2:
-        case BDM_MODE3:
-        case BDM_MODE4:
-            return 0;
-        case ETH_MODE:
-            return 1;
-        case HDD_MODE:
-            return 2;
-        case APP_MODE:
-            return 3;
-        case MMCE_MODE:
-            return 4;
-        default:
-            return 0;
-    }
+    if (ioMode >= BDM_MODE && ioMode < ETH_MODE)
+        return 0;
+    if (ioMode == ETH_MODE)
+        return 1;
+    if (ioMode == HDD_MODE)
+        return 2;
+    if (ioMode == APP_MODE)
+        return 3;
+    if (ioMode == MMCE_MODE)
+        return 4;
+
+    return 0;
 }
 
 void guiShowConfig()
@@ -875,17 +870,13 @@ void guiShowMMCEConfig()
 
     diaSetString(diaMMCEConfig, CFG_MMCEPREFIX, gMMCEPrefix);
 
-#ifdef __DEBUG
     diaSetInt(diaMMCEConfig, CFG_MMCEGAMEID, gMMCEEnableGameID);
-#endif
 
     ret = diaExecuteDialog(diaMMCEConfig, -1, 1, NULL);
     if (ret) {
         diaGetInt(diaMMCEConfig, CFG_MMCEMODE, &gMMCEStartMode);
         diaGetInt(diaMMCEConfig, CFG_MMCESLOT, &gMMCESlot);
-#ifdef __DEBUG
         diaGetInt(diaMMCEConfig, CFG_MMCEGAMEID, &gMMCEEnableGameID);
-#endif
         diaGetInt(diaMMCEConfig, CFG_MMCEIGRSLOT, &gMMCEIGRSlot);
 
         diaGetInt(diaMMCEConfig, CFG_MMCE_WAIT_CYCLES, &gMMCEAckWaitCycles);
@@ -1091,6 +1082,7 @@ static void guiHandleOp(struct gui_update_t *item)
             item->menu.menu->submenu = NULL;
             item->menu.menu->current = NULL;
             item->menu.menu->pagestart = NULL;
+            cacheAdvanceGeneration();
             break;
 
         case GUI_OP_SORT:
@@ -1101,6 +1093,7 @@ static void guiHandleOp(struct gui_update_t *item)
                 item->menu.menu->current = item->menu.menu->submenu;
 
             item->menu.menu->pagestart = item->menu.menu->current;
+            cacheAdvanceGeneration();
             break;
 
         case GUI_OP_ADD_HINT:
@@ -1530,8 +1523,13 @@ static void guiReadPads()
 {
     if (readPads())
         guiInactiveFrames = 0;
-    else
+    else {
+        int wasActive = (guiInactiveFrames == 0);
+
         guiInactiveFrames++;
+        if (wasActive)
+            cacheWakeInteractiveArtOnInputIdle();
+    }
 }
 
 // renders the screen and handles inputs. Also handles screen transitions between numerous
@@ -1609,6 +1607,8 @@ void guiIntroLoop(void)
 
         if (!screenHandlerTarget && screenHandler)
             screenHandler->handleInput();
+
+        cachePrimeReadyTexture();
     }
 }
 
@@ -1648,6 +1648,8 @@ void guiMainLoop(void)
         if (!screenHandlerTarget && screenHandler)
             screenHandler->handleInput();
 
+        cachePrimeReadyTexture();
+
         if (gFrameHook)
             gFrameHook();
     }
@@ -1664,6 +1666,8 @@ void guiSwitchScreen(int target)
     if (screenHandlerTarget != NULL) {
         return;
     }
+
+    cacheAdvanceGeneration();
     sfxPlay(SFX_TRANSITION);
     transIndex = 0;
     screenHandlerTarget = &screenHandlers[target];
@@ -1743,7 +1747,10 @@ int guiMsgBox(const char *text, int addAccept, struct UIItem *ui)
 
 void guiHandleDeferedIO(int *ptr, const char *message, int type, void *data)
 {
-    ioPutRequest(type, data);
+    if (ioPutRequest(type, data) != IO_OK) {
+        *ptr = 0;
+        return;
+    }
 
     while (*ptr)
         guiRenderTextScreen(message);
@@ -1751,7 +1758,10 @@ void guiHandleDeferedIO(int *ptr, const char *message, int type, void *data)
 
 void guiGameHandleDeferedIO(int *ptr, struct UIItem *ui, int type, void *data)
 {
-    ioPutRequest(type, data);
+    if (ioPutRequest(type, data) != IO_OK) {
+        *ptr = 0;
+        return;
+    }
 
     while (*ptr) {
         guiStartFrame();
