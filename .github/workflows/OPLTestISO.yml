@@ -7,9 +7,6 @@ on:
       - 'labs/opltestiso/**'
   workflow_dispatch:
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
   build-opltestiso:
     runs-on: ubuntu-latest
@@ -19,7 +16,7 @@ jobs:
         run: apk add build-base git zip cdrkit
 
       - name: git checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
