@@ -1,0 +1,37 @@
+name: CI-OPLTestISO
+
+on:
+  push:
+    paths:
+      - '.github/workflows/OPLTestISO.yml'
+      - 'labs/opltestiso/**'
+  workflow_dispatch:
+
+jobs:
+  build-opltestiso:
+    runs-on: ubuntu-latest
+    container: ps2dev/ps2dev:latest
+    steps:
+    - name: Install dependencies
+      run:  apk add build-base git zip cdrkit
+
+    - name: git checkout
+      uses: actions/checkout@v5
+      with:
+        fetch-depth: 0
+
+    - name: Configure git safe.directory for act bind mounts
+      run: |
+        git config --global --add safe.directory "$GITHUB_WORKSPACE" || true
+
+    - name: make ISO
+      run: |
+          cd labs/opltestiso/
+          make iso
+
+    - name: Upload release artifact ISO
+      uses: actions/upload-artifact@v6
+      with:
+        name: OPLTESTISO
+        path: |
+           labs/opltestiso/*.iso

@@ -6,6 +6,7 @@
 #include "include/util.h"
 #include "include/themes.h"
 #include "include/textures.h"
+#include "include/texcache.h"
 #include "include/ioman.h"
 #include "include/system.h"
 #include "include/extern_irx.h"
@@ -14,19 +15,90 @@
 #include "../ee_core/include/coreconfig.h"
 #include <usbhdfsd-common.h>
 
+#include <kernel.h>
 #include <ps2sdkapi.h>
 #define NEWLIB_PORT_AWARE
 #include <fileXio_rpc.h> // fileXioIoctl, fileXioDevctl
 
 static char mmcePrefix[40]; // Contains the full path to the folder where all the games are.
+static char mmceArtPrimary[40];
 static int mmceULSizePrev = -2;
 static time_t mmceModifiedCDPrev;
 static time_t mmceModifiedDVDPrev;
 static int mmceGameCount = 0;
 static base_game_info_t *mmceGames;
 
+#define MMCE_GAMEID_WAIT_TICKS    120
+/* Allow up to 500 ms for the art thread to drain before resorting to
+ * TerminateThread.  The MMCE worker checks the abort flag between every
+ * 4 KB read chunk (~16 ms at typical card speeds), so 500 ms covers
+ * even very slow cards and avoids the fileXio RPC corruption that
+ * TerminateThread can cause mid-read. */
+#define MMCE_ART_ABORT_WAIT_TICKS 500
+
 // forward declaration
 static item_list_t mmceGameList;
+
+static void mmceGetDeviceRoot(char *root, size_t size)
+{
+    const char *separator = strstr(mmcePrefix, ":/");
+    size_t length;
+
+    if (root == NULL || size == 0)
+        return;
+
+    if (separator != NULL) {
+        length = (size_t)(separator - mmcePrefix) + 2;
+        if (length >= size)
+            length = size - 1;
+
+        memcpy(root, mmcePrefix, length);
+        root[length] = '\0';
+        return;
+    }
+
+    if (gMMCESlot == 0)
+        snprintf(root, size, "mmce0:/");
+    else if (gMMCESlot == 1)
+        snprintf(root, size, "mmce1:/");
+    else
+        root[0] = '\0';
+}
+
+static void mmceRefreshArtRoots(void)
+{
+    int len;
+
+    mmceArtPrimary[0] = '\0';
+
+    if (mmcePrefix[0] == '\0')
+        return;
+
+    /* Ensure mmcePrefix always ends with '/' so path concatenation is correct
+     * (e.g. "mmce0:/CD" -> "mmce0:/CD/" prevents "mmce0:/CDART" paths). */
+    len = strlen(mmcePrefix);
+    if (len < (int)sizeof(mmcePrefix) - 1 && mmcePrefix[len - 1] != '/') {
+        mmcePrefix[len] = '/';
+        mmcePrefix[len + 1] = '\0';
+    }
+
+    snprintf(mmceArtPrimary, sizeof(mmceArtPrimary), "%s", mmcePrefix);
+}
+
+static int mmceTryLoadImage(const char *prefix, char *folder, int isRelative, char *value, char *suffix, GSTEXTURE *resultTex)
+{
+    char path[256];
+
+    if ((prefix == NULL || prefix[0] == '\0') && isRelative)
+        return -1;
+
+    if (isRelative)
+        snprintf(path, sizeof(path), "%s%s/%s_%s", prefix, folder, value, suffix);
+    else
+        snprintf(path, sizeof(path), "%s%s_%s", folder, value, suffix);
+
+    return texDiscoverLoad(resultTex, path, -1);
+}
 
 int mmceDetectSlot(void)
 {
@@ -49,6 +121,8 @@ void mmceSetPrefix(void)
         sprintf(mmcePrefix, "mmce1:/%s", gMMCEPrefix);
     else if (gMMCESlot == 2)
         (void)mmceDetectSlot();
+
+    mmceRefreshArtRoots();
 }
 
 void mmceLoadModules(void)
@@ -61,6 +135,8 @@ void mmceLoadModules(void)
 void mmceInit(item_list_t *itemList)
 {
     LOG("MMCESUPPORT Init\n");
+    mmcePrefix[0] = '\0';
+    mmceArtPrimary[0] = '\0';
     mmceULSizePrev = -2;
     mmceModifiedCDPrev = 0;
     mmceModifiedDVDPrev = 0;
@@ -68,16 +144,10 @@ void mmceInit(item_list_t *itemList)
     mmceGames = NULL;
 
     configGetInt(configGetByType(CONFIG_OPL), "usb_frames_delay", &mmceGameList.delay);
-    mmceGameList.updateDelay = -1; //No automatic updates
+    mmceGameList.updateDelay = MMCE_MODE_UPDATE_DELAY;
 
     mmceLoadModules();
-
-    if (gMMCESlot == 0)
-        sprintf(mmcePrefix, "mmce0:/");
-    else if (gMMCESlot == 1)
-        sprintf(mmcePrefix, "mmce1:/");
-    else if (gMMCESlot == 2)
-        mmceDetectSlot();
+    mmceSetPrefix();
 
     mmceGameList.enabled = 1;
 }
@@ -98,8 +168,15 @@ static int mmceNeedsUpdate(item_list_t *itemList)
     int result = 0;
     struct stat st;
 
-    //Hacky: check if slot was changed, update prefix if needed
+    // Hacky: check if slot was changed, update prefix if needed
     mmceSetPrefix();
+
+    if (mmcePrefix[0] == '\0') {
+        mmceGameList.updateDelay = MMCE_MODE_UPDATE_DELAY;
+        return (mmceGameCount > 0);
+    }
+
+    mmceGameList.updateDelay = MENU_UPD_DELAY_NOUPDATE;
 
     if (mmceULSizePrev == -2)
         result = 1;
@@ -146,6 +223,9 @@ static int mmceNeedsUpdate(item_list_t *itemList)
 
 static int mmceUpdateGameList(item_list_t *itemList)
 {
+    if (mmcePrefix[0] == '\0')
+        return mmceGameCount;
+
     sbReadList(&mmceGames, mmcePrefix, &mmceULSizePrev, &mmceGameCount);
     return mmceGameCount;
 }
@@ -194,6 +274,7 @@ void mmceLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
     int result;
 
     char partname[256], filename[32];
+    char mmceDevice[sizeof(mmcePrefix)];
     base_game_info_t *game;
     struct cdvdman_settings_mmce *settings;
     u32 layer1_start, layer1_offset;
@@ -204,6 +285,11 @@ void mmceLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
         game = &mmceGames[id];
     else
         game = gAutoLaunchBDMGame;
+
+    if (!cacheAbortMmceImageLoadsTimed(MMCE_ART_ABORT_WAIT_TICKS)) {
+        cacheEnd(1);
+        cacheInit();
+    }
 
     void *irx = &mmce_cdvdman_irx;
     int irx_size = size_mmce_cdvdman_irx;
@@ -307,7 +393,7 @@ void mmceLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
         strcpy(filename, game->startup);
 
 
-    //MMCEDRV settings
+    // MMCEDRV settings
     if (gMMCESlot == 0)
         settings->port = 2;
     else if (gMMCESlot == 1)
@@ -324,39 +410,41 @@ void mmceLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
     settings->ack_wait_cycles = gMMCEAckWaitCycles;
     settings->use_alarms = gMMCEUseAlarms;
 
-    //TEMP: The fd given by sd2psx is not the same one we see here on the EE
-    //and ps2sdk_get_iop_fd does not seem to return the right value either
+    // TEMP: The fd given by sd2psx is not the same one we see here on the EE
+    // and ps2sdk_get_iop_fd does not seem to return the right value either
     settings->iso_fd = fileXioIoctl2(iso_file, 0x80, NULL, 0, NULL, 0);
 
     LOG("name: %s\n", game->name);
     LOG("start: %s\n", game->startup);
 
-    //Set gameid and poll card until ready
-#ifdef __DEBUG
-    if (gMMCEEnableGameID) {
-#endif
+    mmceGetDeviceRoot(mmceDevice, sizeof(mmceDevice));
 
+    // Set GameID and only wait for readiness when that feature is enabled.
+    if (gMMCEEnableGameID && mmceDevice[0] != '\0' && fileXioDevctl(mmceDevice, 0x8, game->startup, (strlen(game->startup) + 1), NULL, 0) >= 0) {
         // Send GameID to MMCE
-        fileXioDevctl(mmcePrefix, 0x8, game->startup, (strlen(game->startup) + 1), NULL, 0);
+        for (int i = 0; i < MMCE_GAMEID_WAIT_TICKS; i++) {
+            int status;
 
-        for (int i = 0; i < 15; i++) {
-            sleep(1);
+            nopdelay();
 
             // Poll MMCE status until busy bit is clear
-            if ((fileXioDevctl(mmcePrefix, 0x2, NULL, 0, NULL, 0) & 1) == 0) {
+            status = fileXioDevctl(mmceDevice, 0x2, NULL, 0, NULL, 0);
+            if (status < 0)
+                break;
+
+            if ((status & 1) == 0) {
                 LOG("Set MMCE GameID to: %s\n", game->startup);
                 break;
             }
         }
-#ifdef __DEBUG
     }
-#endif
 
-    //mcReset();
-    //mcInit(MC_TYPE_XMC);
+    // mcReset();
+    // mcInit(MC_TYPE_XMC);
 
-    if (gAutoLaunchBDMGame == NULL)
+    if (gAutoLaunchBDMGame == NULL) {
         deinit(NO_EXCEPTION, MMCE_MODE); // CAREFUL: deinit will call mmceCleanUp, so mmceGames/game will be freed
+    }
 
     /* No autolaunch yet
     else {
@@ -378,12 +466,7 @@ static config_set_t *mmceGetConfig(item_list_t *itemList, int id)
 
 static int mmceGetImage(item_list_t *itemList, char *folder, int isRelative, char *value, char *suffix, GSTEXTURE *resultTex, short psm)
 {
-    char path[256];
-    if (isRelative)
-        snprintf(path, sizeof(path), "%s%s/%s_%s", mmcePrefix, folder, value, suffix);
-    else
-        snprintf(path, sizeof(path), "%s%s_%s", folder, value, suffix);
-    return texDiscoverLoad(resultTex, path, -1);
+    return mmceTryLoadImage(mmceArtPrimary, folder, isRelative, value, suffix, resultTex);
 }
 
 static int mmceGetTextId(item_list_t *itemList)
@@ -423,7 +506,7 @@ static void mmceShutdown(item_list_t *itemList)
     }
 
     // As required by some (typically 2.5") HDDs, issue the SCSI STOP UNIT command to avoid causing an emergency park.
-    //fileXioDevctl("mass:", USBMASS_DEVCTL_STOP_ALL, NULL, 0, NULL, 0);
+    // fileXioDevctl("mass:", USBMASS_DEVCTL_STOP_ALL, NULL, 0, NULL, 0);
 }
 
 static int mmceCheckVMC(item_list_t *itemList, char *name, int createSize)
@@ -444,7 +527,7 @@ static item_list_t mmceGameList = {
 void mmceInitSemaphore()
 {
     // Create a semaphore so only one thread can load IOP modules at a time.
-    //if (mmceLoadModuleLock < 0) {
+    // if (mmceLoadModuleLock < 0) {
     //    mmceLoadModuleLock = sbCreateSemaphore();
     //}
 }

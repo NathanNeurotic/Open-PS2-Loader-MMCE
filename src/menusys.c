@@ -17,6 +17,7 @@
 #include "include/system.h"
 #include "include/ioman.h"
 #include "include/sound.h"
+#include "include/texcache.h"
 #include <assert.h>
 
 enum MENU_IDs {
@@ -80,6 +81,24 @@ static s32 menuSemaId;
 static s32 menuListSemaId = -1;
 static ee_sema_t menuSema;
 
+#define MENU_MMCE_CONFIG_IDLE_FRAMES 20
+
+static void menuInvalidateArtSelection(void)
+{
+    cacheAdvanceGeneration();
+}
+
+static void menuAdvanceArtSelectionOnMove(void)
+{
+    item_list_t *support = selected_item != NULL ? (item_list_t *)selected_item->item->userdata : NULL;
+
+    /* Keep APP prefetch, but drop stale interactive work from prior selections. */
+    if (support != NULL && support->mode == APP_MODE)
+        cacheAdvanceGenerationPreservePrefetch();
+    else
+        cacheAdvanceGeneration();
+}
+
 static void menuRenameGame(submenu_list_t **submenu)
 {
     if (!selected_item->item->current) {
@@ -142,11 +161,30 @@ static void menuDeleteGame(submenu_list_t **submenu)
 
 static void _menuLoadConfig()
 {
+    int blockingLoad = 0;
+    item_list_t *list = NULL;
+    config_set_t *loadedConfig = NULL;
+    int configId = -1;
+
     WaitSema(menuSemaId);
-    if (!itemConfig) {
-        item_list_t *list = selected_item->item->userdata;
-        itemConfig = list->itemGetConfig(list, itemConfigId);
+    blockingLoad = actionStatus != 0;
+    if (!itemConfig && selected_item != NULL && selected_item->item->current != NULL && itemConfigId >= 0) {
+        list = selected_item->item->userdata;
+        configId = itemConfigId;
     }
+    SignalSema(menuSemaId);
+
+    if (blockingLoad)
+        (void)cacheCancelPendingImageLoadsTimed(MENU_MIN_INACTIVE_FRAMES);
+
+    if (list != NULL)
+        loadedConfig = list->itemGetConfig(list, configId);
+
+    WaitSema(menuSemaId);
+    if (!itemConfig && loadedConfig != NULL && itemConfigId == configId)
+        itemConfig = loadedConfig;
+    else if (loadedConfig != NULL)
+        configFree(loadedConfig);
     actionStatus = 0;
     SignalSema(menuSemaId);
 }
@@ -167,8 +205,12 @@ static void _menuSaveConfig()
 
 static void _menuRequestConfig()
 {
+    int shouldQueueLoad = 0;
+
     WaitSema(menuSemaId);
-    if (selected_item->item->current != NULL && itemConfigId != selected_item->item->current->item.id) {
+    if (selected_item == NULL || selected_item->item == NULL || selected_item->item->current == NULL) {
+        actionStatus = 0;
+    } else if (itemConfigId != selected_item->item->current->item.id) {
         if (itemConfig) {
             configFree(itemConfig);
             itemConfig = NULL;
@@ -176,12 +218,77 @@ static void _menuRequestConfig()
         item_list_t *list = selected_item->item->userdata;
         if (itemConfigId == -1 || guiInactiveFrames >= list->delay) {
             itemConfigId = selected_item->item->current->item.id;
-            ioPutRequest(IO_CUSTOM_SIMPLEACTION, &_menuLoadConfig);
+            shouldQueueLoad = 1;
         }
-    } else if (itemConfig)
+    } else if (itemConfig == NULL && actionStatus != 0) {
+        shouldQueueLoad = 1;
+    } else
         actionStatus = 0;
 
     SignalSema(menuSemaId);
+
+    if (shouldQueueLoad && ioPutRequest(IO_CUSTOM_SIMPLEACTION, &_menuLoadConfig) != IO_OK) {
+        WaitSema(menuSemaId);
+        actionStatus = 0;
+        SignalSema(menuSemaId);
+    }
+}
+
+static config_set_t *menuLoadConfigDirectInternal(void)
+{
+    config_set_t *loadedConfig = NULL;
+    config_set_t *result = NULL;
+    item_list_t *list = NULL;
+    int configId = -1;
+
+    WaitSema(menuSemaId);
+    if (selected_item != NULL && selected_item->item != NULL && selected_item->item->current != NULL) {
+        list = selected_item->item->userdata;
+        configId = selected_item->item->current->item.id;
+
+        if (itemConfigId == configId && itemConfig != NULL) {
+            result = itemConfig;
+        } else {
+            if (itemConfig != NULL) {
+                configFree(itemConfig);
+                itemConfig = NULL;
+            }
+            itemConfigId = configId;
+        }
+    } else {
+        if (itemConfig != NULL) {
+            configFree(itemConfig);
+            itemConfig = NULL;
+        }
+        itemConfigId = -1;
+    }
+    SignalSema(menuSemaId);
+
+    if (result != NULL || list == NULL || configId < 0)
+        return result;
+
+    if (list->mode == MMCE_MODE) {
+        /* Signal the art loader to abort, but do not block waiting for it to
+         * drain.  The MMCE config read that follows will simply be serialised
+         * behind the current art chunk in the IOP queue (typically ≤ 20 ms).
+         * A blocking wait here froze navigation for up to 60 ms on every
+         * CROSS/CIRCLE press and – if the abort timed out – triggered a
+         * TerminateThread that corrupted the fileXio RPC channel, causing art
+         * to stop loading for the rest of the session. */
+        cacheAbortMmceImageLoadsTimed(0);
+    } else
+        (void)cacheCancelPendingImageLoadsTimed(MENU_MIN_INACTIVE_FRAMES);
+    loadedConfig = list->itemGetConfig(list, configId);
+
+    WaitSema(menuSemaId);
+    if (itemConfigId == configId && itemConfig == NULL)
+        itemConfig = loadedConfig;
+    else if (loadedConfig != NULL)
+        configFree(loadedConfig);
+    result = itemConfig;
+    SignalSema(menuSemaId);
+
+    return result;
 }
 
 config_set_t *menuLoadConfig()
@@ -190,6 +297,12 @@ config_set_t *menuLoadConfig()
     itemConfigId = -1;
     guiHandleDeferedIO(&actionStatus, _l(_STR_LOADING_SETTINGS), IO_CUSTOM_SIMPLEACTION, &_menuRequestConfig);
     return itemConfig;
+}
+
+config_set_t *menuLoadConfigDirect(void)
+{
+    actionStatus = 0;
+    return menuLoadConfigDirectInternal();
 }
 
 // we don't want a pop up when transitioning to or refreshing Game Menu gui.
@@ -384,8 +497,11 @@ static void refreshMenuPosition(void)
     if (cur->item->visible == 0) {
         // No visible menu was found, just set the current menu to the first one in the list.
         selected_item = menu;
-    } else
+    } else {
         selected_item = cur;
+    }
+
+    menuInvalidateArtSelection();
 }
 
 void submenuRebuildCache(submenu_list_t *submenu)
@@ -611,6 +727,7 @@ static void menuNextH()
     if (next != NULL) {
         selected_item = next;
         itemConfigId = -1;
+        menuInvalidateArtSelection();
         sfxPlay(SFX_CURSOR);
     }
 }
@@ -624,6 +741,7 @@ static void menuPrevH()
     if (prev != NULL) {
         selected_item = prev;
         itemConfigId = -1;
+        menuInvalidateArtSelection();
         sfxPlay(SFX_CURSOR);
     }
 }
@@ -631,20 +749,21 @@ static void menuPrevH()
 static void menuFirstPage()
 {
     submenu_list_t *cur = selected_item->item->current;
-    if (cur) {
+    if (cur && cur != selected_item->item->submenu) {
         if (cur->prev) {
             sfxPlay(SFX_CURSOR);
         }
 
         selected_item->item->current = selected_item->item->submenu;
         selected_item->item->pagestart = selected_item->item->current;
+        menuInvalidateArtSelection();
     }
 }
 
 static void menuLastPage()
 {
     submenu_list_t *cur = selected_item->item->current;
-    if (cur) {
+    if (cur && cur->next) {
         if (cur->next) {
             sfxPlay(SFX_CURSOR);
         }
@@ -658,6 +777,7 @@ static void menuLastPage()
             cur = cur->prev;
 
         selected_item->item->pagestart = cur;
+        menuInvalidateArtSelection();
     }
 }
 
@@ -668,6 +788,7 @@ static void menuNextV()
     if (cur && cur->next) {
         selected_item->item->current = cur->next;
         sfxPlay(SFX_CURSOR);
+        menuAdvanceArtSelectionOnMove();
 
         // if the current item is beyond the page start, move the page start one page down
         cur = selected_item->item->pagestart;
@@ -698,6 +819,8 @@ static void menuPrevV()
             while (--itms && selected_item->item->pagestart->prev)
                 selected_item->item->pagestart = selected_item->item->pagestart->prev;
         }
+
+        menuAdvanceArtSelectionOnMove();
     } else { // wrap to end
         menuLastPage();
     }
@@ -716,6 +839,7 @@ static void menuNextPage()
 
         selected_item->item->current = cur;
         selected_item->item->pagestart = selected_item->item->current;
+        menuInvalidateArtSelection();
     } else { // wrap to start
         menuFirstPage();
     }
@@ -734,6 +858,7 @@ static void menuPrevPage()
 
         selected_item->item->current = cur;
         selected_item->item->pagestart = selected_item->item->current;
+        menuInvalidateArtSelection();
     } else { // wrap to end
         menuLastPage();
     }
@@ -746,6 +871,7 @@ void menuSetSelectedItem(menu_item_t *item)
     while (itm) {
         if (itm->item == item) {
             selected_item = itm;
+            menuInvalidateArtSelection();
             return;
         }
 
@@ -930,16 +1056,21 @@ void menuHandleInputMenu()
     }
 }
 
-static void menuRenderElements(theme_element_t *elem)
+static void menuRenderElements(theme_elems_t *elems, int allowItemConfig, config_set_t *renderConfig)
 {
     // selected_item can't be NULL here as we only allow to switch to "Main" rendering when there is at least one device activated
-    _menuRequestConfig();
+    theme_element_t *elem = elems->first;
+    item_list_t *list = selected_item != NULL && selected_item->item != NULL ? selected_item->item->userdata : NULL;
+
+    if (allowItemConfig && elems->needsItemConfig && !cacheHasPendingInteractiveArt() &&
+        (list == NULL || list->mode != MMCE_MODE || guiInactiveFrames >= MENU_MMCE_CONFIG_IDLE_FRAMES))
+        _menuRequestConfig();
 
     WaitSema(menuSemaId);
 
     while (elem) {
         if (elem->drawElem)
-            elem->drawElem(selected_item, selected_item->item->current, itemConfig, elem);
+            elem->drawElem(selected_item, selected_item->item->current, renderConfig, elem);
 
         elem = elem->next;
     }
@@ -949,12 +1080,14 @@ static void menuRenderElements(theme_element_t *elem)
 void menuRenderMain(void)
 {
     item_list_t *list = selected_item->item->userdata;
+    int allowItemConfig = !(list != NULL && list->mode == MMCE_MODE);
+    config_set_t *renderConfig = allowItemConfig ? itemConfig : NULL;
 
     if (list->mode == APP_MODE) {
-        menuRenderElements(gTheme->appsMainElems.first);
+        menuRenderElements(&gTheme->appsMainElems, allowItemConfig, renderConfig);
         gTheme->itemsList = gTheme->appsItemsList;
     } else {
-        menuRenderElements(gTheme->mainElems.first);
+        menuRenderElements(&gTheme->mainElems, allowItemConfig, renderConfig);
         gTheme->itemsList = gTheme->gamesItemsList;
     }
 }
@@ -1008,10 +1141,10 @@ void menuRenderInfo(void)
     item_list_t *list = selected_item->item->userdata;
 
     if (list->mode == APP_MODE) {
-        menuRenderElements(gTheme->appsInfoElems.first);
+        menuRenderElements(&gTheme->appsInfoElems, 1, itemConfig);
         gTheme->itemsList = gTheme->appsItemsList;
     } else {
-        menuRenderElements(gTheme->infoElems.first);
+        menuRenderElements(&gTheme->infoElems, 1, itemConfig);
         gTheme->itemsList = gTheme->gamesItemsList;
     }
 }

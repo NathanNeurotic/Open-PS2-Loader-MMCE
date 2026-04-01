@@ -263,7 +263,7 @@ static void itemInitSupport(item_list_t *support)
     support->itemInit(support);
     moduleUpdateMenuInternal((opl_io_module_t *)support->owner, 0, 0);
     // Manual refreshing can only be done if either auto refresh is disabled or auto refresh is disabled for the item.
-    if (!gAutoRefresh || (support->updateDelay == MENU_UPD_DELAY_NOUPDATE))
+    if (!gAutoRefresh || (support->updateDelay == MENU_UPD_DELAY_NOUPDATE) || support->mode == MMCE_MODE)
         ioPutRequest(IO_MENU_UPDATE_DEFFERED, &support->mode);
 }
 
@@ -275,14 +275,16 @@ static void itemExecSelect(struct menu_item *curMenu)
     if (support) {
         if (support->enabled) {
             if (curMenu->current) {
-                config_set_t *configSet = menuLoadConfig();
+                config_set_t *configSet = menuLoadConfigDirect();
                 support->itemLaunch(support, curMenu->current->item.id, configSet);
             }
         } else {
+            (void)cacheCancelPendingImageLoadsTimed(MENU_MIN_INACTIVE_FRAMES);
+
             // If we're trying to enable BDM support we need to enable it for all BDM menu slots.
             if (support->mode == BDM_MODE) {
                 // Initialize support for all bdm modules.
-                for (int i = 0; i <= BDM_MODE4; i++) {
+                for (int i = BDM_MODE; i <= BDM_MODE_LAST; i++) {
                     opl_io_module_t *mod = &list_support[i];
                     itemInitSupport(mod->support);
                 }
@@ -476,40 +478,30 @@ int oplPath2Mode(const char *path)
     return -1;
 }
 
-int oplGetAppImage(const char *device, char *folder, int isRelative, char *value, char *suffix, GSTEXTURE *resultTex, short psm)
+int oplGetAppImageByMode(int mode, char *folder, int isRelative, char *value, char *suffix, GSTEXTURE *resultTex, short psm)
 {
-    int i, remaining, elfbootmode;
-    char priority;
     item_list_t *listSupport;
 
-    elfbootmode = -1;
-    if (device != NULL) {
-        elfbootmode = oplPath2Mode(device);
-        if (elfbootmode >= 0) {
-            listSupport = list_support[elfbootmode].support;
+    if (mode < 0 || mode >= MODE_COUNT)
+        return -1;
 
-            if ((listSupport != NULL) && (listSupport->enabled)) {
-                if (listSupport->itemGetImage(listSupport, folder, isRelative, value, suffix, resultTex, psm) >= 0)
-                    return 0;
-            }
-        }
-    }
+    listSupport = list_support[mode].support;
+    if ((listSupport != NULL) && (listSupport->enabled))
+        return listSupport->itemGetImage(listSupport, folder, isRelative, value, suffix, resultTex, psm);
 
-    // We search on ever devices from fatest to slowest.
-    for (remaining = MODE_COUNT, priority = 0; remaining > 0 && priority < 4; priority++) {
-        for (i = 0; i < MODE_COUNT; i++) {
-            listSupport = list_support[i].support;
+    return -1;
+}
 
-            if (i == elfbootmode)
-                continue;
+int oplGetAppImage(const char *device, char *folder, int isRelative, char *value, char *suffix, GSTEXTURE *resultTex, short psm)
+{
+    int mode;
 
-            if ((listSupport != NULL) && (listSupport->enabled) && (listSupport->appsPriority == priority)) {
-                if (listSupport->itemGetImage(listSupport, folder, isRelative, value, suffix, resultTex, psm) >= 0)
-                    return 0;
-                remaining--;
-            }
-        }
-    }
+    if (device == NULL)
+        return -1;
+
+    mode = oplPath2Mode(device);
+    if (mode >= 0)
+        return oplGetAppImageByMode(mode, folder, isRelative, value, suffix, resultTex, psm);
 
     return -1;
 }
@@ -736,6 +728,17 @@ static void menuUpdateHook()
 
     // if timer exceeds some threshold, schedule updates of the available input sources
     frameCounter++;
+
+    // Keep background refresh work out of the shared IO queue while the user is actively navigating.
+    if (guiInactiveFrames < MENU_MIN_INACTIVE_FRAMES)
+        return;
+
+    // Let the current queue drain before adding background refresh work.
+    if (ioHasPendingRequests())
+        return;
+
+    if (cacheHasPendingArt())
+        return;
 
     // schedule updates of all the list handlers
     if (gAutoRefresh) {
@@ -969,9 +972,7 @@ static void _loadConfig()
             configGetInt(configOPL, CONFIG_OPL_MMCE_MODE, &gMMCEStartMode);
             configGetInt(configOPL, CONFIG_OPL_MMCE_SLOT, &gMMCESlot);
             configGetInt(configOPL, CONFIG_OPL_MMCEIGR_SLOT, &gMMCEIGRSlot);
-#ifdef __DEBUG
             configGetInt(configOPL, CONFIG_OPL_MMCE_GAMEID, &gMMCEEnableGameID);
-#endif
             configGetInt(configOPL, CONFIG_OPL_MMCE_WAIT_CYCLES, &gMMCEAckWaitCycles);
             configGetInt(configOPL, CONFIG_OPL_MMCE_USE_ALARMS, &gMMCEUseAlarms);
             configGetInt(configOPL, CONFIG_OPL_ENABLE_USB, &gEnableUSB);
@@ -1146,9 +1147,7 @@ static void _saveConfig()
         configSetInt(configOPL, CONFIG_OPL_MMCE_MODE, gMMCEStartMode);
         configSetInt(configOPL, CONFIG_OPL_MMCE_SLOT, gMMCESlot);
         configSetInt(configOPL, CONFIG_OPL_MMCEIGR_SLOT, gMMCEIGRSlot);
-#ifdef __DEBUG
         configSetInt(configOPL, CONFIG_OPL_MMCE_GAMEID, gMMCEEnableGameID);
-#endif
         configSetInt(configOPL, CONFIG_OPL_MMCE_WAIT_CYCLES, gMMCEAckWaitCycles);
         configSetInt(configOPL, CONFIG_OPL_MMCE_USE_ALARMS, gMMCEUseAlarms);
         configSetInt(configOPL, CONFIG_OPL_BDM_CACHE, bdmCacheSize);
@@ -1679,6 +1678,7 @@ void deinit(int exception, int modeSelected)
     // block all io ops, wait for the ones still running to finish
     ioBlockOps(1);
     guiExecDeferredOps();
+    cacheEnd(modeSelected == IO_MODE_SELECTED_ALL || modeSelected == IO_MODE_SELECTED_NONE);
 
 #ifdef PADEMU
     ds34usb_reset();
@@ -1799,9 +1799,7 @@ static void setDefaults(void)
 
     gMMCESlot = 2; //Default to first Auto slot
     gMMCEIGRSlot = 3;
-#ifdef __DEBUG
     gMMCEEnableGameID = 1;
-#endif
     gMMCEAckWaitCycles = 5;
     gMMCEUseAlarms = 1;
 
@@ -2017,27 +2015,40 @@ static void autoLaunchBDMGame(char *argv[])
 
     gAutoLaunchDeviceData = malloc(sizeof(bdm_device_data_t));
     memset(gAutoLaunchDeviceData, 0, sizeof(bdm_device_data_t));
+    gAutoLaunchDeviceData->bdmDeviceType = BDM_TYPE_UNKNOWN;
+    gAutoLaunchDeviceData->bdmHddIsLBA48 = -1;
+    gAutoLaunchDeviceData->ataHighestUDMAMode = -1;
 
-    char apaDevicePrefix[8] = {0};
+    char apaDevicePrefix[BDM_DEVICE_ROOT_MAX] = {0};
+    int selectedMassSlot = -1;
     delay(8);
-    snprintf(apaDevicePrefix, sizeof(apaDevicePrefix), "mass0:");
     // Loop through mass0: to mass4:
     for (int i = 0; i <= 4; i++) {
-        snprintf(path, sizeof(path), "mass%d:", i);
+        snprintf(path, sizeof(path), "mass%d:/", i);
         int dir = fileXioDopen(path);
 
         if (dir >= 0) {
-            fileXioIoctl2(dir, USBMASS_IOCTL_GET_DRIVERNAME, NULL, 0, &gAutoLaunchDeviceData->bdmDriver, sizeof(gAutoLaunchDeviceData->bdmDriver) - 1);
-            fileXioIoctl2(dir, USBMASS_IOCTL_GET_DEVICE_NUMBER, NULL, 0, &gAutoLaunchDeviceData->massDeviceIndex, sizeof(gAutoLaunchDeviceData->massDeviceIndex));
+            char detectedDriver[sizeof(gAutoLaunchDeviceData->bdmDriver)] = {0};
+            int detectedDeviceIndex = -1;
 
-            if (!strcmp(gAutoLaunchDeviceData->bdmDriver, "ata") && strlen(gAutoLaunchDeviceData->bdmDriver) == 3) {
-                bdmResolveLBA_UDMA(gAutoLaunchDeviceData);
+            fileXioIoctl2(dir, USBMASS_IOCTL_GET_DRIVERNAME, NULL, 0, detectedDriver, sizeof(detectedDriver) - 1);
+            fileXioIoctl2(dir, USBMASS_IOCTL_GET_DEVICE_NUMBER, NULL, 0, &detectedDeviceIndex, sizeof(detectedDeviceIndex));
+            fileXioDclose(dir);
+
+            if (selectedMassSlot < 0) {
+                selectedMassSlot = i;
+                snprintf(gAutoLaunchDeviceData->bdmDriver, sizeof(gAutoLaunchDeviceData->bdmDriver), "%s", detectedDriver);
+                gAutoLaunchDeviceData->massDeviceIndex = detectedDeviceIndex;
                 snprintf(apaDevicePrefix, sizeof(apaDevicePrefix), "mass%d:", i);
-                fileXioDclose(dir);
-                break; // Exit the loop if "ata" device is found
             }
 
-            fileXioDclose(dir);
+            if (!strcmp(detectedDriver, "ata") && strlen(detectedDriver) == 3) {
+                selectedMassSlot = i;
+                snprintf(gAutoLaunchDeviceData->bdmDriver, sizeof(gAutoLaunchDeviceData->bdmDriver), "%s", detectedDriver);
+                gAutoLaunchDeviceData->massDeviceIndex = detectedDeviceIndex;
+                snprintf(apaDevicePrefix, sizeof(apaDevicePrefix), "mass%d:", i);
+                break; // Exit the loop if "ata" device is found
+            }
         } else {
             // Retry for mass0: only
             if (i == 0) {
@@ -2049,6 +2060,11 @@ static void autoLaunchBDMGame(char *argv[])
         }
         delay(6);
     }
+
+    if (selectedMassSlot < 0)
+        snprintf(apaDevicePrefix, sizeof(apaDevicePrefix), "mass0:");
+
+    snprintf(gAutoLaunchDeviceData->bdmDeviceRoot, sizeof(gAutoLaunchDeviceData->bdmDeviceRoot), "%s", apaDevicePrefix);
 
     if (gBDMPrefix[0] != '\0') {
         snprintf(path, sizeof(path), "%s%s/CFG/%s.cfg", apaDevicePrefix, gBDMPrefix, gAutoLaunchBDMGame->startup);

@@ -1109,12 +1109,10 @@ struct UIItem diaMMCEConfig[] = {
     {UI_STRING, CFG_MMCEPREFIX, 1, 1, -1, 0, 0, {.stringvalue = {"", "", NULL}}},
     {UI_BREAK},
 
-#ifdef __DEBUG
     {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {"Send GameID on Launch", -1}}},
     {UI_SPACER},
     {UI_BOOL, CFG_MMCEGAMEID, 1, 1, -1, 0, 0, {.intvalue = {0, 0}}},
     {UI_BREAK},
-#endif
 
     {UI_BREAK},
     {UI_LABEL, 0, 1, 1, -1, 0, 0, {.label = {NULL, _STR_MMCE_ADVANCED}}},

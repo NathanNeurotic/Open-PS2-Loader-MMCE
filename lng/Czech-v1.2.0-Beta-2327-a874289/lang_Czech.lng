@@ -1,0 +1,343 @@
+# Czech translation by jimmysmith & miraficus
+# For Open PS2 Loader v1.0.0 + betas - Official OPL Beta thread @https://www.psx-place.com/threads/open-ps2-loader-language-pack.20547/
+Czech
+Uložit změny
+Zpět
+Síťová konfigurace
+Pokročilé možnosti
+<žádné hodnoty>
+Nastavení uloženo do %s
+Chyba při ukládání nastavení!
+Ukončit
+Nastavení
+Menu
+BDM Hry
+HDD Hry
+ETH Hry
+Aplikace
+Skin
+Jazyk
+Systém bude vypnut.
+Ukončit a vrátit se do Prohlížeče?
+Zrušit update?
+%d: Harddisk nebyl detekován
+%d: Harddisk není naformátován
+%d: Chyba při inicializaci sítě
+%d: Síťový adaptér nenalezen
+%d: Nelze se připojit k SMB serveru
+%d: Nelze se přihlásit k SMB serveru
+%d: Nelze otevřít SMB share
+%d: Nelze zobrazit SMB share
+%d: Nelze zobrazit seznam her
+%d: DHCP server nenalezen
+%d: Žádné síťové připojení
+Zap
+Vyp
+OK
+Vybrat
+Zrušit
+Kolečko
+Křížek
+Seznam her
+Nastavení hry
+Odstranit včechno nastavení
+Skrolování
+Pomalu
+Normálně
+Rychle
+Výchozí menu
+Nahrát z disku
+Chvilku strpení
+Chyba při nahrávání Game ID
+Automatické seřazení
+Chyba při nahrávání jazykového souboru
+Ladicí barvy
+Nebyl detekován žádný ovladač, čekám…
+Obaly her
+Širokoúhlá obrazovka
+Vypnout
+Nahrávám konfiguraci
+Ukládám konfiguraci
+Zapnout zařízení
+Obnovit
+Režim spuštění BDM
+HDD zařízení při startu
+ETH zařízení při startu
+Aplikace při startu
+Automaticky
+Ručně
+Spustit NBD Server
+Spouštím NBD Server…
+NBD Server běží…
+Start NBD Serveru se nezdařil.
+Vypínání NBD Serveru…
+Cesta k IGR
+Barva pozadí
+Barva textu
+- SMB Server -
+Typ IP adresy
+Statická
+DHCP
+IP adresa
+Adresa
+Maska
+Brána
+DNS server
+Port
+Sdílená složka
+Jméno
+Heslo
+<nenastaveno>
+Typ Adresy
+IP Adresa
+NetBIOS
+Potvrdit
+Položka bude nevratně odstraněna, pokračovat?
+Přejmen.
+Smazat
+Spustit
+Nastavení obrazovky
+Zápisové operace
+Pamatovat posledně hranou hru
+Tlačítko Select
+Chyba, hra je fragmentovaná
+Chyba, nemůžu spustit hru
+Otestovat změny
+Nechte prázdné pro přihlášení GUEST účtu
+Přesné čtení
+Synchronní mód
+Odpojit systémová volání
+Přeskočit videa
+Emulovat DVD-DL
+Vypnout IGR
+Změna velikosti přeformátuje VMC
+Vytvořit
+Spustit
+Změnit
+Zrušit
+Resetovat
+Použít generickou
+Nastavení VMC
+Jméno
+Velikost
+Stav
+Postup
+VMC soubor existuje
+Vadný VMC soubor, nesprávná velikost
+Je potřeba vytvořit VMC soubor
+Chyba při přístupu k VMC %s. Pokračovat s paměťovou kartou ve slotu %d?
+Automatické obnovení
+O aplikaci
+Kodéři
+Kontrola kvality
+prefix cesty k BDM
+Načíst svůj ELF po IGR
+Hodnota v minutách, 0 pro vypnutí spin-down disku
+Automatický HDD spin-down
+Video mód
+Barva dialogu
+Vybraná barva
+Obnovit barvy
+Informace
+Vlastní ELF
+Barva zvýraznení
+Znovu připojit
+Nechte prázdné pro seznam share
+prefix cesty k ETH
+Backspace
+Mezera
+Enter
+Mód
+Slot VMC 1
+Slot VMC 2
+ID hry
+DMA Mód
+V - Sync
+Mód 1
+Mód 2
+Mód 3
+Mód 4
+Mód 5
+Mód 6
+Konfigurovat GSM
+Ethernet link mód
+100Mbit full-duplex
+100Mbit half-duplex
+10Mbit full-duplex
+10Mbit half-duplex
+Nastavení GSM
+Výběr GSM
+Přepíná GSM ON/OFF
+Vnutit uživatelský Display Mód
+H-Pozice
+Horizontální úprava
+V-Pozice
+Vertikální úprava
+Překrytí obrazu
+Overscan Adjustment
+Přeskočit FMV
+Přeskočit Full Motion Videa
+Nastavení Cheatů
+PS2RD Cheat Engine
+Umožní použití PS2RD Cheat Enginu
+PS2RD Cheat Engine Mód
+Automatické nebo uživatelská volba cheatů
+Automaticky hledat a použít cheaty ke hře
+Vybrat cheaty pro hru
+Chyba: nepodařilo se nahrát soubor s cheaty
+Nenalezeny žádné cheaty
+Stáhnout původní verze konfigů
+Síťový update
+Přepsat existující záznamy
+Update selhal.
+Připojení k update serveru se nezdařilo.
+Update kompletní.
+Update zrušen.
+Stáhnout nastavení ze sítě?
+Vlastní nastavení
+Stažené původní verze konfigů
+Automatický start v %i s…
+Auto start
+Hodnota v sekundách, zadej 0 pro vypnutí auto startu
+PS2 Logo
+Zobrazováno pouze u validního loga disku, který má stejný region jako konzole
+Nastavení PADEMU
+Nastavení emulátoru ovladače
+Emulátor ovladače
+Zapne/vypne PadEmulator pro vybranou hru.
+Režim emulátoru ovladače
+Vyberte režim emulátoru ovladače
+DualShock3/4 USB
+DualShock3/4 Bluetooth
+Nastavení portu:
+Vyberte port pro nastavení emulátoru ovladače
+Emulace
+Zapnout/vypnout emulátor ovladače pro zvolený port
+Vibrace
+Zapnout/vypnout vibrace pro zvolený port emulátoru ovladače
+Usb bluetooth adaptér spárován s MAC adresou:
+DS ovladač spárován s MAC adresou:
+Spárovat
+Spárovat DS ovladač
+Spáruje DS ovladač s MAC adresou Bluetooth adaptéru
+Nepřipojeno
+Informace o Bluetooth adaptéru
+Zobrazí více informací a podporované funkce
+Verze HCI
+Verze LMP
+ID výrobce
+Podporované funkce:
+Ano
+Ne
+Bluetooth adaptér je plně kompatibilní s ovladači DS3/DS4
+Bluetooth adaptér nemusí správně fungovat s ovladači DS3/DS4
+Emulace Multitapu
+Zapne/vypne emulaci Multitapu pro vybranou hru
+Emulátor Multitap na portu
+Vyberte port pro emulaci Multitapu
+Vypnout úpravu pro falešné DS3
+Některé falešné DS3 vyžadují úpravu, tato volba ji aktivuje
+Emulovat přepínání FIELD
+Oprava pro hry, které mají chyby v progresivním video režimu
+Nastavení rodičovského zámku
+Heslo rodičovského zámku
+Nechte prázdné pro vypnutí rodičovského zámku
+Zadejte heslo rodičovského zámku
+Heslo rodičovského zámku je nesprávné
+Rodičovský zámek byl vypnut
+Možnosti sestavení
+Chyba – toto heslo nelze použít
+Soubor VMC %s je fragmentovaný. Pokračovat s paměťovou kartou ve slotu %d?
+Nastavení zvuku
+Zvukové efekty
+Zvuk při spuštění
+Hlasitost zvukových efektů
+Hlasitost zvuku při spuštění
+Potvrdit změnu video režimu?
+Ukládat seznam her (HDD)
+Notifikace
+Konfigurace načtena z %s
+Motiv načten z %s
+Jazyk načten z %s
+Oddíl %s připojen.
+Možnosti
+Nastavení hry uloženo.
+Nastavení %s odstraněno.
+Při aktivaci přepíše existující nastavení kompatibility her.
+Režim nastavení
+Globální
+Pro hru
+Vše
+Vyberte nastavení k odstranění.
+Podpůrná fóra:
+Název
+Žánr
+Datum vydání
+Vývojář
+Popis
+Nastavení blokových zařízení
+Nastavení ovladače
+Zapnout/vypnout správce blokových zařízení.
+Zapnout/vypnout bloková zařízení (např. USB).
+USB hry
+iLink hry
+MX4SIO hry
+Nastavení PADMACRO
+Nastavení makra ovladače
+Makra ovladače
+Zpomalení analogu:
+Zmenší rozsah analogové páčky při stisknutí tlačítka
+Levá páčka
+Pravá páčka
+Inverze osy analogu:
+Inverze osy analogové páčky
+Rychlost turbo tlačítka
+Jak rychle se má tlačítko mačkat při aktivním turbu
+Při stisknutém tlačítku
+Přepnuto tlačítkem
+Japonština
+Angličtina
+Francouzština
+Španělština
+Němčina
+Italština
+Holandština
+Portugalština
+Ruština
+Korejština
+Tradiční čínština
+Zjednodušená čínština
+Nastavení OSD
+Jazyk OSD
+Force a custom language configuration
+Změnit jazyk
+Screen Size
+Full Screen
+Video Mode
+System Default
+Hudba na pozadí
+Hlasitost hudby na pozadí
+Výchozí hudba motivu
+Nastaví cestu ke streamované hudbě pro interní motiv
+High
+Low
+Analog X-Axis Sensitivity
+Analog Y-Axis Sensitivity
+Files found: %i
+Cheat Selection
+Only one HDD allowed, enabling locks APA or GPT.
+MMCE
+MMCE Games
+MMCE Start Mode
+MMCE Prefix Path
+MMCE Slot
+IGR Bootcard Slot(s)
+Switch to bootcard cmd will be sent to the selected slot(s) on IGR
+Advanced
+MMCE Settings
+Lock Sema Enqueuing Method
+THFIFO may help with compatibility but worsen performance
+Wait cycles after /ACK low
+Lower values may improve performance but result in instabilities
+Use timeout alarms
+OFF may help performance but can cause MMCE timeouts to result in freezes

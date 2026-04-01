@@ -1,0 +1,343 @@
+# Hungarian translation by co5oos & sAGA
+# For Open PS2 Loader v1.0.0 + betas - Official OPL Beta thread @https://www.psx-place.com/threads/open-ps2-loader-language-pack.20547/
+Hungarian
+Változtatások mentése
+Vissza
+Hálózat konfigurálása
+Haladó beállítások
+<Nincs érték>
+Beállítások elmentve ide %s
+Hiba a beállítások írásában!
+Kilépés
+Beállítások
+Menü
+BDM játékok
+HDD játékok
+ETH játékok
+Alkalmazások
+Téma
+Nyelv
+A rendszer le fog állni.
+Kilépés a Browser-be?
+Frissítés visszavonása?
+%d: Merevlemez nem található
+%d: Merevlemez nincs leformázva
+%d: Hálózat indítási hiba
+%d: Nem található hálózati adapter
+%d: Nem sikerült csatlakozni az SMB szerverhez
+%d: Nem sikerült bejelentkezni az SMB szerverbe
+%d: Nem sikerült megnyitni az SMB megosztást
+%d: Nem sikerült listázni az SMB megosztásokat
+%d: Nem sikerült listázni a játékokat
+%d: DHCP szerver nem elérhető
+%d: Nincs hálózati kapcsolat
+Be
+Ki
+OK
+Kiválaszt
+Vissza
+Kör
+Kereszt
+Játék lista
+Játékbeállítások
+Beállítások eltávolítása
+Görgetés
+Lassú
+Közepes
+Gyors
+Alapértelmezett menü
+Lemezről való beolvasás
+Kérem várjon
+Hiba a Játék ID betöltése közben
+Automatikus rendezés
+Hiba a nyelv fájl betöltésnél
+Debug színek
+Nem található kontroller, várakozás…
+Borítókép
+Szélesvásznú mód
+Kikapcsolás
+Konfiguráció betöltése
+Konfiguráció mentése
+Eszköz indítása
+Frissítés
+BDM start mód
+HDD eszköz indítási mód
+ETH eszköz indítási mód
+Alkalmazások menü megjelenítési mód
+Automatikus
+Manuális
+NBD szerver indítása
+NBD szerver elindul…
+NBD szerver fut…
+Az NBD szerver elindítása sikertelen.
+Az NBD szerver kirakodása…
+IGR útvonal
+Háttérszín
+Szövegszín
+- SMB szerver -
+IP cím típus
+Statikus
+DHCP
+IP cím
+Cím
+Maszk
+Alapértelmezett átjáró
+DNS szerver
+Port
+Megosztás
+Felhasználónév
+Jelszó
+<nincs megadva>
+Cím típus
+IP
+NetBIOS
+Elfogad
+Az elem véglegesen törlésre kerül, folytatja?
+Átnevezés
+Törlés
+Futtatás
+Képernyőbeállítások
+Írásműveletek
+Emlékezzen a legutóbbi játékra
+SELECT gomb
+Hiba, a játék töredezett
+Hiba, az elem futtatása sikertelen
+Változások tesztelése
+Hagyja üresen VENDÉG hitelesítéshez
+Pontos olvasás
+Egyidejű mód
+Syscalls kiakasztás
+Videók átugrása
+DVD-DL emulálása
+IGR letiltása
+A méretváltoztatás leformázza a VMC-t
+Létrehoz
+Indít
+Módosít
+Megszakít
+Visszaállítás
+Generikus használata
+VMC konfiguráció
+Név
+Méret
+Állapot
+Folyamat
+A VMC fájl már létezik
+Érvénytelen VMC fájl, helytelen méret
+VMC fájl létrehozása szükséges
+Hiba a VMC-vel %s, folytatás a fizikai MC-vel (foglalat %d) ?
+Automatikus frissítés
+Névjegy
+Kódolók
+Minőségbiztosítás
+BDM előtag elérési út
+Testreszabott ELF bootolása egy IGR után
+Érték percben, 0 a kikapcsolás letiltása
+Automatikus merevlemez kikapcsolás
+Videó mód
+Párbeszédablak színe
+Kiválasztott elem színe
+Színek visszaállítása
+Infó
+Testreszabott ELF
+Szín szelekció
+Újracsatlakozás
+Hagyja üresen a megosztások listázásához
+ETH előtag elérési út
+Backspace
+Szóköz
+Enter
+Mód
+VMC foglalat 1
+VMC foglalat 2
+Játék ID
+DMA mód
+V-Sync
+Mód 1
+Mód 2
+Mód 3
+Mód 4
+Mód 5
+Mód 6
+GSM konfiguráció
+Ethernet kapcsolat módja
+100Mbit full-duplex
+100Mbit half-duplex
+10Mbit full-duplex
+10Mbit half-duplex
+GSM beállítások
+GSM Selector
+KI vagy BE kapcsolja a GSM-et
+Kényszerített testreszabott megjelenítési mód
+Vízszintes-pozíció
+Vízszintes szabályozás
+Függőleges-pozíció
+Függőleges szabályozás
+Overscan
+Overscan beállítása
+FMV átugrása
+Átugorja a Full Motion videókat
+Csalás beállítások
+PS2RD Cheat Engine
+Engedi a PS2RD csalásmotornak, hogy patch-elje a játékokat.
+PS2RD csalásmotor mód
+Auto-kiválaszt vagy játékcsalások kiválasztása
+Csalások Auto-kiválasztása
+Játékcsalások kiválasztása
+Hiba: A Csalásfájl betöltése sikertelen
+Nem találhatóak csalások
+Alapértelmezések letöltése
+Hálózati frissítés
+Létező rekordok felülírása
+Frissítés sikertelen.
+Nem sikerült csatlakozni a frissítő szerverhez.
+Frissítés befejezve.
+Frissítés visszavonva.
+Beállítások letöltése a hálózatról?
+Testreszabott beállítások
+Letöltött alapértelmezések
+Automatikus indítás %i mp-en belül…
+Automatikus indítás
+Érték másodpercben, 0 az Automatikus indítás letiltásához
+PS2 logó
+Csak egy érvényes lemez logónál jelenik meg, amely egyezik a konzol régiójával
+PADEMU konfigurálása
+Pad Emulator beállítások
+Pad Emulator
+Be/ki kapcsolja a PadEmulátor-t a kiválaszott játékhoz.
+Pad Emulátor mód
+Válassza ki a PadEmulátor módját.
+DualShock3/4 USB
+DualShock3/4 BT
+Port beállítások:
+Válassza ki a PadEmulátor portot a beállításokhoz.
+Emulation
+Be/ki kapcsolja a PadEmulátor-t a kiválasztott porthoz.
+Vibration
+Be/ki kapcsolja a rezgést a PadEmulátor kiválasztott portjához.
+USB bluetooth adapter mac címe:
+DS kontroller a következő MAC címhez párosítva:
+Párosítás
+DS kontroller párosítása
+DS kontroller párosítása Bluetooth adapter MAC címmel.
+Nincs csatlakoztatva
+Bluetooth adapter információ
+Több információ és támogatott funkciók mutatása
+HCI verzió:
+LMP verzió:
+Gyártó ID:
+Támogatott funkciók:
+Igen
+Nem
+A Bluetooth adapternek teljes mértékben kompatibilisnek kell lennie a DS3/DS4 kontrollerekkel.
+A Bluetooth adapter nem biztos, hogy megfelelően fog működni DS3/DS4 kontrollerekkel.
+Multitap Emulation
+Ki/be kapcsolja a Multitap emulációt a kiválasztott játékhoz.
+Multitap emuláció ezen a porton
+Válassza ki a portot a Multitap emulációhoz.
+Fake DS3 Workaround
+Some fake DS3s need a workaround, this option will enable it.
+FIELD flipping emulálása
+Fix azon játékokhoz, melyek hibát produkálnak progresszív videó mód alatt.
+Gyerekzár beállítások
+Gyerekzár jelszó
+Hagyja üresen a gyerekzár kikapcsolásához.
+Írja be a gyerekzár jelszót
+Gyerekzár jelszó helytelen.
+Gyerekzár kikapcsolva.
+Build opciók:
+Hiba - ez a jelszó nem használható.
+VMC %s fájl töredezett. Folytatás a %d foglalatban lévő memóriakártyával?
+Hangbeállítások
+Hangeffektek
+Boot effekt
+Hanghatások hangereje
+Boot effekt hangereje
+jóváhagyja a Videó mód változtatását?
+Játéklista cachelés (HDD)
+Értesítések
+Config loaded from %s
+Theme loaded from %s
+Language loaded from %s
+%s partition mounted.
+Opciók
+Játékbeállítások elmentve.
+%s beállítások eltávolítva
+Engedélyezéskor felülírja a létező játék kompatibilitási beállításokat.
+Beállítások mód
+Globális
+Játékonként
+Összes
+Válassza ki az eltávolítani kívánt beállításokat.
+Támogatási fórumok:
+Cím
+Műfaj
+Kiadás
+Fejlesztő
+Leírás
+BDM Devices
+Kontrollerbeállítások
+A Block Device Manager ki/bekapcsolása.
+Ki/bekapcsolja a Block eszközöket (pl. USB).
+USB játékok
+iLink játékok
+MX4SIO játékok
+PADMACRO beállítása
+Padmakró beállítások
+Padmakrók
+Analog Slow-Down:
+Reduce the range of analog stick when button is pressed.
+Bal kar
+Jobb kar
+Analog Axis Invert:
+Inverts the axis of selected analog stick.
+Turbo gomb sebessége
+Milyen gyorsan nyomkodja a gombot, ha a turbó aktív
+Amíg a gomb lenyomva van
+A gombbal átkapcsolható
+JAPÁN
+ANGOL
+FRANCIA
+SPANYOL
+NÉMET
+OLASZ
+HOLLAND
+PORTUGÁL
+OROSZ
+KOREAI
+HAGYOMÁNYOS KÍNAI
+EGYSZERŰSÍTETT KÍNAI
+OSD beállítások
+OSD nyelv
+Force a custom language configuration
+Nyelv módosítása
+Screen Size
+Full Screen
+Video Mode
+System Default
+Háttérzene
+Háttérzene hangerő
+Téma alapértelmezett zenéje
+Set path to stream music for internal theme.
+High
+Low
+Analog X-Axis Sensitivity
+Analog Y-Axis Sensitivity
+Files found: %i
+Cheat Selection
+Only one HDD allowed, enabling locks APA or GPT.
+MMCE
+MMCE Games
+MMCE Start Mode
+MMCE Prefix Path
+MMCE Slot
+IGR Bootcard Slot(s)
+Switch to bootcard cmd will be sent to the selected slot(s) on IGR
+Advanced
+MMCE Settings
+Lock Sema Enqueuing Method
+THFIFO may help with compatibility but worsen performance
+Wait cycles after /ACK low
+Lower values may improve performance but result in instabilities
+Use timeout alarms
+OFF may help performance but can cause MMCE timeouts to result in freezes
