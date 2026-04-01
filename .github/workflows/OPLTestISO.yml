@@ -7,29 +7,32 @@ on:
       - 'labs/opltestiso/**'
   workflow_dispatch:
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   build-opltestiso:
     runs-on: ubuntu-latest
     container: ps2dev/ps2dev:latest
     steps:
-    - name: Install dependencies
-      run:  apk add build-base git zip cdrkit
+      - name: Install dependencies
+        run: apk add build-base git zip cdrkit
 
-    - name: git checkout
-      uses: actions/checkout@v3
+      - name: git checkout
+        uses: actions/checkout@v5
 
-    - run: |
-        git config --global --add safe.directory "$GITHUB_WORKSPACE"
-        git fetch --prune --unshallow
+      - run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git fetch --prune --unshallow
 
-    - name: make ISO
-      run: |
+      - name: make ISO
+        run: |
           cd labs/opltestiso/
           make iso
 
-    - name: Upload release artifact ISO
-      uses: actions/upload-artifact@v4
-      with:
-        name: OPLTESTISO
-        path: |
-           labs/opltestiso/*.iso
+      - name: Upload release artifact ISO
+        uses: actions/upload-artifact@v6
+        with:
+          name: OPLTESTISO
+          path: |
+            labs/opltestiso/*.iso
