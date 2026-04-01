@@ -18,6 +18,7 @@
 #include <ps2sdkapi.h>
 #define NEWLIB_PORT_AWARE
 #include <fileXio_rpc.h> // fileXioIoctl, fileXioDevctl
+#include <delaythread.h>
 
 static int iUSBModLoaded = 0;
 static int iLinkModLoaded = 0;
@@ -1036,5 +1037,72 @@ int bdmUpdateDeviceData(item_list_t *itemList)
     // No change to the device state detected.
     if (dir >= 0)
         fileXioDclose(dir);
+    return 0;
+}
+
+int bdmWaitForDevice(int deviceId, u32 timeoutMs)
+{
+    const int RETRY_DELAY = 100;
+    char path[16];
+
+    u32 start = GetTimerSystemTime();
+    sprintf(path, "mass%d:/", deviceId);
+
+    while (1) {
+        int dir = fileXioDopen(path);
+
+        if (dir >= 0) {
+            fileXioDclose(dir);
+            return 1; // ready
+        }
+
+        u32 now = GetTimerSystemTime();
+        u32 elapsed_ms = (now - start) / (kBUSCLK / 1000);
+
+        if (elapsed_ms > timeoutMs) {
+            return 0; // timeout
+        }
+
+        DelayThread(RETRY_DELAY * 1000);
+    }
+}
+
+int bdmHDDIsPresent()
+{
+    // the only thing that currently uses ata_device_identify is ATA_DEVCTL_GET_HIGHEST_UDMA_MODE, so this is the best method to check for presence via xhdd (for now anyways)
+    // ideally, we'd only have ata_device_identify
+    return fileXioDevctl("xhdd0:", ATA_DEVCTL_GET_HIGHEST_UDMA_MODE, NULL, 0, NULL, 0) >= 0;
+}
+
+
+int bdmFindPartition(char *target, const char *name, int write)
+{
+    int i, fd;
+    char path[256];
+
+    for (i = 0; i < MAX_BDM_DEVICES; i++) {
+        if (gBDMPrefix[0] != '\0')
+            sprintf(path, "mass0:/", i, gBDMPrefix, name);
+        else
+            sprintf(path, "mass0:", i, name);
+        if (write)
+            fd = open(path, O_WRONLY | O_TRUNC | O_CREAT, 0666);
+        else
+            fd = open(path, O_RDONLY);
+
+        if (fd >= 0) {
+            if (gBDMPrefix[0] != '\0')
+                sprintf(target, "mass0:/", i, gBDMPrefix);
+            else
+                sprintf(target, "mass0:", i);
+            close(fd);
+            return 1;
+        }
+    }
+
+    if (gBDMPrefix[0] != '\0')
+        sprintf(target, "mass0:/", gBDMPrefix);
+    else
+        sprintf(target, "mass0:");
     return 0;
 }
