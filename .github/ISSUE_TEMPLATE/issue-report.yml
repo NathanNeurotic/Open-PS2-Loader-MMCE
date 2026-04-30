@@ -59,6 +59,11 @@ body:
       label: "In which device(s) have you experienced this issue?"
       multiple: true
       options:
+        - USB
+        - SMB
+        - HDD
+        - iLink
+        - MX4SIO
         - SD2PSX (DIY)
         - MemCardPRO2 (8BitMods)
         - PSxMemCard Gen1 (Bitfunx)
