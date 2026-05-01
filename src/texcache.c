@@ -48,6 +48,7 @@ enum {
 
 #define CACHE_SLOW_MODE_INTERACTIVE_DELAY 4
 #define CACHE_MMCE_INTERACTIVE_MAX_DELAY  12
+#define CACHE_MMCE_INTERACTIVE_DEBOUNCE   2
 #define CACHE_APP_INTERACTIVE_MAX_DELAY   4
 #define CACHE_APP_PREFETCH_DELAY          10
 #define CACHE_PRIME_IDLE_DELAY            12
@@ -75,6 +76,8 @@ static int gArtActiveCount = 0;
 static int gArtInteractiveActiveCount = 0;
 static int gCacheGeneration = 1;
 static load_image_request_t *gArtCurrentReq = NULL;
+static int gMmceInteractiveDebounceUntilFrame = -1;
+static char gMmceInteractiveDebounceValue[64];
 
 static load_image_request_t *gArtInteractiveReqList = NULL;
 static load_image_request_t *gArtInteractiveReqEnd = NULL;
@@ -254,6 +257,8 @@ static void cacheResetRequestTrackingLocked(void)
     gArtInteractiveReqEnd = NULL;
     gArtPrefetchReqList = NULL;
     gArtPrefetchReqEnd = NULL;
+    gMmceInteractiveDebounceUntilFrame = -1;
+    gMmceInteractiveDebounceValue[0] = '\0';
     gArtQueuedCount = 0;
     gArtActiveCount = 0;
     gArtInteractiveActiveCount = 0;
@@ -420,6 +425,41 @@ static int cacheShouldDeferInteractiveArtOnInput(const item_list_t *list, const 
         return cacheIsNavigationActive();
 
     return 0;
+}
+
+static int cacheHasQueuedInteractiveMmceValueLocked(const char *value)
+{
+    load_image_request_t *req;
+
+    for (req = gArtInteractiveReqList; req != NULL; req = req->next) {
+        if (req->effectiveMode == MMCE_MODE && strcmp(req->value, value) == 0)
+            return 1;
+    }
+
+    return 0;
+}
+
+static void cacheDropQueuedInteractiveMmceDifferentValueLocked(const char *value)
+{
+    for (load_image_request_t *req = gArtInteractiveReqList, *next; req != NULL; req = next) {
+        next = req->next;
+        if (req->effectiveMode == MMCE_MODE && strcmp(req->value, value) != 0)
+            cacheDropQueuedRequestLocked(req);
+    }
+}
+
+static int cacheShouldDebounceMmceInteractiveLocked(int effectiveMode, const char *value)
+{
+    if (effectiveMode != MMCE_MODE || value == NULL)
+        return 0;
+
+    if (strcmp(gMmceInteractiveDebounceValue, value) != 0) {
+        snprintf(gMmceInteractiveDebounceValue, sizeof(gMmceInteractiveDebounceValue), "%s", value);
+        gMmceInteractiveDebounceUntilFrame = guiFrameId + CACHE_MMCE_INTERACTIVE_DEBOUNCE;
+        return 1;
+    }
+
+    return guiFrameId < gMmceInteractiveDebounceUntilFrame;
 }
 
 static int cacheGetLoadThreadPriority(const load_image_request_t *req)
@@ -888,6 +928,8 @@ void cacheInit()
     gArtInteractiveReqEnd = NULL;
     gArtPrefetchReqList = NULL;
     gArtPrefetchReqEnd = NULL;
+    gMmceInteractiveDebounceUntilFrame = -1;
+    gMmceInteractiveDebounceValue[0] = '\0';
 
     gArtSema.init_count = 1;
     gArtSema.max_count = 1;
@@ -1356,7 +1398,8 @@ static GSTEXTURE *cacheGetTextureInternal(image_cache_t *cache, item_list_t *lis
     }
 
     if (priority == CACHE_REQ_PRIORITY_INTERACTIVE) {
-        if (cacheShouldDeferInteractiveArtOnInput(list, value)) {
+        if (cacheShouldDeferInteractiveArtOnInput(list, value) ||
+            cacheShouldDebounceMmceInteractiveLocked(effectiveMode, value)) {
             cacheUnlock();
             return NULL;
         }
@@ -1417,13 +1460,13 @@ static GSTEXTURE *cacheGetTextureInternal(image_cache_t *cache, item_list_t *lis
     }
 
     if (priority == CACHE_REQ_PRIORITY_INTERACTIVE && list != NULL && list->mode == MMCE_MODE && effectiveMode == MMCE_MODE) {
-        /* Safety net: if a queued request for a different game somehow survived a
-         * generation advance, drop it now so the new game's art can queue cleanly.
-         * cacheAdvanceGeneration() normally handles this on every navigation event. */
-        load_image_request_t *queuedMmceReq = cacheFindQueuedInteractiveModeLocked(MMCE_MODE);
+        cacheDropQueuedInteractiveMmceDifferentValueLocked(value);
 
-        if (queuedMmceReq != NULL && strcmp(queuedMmceReq->value, value) != 0)
-            cacheDropQueuedRequestLocked(queuedMmceReq);
+        if ((gArtCurrentReq != NULL && cacheIsAbortableMmceRequest(gArtCurrentReq) && strcmp(gArtCurrentReq->value, value) != 0) &&
+            cacheHasQueuedInteractiveMmceValueLocked(value)) {
+            cacheUnlock();
+            return NULL;
+        }
     }
 
     if (priority == CACHE_REQ_PRIORITY_PREFETCH && cache->queuedPrefetchRequests >= cacheGetPrefetchLimit(cache)) {
