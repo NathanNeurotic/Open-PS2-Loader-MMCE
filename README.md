@@ -18,7 +18,7 @@ It supports five categories of devices:
 
 1. USB mass storage devices;
 2. MX4SIO (SD card connected to memory card port via adapter);
-3. iLink (SBP2 compliant storage devices via IEE1394);
+3. iLink (SBP2 compliant storage devices via IEEE 1394);
 4. SMBv1 shares;
 5. ATA/IDE HDDs.
 
@@ -117,7 +117,7 @@ HDDs are also able to be formatted as exFAT to avoid the 2TB limitation.  Please
 <p>
 
 Supported file systems:
-EXFAT (since OPL v1.2.0 beta - rev1880) and FAT32, both use the MBR partition table
+exFAT (since OPL v1.2.0 beta - rev1880) and FAT32, both use the MBR partition table
 
 Game files should be *ideally* defragmented either file by file or by whole drive.
 
@@ -162,7 +162,7 @@ For PS2, 48-bit LBA internal HDDs are supported. The HDD can be formatted as:
   <summary> <b> APPS </b> </summary>
 <p>
 
-There are two methods to add apps to OPL.
+There are two methods for adding apps to OPL.
 
 ### conf_apps.cfg method (Legacy)
 
@@ -176,7 +176,7 @@ To begin:
 2. In this file, put the name you want to appear in the list of apps, followed by the "=" sign.
 3. Put the device identifier
 (for a USB device it would be `mass:`, for MemoryCard it would be `mc:`, and so on for other devices)\
-And finally path to the desired ELF
+And finally, add the path to the desired ELF.
 
 > NOTE: Be careful to enter the exact path, OPL is case sensitive
 
@@ -192,16 +192,16 @@ let's use OPL itself as an example:
 OPL=mass:APPS/OPNPS2LD.ELF
 ```
 
-With this method the ELFs don't need to be in the APPS folder, but keeping them there helps keep everything organized.
+With this method, the ELFs do not need to be in the APPS folder, but keeping them there helps keep everything organized.
 
-the conf_apps.cfg file must be in the OPL folder, on your MemoryCard.\
-Or at the root of the storage device
+The conf_apps.cfg file must be in the OPL folder on your Memory Card,\
+or at the root of the storage device.
 
 
 ### title.cfg method
 
-Also composed of two parts, or to be more exact, two lines
-Where, in the first line we put the name that will appear in the list of apps, and in the second line we put the ELF
+This method is also composed of two parts—more precisely, two lines.
+In the first line, put the name that will appear in the app list, and in the second line, put the ELF.
 
 To begin:
 
@@ -221,9 +221,9 @@ title=Open PS2 Loader
 boot=OPNPS2LD.ELF
 ```
 
-I would like to emphasize that in this method it is necessary that the ELF file and the title.cfg file must be in a folder, within the APPS folder.
+In this method, the ELF file and the title.cfg file must be in a folder within the APPS folder.
 
-> NOTE: In both methods, it is necessary attention to the file names, because, as already mentioned: OPL is case sensitive.
+> NOTE: In both methods, pay close attention to file names because, as already mentioned, OPL is case-sensitive.
 
 </p>
 </details>
@@ -236,13 +236,13 @@ OPL accepts `.cht` files in PS2RD format. Each cheat file corresponds to a speci
 Cheats are structured as hexadecimal codes, with proper headers as descriptions to identify their function.
 You can activate cheats via OPL's graphical interface. Navigate to a games settings, enable cheats and select the desired mode.
 
-### cheat modes
+### Cheat Modes
 
   * Auto Select Cheats:  
 This mode will enable and apply all cheat codes in your `.cht` file to your game automatically.
 
   * Select Game Cheats:  
-When enabled a cheat selection menu will appear when you launch a game. You can navigate the menu and disable undesired cheats for this launch session. `Mastercode`s cannot be disabled as they are required for any other cheats to be applied.
+When enabled a cheat selection menu will appear when you launch a game. You can navigate the menu and disable undesired cheats for this launch session. Master Codes cannot be disabled as they are required for any other cheats to be applied.
 
 </p>
 </details>
@@ -265,7 +265,7 @@ You can use `hdl-dump`, `pfs-shell`, or even directly edit the disk in a hex edi
 
 For example, to use `hdl_dump` to install a game to the HDD:
 
-  * Connect with your choosen client (OS specific)
+  * Connect with your chosen client (OS specific)
   * Run `hdl_dump inject_dvd ps2/nbd "Test Game" ./TEST.ISO`
   * Disconnect the client.
 
@@ -301,7 +301,7 @@ disconnect:
 nbd-client -d /dev/nbd1
 ```
 
-You'll generally need sudo to run this commands in root or
+You'll generally need sudo to run these commands in root or
 add your user to the right group usually "disk".
 
 ### nbdfuse
@@ -419,13 +419,12 @@ Since 05/07/2021 every OPL build dispatched to the release section of this repos
 
 ### OPL Freezes on logo or grey screen
 
- Sometimes OPL freezes when loading config files made by older OPL builds.
-> hold __`START`__ while OPL initializes to make it skip the config loading, then, you can save your own settings.
-> fixing the issue.
+Sometimes OPL freezes when loading config files made by older OPL builds.
+> Hold __`START`__ while OPL initializes to skip config loading, then save your settings to fix the issue.
 
 ### Game freezes on white screen
 
-> Main game executable could not be found. Either game is fragmented or image is corrupted
+> The main game executable could not be found. Either the game is fragmented or the image is corrupted.
 
 ### OPL does not display anything on boot
 
