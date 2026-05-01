@@ -28,6 +28,7 @@ jobs:
       - name: Install diagnostic host dependencies (Alpine only)
         run: |
           if command -v apk >/dev/null 2>&1; then
+            # Consolidated ps2dev Alpine prerequisites: build tools, scripting, packaging, and gcc runtime libs.
             apk add --no-cache \
               bash \
               make \
