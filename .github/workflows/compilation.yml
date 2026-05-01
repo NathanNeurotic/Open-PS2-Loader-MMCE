@@ -49,6 +49,7 @@ jobs:
 
 
   build-ps2dev-latest:
+    if: ${{ github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     container: ps2dev/ps2dev:latest
     steps:
@@ -150,6 +151,7 @@ jobs:
 
 
   build-variants-ps2dev-latest:
+    if: ${{ github.event_name == 'workflow_dispatch' }}
     strategy:
       fail-fast: false
       matrix:
@@ -232,6 +234,7 @@ jobs:
 
 
   merge-variants-ps2dev-latest:
+    if: ${{ github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     needs: build-variants-ps2dev-latest
     steps:
@@ -275,6 +278,7 @@ jobs:
 
 
   build-lang-ps2dev-latest:
+    if: ${{ github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     container: ps2dev/ps2dev:latest
     steps:
@@ -382,6 +386,7 @@ jobs:
 
 
   build-debug-ps2dev-latest:
+    if: ${{ github.event_name == 'workflow_dispatch' }}
     strategy:
       fail-fast: false
       matrix:
@@ -442,6 +447,7 @@ jobs:
           path: opl-*.elf
 
   merge-debug-ps2dev-latest:
+    if: ${{ github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     needs: build-debug-ps2dev-latest
     steps:
