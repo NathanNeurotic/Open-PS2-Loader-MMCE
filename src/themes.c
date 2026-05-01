@@ -908,6 +908,20 @@ static void drawItemsList(struct menu_list *menu, struct submenu_list *item, con
     if (item) {
         items_list_t *itemsList = (items_list_t *)elem->extended;
         item_list_t *list = menu->item->userdata;
+        int mmceSelectionChanged = 0;
+        char *selectedStartup = NULL;
+
+        if (list != NULL && list->mode == MMCE_MODE && itemsList->decoratorImage != NULL && itemsList->decoratorImage->cache != NULL) {
+            selectedStartup = list->itemGetStartup(list, item->item.id);
+            if (selectedStartup == NULL)
+                selectedStartup = "";
+
+            if (itemsList->lastSelectedItemId != item->item.id || strcmp(itemsList->lastSelectedStartup, selectedStartup) != 0) {
+                mmceSelectionChanged = 1;
+                itemsList->lastSelectedItemId = item->item.id;
+                snprintf(itemsList->lastSelectedStartup, sizeof(itemsList->lastSelectedStartup), "%s", selectedStartup);
+            }
+        }
 
         int posX = elem->posX, posY = elem->posY;
         if (elem->aligned) {
@@ -927,10 +941,13 @@ static void drawItemsList(struct menu_list *menu, struct submenu_list *item, con
             if (itemsList->decoratorImage) {
                 GSTEXTURE *itemIconTex;
 
-                /* MMCE main-page row art must never queue fresh IO; only use already-ready textures. */
                 if (list != NULL && list->mode == MMCE_MODE && itemsList->decoratorImage->cache != NULL) {
                     image_cache_t *cache = itemsList->decoratorImage->cache;
-                    itemIconTex = cacheGetTextureIfReady(cache, &ps->item.cache_id[cache->userId], &ps->item.cache_uid[cache->userId]);
+
+                    if (mmceSelectionChanged && ps == item)
+                        itemIconTex = getGameImageTexture(cache, menu->item->userdata, &ps->item);
+                    else
+                        itemIconTex = cacheGetTextureIfReady(cache, &ps->item.cache_id[cache->userId], &ps->item.cache_uid[cache->userId]);
                 } else
                     itemIconTex = getGameImageTexture(itemsList->decoratorImage->cache, menu->item->userdata, &ps->item);
 
@@ -972,6 +989,8 @@ static void initItemsList(const char *themePath, config_set_t *themeConfig, them
         itemsList->decorator = decorator; // Will be used later (thmValidate)
 
     itemsList->decoratorImage = NULL;
+    itemsList->lastSelectedItemId = -1;
+    itemsList->lastSelectedStartup[0] = '\0';
 
     elem->extended = itemsList;
     // elem->endElem = &endBasic; does the job

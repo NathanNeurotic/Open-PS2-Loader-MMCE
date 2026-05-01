@@ -64,6 +64,9 @@ typedef struct
 
     const char *decorator;
     mutable_image_t *decoratorImage;
+
+    int lastSelectedItemId;
+    char lastSelectedStartup[256];
 } items_list_t;
 
 typedef struct theme_element
