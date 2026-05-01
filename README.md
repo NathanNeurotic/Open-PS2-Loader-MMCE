@@ -182,23 +182,24 @@ For PS2, 48-bit LBA internal HDDs are supported. The HDD can be formatted as:
   <summary> <b> APPS </b> </summary>
 <p>
 
-There are two methods for adding apps to OPL.
+There are two supported methods for adding apps to OPL. Keep both available and choose the one that fits your setup:
+
+- Use legacy `conf_apps.cfg` when you want one central list and/or apps stored anywhere on supported devices.
+- Prefer folder-based `title.cfg` when you want each app self-contained inside `APPS/<APP_FOLDER>/`.
 
 ### conf_apps.cfg method (Legacy)
 
-Composed of two parts separated by an "=" sign\
-Where, the first part consists of the name that will appear in your OPL apps list.\
-And the second part consists of the path to the ELF.
+Each entry uses `Display Name=DevicePathToELF`:
+- Left side: the name shown in the OPL app list.
+- Right side: full device/path to the ELF.
 
 To begin:
 
 1. Create a text file called `conf_apps.cfg`.
 2. In this file, put the name you want to appear in the list of apps, followed by the "=" sign.
-3. Put the device identifier
-(for a USB device it would be `mass:`, for MemoryCard it would be `mc:`, and so on for other devices)\
-And finally, add the path to the desired ELF.
+3. Add the device prefix and ELF path (for example `mass:` for USB, `mc:` for Memory Card), then the file path to the ELF.
 
-> NOTE: Be careful to enter the exact path, OPL is case sensitive
+> NOTE: Enter the exact path and exact letter case. OPL is case-sensitive.
 
 The structure should look like this:
 
@@ -212,21 +213,22 @@ let's use OPL itself as an example:
 OPL=mass:APPS/OPNPS2LD.ELF
 ```
 
-With this method, the ELFs do not need to be in the APPS folder, but keeping them there helps keep everything organized.
+With this method, ELFs do not need to be in `APPS`, but keeping them there can make your setup easier to manage.
 
-The conf_apps.cfg file must be in the OPL folder on your Memory Card,\
+The `conf_apps.cfg` file must be in the OPL folder on your Memory Card,\
 or at the root of the storage device.
 
 
 ### title.cfg method
 
-This method is also composed of two parts—more precisely, two lines.
-In the first line, put the name that will appear in the app list, and in the second line, put the ELF.
+This method uses one `title.cfg` per app folder, with two required lines:
+- `title=` for the app name shown in OPL.
+- `boot=` for the ELF filename to launch.
 
 To begin:
 
-1. In the APPS folder, create a new folder with the name of the ELF you want to add
-2. In this new folder, place the ELF and create also a text file called `title.cfg`.
+1. In `APPS`, create a folder for the app.
+2. Put the ELF in that folder, and create a text file named `title.cfg` in the same folder.
 3. In that file, add the following instructions:
 
 ```
@@ -241,7 +243,7 @@ title=Open PS2 Loader
 boot=OPNPS2LD.ELF
 ```
 
-In this method, the ELF file and the title.cfg file must be in a folder within the APPS folder.
+In this method, both the ELF and `title.cfg` must be in the same folder under `APPS`.
 
 > NOTE: In both methods, pay close attention to file names because, as already mentioned, OPL is case-sensitive.
 
