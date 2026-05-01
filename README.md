@@ -111,7 +111,7 @@ USB modes:
 | ------ | ---------------------------------------------------- | ----------- |
 | `CD`   | for games on CD media - i.e. blue-bottom discs       | USB and SMB |
 | `DVD`  | for DVD5 and DVD9 images (if filesystem supports +4gb files) | USB and SMB |
-| `VMC`  | for Virtual Memory Card images - from 8MB up to 64MB | all         |
+| `VMC`  | Virtual Memory Card images (headline save feature): stored in `VMC/`, typically 8MB to 64MB, then assigned per game via **Game Settings** | all         |
 | `CFG`  | for saving per-game configuration files              | all         |
 | `ART`  | for game art images                                  | all         |
 | `THM`  | for themes support                                   | all         |
@@ -119,7 +119,7 @@ USB modes:
 | `CHT`  | for cheats files                                     | all         |
 | `APPS`  | for ELF files                                       | all         |
 
-Per-game settings are stored per title in the `CFG` context. Typical use cases include compatibility toggles, video options (GSM), cheat toggles, and VMC assignment.
+Per-game settings are stored per title in the `CFG` context. Typical use cases include compatibility toggles, video options (GSM), cheat toggles, and assigning a VMC file from the `VMC` folder to that game.
 
 OPL will automatically create the above directory structure the first time you launch it and enable your favorite device.
 
