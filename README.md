@@ -68,6 +68,19 @@ For an updated compatibility list, you can visit the OPL-CL site at:\
 For detailed setup steps, jump to the README sections for **USB/MX4SIO/iLink**, **SMB**, **HDD**, **APPS**, and **Frequent Issues**.
 
 
+### Major Features Overview
+
+- **MMCE / MX4SIO support:** OPL supports MX4SIO adapters (including MMCE-compatible setups) for loading content from SD cards through the Memory Card slot. See the **USB/MX4SIO/iLink** section for filesystem and layout guidance.
+- **Internal HDD exFAT support:** Internal HDD loading supports exFAT in addition to APA/PFS, including GPT partitioning for large disks. See the **HDD** section for formatting and fragmentation guidance.
+- **Themes:** Place theme assets in the `THM` folder, then select and apply themes from OPL settings.
+- **Cheats / PS2RD:** OPL supports PS2RD `.cht` cheat files from the `CHT` folder, with both auto-apply and launch-time selection modes.
+- **Pad emulation (DS3/DS4):** Builds that include PADEMU allow DualShock 3 and DualShock 4 pad emulation support.
+- **GSM (video mode handling):** Builds that include GSM allow game video mode handling/overrides for display compatibility.
+- **VMC (Virtual Memory Cards):** Create and use VMC images (8MB to 64MB) via the `VMC` folder and per-game options.
+- **Per-game settings workflow:** Highlight a game, open **Game Settings**, adjust options (such as compatibility modes, cheats, GSM, PADEMU, and VMC), then save so settings persist per title.
+- **App launching (APPS + config methods):** OPL can launch homebrew ELFs using either `conf_apps.cfg` entries or per-app `title.cfg` metadata in `APPS` subfolders.
+
+
 <details>
   <summary> <b> Release types </b> </summary>
 <p>
@@ -121,7 +134,7 @@ HDDs are also able to be formatted as exFAT to avoid the 2TB limitation.  Please
 <p>
 
 Supported file systems:
-exFAT (since OPL v1.2.0 beta - rev1880) and FAT32, both use the MBR partition table
+exFAT (since OPL v1.2.0 beta - rev1880) and FAT32, both use the MBR partition table. This section applies to MX4SIO/MMCE SD setups and USB storage.
 
 Game files should be *ideally* defragmented either file by file or by whole drive.
 
