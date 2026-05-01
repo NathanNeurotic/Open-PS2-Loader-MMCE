@@ -119,6 +119,8 @@ USB modes:
 | `CHT`  | for cheats files                                     | all         |
 | `APPS`  | for ELF files                                       | all         |
 
+Per-game settings are stored per title in the `CFG` context. Typical use cases include compatibility toggles, video options (GSM), cheat toggles, and VMC assignment.
+
 OPL will automatically create the above directory structure the first time you launch it and enable your favorite device.
 
 For HDDs formatted with the APA partition scheme, OPL will read `hdd0:__common/OPL/conf_hdd.cfg` for the config entry `hdd_partition` to use as your OPL partition.
