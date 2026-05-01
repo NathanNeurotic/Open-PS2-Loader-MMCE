@@ -91,7 +91,7 @@ types come with more or fewer features included.
 
 | Type (can be a combination) | Description                                                                             |
 | --------------------------- | --------------------------------------------------------------------------------------- |
-| `Release`                   | Full-feature build for most users: includes video-mode fixes (GSM), in-game screenshots (IGS), DS3/DS4 pad emulation, VMC support, PS2RD cheats, and parental controls. |
+| `Release`                   | Full-feature build for most users: includes GSM video mode/scaling compatibility tooling (video-mode fixes/overrides), in-game screenshots (IGS), DS3/DS4 pad emulation, VMC support, PS2RD cheats, and parental controls. |
 | `DTL_T10000`                | OPL for TOOLs (DevKit PS2)                                                              |
 | `IGS`                       | Adds in-game screenshot capture so you can save screenshots while playing.              |
 | `PADEMU`                    | Adds DualShock 3/DualShock 4 controller emulation support on compatible setups.         |
@@ -458,9 +458,11 @@ Since 05/07/2021 every OPL build dispatched to the release section of this repos
 ### OPL does not display anything on boot
 
 1. **Symptom:** No image is shown after launching OPL (black/blank screen on TV).
-2. **Likely cause:** A forced video mode was saved that your display does not support.
+2. **Likely cause:** A forced video mode was saved that your display does not support (commonly from GSM video mode/scaling compatibility settings).
 3. **Recovery steps:** Hold __`Triangle + Cross`__ while OPL initializes to reset video mode to __`Auto`__.
 4. **Verification:** Start OPL again normally and confirm the interface appears and remains visible.
+
+For GSM/video-mode mistakes, use the same recovery combo above: hold __`Triangle + Cross`__ at boot to restore __`Auto`__ video mode.
 
 If your issue is still unresolved, report it here: <https://www.psx-place.com/threads/open-ps2-loader-game-bug-reports.19401/>.
 
