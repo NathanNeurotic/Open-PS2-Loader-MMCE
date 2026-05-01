@@ -87,6 +87,7 @@ static void cacheClearItem(cache_entry_t *item, int freeTxt);
 static void cacheResetTextureState(GSTEXTURE *texture);
 static void cacheResetRequestTrackingLocked(void);
 static void cacheWakeWorker(void);
+static void cacheDropQueuedRequestLocked(load_image_request_t *req);
 
 static void cacheReleaseTexture(GSTEXTURE *texture)
 {
