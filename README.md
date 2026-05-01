@@ -11,7 +11,7 @@ Review the LICENSE file for further details.<br><br>
 [![Discord](https://img.shields.io/discord/1275875800318476381?style=flat&logo=Discord)](https://tinyurl.com/PS2SPACE)
 ## Contents
 
-- [Introduction](#introduction) · [Release Types](#release-types) · [How to Use](#how-to-use) · [USB/MX4SIO/iLink](#usbmx4sioilink) · [SMB](#smb) · [HDD](#hdd) · [APPS](#apps) · [Cheats](#cheats) · [NBD Server](#nbd-server) · [ZSO Format](#zso-format) · [PS3 BC](#ps3-bc) · [Frequent Issues](#frequent-issues)
+- [Introduction](#introduction) · [Quick Start](#quick-start) · [Major Features Overview](#major-features-overview) · [Release Types](#release-types) · [How to Use](#how-to-use) · [USB/MX4SIO/iLink](#usbmx4sioilink) · [SMB](#smb) · [HDD](#hdd) · [APPS](#apps) · [Cheats](#cheats) · [NBD Server](#nbd-server) · [ZSO Format](#zso-format) · [PS3 BC](#ps3-bc) · [Frequent Issues](#frequent-issues)
 
 ## Introduction
 
@@ -70,6 +70,8 @@ For detailed setup steps, jump to the README sections for **USB/MX4SIO/iLink**, 
 
 
 ### Major Features Overview
+
+This section is a fast feature map to improve discoverability of core OPL capabilities and reduce setup friction for first-time and returning users.
 
 - **MMCE / MX4SIO support:** OPL supports MX4SIO adapters (including MMCE-compatible setups) for loading content from SD cards through the Memory Card slot. See the **USB/MX4SIO/iLink** section for filesystem and layout guidance.
 - **Internal HDD exFAT support:** Internal HDD loading supports exFAT in addition to APA/PFS, including GPT partitioning for large disks. See the **HDD** section for formatting and fragmentation guidance.
