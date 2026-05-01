@@ -11,7 +11,7 @@ Review the LICENSE file for further details.<br><br>
 [![Discord](https://img.shields.io/discord/1275875800318476381?style=flat&logo=Discord)](https://tinyurl.com/PS2SPACE)
 ## Contents
 
-- [Introduction](#introduction) · [Quick Start](#quick-start) · [Major Features Overview](#major-features-overview) · [Release Types](#release-types) · [How to Use](#how-to-use) · [USB/MX4SIO/iLink](#usbmx4sioilink) · [SMB](#smb) · [HDD](#hdd) · [APPS](#apps) · [Cheats](#cheats) · [NBD Server](#nbd-server) · [ZSO Format](#zso-format) · [PS3 BC](#ps3-bc) · [Frequent Issues](#frequent-issues)
+- [Introduction](#introduction) · [Quick Start](#quick-start) · [Major Features Overview](#major-features-overview) · [Release Types](#release-types) · [How to Use](#how-to-use) · [USB/MMCE/MX4SIO/iLink](#usbmmcemx4sioilink) · [SMB](#smb) · [HDD](#hdd) · [APPS](#apps) · [Cheats](#cheats) · [NBD Server](#nbd-server) · [ZSO Format](#zso-format) · [PS3 BC](#ps3-bc) · [Frequent Issues](#frequent-issues)
 
 ## Introduction
 
@@ -19,13 +19,14 @@ Open PS2 Loader (OPL) is a 100% Open source game and application loader for
 the PS2 and PS3 units.
 Major capabilities include GSM video mode fixes, Virtual Memory Cards (VMC), PS2RD cheats, DS3/DS4 pad emulation, themes, and homebrew app launching.
 
-It supports five categories of devices:
+It supports six categories of devices:
 
 1. USB mass storage devices;
-2. MX4SIO (SD card connected to memory card port via adapter);
-3. iLink (SBP2 compliant storage devices via IEEE 1394);
-4. SMBv1 shares;
-5. ATA/IDE HDDs.
+2. MMCE (Memory Card Mass Storage protocol devices);
+3. MX4SIO (SD card connected to memory card port via adapter);
+4. iLink (SBP2 compliant storage devices via IEEE 1394);
+5. SMBv1 shares;
+6. ATA/IDE HDDs, including internal exFAT configurations (MBR/GPT).
 
 All of the devices mentioned above support multiple file formats, including:
 
@@ -34,8 +35,6 @@ All of the devices mentioned above support multiple file formats, including:
 - USB Extreme (ul);
 - Homebrews (Apps) in ELF format;
 - HDDs support the HDLoader format.
-
-It's now the most compatible homebrew loader.
 
 >[!NOTE]
 OPL is developed continuously - anyone can contribute improvements to the project due to its open-source nature.
@@ -54,7 +53,7 @@ For an updated compatibility list, you can visit the OPL-CL site at:\
 ### What you need
 
 - [ ] A PlayStation 2 or backward-compatible PlayStation 3.
-- [ ] One storage option: USB drive, MX4SIO SD card, SMB network share, or internal HDD.
+- [ ] One storage option: USB drive, MMCE or MX4SIO SD setup, iLink storage, SMB network share, or internal HDD (APA/PFS or exFAT).
 - [ ] The latest Open PS2 Loader (OPL) ELF binary.
 - [ ] Optional: network access (recommended for SMB and remote file management).
 
@@ -66,14 +65,15 @@ For an updated compatibility list, you can visit the OPL-CL site at:\
 4. Open OPL settings and enable the device mode you plan to use.
 5. Launch one test game, then save settings so OPL reuses your configuration.
 
-For detailed setup steps, jump to the README sections for **USB/MX4SIO/iLink**, **SMB**, **HDD**, **APPS**, and **Frequent Issues**.
+For detailed setup steps, jump to the README sections for **USB/MMCE/MX4SIO/iLink**, **SMB**, **HDD**, **APPS**, and **Frequent Issues**.
 
 
 ### Major Features Overview
 
 This section is a fast feature map to improve discoverability of core OPL capabilities and reduce setup friction for first-time and returning users.
 
-- **MMCE / MX4SIO support:** OPL supports MX4SIO adapters (including MMCE-compatible setups) for loading content from SD cards through the Memory Card slot. See the **USB/MX4SIO/iLink** section for filesystem and layout guidance.
+- **MMCE support:** OPL supports MMCE devices using the Memory Card Mass Storage protocol for SD-based loading through the Memory Card slot.
+- **MX4SIO support:** OPL supports MX4SIO adapters for SD-based loading through the Memory Card slot. See the **USB/MMCE/MX4SIO/iLink** section for filesystem and layout guidance.
 - **Internal HDD exFAT support:** Internal HDD loading supports exFAT in addition to APA/PFS, including GPT partitioning for large disks. See the **HDD** section for formatting and fragmentation guidance.
 - **Themes:** Place theme assets in the `THM` folder, then select and apply themes from OPL settings.
 - **Cheats / PS2RD:** OPL supports PS2RD `.cht` cheat files from the `CHT` folder, with both auto-apply and launch-time selection modes.
@@ -135,11 +135,11 @@ HDDs are also able to be formatted as exFAT to avoid the 2TB limitation.  Please
 </details>
 
 <details>
-  <summary> <b> USB/MX4SIO/iLink </b> </summary>
+  <summary> <b> USB/MMCE/MX4SIO/iLink </b> </summary>
 <p>
 
 Supported file systems:
-exFAT (since OPL v1.2.0 beta - rev1880) and FAT32, both use the MBR partition table. This section applies to MX4SIO/MMCE SD setups and USB storage.
+exFAT (since OPL v1.2.0 beta - rev1880) and FAT32, both use the MBR partition table. This section applies to MMCE and MX4SIO SD setups, USB storage, and iLink SBP2 storage.
 
 Game files should be *ideally* defragmented either file by file or by whole drive.
 
