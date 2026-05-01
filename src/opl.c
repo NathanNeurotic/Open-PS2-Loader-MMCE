@@ -906,7 +906,7 @@ static void _loadConfig()
     int value, themeID = -1, langID = -1;
     const char *temp;
     int result = configReadMulti(lscstatus);
-    if (result == 0)
+    if ((lscstatus & CONFIG_OPL) && !(result & CONFIG_OPL))
         result = tryAlternateDevice(lscstatus);
 
     if (lscstatus & CONFIG_OPL) {
