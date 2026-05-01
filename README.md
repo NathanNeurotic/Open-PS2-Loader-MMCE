@@ -44,6 +44,26 @@ You can report compatibility game problems at:\
 For an updated compatibility list, you can visit the OPL-CL site at:\
 <http://sx.sytes.net/oplcl/games.aspx>
 
+## Quick Start
+
+### What you need
+
+- [ ] A PlayStation 2 or backward-compatible PlayStation 3.
+- [ ] One storage option: USB drive, MX4SIO SD card, SMB network share, or internal HDD.
+- [ ] The latest Open PS2 Loader (OPL) ELF binary.
+- [ ] Optional: network access (recommended for SMB and remote file management).
+
+### Minimal startup path
+
+1. Download the latest OPL release build.
+2. Copy the `OPNPS2LD.ELF` file to your launch method (FMCB, FHDB, or equivalent).
+3. Prepare your storage with the expected OPL folders: `DVD`, `CD`, `CFG`, `ART`, `VMC`, and other mode-specific directories as needed.
+4. Open OPL settings and enable the device mode you plan to use.
+5. Launch one test game, then save settings so OPL reuses your configuration.
+
+For detailed setup steps, jump to the README sections for **USB/MX4SIO/iLink**, **SMB**, **HDD**, **APPS**, and **Frequent Issues**.
+
+
 <details>
   <summary> <b> Release types </b> </summary>
 <p>
