@@ -73,7 +73,7 @@ jobs:
               py3-yaml \
               gmp \
               mpfr4 \
-              libmpc1 \
+              mpc1 \
               perl \
               cmake \
               pkgconf \
