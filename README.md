@@ -425,16 +425,26 @@ Since 05/07/2021 every OPL build dispatched to the release section of this repos
 
 ### OPL Freezes on logo or grey screen
 
-Sometimes OPL freezes when loading config files made by older OPL builds.
-> Hold __`START`__ while OPL initializes to skip config loading, then save your settings to fix the issue.
+1. **Symptom:** OPL hangs on the logo or a grey screen during startup.
+2. **Likely cause:** OPL is trying to load an incompatible or corrupted config file from an older build.
+3. **Recovery steps:** Hold __`START`__ while OPL initializes to skip config loading, open settings, then save a fresh configuration.
+4. **Verification:** Reboot OPL normally (without holding buttons) and confirm it reaches the game list/settings screen without freezing.
 
 ### Game freezes on white screen
 
-> The main game executable could not be found. Either the game is fragmented or the image is corrupted.
+1. **Symptom:** Game boot stops on a white screen or fails to continue loading.
+2. **Likely cause:** The game image is fragmented so OPL cannot read it reliably, or the ISO/ZSO/UL image is corrupted/incomplete.
+3. **Recovery steps:** Check the game file integrity (size/hash against known-good dump if available), recopy the game image, and ensure files are contiguous (copy all files off the device, reformat, then copy files back in order).
+4. **Verification:** Relaunch the same title and confirm it passes the white screen and reaches the game's intro/menu.
 
 ### OPL does not display anything on boot
 
-> You may have selected a Video Mode which your TV does not support. Hold Triangle and Cross while OPL initializes to reset your video mode to "Auto".
+1. **Symptom:** No image is shown after launching OPL (black/blank screen on TV).
+2. **Likely cause:** A forced video mode was saved that your display does not support.
+3. **Recovery steps:** Hold __`Triangle + Cross`__ while OPL initializes to reset video mode to __`Auto`__.
+4. **Verification:** Start OPL again normally and confirm the interface appears and remains visible.
+
+If your issue is still unresolved, report it here: <https://www.psx-place.com/threads/open-ps2-loader-game-bug-reports.19401/>.
 
 </p>
 </details>
