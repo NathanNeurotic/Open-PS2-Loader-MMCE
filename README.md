@@ -5,9 +5,9 @@ Copyright 2013, Ifcaro & jimmikaelkael<br>
 Licensed under Academic Free License version 3.0<br>
 Review the LICENSE file for further details.<br><br>
 
-![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/NathanNeurotic/open-ps2-loader-mmce/total?style=plastic&logo=github&logoSize=auto&label=Total%20Downloads&labelColor=navy&color=skyblue&link=https%3A%2F%2Fgithub.com%2FNathanNeurotic%2FOpen-PS2-Loader-MMCE%2Freleases)
-[![CI](https://github.com/NathanNeurotic/Open-PS2-Loader-MMCE/actions/workflows/compilation.yml/badge.svg?branch=master)](https://github.com/NathanNeurotic/Open-PS2-Loader-MMCE/actions/workflows/compilation.yml)
-[![Codacy Badge](https://app.codacy.com/project/badge/Grade/581556b20d6b4dbf8e8af2232c89d60c)](https://app.codacy.com/gh/NathanNeurotic/Open-PS2-Loader-MMCE/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade)
+![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/ps2homebrew/Open-PS2-Loader/total?style=plastic&logo=github&logoSize=auto&label=Total%20Downloads&labelColor=navy&color=skyblue)
+[![CI](https://github.com/ps2homebrew/Open-PS2-Loader/actions/workflows/compilation.yml/badge.svg?branch=master)](https://github.com/ps2homebrew/Open-PS2-Loader/actions/workflows/compilation.yml)
+[![Codacy Badge](https://app.codacy.com/project/badge/Grade/581556b20d6b4dbf8e8af2232c89d60c)](https://app.codacy.com/gh/ps2homebrew/Open-PS2-Loader/dashboard?utm_source=gh&utm_medium=referral&utm_content=ps2homebrew/Open-PS2-Loader&utm_campaign=Badge_grade)
 [![Discord](https://img.shields.io/discord/1275875800318476381?style=flat&logo=Discord)](https://tinyurl.com/PS2SPACE)
 ## Introduction
 
@@ -261,6 +261,8 @@ This means that any utility that worked with the drive when it was directly atta
 
 OPL currently only supports exporting (sharing out) the PS2's drive.
 
+Version note: feature availability and behavior may differ by build date/tag.
+
 You can use `hdl-dump`, `pfs-shell`, or even directly edit the disk in a hex editor.
 
 For example, to use `hdl_dump` to install a game to the HDD:
@@ -271,7 +273,7 @@ For example, to use `hdl_dump` to install a game to the HDD:
 
 To use the NBD server in OPL:
 
-  * Grab the latest beta version (OPL 1.1.0 (current stable) has some bugs in the NBD server) - go to the [Releases](https://github.com/ps2homebrew/Open-PS2-Loader/releases) section and grab the one at the top.
+  * Use the latest release or pre-release from the [Releases](https://github.com/ps2homebrew/Open-PS2-Loader/releases) page if you need newer NBD fixes.
   * Ensure OPL is configured with an IP address (either static or DHCP).
   * Open the menu and select "Start NBD server". Once it's ready, it should update the screen to say "NBD Server running..."
   * Now you can connect with any of the following NBD clients.
