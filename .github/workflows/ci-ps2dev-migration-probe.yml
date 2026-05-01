@@ -25,11 +25,6 @@ jobs:
       - name: git checkout
         uses: actions/checkout@v6
 
-      - name: Mark workspace safe and fetch history
-        run: |
-          git config --global --add safe.directory "$GITHUB_WORKSPACE"
-          git fetch --prune --unshallow
-
       - name: Install diagnostic host dependencies (Alpine only)
         run: |
           if command -v apk >/dev/null 2>&1; then
@@ -53,6 +48,15 @@ jobs:
               sed \
               gawk \
               diffutils
+          fi
+
+      - name: Mark workspace safe and fetch history
+        run: |
+          if command -v git >/dev/null 2>&1; then
+            git config --global --add safe.directory "$GITHUB_WORKSPACE"
+            git fetch --prune --unshallow || true
+          else
+            echo "git not available before dependency install"
           fi
 
       - name: Capture fingerprint and SDK snapshot
