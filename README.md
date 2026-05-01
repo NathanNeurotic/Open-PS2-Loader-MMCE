@@ -17,6 +17,7 @@ Review the LICENSE file for further details.<br><br>
 
 Open PS2 Loader (OPL) is a 100% Open source game and application loader for
 the PS2 and PS3 units.
+Major capabilities include GSM video mode fixes, Virtual Memory Cards (VMC), PS2RD cheats, DS3/DS4 pad emulation, themes, and homebrew app launching.
 
 It supports five categories of devices:
 
@@ -90,10 +91,10 @@ types come with more or fewer features included.
 
 | Type (can be a combination) | Description                                                                             |
 | --------------------------- | --------------------------------------------------------------------------------------- |
-| `Release`                   | Regular OPL release with GSM, IGS, PADEMU, VMC, PS2RD Cheat Engine & Parental Controls. |
+| `Release`                   | Full-feature build for most users: includes video-mode fixes (GSM), in-game screenshots (IGS), DS3/DS4 pad emulation, VMC support, PS2RD cheats, and parental controls. |
 | `DTL_T10000`                | OPL for TOOLs (DevKit PS2)                                                              |
-| `IGS`                       | OPL with InGame Screenshot feature.                                                     |
-| `PADEMU`                    | OPL with Pad Emulation for DS3 & DS4.                                                   |
+| `IGS`                       | Adds in-game screenshot capture so you can save screenshots while playing.              |
+| `PADEMU`                    | Adds DualShock 3/DualShock 4 controller emulation support on compatible setups.         |
 | `RTL`                       | OPL with the right to left language support.                                            |
 
 </p>
