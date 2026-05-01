@@ -1792,8 +1792,8 @@ static void setDefaults(void)
     gMMCESlot = 2; //Default to first Auto slot
     gMMCEIGRSlot = 3;
     gMMCEEnableGameID = 1;
-    gMMCEAckWaitCycles = 5;
-    gMMCEUseAlarms = 1;
+    gMMCEAckWaitCycles = 0;
+    gMMCEUseAlarms = 0;
 
     gEnableUSB = 0;
     gEnableILK = 0;

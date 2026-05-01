@@ -38,6 +38,40 @@ static base_game_info_t *mmceGames;
 
 // forward declaration
 static item_list_t mmceGameList;
+static void mmceGetDeviceRoot(char *root, size_t size);
+
+static int mmceSendGameID(const char *startup)
+{
+    char mmceDevice[sizeof(mmcePrefix)];
+
+    if (!gMMCEEnableGameID || startup == NULL || startup[0] == '\0')
+        return 0;
+
+    mmceGetDeviceRoot(mmceDevice, sizeof(mmceDevice));
+    if (mmceDevice[0] == '\0')
+        return 0;
+
+    if (fileXioDevctl(mmceDevice, 0x8, (void *)startup, (strlen(startup) + 1), NULL, 0) < 0)
+        return 0;
+
+    // Send GameID to MMCE and wait until busy bit is clear.
+    for (int i = 0; i < MMCE_GAMEID_WAIT_TICKS; i++) {
+        int status;
+
+        nopdelay();
+
+        status = fileXioDevctl(mmceDevice, 0x2, NULL, 0, NULL, 0);
+        if (status < 0)
+            break;
+
+        if ((status & 1) == 0) {
+            LOG("Set MMCE GameID to: %s\n", startup);
+            return 1;
+        }
+    }
+
+    return 1;
+}
 
 static void mmceGetDeviceRoot(char *root, size_t size)
 {
@@ -274,7 +308,6 @@ void mmceLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
     int result;
 
     char partname[256], filename[32];
-    char mmceDevice[sizeof(mmcePrefix)];
     base_game_info_t *game;
     struct cdvdman_settings_mmce *settings;
     u32 layer1_start, layer1_offset;
@@ -417,27 +450,7 @@ void mmceLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
     LOG("name: %s\n", game->name);
     LOG("start: %s\n", game->startup);
 
-    mmceGetDeviceRoot(mmceDevice, sizeof(mmceDevice));
-
-    // Set GameID and only wait for readiness when that feature is enabled.
-    if (gMMCEEnableGameID && mmceDevice[0] != '\0' && fileXioDevctl(mmceDevice, 0x8, game->startup, (strlen(game->startup) + 1), NULL, 0) >= 0) {
-        // Send GameID to MMCE
-        for (int i = 0; i < MMCE_GAMEID_WAIT_TICKS; i++) {
-            int status;
-
-            nopdelay();
-
-            // Poll MMCE status until busy bit is clear
-            status = fileXioDevctl(mmceDevice, 0x2, NULL, 0, NULL, 0);
-            if (status < 0)
-                break;
-
-            if ((status & 1) == 0) {
-                LOG("Set MMCE GameID to: %s\n", game->startup);
-                break;
-            }
-        }
-    }
+    mmceSendGameID(game->startup);
 
     // mcReset();
     // mcInit(MC_TYPE_XMC);
