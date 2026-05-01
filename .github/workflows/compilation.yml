@@ -70,6 +70,9 @@ jobs:
               python3 \
               py3-pip \
               py3-yaml \
+              gmp \
+              mpfr4 \
+              libmpc1 \
               perl \
               cmake \
               pkgconf \
