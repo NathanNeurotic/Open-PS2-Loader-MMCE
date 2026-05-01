@@ -9,6 +9,10 @@ Review the LICENSE file for further details.<br><br>
 [![CI](https://github.com/ps2homebrew/Open-PS2-Loader/actions/workflows/compilation.yml/badge.svg?branch=master)](https://github.com/ps2homebrew/Open-PS2-Loader/actions/workflows/compilation.yml)
 [![Codacy Badge](https://app.codacy.com/project/badge/Grade/581556b20d6b4dbf8e8af2232c89d60c)](https://app.codacy.com/gh/ps2homebrew/Open-PS2-Loader/dashboard?utm_source=gh&utm_medium=referral&utm_content=ps2homebrew/Open-PS2-Loader&utm_campaign=Badge_grade)
 [![Discord](https://img.shields.io/discord/1275875800318476381?style=flat&logo=Discord)](https://tinyurl.com/PS2SPACE)
+## Contents
+
+- [Introduction](#introduction) · [Release Types](#release-types) · [How to Use](#how-to-use) · [USB/MX4SIO/iLink](#usbmx4sioilink) · [SMB](#smb) · [HDD](#hdd) · [APPS](#apps) · [Cheats](#cheats) · [NBD Server](#nbd-server) · [ZSO Format](#zso-format) · [PS3 BC](#ps3-bc) · [Frequent Issues](#frequent-issues)
+
 ## Introduction
 
 Open PS2 Loader (OPL) is a 100% Open source game and application loader for
