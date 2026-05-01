@@ -38,6 +38,7 @@ static base_game_info_t *mmceGames;
 
 // forward declaration
 static item_list_t mmceGameList;
+static void mmceGetDeviceRoot(char *root, size_t size);
 
 static int mmceSendGameID(const char *startup)
 {
@@ -50,7 +51,7 @@ static int mmceSendGameID(const char *startup)
     if (mmceDevice[0] == '\0')
         return 0;
 
-    if (fileXioDevctl(mmceDevice, 0x8, startup, (strlen(startup) + 1), NULL, 0) < 0)
+    if (fileXioDevctl(mmceDevice, 0x8, (void *)startup, (strlen(startup) + 1), NULL, 0) < 0)
         return 0;
 
     // Send GameID to MMCE and wait until busy bit is clear.
