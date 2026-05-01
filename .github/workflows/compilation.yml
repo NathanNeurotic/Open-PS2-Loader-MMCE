@@ -47,6 +47,73 @@ jobs:
             LICENSE
             README.md
 
+
+  build-ps2dev-latest:
+    runs-on: ubuntu-latest
+    container: ps2dev/ps2dev:latest
+    steps:
+      - name: git checkout
+        uses: actions/checkout@v6
+
+      - name: Install host dependencies (Alpine only)
+        run: |
+          if command -v apk >/dev/null 2>&1; then
+            # Consolidated ps2dev Alpine prerequisites: build tools, scripting, packaging, and gcc runtime libs.
+            apk add --no-cache \
+              bash \
+              make \
+              git \
+              zip \
+              unzip \
+              tar \
+              gzip \
+              xz \
+              python3 \
+              py3-pip \
+              py3-yaml \
+              gmp \
+              mpfr4 \
+              mpc1 \
+              perl \
+              cmake \
+              pkgconf \
+              coreutils \
+              findutils \
+              grep \
+              sed \
+              gawk \
+              diffutils
+          fi
+
+      - run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git fetch --prune --unshallow || true
+
+      - name: Compile -> make clean release
+        run: make --trace clean release
+
+      - name: Create detailed changelog
+        run: sh ./make_changelog.sh
+
+      - name: Upload release artifact ELF (ps2dev-latest)
+        if: ${{ success() }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: OPNPS2LD-ps2dev-latest
+          path: |
+            OPNPS2LD-*.ELF
+
+      - name: Upload release artifact info (ps2dev-latest)
+        if: ${{ success() }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: INFO-ps2dev-latest
+          path: |
+            DETAILED_CHANGELOG
+            CREDITS
+            LICENSE
+            README.md
+
   build-variants:
     strategy:
       fail-fast: false
@@ -81,6 +148,71 @@ jobs:
           name: OPNPS2LD-VARIANTS ${{ matrix.pademu }} ${{ matrix.extra }}
           path: OPNPS2LD*.ELF
 
+
+  build-variants-ps2dev-latest:
+    strategy:
+      fail-fast: false
+      matrix:
+        extra: [EXTRA_FEATURES=0, EXTRA_FEATURES=1]
+        pademu: [PADEMU=0, PADEMU=1]
+    runs-on: ubuntu-latest
+    container: ps2dev/ps2dev:latest
+    steps:
+      - name: git checkout
+        uses: actions/checkout@v6
+
+      - name: Install host dependencies (Alpine only)
+        run: |
+          if command -v apk >/dev/null 2>&1; then
+            # Consolidated ps2dev Alpine prerequisites: build tools, scripting, packaging, and gcc runtime libs.
+            apk add --no-cache \
+              bash \
+              make \
+              git \
+              zip \
+              unzip \
+              tar \
+              gzip \
+              xz \
+              python3 \
+              py3-pip \
+              py3-yaml \
+              gmp \
+              mpfr4 \
+              mpc1 \
+              perl \
+              cmake \
+              pkgconf \
+              coreutils \
+              findutils \
+              grep \
+              sed \
+              gawk \
+              diffutils
+          fi
+
+      - run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git fetch --prune --unshallow || true
+
+      - name: Get version
+        run: |
+          echo "OPL_VERSION=$(make oplversion)" >> "$GITHUB_ENV"
+
+      - name: Compile -> make ${{ matrix.extra }} ${{ matrix.pademu }} ${{ matrix.extra }} NOT_PACKED=1
+        run: |
+          make --trace ${{ matrix.pademu }} ${{ matrix.extra }} NOT_PACKED=1
+          mv opl.elf OPNPS2LD-${{ env.OPL_VERSION }}-${{ matrix.pademu }}-${{ matrix.extra }}.ELF
+
+      - name: Create detailed changelog
+        run: sh ./make_changelog.sh
+
+      - name: Upload variants artifact ELF (ps2dev-latest)
+        uses: actions/upload-artifact@v6
+        with:
+          name: OPNPS2LD-VARIANTS-ps2dev-latest ${{ matrix.pademu }} ${{ matrix.extra }}
+          path: OPNPS2LD*.ELF
+
   merge-variants:
     runs-on: ubuntu-latest
     needs: build-variants
@@ -97,6 +229,24 @@ jobs:
         with:
           name: OPNPS2LD-VARIANTS
           path: merged-variants
+
+
+  merge-variants-ps2dev-latest:
+    runs-on: ubuntu-latest
+    needs: build-variants-ps2dev-latest
+    steps:
+      - name: Download variant artifacts (ps2dev-latest)
+        uses: actions/download-artifact@v8
+        with:
+          pattern: OPNPS2LD-VARIANTS-ps2dev-latest*
+          path: merged-variants-ps2dev-latest
+          merge-multiple: true
+
+      - name: Re-upload merged variants (ps2dev-latest)
+        uses: actions/upload-artifact@v6
+        with:
+          name: OPNPS2LD-VARIANTS-ps2dev-latest
+          path: merged-variants-ps2dev-latest
 
   build-lang:
     runs-on: ubuntu-latest
@@ -120,6 +270,62 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: OPNPS2LD-LANGS
+          path: |
+            OPNPS2LD-LANGS-*.zip
+
+
+  build-lang-ps2dev-latest:
+    runs-on: ubuntu-latest
+    container: ps2dev/ps2dev:latest
+    steps:
+      - name: git checkout
+        uses: actions/checkout@v6
+
+      - name: Install host dependencies (Alpine only)
+        run: |
+          if command -v apk >/dev/null 2>&1; then
+            # Consolidated ps2dev Alpine prerequisites: build tools, scripting, packaging, and gcc runtime libs.
+            apk add --no-cache \
+              bash \
+              make \
+              git \
+              zip \
+              unzip \
+              tar \
+              gzip \
+              xz \
+              python3 \
+              py3-pip \
+              py3-yaml \
+              gmp \
+              mpfr4 \
+              mpc1 \
+              perl \
+              cmake \
+              pkgconf \
+              coreutils \
+              findutils \
+              grep \
+              sed \
+              gawk \
+              diffutils
+          fi
+
+      - run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git fetch --prune --unshallow || true
+
+      - name: Compile -> make download_lng languages
+        run: make --trace download_lng languages
+
+      - name: Create artifact
+        run: sh ./lng_pack.sh
+
+      - name: Upload release artifact (ps2dev-latest)
+        if: ${{ success() }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: OPNPS2LD-LANGS-ps2dev-latest
           path: |
             OPNPS2LD-LANGS-*.zip
 
@@ -173,6 +379,84 @@ jobs:
         with:
           name: OPNPS2LD-DEBUG
           path: merged-debug
+
+
+  build-debug-ps2dev-latest:
+    strategy:
+      fail-fast: false
+      matrix:
+        debug: [iopcore_debug, ingame_debug, eesio_debug, iopcore_ppctty_debug, ingame_ppctty_debug, DTL_T10000=1]
+    runs-on: ubuntu-latest
+    container: ps2dev/ps2dev:latest
+    steps:
+      - name: git checkout
+        uses: actions/checkout@v6
+
+      - name: Install host dependencies (Alpine only)
+        run: |
+          if command -v apk >/dev/null 2>&1; then
+            # Consolidated ps2dev Alpine prerequisites: build tools, scripting, packaging, and gcc runtime libs.
+            apk add --no-cache \
+              bash \
+              make \
+              git \
+              zip \
+              unzip \
+              tar \
+              gzip \
+              xz \
+              python3 \
+              py3-pip \
+              py3-yaml \
+              gmp \
+              mpfr4 \
+              mpc1 \
+              perl \
+              cmake \
+              pkgconf \
+              coreutils \
+              findutils \
+              grep \
+              sed \
+              gawk \
+              diffutils
+          fi
+
+      - run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git fetch --prune --unshallow || true
+
+      - name: Get version
+        run: |
+          echo "OPL_VERSION=$(make oplversion)" >> "$GITHUB_ENV"
+
+      - name: Compile -> make debug
+        run: |
+          make ${{ matrix.debug }} --trace
+          mv opl.elf opl-${{ matrix.debug }}-${{ env.OPL_VERSION }}-ps2dev-latest.elf
+
+      - name: Upload debug artifact ELF (ps2dev-latest)
+        uses: actions/upload-artifact@v6
+        with:
+          name: opl-${{ matrix.debug }}-${{ env.OPL_VERSION }}-ps2dev-latest
+          path: opl-*.elf
+
+  merge-debug-ps2dev-latest:
+    runs-on: ubuntu-latest
+    needs: build-debug-ps2dev-latest
+    steps:
+      - name: Download debug artifacts (ps2dev-latest)
+        uses: actions/download-artifact@v8
+        with:
+          pattern: opl-*-ps2dev-latest
+          path: merged-debug-ps2dev-latest
+          merge-multiple: true
+
+      - name: Re-upload merged debug artifacts (ps2dev-latest)
+        uses: actions/upload-artifact@v6
+        with:
+          name: OPNPS2LD-DEBUG-ps2dev-latest
+          path: merged-debug-ps2dev-latest
 
   release:
     needs: [build, merge-variants, build-lang]
