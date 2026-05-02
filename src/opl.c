@@ -810,6 +810,28 @@ static int checkLoadConfigBDM(int types)
     return 0;
 }
 
+static int checkLoadConfigBDMHDD(int types)
+{
+    char path[64];
+    int value;
+
+    // Bounded wait so BDM-on-HDD can be detected without long black-screen stalls.
+    if (hddLoadModules() >= 0 && bdmHDDIsPresent(500)) {
+        if (bdmFindPartition(path, "conf_opl.cfg", 0)) {
+            configEnd();
+            configInit(path);
+            value = configReadMulti(types);
+            config_set_t *configOPL = configGetByType(CONFIG_OPL);
+            configSetInt(configOPL, CONFIG_OPL_BDM_MODE, START_MODE_AUTO);
+            gEnableBdmHDD = 1;
+            configSetInt(configOPL, CONFIG_OPL_ENABLE_BDMHDD, gEnableBdmHDD);
+            return value;
+        }
+    }
+
+    return 0;
+}
+
 static int checkLoadConfigHDD(int types)
 {
     int value;
@@ -854,6 +876,9 @@ static int tryAlternateDevice(int types)
     // Config was not found on the boot device. Check all supported devices.
     //  Check USB device
     if ((value = checkLoadConfigBDM(types)) != 0)
+        return value;
+    // Check BDM HDD with a short bounded wait.
+    if ((value = checkLoadConfigBDMHDD(types)) != 0)
         return value;
     // Check HDD
     if ((value = checkLoadConfigHDD(types)) != 0)
@@ -1028,6 +1053,21 @@ static int trySaveConfigBDM(int types)
     return -ENOENT;
 }
 
+static int trySaveConfigBDMHDD(int types)
+{
+    char path[64];
+
+    // Bounded wait so save can target BDM-on-HDD without long stalls.
+    if (hddLoadModules() >= 0 && bdmHDDIsPresent(500)) {
+        if (bdmFindPartition(path, "conf_opl.cfg", 1)) {
+            configSetMove(path);
+            return configWriteMulti(types);
+        }
+    }
+
+    return -ENOENT;
+}
+
 static int trySaveConfigHDD(int types)
 {
     hddLoadModules();
@@ -1056,6 +1096,8 @@ static int trySaveAlternateDevice(int types)
             return value;
     }
     if ((value = trySaveConfigBDM(types)) > 0)
+        return value;
+    if ((value = trySaveConfigBDMHDD(types)) > 0)
         return value;
     if ((value = trySaveConfigHDD(types)) > 0)
         return value;
