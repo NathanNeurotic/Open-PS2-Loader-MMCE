@@ -1774,6 +1774,12 @@ static void moduleCleanup(opl_io_module_t *mod, int exception, int modeSelected)
 
 void deinit(int exception, int modeSelected)
 {
+    /* Cut launch/exit latency by stopping queued art I/O before globally
+     * blocking the I/O worker. This avoids waiting for stale cover requests
+     * that are no longer needed once we are deinitializing. */
+    cacheAbortMmceImageLoadsTimed(0);
+    (void)cacheCancelPendingImageLoadsTimed(0);
+
     // block all io ops, wait for the ones still running to finish
     ioBlockOps(1);
     guiExecDeferredOps();
