@@ -1177,8 +1177,23 @@ static int trySaveConfigHDD(int types)
 
 static int trySaveConfigMC(int types)
 {
-    configSetMove(NULL);
-    return configWriteMulti(types);
+    DIR *dir = opendir("mc0:/");
+    if (dir != NULL) {
+        closedir(dir);
+        configSetMove("mc0:OPL");
+        if (configWriteMulti(types) > 0)
+            return 1;
+    }
+
+    dir = opendir("mc1:/");
+    if (dir != NULL) {
+        closedir(dir);
+        configSetMove("mc1:OPL");
+        if (configWriteMulti(types) > 0)
+            return 1;
+    }
+
+    return 0;
 }
 
 static int trySaveAlternateDevice(int types)
