@@ -1962,6 +1962,7 @@ static void init(void)
         padStatus = startPads();
     readPads();
     if (!getKeyPressed(KEY_START)) {
+        guiRenderTextScreen(_l(_STR_LOADING_SETTINGS));
         _loadConfig(); // only try to restore config if emergency key is not being pressed
     } else {
         LOG("--- SKIPPING OPL CONFIG LOADING\n");
