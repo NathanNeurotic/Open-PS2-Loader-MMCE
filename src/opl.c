@@ -788,6 +788,38 @@ void setErrorMessage(int strId)
 
 static int lscstatus = CONFIG_ALL;
 static int lscret = 0;
+static const char *configPathRedirectFile = "config.path";
+
+static int readConfigPathRedirect(char *outPath, int outPathLen)
+{
+    int fd;
+    int len;
+
+    fd = open((char *)configPathRedirectFile, O_RDONLY);
+    if (fd < 0)
+        return 0;
+
+    len = read(fd, outPath, outPathLen - 1);
+    close(fd);
+    if (len <= 0)
+        return 0;
+
+    while (len > 0 && (outPath[len - 1] == '\r' || outPath[len - 1] == '\n' || outPath[len - 1] == ' ' || outPath[len - 1] == '\t'))
+        len--;
+    outPath[len] = '\0';
+
+    return len > 0;
+}
+
+static void writeConfigPathRedirect(const char *path)
+{
+    int fd = open((char *)configPathRedirectFile, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+    if (fd >= 0) {
+        write(fd, path, strlen(path));
+        write(fd, "\n", 1);
+        close(fd);
+    }
+}
 
 static int checkLoadConfigBDM(int types)
 {
@@ -805,6 +837,38 @@ static int checkLoadConfigBDM(int types)
         config_set_t *configOPL = configGetByType(CONFIG_OPL);
         configSetInt(configOPL, CONFIG_OPL_BDM_MODE, START_MODE_AUTO);
         return value;
+    }
+
+    return 0;
+}
+
+static int checkLoadConfigMMCE(int types)
+{
+    int value;
+    DIR *dir = opendir("mmce0:");
+    if (dir != NULL) {
+        closedir(dir);
+        configEnd();
+        configInit("mmce0:");
+        value = configReadMulti(types);
+        if (value & CONFIG_OPL) {
+            config_set_t *configOPL = configGetByType(CONFIG_OPL);
+            configSetInt(configOPL, CONFIG_OPL_MMCE_MODE, START_MODE_AUTO);
+            return value;
+        }
+    }
+
+    dir = opendir("mmce1:");
+    if (dir != NULL) {
+        closedir(dir);
+        configEnd();
+        configInit("mmce1:");
+        value = configReadMulti(types);
+        if (value & CONFIG_OPL) {
+            config_set_t *configOPL = configGetByType(CONFIG_OPL);
+            configSetInt(configOPL, CONFIG_OPL_MMCE_MODE, START_MODE_AUTO);
+            return value;
+        }
     }
 
     return 0;
@@ -859,10 +923,19 @@ static int checkLoadConfigHDD(int types)
 static int tryAlternateDevice(int types)
 {
     char pwd[8];
+    char redirectPath[64];
     int value;
     DIR *dir;
 
     getcwd(pwd, sizeof(pwd));
+
+    if (readConfigPathRedirect(redirectPath, sizeof(redirectPath))) {
+        configEnd();
+        configInit(redirectPath);
+        value = configReadMulti(types);
+        if (value & CONFIG_OPL)
+            return value;
+    }
 
     // First, try the device that OPL booted from.
     if (!strncmp(pwd, "mass", 4) && (pwd[4] == ':' || pwd[5] == ':')) {
@@ -874,7 +947,10 @@ static int tryAlternateDevice(int types)
     }
 
     // Config was not found on the boot device. Check all supported devices.
-    //  Check USB device
+    // Check MMCE before BDM.
+    if ((value = checkLoadConfigMMCE(types)) != 0)
+        return value;
+    // Check BDM devices.
     if ((value = checkLoadConfigBDM(types)) != 0)
         return value;
     // Check BDM HDD with a short bounded wait.
@@ -1053,6 +1129,25 @@ static int trySaveConfigBDM(int types)
     return -ENOENT;
 }
 
+static int trySaveConfigMMCE(int types)
+{
+    DIR *dir = opendir("mmce0:");
+    if (dir != NULL) {
+        closedir(dir);
+        configSetMove("mmce0:");
+        return configWriteMulti(types);
+    }
+
+    dir = opendir("mmce1:");
+    if (dir != NULL) {
+        closedir(dir);
+        configSetMove("mmce1:");
+        return configWriteMulti(types);
+    }
+
+    return -ENOENT;
+}
+
 static int trySaveConfigBDMHDD(int types)
 {
     char path[64];
@@ -1090,11 +1185,13 @@ static int trySaveAlternateDevice(int types)
 {
     int value;
 
-    // Save in deterministic order: MC -> BDM -> HDD.
+    // Save in deterministic order: MC -> MMCE -> BDM -> BDM-HDD -> HDD.
     if (sysCheckMC() >= 0) {
         if ((value = trySaveConfigMC(types)) > 0)
             return value;
     }
+    if ((value = trySaveConfigMMCE(types)) > 0)
+        return value;
     if ((value = trySaveConfigBDM(types)) > 0)
         return value;
     if ((value = trySaveConfigBDMHDD(types)) > 0)
@@ -1201,6 +1298,8 @@ static void _saveConfig()
     }
 
     lscret = configWriteMulti(lscstatus);
+    if (lscret > 0)
+        writeConfigPathRedirect(configGetDir());
     lscstatus = 0;
 }
 
