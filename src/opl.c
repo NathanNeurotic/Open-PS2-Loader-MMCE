@@ -842,6 +842,32 @@ static int checkLoadConfigBDM(int types)
     return 0;
 }
 
+static int checkLoadConfigMC(int types)
+{
+    int value;
+    DIR *dir = opendir("mc0:/");
+    if (dir != NULL) {
+        closedir(dir);
+        configEnd();
+        configInit("mc0:OPL");
+        value = configReadMulti(types);
+        if (value & CONFIG_OPL)
+            return value;
+    }
+
+    dir = opendir("mc1:/");
+    if (dir != NULL) {
+        closedir(dir);
+        configEnd();
+        configInit("mc1:OPL");
+        value = configReadMulti(types);
+        if (value & CONFIG_OPL)
+            return value;
+    }
+
+    return 0;
+}
+
 static int checkLoadConfigMMCE(int types)
 {
     int value;
@@ -936,6 +962,10 @@ static int tryAlternateDevice(int types)
         if (value & CONFIG_OPL)
             return value;
     }
+
+    // Try both memory cards explicitly before probing slower removable devices.
+    if ((value = checkLoadConfigMC(types)) != 0)
+        return value;
 
     // First, try the device that OPL booted from.
     if (!strncmp(pwd, "mass", 4) && (pwd[4] == ':' || pwd[5] == ':')) {
