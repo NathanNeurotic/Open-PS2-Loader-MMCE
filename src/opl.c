@@ -788,25 +788,47 @@ void setErrorMessage(int strId)
 
 static int lscstatus = CONFIG_ALL;
 static int lscret = 0;
+static const char *configPathRedirectFile = "config.path";
+
+static int readConfigPathRedirect(char *outPath, int outPathLen)
+{
+    int fd;
+    int len;
+
+    fd = open((char *)configPathRedirectFile, O_RDONLY);
+    if (fd < 0)
+        return 0;
+
+    len = read(fd, outPath, outPathLen - 1);
+    close(fd);
+    if (len <= 0)
+        return 0;
+
+    while (len > 0 && (outPath[len - 1] == '\r' || outPath[len - 1] == '\n' || outPath[len - 1] == ' ' || outPath[len - 1] == '\t'))
+        len--;
+    outPath[len] = '\0';
+
+    return len > 0;
+}
+
+static void writeConfigPathRedirect(const char *path)
+{
+    int fd = open((char *)configPathRedirectFile, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+    if (fd >= 0) {
+        write(fd, path, strlen(path));
+        write(fd, "\n", 1);
+        close(fd);
+    }
+}
 
 static int checkLoadConfigBDM(int types)
 {
     char path[64];
     int value;
     int bdm_result;
-    int is_hdd = 0;
 
-    // check USB
+    // Check BDM devices first (mass:/massX:/mmce:/mx4sio: etc).
     bdm_result = bdmFindPartition(path, "conf_opl.cfg", 0);
-    // if not on USB, check BDM HDD
-    if (bdm_result == 0) {
-        // wait for up to 5 seconds for the HDD to spin up and become accessible...
-        if (hddLoadModules() >= 0 && bdmHDDIsPresent(5000)) {
-            bdm_result = bdmFindPartition(path, "conf_opl.cfg", 0);
-            if (bdm_result)
-                is_hdd = 1;
-        }
-    }
 
     if (bdm_result) {
         configEnd();
@@ -814,11 +836,61 @@ static int checkLoadConfigBDM(int types)
         value = configReadMulti(types);
         config_set_t *configOPL = configGetByType(CONFIG_OPL);
         configSetInt(configOPL, CONFIG_OPL_BDM_MODE, START_MODE_AUTO);
-        if (is_hdd != 0) {
+        return value;
+    }
+
+    return 0;
+}
+
+static int checkLoadConfigMMCE(int types)
+{
+    int value;
+    DIR *dir = opendir("mmce0:");
+    if (dir != NULL) {
+        closedir(dir);
+        configEnd();
+        configInit("mmce0:");
+        value = configReadMulti(types);
+        if (value & CONFIG_OPL) {
+            config_set_t *configOPL = configGetByType(CONFIG_OPL);
+            configSetInt(configOPL, CONFIG_OPL_MMCE_MODE, START_MODE_AUTO);
+            return value;
+        }
+    }
+
+    dir = opendir("mmce1:");
+    if (dir != NULL) {
+        closedir(dir);
+        configEnd();
+        configInit("mmce1:");
+        value = configReadMulti(types);
+        if (value & CONFIG_OPL) {
+            config_set_t *configOPL = configGetByType(CONFIG_OPL);
+            configSetInt(configOPL, CONFIG_OPL_MMCE_MODE, START_MODE_AUTO);
+            return value;
+        }
+    }
+
+    return 0;
+}
+
+static int checkLoadConfigBDMHDD(int types)
+{
+    char path[64];
+    int value;
+
+    // Bounded wait so BDM-on-HDD can be detected without long black-screen stalls.
+    if (hddLoadModules() >= 0 && bdmHDDIsPresent(500)) {
+        if (bdmFindPartition(path, "conf_opl.cfg", 0)) {
+            configEnd();
+            configInit(path);
+            value = configReadMulti(types);
+            config_set_t *configOPL = configGetByType(CONFIG_OPL);
+            configSetInt(configOPL, CONFIG_OPL_BDM_MODE, START_MODE_AUTO);
             gEnableBdmHDD = 1;
             configSetInt(configOPL, CONFIG_OPL_ENABLE_BDMHDD, gEnableBdmHDD);
+            return value;
         }
-        return value;
     }
 
     return 0;
@@ -851,10 +923,19 @@ static int checkLoadConfigHDD(int types)
 static int tryAlternateDevice(int types)
 {
     char pwd[8];
+    char redirectPath[64];
     int value;
     DIR *dir;
 
     getcwd(pwd, sizeof(pwd));
+
+    if (readConfigPathRedirect(redirectPath, sizeof(redirectPath))) {
+        configEnd();
+        configInit(redirectPath);
+        value = configReadMulti(types);
+        if (value & CONFIG_OPL)
+            return value;
+    }
 
     // First, try the device that OPL booted from.
     if (!strncmp(pwd, "mass", 4) && (pwd[4] == ':' || pwd[5] == ':')) {
@@ -866,8 +947,14 @@ static int tryAlternateDevice(int types)
     }
 
     // Config was not found on the boot device. Check all supported devices.
-    //  Check USB device
+    // Check MMCE before BDM.
+    if ((value = checkLoadConfigMMCE(types)) != 0)
+        return value;
+    // Check BDM devices.
     if ((value = checkLoadConfigBDM(types)) != 0)
+        return value;
+    // Check BDM HDD with a short bounded wait.
+    if ((value = checkLoadConfigBDMHDD(types)) != 0)
         return value;
     // Check HDD
     if ((value = checkLoadConfigHDD(types)) != 0)
@@ -906,6 +993,8 @@ static void _loadConfig()
     int value, themeID = -1, langID = -1;
     const char *temp;
     int result = configReadMulti(lscstatus);
+    if ((lscstatus & CONFIG_OPL) && !(result & CONFIG_OPL))
+        result = tryAlternateDevice(lscstatus);
 
     if (lscstatus & CONFIG_OPL) {
         if (result & CONFIG_OPL) {
@@ -1029,19 +1118,46 @@ static int trySaveConfigBDM(int types)
     char path[64];
     int bdm_result;
 
-    // check USB
+    // Check BDM devices first (mass:/massX:/mmce:/mx4sio: etc).
     bdm_result = bdmFindPartition(path, "conf_opl.cfg", 1);
-    // if not on USB, check BDM HDD
-    if (bdm_result == 0) {
-        // wait for up to 5 seconds for the HDD to spin up and become accessible...
-        if (hddLoadModules() >= 0 && bdmHDDIsPresent(5000)) {
-            bdm_result = bdmFindPartition(path, "conf_opl.cfg", 1);
-        }
-    }
 
     if (bdm_result) {
         configSetMove(path);
         return configWriteMulti(types);
+    }
+
+    return -ENOENT;
+}
+
+static int trySaveConfigMMCE(int types)
+{
+    DIR *dir = opendir("mmce0:");
+    if (dir != NULL) {
+        closedir(dir);
+        configSetMove("mmce0:");
+        return configWriteMulti(types);
+    }
+
+    dir = opendir("mmce1:");
+    if (dir != NULL) {
+        closedir(dir);
+        configSetMove("mmce1:");
+        return configWriteMulti(types);
+    }
+
+    return -ENOENT;
+}
+
+static int trySaveConfigBDMHDD(int types)
+{
+    char path[64];
+
+    // Bounded wait so save can target BDM-on-HDD without long stalls.
+    if (hddLoadModules() >= 0 && bdmHDDIsPresent(500)) {
+        if (bdmFindPartition(path, "conf_opl.cfg", 1)) {
+            configSetMove(path);
+            return configWriteMulti(types);
+        }
     }
 
     return -ENOENT;
@@ -1067,30 +1183,19 @@ static int trySaveConfigMC(int types)
 
 static int trySaveAlternateDevice(int types)
 {
-    char pwd[8];
     int value;
 
-    getcwd(pwd, sizeof(pwd));
-
-    // First, try the device that OPL booted from.
-    if (!strncmp(pwd, "mass", 4) && (pwd[4] == ':' || pwd[5] == ':')) {
-        if ((value = trySaveConfigBDM(types)) > 0)
-            return value;
-    } else if (!strncmp(pwd, "hdd", 3) && (pwd[3] == ':' || pwd[4] == ':')) {
-        if ((value = trySaveConfigHDD(types)) > 0)
-            return value;
-    }
-
-    // Config was not saved to the boot device. Try all supported devices.
-    // Try memory cards
+    // Save in deterministic order: MC -> MMCE -> BDM -> BDM-HDD -> HDD.
     if (sysCheckMC() >= 0) {
         if ((value = trySaveConfigMC(types)) > 0)
             return value;
     }
-    // Try a USB device
+    if ((value = trySaveConfigMMCE(types)) > 0)
+        return value;
     if ((value = trySaveConfigBDM(types)) > 0)
         return value;
-    // Try the HDD
+    if ((value = trySaveConfigBDMHDD(types)) > 0)
+        return value;
     if ((value = trySaveConfigHDD(types)) > 0)
         return value;
 
@@ -1193,6 +1298,8 @@ static void _saveConfig()
     }
 
     lscret = configWriteMulti(lscstatus);
+    if (lscret > 0)
+        writeConfigPathRedirect(configGetDir());
     lscstatus = 0;
 }
 
@@ -1667,6 +1774,12 @@ static void moduleCleanup(opl_io_module_t *mod, int exception, int modeSelected)
 
 void deinit(int exception, int modeSelected)
 {
+    /* Cut launch/exit latency by stopping queued art I/O before globally
+     * blocking the I/O worker. This avoids waiting for stale cover requests
+     * that are no longer needed once we are deinitializing. */
+    cacheAbortMmceImageLoadsTimed(0);
+    (void)cacheCancelPendingImageLoadsTimed(0);
+
     // block all io ops, wait for the ones still running to finish
     ioBlockOps(1);
     guiExecDeferredOps();
