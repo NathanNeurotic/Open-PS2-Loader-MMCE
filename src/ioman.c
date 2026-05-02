@@ -362,6 +362,7 @@ int ioBlockOps(int block)
 
         // wait for all io to finish
         while (ioHasPendingRequests()) {
+            DelayThread(1000);
         };
 
         ChangeThreadPriority(ThreadID, status.current_priority);
