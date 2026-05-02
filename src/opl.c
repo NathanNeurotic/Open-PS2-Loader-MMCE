@@ -1298,6 +1298,8 @@ static void _saveConfig()
     }
 
     lscret = configWriteMulti(lscstatus);
+    if (lscret <= 0)
+        lscret = trySaveAlternateDevice(lscstatus);
     if (lscret > 0)
         writeConfigPathRedirect(configGetDir());
     lscstatus = 0;
