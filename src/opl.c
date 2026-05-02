@@ -842,6 +842,32 @@ static int checkLoadConfigBDM(int types)
     return 0;
 }
 
+static int checkLoadConfigMC(int types)
+{
+    int value;
+    DIR *dir = opendir("mc0:/");
+    if (dir != NULL) {
+        closedir(dir);
+        configEnd();
+        configInit("mc0:OPL");
+        value = configReadMulti(types);
+        if (value & CONFIG_OPL)
+            return value;
+    }
+
+    dir = opendir("mc1:/");
+    if (dir != NULL) {
+        closedir(dir);
+        configEnd();
+        configInit("mc1:OPL");
+        value = configReadMulti(types);
+        if (value & CONFIG_OPL)
+            return value;
+    }
+
+    return 0;
+}
+
 static int checkLoadConfigMMCE(int types)
 {
     int value;
@@ -936,6 +962,10 @@ static int tryAlternateDevice(int types)
         if (value & CONFIG_OPL)
             return value;
     }
+
+    // Try both memory cards explicitly before probing slower removable devices.
+    if ((value = checkLoadConfigMC(types)) != 0)
+        return value;
 
     // First, try the device that OPL booted from.
     if (!strncmp(pwd, "mass", 4) && (pwd[4] == ':' || pwd[5] == ':')) {
@@ -1177,8 +1207,23 @@ static int trySaveConfigHDD(int types)
 
 static int trySaveConfigMC(int types)
 {
-    configSetMove(NULL);
-    return configWriteMulti(types);
+    DIR *dir = opendir("mc0:/");
+    if (dir != NULL) {
+        closedir(dir);
+        configSetMove("mc0:OPL");
+        if (configWriteMulti(types) > 0)
+            return 1;
+    }
+
+    dir = opendir("mc1:/");
+    if (dir != NULL) {
+        closedir(dir);
+        configSetMove("mc1:OPL");
+        if (configWriteMulti(types) > 0)
+            return 1;
+    }
+
+    return 0;
 }
 
 static int trySaveAlternateDevice(int types)
@@ -1298,6 +1343,8 @@ static void _saveConfig()
     }
 
     lscret = configWriteMulti(lscstatus);
+    if (lscret <= 0)
+        lscret = trySaveAlternateDevice(lscstatus);
     if (lscret > 0)
         writeConfigPathRedirect(configGetDir());
     lscstatus = 0;
@@ -1962,6 +2009,7 @@ static void init(void)
         padStatus = startPads();
     readPads();
     if (!getKeyPressed(KEY_START)) {
+        guiRenderTextScreen(_l(_STR_LOADING_SETTINGS));
         _loadConfig(); // only try to restore config if emergency key is not being pressed
     } else {
         LOG("--- SKIPPING OPL CONFIG LOADING\n");

@@ -1,5 +1,6 @@
 #include "include/opl.h"
 #include "include/ioman.h"
+#include "include/util.h"
 #include <kernel.h>
 #include <string.h>
 #include <malloc.h>
@@ -362,6 +363,7 @@ int ioBlockOps(int block)
 
         // wait for all io to finish
         while (ioHasPendingRequests()) {
+            delay(1);
         };
 
         ChangeThreadPriority(ThreadID, status.current_priority);
