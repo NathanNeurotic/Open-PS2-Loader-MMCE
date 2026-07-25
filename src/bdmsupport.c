@@ -767,6 +767,10 @@ static void bdmLaunchVcd(item_list_t *itemList, const char *vcdName, config_set_
     // toasts its diagnostic in passing. iLink/UDPBD/unknown have no BDMA variant and are left as-is.
     switch (pDeviceData->bdmDeviceType) {
         case BDM_TYPE_USB:
+            // AUTO (gBdmaApplyOnLaunch) always equips the USBEXFAT pair for USB (maintainer
+            // directive 2026-07-25): that driver reads FAT32 too, so ONE variant plays every
+            // USB stick and nobody has to guess the filesystem. FAT32/no-BDMA (POPSTARTER's
+            // built-in USB stack) is a MANUAL-only choice (VCD Settings, apply-on-launch OFF).
             vcdEnsureBdmaForLaunch(VCD_BDMA_SRC_USB, VCD_BDMA_USBEXFAT);
             break;
         case BDM_TYPE_SDC:
