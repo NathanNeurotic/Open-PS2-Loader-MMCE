@@ -170,8 +170,10 @@ static int appStartupKeyEqual(const char *a, const char *b)
 // donates its argv1 (title.cfg-only metadata) to an empty-handed legacy survivor. Legacy-vs-legacy
 // collisions (two conf_apps.cfg keys pointing at the same ELF) are KEPT: dropping one would shift
 // the config-node mapping, and a duplicated hand-edited entry is the user's own data.
+static int appDroppedCount;
 static void appDedupList(void)
 {
+    appDroppedCount = 0;
     if (appsList == NULL || appItemCount <= 1)
         return;
 
@@ -185,6 +187,7 @@ static void appDedupList(void)
             }
         }
         if (dup >= 0 && !appsList[i].legacy) {
+            appDroppedCount++;
             LOG("APPSUPPORT dedup: dropping scanned '%s' (%s) -- already listed as '%s' (%s)\n",
                 appsList[i].title, appsList[i].startup, appsList[dup].title, appsList[dup].startup);
             if (appsList[dup].argv1[0] == '\0' && appsList[i].argv1[0] != '\0') {
@@ -198,6 +201,35 @@ static void appDedupList(void)
         kept++;
     }
     appItemCount = kept;
+}
+
+// #253 diagnostics: write every entry's resolved identity to <config home>/apps-dump.txt so a
+// reporter's file answers "which two prefixes did this app come in through" without a serial
+// cable. Called only with debug enabled (gEnableDebug); small text file, rewritten per rebuild.
+static void appDumpDiscovery(void)
+{
+    char path[300];
+    FILE *f;
+
+    snprintf(path, sizeof(path), "%sapps-dump.txt", configGetDir());
+    f = fopen(path, "w");
+    if (f == NULL) {
+        LOG("APPSUPPORT unable to write %s\n", path);
+        return;
+    }
+    fprintf(f, "# RiptOPL app discovery dump: %d apps, %d duplicate(s) dropped by dedup\n", appItemCount, appDroppedCount);
+    fprintf(f, "# [index] [source] title | path | boot | resolved startup\n");
+    for (int i = 0; appsList != NULL && i < appItemCount; i++) {
+        fprintf(f, "%3d [%s] %s | %s | %s | %s\n",
+                i, appsList[i].legacy ? "legacy" : "scan", appsList[i].title,
+                appsList[i].path, appsList[i].boot, appsList[i].startup);
+    }
+    // Claim success only when the whole file is confirmed on disk -- the same
+    // evidence-over-status-codes rule as the config save path (#245).
+    if (fclose(f) == 0)
+        LOG("APPSUPPORT discovery dump written to %s\n", path);
+    else
+        LOG("APPSUPPORT discovery dump write FAILED on close: %s\n", path);
 }
 
 
@@ -566,6 +598,13 @@ static int appUpdateItemList(item_list_t *itemList)
             appItemCount = 0;
         }
     }
+
+    // #253 diagnostics: with debug enabled, dump every entry's resolved identity so a
+    // reporter's file answers "which two prefixes did this app come in through" without a
+    // serial cable. Tiny text file at the config home, rewritten each rebuild -- including
+    // the zero-app rebuild, or a stale dump would outlive the truth (CodeRabbit #262).
+    if (gEnableDebug)
+        appDumpDiscovery();
 
     if (appBuildArtLookup() < 0)
         LOG("APPSUPPORT unable to allocate art lookup table.\n");
