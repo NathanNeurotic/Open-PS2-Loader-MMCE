@@ -1852,7 +1852,12 @@ static void _loadConfig()
 
     lscret = result;
     lscstatus = 0;
-    showCfgPopup = 1;
+    // Only claim "Config loaded from ..." when a config file was actually READ (#254 follow-up:
+    // the toast used to fire unconditionally, so with no conf_opl.cfg anywhere it still said
+    // "Config loaded from mass0:" -- which read exactly like the freeze screen on reporters'
+    // photos (brenotomaz, PixeliGer), when the real state was the DEFAULT start menu (every
+    // device OFF). Defaults are not a load; stay silent then.
+    showCfgPopup = (result & CONFIG_OPL) ? 1 : 0;
 }
 
 static int trySaveConfigBDM(int types)
