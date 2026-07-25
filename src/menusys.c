@@ -1074,6 +1074,14 @@ static void menuPrevPage()
     // issue #48 (the prior #48 fix only clamped R1, leaving this L1 wrap behind).
 }
 
+// True once the global menu list contains a registered device/mode tab (returns menu != NULL).
+// initSupport uses the FALSE case to spot "user enabled the FIRST tab from the start menu",
+// where nothing would otherwise take them to it (#254).
+int menuHasRegisteredItems(void)
+{
+    return menu != NULL;
+}
+
 void menuSetSelectedItem(menu_item_t *item)
 {
     menu_list_t *itm = menu;
