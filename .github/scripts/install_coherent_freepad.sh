@@ -33,12 +33,14 @@ fi
 
 # Verify the vendored bytes before installing (a corrupted or stale blob must
 # never ship silently -- same fail-loud rule as the mmceman scripts).
-if command -v sha256sum >/dev/null 2>&1; then
-    got="$(sha256sum "$SRC" | awk '{print $1}')"
-    if [ "$got" != "$WANT_SHA256" ]; then
-        echo "ERROR: vendored freepad.irx sha256 mismatch (got $got, want $WANT_SHA256)" >&2
-        exit 1
-    fi
+if ! command -v sha256sum >/dev/null 2>&1; then
+    echo "ERROR: sha256sum not available to verify vendored freepad.irx" >&2
+    exit 1
+fi
+got="$(sha256sum "$SRC" | awk '{print $1}')"
+if [ "$got" != "$WANT_SHA256" ]; then
+    echo "ERROR: vendored freepad.irx sha256 mismatch (got $got, want $WANT_SHA256)" >&2
+    exit 1
 fi
 
 if [ ! -f "$DEST/freepad.irx" ]; then
@@ -46,4 +48,4 @@ if [ ! -f "$DEST/freepad.irx" ]; then
     exit 1
 fi
 cp -f "$SRC" "$DEST/freepad.irx"
-echo "== Installed newer-generation freepad.irx ($(wc -c < "$SRC") bytes, sha256 ${WANT_SHA256:0:12}...) -> $DEST/ (#254) =="
+echo "== Installed newer-generation freepad.irx ($(wc -c < "$SRC") bytes, sha256 $(printf '%s' "$WANT_SHA256" | cut -c 1-12)...) -> $DEST/ (#254) =="
