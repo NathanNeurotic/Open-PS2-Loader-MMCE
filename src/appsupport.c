@@ -211,8 +211,6 @@ static void appDumpDiscovery(void)
     char path[300];
     FILE *f;
 
-    if (appsList == NULL)
-        return;
     snprintf(path, sizeof(path), "%sapps-dump.txt", configGetDir());
     f = fopen(path, "w");
     if (f == NULL) {
@@ -221,13 +219,17 @@ static void appDumpDiscovery(void)
     }
     fprintf(f, "# RiptOPL app discovery dump: %d apps, %d duplicate(s) dropped by dedup\n", appItemCount, appDroppedCount);
     fprintf(f, "# [index] [source] title | path | boot | resolved startup\n");
-    for (int i = 0; i < appItemCount; i++) {
+    for (int i = 0; appsList != NULL && i < appItemCount; i++) {
         fprintf(f, "%3d [%s] %s | %s | %s | %s\n",
                 i, appsList[i].legacy ? "legacy" : "scan", appsList[i].title,
                 appsList[i].path, appsList[i].boot, appsList[i].startup);
     }
-    fclose(f);
-    LOG("APPSUPPORT discovery dump written to %s\n", path);
+    // Claim success only when the whole file is confirmed on disk -- the same
+    // evidence-over-status-codes rule as the config save path (#245).
+    if (fclose(f) == 0)
+        LOG("APPSUPPORT discovery dump written to %s\n", path);
+    else
+        LOG("APPSUPPORT discovery dump write FAILED on close: %s\n", path);
 }
 
 
@@ -591,17 +593,18 @@ static int appUpdateItemList(item_list_t *itemList)
             // must appear ONCE (#253). Runs before the art table is built so its startup hashes map
             // to the deduped rows.
             appDedupList();
-
-            // #253 diagnostics: with debug enabled, dump every entry's resolved identity so a
-            // reporter's file answers "which two prefixes did this app come in through" without a
-            // serial cable. Tiny text file at the config home, rewritten each rebuild.
-            if (gEnableDebug)
-                appDumpDiscovery();
         } else {
             LOG("APPSUPPORT unable to allocate memory.\n");
             appItemCount = 0;
         }
     }
+
+    // #253 diagnostics: with debug enabled, dump every entry's resolved identity so a
+    // reporter's file answers "which two prefixes did this app come in through" without a
+    // serial cable. Tiny text file at the config home, rewritten each rebuild -- including
+    // the zero-app rebuild, or a stale dump would outlive the truth (CodeRabbit #262).
+    if (gEnableDebug)
+        appDumpDiscovery();
 
     if (appBuildArtLookup() < 0)
         LOG("APPSUPPORT unable to allocate art lookup table.\n");
