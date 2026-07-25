@@ -652,6 +652,21 @@ void initSupport(item_list_t *itemList, int mode, int force_reinit)
             mod->support = itemList;
             mod->support->owner = mod;
             initMenuForListSupport(mod);
+
+            // First-ever tab while the GUI sits on the start menu (fresh/default config, every
+            // mode OFF): take the user TO the new tab, or they stay on the "default interface"
+            // with no visible way to it -- exactly how PixeliGer's #254 follow-up presented
+            // ("Apps section does not appear in the default interface even if enabled, until a
+            // theme is applied" -- the theme apply was just the thing that returned them to the
+            // tab screen). Boot is unaffected: deferredInit's default-device select queues AFTER
+            // this one and wins; multi-mode enables land on the last registered tab.
+            if (!menuHasRegisteredItems()) {
+                struct gui_update_t *sel = guiOpCreate(GUI_OP_SELECT_MENU);
+                if (sel) {
+                    sel->menu.menu = &mod->menuItem;
+                    guiDeferUpdate(sel);
+                }
+            }
         } else {
             // Re-enable after a prior disable: the support + its menu item already exist (registered on
             // an earlier enable), so the !mod->support branch above -- the ONLY place that sets

@@ -133,6 +133,9 @@ void menuHandleInputInfo();
 void menuHandleInputGameMenu();
 void menuHandleInputAppMenu();
 
+// True while no device/mode tab has ever been appended this session (menu list still empty).
+int menuHasRegisteredItems(void);
+
 // Sets the selected item if it is found in the menu list
 void menuSetSelectedItem(menu_item_t *item);
 
