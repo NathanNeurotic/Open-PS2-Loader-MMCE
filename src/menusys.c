@@ -1074,8 +1074,8 @@ static void menuPrevPage()
     // issue #48 (the prior #48 fix only clamped R1, leaving this L1 wrap behind).
 }
 
-// True while no device/mode tab has ever been appended this session (the global menu list is
-// still empty). initSupport uses this to spot "user enabled the FIRST tab from the start menu",
+// True once the global menu list contains a registered device/mode tab (returns menu != NULL).
+// initSupport uses the FALSE case to spot "user enabled the FIRST tab from the start menu",
 // where nothing would otherwise take them to it (#254).
 int menuHasRegisteredItems(void)
 {
