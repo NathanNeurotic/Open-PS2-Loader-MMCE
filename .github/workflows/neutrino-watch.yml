@@ -9,7 +9,7 @@ name: Neutrino Watch
 # for an OPL commit.
 #
 # It is only a slow safety net -- any push to master rebundles Neutrino anyway -- so it ticks about
-# once every 10 days rather than hourly; use the workflow_dispatch button for an on-demand check.
+# once every 10 days rather than the every-3h it used to; use workflow_dispatch for an on-demand check.
 #
 # Cheap + conditional: every run is two read-only API calls; it only dispatches a rebuild when the
 # upstream Neutrino version actually differs from what's already bundled (parsed from the rolling
