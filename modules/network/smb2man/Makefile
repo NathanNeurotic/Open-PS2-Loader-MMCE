@@ -9,7 +9,7 @@ LIBSMB2_OBJS = $(patsubst libsmb2/lib/%.c,%.o,$(wildcard libsmb2/lib/*.c))
 
 IOP_OBJS = smb2man.o alloc.o udivdi3.o $(LIBSMB2_OBJS) imports.o
 
-IOP_INCS += -I. -Ilibsmb2/include -Ilibsmb2/lib -I$(PS2SDK)/common/include
+IOP_INCS += -I. -Ishim -Ilibsmb2/include -Ilibsmb2/include/smb2 -Ilibsmb2/lib -I$(PS2SDK)/common/include
 # libsmb2 is portable C written for hosted platforms; silence the diagnostics that are pure noise
 # on a freestanding IOP build rather than editing vendored code.
 # -include stdint.h: libsmb2 is written against C99 fixed-width types, which the IOP headers do
