@@ -29,6 +29,20 @@ char *strdup(const char *s);
   binds. Do not paper over this: a file-close on a socket fd fails silently.
 */
 
+#ifndef SMB2MAN_SSIZE_T_DEFINED
+#define SMB2MAN_SSIZE_T_DEFINED
+typedef int ssize_t; /* IOP is 32-bit; matches the int-returning lwip_recv/lwip_send */
+#endif
+
+#ifndef SEEK_SET
+#define SEEK_SET 0
+#define SEEK_CUR 1
+#define SEEK_END 2
+#endif
+
+int asprintf(char **strp, const char *fmt, ...);
+int gethostname(char *name, size_t len);
+char *strerror(int errnum);
 int getpid(void);
 int getlogin_r(char *buf, size_t size);
 void srandom(unsigned int seed);

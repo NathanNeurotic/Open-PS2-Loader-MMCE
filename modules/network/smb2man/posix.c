@@ -14,6 +14,11 @@
 #include <sysclib.h>
 #include <thbase.h>
 
+#include <poll.h>
+#include <sys/time.h>
+#include <sys/uio.h>
+#include <netdb.h>
+
 void *malloc(size_t size); // from alloc.c
 
 /*
@@ -148,4 +153,210 @@ time_t time(time_t *t)
         *t = (time_t)sec;
 
     return (time_t)sec;
+}
+
+/*
+  poll() over lwip_select().
+
+  ps2ip has no poll(). libsmb2 uses it to wait on a single socket for readability/writability, which
+  select covers exactly -- so translate rather than stubbing. Only the bits libsmb2 sets (POLLIN /
+  POLLOUT) are honoured; POLLERR/POLLHUP are reported via select's exception set.
+*/
+int poll(struct pollfd *fds, nfds_t nfds, int timeout)
+{
+    fd_set rd, wr, ex;
+    struct timeval tv, *ptv;
+    int maxfd = -1, rv;
+    unsigned int i;
+
+    FD_ZERO(&rd);
+    FD_ZERO(&wr);
+    FD_ZERO(&ex);
+
+    for (i = 0; i < nfds; i++) {
+        fds[i].revents = 0;
+        if (fds[i].fd < 0)
+            continue;
+        if (fds[i].events & POLLIN)
+            FD_SET(fds[i].fd, &rd);
+        if (fds[i].events & POLLOUT)
+            FD_SET(fds[i].fd, &wr);
+        FD_SET(fds[i].fd, &ex);
+        if (fds[i].fd > maxfd)
+            maxfd = fds[i].fd;
+    }
+
+    if (maxfd < 0)
+        return 0;
+
+    if (timeout < 0) {
+        ptv = NULL; // block indefinitely
+    } else {
+        tv.tv_sec = timeout / 1000;
+        tv.tv_usec = (timeout % 1000) * 1000;
+        ptv = &tv;
+    }
+
+    rv = lwip_select(maxfd + 1, &rd, &wr, &ex, ptv);
+    if (rv <= 0)
+        return rv;
+
+    rv = 0;
+    for (i = 0; i < nfds; i++) {
+        if (fds[i].fd < 0)
+            continue;
+        if (FD_ISSET(fds[i].fd, &rd))
+            fds[i].revents |= POLLIN;
+        if (FD_ISSET(fds[i].fd, &wr))
+            fds[i].revents |= POLLOUT;
+        if (FD_ISSET(fds[i].fd, &ex))
+            fds[i].revents |= POLLERR;
+        if (fds[i].revents != 0)
+            rv++;
+    }
+
+    return rv;
+}
+
+int asprintf(char **strp, const char *fmt, ...)
+{
+    char scratch[1024];
+    va_list ap;
+    int len;
+
+    if (strp == NULL)
+        return -1;
+
+    va_start(ap, fmt);
+    len = vsprintf(scratch, fmt, ap);
+    va_end(ap);
+
+    if (len < 0)
+        return -1;
+
+    *strp = (char *)malloc((size_t)len + 1);
+    if (*strp == NULL)
+        return -1;
+
+    memcpy(*strp, scratch, (size_t)len + 1);
+
+    return len;
+}
+
+int gethostname(char *name, size_t len)
+{
+    // No hostname on the IOP. libsmb2 uses this only to fill the NTLMSSP workstation field, where
+    // a fixed name is fine (and matches what the in-game client sends).
+    const char *host = "PLAYSTATION2";
+    size_t n = strlen(host);
+
+    if (name == NULL || len == 0)
+        return -1;
+    if (n >= len)
+        n = len - 1;
+
+    memcpy(name, host, n);
+    name[n] = '\0';
+
+    return 0;
+}
+
+char *strerror(int errnum)
+{
+    // libsmb2 only ever prints this. Returning a constant avoids dragging in a message table for
+    // text nobody reads on a console with no stderr.
+    (void)errnum;
+    return "error";
+}
+
+/*
+  readv/writev over plain recv/send.
+
+  lwIP has no scatter/gather socket calls. libsmb2 uses these to push an SMB2 header and its
+  payload without first copying them into a single buffer; looping keeps that zero-copy property on
+  the caller's side, at the cost of one lwIP call per segment.
+
+  Short writes are propagated rather than retried: libsmb2 tracks how much of its iovec set was
+  consumed and re-enters, so silently looping here would double-send.
+*/
+int writev(int fd, const struct iovec *iov, int iovcnt)
+{
+    int i, sent, total = 0;
+
+    for (i = 0; i < iovcnt; i++) {
+        if (iov[i].iov_len == 0)
+            continue;
+        sent = lwip_send(fd, iov[i].iov_base, (int)iov[i].iov_len, 0);
+        if (sent < 0)
+            return (total > 0) ? total : sent;
+        total += sent;
+        if ((size_t)sent < iov[i].iov_len)
+            break; // partial write: let libsmb2 resume from here
+    }
+
+    return total;
+}
+
+int readv(int fd, const struct iovec *iov, int iovcnt)
+{
+    int i, got, total = 0;
+
+    for (i = 0; i < iovcnt; i++) {
+        if (iov[i].iov_len == 0)
+            continue;
+        got = lwip_recv(fd, iov[i].iov_base, (int)iov[i].iov_len, 0);
+        if (got < 0)
+            return (total > 0) ? total : got;
+        total += got;
+        if ((size_t)got < iov[i].iov_len)
+            break; // short read: caller re-enters for the rest
+    }
+
+    return total;
+}
+
+struct protoent *getprotobyname(const char *name)
+{
+    // libsmb2 calls this only to look up "tcp" before socket(); ps2ip has no protocol database, and
+    // IPPROTO_TCP is the only answer that matters here.
+    static char proto_tcp[] = "tcp";
+    static struct protoent ent = {proto_tcp, NULL, 6 /* IPPROTO_TCP */};
+
+    (void)name;
+    return &ent;
+}
+
+/*
+  errno.
+
+  IOP modules have no per-thread errno. libsmb2 reads it after socket calls to distinguish
+  EAGAIN/EINTR from real failures, so a single global is enough here: this driver serialises every
+  SMB operation behind one semaphore (see smb2man.c), so there is never more than one call in
+  flight to race over it.
+*/
+int errno = 0;
+
+int fcntl(int fd, int cmd, ...)
+{
+    va_list ap;
+    int arg;
+
+    va_start(ap, cmd);
+    arg = va_arg(ap, int);
+    va_end(ap);
+
+    return lwip_fcntl(fd, cmd, arg);
+}
+
+/*
+  Share enumeration is not built (see LIBSMB2_EXCLUDE in the Makefile) -- it needs the DCE/RPC
+  layer, and this driver reports an empty share list. libsmb2.c still references the entry point,
+  so fail it cleanly rather than linking the whole srvsvc stack for a call OPL never makes.
+*/
+int smb2_share_enum_async(void *smb2, void *cb, void *cb_data)
+{
+    (void)smb2;
+    (void)cb;
+    (void)cb_data;
+    return -1;
 }

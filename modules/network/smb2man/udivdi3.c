@@ -122,3 +122,43 @@ u64_t __umoddi3(u64_t num, u64_t den)
 
     return r;
 }
+
+/* Arithmetic (sign-propagating) 64-bit right shift; same reasoning as __lshrdi3 above, but the
+   high word shifts in the sign bit. */
+long long __ashrdi3(long long a, int b)
+{
+    union
+    {
+        long long v;
+        struct
+        {
+            unsigned int lo;
+            int hi;
+        } h;
+    } s;
+
+    if (b == 0)
+        return a;
+
+    s.v = a;
+
+    if (b >= 32) {
+        s.h.lo = (unsigned int)(s.h.hi >> (b - 32));
+        s.h.hi = s.h.hi >> 31; /* 0 or -1 */
+    } else {
+        s.h.lo = (s.h.lo >> b) | ((unsigned int)s.h.hi << (32 - b));
+        s.h.hi = s.h.hi >> b;
+    }
+
+    return s.v;
+}
+
+/* 32-bit byte swap. libsmb2 uses it for endian conversion; the IOP is little-endian and SMB2 is
+   little-endian, so this is only hit on the few big-endian-tagged fields. */
+unsigned int __bswapsi2(unsigned int x)
+{
+    return ((x & 0x000000FFu) << 24) |
+           ((x & 0x0000FF00u) << 8) |
+           ((x & 0x00FF0000u) >> 8) |
+           ((x & 0xFF000000u) >> 24);
+}

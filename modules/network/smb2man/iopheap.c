@@ -10,6 +10,10 @@
   memcpy()s packet data through these blocks, and the IOP's unaligned-access behaviour makes
   under-aligned buffers an intermittent-corruption risk rather than a clean fault.
 
+  Named iopheap.c, not alloc.c: libsmb2 ships its own lib/alloc.c, and both would compile to the
+  same obj/alloc.o -- which the linker reports as "multiple definition of realloc" pointing at one
+  file, since the object is simply listed twice.
+
   These symbols are deliberately NOT exported -- they exist to satisfy libsmb2's link inside this
   IRX only, and must not become an accidental IOP-wide allocator.
 */

@@ -11,8 +11,7 @@
                          excluded from the build entirely).
     HAVE_DCERPC_FULL  -- the full DCE/RPC surface is only needed for share enumeration, which this
                          driver reports as empty (see SMB_DEVCTL_GETSHARELIST in smb2man.c).
-    HAVE_POLL_H / HAVE_SYS_POLL_H
-                      -- ps2ip exposes select(), not poll(); libsmb2 falls back to select.
+    HAVE_SYS_POLL_H   -- there is no <sys/poll.h>; the plain <poll.h> shim covers it.
     HAVE_SOCKADDR_LEN / SA_LEN / SIN_LEN
                       -- lwIP's sockaddr has no sa_len field in the PS2SDK build.
 */
@@ -39,8 +38,19 @@
 #define HAVE_ADDRINFO      1
 #define HAVE_SOCKADDR_STORAGE 1
 
-/* SO_LINGER exists in lwIP. */
-#define HAVE_LINGER 1
+/* HAVE_LINGER is deliberately OFF: this lwIP build has no struct linger. libsmb2 uses it only to
+   set SO_LINGER on close, which is a nicety, not a requirement -- without it the socket closes
+   normally. (An earlier guess that lwIP had it produced "incomplete type 'struct linger'".) */
+
+/* poll() does not exist on the IOP, but shim/poll.h declares it and posix.c implements it over
+   lwip_select(). Declaring it available is what makes libsmb2 include the header at all -- with it
+   off, libsmb2 still references POLLIN/POLLOUT without ever including a definition. */
+#define HAVE_POLL_H 1
+
+/* Same reasoning as HAVE_POLL_H: the IOP has no scatter/gather socket I/O, but shim/sys/uio.h
+   declares struct iovec + readv/writev and posix.c implements them over lwip_recv/lwip_send.
+   Without this, socket.c uses struct iovec without ever including a definition. */
+#define HAVE_SYS_UIO_H 1
 
 #endif /* SMB2MAN_CONFIG_H */
 
