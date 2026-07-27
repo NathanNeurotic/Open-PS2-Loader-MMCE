@@ -7,14 +7,14 @@ IOP_BIN  = smb2man.irx
 # module's -G0 -mno-explicit-relocs and fix up correctly.
 LIBSMB2_OBJS = $(patsubst libsmb2/lib/%.c,%.o,$(wildcard libsmb2/lib/*.c))
 
-IOP_OBJS = smb2man.o alloc.o udivdi3.o $(LIBSMB2_OBJS) imports.o
+IOP_OBJS = smb2man.o alloc.o udivdi3.o posix.o $(LIBSMB2_OBJS) imports.o
 
 IOP_INCS += -I. -Ishim -Ilibsmb2/include -Ilibsmb2/include/smb2 -Ilibsmb2/lib -I$(PS2SDK)/common/include
 # libsmb2 is portable C written for hosted platforms; silence the diagnostics that are pure noise
 # on a freestanding IOP build rather than editing vendored code.
-# -include stdint.h: libsmb2 is written against C99 fixed-width types, which the IOP headers do
+# -include stdint.h -include posix-compat.h: libsmb2 is written against C99 fixed-width types, which the IOP headers do
 # not pull in on their own.
-IOP_CFLAGS += -DHAVE_CONFIG_H=1 -include stdint.h -D_U_= -Wno-unused-parameter -Wno-sign-compare
+IOP_CFLAGS += -DHAVE_CONFIG_H=1 -include stdint.h -include posix-compat.h -D_U_= -Wno-unused-parameter -Wno-sign-compare
 
 # No -lgcc: it has the same explicit-relocation problem as the prebuilt library above.
 # udivdi3.c supplies the 64-bit helpers instead.

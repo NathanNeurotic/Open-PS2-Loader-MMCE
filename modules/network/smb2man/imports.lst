@@ -24,6 +24,7 @@ I_memset
 I_memcmp
 I_memmove
 I_sprintf
+I_vsprintf
 I_toupper
 I_look_ctype_table
 sysclib_IMPORTS_end
