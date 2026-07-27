@@ -8,6 +8,9 @@ name: Neutrino Watch
 # re-dispatches rolling-release.yml so the package rebundles the latest Neutrino -- without waiting
 # for an OPL commit.
 #
+# It is only a slow safety net -- any push to master rebundles Neutrino anyway -- so it ticks about
+# once every 10 days rather than the every-3h it used to; use workflow_dispatch for an on-demand check.
+#
 # Cheap + conditional: every run is two read-only API calls; it only dispatches a rebuild when the
 # upstream Neutrino version actually differs from what's already bundled (parsed from the rolling
 # release notes' "Included build:" line that rolling-release.yml writes). workflow_dispatch via the
@@ -15,7 +18,12 @@ name: Neutrino Watch
 
 on:
   schedule:
-    - cron: "41 */3 * * *" # every 3h (offset minute to dodge the top-of-hour cron backlog)
+    # ~Every 10 days. cron has no "every N days" operator that spans month boundaries, so pin the
+    # days explicitly: the 1st, 11th and 21st (gaps of 10, 10, then 8-11 into the next month).
+    # Deliberately NOT "*/10" for day-of-month -- that also fires on the 31st, one day after the
+    # 21st+10 tick, i.e. two runs back to back in the 7 long months.
+    # Off-hour + offset minute to dodge the top-of-hour cron backlog.
+    - cron: "41 5 1,11,21 * *"
   workflow_dispatch:
 
 permissions:
