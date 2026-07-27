@@ -12,6 +12,22 @@
 #define IOPCORE_COMPAT_ACCU_READS    0x0008
 #define IOPCORE_ENABLE_POFF          0x0100
 #define IOPCORE_SMB_FORMAT_USBLD     0x0200
+/*
+  SMB dialect for the in-game reader, chosen on the EE side and read by smbdisp.c.
+
+  These live in common.flags rather than in cdvdman_settings_smb because that struct's SMB fields
+  share a union with FIDs[] -- there is no room to grow it. common.flags already carries an
+  SMB-specific bit (IOPCORE_SMB_FORMAT_USBLD), so this follows the established pattern and keeps the
+  struct layout byte-identical.
+
+  0x0000 (V1) is the default, so a config written by an older build -- where these bits are zero --
+  selects SMB1 exactly as before. V3 is reserved, not yet implemented; smbdisp.c falls back to V1
+  for any value it does not recognise rather than refusing to boot.
+*/
+#define IOPCORE_SMB_DIALECT_MASK     0x0C00
+#define IOPCORE_SMB_DIALECT_V1       0x0000
+#define IOPCORE_SMB_DIALECT_V2       0x0400
+#define IOPCORE_SMB_DIALECT_V3       0x0800
 
 // fakemodule_flags
 #define FAKE_MODULE_FLAG_DEV9    (1 << 0) // not used, compiled in

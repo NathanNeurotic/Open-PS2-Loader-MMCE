@@ -262,7 +262,7 @@ static int setStringField(char *out, const char *in)
 }
 
 //-------------------------------------------------------------------------
-int smb_NegotiateProtocol(char *SMBServerIP, int SMBServerPort, char *Username, char *Password, u32 *capabilities, OplSmbPwHashFunc_t hash_callback)
+int smb1_NegotiateProtocol(char *SMBServerIP, int SMBServerPort, char *Username, char *Password, u32 *capabilities, OplSmbPwHashFunc_t hash_callback)
 {
     char *dialect = "NT LM 0.12";
     NegotiateProtocolRequest_t *NPR = &SMB_buf.smb.negotiateProtocolRequest;
@@ -341,7 +341,7 @@ negotiate_retry:
 }
 
 //-------------------------------------------------------------------------
-int smb_SessionSetupAndX(u32 capabilities)
+int smb1_SessionSetupAndX(u32 capabilities)
 {
     SessionSetupAndXRequest_t *SSR = &SMB_buf.smb.sessionSetupAndXRequest;
     SessionSetupAndXResponse_t *SSRsp = &SMB_buf.smb.sessionSetupAndXResponse;
@@ -436,7 +436,7 @@ lbl_session_setup:
 }
 
 //-------------------------------------------------------------------------
-int smb_TreeConnectAndX(char *ShareName)
+int smb1_TreeConnectAndX(char *ShareName)
 {
     TreeConnectAndXRequest_t *TCR = &SMB_buf.smb.treeConnectAndXRequest;
     TreeConnectAndXResponse_t *TCRsp = &SMB_buf.smb.treeConnectAndXResponse;
@@ -499,7 +499,7 @@ int smb_TreeConnectAndX(char *ShareName)
 }
 
 //-------------------------------------------------------------------------
-int smb_OpenAndX(char *filename, u8 *FID, int Write)
+int smb1_OpenAndX(char *filename, u8 *FID, int Write)
 {
     OpenAndXRequest_t *OR = &SMB_buf.smb.openAndXRequest;
     OpenAndXResponse_t *ORsp = &SMB_buf.smb.openAndXResponse;
@@ -557,7 +557,7 @@ int smb_OpenAndX(char *filename, u8 *FID, int Write)
 
 //-------------------------------------------------------------------------
 //Do not call WaitSema() from this function because it would have been already called.
-int smb_Close(int FID)
+int smb1_Close(int FID)
 {
     int r;
     CloseRequest_t *CR = &SMB_buf.smb.closeRequest;
@@ -679,7 +679,7 @@ static int smb_ReadAndX(u16 FID, u32 offsetlow, u32 offsethigh, void *readbuf, i
     return DataLength;
 }
 
-int smb_ReadFile(u16 FID, u32 offsetlow, u32 offsethigh, void *readbuf, int nbytes)
+int smb1_ReadFile(u16 FID, u32 offsetlow, u32 offsethigh, void *readbuf, int nbytes)
 {
     int result, remaining, toRead;
     char *ptr;
@@ -748,7 +748,7 @@ static int smb_WriteAndX(u16 FID, u32 offsetlow, u32 offsethigh, void *writebuf,
     return nbytes;
 }
 
-int smb_WriteFile(u16 FID, u32 offsetlow, u32 offsethigh, void *writebuf, int nbytes)
+int smb1_WriteFile(u16 FID, u32 offsetlow, u32 offsethigh, void *writebuf, int nbytes)
 {
     int result, remaining, toWrite;
     char *ptr;
@@ -779,26 +779,12 @@ int smb_WriteFile(u16 FID, u32 offsetlow, u32 offsethigh, void *writebuf, int nb
 }
 
 //-------------------------------------------------------------------------
-int smb_ReadCD(unsigned int lsn, unsigned int nsectors, void *buf, int part_num)
-{
-    return smb_ReadFile(cdvdman_settings.FIDs[part_num], lsn * 2048, lsn >> 21, buf, (int)(nsectors * 2048));
-}
-
-void smb_CloseAll(void)
-{
-    int i, fd;
-
-    for (i = 0; i < cdvdman_settings.common.NumParts; i++) {
-        fd = cdvdman_settings.FIDs[i];
-        if (fd >= 0) {
-            smb_Close(fd);
-            cdvdman_settings.FIDs[i] = -1;
-        }
-    }
-}
+// smb_ReadCD() and smb_CloseAll() used to live here. They are pure glue over ReadFile/Close plus
+// cdvdman_settings -- no SMB1 wire knowledge at all -- so they now sit in smbdisp.c and are shared
+// by both dialects rather than being duplicated for SMB2.
 
 //-------------------------------------------------------------------------
-int smb_Disconnect(void)
+int smb1_Disconnect(void)
 {
     if (main_socket >= 0) {
         plwip_close(main_socket);

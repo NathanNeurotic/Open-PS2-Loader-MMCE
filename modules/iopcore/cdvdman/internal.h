@@ -5,6 +5,10 @@
 #include "dev9.h"
 #include "oplsmb.h"
 #include "smb.h"
+// smb.h declares the SMB1 implementation (smb1_*). smbdisp.h declares the dialect-agnostic smb_*
+// API that device-smb.c and the export table actually use -- include it here so every consumer of
+// internal.h keeps seeing the same smb_* names it always did.
+#include "smbdisp.h"
 #include "atad.h"
 #include "ioplib_util.h"
 #include "cdvdman_opl.h"
