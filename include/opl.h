@@ -174,6 +174,24 @@ enum NETWORK_PROTOCOL {
 extern int gNetworkProtocol; // enum NETWORK_PROTOCOL -- authoritative backend; the three above are derived shadows
 extern int gNetStartMode;    // START_MODE_* -- network start row (Off/Manual/Auto); DISABLED <=> protocol OFF
 
+/*
+  SMB dialect, shown as a sub-row of the SMB protocol choice (the same shape as the UDPFS Access
+  row). Only meaningful when gNetworkProtocol == NET_PROTO_SMB; ignored otherwise.
+
+  SMBv1 stays the default and is never removed -- it is the only dialect with hardware validation
+  behind it, and the fork's own PC server (pc/smbserver/smbserver_opl.py) speaks it.
+
+  SMB3 is deliberately NOT offered yet: it mandates packet signing (AES-CMAC/HMAC-SHA256), which
+  does not exist in this tree, so listing it would be a picker that silently behaves as something
+  else. The enum value is reserved so the row extends by one line once signing lands.
+*/
+enum SMB_DIALECT {
+    SMB_DIALECT_SMB1 = 0, // NT LM 0.12 -- default, in-game reader = smb.c
+    SMB_DIALECT_SMB2 = 1, // 2.0.2 / 2.1 -- in-game reader = smb2.c
+    SMB_DIALECT_SMB3 = 2, // reserved, not selectable until signing exists
+};
+extern int gSMBDialect; // enum SMB_DIALECT; applies to the SMB backend only
+
 extern int gAutosort;
 extern int gAutoRefresh;
 extern int gEnableNotifications;

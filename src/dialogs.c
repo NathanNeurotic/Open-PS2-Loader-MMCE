@@ -322,6 +322,13 @@ struct UIItem diaDeviceConfig[] = {
     {UI_ENUM, CFG_NETPROTOCOL, 1, 1, -1, 0, 0, {.intvalue = {0, 0}}},
     {UI_BREAK},
 
+    // SMB version sits directly under Protocol, mirroring how Access qualifies UDPFS: it is only
+    // live while Protocol == SMB, and greyed otherwise. SMBv1 is the default and is never removed.
+    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {"SMB Version", -1}}},
+    {UI_SPACER},
+    {UI_ENUM, CFG_SMBDIALECT, 1, 1, -1, 0, 0, {.intvalue = {0, 0}}},
+    {UI_BREAK},
+
     {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {"Access", -1}}},
     {UI_SPACER},
     {UI_ENUM, CFG_UDPFSMODE, 1, 1, -1, 0, 0, {.intvalue = {0, 0}}},

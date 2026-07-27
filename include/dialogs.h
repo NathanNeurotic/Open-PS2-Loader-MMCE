@@ -58,6 +58,7 @@ enum UI_ITEMS {
     CFG_NETSTART,        // network start mode row: Off / Manual / Auto (== START_MODE_*)
     CFG_NETPROTOCOL,     // protocol row: SMB / UDPFS / UDPBD (Off moved to CFG_NETSTART)
     CFG_UDPFSMODE,       // access row: Files (udpfs_ioman filesystem) vs IMG (udpfs_bd block/massN:); locked per protocol
+    CFG_SMBDIALECT,      // SMB version row: SMBv1 / SMB2; only enabled while the protocol row is SMB
     CFG_LASTPLAYED,
     CFG_FOLDERNAV,
     CFG_RUMBLE,

@@ -12,8 +12,8 @@
 #include "des.h"
 #include "md4.h"
 
-#define SERVER_USE_PLAINTEXT_PASSWORD 0
-#define SERVER_USE_ENCRYPTED_PASSWORD 1
+// SERVER_USE_{PLAINTEXT,ENCRYPTED}_PASSWORD now come from oplsmb.h, with the server_specs_t field
+// they describe, instead of being redefined here.
 
 /*
  * LM_Password_Hash: this function create a LM password hash from a given password

@@ -268,10 +268,8 @@
 #define STATUS_OBJECT_NAME_NOT_FOUND 0xc0000034
 #define STATUS_LOGON_FAILURE         0xc000006d
 
-#define SERVER_SHARE_SECURITY_LEVEL   0
-#define SERVER_USER_SECURITY_LEVEL    1
-#define SERVER_USE_PLAINTEXT_PASSWORD 0
-#define SERVER_USE_ENCRYPTED_PASSWORD 1
+// SERVER_{SHARE,USER}_SECURITY_LEVEL and SERVER_USE_{PLAINTEXT,ENCRYPTED}_PASSWORD moved to
+// oplsmb.h, alongside the server_specs_t fields they describe.
 
 typedef struct
 {
@@ -496,18 +494,22 @@ typedef struct
     u16 ByteCount;
 } __attribute__((packed)) CloseResponse_t;
 
-// function prototypes
-int smb_NegotiateProtocol(char *SMBServerIP, int SMBServerPort, char *Username, char *Password, u32 *capabilities, OplSmbPwHashFunc_t hash_callback); // process a Negotiate Procotol message
-int smb_SessionSetupTreeConnect(char *share_name);
-int smb_SessionSetupAndX(u32 capabilities); // process a Session Setup message, for NT LM 0.12 dialect, Non Extended Security negociated
-int smb_TreeConnectAndX(char *ShareName);
-int smb_OpenAndX(char *filename, u8 *FID, int Write); // process a Open AndX message
-int smb_Close(int FID);
-int smb_ReadFile(u16 FID, u32 offsetlow, u32 offsethigh, void *readbuf, int nbytes);
-int smb_WriteFile(u16 FID, u32 offsetlow, u32 offsethigh, void *writebuf, int nbytes);
-int smb_ReadCD(unsigned int lsn, unsigned int nsectors, void *buf, int part_num);
-void smb_CloseAll(void);
-int smb_Disconnect(void);
+/*
+  Function prototypes.
+
+  These are the SMB1 implementations. They are NOT the API the rest of cdvdman calls -- callers use
+  the dialect-agnostic smb_* names in smbdisp.h, which route here or into smb2.c depending on the
+  dialect selected at launch. Renamed from smb_* to smb1_* when SMB2 was added; the bodies are
+  unchanged.
+*/
+int smb1_NegotiateProtocol(char *SMBServerIP, int SMBServerPort, char *Username, char *Password, u32 *capabilities, OplSmbPwHashFunc_t hash_callback); // process a Negotiate Procotol message
+int smb1_SessionSetupAndX(u32 capabilities);                                                                                                           // process a Session Setup message, for NT LM 0.12 dialect, Non Extended Security negociated
+int smb1_TreeConnectAndX(char *ShareName);
+int smb1_OpenAndX(char *filename, u8 *FID, int Write); // process a Open AndX message
+int smb1_Close(int FID);
+int smb1_ReadFile(u16 FID, u32 offsetlow, u32 offsethigh, void *readbuf, int nbytes);
+int smb1_WriteFile(u16 FID, u32 offsetlow, u32 offsethigh, void *writebuf, int nbytes);
+int smb1_Disconnect(void);
 
 #define MAX_SMB_BUF     896 // must fit on u16 !!!
 #define MAX_SMB_BUF_HDR 128 //Must be at least as large as the largest header structure.

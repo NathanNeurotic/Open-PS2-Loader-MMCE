@@ -754,6 +754,21 @@ static void ethLaunchGame(item_list_t *itemList, int id, config_set_t *configSet
             settings->common.flags |= IOPCORE_SMB_FORMAT_USBLD;
     }
 
+    /*
+      Hand the chosen dialect to the in-game reader. smbdisp.c reads these bits once, at negotiate
+      time, to pick between smb.c (SMB1) and smb2.c (SMB2).
+
+      They live in common.flags because cdvdman_settings_smb's SMB fields share a union with FIDs[]
+      and cannot grow; common.flags already carries IOPCORE_SMB_FORMAT_USBLD for the same reason.
+      Note this must come AFTER the format switch above, which also ORs into common.flags.
+
+      Only SMB1/SMB2 are emitted -- gSMBDialect is clamped to those on load, and the picker offers
+      no third value. Leaving the bits clear for SMB1 keeps the wire format identical to every
+      build that predates the dialect field.
+    */
+    if (gSMBDialect == SMB_DIALECT_SMB2)
+        settings->common.flags |= IOPCORE_SMB_DIALECT_V2;
+
     sprintf(settings->smb_ip, "%u.%u.%u.%u", pc_ip[0], pc_ip[1], pc_ip[2], pc_ip[3]);
     settings->smb_port = gPCPort;
     strcpy(settings->smb_share, gPCShareName);

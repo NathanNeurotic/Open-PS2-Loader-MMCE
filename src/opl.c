@@ -168,6 +168,7 @@ int gEnableUDPBD;
 int gNetBootProtocol; // NET_BOOT_UDPBD | NET_BOOT_UDPFS (legacy shadow, derived from gNetworkProtocol)
 int gNetworkProtocol; // enum NETWORK_PROTOCOL -- authoritative backend selector (Off/SMB/UDPBD/UDPFSBD/UDPFS)
 int gNetStartMode;    // START_MODE_* -- the Off/Manual/Auto network start row (see the 3-row Network setting)
+int gSMBDialect;      // enum SMB_DIALECT -- SMBv1 (default) or SMB2; sub-row of the SMB protocol choice
 int gAutosort;
 int gAutoRefresh;
 int gEnableNotifications;
@@ -1750,6 +1751,17 @@ static void _loadConfig()
             // (ethsupport start path, system.c getDeviceName, bdmsupport) stay consistent no matter which
             // config format was loaded. SMB keeps its prior Auto/Manual start-mode; a fresh SMB pick that
             // had eth_mode=0 gets Manual. Any non-SMB protocol forces SMB off (preserves UDPBD-wins).
+            /*
+              SMB dialect. Absent key -> SMBv1, so every config written before the picker existed
+              keeps the exact behaviour it had. Clamp anything out of range (a hand-edited file, or
+              a config written by a later build that offers SMB3) back to SMBv1 rather than handing
+              an unknown value to the IOP side.
+            */
+            if (!configGetInt(configOPL, CONFIG_OPL_SMB_DIALECT, &gSMBDialect))
+                gSMBDialect = SMB_DIALECT_SMB1;
+            if (gSMBDialect != SMB_DIALECT_SMB1 && gSMBDialect != SMB_DIALECT_SMB2)
+                gSMBDialect = SMB_DIALECT_SMB1;
+
             gEnableUDPBD = (gNetworkProtocol == NET_PROTO_UDPBD || gNetworkProtocol == NET_PROTO_UDPFSBD);
             gNetBootProtocol = (gNetworkProtocol == NET_PROTO_UDPFSBD) ? NET_BOOT_UDPFS : NET_BOOT_UDPBD;
             if (gNetworkProtocol == NET_PROTO_SMB) {
@@ -2100,6 +2112,7 @@ static void _saveConfig()
         // so a config saved by this build still boots correctly on an older OPL that only reads the legacy keys.
         configSetInt(configOPL, CONFIG_OPL_NETWORK_PROTOCOL, gNetworkProtocol);
         configSetInt(configOPL, CONFIG_OPL_NET_START_MODE, gNetStartMode);
+        configSetInt(configOPL, CONFIG_OPL_SMB_DIALECT, gSMBDialect);
         configSetInt(configOPL, CONFIG_OPL_SFX, gEnableSFX);
         configSetInt(configOPL, CONFIG_OPL_BOOT_SND, gEnableBootSND);
         configSetInt(configOPL, CONFIG_OPL_BGM, gEnableBGM);
@@ -2940,6 +2953,7 @@ static void setDefaults(void)
     // Existing installs are unaffected: a saved net protocol in settings_riptopl.cfg overrides this.
     gNetworkProtocol = NET_PROTO_OFF;
     gNetStartMode = START_MODE_DISABLED; // Off in the 3-row Network setting; migration reconciles old configs
+    gSMBDialect = SMB_DIALECT_SMB1;      // SMBv1 unless the user opts into SMB2; never auto-migrated
 
     frameCounter = 0;
 

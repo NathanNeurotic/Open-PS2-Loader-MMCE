@@ -2,6 +2,19 @@
 #ifndef __OPLSMB__
 #define __OPLSMB__
 
+/*
+  Values for server_specs_t.SecurityMode and .PasswordType below.
+
+  These describe the shared cdvdman <-> smbinit contract, so they live with the struct rather than
+  in any one dialect's header. They were previously defined twice -- once in cdvdman's smb.h and
+  again locally in smbinit's smbauth.c -- which meant the two modules that must agree on
+  PasswordType each carried their own copy. Consolidated here when SMB2 became a third consumer.
+*/
+#define SERVER_SHARE_SECURITY_LEVEL   0
+#define SERVER_USER_SECURITY_LEVEL    1
+#define SERVER_USE_PLAINTEXT_PASSWORD 0
+#define SERVER_USE_ENCRYPTED_PASSWORD 1
+
 typedef struct
 {
     u32 MaxBufferSize;

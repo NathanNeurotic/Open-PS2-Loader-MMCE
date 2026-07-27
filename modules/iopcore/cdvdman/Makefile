@@ -22,7 +22,7 @@ endif
 ifeq ($(USE_SMB),1)
 IOP_BIN  = smb_cdvdman.irx
 IOP_OBJS_DIR = obj.smb/
-IOP_OBJS += device-smb.o smb.o
+IOP_OBJS += device-smb.o smb.o smb2.o smbdisp.o
 IOP_CFLAGS += -DSMB_DRIVER
 USE_DEV9 = 1
 IOP_INCS += -I../../network/common
