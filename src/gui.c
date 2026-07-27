@@ -1237,6 +1237,12 @@ static int guiDeviceUpdater(int modified)
         diaGetInt(diaDeviceConfig, CFG_NETPROTOCOL, &netProto);
         int netOn = (netStart != START_MODE_DISABLED);
         diaSetEnabled(diaDeviceConfig, CFG_NETPROTOCOL, netOn);
+        // SMB Version qualifies SMB the way Access qualifies UDPFS: live only when this protocol is
+        // actually the one selected. Value is NOT snapped when greyed -- unlike Access, a stale
+        // dialect cannot mis-derive anything (the OK read-back ignores it unless protocol == SMB),
+        // and preserving it means flipping away to UDPFS and back does not silently reset the user
+        // to SMBv1.
+        diaSetEnabled(diaDeviceConfig, CFG_SMBDIALECT, netOn && netProto == 0);
         if (!netOn) {
             diaSetEnabled(diaDeviceConfig, CFG_UDPFSMODE, 0);
         } else if (netProto == 0) { // SMB -> Files, locked
@@ -1259,6 +1265,10 @@ void guiShowDeviceConfig(void)
     const char *deviceModes[] = {_l(_STR_OFF), _l(_STR_MANUAL), _l(_STR_AUTO), NULL};
     const char *netProtocols[] = {"SMB", "UDPFS", "UDPBD", NULL}; // Row 2 (Off moved to Row 1); UDPBD = SUDPBDv2 server -- protocol names, not translated
     const char *udpfsModes[] = {"Files", "IMG", NULL};            // Row 3: Files=udpfs_ioman filesystem, IMG=udpfs_bd block
+    // SMB version row. SMB3 is intentionally absent: it mandates packet signing, which does not
+    // exist in this tree yet, so offering it would be a picker that silently does something else.
+    // Index order matches enum SMB_DIALECT. Protocol names, not translated -- same as the rows above.
+    const char *smbDialects[] = {"SMBv1", "SMB2", NULL};
 
     // Devices & modes
     diaSetEnum(diaDeviceConfig, CFG_DEFDEVICE, deviceNames);
@@ -1304,10 +1314,14 @@ void guiShowDeviceConfig(void)
     diaSetInt(diaDeviceConfig, CFG_NETPROTOCOL, netProtoVal);
     diaSetEnum(diaDeviceConfig, CFG_UDPFSMODE, udpfsModes);
     diaSetInt(diaDeviceConfig, CFG_UDPFSMODE, netAccessVal);
+    // Same function scope as the dialog it feeds, so the diaSetEnum raw-pointer rule (#154) holds.
+    diaSetEnum(diaDeviceConfig, CFG_SMBDIALECT, smbDialects);
+    diaSetInt(diaDeviceConfig, CFG_SMBDIALECT, gSMBDialect);
     // Seed the initial grey/lock: diaExecuteDialog renders the FIRST frame before it calls
     // guiDeviceUpdater, so without this the first frame flashes every row enabled.
     diaSetEnabled(diaDeviceConfig, CFG_NETPROTOCOL, netStartVal != START_MODE_DISABLED);
     diaSetEnabled(diaDeviceConfig, CFG_UDPFSMODE, netStartVal != START_MODE_DISABLED && netProtoVal == 1);
+    diaSetEnabled(diaDeviceConfig, CFG_SMBDIALECT, netStartVal != START_MODE_DISABLED && netProtoVal == 0);
 
     // Cache & storage (spindown, game-list cache, BDM/HDD/SMB caches) moved to General Settings
     // (guiShowConfig / diaConfig) -- Device Settings is now strictly device selection.
@@ -1336,9 +1350,14 @@ void guiShowDeviceConfig(void)
         // mis-derive. Start=Off -> OFF regardless of the (greyed) protocol/access. Then re-derive the
         // legacy shadows (gEnableUDPBD / gNetBootProtocol / gETHStartMode) downstream consumers read.
         int netStartVal = 0, netProtoVal = 0, netAccessVal = 0;
+        int smbDialectWas = gSMBDialect;
         diaGetInt(diaDeviceConfig, CFG_NETSTART, &netStartVal);
         diaGetInt(diaDeviceConfig, CFG_NETPROTOCOL, &netProtoVal);
         diaGetInt(diaDeviceConfig, CFG_UDPFSMODE, &netAccessVal);
+        // Read the dialect unconditionally -- it is a property of the SMB backend, not of the
+        // current selection, so it survives a detour through another protocol. Everything
+        // downstream consults it only when the live protocol is SMB.
+        diaGetInt(diaDeviceConfig, CFG_SMBDIALECT, &gSMBDialect);
         gNetStartMode = netStartVal; // 0/1/2 == START_MODE_DISABLED/MANUAL/AUTO
         gNetworkProtocol = (netStartVal == START_MODE_DISABLED) ? NET_PROTO_OFF :
                            (netProtoVal == 0)                   ? NET_PROTO_SMB :
@@ -1378,10 +1397,36 @@ void guiShowDeviceConfig(void)
                 guiMsgBox(_l(_STR_NET_UDPBD_TAB_HINT), 0, NULL);
         }
 
+        /*
+          Turning SMB2 on needs a word of explanation, or it reads as broken.
+
+          SMB2 currently covers the IN-GAME reader only. Browsing the share -- listing games, cover
+          art, per-game configs -- still goes through the stock SMBv1 smbman.irx, so the server must
+          keep SMBv1 reachable or OPL shows an empty list and the user never reaches a launch at
+          all. That is the opposite of what someone enabling SMB2 expects, and it is precisely the
+          "nothing happens" failure the UDPFS/UDPBD hints above exist to prevent.
+
+          English literal rather than a lang label, matching the untranslated row labels in this same
+          dialog ("Protocol", "Access", "SMB Version") and avoiding an insert into the
+          position-indexed .lng tables. Fold into a label when the browse side lands and this caveat
+          goes away.
+        */
+        if (gNetworkProtocol == NET_PROTO_SMB && gSMBDialect == SMB_DIALECT_SMB2 && gSMBDialect != smbDialectWas)
+            guiMsgBox("SMB2 applies to in-game reading only.\n"
+                      "Browsing the share still uses SMBv1, so the\n"
+                      "server must keep SMBv1 enabled for now.",
+                      0, NULL);
+
         // Each network transport loads its IOP module chain once per boot (the load latch is not cleared
         // live). If any network stack is already up and the user changed protocol, the switch takes effect
         // only after a restart -- say so instead of silently doing nothing.
-        if (gNetworkProtocol != netProtocolWas && (bdmIsUDPBDLoaded() || ethGetModulesLoaded() || udpfsGetModulesLoaded()))
+        // Changing the SMB dialect has the same "takes effect next boot" property as changing the
+        // protocol: the in-game reader picks its dialect when cdvdman starts, and the browse-side
+        // SMB stack loads its module chain once per boot. Reuse the same notice so a user who
+        // switches SMBv1 <-> SMB2 with the stack already up is not left wondering why nothing moved.
+        if ((gNetworkProtocol != netProtocolWas ||
+             (gNetworkProtocol == NET_PROTO_SMB && gSMBDialect != smbDialectWas)) &&
+            (bdmIsUDPBDLoaded() || ethGetModulesLoaded() || udpfsGetModulesLoaded()))
             guiMsgBox(_l(_STR_NETBOOT_RESTART), 0, NULL);
 
         // A BDM tab can be latched hidden (bdmNeedsUpdate force-hides it when its enable flag reads 0,
