@@ -425,8 +425,21 @@ static void smbLoadModules(void)
 
     if (ret == 0) {
         gNetworkStartup = ERROR_ETH_MODULE_SMBMAN_FAILURE;
-        LOG("[SMBMAN]:\n");
-        if (sysLoadModuleBuffer(&smbman_irx, size_smbman_irx, 0, NULL) >= 0) {
+        /*
+          Load ONE SMB filesystem driver, chosen by the SMB Version picker. Both register the same
+          iomanX device name ("smb", hence the "smb0:" paths everywhere), so only one may ever be
+          resident -- and every path in OPL stays identical whichever one it is.
+
+            smbman  -- PS2SDK's SMB1 driver, consumed prebuilt. Unchanged, still the default.
+            smb2man -- our SMB2/SMB3 driver over vendored libsmb2 (modules/network/smb2man).
+
+          Anything other than an explicit SMB2 selection falls back to smbman: losing SMB2 is
+          recoverable, booting with no filesystem driver at all is not.
+        */
+        const int useSmb2 = (gSMBDialect == SMB_DIALECT_SMB2);
+        LOG(useSmb2 ? "[SMB2MAN]:\n" : "[SMBMAN]:\n");
+        if (sysLoadModuleBuffer(useSmb2 ? (void *)&smb2man_irx : (void *)&smbman_irx,
+                                useSmb2 ? size_smb2man_irx : size_smbman_irx, 0, NULL) >= 0) {
             LOG("[NBNS]:\n");
             sysLoadModuleBuffer(&nbns_irx, size_nbns_irx, 0, NULL);
             nbnsInit();

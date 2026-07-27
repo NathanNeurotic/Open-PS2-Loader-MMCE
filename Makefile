@@ -104,7 +104,7 @@ EECORE_OBJS = ee_core.o ioprp.o util.o \
 		udnl.o imgdrv.o eesync.o \
 		bdm_cdvdman.o bdm_ata_cdvdman.o IOPRP_img.o smb_cdvdman.o \
 		hdd_cdvdman.o mmce_cdvdman.o hdd_hdpro_cdvdman.o cdvdfsv.o \
-		ingame_smstcpip.o smap_ingame.o smbman.o smbinit.o
+		ingame_smstcpip.o smap_ingame.o smbman.o smb2man.o smbinit.o
 
 PNG_ASSETS = load0 load1 load2 load3 load4 load5 load6 load7 usb usb_bd ilk_bd \
 	m4s_bd hdd_bd mmce hdd eth udp_bd udp_fs app cross triangle circle square select start left right \
@@ -363,6 +363,8 @@ clean:	download_lwNBD
 	$(MAKE) -C modules/network/udpfs_ministack clean
 	$(MAKE) -C modules/network/udpfs_bd clean
 	$(MAKE) -C modules/network/udpfs_ioman clean
+	echo " -smb2man"
+	$(MAKE) -C modules/network/smb2man clean
 	echo " -smbinit"
 	$(MAKE) -C modules/network/smbinit clean
 	echo " -nbns"
@@ -728,6 +730,15 @@ $(EE_ASM_DIR)netman.c: $(PS2SDK)/iop/irx/netman.irx | $(EE_ASM_DIR)
 	$(BIN2C) $< $@ $(*F)_irx
 
 $(EE_ASM_DIR)ps2ips.c: $(PS2SDK)/iop/irx/ps2ips.irx | $(EE_ASM_DIR)
+	$(BIN2C) $< $@ $(*F)_irx
+
+# smb2man is OUR module (SMB2/SMB3 browse driver, built from vendored libsmb2), unlike smbman
+# which is consumed prebuilt from the SDK. Both are embedded; exactly one is loaded per boot,
+# chosen by the SMB Version picker.
+modules/network/smb2man/smb2man.irx: modules/network/smb2man
+	$(MAKE) -C $< all
+
+$(EE_ASM_DIR)smb2man.c: modules/network/smb2man/smb2man.irx | $(EE_ASM_DIR)
 	$(BIN2C) $< $@ $(*F)_irx
 
 $(EE_ASM_DIR)smbman.c: $(PS2SDK)/iop/irx/smbman.irx | $(EE_ASM_DIR)
