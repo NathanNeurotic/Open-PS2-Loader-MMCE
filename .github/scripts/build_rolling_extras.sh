@@ -4,10 +4,10 @@
 #   * the debug configs                          -> rolling/debug/
 #
 # Called by EACH SDK build job in rolling-release.yml. $1 is the SDK suffix appended to each
-# filename: "-WOPLSDK" for the wOPL-pinned-container build, "-PS2MAXSDK" for the pinned ps2max
+# filename: "-PS2MAXSDK" for the pinned ps2max
 # build, "-PS2DEVLATESTSDK" for the ps2dev:latest build -- so the VARIANTS and DEBUG zips carry
 # every SDK flavour of every build. $2 is the LOCALVERSION
-# toolchain brand ("WOPLSDK"/"PS2MAXSDK"/"PS2DEVLATESTSDK") embedded in each ELF's version string: filenames get renamed
+# toolchain brand ("PS2MAXSDK"/"PS2DEVLATESTSDK") embedded in each ELF's version string: filenames get renamed
 # and moved to cards, and the debug/variant builds are exactly the ones that show up in bug
 # reports -- the on-screen version must self-identify the toolchain like the main builds do.
 #

@@ -289,12 +289,13 @@ There are two release channels:
 See **[ROLLING_RELEASE.md](ROLLING_RELEASE.md)** for exactly what the rolling release
 contains and how to pull it.
 
-> **Which rolling build?** The rolling zip ships three loader ELFs that differ only by build
+> **Which rolling build?** The rolling zip ships two loader ELFs that differ only by build
 > toolchain — the RiptOPL code in each is identical. Recommended in order of reliability:
-> **`APP_RIPTOPL-WOPLSDK/`** (#1) or **`APP_RIPTOPL-PS2MAXSDK/`** (#2), both built on pinned,
-> known-stable SDK snapshots that boot reliably. **`APP_RIPTOPL-PS2DEVLATESTSDK/`** (#3) tracks
+> **`APP_RIPTOPL-PS2MAXSDK/`** (#1), built on a pinned, known-stable SDK snapshot that boots
+> reliably. **`APP_RIPTOPL-PS2DEVLATESTSDK/`** (#2) tracks
 > the bleeding-edge `ps2dev:latest` SDK, which moves constantly and can intermittently fail to
-> boot on some consoles — it exists mainly to catch upstream SDK regressions early. See
+> boot on some consoles — it exists mainly to catch upstream SDK regressions early.
+> (A third `WOPLSDK` flavour was dropped in 2026-07 — it crashed at the setup menu, issue #270.) See
 > [Which build should I use?](ROLLING_RELEASE.md#which-build-should-i-use).
 
 > 🗄️ **Permanent archive (MEGA):** the GitHub `rolling` pre-release only ever holds the *latest*
