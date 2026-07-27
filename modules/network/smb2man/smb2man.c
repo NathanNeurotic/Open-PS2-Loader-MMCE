@@ -141,9 +141,52 @@ static int smb2man_open(iop_file_t *f, const char *filename, int flags, int mode
 
     smb2man_fixpath(path, filename, sizeof(path));
 
-    // OPL only ever reads over the browse path; keep write intent working for completeness but do
-    // not create -- a missing file must report ENOENT, not silently appear as an empty one.
-    oflags = (flags & O_WRONLY) ? O_WRONLY : ((flags & O_RDWR) ? O_RDWR : O_RDONLY);
+    /*
+      Translate iomanX open flags into the values libsmb2 expects. These are TWO DIFFERENT
+      NAMESPACES and they must never be passed through unconverted:
+
+        incoming (iomanX / FIO, via io_common.h): RDONLY=1, WRONLY=2, RDWR=3
+        libsmb2 (shim/fcntl.h, this build):       RDONLY=0, WRONLY=1, RDWR=2, ACCMODE=3
+
+      Passing the incoming value straight through sends FIO_O_RDONLY(1) as libsmb2's O_WRONLY, and
+      worse, a plain `flags & O_RDWR` test misreads every read-only open as read-write because
+      FIO_O_RDWR(3) is a bit-superset of FIO_O_RDONLY(1) -- yielding 3, which matches no case in
+      libsmb2's `switch (flags & O_ACCMODE)` and leaves DesiredAccess at 0. The server then rejects
+      every CREATE and the whole share reads as empty. (PS2SDK's own SMB1 smbman guards this with
+      the same `(mode & O_RDWR) == O_RDWR` shape, for the same reason.)
+
+      Literal values are used deliberately: BOTH namespaces' O_* macros are reachable from this
+      translation unit, so naming them here would be ambiguous to a reader and fragile to an
+      include-order change. LIBSMB2_O_* below are libsmb2's, matching shim/fcntl.h.
+    */
+#define LIBSMB2_O_RDONLY 0x0000
+#define LIBSMB2_O_WRONLY 0x0001
+#define LIBSMB2_O_RDWR   0x0002
+#define LIBSMB2_O_CREAT  0x0200
+#define LIBSMB2_O_TRUNC  0x0400
+#define LIBSMB2_O_EXCL   0x0800
+
+    if ((flags & FIO_O_RDWR) == FIO_O_RDWR)
+        oflags = LIBSMB2_O_RDWR;
+    else if (flags & FIO_O_WRONLY)
+        oflags = LIBSMB2_O_WRONLY;
+    else
+        oflags = LIBSMB2_O_RDONLY;
+
+    /*
+      Carry the creation flags through. libsmb2 derives its SMB2 CREATE disposition purely from
+      these, so dropping them means (a) O_CREAT writes can never make a new file -- every per-game
+      CFG save, favourites.bin write and VMC create fails with ENOENT -- and (b) an O_TRUNC rewrite
+      leaves the old tail in place when the new content is shorter, producing a half-new/half-old
+      config that parses stale keys on the next boot. The FIO and libsmb2 values coincide for these
+      three (0x200/0x400/0x800), but they are mapped explicitly rather than relied upon.
+    */
+    if (flags & FIO_O_CREAT)
+        oflags |= LIBSMB2_O_CREAT;
+    if (flags & FIO_O_TRUNC)
+        oflags |= LIBSMB2_O_TRUNC;
+    if (flags & FIO_O_EXCL)
+        oflags |= LIBSMB2_O_EXCL;
 
     fh = smb2_open(smb2, path, oflags);
     if (fh == NULL) {
@@ -384,12 +427,43 @@ static int smb2man_devctl(iop_file_t *f, const char *name, int cmd, void *arg, u
             LOCK();
             smb2man_teardown();
 
-            strncpy(conn_server, logon->serverIP, sizeof(conn_server) - 1);
+            /*
+              The PORT must be folded into the server string. libsmb2 has no smb2_set_port(); its
+              only channel is the "<host>[:<port>]" form documented at libsmb2.h, and a bare host
+              defaults to 445 inside socket.c. Ignoring logon->serverPort would therefore always
+              dial 445 -- while RiptOPL's own shipped default is 1111 (the PC server tool in
+              pc/smbserver/ listens there because Windows still occupies 445). So the common case
+              would silently connect to the wrong port, or to a Windows share the user did not mean.
+            */
+            if (logon->serverPort > 0 && logon->serverPort != 445)
+                sprintf(conn_server, "%.48s:%d", logon->serverIP, logon->serverPort);
+            else
+                snprintf(conn_server, sizeof(conn_server), "%s", logon->serverIP);
             conn_server[sizeof(conn_server) - 1] = '\0';
+
             strncpy(conn_user, logon->User, sizeof(conn_user) - 1);
             conn_user[sizeof(conn_user) - 1] = '\0';
-            strncpy(conn_password, logon->Password, sizeof(conn_password) - 1);
-            conn_password[sizeof(conn_password) - 1] = '\0';
+
+            /*
+              Honour PasswordType. ethsupport.c declares smbLogOn_in_t as an UNINITIALISED stack
+              local and, on the no-password path, sets only User and PasswordType -- it never
+              touches logon->Password. Copying that field unconditionally would hand libsmb2 256
+              bytes of uninitialised stack as the password, which is both a garbage credential (so
+              guest/no-password shares fail to authenticate) and a leak of whatever the EE stack
+              happened to hold. That is OPL's SHIPPED DEFAULT configuration, so it is the common
+              case, not an edge case.
+
+              HASHED_PASSWORD cannot be honoured at all: libsmb2 runs the whole NTLMSSP exchange
+              itself and needs the plaintext. GETPASSWORDHASHES already returns failure so that
+              ethsupport falls back to PLAINTEXT_PASSWORD; treat anything else as "no password"
+              rather than feeding libsmb2 a 32-byte binary hash it would use as literal text.
+            */
+            if (logon->PasswordType == PLAINTEXT_PASSWORD) {
+                strncpy(conn_password, logon->Password, sizeof(conn_password) - 1);
+                conn_password[sizeof(conn_password) - 1] = '\0';
+            } else {
+                conn_password[0] = '\0';
+            }
             conn_valid = 1;
 
             /*
@@ -408,6 +482,16 @@ static int smb2man_devctl(iop_file_t *f, const char *name, int cmd, void *arg, u
             smb2_set_security_mode(smb2, SMB2_NEGOTIATE_SIGNING_ENABLED);
             // ANY lets libsmb2 negotiate the best dialect the server offers, 2.0.2 through 3.1.1.
             smb2_set_version(smb2, SMB2_VERSION_ANY2);
+            /*
+              A timeout is mandatory here, not a nicety. libsmb2's synchronous wait loop only calls
+              smb2_timeout_pdus() when ->timeout is non-zero, and the context is calloc'd, so the
+              default of 0 means "wait forever". Every call in this driver runs with smb2_sema held,
+              on OPL's single IO worker -- so one unresponsive or half-dead server does not merely
+              stall the share, it wedges the worker with the lock held and takes the whole UI with
+              it. That is the exact failure class as the bounded MMCE wait and the bounded connect
+              retry: a network device must fail, not hang.
+            */
+            smb2_set_timeout(smb2, 15);
 
             UNLOCK();
             return 0;

@@ -43,6 +43,9 @@ typedef int ssize_t; /* IOP is 32-bit; matches the int-returning lwip_recv/lwip_
 int asprintf(char **strp, const char *fmt, ...);
 int gethostname(char *name, size_t len);
 char *strerror(int errnum);
+int smb2man_connect(int s, struct sockaddr *name, socklen_t namelen);
+int smb2man_recv(int s, void *mem, int len, unsigned int flags);
+int smb2man_send(int s, void *dataptr, int size, unsigned int flags);
 int getpid(void);
 int getlogin_r(char *buf, size_t size);
 void srandom(unsigned int seed);

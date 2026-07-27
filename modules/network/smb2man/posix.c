@@ -17,6 +17,7 @@
 #include <poll.h>
 #include <sys/time.h>
 #include <sys/uio.h>
+#include <errno.h>
 #include <netdb.h>
 
 void *malloc(size_t size); // from alloc.c
@@ -335,6 +336,89 @@ struct protoent *getprotobyname(const char *name)
   flight to race over it.
 */
 int errno = 0;
+
+/*
+  Socket wrappers that PUBLISH errno.
+
+  libsmb2 reads errno after every socket call to tell "would block / in progress" apart from a real
+  failure -- most importantly at socket.c's non-blocking connect(), which treats anything other than
+  EINPROGRESS as fatal. But ps2ip.h aliases connect/recv/send straight to lwip_*, and lwIP keeps its
+  errno inside the ps2ip module; IRX linkage cannot import a data symbol, so the `errno` above is a
+  DIFFERENT object that nothing ever writes. Every such check therefore read 0 and libsmb2 concluded
+  "hard failure" on a perfectly normal in-progress connect.
+
+  The redirect is done on lwip_* rather than on connect/recv/send because ps2ip.h defines those
+  three itself and would win over a command-line -D. LIBSMB2_CFLAGS maps lwip_connect/recv/send to
+  these wrappers for the VENDORED sources only -- this file gets no such define, so the calls below
+  reach the real imports and cannot recurse.
+
+  CAVEAT worth a hardware check: the value is read back via SO_ERROR, and lwIP's numbering is not
+  guaranteed to match the IOP errno.h constants we compare against. The EINPROGRESS mapping below is
+  therefore explicit rather than trusting the raw value through.
+*/
+#ifndef SO_ERROR
+#define SO_ERROR 0x1007 // lwIP/BSD value; ps2ip.h does not export it
+#endif
+#ifndef SOL_SOCKET
+#define SOL_SOCKET 0xfff
+#endif
+
+static void smb2man_publish_errno(int fd)
+{
+    int soerr = 0;
+    socklen_t len = sizeof(soerr);
+
+    if (lwip_getsockopt(fd, SOL_SOCKET, SO_ERROR, &soerr, &len) == 0 && soerr != 0) {
+        errno = soerr;
+        return;
+    }
+
+    /*
+      No SO_ERROR to report but the call still failed: for a non-blocking socket that means the
+      operation is merely pending. Reporting EINPROGRESS is what libsmb2's connect path needs to
+      keep waiting instead of aborting; recv/send read it as EAGAIN via the caller's own test.
+    */
+    errno = EINPROGRESS;
+}
+
+int smb2man_connect(int s, struct sockaddr *name, socklen_t namelen)
+{
+    int fd = s;
+    int rv = lwip_connect(s, name, namelen);
+
+    if (rv < 0)
+        smb2man_publish_errno(fd);
+    else
+        errno = 0;
+
+    return rv;
+}
+
+int smb2man_recv(int s, void *mem, int len, unsigned int flags)
+{
+    int fd = s;
+    int rv = lwip_recv(s, mem, len, flags);
+
+    if (rv < 0)
+        smb2man_publish_errno(fd);
+    else
+        errno = 0;
+
+    return rv;
+}
+
+int smb2man_send(int s, void *dataptr, int size, unsigned int flags)
+{
+    int fd = s;
+    int rv = lwip_send(s, dataptr, size, flags);
+
+    if (rv < 0)
+        smb2man_publish_errno(fd);
+    else
+        errno = 0;
+
+    return rv;
+}
 
 int fcntl(int fd, int cmd, ...)
 {

@@ -35,7 +35,10 @@ include $(PS2SDK)/samples/Makefile.iopglobal
 # server->fd / fd). Letting the iomanX definition win would file-close a socket fd -- which fails
 # silently and leaks the connection rather than erroring. Redirecting here binds them to lwIP
 # without touching vendored code, and without changing close() for smb2man.c itself.
-LIBSMB2_CFLAGS = $(IOP_CFLAGS) -Dclose=lwip_close
+# Redirect the socket calls through posix.c's wrappers so errno is actually published to libsmb2
+# (ps2ip keeps lwIP's errno in its own module, which an IRX cannot import). Redirecting lwip_* --
+# not connect/recv/send -- because ps2ip.h defines those three itself and would override a -D.
+LIBSMB2_CFLAGS = $(IOP_CFLAGS) -Dclose=lwip_close                  -Dlwip_connect=smb2man_connect -Dlwip_recv=smb2man_recv -Dlwip_send=smb2man_send
 
 $(IOP_OBJS_DIR)%.o: libsmb2/lib/%.c
 	$(DIR_GUARD)
