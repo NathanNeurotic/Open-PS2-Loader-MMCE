@@ -1052,7 +1052,7 @@ void hddLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
         if (gAutoLaunchGame == NULL) {
             switch (result) {
                 case -ENOENT:
-                    guiWarning(_l(_STR_NO_CHEATS_FOUND), 10);
+                    guiWarning(sbCheatsNotFoundText(), 10); // #265: name the paths actually probed
                     break;
                 default:
                     guiWarning(_l(_STR_ERR_CHEATS_LOAD_FAILED), 10);

@@ -106,6 +106,10 @@ void neutrinoArgsParse(const char *in, neutrino_args_t *na);
 void neutrinoArgsAssemble(const neutrino_args_t *na, char *out, int outSize);
 
 int sbLoadCheats(const char *path, const char *file);
+// Newline-separated list of every location the last sbLoadCheats() call probed (#265).
+const char *sbGetCheatSearchLog(void);
+// Localized "no cheats found" text with the probed locations appended (#265). Static buffer.
+const char *sbCheatsNotFoundText(void);
 int sbLoadImage(const char *path, const char *file);
 
 #endif
