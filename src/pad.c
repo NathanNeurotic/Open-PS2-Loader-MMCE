@@ -118,6 +118,11 @@ struct pad_data_t
 /// current time in miliseconds (last update time)
 static u32 curtime = 0;
 static u32 time_since_last = 0;
+// Raw-tick bookkeeping for the wrap-correct delta in readPads(). lastticks is the previous poll's
+// cpu_ticks(); tickrem carries the sub-millisecond remainder so dividing a delta stays drift-free.
+static u32 lastticks = 0;
+static u32 tickrem = 0;
+static int padTicksSeeded = 0;
 
 static unsigned short pad_count;
 static struct pad_data_t pad_data[MAX_PADS];
@@ -558,7 +563,10 @@ void padRumbleActivate(void)
     rumbleLive = 1;
 }
 
-static u32 rumbleLastMs = 0;
+// Previous rumble-arm timestamp in RAW ticks (see padRumbleArm) -- raw, not ms, so the
+// difference is wrap-correct on the full 32-bit counter.
+static u32 rumbleLastTicks = 0;
+static int rumbleLastTicksValid = 0;
 
 // Gate a rumble command. Deliberately as PERMISSIVE as the known-working reference.
 //
@@ -692,9 +700,13 @@ static void padRumbleArm(int durationMs, unsigned char level, int smallEngine)
     // ticks with. The interval is measured across EVERY arm attempt -- including suppressed ones --
     // so a fast held scroll stays silent for its whole run instead of strobing at the window edge.
     // Bumps (smallEngine) are decisions, not repeats: they always land at full length.
-    u32 now = cpu_ticks() / CLOCKS_PER_MILISEC;
-    u32 interval = (rumbleLastMs != 0) ? (now - rumbleLastMs) : 0xFFFFFFFFu;
-    rumbleLastMs = now;
+    // Raw ticks, differenced BEFORE dividing -- same wrap correctness as readPads(). Dividing first
+    // put both operands in 0..29127 (cpu_ticks() wraps every ~29.13 s), so once per wrap `interval`
+    // came out enormous and this arm was treated as isolated rather than a repeat.
+    u32 nowRumbleTicks = cpu_ticks();
+    u32 interval = (rumbleLastTicksValid) ? ((nowRumbleTicks - rumbleLastTicks) / CLOCKS_PER_MILISEC) : 0xFFFFFFFFu;
+    rumbleLastTicks = nowRumbleTicks;
+    rumbleLastTicksValid = 1;
     if (!smallEngine && interval < RUMBLE_REPEAT_WINDOW_MS) {
         int duty = (int)interval * RUMBLE_REPEAT_DUTY_PCT / 100;
         if (duty < RUMBLE_REPEAT_FLOOR_MS)
@@ -825,10 +837,40 @@ int readPads()
     oldpaddata = paddata;
     paddata = 0;
 
-    // in ms.
-    u32 newtime = cpu_ticks() / CLOCKS_PER_MILISEC;
-    time_since_last = newtime - curtime;
-    curtime = newtime;
+    /*
+      Elapsed time since the last poll, in ms.
+
+      Difference the RAW tick counter, then divide. The old form divided FIRST
+      (cpu_ticks() / CLOCKS_PER_MILISEC, then subtract), which put both operands in 0..29127 --
+      cpu_ticks() is a 32-bit counter at 147.456 MHz, so it wraps every ~29.13 s and the DIVIDED
+      values wrap with it. u32 modular subtraction is only wrap-correct on the full-width counter,
+      so on the rollover poll time_since_last became ~4,294,938,169 instead of ~16.
+
+      That poisoned all three consumers below:
+        - delaycnt[i] -= time_since_last  (int minus u32 promotes to unsigned) ADDED ~29,127 ms, so
+          getKey()'s only repeat exit (delaycnt <= 0) was unreachable until the key was released.
+        - rumbleMsLeft -= (int)time_since_last SUBTRACTS ~-29,127, turning a 240 ms nav tap into a
+          ~29 second continuous buzz with the motor re-asserted every frame.
+        - the same divided-value wrap in padRumbleArm (now rumbleLastTicks).
+
+      The remainder is CARRIED rather than discarded. Differencing absolute ms was drift-free by
+      construction (16/17 alternating at 60 Hz); dividing a delta and dropping the sub-ms remainder
+      would lose ~0.5 ms of every ~16.7 ms frame, i.e. make every repeat ~3% slow and every rumble
+      tap correspondingly short. Carrying it keeps the old timing exactly.
+
+      First poll: lastticks is seeded on use so an arbitrary power-on tick value cannot present as
+      one enormous delta.
+    */
+    u32 nowticks = cpu_ticks();
+    if (!padTicksSeeded) {
+        lastticks = nowticks;
+        padTicksSeeded = 1;
+    }
+    u32 dticks = (nowticks - lastticks) + tickrem; // wrap-correct: full-width counter
+    lastticks = nowticks;
+    time_since_last = dticks / CLOCKS_PER_MILISEC;
+    tickrem = dticks % CLOCKS_PER_MILISEC;
+    curtime += time_since_last;
 
     int rslt = 0;
 
