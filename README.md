@@ -255,7 +255,7 @@ work it is built on:
 
 Enormous thanks to the testers who run every rolling build on real consoles and file the
 reports that shape the fixes — **eliminator1403, lucaslmgv, AndrewBento, AcidReach, bodvenomz,
-nuno6573 and Blade1984**.
+nuno6573, Blade1984 and zackcage6**.
 
 ### Financial support (this fork)
 

@@ -1123,16 +1123,19 @@ struct UIItem diaAbout[] = {
     {UI_BREAK},
 
     {UI_SPACER},
-    // Blade1984 sits here rather than in a fork-testers block of his own: the About cannot scroll
-    // (its only navigable control is the trailing OK, and diaRenderUI pins diaScrollOffset to 0 while
-    // focus is on the first control), so a new heading + name row pushed the content bottom from
-    // 367px to 442px -- past visibleBottom (gTheme->usedHeight - 40 = 440, and only 408 on a
-    // 448-line theme). That would have rendered the credit, and the OK button, off-screen.
+    // Blade1984 and zackcage6 sit here rather than in a fork-testers block of their own: the About
+    // cannot scroll (its only navigable control is the trailing OK, and diaRenderUI pins
+    // diaScrollOffset to 0 while focus is on the first control), so a new heading + name row pushed
+    // the content bottom from 367px to 442px -- past visibleBottom (gTheme->usedHeight - 40 = 440,
+    // and only 408 on a 448-line theme). That would have rendered the credit, and the OK button,
+    // off-screen. APPEND fork testers to an existing row; never add a row.
     {UI_LABEL, 0, 1, 1, -1, 0, 15, {.label = {"algol - Berion - Blade1984 - El_Patas - EP - gledson999 - jolek - lee4", -1}}},
     {UI_BREAK},
 
     {UI_SPACER},
-    {UI_LABEL, 0, 1, 1, -1, 0, 15, {.label = {"LocalH - RandQalan - ShaolinAssassin - yoshi314 - zero35", -1}}},
+    // 67 chars, still shorter than the 69-char row above it, so this stays inside the width the
+    // block already proved safe on a 448-line theme.
+    {UI_LABEL, 0, 1, 1, -1, 0, 15, {.label = {"LocalH - RandQalan - ShaolinAssassin - yoshi314 - zero35 - zackcage6", -1}}},
     {UI_BREAK},
 
     {UI_BREAK},
