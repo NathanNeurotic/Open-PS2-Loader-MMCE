@@ -153,6 +153,39 @@ static struct pad_data_t pad_data[MAX_PADS];
 static u32 paddata;
 static u32 oldpaddata;
 
+/*
+  SECOND, SEPARATELY-CARRIED VIEW OF THE SAME BUTTONS, used ONLY by getKeyOn()/getKeyOff() (#271).
+
+  paddata above is the LEVEL view: "is the button down right now". Its read-miss carry is bounded to
+  PAD_READ_CARRY_MS because it feeds getKeyPressed() and therefore delaycnt, where carrying too long
+  would manufacture auto-repeats the user never asked for.
+
+  edgedata is the EDGE view: "was the button newly pressed". It carries a missed poll's bits
+  WITHOUT a time bound, because the two detectors fail in opposite directions and cannot share one
+  budget:
+
+    * Over-carrying the LEVEL view INVENTS movement (phantom repeats) -- so it must be bounded.
+    * Over-carrying the EDGE view can only ever SUPPRESS a second edge. It cannot invent one: an
+      edge needs a 0 -> 1 transition, and carrying a 1 forward never produces one. It self-corrects
+      the instant a single successful read shows the button clear.
+
+  Sharing one bounded carry is exactly what caused the "skips 2-3 games" report. With a ~150 ms tap
+  and 33 ms frames:
+
+      F0  read OK, LEFT down        -> getKeyOn -> move #1
+      F1  miss, carry (33 ms)       -> no edge
+      F2  miss, carry (66 ms)       -> no edge
+      F3  miss, 66 >= 48 -> DROPPED -> global paddata falls to 0 while the finger is still down
+      F4  read OK, LEFT STILL DOWN  -> 0 -> 1 again -> getKeyOn -> move #2 from ONE press
+
+  Raising PAD_READ_CARRY_MS does NOT fix this and makes things worse: to bridge a whole tap the
+  window would have to exceed the user's RELEASE gap, at which point the carry is still asserting
+  the previous tap when the next one arrives, the 0 -> 1 never happens, and presses get eaten
+  instead. Jumps would simply become hangs. The two views have to be carried differently.
+*/
+static u32 edgedata;
+static u32 oldedgedata;
+
 static int delaycnt[16];
 static int paddelay[16];
 
@@ -533,8 +566,25 @@ static int readPad(struct pad_data_t *pad)
 
         // merge into the global vars
         paddata |= pad->paddata;
-    } else if ((pad->state == PAD_STATE_STABLE || pad->state == PAD_STATE_FINDCTP1) &&
-               pad->paddata != 0 && pad->readMissMs < PAD_READ_CARRY_MS) {
+        edgedata |= pad->paddata;
+    } else if (pad->state == PAD_STATE_STABLE || pad->state == PAD_STATE_FINDCTP1) {
+        /*
+          EDGE VIEW -- carried UNBOUNDED (see the edgedata note near the globals).
+
+          A missed poll must not make the edge detector see the button go away, or the recovery poll
+          reads as a brand-new press and one physical tap moves the list twice. Suppressing a second
+          edge is the only thing this can do; it cannot invent one, because an edge requires a
+          0 -> 1 transition and carrying a 1 never creates that.
+
+          Residual, stated rather than hidden: if a genuine RELEASE is never sampled at all (the
+          whole release gap falls inside a stall), the following press is suppressed -- an extra move
+          becomes a dropped one. That is the better failure of the two, but it is real.
+        */
+        edgedata |= pad->paddata;
+    }
+
+    if (padsRead == 0 && (pad->state == PAD_STATE_STABLE || pad->state == PAD_STATE_FINDCTP1) &&
+        pad->paddata != 0 && pad->readMissMs < PAD_READ_CARRY_MS) {
         /*
           TRANSIENT READ MISS -- carry the held buttons forward (#272, and the scroll-skip half of #271).
 
@@ -913,6 +963,10 @@ int readPads()
     int i;
     oldpaddata = paddata;
     paddata = 0;
+    // Same one-poll lifetime as paddata, so an edge still lasts exactly one poll and cannot re-fire;
+    // the difference is only in how a MISSED read contributes below (see the edgedata note above).
+    oldedgedata = edgedata;
+    edgedata = 0;
 
     /*
       Elapsed time since the last poll, in ms.
@@ -1048,7 +1102,9 @@ int getKeyOn(int id)
     // old v.s. new pad data
     int keyid = keyToPad[id];
 
-    return (paddata & keyid) && (!(oldpaddata & keyid));
+    // EDGE view, not the level view: a transient read miss must not read as release-then-press. See
+    // the edgedata note near the globals -- this is the #271 "skips 2-3 games" fix.
+    return (edgedata & keyid) && (!(oldedgedata & keyid));
 }
 
 /** Detects key-off event. Returns true if the button was pressed the last frame but is not pressed this frame.
@@ -1063,7 +1119,8 @@ int getKeyOff(int id)
     // old v.s. new pad data
     int keyid = keyToPad[id];
 
-    return (!(paddata & keyid)) && (oldpaddata & keyid);
+    // Edge view, for the same reason as getKeyOn: a miss is "unknown", not "released".
+    return (!(edgedata & keyid)) && (oldedgedata & keyid);
 }
 
 /** Returns true (nonzero) if the button is currently pressed
