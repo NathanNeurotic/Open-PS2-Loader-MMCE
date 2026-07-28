@@ -39,12 +39,12 @@ PADEMU ?= 1
 #Enables/disables PS5 DualSense (USB) support in the pad emulator. HW-VALIDATED on a real DS5
 #(maintainer, 2026-07-06) but kept OFF in the default build by deliberate choice -- the rolling
 #release ships ready-made DUALSENSE=1 builds as named RIPTOPL-<version>-<SDK>-ds5.ELF assets,
-#one per SDK flavour (WOPLSDK / PS2MAXSDK / PS2DEVLATESTSDK).
+#one per SDK flavour (PS2DEVLATESTSDK / PS2DEVPINNEDSDK).
 DUALSENSE ?= 0
 
 #Enables/disables the experimental, hardware-UNVALIDATED GSM 1080p video mode (a GSM-synthetic
 #progressive raster; see ee_core DTV_1080P). Kept OFF in every default build; the rolling release
-#ships ONE ready-made GSM1080P=1 build as a named RIPTOPL-<version>-PS2DEVLATESTSDK-1080p.ELF asset
+#ships ONE ready-made GSM1080P=1 build as a named RIPTOPL-PS2DEVLATESTSDK-1080p.ELF asset
 #(latest-SDK flavour only), gated behind a triple-confirm in the GUI. When 0, none of the 1080p
 #table/GUI/engine code is compiled in.
 GSM1080P ?= 0
@@ -79,7 +79,7 @@ OPL_VERSION = v$(VERSION).$(SUBVERSION).$(PATCHLEVEL)$(if $(EXTRAVERSION),-$(EXT
 
 ifneq ($(GIT_TAG),)
 ifneq ($(GIT_TAG),latest)
-	# git revision is tagged. Keep the LOCALVERSION toolchain brand (-WOPLSDK/-PS2MAXSDK/-PS2DEVLATESTSDK) here too:
+	# git revision is tagged. Keep the LOCALVERSION toolchain brand (-PS2DEVLATESTSDK/-PS2DEVPINNEDSDK) here too:
 	# tagged releases ship BOTH toolchains' ELFs, and without the brand their version strings
 	# would be byte-identical -- a hardware report then can't say which binary it ran.
 	OPL_VERSION = $(GIT_TAG)$(if $(DIRTY),$(DIRTY))$(if $(LOCALVERSION),-$(LOCALVERSION))

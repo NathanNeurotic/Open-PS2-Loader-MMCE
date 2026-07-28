@@ -1,7 +1,7 @@
 #!/bin/sh
 # Install a MENU-coherent mmceman into the container's $(PS2SDK)/iop/irx, replacing the
-# SDK-provided prebuilt. Used by ALL THREE build flavours (ps2dev/ps2dev:latest, ps2max/dev,
-# ghcr ps2homebrew pin) since the #254 fix. mmcedrv/mmceigr (the IN-GAME modules) are deliberately
+# SDK-provided prebuilt. Used by BOTH build flavours (ps2dev/ps2dev:latest and the ps2dev digest
+# pin) since the #254 fix. mmcedrv/mmceigr (the IN-GAME modules) are deliberately
 # LEFT AS THE CONTAINER'S STOCK PREBUILDS.
 #
 # WHY (menu / mmceman): the containers' mmce trio comes via ps2sdk-ports, pinned to ps2-mmce

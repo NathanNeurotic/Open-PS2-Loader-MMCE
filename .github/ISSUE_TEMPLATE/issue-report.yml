@@ -60,8 +60,7 @@ body:
       description: Each release ships several ELF flavours built with different SDKs — it matters for triage
       options:
         - Main RIPTOPL zip (PS2DEVLATESTSDK)
-        - WOPLSDK variant
-        - PS2MAXSDK variant
+        - PS2DEVPINNEDSDK variant (fallback build)
         - Not sure
     validations:
       required: true

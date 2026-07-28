@@ -41,11 +41,16 @@ translations:
 
 ## How to ADD a new string
 
-1. Add it to `lng_tmpl/_base.yml`:
+1. Add it to the **END** of `lng_tmpl/_base.yml`, below the APPEND-ONLY banner (~line 923):
+
    ```yaml
    - label: MY_NEW_SETTING
      string: My New Setting
    ```
+
+   External `lang_*.lng` files are consumed by **line position** (`lang.c`), so inserting a
+   label mid-list shifts every later string ID and makes stale user language packs show the
+   **wrong text** — never an English fallback.
 2. Use `_STR_MY_NEW_SETTING` in code (the enum id is auto-generated).
 3. That's enough to ship — it shows English everywhere until translated.
 

@@ -697,8 +697,8 @@ jobs:
           #
           # Archive the INSTALLABLE + REPRODUCIBLE payload only. The two big diagnostic BUNDLES are
           # deliberately EXCLUDED from the permanent MEGA copy:
-          #   RIPTOPL-VARIANTS-*.zip  (~120 MB -- every EXTRA_FEATURES x PADEMU combo x 3 SDKs)
-          #   RIPTOPL-DEBUG-*.zip     (~91 MB  -- iopcore/ingame/eesio/ppctty/DTL debug builds x 3 SDKs)
+          #   RIPTOPL-VARIANTS-*.zip  (~120 MB -- every PADEMU x EXTRA_FEATURES x DUALSENSE combo, both SDKs)
+          #   RIPTOPL-DEBUG-*.zip     (~91 MB  -- iopcore/ingame/eesio/ppctty/DTL debug builds, both SDKs)
           # They dominate the size (~10x: ~233 MB -> ~22 MB), they still ship on the GitHub rolling
           # release for the CURRENT build, and a *permanent* per-build archive is for restoring or
           # rebuilding an installable build -- not for old diagnostic permutations (when you debug,
