@@ -24,8 +24,13 @@
 #define UI_SPACER_MINIMAL 30
 // length of breaking line in pixels
 #define UI_BREAK_LEN      600
-// scroll speed (delay in ms!) when in dialogs
-#define DIA_SCROLL_SPEED  300
+// Floor for the dialog repeat delay, in ms. Dialogs are deliberately calmer than the game list --
+// overshooting a settings row is more annoying than overshooting a game -- but that intent used to
+// be expressed as a HARDCODED 300 ms, which is exactly the "medium" main-menu value. The result was
+// that Settings ignored the user's Scroll Speed entirely: picking "fast" (100 ms) still gave 300 ms
+// in every dialog (3x slower than asked), and picking "slow" (500 ms) gave no extra slowness at all.
+// See diaScrollDelay(); medium is unchanged, so most users see no difference.
+#define DIA_SCROLL_MIN_MS 200
 // scroll speed (delay in ms!) when setting int value
 #define DIA_INT_SET_SPEED 100
 
@@ -1026,6 +1031,32 @@ static void diaRestoreScrollSpeed(void)
     padRestoreSettings(diaPadSettings);
 }
 
+/*
+  Dialog repeat delay, derived from the user's Scroll Speed instead of ignoring it.
+
+  guiUpdateScrollSpeed() maps gScrollSpeed 0/1/2 -> 500/300/100 ms for the main menu. Dialogs take
+  that same value but never go below DIA_SCROLL_MIN_MS, keeping them calmer than the game list
+  without overriding the preference outright:
+
+    slow   (500) -> 500   (was 300: "slow" now actually is slower)
+    medium (300) -> 300   (unchanged -- the shipped default is unaffected)
+    fast   (100) -> 200   (was 300: "fast" is now genuinely faster, with a floor so a settings
+                           list cannot become as twitchy as the game list)
+*/
+static int diaScrollDelay(void)
+{
+    int delay = 500 - gScrollSpeed * 200; // mirrors guiUpdateScrollSpeed()
+
+    // gScrollSpeed is sanitised to 0..2 by guiUpdateScrollSpeed, but this runs on paths that may
+    // not have gone through it yet; clamp rather than trust it.
+    if (delay < DIA_SCROLL_MIN_MS)
+        delay = DIA_SCROLL_MIN_MS;
+    if (delay > 500)
+        delay = 500;
+
+    return delay;
+}
+
 static struct UIItem *diaFindByID(struct UIItem *ui, int id)
 {
     while (ui->type != UI_TERMINATOR) {
@@ -1058,8 +1089,8 @@ int diaExecuteDialog(struct UIItem *ui, int uiId, short inMenu, int (*updater)(i
     diaStoreScrollSpeed();
 
     // slower controls for dialogs
-    setButtonDelay(KEY_UP, DIA_SCROLL_SPEED);
-    setButtonDelay(KEY_DOWN, DIA_SCROLL_SPEED);
+    setButtonDelay(KEY_UP, diaScrollDelay());
+    setButtonDelay(KEY_DOWN, diaScrollDelay());
 
     diaScrollOffset = 0; // start each dialog scrolled to the top
 
@@ -1077,8 +1108,8 @@ int diaExecuteDialog(struct UIItem *ui, int uiId, short inMenu, int (*updater)(i
             haveFocus = diaHandleInput(cur, &modified);
 
             if (!haveFocus) {
-                setButtonDelay(KEY_UP, DIA_SCROLL_SPEED);
-                setButtonDelay(KEY_DOWN, DIA_SCROLL_SPEED);
+                setButtonDelay(KEY_UP, diaScrollDelay());
+                setButtonDelay(KEY_DOWN, diaScrollDelay());
             }
         } else {
             modified = 0;
