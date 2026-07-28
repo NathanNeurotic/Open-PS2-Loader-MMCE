@@ -1091,8 +1091,8 @@ static void drawCoverFlow(struct menu_list *menu, struct submenu_list *item, con
     // Slide animation (cubic ease-out). clock() wrap is clamped to snap-complete.
     // Sign convention (FifthFox HW report: coverflow "advances in the opposite direction you'd expect"):
     // advancing (Next / Right, dir=+1) must bring the incoming cover in from the RIGHT -> the strip starts
-    // shifted +right and eases to 0 (i.e. slides LEFT), and the OUTGOING old-center (now at centerIndex-dir)
-    // is the cover that shrinks. The prior (eased-1.0f) / centerIndex+dir convention slid the opposite way.
+    // shifted +right and eases to 0 (i.e. slides LEFT), and the OUTGOING old-center (now at centerIdx-dir)
+    // is the cover that shrinks. The prior (eased-1.0f) / centerIdx+dir convention slid the opposite way.
     float eased = 1.0f;
     int animOffset = 0;
     if (gCoverflowAnimSpeed <= 0) {
@@ -1187,7 +1187,7 @@ static void drawCoverFlow(struct menu_list *menu, struct submenu_list *item, con
         int topAlign = (drawH > drawW) ? (drawH - drawW) / 2 : 0;
         int posY = elem->posY + recenterY * drawH / csh + topAlign;
 
-        u64 coverColor = (gCoverflowDimCovers && i != centerIndex) ? GS_SETREG_RGBA(0x80, 0x80, 0x80, 0x40) : gDefaultCol;
+        u64 coverColor = (gCoverflowDimCovers && i != centerIdx) ? GS_SETREG_RGBA(0x80, 0x80, 0x80, 0x40) : gDefaultCol;
 
         if (cimg->overlayTexture) {
             // Scale the inlay (cover) corner offsets to the drawn overlay size so the case
