@@ -22,7 +22,7 @@ ELFs and supporting files are published alongside it:
 | `SHA256SUMS.txt` | SHA256 of every published binary + the source snapshot. |
 | `IRX-MANIFEST*.txt` | SHA256 of every SDK-prebuilt IOP module each toolchain consumed (provenance for silent SDK-side driver swaps). |
 | `RIPTOPL-LANGS-*.zip` | Extra UI language files (`.lng` + non-Latin fonts) — copy into your OPL folder. |
-| `RIPTOPL-VARIANTS-*.zip` / `RIPTOPL-DEBUG-*.zip` | Alternate build configs and debug builds, all three toolchains — for testing/diagnostics. |
+| `RIPTOPL-VARIANTS-*.zip` / `RIPTOPL-DEBUG-*.zip` | Alternate build configs and debug builds, both toolchains — for testing/diagnostics. |
 
 `<version>` is the `ps2dev:latest` build's `git describe` (e.g. `v1.2.0-Beta-2559-bb25a00`); each
 flavour carries the same version with a `-PS2MAXSDK` / `-PS2DEVLATESTSDK` suffix.

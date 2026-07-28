@@ -283,7 +283,7 @@ There are two release channels:
 
 | Channel | What it is |
 | --- | --- |
-| **Rolling pre-release** (the `rolling` tag) | Continuously rebuilt from `master` on every push — the bleeding edge. Each build publishes a full installable package zip (`RIPTOPL-<rel>-<sha>.zip`, containing all three labeled SDK loader folders + the bundled Neutrino core + a `PS2-Servers.url` shortcut), the bare loader ELFs, a source snapshot, `SHA256SUMS.txt`, and a language pack. May be unstable. |
+| **Rolling pre-release** (the `rolling` tag) | Continuously rebuilt from `master` on every push — the bleeding edge. Each build publishes a full installable package zip (`RIPTOPL-<rel>-<sha>.zip`, containing both labeled SDK loader folders + the bundled Neutrino core + a `PS2-Servers.url` shortcut), the bare loader ELFs, a source snapshot, `SHA256SUMS.txt`, and a language pack. May be unstable. |
 | **Tagged releases** (`v*` tags) | Curated, known-good versions cut from a tag. Use these for stability. |
 
 See **[ROLLING_RELEASE.md](ROLLING_RELEASE.md)** for exactly what the rolling release
@@ -300,7 +300,7 @@ contains and how to pull it.
 
 > 🗄️ **Permanent archive (MEGA):** the GitHub `rolling` pre-release only ever holds the *latest*
 > build — every push overwrites it. So **every** rolling build is also archived permanently to MEGA
-> as one self-contained zip of the installable payload (all three loader ELFs, the installable
+> as one self-contained zip of the installable payload (both loader ELFs, the installable
 > package zip, the source snapshot, `SHA256SUMS.txt`, and the IRX manifests — the large VARIANTS
 > and DEBUG diagnostic bundles stay on the GitHub release only). Click the **MEGA**
 > badge at the top of this README — or [browse the archive here](https://mega.nz/folder/74pRHKRB#9SLDkrkvZAbeKO4Qvxg9LQ) —
