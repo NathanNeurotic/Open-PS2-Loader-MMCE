@@ -743,13 +743,11 @@ static void ethLaunchGame(item_list_t *itemList, int id, config_set_t *configSet
     compatmask = sbPrepare(game, configSet, size_smb_cdvdman_irx, smb_cdvdman_irx, &i);
 
     if ((result = sbLoadCheats(ethPrefix, game->startup)) < 0) {
-        switch (result) {
-            case -ENOENT:
-                guiWarning(_l(_STR_NO_CHEATS_FOUND), 10);
-                break;
-            default:
-                guiWarning(_l(_STR_ERR_CHEATS_LOAD_FAILED), 10);
-        }
+        // #265: let the user back out instead of sitting through the whole load. The helper does
+        // the sbUnprepare itself -- see include/supportbase.h; skipping it breaks the NEXT launch.
+        // `settings` is not assigned until below, so derive the common block from the IRX base.
+        if (!sbCheatsMissingContinue((u8 *)(&smb_cdvdman_irx) + i, result))
+            return;
     }
     sbLoadImage(ethPrefix, game->startup);
 

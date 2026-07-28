@@ -866,16 +866,10 @@ void mmceLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
     settings->common.layer1_start = layer1_start;
 
     if ((result = sbLoadCheats(mmcePrefix, game->startup)) < 0) {
-        if (gAutoLaunchBDMGame == NULL) {
-            switch (result) {
-                case -ENOENT:
-                    guiWarning(_l(_STR_NO_CHEATS_FOUND), 10);
-                    break;
-                default:
-                    guiWarning(_l(_STR_ERR_CHEATS_LOAD_FAILED), 10);
-            }
-        } else
-            LOG("Cheats error\n");
+        // #265: let the user back out instead of sitting through the whole load. The helper does
+        // the sbUnprepare itself -- see include/supportbase.h; skipping it breaks the NEXT launch.
+        if (!sbCheatsMissingContinue(&settings->common, result))
+            return;
     }
     sbLoadImage(mmcePrefix, game->startup);
 

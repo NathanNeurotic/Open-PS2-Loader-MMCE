@@ -865,6 +865,22 @@ int oplScanApps(int (*callback)(const char *path, config_set_t *appConfig, void 
         listSupport = list_support[i].support;
         if ((listSupport != NULL) && (listSupport->enabled) && (listSupport->itemGetPrefix != NULL)) {
             char *prefix = listSupport->itemGetPrefix(listSupport);
+            /*
+              #253: never scan a DEVICE-LESS prefix.
+
+              An enabled-but-unmounted slot (a BDM index with nothing plugged in, MMCE with no card,
+              ETH with no share) returns an EMPTY prefix. "%sAPPS" then yields the bare relative
+              path "APPS", which the PS2 resolves against the CWD -- OPL's own boot folder. When OPL
+              boots from a device root (PixeliGer's case: USB), that is the SAME directory the real
+              mass0: prefix already scanned, so every app was discovered twice and appeared twice in
+              the list.
+
+              It also explains why dedup did not help: the two hits arrive with different path
+              strings ("mass0:APPS/..." vs "APPS/..."), so they are legitimately distinct entries as
+              far as the dedup key is concerned.
+            */
+            if (prefix == NULL || prefix[0] == '\0')
+                continue;
             snprintf(appsPath, sizeof(appsPath), "%sAPPS", prefix);
             count += scanApps(callback, arg, appsPath, 0);
         }
@@ -3045,6 +3061,18 @@ static void deferredInit(void)
     // appends the arm after this handler in the IO FIFO: worst case a wedged probe degrades the IO
     // worker POST-boot (visible, diagnosable, menu alive) instead of killing the boot. The
     // settings-apply leg still arms immediately from initAllSupport.
+    /*
+      DELIBERATELY NOT gated on gMMCEStartMode (#254 / maintainer directive 2026-07-27).
+
+      Arming here on every boot -- regardless of whether the MMCE device is enabled -- is the #51
+      contract: GameID works without the MMCE page ever being enabled, so a cross-device launch can
+      still push the game id to a card. Do not add a device-enabled condition; it was tried and
+      reverted on that basis.
+
+      The #254 dead-cursor report (mmceman's sio2man hook killing pad input on the ps2max/ghcr
+      freepad build) must therefore be fixed BUILD-SIDE, by shipping a freepad that survives the
+      hook -- see .github/scripts/install_coherent_freepad.sh -- not by narrowing this.
+    */
     if (gMMCEEnableGameID)
         ioPutRequest(IO_CUSTOM_SIMPLEACTION, &mmceArmGameIDTransport);
 

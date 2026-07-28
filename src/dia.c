@@ -329,6 +329,29 @@ static int diaShowColSel(unsigned char *r, unsigned char *g, unsigned char *b)
 
         rmEndFrame();
 
+        /*
+          Confirm/cancel are tested FIRST, and outside the direction chain.
+
+          The direction arms below use getKey() under setButtonDelay(..., 1), so while a direction
+          is physically held getKey() reports true on EVERY frame. With confirm/cancel chained onto
+          the same else-if ladder they were unreachable for the entire duration of a hold: press X
+          while still leaning on the D-pad and nothing happened. getKeyOn() is edge-triggered, so
+          hoisting it cannot steal a repeat from the directions.
+        */
+        if (getKeyOn(gSelectButton)) {
+            sfxPlay(SFX_CONFIRM);
+            *r = col[0];
+            *g = col[1];
+            *b = col[2];
+            ret = 1;
+            break;
+        }
+        if (getKeyOn(gSelectButton == KEY_CIRCLE ? KEY_CROSS : KEY_CIRCLE)) {
+            sfxPlay(SFX_CANCEL);
+            ret = 0;
+            break;
+        }
+
         if (getKey(KEY_LEFT)) {
             if (col[selc] > 0) {
                 col[selc]--;
@@ -349,17 +372,6 @@ static int diaShowColSel(unsigned char *r, unsigned char *g, unsigned char *b)
                 selc++;
                 sfxPlay(SFX_CURSOR);
             }
-        } else if (getKeyOn(gSelectButton)) {
-            sfxPlay(SFX_CONFIRM);
-            *r = col[0];
-            *g = col[1];
-            *b = col[2];
-            ret = 1;
-            break;
-        } else if (getKeyOn(gSelectButton == KEY_CIRCLE ? KEY_CROSS : KEY_CIRCLE)) {
-            sfxPlay(SFX_CANCEL);
-            ret = 0;
-            break;
         }
     }
 
@@ -1128,8 +1140,14 @@ int diaExecuteDialog(struct UIItem *ui, int uiId, short inMenu, int (*updater)(i
 
         if (updater) {
             int updResult = updater(modified);
-            if (updResult)
+            if (updResult) {
+                // The other three exits (above) restore; this one did not, leaking the dialog's
+                // 300 ms KEY_UP/KEY_DOWN delay into whatever screen follows. Inert today -- every
+                // settings updater returns 0, and each dialog re-applies the delay on entry -- but
+                // it is a real asymmetry, and the next updater that returns non-zero inherits it.
+                diaRestoreScrollSpeed();
                 return updResult;
+            }
         }
     }
 }

@@ -2685,9 +2685,14 @@ void guiRenderTextScreen(const char *message)
 // Renders the CosmicScale "GameID" barcode just before a game is handed to its core, so an HDMI
 // scaler can auto-load that game's per-title display profile. Encoding is the canonical CosmicScale
 // scheme (start word 0xA5 / end word 0xD5 / length byte / additive 0x100-sum checksum), drawn with
-// rmDrawRect exactly as CosmicScale's own OPL fork does. Gated behind gApplyGameID (default OFF) --
-// the pattern is meaningless to non-GameID displays, and the actual HDMI latch is only verifiable on
-// real GameID hardware (experimental until a tester confirms).
+// rmDrawRect exactly as CosmicScale's own OPL fork does. Gated behind gApplyGameID, which has been
+// default ON since 120045d0 -- the pattern is meaningless to non-GameID displays, and the actual HDMI
+// latch is only verifiable on real GameID hardware (experimental until a tester confirms).
+//
+// NOTE (#269): "imperceptible on other displays" was only true once guiShowGameID stopped LEAVING the
+// barcode on screen. It is the last thing OPL draws before the ELF handoff, and on composite the
+// 1-pixel-pitch strip averages to a solid white bar that the GS scans out for the whole game load.
+// The trailing clean-frame loop at the end of guiShowGameID is what makes that premise hold.
 
 #define GAMEID_HOLD_FRAMES 45 // ~0.75s @ 60fps -- enough stable frames for a scaler to sample
 
@@ -2782,6 +2787,31 @@ void guiShowGameID(const char *startup)
         guiStartFrame();
         rmDrawRect(0, 0, screenWidth, screenHeight, GS_SETREG_RGBA(0x00, 0x00, 0x00, 0x80));
         gameIDDrawBars(startup);
+        guiEndFrame();
+    }
+
+    /*
+      Leave a CLEAN black frame behind (#269).
+
+      This is the last thing OPL renders: itemExecSelect() calls us and then goes straight into
+      itemLaunch() -> deinit() -> ExecPS2(), and on a default config nothing in between draws
+      anything (gRememberLastPlayed is off, so there is no save toast; no cheats, no VMC, no
+      MX4SIO warning). Neither deinit() nor sysLaunchLoaderElf() reprograms a GS display register,
+      so whatever buffer rmEndFrame last pointed DISPFB2 at keeps being scanned out until the GAME
+      programs the GS -- which on USB is minutes away.
+
+      Without this, that buffer is "black field + barcode strip", and the strip is drawn at
+      1-virtual-pixel pitch (magenta column immediately followed by cyan/yellow). That is below the
+      chroma bandwidth of composite output, so the columns average to near-white and the user sees
+      a solid ~288x2 white bar, ~71% down an otherwise black screen, for the entire load. Exactly
+      the report: every game, unrelated to Debug Colors, lasting as long as the media takes.
+
+      Two frames because rendering is double-buffered -- one alone leaves the barcode in the OTHER
+      buffer, which is the one a scaler may resync to across the video-mode change.
+    */
+    for (frame = 0; frame < 2; frame++) {
+        guiStartFrame();
+        rmDrawRect(0, 0, screenWidth, screenHeight, GS_SETREG_RGBA(0x00, 0x00, 0x00, 0x80));
         guiEndFrame();
     }
 }
