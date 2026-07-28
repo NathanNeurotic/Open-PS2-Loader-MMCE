@@ -6,10 +6,10 @@ name: Rolling Release
 # Builds with TWO toolchains so a regression in either is visible from the rolling channel
 # (and a hardware failure can be triaged by WHICH flavours reproduce it). Each ships as its own
 # labeled APP_RIPTOPL-<SDK>/ folder + bare ELF; recommended download order is by reliability:
-#   * ps2max/dev (pinned)        -> -PS2MAXSDK        (pinned 2025 SDK; RECOMMENDED #1)
-#   * ps2dev/ps2dev:latest       -> -PS2DEVLATESTSDK  (bleeding-edge MOVING tag; ps2sdk drifts
-#                                                      daily and can produce a non-booting binary,
-#                                                      see issue #102 -- least recommended)
+#   * ps2dev/ps2dev:latest       -> -PS2DEVLATESTSDK  (current SDK, stock drivers; RECOMMENDED #1 --
+#                                                      what RiptOPL is developed and tested against)
+#   * ps2max/dev (pinned)        -> -PS2MAXSDK        (pinned 2025 SDK; SAFE FALLBACK for when the
+#                                                      moving latest tag regresses, see issue #102)
 #
 # A source snapshot (RIPTOPL-<version>-src.zip) of the exact built commit is also
 # published, so every rolling build is self-preserving: testers can restore and
@@ -32,8 +32,8 @@ name: Rolling Release
 # toolchain can never be swapped in silently. Each ELF self-identifies: the version string
 # carries "-PS2MAXSDK" / "-PS2DEVLATESTSDK" (LOCALVERSION). Note the compile gate
 # catches BUILD breakage only: ps2dev:latest tracks a MOVING tag whose ps2sdk drifts daily and
-# can yield a green-but-non-booting binary (issue #102), which is why the two pinned flavours
-# are the recommended downloads -- see the release notes "Get started".
+# can yield a green-but-non-booting binary (issue #102), which is why the pinned PS2MAXSDK flavour
+# is kept as the safe fallback -- see the release notes "Get started".
 
 on:
   push:
@@ -388,8 +388,8 @@ jobs:
         run: |
           set -eu
           # Full installable package the user copies to a memory card / device:
-          #                                              drivers (no coherent-mmce override); RECOMMENDED #1.
-          #   APP_RIPTOPL-PS2MAXSDK/RIPTOPL.ELF       -- pinned/stable 2025 ps2max SDK; RECOMMENDED #2.
+          #                                              drivers (no coherent-mmce override); SAFE FALLBACK.
+          #   APP_RIPTOPL-PS2MAXSDK/RIPTOPL.ELF       -- pinned/stable 2025 ps2max SDK; SAFE FALLBACK.
           #   APP_RIPTOPL-PS2DEVLATESTSDK/RIPTOPL.ELF -- ps2dev:latest (bleeding-edge MOVING tag; may not
           #                                              boot, issue #102). No unlabeled default folder.
           #   POPSTARTER/                     -- SMB network stack (popsmb/) + bdma_config.txt=fat32.
@@ -514,13 +514,13 @@ jobs:
             printf 'SDK toolchain each was built with -- the RiptOPL code in every one is identical. Pick a folder\n'
             printf 'and copy its RIPTOPL.ELF to your launch method. Recommended in this order (by reliability):\n'
             printf '\n'
-            printf '  1. **APP_RIPTOPL-PS2MAXSDK/** -- pinned 2025 ps2max/dev SDK (version ends "-PS2MAXSDK").\n'
-            printf '     Pinned and field-proven: the recommended choice.\n'
-            printf '  2. **APP_RIPTOPL-PS2DEVLATESTSDK/** -- built on the ps2dev:latest toolchain (version ends\n'
-            printf '     "-PS2DEVLATESTSDK"). It tracks a MOVING SDK tag that changes constantly, so it can\n'
-            printf '     intermittently fail to boot on some consoles -- expected volatility of a moving SDK, NOT\n'
-            printf '     a RiptOPL bug (see issue #102). Great for catching upstream SDK regressions early; if it\n'
-            printf '     black-screens at startup, use the PS2MAXSDK build instead.\n'
+            printf '  1. **APP_RIPTOPL-PS2DEVLATESTSDK/** -- built on the ps2dev:latest toolchain (version ends\n'
+            printf '     "-PS2DEVLATESTSDK"). This is the RECOMMENDED download: it uses the current SDK, with the\n'
+            printf '     stock drivers RiptOPL is developed and tested against.\n'
+            printf '  2. **APP_RIPTOPL-PS2MAXSDK/** -- pinned 2025 ps2max/dev SDK (version ends "-PS2MAXSDK").\n'
+            printf '     The SAFE FALLBACK. Because it tracks a moving SDK tag, the recommended build can\n'
+            printf '     occasionally regress on some consoles (see issue #102) -- if it black-screens at startup\n'
+            printf '     or the cursor does not respond, use this one and please say so in the report.\n'
             printf '\n'
             printf 'When something misbehaves on hardware, please say WHICH flavour you ran (the in-app version\n'
             printf 'string suffix tells you). A PS2DEVLATESTSDK-only failure points at an SDK regression; a\n'
@@ -572,11 +572,11 @@ jobs:
               printf -- '- RIPTOPL-DEBUG-*.zip: debug builds (iopcore/ingame/eesio/ppctty/DTL_T10000), both SDKs -- diagnostics\n'
             fi
             if [ "$HAS_PS2MAXSDK" = yes ]; then
-              printf -- '- %s-PS2MAXSDK.ELF: bare loader, ps2max/dev %s pinned toolchain (RECOMMENDED -- pinned, boots reliably)\n' "$VERSIONED_BASE" "$SDK_VER"
+              printf -- '- %s-PS2MAXSDK.ELF: bare loader, ps2max/dev %s pinned toolchain (SAFE FALLBACK -- pinned, boots reliably)\n' "$VERSIONED_BASE" "$SDK_VER"
             else
               printf -- '- (pinned %s PS2MAXSDK build FAILED this run)\n' "$SDK_VER"
             fi
-            printf -- '- %s-PS2DEVLATESTSDK.ELF: bare loader, ps2dev:latest toolchain (bleeding-edge -- moving SDK tag, may not boot on all consoles; see "Get started")\n' "$VERSIONED_BASE"
+            printf -- '- %s-PS2DEVLATESTSDK.ELF: bare loader, ps2dev:latest toolchain (RECOMMENDED -- current SDK; see "Get started")\n' "$VERSIONED_BASE"
             for sdk in PS2MAXSDK PS2DEVLATESTSDK; do
               if [ -f "rolling/${VERSIONED_BASE}-${sdk}-ds5.ELF" ]; then
                 printf -- '- %s-%s-ds5.ELF: %s toolchain WITH DualSense (DS5 USB) pad support (same reliability as the %s bare loader above)\n' "$VERSIONED_BASE" "$sdk" "$sdk" "$sdk"
