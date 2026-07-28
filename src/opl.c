@@ -3062,30 +3062,18 @@ static void deferredInit(void)
     // worker POST-boot (visible, diagnosable, menu alive) instead of killing the boot. The
     // settings-apply leg still arms immediately from initAllSupport.
     /*
-      #254: also require MMCE to actually be enabled before arming at BOOT.
+      DELIBERATELY NOT gated on gMMCEStartMode (#254 / maintainer directive 2026-07-27).
 
-      gMMCEEnableGameID ships ON (see the defaults below) while every device -- MMCE included --
-      ships DISABLED. So this fired on literally every boot, including a fresh install on a console
-      with no MMCE hardware at all, and pushed a blocking mmceman.irx load into the IO worker.
-      mmceman installs a hook on sio2man, which is the same bus freepad polls the PADS over. On the
-      ps2max/ghcr containers' freepad build that takes pad input down -- and because this arm is
-      deliberately posted AFTER GUI_INIT_DONE (see above), the menu is already drawn when the hook
-      lands. That is exactly PixeliGer's report: live menu, config toast shown, cursor dead.
+      Arming here on every boot -- regardless of whether the MMCE device is enabled -- is the #51
+      contract: GameID works without the MMCE page ever being enabled, so a cross-device launch can
+      still push the game id to a card. Do not add a device-enabled condition; it was tried and
+      reverted on that basis.
 
-      It is also unrecoverable in-app: the only cure is Settings -> MMCE -> Game ID off, which needs
-      a working cursor. Hence his "you must copy a config from another build first" workaround.
-
-      HONEST TRADE-OFF -- this DOES narrow #51. That change deliberately let GameID work "without
-      the MMCE page ever being enabled", and this gate withdraws that for the boot arm: a user who
-      wants cross-device GameID must now enable the MMCE device in Device Settings. The
-      settings-apply leg (initAllSupport) is untouched, so enabling it there arms immediately.
-      Accepted because the alternative is a dead cursor on a default install of the RECOMMENDED
-      download, with no way out that does not involve another build's config file.
-
-      Note we cannot simply probe for a card instead: the presence devctl is answered BY mmceman,
-      so probing would require the very load this is trying to avoid.
+      The #254 dead-cursor report (mmceman's sio2man hook killing pad input on the ps2max/ghcr
+      freepad build) must therefore be fixed BUILD-SIDE, by shipping a freepad that survives the
+      hook -- see .github/scripts/install_coherent_freepad.sh -- not by narrowing this.
     */
-    if (gMMCEEnableGameID && gMMCEStartMode != START_MODE_DISABLED)
+    if (gMMCEEnableGameID)
         ioPutRequest(IO_CUSTOM_SIMPLEACTION, &mmceArmGameIDTransport);
 
     // Nad #6: never silently SKIP the boot select -- doing so left the GUI on the start-menu screen
