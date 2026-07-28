@@ -1049,16 +1049,11 @@ void hddLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
     sbPrepare(NULL, configSet, size_irx, irx, &i);
 
     if ((result = sbLoadCheats(gHDDPrefix, game->startup)) < 0) {
-        if (gAutoLaunchGame == NULL) {
-            switch (result) {
-                case -ENOENT:
-                    guiWarning(sbCheatsNotFoundText(), 10); // #265: name the paths actually probed
-                    break;
-                default:
-                    guiWarning(_l(_STR_ERR_CHEATS_LOAD_FAILED), 10);
-            }
-        } else
-            LOG("Cheats error\n");
+        // #265: let the user back out instead of sitting through the whole load. The helper does
+        // the sbUnprepare itself -- see include/supportbase.h; skipping it breaks the NEXT launch.
+        // `settings` is not assigned until below, so derive the common block from the IRX base.
+        if (!sbCheatsMissingContinue((u8 *)irx + i, result))
+            return;
     }
     sbLoadImage(gHDDPrefix, game->startup);
 

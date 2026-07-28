@@ -273,13 +273,12 @@ static void udpfsLaunchGame(item_list_t *itemList, int id, config_set_t *configS
         return;
 
     if ((result = sbLoadCheats(udpfsPrefix, game->startup)) < 0) {
-        switch (result) {
-            case -ENOENT:
-                guiWarning(sbCheatsNotFoundText(), 10); // #265: name the paths actually probed
-                break;
-            default:
-                guiWarning(_l(_STR_ERR_CHEATS_LOAD_FAILED), 10);
-        }
+        // #265: let the user back out instead of sitting through the whole load. The helper does
+        // the sbUnprepare itself -- see include/supportbase.h; skipping it breaks the NEXT launch.
+        // udpfs never assigns `settings` (Neutrino reads the game, not an OPL cdvdman), but
+        // sbPrepare still patched smb_cdvdman_irx, so the unwind is required all the same.
+        if (!sbCheatsMissingContinue((u8 *)(&smb_cdvdman_irx) + index, result))
+            return;
     }
     sbLoadImage(udpfsPrefix, game->startup);
 
