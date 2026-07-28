@@ -97,7 +97,11 @@ int bdmEnsureSourceModules(int bdmType, u32 timeoutMs);
 int bdmResolveBootDir(char *bootDir, int bootDirSize, const char *elfName, int *ioBdmType);
 
 int bdmFindPartition(char *target, const char *name, int write);
-int bdmIsUDPBDLoaded(void);                  // 1 if the UDPBD NIC stack is loaded (the SMB stack must not load on top)
+int bdmIsUDPBDLoaded(void); // 1 if the UDPBD NIC stack is loaded (the SMB stack must not load on top)
+// Which network block transport is actually resident (NET_BOOT_UDPBD / NET_BOOT_UDPFS). Use this,
+// not gNetBootProtocol, for anything DESCRIBING the live device -- the picker can change without a
+// reboot while the loaded IRX cannot.
+int bdmGetLoadedNetProtocol(void);
 int bdmSupportIsUDPBD(item_list_t *support); // 1 if this support is the UDPBD block device (its games are Neutrino-only)
 
 // Re-evaluate every BDM device's presence + page visibility on the next refresh (bumps the latch

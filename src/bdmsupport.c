@@ -33,6 +33,20 @@ static int ieee1394ModLoaded = 0;
 static int mx4sioModLoaded = 0;
 static int hddModLoaded = 0;
 static int udpbdModLoaded = 0;
+/*
+  WHICH network block transport is actually resident, as NET_BOOT_UDPBD / NET_BOOT_UDPFS, or -1
+  when none is loaded.
+
+  udpbdModLoaded alone is protocol-agnostic: both branches of the loader set it to 1, so once
+  either chain is up the module gate short-circuits. But the tab label, the tab icon and the
+  Neutrino -bsd backend all read the LIVE gNetBootProtocol. Change the picker without rebooting and
+  those three start describing a transport that is NOT the one loaded -- e.g. a tab labelled UDPFSBD
+  and a "-bsd=udpfsbd" launch arg while the smap_udpbd monolith is what is actually resident.
+  (A restart notice is shown on protocol change, but nothing enforces it.)
+
+  Consumers below use this instead, so they always describe what is really loaded.
+*/
+static int udpbdLoadedProtocol = -1;
 static s32 bdmLoadModuleLock;
 int bdmDeviceModeStarted;
 
@@ -264,6 +278,15 @@ int bdmIsUDPBDLoaded(void)
     return udpbdModLoaded;
 }
 
+/*
+  The network block transport actually resident (NET_BOOT_UDPBD / NET_BOOT_UDPFS). Falls back to the
+  live gNetBootProtocol before anything has loaded, so first-boot labelling is unchanged.
+*/
+int bdmGetLoadedNetProtocol(void)
+{
+    return (udpbdLoadedProtocol >= 0) ? udpbdLoadedProtocol : gNetBootProtocol;
+}
+
 // True when this support's device is the UDPBD block device (its games are Neutrino-only).
 // Returns 0 for non-BDM supports (incl. FAV-wrapped items, which have no source lookup here).
 int bdmSupportIsUDPBD(item_list_t *support)
@@ -369,12 +392,16 @@ static void bdmLoadBlockDeviceModules(void)
             // ministack (gets the ip= arg, exports to bd), then udpfs_bd (registers the "udp" BDM device).
             if (bdmLoadOptionalModule("UDPFS_SMAP", &udpfs_smap_irx, size_udpfs_smap_irx) >= 0 &&
                 bdmLoadOptionalModuleArgs("UDPFS_MINISTACK", &udpfs_ministack_irx, size_udpfs_ministack_irx, (int)strlen(ipArg) + 1, ipArg) >= 0 &&
-                bdmLoadOptionalModule("UDPFS_BD", &udpfs_bd_irx, size_udpfs_bd_irx) >= 0)
+                bdmLoadOptionalModule("UDPFS_BD", &udpfs_bd_irx, size_udpfs_bd_irx) >= 0) {
                 udpbdModLoaded = 1;
+                udpbdLoadedProtocol = NET_BOOT_UDPFS;
+            }
         } else {
             // UDPBD: the self-contained smap_udpbd monolith (smap + ministack + udpbd in one irx).
-            if (bdmLoadOptionalModuleArgs("SMAP_UDPBD", &smap_udpbd_irx, size_smap_udpbd_irx, (int)strlen(ipArg) + 1, ipArg) >= 0)
+            if (bdmLoadOptionalModuleArgs("SMAP_UDPBD", &smap_udpbd_irx, size_smap_udpbd_irx, (int)strlen(ipArg) + 1, ipArg) >= 0) {
                 udpbdModLoaded = 1;
+                udpbdLoadedProtocol = NET_BOOT_UDPBD;
+            }
         }
         // Release the dev9 reference taken above if the load failed -- otherwise a failing/retrying
         // UDPBD/UDPFS (both gates re-enter on every device refresh while !udpbdModLoaded) inflates the
@@ -1320,7 +1347,7 @@ static int bdmGetTextId(item_list_t *itemList)
     else if (bdmDriverIsATA(pDeviceData->bdmDriver))
         mode = _STR_HDD_GAMES;
     else if (bdmDriverIsUDPBD(pDeviceData->bdmDriver))
-        mode = (gNetBootProtocol == NET_BOOT_UDPFS) ? _STR_UDPFSBD_GAMES : _STR_UDPBD_GAMES; // BLOCK: UDPFSBD vs UDPBD (the udpfs FILESYSTEM tab is _STR_UDPFS_GAMES, a separate device); mirror bdmGetIconId
+        mode = (bdmGetLoadedNetProtocol() == NET_BOOT_UDPFS) ? _STR_UDPFSBD_GAMES : _STR_UDPBD_GAMES; // BLOCK: UDPFSBD vs UDPBD (the udpfs FILESYSTEM tab is _STR_UDPFS_GAMES, a separate device); mirror bdmGetIconId
 
     return mode;
 }
@@ -1340,7 +1367,7 @@ static int bdmGetIconId(item_list_t *itemList)
     else if (bdmDriverIsATA(pDeviceData->bdmDriver))
         mode = HDD_BD_ICON;
     else if (bdmDriverIsUDPBD(pDeviceData->bdmDriver))
-        mode = (gNetBootProtocol == NET_BOOT_UDPFS) ? UDPFS_ICON : UDP_ICON;
+        mode = (bdmGetLoadedNetProtocol() == NET_BOOT_UDPFS) ? UDPFS_ICON : UDP_ICON;
 
     return mode;
 }
