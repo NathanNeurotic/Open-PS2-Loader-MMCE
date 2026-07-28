@@ -51,7 +51,8 @@ static theme_file_t themes[THM_MAX_FILES];
 static const char **guiThemesNames = NULL;
 
 // Coverflow render-mode state (externs in themes.h; defaults match wOPL 3/30/200/0).
-#define COVERFLOW_MAX 5
+#define COVERFLOW_PAD 1 // extra covers built off each edge, purely to fill the slide (see drawCoverFlow)
+#define COVERFLOW_MAX (5 + 2 * COVERFLOW_PAD)
 int gCoverflowCount = 3;        // 3 or 5 only (clamped on load AND at draw)
 int gCoverflowCenterScale = 30; // px added to the center cover (UI 0/15/30/45)
 int gCoverflowAnimSpeed = 200;  // ms (UI 0/100/200/400; 0 = instant, no anim)
@@ -1012,7 +1013,8 @@ static void drawCoverFlow(struct menu_list *menu, struct submenu_list *item, con
     item_list_t *sourceList = (item_list_t *)thmGetItemSource(menu, item);
 
     // Defensive clamp: never trust the global at the draw site (conf.cfg may be hand-edited
-    // to e.g. 7 -> covers[] OOB). coverCount is the ONLY index bound below.
+    // to e.g. 7 -> covers[] OOB). coverCount is the VISIBLE count and drives layout only;
+    // coverTotal (= coverCount + 2*COVERFLOW_PAD) is the index bound for covers[].
     int coverCount = (gCoverflowCount == 5) ? 5 : 3;
     int centerIndex = coverCount / 2;
 
@@ -1043,17 +1045,33 @@ static void drawCoverFlow(struct menu_list *menu, struct submenu_list *item, con
     // overlay -- the Favourites tab can mix game and app cases (different frame insets), so a
     // single shared recenter would shift the odd one out.
 
-    // Build the visible window: covers[centerIndex] is the selection; fan out both sides,
-    // wrapping last<->first. The left wrap reads menu->item->last (full lifecycle wired in
-    // Commit E) -- single-game/exhausted lists break out before dereferencing a stale ptr.
+    /*
+      Build the window: covers[centerIdx] is the selection; fan out both sides, wrapping
+      last<->first. The left wrap reads menu->item->last (full lifecycle wired in Commit E) --
+      single-game/exhausted lists break out before dereferencing a stale ptr.
+
+      COVERFLOW_PAD extra covers are built on EACH side, outside the visible slots. The slide
+      translates the WHOLE strip by up to +/-coverDistance (animOffset, below) rather than moving
+      covers between slots, so without padding the leading slot has nothing to slide in from: for
+      the duration of every animation one edge slot was empty, while the cover at the far end was
+      pushed entirely off-screen after being fetched and decoded.
+
+      Indices are shifted by COVERFLOW_PAD so that i == COVERFLOW_PAD lands on the SAME screen
+      position slot 0 used before (see posX in the draw loop, which subtracts it back out). Layout
+      maths -- maxCoverWidth, coverSpacing, basePosX -- still keys off coverCount, the VISIBLE
+      count, so nothing about the resting layout changes.
+    */
+    int coverTotal = coverCount + 2 * COVERFLOW_PAD; // entries built and drawn
+    int centerIdx = COVERFLOW_PAD + centerIndex;     // the selection, within the padded array
+
     struct submenu_list *covers[COVERFLOW_MAX];
     int i;
     for (i = 0; i < COVERFLOW_MAX; i++)
         covers[i] = NULL;
-    covers[centerIndex] = item;
+    covers[centerIdx] = item;
 
     struct submenu_list *walk = item;
-    for (i = centerIndex - 1; i >= 0; i--) {
+    for (i = centerIdx - 1; i >= 0; i--) {
         struct submenu_list *prev = walk->prev ? walk->prev : menu->item->last;
         if (!prev || prev == walk || prev == item)
             break;
@@ -1062,7 +1080,7 @@ static void drawCoverFlow(struct menu_list *menu, struct submenu_list *item, con
     }
 
     walk = item;
-    for (i = centerIndex + 1; i < coverCount; i++) {
+    for (i = centerIdx + 1; i < coverTotal; i++) {
         struct submenu_list *next = walk->next ? walk->next : menu->item->submenu;
         if (!next || next == walk || next == item)
             break;
@@ -1094,11 +1112,20 @@ static void drawCoverFlow(struct menu_list *menu, struct submenu_list *item, con
         eased = 1.0f - powf(1.0f - t, 3.0f);
         animOffset = (int)(cfAnimDirection * coverDistance * (1.0f - eased));
     }
-    int leavingIndex = centerIndex - cfAnimDirection; // the OUTGOING old-center shrinks (opposite the slide-in side)
+    int leavingIndex = centerIdx - cfAnimDirection; // the OUTGOING old-center shrinks (opposite the slide-in side)
 
     rmSetReflectionYOffset(elem->reflectionOffset); // theme reflection_offset; reset after the loop
 
-    for (i = 0; i < coverCount; i++) {
+    /*
+      At REST the two padding covers sit fully off-screen, so drawing them would cost two extra
+      texture fetches per frame for nothing -- and this carousel is already the subject of a
+      lag report (#271). Fetch and draw them ONLY while a slide is actually in flight, which is
+      the only time they are on-screen. Rest-state cost is therefore byte-identical to before.
+    */
+    int drawFirst = cfIsAnimating ? 0 : COVERFLOW_PAD;
+    int drawLast = cfIsAnimating ? coverTotal : coverTotal - COVERFLOW_PAD;
+
+    for (i = drawFirst; i < drawLast; i++) {
         if (!covers[i])
             continue;
 
@@ -1128,11 +1155,11 @@ static void drawCoverFlow(struct menu_list *menu, struct submenu_list *item, con
             continue;
 
         // Center grows; the leaving neighbour shrinks. leavingIndex is bounds-checked into
-        // [0,coverCount) BEFORE it indexes covers[] (audit fix).
+        // [0,coverTotal) BEFORE it indexes covers[] (audit fix).
         int scaleAdd = 0;
-        if (i == centerIndex)
+        if (i == centerIdx)
             scaleAdd = (int)(gCoverflowCenterScale * eased);
-        else if (cfIsAnimating && leavingIndex >= 0 && leavingIndex < coverCount && i == leavingIndex)
+        else if (cfIsAnimating && leavingIndex >= 0 && leavingIndex < coverTotal && i == leavingIndex)
             scaleAdd = (int)(gCoverflowCenterScale * (1.0f - eased));
 
         int drawW = coverWidth + scaleAdd;
@@ -1152,7 +1179,7 @@ static void drawCoverFlow(struct menu_list *menu, struct submenu_list *item, con
             recenterY = csh / 2 - (ovc->upperLeft_y + ovc->lowerLeft_y) / 2;
         }
 
-        int posX = basePosX + i * coverDistance + animOffset + recenterX * drawW / csw;
+        int posX = basePosX + (i - COVERFLOW_PAD) * coverDistance + animOffset + recenterX * drawW / csw;
         // Covers draw ALIGN_CENTER at elem->posY, so a tall (portrait) cover's TOP overshoots a square
         // cover's top by (drawH-drawW)/2 and touches the background frame. Shift portrait covers DOWN by
         // that excess so every cover TOP-aligns at the square baseline -- square covers (Apps, square
