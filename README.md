@@ -297,12 +297,14 @@ There are two release channels:
 See **[ROLLING_RELEASE.md](ROLLING_RELEASE.md)** for exactly what the rolling release
 contains and how to pull it.
 
-> **Which rolling build?** The rolling zip ships two loader ELFs that differ only by build
+> **Which rolling build?** The rolling zip normally ships two loader ELFs that differ only by build
 > toolchain — the RiptOPL code in each is identical. Recommended in order of reliability:
 > **`APP_RIPTOPL-PS2DEVLATESTSDK/`** (#1) — the current SDK with stock drivers, which is what
 > RiptOPL is developed and tested against. **`APP_RIPTOPL-PS2DEVPINNEDSDK/`** (#2) is the safe
 > fallback: the same ps2dev SDK pinned by image digest to a day it was known good, for when the
-> moving `ps2dev:latest` tag regresses on a given console.
+> moving `ps2dev:latest` tag regresses on a given console. The pinned build is best-effort, so on a
+> run where it fails the zip ships the latest-SDK folder alone — only the latest build gates the
+> publish.
 > (A third `WOPLSDK` flavour was dropped in 2026-07 — it crashed at the setup menu, issue #270.) See
 > [Which build should I use?](ROLLING_RELEASE.md#which-build-should-i-use).
 
@@ -370,7 +372,7 @@ are supported using the folder structure above.
 > **SMBv1**; setting it to **SMB2** switches *both* sides — browsing loads the SMB2 driver instead
 > of the SMBv1 one, and so does the in-game reader — so the server must speak SMB2 for the whole
 > session.
-
+>
 > **RiptOPL network defaults:** the network protocol selector defaults to **Off** — under
 > **Device Settings** set **Network Protocol** to **Manual** or **Auto**, then set **Protocol**
 > to **SMB**, before the **NET Games** tab appears. Network Config

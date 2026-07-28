@@ -1133,7 +1133,7 @@ struct UIItem diaAbout[] = {
     {UI_BREAK},
 
     {UI_SPACER},
-    // 67 chars, still shorter than the 69-char row above it, so this stays inside the width the
+    // 68 chars, still shorter than the 70-char row above it, so this stays inside the width the
     // block already proved safe on a 448-line theme.
     {UI_LABEL, 0, 1, 1, -1, 0, 15, {.label = {"LocalH - RandQalan - ShaolinAssassin - yoshi314 - zero35 - zackcage6", -1}}},
     {UI_BREAK},
