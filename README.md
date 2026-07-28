@@ -291,10 +291,9 @@ contains and how to pull it.
 
 > **Which rolling build?** The rolling zip ships two loader ELFs that differ only by build
 > toolchain — the RiptOPL code in each is identical. Recommended in order of reliability:
-> **`APP_RIPTOPL-PS2MAXSDK/`** (#1), built on a pinned, known-stable SDK snapshot that boots
-> reliably. **`APP_RIPTOPL-PS2DEVLATESTSDK/`** (#2) tracks
-> the bleeding-edge `ps2dev:latest` SDK, which moves constantly and can intermittently fail to
-> boot on some consoles — it exists mainly to catch upstream SDK regressions early.
+> **`APP_RIPTOPL-PS2DEVLATESTSDK/`** (#1) — the current SDK with stock drivers, which is what
+> RiptOPL is developed and tested against. **`APP_RIPTOPL-PS2MAXSDK/`** (#2) is the safe fallback:
+> a pinned 2025 SDK, for when the moving `ps2dev:latest` tag regresses on a given console.
 > (A third `WOPLSDK` flavour was dropped in 2026-07 — it crashed at the setup menu, issue #270.) See
 > [Which build should I use?](ROLLING_RELEASE.md#which-build-should-i-use).
 

@@ -13,9 +13,9 @@ ELFs and supporting files are published alongside it:
 
 | Asset | What it is |
 |---|---|
-| `RIPTOPL-<rel>-<sha>.zip` | **The installable package.** Contains two loader folders that differ ONLY by the SDK toolchain they were built with (the RiptOPL code in each is identical), each explicitly labeled and recommended in this order: `APP_RIPTOPL-PS2MAXSDK/RIPTOPL.ELF` (#1), built on a **pinned, known-stable** SDK snapshot, then `APP_RIPTOPL-PS2DEVLATESTSDK/RIPTOPL.ELF` (#2), built on the moving `ps2dev:latest` tag (bleeding-edge; may not boot on all consoles). There is no unlabeled default folder. Also includes the `POPSTARTER/` + `POPS/` folders for PS1 support, the bundled Neutrino core as a ready-to-use `neutrino/` folder (drag-and-drop to `mc?:/`), and `PS2-Servers.url`, a shortcut to the maintained UDPFS / SMBv1 / UDPBD all-in-one PC launcher. The old `PC-SMB-Server/` folder is no longer embedded. Extract it, pick a folder and copy its `RIPTOPL.ELF` — see [Which build should I use?](#which-build-should-i-use) below. |
-| `RIPTOPL-<version>-PS2MAXSDK.ELF` | Bare loader, `ps2max/dev` (pinned) toolchain (**recommended**; in-app version ends `-PS2MAXSDK`). |
-| `RIPTOPL-<version>-PS2DEVLATESTSDK.ELF` | Bare loader, `ps2dev/ps2dev:latest` toolchain (bleeding-edge; in-app version ends `-PS2DEVLATESTSDK`; may not boot on all consoles). |
+| `RIPTOPL-<rel>-<sha>.zip` | **The installable package.** Contains two loader folders that differ ONLY by the SDK toolchain they were built with (the RiptOPL code in each is identical), each explicitly labeled and recommended in this order: `APP_RIPTOPL-PS2DEVLATESTSDK/RIPTOPL.ELF` (#1), built on the current `ps2dev:latest` SDK with stock drivers, then `APP_RIPTOPL-PS2MAXSDK/RIPTOPL.ELF` (#2), a **pinned** 2025 SDK kept as the safe fallback. There is no unlabeled default folder. Also includes the `POPSTARTER/` + `POPS/` folders for PS1 support, the bundled Neutrino core as a ready-to-use `neutrino/` folder (drag-and-drop to `mc?:/`), and `PS2-Servers.url`, a shortcut to the maintained UDPFS / SMBv1 / UDPBD all-in-one PC launcher. The old `PC-SMB-Server/` folder is no longer embedded. Extract it, pick a folder and copy its `RIPTOPL.ELF` — see [Which build should I use?](#which-build-should-i-use) below. |
+| `RIPTOPL-<version>-PS2MAXSDK.ELF` | Bare loader, `ps2max/dev` (pinned) toolchain (**safe fallback**; in-app version ends `-PS2MAXSDK`). |
+| `RIPTOPL-<version>-PS2DEVLATESTSDK.ELF` | Bare loader, `ps2dev/ps2dev:latest` toolchain (**recommended**; in-app version ends `-PS2DEVLATESTSDK`). |
 | `RIPTOPL-<version>-<SDK>-ds5.ELF` | Same as the bare loader for each SDK flavour, **with DualSense (DS5 USB) pad support** compiled in (`DUALSENSE=1`). One per flavour (`-PS2MAXSDK-ds5` / `-PS2DEVLATESTSDK-ds5`); same reliability order applies. The default builds keep DualSense OFF. Best-effort — a flavour's DS5 build may be absent if it failed that run. |
 | `RIPTOPL-<version>-PS2DEVLATESTSDK-1080p.ELF` | **Experimental** loader with the re-added forced-**1080p** GSM video mode compiled in (`GSM1080P=1`). **Latest-SDK flavour only** — the raster is hardware-unvalidated, so it is kept out of every other asset. Selecting 1080p in the per-game GSM picker requires clearing a **three-step confirmation**; the Triangle + Cross boot combo forces safe 480p if a display can't sync it. Best-effort. |
 | `RIPTOPL-<version>-src.zip` | Source snapshot to rebuild this exact commit. |
@@ -32,14 +32,17 @@ flavour carries the same version with a `-PS2MAXSDK` / `-PS2DEVLATESTSDK` suffix
 Both loaders are **the same RiptOPL code** — they differ only by the SDK toolchain that built them.
 Recommended in this order, by reliability:
 
-1. **`APP_RIPTOPL-PS2MAXSDK/` (`-PS2MAXSDK`).** Built on a pinned 2025 `ps2max/dev` SDK. Pinned and
-   field-proven — the most reliable choice.
-2. **`APP_RIPTOPL-PS2DEVLATESTSDK/` (`-PS2DEVLATESTSDK`) is the bleeding edge.** It is built against the
+1. **`APP_RIPTOPL-PS2DEVLATESTSDK/` (`-PS2DEVLATESTSDK`) — the recommended download.** Built on the
+   current `ps2dev:latest` SDK with its stock drivers, which is what RiptOPL is developed and tested
+   against.
+2. **`APP_RIPTOPL-PS2MAXSDK/` (`-PS2MAXSDK`) is the safe fallback.** A pinned 2025 `ps2max/dev` SDK.
+   Use it when the recommended build misbehaves on your console. It is built against the
    `ps2dev:latest` Docker tag, which **moves constantly** (often several times a day). That makes it the
    best early-warning signal for upstream SDK regressions, but it also means it can *intermittently fail
    to boot* on some consoles when the SDK underneath it changes — that is expected volatility of a moving
    tag, **not** a RiptOPL bug (see issue [#102](https://github.com/NathanNeurotic/Open-PS2-Loader/issues/102)).
-   If it black-screens at startup, use the PS2MAXSDK build instead.
+   If the recommended build black-screens at startup or the cursor does not respond, use this one
+   and please say which you ran in the report.
 
 When something misbehaves on hardware, please say **which flavour you ran** — the in-app version string's
 `-PS2MAXSDK` / `-PS2DEVLATESTSDK` suffix tells you. A PS2DEVLATESTSDK-only failure points at an
@@ -80,7 +83,7 @@ whether the bleeding-edge build succeeded.
   fails loudly. Note this guards against *build* breakage only — because `ps2dev:latest` tracks a
   moving SDK tag, a green build can still produce a binary that does not boot on hardware (see
   [Which build should I use?](#which-build-should-i-use)), which is why the pinned
-  `-PS2MAXSDK` flavour is the recommended download. The pinned build is best-effort
+  `-PS2MAXSDK` flavour is kept as the safe fallback. The pinned build is best-effort
   (`continue-on-error`); when one fails, the package ships without that folder and the notes say so.
 - Publishes/updates the single `rolling` pre-release from the host runner.
 - `concurrency` cancels superseded in-flight runs, so the release reflects the newest push.
