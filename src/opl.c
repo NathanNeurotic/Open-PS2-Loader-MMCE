@@ -865,6 +865,22 @@ int oplScanApps(int (*callback)(const char *path, config_set_t *appConfig, void 
         listSupport = list_support[i].support;
         if ((listSupport != NULL) && (listSupport->enabled) && (listSupport->itemGetPrefix != NULL)) {
             char *prefix = listSupport->itemGetPrefix(listSupport);
+            /*
+              #253: never scan a DEVICE-LESS prefix.
+
+              An enabled-but-unmounted slot (a BDM index with nothing plugged in, MMCE with no card,
+              ETH with no share) returns an EMPTY prefix. "%sAPPS" then yields the bare relative
+              path "APPS", which the PS2 resolves against the CWD -- OPL's own boot folder. When OPL
+              boots from a device root (PixeliGer's case: USB), that is the SAME directory the real
+              mass0: prefix already scanned, so every app was discovered twice and appeared twice in
+              the list.
+
+              It also explains why dedup did not help: the two hits arrive with different path
+              strings ("mass0:APPS/..." vs "APPS/..."), so they are legitimately distinct entries as
+              far as the dedup key is concerned.
+            */
+            if (prefix == NULL || prefix[0] == '\0')
+                continue;
             snprintf(appsPath, sizeof(appsPath), "%sAPPS", prefix);
             count += scanApps(callback, arg, appsPath, 0);
         }
@@ -3045,7 +3061,31 @@ static void deferredInit(void)
     // appends the arm after this handler in the IO FIFO: worst case a wedged probe degrades the IO
     // worker POST-boot (visible, diagnosable, menu alive) instead of killing the boot. The
     // settings-apply leg still arms immediately from initAllSupport.
-    if (gMMCEEnableGameID)
+    /*
+      #254: also require MMCE to actually be enabled before arming at BOOT.
+
+      gMMCEEnableGameID ships ON (see the defaults below) while every device -- MMCE included --
+      ships DISABLED. So this fired on literally every boot, including a fresh install on a console
+      with no MMCE hardware at all, and pushed a blocking mmceman.irx load into the IO worker.
+      mmceman installs a hook on sio2man, which is the same bus freepad polls the PADS over. On the
+      ps2max/ghcr containers' freepad build that takes pad input down -- and because this arm is
+      deliberately posted AFTER GUI_INIT_DONE (see above), the menu is already drawn when the hook
+      lands. That is exactly PixeliGer's report: live menu, config toast shown, cursor dead.
+
+      It is also unrecoverable in-app: the only cure is Settings -> MMCE -> Game ID off, which needs
+      a working cursor. Hence his "you must copy a config from another build first" workaround.
+
+      HONEST TRADE-OFF -- this DOES narrow #51. That change deliberately let GameID work "without
+      the MMCE page ever being enabled", and this gate withdraws that for the boot arm: a user who
+      wants cross-device GameID must now enable the MMCE device in Device Settings. The
+      settings-apply leg (initAllSupport) is untouched, so enabling it there arms immediately.
+      Accepted because the alternative is a dead cursor on a default install of the RECOMMENDED
+      download, with no way out that does not involve another build's config file.
+
+      Note we cannot simply probe for a card instead: the presence devctl is answered BY mmceman,
+      so probing would require the very load this is trying to avoid.
+    */
+    if (gMMCEEnableGameID && gMMCEStartMode != START_MODE_DISABLED)
         ioPutRequest(IO_CUSTOM_SIMPLEACTION, &mmceArmGameIDTransport);
 
     // Nad #6: never silently SKIP the boot select -- doing so left the GUI on the start-menu screen
