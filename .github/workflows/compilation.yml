@@ -13,8 +13,46 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    container: ps2max/dev:v20250725-2
+    container: ps2dev/ps2dev@sha256:c64ae69c9817865ed98ff054e4ae5360b9e280ed952c97946bca95d9d35be995
     steps:
+      # Install git BEFORE checkout: without it, actions/checkout falls back to an API
+      # tarball (no .git directory), so git describe fails and the Makefile marks the
+      # build "-dirty" -- the version string then collapses and hardware reports cannot
+      # identify the exact commit/toolchain they ran.
+      #
+      # Required by EVERY ps2dev-image job, pinned or latest: the image is Alpine and ships
+      # no git. The old ps2max container carried these preinstalled, so the fallback jobs
+      # never needed this step -- retiring ps2max means they do now.
+      - name: Install host dependencies (Alpine only)
+        run: |
+          if command -v apk >/dev/null 2>&1; then
+            # Consolidated ps2dev Alpine prerequisites: build tools, scripting, packaging, and gcc runtime libs.
+            apk add --no-cache \
+              bash \
+              make \
+              git \
+              zip \
+              unzip \
+              tar \
+              gzip \
+              xz \
+              python3 \
+              py3-pip \
+              py3-yaml \
+              gmp \
+              mpfr4 \
+              mpc1 \
+              perl \
+              cmake \
+              pkgconf \
+              coreutils \
+              findutils \
+              grep \
+              sed \
+              gawk \
+              diffutils
+          fi
+
       - name: git checkout
         uses: actions/checkout@v6
 
@@ -27,7 +65,7 @@ jobs:
 
       - name: Install newer-generation freepad (#254 pad death)
         # The GameID mmceman load kills pad input with these containers' stock freepad
-        # builds (PixeliGer: dead cursor, live menu, WOPLSDK+PS2MAXSDK). The ps2max job
+        # builds (PixeliGer: dead cursor, live menu). The digest-pinned job
         # in compilation.yml runs in the SAME container -- swap there too. Vendored
         # newer-generation bytes (modules/freepad/PROVENANCE.md), fail-loud checks.
         run: sh ./.github/scripts/install_coherent_freepad.sh
@@ -143,8 +181,38 @@ jobs:
         extra: [EXTRA_FEATURES=0, EXTRA_FEATURES=1]
         pademu: [PADEMU=0, PADEMU=1]
     runs-on: ubuntu-latest
-    container: ps2max/dev:v20250725-2
+    container: ps2dev/ps2dev@sha256:c64ae69c9817865ed98ff054e4ae5360b9e280ed952c97946bca95d9d35be995
     steps:
+      # See the build job: pinned ps2dev images are Alpine and ship no git.
+      - name: Install host dependencies (Alpine only)
+        run: |
+          if command -v apk >/dev/null 2>&1; then
+            apk add --no-cache \
+              bash \
+              make \
+              git \
+              zip \
+              unzip \
+              tar \
+              gzip \
+              xz \
+              python3 \
+              py3-pip \
+              py3-yaml \
+              gmp \
+              mpfr4 \
+              mpc1 \
+              perl \
+              cmake \
+              pkgconf \
+              coreutils \
+              findutils \
+              grep \
+              sed \
+              gawk \
+              diffutils
+          fi
+
       - name: git checkout
         uses: actions/checkout@v6
 
@@ -157,7 +225,7 @@ jobs:
 
       - name: Install newer-generation freepad (#254 pad death)
         # The GameID mmceman load kills pad input with these containers' stock freepad
-        # builds (PixeliGer: dead cursor, live menu, WOPLSDK+PS2MAXSDK). The ps2max job
+        # builds (PixeliGer: dead cursor, live menu). The digest-pinned job
         # in compilation.yml runs in the SAME container -- swap there too. Vendored
         # newer-generation bytes (modules/freepad/PROVENANCE.md), fail-loud checks.
         run: sh ./.github/scripts/install_coherent_freepad.sh
@@ -294,8 +362,38 @@ jobs:
 
   build-lang:
     runs-on: ubuntu-latest
-    container: ps2max/dev:v20250725-2
+    container: ps2dev/ps2dev@sha256:c64ae69c9817865ed98ff054e4ae5360b9e280ed952c97946bca95d9d35be995
     steps:
+      # See the build job: pinned ps2dev images are Alpine and ship no git.
+      - name: Install host dependencies (Alpine only)
+        run: |
+          if command -v apk >/dev/null 2>&1; then
+            apk add --no-cache \
+              bash \
+              make \
+              git \
+              zip \
+              unzip \
+              tar \
+              gzip \
+              xz \
+              python3 \
+              py3-pip \
+              py3-yaml \
+              gmp \
+              mpfr4 \
+              mpc1 \
+              perl \
+              cmake \
+              pkgconf \
+              coreutils \
+              findutils \
+              grep \
+              sed \
+              gawk \
+              diffutils
+          fi
+
       - name: git checkout
         uses: actions/checkout@v6
 
@@ -383,10 +481,40 @@ jobs:
       fail-fast: false
       matrix:
         debug: [iopcore_debug, ingame_debug, eesio_debug, iopcore_ppctty_debug, ingame_ppctty_debug, DTL_T10000=1]
-        container_commit: [":v20250725-2"]
+        container_commit: ["@sha256:c64ae69c9817865ed98ff054e4ae5360b9e280ed952c97946bca95d9d35be995"]
     runs-on: ubuntu-latest
-    container: ps2max/dev${{ matrix.container_commit }}
+    container: ps2dev/ps2dev${{ matrix.container_commit }}
     steps:
+      # See the build job: pinned ps2dev images are Alpine and ship no git.
+      - name: Install host dependencies (Alpine only)
+        run: |
+          if command -v apk >/dev/null 2>&1; then
+            apk add --no-cache \
+              bash \
+              make \
+              git \
+              zip \
+              unzip \
+              tar \
+              gzip \
+              xz \
+              python3 \
+              py3-pip \
+              py3-yaml \
+              gmp \
+              mpfr4 \
+              mpc1 \
+              perl \
+              cmake \
+              pkgconf \
+              coreutils \
+              findutils \
+              grep \
+              sed \
+              gawk \
+              diffutils
+          fi
+
       - name: git checkout
         uses: actions/checkout@v6
 
@@ -399,7 +527,7 @@ jobs:
 
       - name: Install newer-generation freepad (#254 pad death)
         # The GameID mmceman load kills pad input with these containers' stock freepad
-        # builds (PixeliGer: dead cursor, live menu, WOPLSDK+PS2MAXSDK). The ps2max job
+        # builds (PixeliGer: dead cursor, live menu). The digest-pinned job
         # in compilation.yml runs in the SAME container -- swap there too. Vendored
         # newer-generation bytes (modules/freepad/PROVENANCE.md), fail-loud checks.
         run: sh ./.github/scripts/install_coherent_freepad.sh

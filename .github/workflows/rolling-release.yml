@@ -8,8 +8,9 @@ name: Rolling Release
 # labeled APP_RIPTOPL-<SDK>/ folder + bare ELF; recommended download order is by reliability:
 #   * ps2dev/ps2dev:latest       -> -PS2DEVLATESTSDK  (current SDK, stock drivers; RECOMMENDED #1 --
 #                                                      what RiptOPL is developed and tested against)
-#   * ps2max/dev (pinned)        -> -PS2MAXSDK        (pinned 2025 SDK; SAFE FALLBACK for when the
-#                                                      moving latest tag regresses, see issue #102)
+#   * ps2dev/ps2dev@sha256 (pin) -> -PS2DEVPINNEDSDK  (a DIGEST PIN of ps2dev:latest taken on a day it
+#                                                      was known good; SAFE FALLBACK for when the moving
+#                                                      latest tag regresses, see issue #102)
 #
 # A source snapshot (RIPTOPL-<version>-src.zip) of the exact built commit is also
 # published, so every rolling build is self-preserving: testers can restore and
@@ -28,11 +29,11 @@ name: Rolling Release
 #
 # GATING: the ps2dev:latest (PS2DEVLATESTSDK) build must COMPILE -- if it fails to build the
 # publish FAILS loudly. Both flavours ship as their own labeled folder
-# (APP_RIPTOPL-PS2MAXSDK / -PS2DEVLATESTSDK) -- there is NO unlabeled default, so a
+# (APP_RIPTOPL-PS2DEVPINNEDSDK / -PS2DEVLATESTSDK) -- there is NO unlabeled default, so a
 # toolchain can never be swapped in silently. Each ELF self-identifies: the version string
-# carries "-PS2MAXSDK" / "-PS2DEVLATESTSDK" (LOCALVERSION). Note the compile gate
+# carries "-PS2DEVPINNEDSDK" / "-PS2DEVLATESTSDK" (LOCALVERSION). Note the compile gate
 # catches BUILD breakage only: ps2dev:latest tracks a MOVING tag whose ps2sdk drifts daily and
-# can yield a green-but-non-booting binary (issue #102), which is why the pinned PS2MAXSDK flavour
+# can yield a green-but-non-booting binary (issue #102), which is why the pinned PS2DEVPINNEDSDK flavour
 # is kept as the safe fallback -- see the release notes "Get started".
 
 on:
@@ -55,10 +56,44 @@ concurrency:
 jobs:
   build-rolling-pinned:
     runs-on: ubuntu-latest
-    container: ps2max/dev:v20250725-2
+    container: ps2dev/ps2dev@sha256:c64ae69c9817865ed98ff054e4ae5360b9e280ed952c97946bca95d9d35be995
     # Fallback/compatibility toolchain: best-effort, must not block the rolling publish.
     continue-on-error: true
     steps:
+      # Install git BEFORE checkout: without it, actions/checkout falls back to an API
+      # tarball (no .git directory) and git describe fails, collapsing the version string.
+      # Required by every ps2dev image, pinned or latest -- they are Alpine and ship no git.
+      # The retired ps2max container carried these preinstalled, which is why this job did
+      # not need the step before the pin.
+      - name: Install host dependencies (Alpine only)
+        run: |
+          if command -v apk >/dev/null 2>&1; then
+            apk add --no-cache \
+              bash \
+              make \
+              git \
+              zip \
+              unzip \
+              tar \
+              gzip \
+              xz \
+              python3 \
+              py3-pip \
+              py3-yaml \
+              gmp \
+              mpfr4 \
+              mpc1 \
+              perl \
+              cmake \
+              pkgconf \
+              coreutils \
+              findutils \
+              grep \
+              sed \
+              gawk \
+              diffutils
+          fi
+
       - name: Checkout
         uses: actions/checkout@v6
 
@@ -77,18 +112,19 @@ jobs:
         # #245 "no flavour ships the leak" directive is still honored.
         run: sh ./.github/scripts/install_coherent_mmce.sh
 
-      - name: Install newer-generation freepad (#254 pad death)
-        # The GameID mmceman load kills pad input with this container's stock freepad
-        # build (PixeliGer: dead cursor, live menu). Vendored newer-generation bytes
-        # (modules/freepad/PROVENANCE.md), fail-loud checks.
-        run: sh ./.github/scripts/install_coherent_freepad.sh
+      # NO freepad swap here any more. That step existed because the OLD fallback container
+      # (ps2max/dev) shipped a freepad generation whose pad input died under mmceman's sio2man hook
+      # (#254). This flavour is now a DIGEST PIN OF ps2dev:latest, so its freepad is the same
+      # generation the recommended build uses -- overriding it with vendored bytes would make the
+      # fallback differ from the build it is meant to fall back FROM, which defeats the purpose.
+      # The two flavours must now differ by SDK DATE ONLY.
 
       - name: Build (make clean release)
-        # LOCALVERSION brands the in-ELF version string ("-PS2MAXSDK") so hardware reports
+        # LOCALVERSION brands the in-ELF version string ("-PS2DEVPINNEDSDK") so hardware reports
         # self-identify which toolchain's binary produced them (Makefile appends it).
-        run: make --trace clean && make --trace LOCALVERSION=PS2MAXSDK release
+        run: make --trace clean && make --trace LOCALVERSION=PS2DEVPINNEDSDK release
 
-      - name: Stage rolling assets (pinned = PS2MAXSDK)
+      - name: Stage rolling assets (pinned = PS2DEVPINNEDSDK)
         run: |
           set -eu
           mkdir -p rolling
@@ -100,37 +136,37 @@ jobs:
             echo "No RIPTOPL ELF produced by the pinned build" >&2
             exit 1
           fi
-          cp -f "$MAIN_ELF" rolling/RIPTOPL-PS2MAXSDK.ELF
+          cp -f "$MAIN_ELF" rolling/RIPTOPL-PS2DEVPINNEDSDK.ELF
           # IRX provenance manifest: hash every prebuilt module consumed from this container's SDK.
           # A silent SDK-side driver swap (the mmceman class) then shows up as a manifest diff
           # between runs instead of as a hardware mystery.
-          sha256sum "$PS2SDK"/iop/irx/*.irx > rolling/IRX-MANIFEST-PS2MAXSDK.txt 2>/dev/null || true
+          sha256sum "$PS2SDK"/iop/irx/*.irx > rolling/IRX-MANIFEST-PS2DEVPINNEDSDK.txt 2>/dev/null || true
           echo "Staged pinned rolling assets:"
           ls -la rolling
 
-      - name: Build + stage DualSense (DS5) loader (PS2MAXSDK)
+      - name: Build + stage DualSense (DS5) loader (PS2DEVPINNEDSDK)
         # DualSense (DS5 USB) is HW-validated (maintainer, 2026-07-06) but kept OFF in the default
         # build by choice. Ship a ready-made DUALSENSE=1 loader for THIS SDK flavour as a named
         # top-level asset so DS5 owners can pick their preferred (recommended) flavour without
         # digging in the VARIANTS zip. Best-effort: a DS5 build hiccup must not sink the main flavour.
-        # LOCALVERSION carries "-PS2MAXSDK-ds5" so hardware reports self-identify.
+        # LOCALVERSION carries "-PS2DEVPINNEDSDK-ds5" so hardware reports self-identify.
         run: |
           make --trace clean
           rm -f RIPTOPL-*.ELF   # drop the main build's leftover named ELF (already staged) so the DS5 output is unambiguous
-          if make --trace LOCALVERSION=PS2MAXSDK-ds5 DUALSENSE=1 release; then
+          if make --trace LOCALVERSION=PS2DEVPINNEDSDK-ds5 DUALSENSE=1 release; then
             DS5_ELF="$(ls RIPTOPL-*.ELF 2>/dev/null | head -n1)"
             if [ -n "${DS5_ELF:-}" ] && [ -f "$DS5_ELF" ]; then
-              cp -f "$DS5_ELF" rolling/RIPTOPL-PS2MAXSDK-ds5.ELF
+              cp -f "$DS5_ELF" rolling/RIPTOPL-PS2DEVPINNEDSDK-ds5.ELF
             else
-              echo "WARN: PS2MAXSDK DUALSENSE=1 build produced no ELF; skipping DS5 asset this run" >&2
+              echo "WARN: PS2DEVPINNEDSDK DUALSENSE=1 build produced no ELF; skipping DS5 asset this run" >&2
             fi
           else
-            echo "WARN: PS2MAXSDK DUALSENSE=1 build failed; skipping DS5 asset this run" >&2
+            echo "WARN: PS2DEVPINNEDSDK DUALSENSE=1 build failed; skipping DS5 asset this run" >&2
           fi
 
-      - name: Build variant + debug extras (pinned = PS2MAXSDK)
+      - name: Build variant + debug extras (pinned = PS2DEVPINNEDSDK)
         # Runs AFTER staging so the per-build `make clean` can't wipe the saved main ELF.
-        run: sh ./.github/scripts/build_rolling_extras.sh "-PS2MAXSDK" "PS2MAXSDK"
+        run: sh ./.github/scripts/build_rolling_extras.sh "-PS2DEVPINNEDSDK" "PS2DEVPINNEDSDK"
 
       - name: Upload pinned rolling assets
         uses: actions/upload-artifact@v6
@@ -237,7 +273,7 @@ jobs:
       - name: Build + stage DualSense (DS5) loader (PS2DEVLATESTSDK)
         # Named DUALSENSE=1 loader on the ps2dev:latest toolchain. Like the plain PS2DEVLATESTSDK
         # build this rides the moving SDK tag (may not boot -- issue #102); DS5 owners who want a
-        # reliable build should prefer the -PS2MAXSDK-ds5 asset. Best-effort so a
+        # reliable build should prefer the -PS2DEVPINNEDSDK-ds5 asset. Best-effort so a
         # DS5 hiccup can't sink the required primary flavour. LOCALVERSION carries "-PS2DEVLATESTSDK-ds5".
         run: |
           make --trace clean
@@ -293,9 +329,10 @@ jobs:
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       OPL_VERSION: ${{ needs.build-rolling-ps2dev-latest.outputs.version }}
-      # Pinned ps2sdk/toolchain tag of the FALLBACK (-PS2MAXSDK) build, referenced in the release
-      # notes (the -PS2MAXSDK flavour). Bump alongside the build-rolling-pinned container (ps2max/dev:...).
-      SDK_VER: "v20250725-2"
+      # Human-readable label for the FALLBACK (-PS2DEVPINNEDSDK) build, shown in the release notes.
+      # This flavour is a DIGEST PIN of ps2dev:latest, so the label is the date the pin was taken.
+      # Bump it and the container digest together in build-rolling-pinned when re-pinning.
+      SDK_VER: "ps2dev:latest pinned 2026-07-28"
       # MEGA archival credentials (repo secrets MEGA_USERNAME / MEGA_PASSWORD). Exposed under the
       # names USERNAME / PASSWORD because the upload action (Difegue/action-megacmd) reads exactly
       # those env names, and because it lets the MEGA steps gate on `env.USERNAME != ''` -- a fork
@@ -329,7 +366,7 @@ jobs:
           set -eu
           # Apply ONE authoritative version (from the primary ps2dev:latest build, which now
           # resolves full git history) to BOTH toolchains. The source commit is identical, so
-          # the only difference is the toolchain-brand suffix (-PS2MAXSDK / -PS2DEVLATESTSDK).
+          # the only difference is the toolchain-brand suffix (-PS2DEVPINNEDSDK / -PS2DEVLATESTSDK).
           VER="${OPL_VERSION:-}"
           if [ -z "$VER" ]; then
             VER="rolling-${GITHUB_SHA}"
@@ -338,11 +375,11 @@ jobs:
           if [ -f rolling/RIPTOPL.ELF ]; then
             mv -f rolling/RIPTOPL.ELF "rolling/RIPTOPL-${VER}-PS2DEVLATESTSDK.ELF"
           fi
-          if [ -f rolling/RIPTOPL-PS2MAXSDK.ELF ]; then
-            mv -f rolling/RIPTOPL-PS2MAXSDK.ELF "rolling/RIPTOPL-${VER}-PS2MAXSDK.ELF"
+          if [ -f rolling/RIPTOPL-PS2DEVPINNEDSDK.ELF ]; then
+            mv -f rolling/RIPTOPL-PS2DEVPINNEDSDK.ELF "rolling/RIPTOPL-${VER}-PS2DEVPINNEDSDK.ELF"
           fi
           # DualSense (DS5) named loaders, one per SDK flavour (best-effort -- any may be absent).
-          for sdk in PS2MAXSDK PS2DEVLATESTSDK; do
+          for sdk in PS2DEVPINNEDSDK PS2DEVLATESTSDK; do
             if [ -f "rolling/RIPTOPL-${sdk}-ds5.ELF" ]; then
               mv -f "rolling/RIPTOPL-${sdk}-ds5.ELF" "rolling/RIPTOPL-${VER}-${sdk}-ds5.ELF"
             fi
@@ -389,7 +426,7 @@ jobs:
           set -eu
           # Full installable package the user copies to a memory card / device:
           #                                              drivers (no coherent-mmce override); SAFE FALLBACK.
-          #   APP_RIPTOPL-PS2MAXSDK/RIPTOPL.ELF       -- pinned/stable 2025 ps2max SDK; SAFE FALLBACK.
+          #   APP_RIPTOPL-PS2DEVPINNEDSDK/RIPTOPL.ELF   -- digest pin of ps2dev:latest; SAFE FALLBACK.
           #   APP_RIPTOPL-PS2DEVLATESTSDK/RIPTOPL.ELF -- ps2dev:latest (bleeding-edge MOVING tag; may not
           #                                              boot, issue #102). No unlabeled default folder.
           #   POPSTARTER/                     -- SMB network stack (popsmb/) + bdma_config.txt=fat32.
@@ -403,17 +440,17 @@ jobs:
           # the workflow); the two pinned flavours are best-effort, each in its own labeled folder.
           # This belt-and-braces check just asserts the PS2DEVLATESTSDK ELF landed before packaging.
           LATEST_ELF="rolling/${VERSIONED_BASE}-PS2DEVLATESTSDK.ELF"
-          PINNED_ELF="rolling/${VERSIONED_BASE}-PS2MAXSDK.ELF"
+          PINNED_ELF="rolling/${VERSIONED_BASE}-PS2DEVPINNEDSDK.ELF"
           if [ ! -f "$LATEST_ELF" ]; then
             echo "PS2DEVLATESTSDK (ps2dev:latest) ELF missing -- its build job failing already fails the workflow" >&2
             exit 1
           fi
           cp -f "$LATEST_ELF" "$PKG/APP_RIPTOPL-PS2DEVLATESTSDK/RIPTOPL.ELF"
           if [ -f "$PINNED_ELF" ]; then
-            mkdir -p "$PKG/APP_RIPTOPL-PS2MAXSDK"
-            cp -f "$PINNED_ELF" "$PKG/APP_RIPTOPL-PS2MAXSDK/RIPTOPL.ELF"
+            mkdir -p "$PKG/APP_RIPTOPL-PS2DEVPINNEDSDK"
+            cp -f "$PINNED_ELF" "$PKG/APP_RIPTOPL-PS2DEVPINNEDSDK/RIPTOPL.ELF"
           else
-            echo "WARN: pinned fallback build missing this run; package ships without APP_RIPTOPL-PS2MAXSDK" >&2
+            echo "WARN: pinned fallback build missing this run; package ships without APP_RIPTOPL-PS2DEVPINNEDSDK" >&2
           fi
           cp -f popsmb/* "$PKG/POPSTARTER/"
           cp -f pops/* "$PKG/POPS/"
@@ -467,7 +504,7 @@ jobs:
           (
             cd "$PKG"
             zip -r -X "../rolling/${ZIP}" APP_RIPTOPL-PS2DEVLATESTSDK POPSTARTER POPS PS2-Servers.url >/dev/null
-            if [ -d APP_RIPTOPL-PS2MAXSDK ]; then zip -r -X "../rolling/${ZIP}" APP_RIPTOPL-PS2MAXSDK >/dev/null; fi
+            if [ -d APP_RIPTOPL-PS2DEVPINNEDSDK ]; then zip -r -X "../rolling/${ZIP}" APP_RIPTOPL-PS2DEVPINNEDSDK >/dev/null; fi
             # the extracted neutrino/ folder (drag-and-drop; replaces the old zip-in-zip neutrino_*.7z)
             if [ -d neutrino ]; then zip -r -X "../rolling/${ZIP}" neutrino >/dev/null; fi
           )
@@ -478,7 +515,7 @@ jobs:
         run: |
           set -eu
           # The EXTRA_FEATURES x PADEMU variants and the debug builds (each in BOTH SDK flavours:
-          # standard = -PS2DEVLATESTSDK, plus -PS2MAXSDK) -> two separate release zips. Remove the
+          # standard = -PS2DEVLATESTSDK, plus -PS2DEVPINNEDSDK) -> two separate release zips. Remove the
           # loose dirs afterward so the final 'gh release upload rolling/*' stays file-only.
           REL="${OPL_VERSION:-rolling}"
           for kind in variants debug; do
@@ -497,8 +534,8 @@ jobs:
       - name: Build release notes
         run: |
           set -eu
-          HAS_PS2MAXSDK=no
-          [ -f "rolling/${VERSIONED_BASE}-PS2MAXSDK.ELF" ] && HAS_PS2MAXSDK=yes
+          HAS_PS2DEVPINNEDSDK=no
+          [ -f "rolling/${VERSIONED_BASE}-PS2DEVPINNEDSDK.ELF" ] && HAS_PS2DEVPINNEDSDK=yes
           {
             if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
               printf 'RiptOPL %s -- tagged release.\n\n' "$OPL_VERSION"
@@ -517,10 +554,11 @@ jobs:
             printf '  1. **APP_RIPTOPL-PS2DEVLATESTSDK/** -- built on the ps2dev:latest toolchain (version ends\n'
             printf '     "-PS2DEVLATESTSDK"). This is the RECOMMENDED download: it uses the current SDK, with the\n'
             printf '     stock drivers RiptOPL is developed and tested against.\n'
-            printf '  2. **APP_RIPTOPL-PS2MAXSDK/** -- pinned 2025 ps2max/dev SDK (version ends "-PS2MAXSDK").\n'
-            printf '     The SAFE FALLBACK. Because it tracks a moving SDK tag, the recommended build can\n'
-            printf '     occasionally regress on some consoles (see issue #102) -- if it black-screens at startup\n'
-            printf '     or the cursor does not respond, use this one and please say so in the report.\n'
+            printf '  2. **APP_RIPTOPL-PS2DEVPINNEDSDK/** -- the SAME ps2dev SDK, pinned by digest to a day it\n'
+            printf '     was known good (version ends "-PS2DEVPINNEDSDK").\n'
+            printf '     The SAFE FALLBACK. Because #1 tracks a MOVING tag, it can occasionally regress on some\n'
+            printf '     consoles (see issue #102) -- if it black-screens at startup or the cursor does not\n'
+            printf '     respond, use this one and please say so in the report.\n'
             printf '\n'
             printf 'When something misbehaves on hardware, please say WHICH flavour you ran (the in-app version\n'
             printf 'string suffix tells you). A PS2DEVLATESTSDK-only failure points at an SDK regression; a\n'
@@ -528,7 +566,7 @@ jobs:
             printf '\n'
             printf '**DualSense / DS5 (USB) owners:** each flavour also ships a ready-made DUALSENSE=1 loader as\n'
             printf 'a named `RIPTOPL-<version>-<SDK>-ds5.ELF` asset (see "Other downloads"). Same reliability order\n'
-            printf 'applies -- prefer `-PS2MAXSDK-ds5`. The default builds keep DualSense OFF.\n'
+            printf 'applies -- prefer `-PS2DEVPINNEDSDK-ds5`. The default builds keep DualSense OFF.\n'
             printf '\n## Bundled Neutrino core\n'
             printf 'Required for the per-game Neutrino launch mode. From the official repo:\n'
             printf '  https://github.com/rickgaiser/neutrino\n'
@@ -571,13 +609,13 @@ jobs:
             if [ -f "rolling/RIPTOPL-DEBUG-${OPL_VERSION:-rolling}.zip" ]; then
               printf -- '- RIPTOPL-DEBUG-*.zip: debug builds (iopcore/ingame/eesio/ppctty/DTL_T10000), both SDKs -- diagnostics\n'
             fi
-            if [ "$HAS_PS2MAXSDK" = yes ]; then
-              printf -- '- %s-PS2MAXSDK.ELF: bare loader, ps2max/dev %s pinned toolchain (SAFE FALLBACK -- pinned, boots reliably)\n' "$VERSIONED_BASE" "$SDK_VER"
+            if [ "$HAS_PS2DEVPINNEDSDK" = yes ]; then
+              printf -- '- %s-PS2DEVPINNEDSDK.ELF: bare loader, digest-pinned ps2dev snapshot %s (SAFE FALLBACK -- pinned, boots reliably)\n' "$VERSIONED_BASE" "$SDK_VER"
             else
-              printf -- '- (pinned %s PS2MAXSDK build FAILED this run)\n' "$SDK_VER"
+              printf -- '- (pinned %s PS2DEVPINNEDSDK build FAILED this run)\n' "$SDK_VER"
             fi
             printf -- '- %s-PS2DEVLATESTSDK.ELF: bare loader, ps2dev:latest toolchain (RECOMMENDED -- current SDK; see "Get started")\n' "$VERSIONED_BASE"
-            for sdk in PS2MAXSDK PS2DEVLATESTSDK; do
+            for sdk in PS2DEVPINNEDSDK PS2DEVLATESTSDK; do
               if [ -f "rolling/${VERSIONED_BASE}-${sdk}-ds5.ELF" ]; then
                 printf -- '- %s-%s-ds5.ELF: %s toolchain WITH DualSense (DS5 USB) pad support (same reliability as the %s bare loader above)\n' "$VERSIONED_BASE" "$sdk" "$sdk" "$sdk"
               fi
@@ -593,7 +631,7 @@ jobs:
             printf '```\n'
             printf '\nUpdated on every push to master. This is the single rolling channel; stable builds are the v* tagged releases.\n'
           } > notes.md
-          echo "PS2MAXSDK flavour present: $HAS_PS2MAXSDK"
+          echo "PS2DEVPINNEDSDK flavour present: $HAS_PS2DEVPINNEDSDK"
           cat notes.md
           echo "Assets to publish:"
           ls -la rolling
