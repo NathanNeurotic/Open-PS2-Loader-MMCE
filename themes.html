@@ -132,8 +132,9 @@ sequence. (A commented-out block counts as a deletion — re-number around it.)<
 <details class="deep"><summary>Why does a <code>Background</code> have to be element 0?</summary>
 The first element of a list <b>must</b> be the <code>Background</code> (the engine inserts a default plasma
 background if you forget). Likewise only the first <code>ItemsList</code> becomes the games list, the second the
-apps list, the third the Favourites list — so order matters beyond just draw order. The PS1/VCD view reuses the
-games list, so it never needs its own <code>ItemsList</code>.</details>
+apps list, the third the Favourites list and the fourth the PS1/VCD list — so order matters beyond just draw
+order. The PS1/VCD slot is optional: define only three lists and the VCD view falls back to the games list,
+sharing its cover cache. Give it a fourth and it gets its own.</details>
 
 <h2 id="global-properties">3 · Global properties</h2>
 <p>These go at the <em>top</em> of the file, outside any block.</p>
@@ -142,7 +143,8 @@ games list, so it never needs its own <code>ItemsList</code>.</details>
 <table data-sortable>
 <thead><tr><th>Key</th><th>Applies to</th></tr></thead>
 <tbody>
-<tr><td><code>bg_color</code></td><td>Plasma / background tint</td></tr>
+<tr><td><code>bg_color</code></td><td>Plasma / background tint (the gradient's HIGH end)</td></tr>
+<tr><td><code>plasma_blend_color</code></td><td>Plasma gradient LOW end — defaults to black, which reproduces the historical look</td></tr>
 <tr><td><code>text_color</code></td><td>Default element text colour</td></tr>
 <tr><td><code>ui_text_color</code></td><td>UI text (menus, buttons, hints)</td></tr>
 <tr><td><code>sel_text_color</code></td><td>Selected-item text colour</td></tr>
@@ -176,9 +178,10 @@ all, since font loading is skipped for buffer-loaded built-in themes).</p>
 <tr><td><code>coverflow_cover_offset</code></td><td>int (clamped −1024…1024, default 0)</td><td>Horizontal nudge for the Coverflow carousel (see §9).</td></tr>
 </tbody>
 </table>
-<div class="callout info"><div class="h">i Not a real key</div>You may see <code>plasma_blend_color=</code> in
-the shipped <code>theme_coverflow.cfg</code>. The current parser does <b>not</b> read it — the plasma blend uses
-<code>bg_color</code>. It's a harmless leftover; don't rely on it.</div>
+<div class="callout info"><div class="h">i Tinting the plasma</div>The plasma background is a gradient
+between two colours: <code>plasma_blend_color</code> is the <b>low</b> end and <code>bg_color</code> the
+<b>high</b> end. Setting only <code>bg_color</code> keeps the classic look, because
+<code>plasma_blend_color</code> defaults to black. Set both to tint the whole gradient.</div>
 
 <h2 id="common-properties">4 · Common element properties</h2>
 <p>Every element block starts with <code>type=&lt;ElementType&gt;</code> (see §5). Almost all of them also
@@ -535,7 +538,7 @@ a layout survives resolution changes.</p></div>
     type=AttributeText
     attribute=Title       # the game's title…
     color=#ffffff
-    display=0             # 0 = always show "Title: <value>"
+    display=0             # 0 = always show "Title: &lt;value&gt;"
     aligned=0            # anchor top-left at (x,y)
     x=33
     y=70</pre>

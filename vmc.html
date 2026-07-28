@@ -68,7 +68,7 @@ A Virtual Memory Card (VMC) is a <code>.bin</code> file that the IOP mcemu drive
 </tbody>
 </table>
 
-<p>The folder must exist before OPL can create a VMC image inside it. On most devices this folder is created automatically when OPL first sets up its directory structure. If the <b>Configure VMC</b> screen reports an error locating the file, check that the <code>VMC/</code> folder is present on the drive.</p>
+<p>The folder must exist before OPL can create a VMC image inside it. On most devices OPL creates it for you the first time it initialises that device <em>after you have enabled the device in Device Settings</em> — not on first boot, so a device you have never turned on will not have one yet. If the <b>Configure VMC</b> screen reports an error locating the file, check that the <code>VMC/</code> folder is present on the drive.</p>
 
 <div class="callout info"><div class="h">ℹ File naming</div>
 Each VMC image is a plain file named <code>&lt;name&gt;.bin</code> — for example <code>MySaves_0.bin</code>. The name you type in the Configure VMC dialog is the base name without extension. OPL appends <code>.bin</code> automatically when reading or creating the file.

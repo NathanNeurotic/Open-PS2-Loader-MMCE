@@ -65,12 +65,24 @@ Core on <b>OPL</b> (the default). See <a href="neutrino.html">Neutrino Core</a> 
 <h2 id="cht-files">The CHT folder and .cht file format</h2>
 <p>OPL looks for cheat files in the <code>CHT/</code> folder on your storage device (USB, MMCE,
 MX4SIO, iLink, SMB, or the internal HDD). The folder lives alongside <code>DVD/</code>,
-<code>CD/</code>, <code>CFG/</code>, and the other standard OPL folders. On an APA/PFS HDD it
-lives under <code>hdd0:__common/OPL/CHT/</code>.</p>
+<code>CD/</code>, <code>CFG/</code>, and the other standard OPL folders. On an APA/PFS HDD it lives in
+the OPL data partition — <code>pfs0:CHT/</code>, i.e. <code>hdd0:+OPL</code> by default — and only
+becomes <code>pfs0:OPL/CHT/</code> (<code>hdd0:&lt;partition&gt;/OPL/CHT/</code>, e.g.
+<code>hdd0:__common/OPL/CHT/</code>) when <code>conf_hdd.cfg</code>
+points <code>hdd_partition</code> at a partition whose name does not start with <code>+</code>.</p>
 
 <p>Each file covers exactly one game. The filename must match the game's startup name (its disc
-ID, e.g. <code>SLUS_123.45</code>) with a <code>.cht</code> extension:</p>
+ID, e.g. <code>SLUS_123.45</code>) with a <code>.cht</code> extension — <code>.CHT</code> is accepted
+too, because PFS and the BDM FAT drivers do not fold case and several published cheat packs ship the
+uppercase spelling:</p>
 <pre>CHT/SLUS_123.45.cht</pre>
+
+<p>OPL also reads cheats out of <code>CHT/cht.tar</code> — a flat ustar archive of
+<code>&lt;startup&gt;.cht</code> members at a device root — and looks there <b>first</b>, searched
+across devices in the tar engine's own device order (the member name is retried with an uppercase
+<code>.CHT</code> extension as well). The loose file above is the fallback: a tar miss, an empty
+member, an oversize member, or a member that fails to parse all fall through to
+<code>CHT/&lt;startup&gt;.cht</code> rather than failing the launch.</p>
 
 <p>The format is plain text in <b>PS2RD format</b>: a cheat is a description line (the cheat name)
 followed by one or more hex code lines. A code line is exactly 16 hex digits — two groups of 8 —
@@ -169,8 +181,8 @@ lists known-working codes for specific titles.</p>
 <div class="steps">
   <div class="step">
     <h3>Open Game Settings</h3>
-    <p>Highlight the game in any list, press the confirm button (cross by default), and select
-    <b>Options</b> from the game menu. Then open <b>Cheat Settings</b>.</p>
+    <p>Highlight the game in any list and press <b>Triangle</b> to open the game menu, then choose
+    <b>Cheat Settings</b>.</p>
   </div>
   <div class="step">
     <h3>Set the settings source</h3>

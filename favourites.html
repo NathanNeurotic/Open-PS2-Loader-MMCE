@@ -53,10 +53,11 @@
 <p class="lead">Press <b>R3</b> on any game or app to star it. A virtual <b>Favourites</b> page gathers every starred
 title from every connected device into one list — no matter which drive it lives on.</p>
 
-<div class="callout info"><div class="h">ℹ Favourites Start Mode is Manual by default</div>
-The Favourites tab ships enabled in <b>Manual</b> mode under <b>Device Settings → Favourites Start Mode</b>.
-Leave it on <b>Manual</b> to show the tab and control it yourself, switch it to <b>Auto</b> to have OPL manage it
-the same way it manages other device tabs, or set it to <b>Off</b> to hide the tab and disable R3 entirely.</div>
+<div class="callout info"><div class="h">ℹ Favourites Start Mode ships Off</div>
+The Favourites tab ships <b>Off</b> under <b>Device Settings → Favourites Start Mode</b> — set it to
+<b>Manual</b> or <b>Auto</b> before the tab appears and R3 does anything. Use <b>Manual</b> to show the tab and
+control it yourself, <b>Auto</b> to have OPL manage it the same way it manages other device tabs, or
+<b>Off</b> to hide the tab and disable R3 entirely.</div>
 
 <h2 id="quick-start">Quick start</h2>
 <div class="steps">
@@ -122,7 +123,7 @@ read.</p>
   <tbody>
     <tr><td>File name</td><td><code>favourites.bin</code> (shared OPL config dir)</td></tr>
     <tr><td>Format magic</td><td><code>OFAV</code> (0x4641464F, little-endian)</td></tr>
-    <tr><td>Format version</td><td>1</td></tr>
+    <tr><td>Format version</td><td>2 (v1 files still readable; v2 adds a per-record <code>isVcd</code> byte marking PS1/<code>.VCD</code> favourites)</td></tr>
     <tr><td>Maximum favourites</td><td>512 entries</td></tr>
     <tr><td>Maximum title length</td><td>255 characters + NUL (256 bytes)</td></tr>
     <tr><td>Import from uOPL / wOPL</td><td>Automatic, read-only (one-way carry-over)</td></tr>
@@ -138,7 +139,7 @@ read.</p>
     <tr>
       <td><b>Favourites Start Mode</b></td>
       <td>Off / Manual / Auto</td>
-      <td><b>Off</b> hides the tab and disables R3 entirely. <b>Manual</b> (default) shows the tab but does not
+      <td><b>Off</b> (default) hides the tab and disables R3 entirely. <b>Manual</b> shows the tab but does not
       auto-start into it. <b>Auto</b> behaves like Auto mode on a regular device tab.</td>
     </tr>
   </tbody>

@@ -67,7 +67,7 @@ on PSX-Place. For PS1 internals (IGR, cheats, multi-disc, config table), see the
 <div class="steps">
   <div class="step">
     <h3>Skip config on boot</h3>
-    <p>Power on your PS2 and immediately hold <code>START</code> while RiptOPL initializes. Keep it held until the interface appears. This tells OPL to skip loading the saved config and boot with defaults instead.</p>
+    <p>Power on your PS2 and immediately hold <code>START</code> while RiptOPL initializes. Keep it held until the interface appears. This tells OPL to skip loading the saved config and boot with defaults instead. Expect to land on the <b>start menu with no game-list tabs</b> — that is what the defaults look like, since every device ships off — not on a game list.</p>
   </div>
   <div class="step">
     <h3>Open and re-save settings</h3>
@@ -136,11 +136,11 @@ If you saved an incompatible GSM (Graphics Synthesizer Mode) override and your s
 <div class="steps">
   <div class="step">
     <h3>Does the device page appear at all?</h3>
-    <p>If not, it's the device enables, not VCD: USB/MX4SIO/iLink need their toggles on, and the <b>internal exFAT</b> page needs <b>BDM devices</b> + <b>BDM HDD</b> ON with the <b>APA HDD start mode OFF</b>. The two internal-HDD backends are mutually exclusive — a hand-edited or cross-version config that enables both is auto-reconciled at boot (a toast now says so; check Device Settings).</p>
+    <p>If not, it's the device enables, not VCD. Every device ships <b>OFF</b> on a fresh install, so check <b>Device Settings</b> first: USB/MX4SIO/iLink need their own toggles on <em>and</em> <b>BDM Start Mode</b> set to Manual or Auto, and the <b>internal exFAT</b> page additionally needs <b>HDD (GPT/MBR)</b> ON. The two internal-HDD backends are <b>no longer mutually exclusive</b> — APA (HDD start mode) and exFAT/BDM-ATA may both be enabled at once, since one shared ATA stack serves both, so leaving APA on does not suppress the exFAT page.</p>
   </div>
   <div class="step">
     <h3>Do PS2 ISOs list from the device?</h3>
-    <p>If yes, the filesystem/mount layer is proven working — on the WOPLSDK build the exFAT driver is <em>byte-identical</em> to wOPL's, so "works in wOPL" adds no new information past this step.</p>
+    <p>If yes, the filesystem/mount layer is proven working, so "but it works in another loader" adds no new information past this step. Both published builds — <code>PS2DEVLATESTSDK</code> (recommended) and <code>PS2DEVPINNEDSDK</code> (the digest-pinned fallback) — take their exFAT/BDM drivers from the stock ps2dev SDK, so the flavour you picked does not change this answer.</p>
   </div>
   <div class="step">
     <h3>Press L3 on the device page</h3>
@@ -184,7 +184,7 @@ If you saved an incompatible GSM (Graphics Synthesizer Mode) override and your s
   </div>
   <div class="step">
     <h3>Re-apply the equip</h3>
-    <p>With the files in place, go to <b>Settings → General Settings → BDMA Mode / BDMA Source</b>, set your desired values, and save. RiptOPL will copy the modules to <code>mc?:/POPSTARTER/</code> and record the equipped state in a marker file (compatible with POPSLoader).</p>
+    <p>With the files in place, open <b>VCD Settings</b> from the main menu — BDMA has its own page, it is not under General Settings — set <b>BDMA Source</b> / <b>BDMA Mode</b>, and save. (The two manual pickers are hidden while <b>VCD BDMA Apply on Launch</b> is ON, because that option equips automatically; turn it off to set them by hand.) RiptOPL will copy the modules to <code>mc?:/POPSTARTER/</code> and record the equipped state in a marker file (compatible with POPSLoader).</p>
   </div>
 </div>
 

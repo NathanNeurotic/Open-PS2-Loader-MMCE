@@ -118,7 +118,7 @@ PlayStation 1 titles (<code>*.VCD</code>) always boot through <b>POPSTARTER.ELF<
 
 <h2 id="neutrino-device">3. Neutrino Device picker</h2>
 
-<p>Under <b>Settings &rarr; General Settings &rarr; Neutrino Device</b> you can pin Neutrino to a specific storage device <b>type</b>, or leave it on <b>Auto</b>. This is a device <em>type</em> (not a fixed device-name slot): OPL resolves the chosen type to its live device token(s) at launch — USB / MX4SIO / HDD (exFAT) resolve to <code>massN:</code>, MMCE resolves to <code>mmceN:</code>, and HDD (APA) resolves to a <code>pfs</code> mount. It then probes <code>&lt;root&gt;:/neutrino/neutrino.elf</code> (plus case variants) on that device type only. When set to <b>Auto</b>, OPL first probes the <b>active game device</b> for a co-located <code>neutrino.elf</code>, then honours a legacy custom Neutrino ELF path, and only then falls back to the <code>mc0</code>/<code>mc1</code> candidate list.</p>
+<p>Under <b>Settings &rarr; General Settings &rarr; Neutrino Device</b> you can pin Neutrino to a specific storage device <b>type</b>, or leave it on <b>Auto</b>. This is a device <em>type</em> (not a fixed device-name slot): OPL resolves the chosen type to its live device token(s) at launch — USB / MX4SIO / HDD (exFAT) resolve to <code>massN:</code>, MMCE resolves to <code>mmceN:</code>, and HDD (APA) resolves to a <code>pfs</code> mount. It then probes <code>&lt;root&gt;:/neutrino/neutrino.elf</code> (plus case variants) on that device type only. When set to <b>Auto</b>, OPL first probes the <b>active game device</b> for a co-located <code>neutrino.elf</code>, then honours a legacy custom Neutrino ELF path, and only then falls back to the <code>mc0</code>/<code>mc1</code> candidate list. A separate <b>Game's Device</b> choice narrows the search to the active game's own device and nothing else — no legacy custom path and no memory-card fallback.</p>
 
 <p>Available choices:</p>
 <ul class="checklist">
@@ -129,13 +129,14 @@ PlayStation 1 titles (<code>*.VCD</code>) always boot through <b>POPSTARTER.ELF<
 <li><b>MMCE</b> — SD2PSX / MemCard PRO2 (resolves to <code>mmceN:</code>)</li>
 <li><b>HDD (exFAT)</b> — internal BDM/exFAT HDD (resolves to <code>massN:</code>)</li>
 <li><b>HDD (APA)</b> — internal APA HDD (resolves to a <code>pfs</code> mount)</li>
+<li><b>Game's Device</b> — resolves <em>only</em> on the active game's own device (a co-located <code>neutrino/neutrino.elf</code>); there is no legacy custom path and no <code>mc0</code>/<code>mc1</code> fallback, so a miss shows a "not found" message and aborts the launch</li>
 </ul>
 
 <p>In all cases the path searched on the chosen device type is <code>&lt;device&gt;:NEUTRINO/neutrino.elf</code> and its capitalisation variants; the leading-slash form <code>&lt;device&gt;:/neutrino/neutrino.elf</code> is also tried.</p>
 
 <h2 id="launch-args">4. Launch arguments</h2>
 
-<p>OPL always builds the <b>mandatory Neutrino arguments</b> automatically from the game and its settings — you never type these yourself:</p>
+<p>OPL always builds the <b>mandatory Neutrino arguments</b> automatically from the game and its settings — most of which you never type yourself (<code>-dbc</code>, <code>-logo</code> and <code>-gsm</code> are the three exceptions: forward one yourself and OPL drops its own copy — see the callout at the end of this section, and §5):</p>
 
 <table data-sortable>
 <thead><tr><th>Auto-emitted argument</th><th>When emitted</th></tr></thead>
@@ -169,12 +170,14 @@ Both the global and per-game Neutrino Launch Args open a <b>structured sub-scree
 
 <h3 id="args-subscreen">Structured Neutrino Args sub-screen</h3>
 
-<p>Both the <b>global</b> Neutrino Launch Args entry (<b>Settings &rarr; General Settings &rarr; Neutrino Launch Args</b>) and the <b>per-game</b> field (<b>Game Settings &rarr; Compatibility Settings &rarr; Neutrino Launch Args</b>) are buttons that open the <em>same</em> companion sub-screen. It breaks the argument string into named fields — Quick Boot (<code>-qb</code>), Working Dir (<code>-cwd</code>), Config (<code>-cfg</code>), Boot ELF (<code>-elf</code>), ATA0 Image (<code>-ata0</code>), ATA0 ID (<code>-ata0id</code>), ATA1 Image (<code>-ata1</code>), plus a free-form <b>Extra</b> field — reassembles them in a valid canonical order with <code>--b</code> kept last, and writes the result back as a single flat string: the global into <code>neutrino_args</code>, the per-game value into <code>$NeutrinoArgs</code> (each game edited independently).</p>
+<p>Both the <b>global</b> Neutrino Launch Args entry (<b>Settings &rarr; General Settings &rarr; Neutrino Launch Args</b>) and the <b>per-game</b> field (<b>Game Settings &rarr; Compatibility Settings &rarr; Neutrino Launch Args</b>) are buttons that open the <em>same</em> companion sub-screen. It breaks the argument string into named fields — Quick Boot (<code>-qb</code>), Debug Colors (<code>-dbc</code>), PS2 Logo (<code>-logo</code>), Working Dir (<code>-cwd</code>), Config (<code>-cfg</code>), Boot ELF (<code>-elf</code>), ATA0 Image (<code>-ata0</code>), ATA0 ID (<code>-ata0id</code>), ATA1 Image (<code>-ata1</code>), plus a free-form <b>Extra</b> field — reassembles them in a valid canonical order with <code>--b</code> kept last, and writes the result back as a single flat string: the global into <code>neutrino_args</code>, the per-game value into <code>$NeutrinoArgs</code> (each game edited independently).</p>
 
 <table data-sortable>
 <thead><tr><th>Field</th><th>Argument emitted</th><th>Notes</th></tr></thead>
 <tbody>
 <tr><td>Quick Boot (-qb)</td><td><code>-qb</code></td><td>Suppress Neutrino's boot screen; emitted first if enabled</td></tr>
+<tr><td>Debug Colors (-dbc)</td><td><code>-dbc</code></td><td>Neutrino's debug colour output; forwarding it here suppresses OPL's own auto-emitted copy</td></tr>
+<tr><td>PS2 Logo (-logo)</td><td><code>-logo</code></td><td>Show the PS2 logo; forwarding it here suppresses OPL's own auto-emitted copy</td></tr>
 <tr><td>Working Dir (-cwd)</td><td><code>-cwd=&lt;path&gt;</code></td><td>Override Neutrino's working directory</td></tr>
 <tr><td>Config (-cfg)</td><td><code>-cfg=&lt;path&gt;</code></td><td>Point Neutrino at an alternate config file</td></tr>
 <tr><td>Boot ELF (-elf)</td><td><code>-elf=&lt;path&gt;</code></td><td>Launch a different ELF instead of the disc boot ELF</td></tr>
@@ -185,10 +188,11 @@ Both the global and per-game Neutrino Launch Args open a <b>structured sub-scree
 </tbody>
 </table>
 
-<p>The canonical reassembly order is: <code>-qb</code> &rarr; <code>-cwd</code> &rarr; <code>-cfg</code> &rarr; <code>-elf</code> &rarr; <code>-ata0</code> &rarr; <code>-ata0id</code> &rarr; <code>-ata1</code> &rarr; Extra. The Extra slot also collects any flags the parser does not recognise, preserving them verbatim. <code>--b</code> and everything following it is always kept at the tail (those tokens are arguments forwarded to the booted ELF, not to Neutrino itself).</p>
+<p>The canonical reassembly order is: <code>-qb</code> &rarr; <code>-dbc</code> &rarr; <code>-logo</code> &rarr; <code>-cwd</code> &rarr; <code>-cfg</code> &rarr; <code>-elf</code> &rarr; <code>-ata0</code> &rarr; <code>-ata0id</code> &rarr; <code>-ata1</code> &rarr; Extra. The Extra slot also collects any flags the parser does not recognise, preserving them verbatim. <code>--b</code> and everything following it is always kept at the tail (those tokens are arguments forwarded to the booted ELF, not to Neutrino itself).</p>
 
 <div class="callout info"><div class="h">ℹ Auto-emitted flags are never typed</div>
-<code>-bsd</code>, <code>-dvd</code>, <code>-gc</code>, <code>-gsm</code>, <code>-mc0</code>/<code>-mc1</code>, <code>-dbc</code>, and <code>-logo</code> are always constructed from the game settings by OPL. Do not enter them in the Extra field or the Launch Args text box — doing so produces a duplicate that Neutrino may reject or misinterpret. Use the dedicated UI controls (compat modes, Neutrino Video picker, VMC slots, etc.) to set those values instead.
+<code>-bsd</code>, <code>-dvd</code>, <code>-gc</code>, and <code>-mc0</code>/<code>-mc1</code> are always constructed from the game settings by OPL. Do not enter them in the Extra field or the Launch Args text box — doing so produces a duplicate that Neutrino may reject or misinterpret. Use the dedicated UI controls (compat modes, VMC slots, etc.) to set those values instead.
+<p><code>-dbc</code>, <code>-logo</code>, and <code>-gsm</code> are the exceptions: they have dedicated controls (the <b>Debug Colors</b> and <b>PS2 Logo</b> toggles in the args sub-screen, and the <b>Neutrino Video</b> picker), and if you do forward one of them yourself OPL suppresses its own auto-emitted copy so exactly one reaches Neutrino. A copy disabled with a leading <code>$</code> does not count as forwarded, so OPL still emits its own in that case.</p>
 </div>
 
 <h2 id="neutrino-video">5. Per-game Neutrino Video (-gsm)</h2>
@@ -212,9 +216,11 @@ Both the global and per-game Neutrino Launch Args open a <b>structured sub-scree
 <div class="callout info"><div class="h">i The “1080p impression” trick</div>On 1080-class displays,
 <b>1080i x3</b> (<code>-gsm=1080ix3</code>) is the community workaround for progressive-looking output —
 the same effect previously reached by launching Neutrino from PS2BBLE/OSDmenu with
-<code>-gsm=1080ix3</code>. Set it per game, or globally and leave games on “Default”. True 1080p does
-not exist in any OPL/GS mode table — the GS outputs <code>1080i</code>, and OPL's own UI lacks the
-VRAM for a 1080p framebuffer.</div>
+<code>-gsm=1080ix3</code>. Set it per game, or globally and leave games on “Default”. True 1080p is not
+one of Neutrino's <code>-gsm</code> modes — the GS outputs <code>1080i</code>, and OPL's own UI lacks the
+VRAM for a 1080p framebuffer. (An experimental forced-1080p raster exists on the <em>OPL</em> core
+only, compiled into the separate <code>RIPTOPL-PS2DEVLATESTSDK-1080p.ELF</code> release asset and
+nothing else.)</div>
 <p>The picker is the <em>default</em> source for <code>-gsm</code>. If you manually type <code>-gsm=&lt;value&gt;</code> into the <b>Neutrino Launch Args</b> field, that value wins — OPL emits only one <code>-gsm</code> argument, because Neutrino aborts on a duplicate or malformed value.</p>
 
 <h3 id="mode7">Mode 7 — fix IOP buffer overrun (<code>-gc=7</code>)</h3>
@@ -242,12 +248,12 @@ VRAM for a 1080p framebuffer.</div>
 <p>The screen is unchanged from classic OPL. The Neutrino Launch Args field and Neutrino Video picker are greyed (they are never read on the OPL path). Mode 7 is greyed. Modes 4 and 6 are available as usual.</p>
 
 <details class="deep"><summary>What does Neutrino actually honor from OPL's per-game settings?</summary>
-<p>Neutrino honors: the storage backend + image path (<code>-bsd</code> / <code>-dvd</code>, automatic), the compat mode subset that maps to <code>-gc</code> (Modes 1/2/3/5/7), VMC via <code>-mc0</code>/<code>-mc1</code> (BDM/MMCE/UDPFS — not APA HDD), <code>-logo</code> (PS2 logo), <code>-dbc</code> (debug colors), the Neutrino Video picker (<code>-gsm</code>; per-game with a global default in Settings), and the free-text <b>Neutrino Launch Args</b> field. It does <b>not</b> honor: Cheats (OPL patches EE RAM), OPL GSM (OPL patches the GS registers), IGR/IGS (OPL's in-game reset hook), PADEMU (OPL's USB gamepad emulation), or OSD Language — all are OPL-embedded-core features with no Neutrino equivalent.</p>
+<p>Neutrino honors: the storage backend + image path (<code>-bsd</code> / <code>-dvd</code>, automatic), the compat mode subset that maps to <code>-gc</code> (Modes 1/2/3/5/7), VMC via <code>-mc0</code>/<code>-mc1</code> (BDM/MMCE/UDPFS — not APA HDD), <code>-logo</code> (PS2 logo), <code>-dbc</code> (debug colors), the Neutrino Video picker (<code>-gsm</code>; per-game with a global default in Settings), and the free-text <b>Neutrino Launch Args</b> field. It does <b>not</b> honor: Cheats (OPL patches EE RAM), OPL GSM (OPL patches the GS registers), IGR (OPL's in-game reset hook), PADEMU (OPL's USB gamepad emulation), or OSD Language — all are OPL-embedded-core features with no Neutrino equivalent.</p>
 </details>
 
 <h2 id="network-boot">7. Network boot — UDPBD / UDPFS</h2>
 
-<p>UDPBD and UDPFS stream games from a PC over the LAN as network block devices. Both protocols appear in OPL as a single <b>UDPBD Games</b> list with covers and per-game settings. Because there is no OPL cdvdman backend for network block devices, these games <b>always and only launch via Neutrino</b> — OPL forces the Neutrino core automatically, and if <code>neutrino.elf</code> is missing it warns and returns to the menu (there is no <code>&lt;OPL&gt;</code> fallback).</p>
+<p>UDPBD and UDPFS stream games from a PC over the LAN as network block devices. The block protocols (UDPBD and UDPFS-Image) share the BDM block tab — labelled <b>UDPBD Games</b> or <b>UDPFSBD Games</b> depending on which one is active — while UDPFS-Files is a separate filesystem device with its own <b>UDPFS Games</b> tab. Only one can be active per boot anyway (a single NIC), so the two never appear side by side. Either list carries covers and per-game settings. Because there is no OPL cdvdman backend for network block devices, these games <b>always and only launch via Neutrino</b> — OPL forces the Neutrino core automatically, and if <code>neutrino.elf</code> is missing it warns and returns to the menu (there is no <code>&lt;OPL&gt;</code> fallback).</p>
 
 <p>Full setup, server instructions, and the UDPBD vs UDPFS protocol comparison are on the <a href="network-boot.html">Network Boot</a> page.</p>
 

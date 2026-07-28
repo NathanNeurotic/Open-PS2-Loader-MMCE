@@ -111,8 +111,10 @@ and POPSTARTER locates the matching <code>*.VCD</code> file itself.</p>
 
 <h3>POPSTARTER.ELF path</h3>
 <p>By default RiptOPL looks for <code>POPSTARTER.ELF</code> in each device's <code>POPS</code>
-folder. To use one specific copy for all devices, set
-<b>Settings → General Settings → POPSTARTER.ELF Path</b>. The on-screen editor caps at 31
+folder. To pin it to one device instead, set
+<b>Settings → VCD Settings → POPSTARTER.ELF Device</b> — Default, Memory Card, USB, MX4SIO, MMCE,
+HDD (exFAT), HDD (APA), Custom, or Game's Device. The free-text <b>POPSTARTER.ELF Path</b> field
+below it only appears when the Device is set to <b>Custom</b>. The on-screen editor caps at 31
 characters; for a longer path set <code>popstarter_path</code> in
 <code>settings_riptopl.cfg</code> directly.</p>
 
@@ -147,19 +149,25 @@ launched; it just won't auto-match art by ID.
 
 <p>POPSTARTER's stock FAT driver reads FAT32 only. To boot PS1 games from an <b>exFAT</b> drive,
 POPSTARTER needs extra block-device modules (the BDMAssault / "BDMA" drivers). RiptOPL
-<em>equips</em> them onto your memory card from <b>General Settings</b> — you supply the module
-files, RiptOPL copies the right pair to <code>mc?:/POPSTARTER/</code> when you change the
-setting.</p>
+<em>equips</em> them onto your memory card from <b>Settings → VCD Settings</b> — you supply the module
+files, RiptOPL copies the right pair to <code>mc?:/POPSTARTER/</code>. <b>VCD BDMA Apply on Launch</b>
+ships <b>On</b>, so by default the matching pair is equipped automatically immediately before each VCD
+launch and the manual <b>BDMA Source</b> / <b>BDMA Mode</b> pickers stay hidden; turn it <b>Off</b> to
+equip by hand instead.</p>
 
 <div class="callout info"><div class="h">ℹ You supply the BDMA module files</div>
-RiptOPL embeds none of the BDMA modules (no ELF bloat). The module files must be present in the
-<code>POPS/</code> folder of whichever device you select as the <b>BDMA Source</b>. The release
+RiptOPL embeds none of the BDMA modules (no ELF bloat). The module files must be present in a
+<code>POPS/</code> folder RiptOPL can read: with <b>VCD BDMA Apply on Launch</b> <b>On</b> (the
+default) that is the game's own device; with it <b>Off</b>, whichever device you select as the
+<b>BDMA Source</b>. RiptOPL also pre-checks your boot device's <code>POPS/</code> folder — and the
+folder holding a custom <code>POPSTARTER.ELF</code>, if you set one — ahead of either. The release
 <code>POPS/</code> folder includes what ships with the build; check the
 <a href="releases.html">Releases</a> page for details.
 </div>
 
 <h3>BDMA Mode</h3>
-<p>Selects which driver variant POPSTARTER should use:</p>
+<p>Shown only when <b>VCD BDMA Apply on Launch</b> is <b>Off</b>. Selects which driver variant
+POPSTARTER should use:</p>
 <table data-sortable>
   <thead><tr><th>BDMA Mode value</th><th>Effect</th></tr></thead>
   <tbody>
@@ -172,8 +180,10 @@ RiptOPL embeds none of the BDMA modules (no ELF bloat). The module files must be
 </table>
 
 <h3>BDMA Source</h3>
-<p>Selects which device RiptOPL reads the module files from (the device whose <code>POPS/</code>
-folder holds the variant you want to equip): <b>USB</b>, <b>MX4SIO</b>, <b>MMCE</b>, or
+<p>Shown only when <b>VCD BDMA Apply on Launch</b> is <b>Off</b> — with it <b>On</b> the source is
+the game's own device family instead. Selects which device RiptOPL reads the module files from (the
+device whose <code>POPS/</code> folder holds the variant you want to equip): <b>USB</b>,
+<b>MX4SIO</b>, <b>MMCE</b>, or
 <b>Internal HDD</b>. RiptOPL identifies the device by its block-device <em>driver</em>
 (<code>usb</code> / <code>mx4sio</code> / <code>ata</code> / <code>mmce</code>) and reads from that
 specific device, so pick the one your module files actually sit on. For an internally attached exFAT
@@ -191,8 +201,13 @@ volume mounted through the BDM mass-device namespace, never a typed <code>ata0:<
     device you will select as the Source (USB, MX4SIO, MMCE, or the internal HDD).</p>
   </div>
   <div class="step">
+    <h3>Turn VCD BDMA Apply on Launch off</h3>
+    <p>In <b>Settings → VCD Settings</b>, set <b>VCD BDMA Apply on Launch</b> to <b>Off</b>. The
+    <b>BDMA Source</b> and <b>BDMA Mode</b> pickers are hidden while it is On (the default).</p>
+  </div>
+  <div class="step">
     <h3>Set BDMA Source</h3>
-    <p>In <b>Settings → General Settings</b>, set <b>BDMA Source</b> to the device that holds the
+    <p>In <b>Settings → VCD Settings</b>, set <b>BDMA Source</b> to the device that holds the
     module files.</p>
   </div>
   <div class="step">
