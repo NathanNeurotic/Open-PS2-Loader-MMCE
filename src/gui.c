@@ -1398,23 +1398,23 @@ void guiShowDeviceConfig(void)
         }
 
         /*
-          Turning SMB2 on needs a word of explanation, or it reads as broken.
+          Turning SMB2 on changes BOTH SMB paths, so say so: browsing switches from the stock
+          SMBv1 smbman.irx to smb2man (ethsupport.c picks by gSMBDialect), and the in-game reader
+          switches to smb2.c. The whole session is SMB2 -- the server does not need SMBv1 at all.
 
-          SMB2 currently covers the IN-GAME reader only. Browsing the share -- listing games, cover
-          art, per-game configs -- still goes through the stock SMBv1 smbman.irx, so the server must
-          keep SMBv1 reachable or OPL shows an empty list and the user never reaches a launch at
-          all. That is the opposite of what someone enabling SMB2 expects, and it is precisely the
-          "nothing happens" failure the UDPFS/UDPBD hints above exist to prevent.
+          Worth telling the user because the dialect only takes effect on the next boot, and
+          because a server that ONLY speaks SMBv1 (including RiptOPL's own bundled PC server tool)
+          will stop listing games entirely under this setting -- which would otherwise look like a
+          regression rather than a configuration mismatch.
 
-          English literal rather than a lang label, matching the untranslated row labels in this same
-          dialog ("Protocol", "Access", "SMB Version") and avoiding an insert into the
-          position-indexed .lng tables. Fold into a label when the browse side lands and this caveat
-          goes away.
+          English literal rather than a lang label, matching the untranslated row labels in this
+          same dialog ("Protocol", "Access", "SMB Version") and avoiding an insert into the
+          position-indexed .lng tables.
         */
         if (gNetworkProtocol == NET_PROTO_SMB && gSMBDialect == SMB_DIALECT_SMB2 && gSMBDialect != smbDialectWas)
-            guiMsgBox("SMB2 applies to in-game reading only.\n"
-                      "Browsing the share still uses SMBv1, so the\n"
-                      "server must keep SMBv1 enabled for now.",
+            guiMsgBox("SMB2 applies to browsing AND in-game reading.\n"
+                      "Your server must speak SMB2 -- an SMBv1-only\n"
+                      "server will list no games under this setting.",
                       0, NULL);
 
         // Each network transport loads its IOP module chain once per boot (the load latch is not cleared

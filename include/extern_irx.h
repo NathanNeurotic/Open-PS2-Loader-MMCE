@@ -135,6 +135,7 @@ IMPORT_BIN2C(smb_cdvdman_irx);
 IMPORT_BIN2C(smbinit_irx);
 
 IMPORT_BIN2C(smbman_irx);
+IMPORT_BIN2C(smb2man_irx); // SMB2/SMB3 browse driver; loaded instead of smbman when gSMBDialect == SMB2
 
 IMPORT_BIN2C(smsutils_irx);
 
