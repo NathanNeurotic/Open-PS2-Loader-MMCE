@@ -391,6 +391,112 @@ static int smb2man_getstat(iop_file_t *f, const char *filename, iox_stat_t *stat
 }
 
 //-------------------------------------------------------------------------
+// Does `name` already exist as a directory on the share? Used to tell "mkdir failed because it is
+// already there" (benign, and the common case) from a real failure. Takes the lock itself, so it
+// must only be called with the lock RELEASED.
+static int smb2man_stat_exists(const char *name)
+{
+    char path[MAX_PATH_LEN];
+    struct smb2_stat_64 st;
+    int rv;
+
+    LOCK();
+
+    smb2man_fixpath(path, name, sizeof(path));
+    rv = smb2_stat(smb2, path, &st);
+
+    UNLOCK();
+
+    return (rv == 0 && st.smb2_type == SMB2_TYPE_DIRECTORY);
+}
+
+// OPL calls sbCreateFolders() on every activated device root (ethsupport.c), which issues a burst
+// of mkdir()s for CFG/THM/LNG/ART/CD/DVD/VMC. While these were nulldev stubs returning -EIO, an
+// SMB2 share got NONE of them: per-game configs, cover art and themes had nowhere to live unless
+// the user happened to have created the folders by hand, and OPL logged a failure for each. The
+// SMB1 smbman has always implemented these, so this is dialect parity, not new surface.
+static int smb2man_mkdir(iop_file_t *f, const char *dirname, int mode)
+{
+    char path[MAX_PATH_LEN];
+    int rv;
+
+    (void)mode; // no POSIX mode bits over SMB
+
+    if (smb2 == NULL || !share_open)
+        return -ENODEV;
+
+    LOCK();
+
+    smb2man_fixpath(path, dirname, sizeof(path));
+    rv = smb2_mkdir(smb2, path);
+
+    UNLOCK();
+
+    // EEXIST is the normal steady state -- sbCreateFolders re-runs on every device refresh and
+    // must not be made to look like a failure once the folders are already there.
+    if (rv < 0)
+        return (smb2man_stat_exists(dirname)) ? 0 : -EIO;
+
+    return 0;
+}
+
+static int smb2man_rmdir(iop_file_t *f, const char *dirname)
+{
+    char path[MAX_PATH_LEN];
+    int rv;
+
+    if (smb2 == NULL || !share_open)
+        return -ENODEV;
+
+    LOCK();
+
+    smb2man_fixpath(path, dirname, sizeof(path));
+    rv = smb2_rmdir(smb2, path);
+
+    UNLOCK();
+
+    return (rv < 0) ? -EIO : 0;
+}
+
+static int smb2man_remove(iop_file_t *f, const char *filename)
+{
+    char path[MAX_PATH_LEN];
+    int rv;
+
+    if (smb2 == NULL || !share_open)
+        return -ENODEV;
+
+    LOCK();
+
+    smb2man_fixpath(path, filename, sizeof(path));
+    rv = smb2_unlink(smb2, path);
+
+    UNLOCK();
+
+    return (rv < 0) ? -EIO : 0;
+}
+
+static int smb2man_rename(iop_file_t *f, const char *oldname, const char *newname)
+{
+    char oldpath[MAX_PATH_LEN];
+    char newpath[MAX_PATH_LEN];
+    int rv;
+
+    if (smb2 == NULL || !share_open)
+        return -ENODEV;
+
+    LOCK();
+
+    smb2man_fixpath(oldpath, oldname, sizeof(oldpath));
+    smb2man_fixpath(newpath, newname, sizeof(newpath));
+    rv = smb2_rename(smb2, oldpath, newpath);
+
+    UNLOCK();
+
+    return (rv < 0) ? -EIO : 0;
+}
+
+//-------------------------------------------------------------------------
 static void smb2man_teardown(void)
 {
     if (smb2 != NULL) {
@@ -591,15 +697,15 @@ static iop_device_ops_t smb2man_ops = {
     &smb2man_write,
     &smb2man_lseek,
     (void *)&smb2man_nulldev, // ioctl
-    (void *)&smb2man_nulldev, // remove
-    (void *)&smb2man_nulldev, // mkdir
-    (void *)&smb2man_nulldev, // rmdir
+    &smb2man_remove,
+    &smb2man_mkdir,
+    &smb2man_rmdir,
     &smb2man_dopen,
     &smb2man_dclose,
     &smb2man_dread,
     &smb2man_getstat,
     (void *)&smb2man_nulldev, // chstat
-    (void *)&smb2man_nulldev, // rename
+    &smb2man_rename,
     (void *)&smb2man_nulldev, // chdir
     (void *)&smb2man_nulldev, // sync
     (void *)&smb2man_nulldev, // mount
