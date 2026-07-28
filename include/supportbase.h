@@ -110,6 +110,14 @@ int sbLoadCheats(const char *path, const char *file);
 const char *sbGetCheatSearchLog(void);
 // Localized "no cheats found" text with the probed locations appended (#265). Static buffer.
 const char *sbCheatsNotFoundText(void);
+/*
+  Confirm dialog for a failed cheat load (#265). 1 = continue the launch, 0 = user cancelled and the
+  caller MUST return immediately. On cancel this calls sbUnprepare(pCommon) itself -- without that
+  the patch zone stays modified and the NEXT launch's sbPrepare cannot find it.
+  pCommon is NOT always &settings->common: eth/hdd/udpfs run this before `settings` is assigned and
+  must pass ((u8 *)irx + index) directly.
+*/
+int sbCheatsMissingContinue(void *pCommon, int cheatResult);
 int sbLoadImage(const char *path, const char *file);
 
 #endif

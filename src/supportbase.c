@@ -1515,6 +1515,46 @@ const char *sbCheatsNotFoundText(void)
     return msg;
 }
 
+/*
+  Offer the user a way OUT of the launch when cheats did not load (#265).
+
+  Previously the launch legs showed a 10-frame toast and carried straight on into the game, so a
+  user who had just noticed "no cheats found" had no choice but to sit through the load and reset
+  the console. Now it is a confirm: accept launches anyway, cancel returns to the menu.
+
+  THE UNWIND IS THE WHOLE POINT OF THIS HELPER. Every leg reaches the cheat check AFTER
+  sbPrepare(), which finds its patch zone by SEARCHING THE IRX IMAGE for the sample pattern in
+  cdvdman_settings_common_sample. Returning to the menu without restoring that pattern would leave
+  the zone unrecognisable, and the NEXT launch's sbPrepare would fail to locate it -- so a single
+  cancel would break every subsequent launch until reboot. Doing it here rather than in five call
+  sites means no leg can forget.
+
+  pCommon must be the settings' common block. NOTE it is NOT always &settings->common: in
+  ethsupport, hddsupport and udpfssupport the cheat check runs BEFORE `settings` is assigned, so
+  those legs pass the same expression sbPrepare's index yields, ((u8 *)irx + index).
+
+  Returns 1 to continue the launch, 0 if the user cancelled (caller must return immediately).
+*/
+int sbCheatsMissingContinue(void *pCommon, int cheatResult)
+{
+    const char *text = (cheatResult == -ENOENT) ? sbCheatsNotFoundText() : _l(_STR_ERR_CHEATS_LOAD_FAILED);
+
+    // Autolaunch has no user at the pad; never block an unattended boot on a prompt.
+    if ((gAutoLaunchGame != NULL) || (gAutoLaunchBDMGame != NULL)) {
+        LOG("Cheats error (autolaunch: continuing)\n");
+        return 1;
+    }
+
+    // guiMsgBox: 2 == accept (gSelectButton), 1 == the other button. addAccept draws both icons.
+    if (guiMsgBox(text, 1, NULL) == 2)
+        return 1;
+
+    sbUnprepare(pCommon);
+    LOG("Cheats error: user cancelled the launch\n");
+
+    return 0;
+}
+
 int sbLoadCheats(const char *path, const char *file)
 {
     // 64 was too small for BDM device prefixes (up to BDM_PREFIX_MAX) plus

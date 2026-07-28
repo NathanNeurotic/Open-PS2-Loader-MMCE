@@ -1175,16 +1175,10 @@ void bdmLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
     settings->common.zso_cache = bdmCacheSize;
 
     if ((result = sbLoadCheats(pDeviceData->bdmPrefix, game->startup)) < 0) {
-        if (gAutoLaunchBDMGame == NULL) {
-            switch (result) {
-                case -ENOENT:
-                    guiWarning(sbCheatsNotFoundText(), 10); // #265: name the paths actually probed
-                    break;
-                default:
-                    guiWarning(_l(_STR_ERR_CHEATS_LOAD_FAILED), 10);
-            }
-        } else
-            LOG("Cheats error\n");
+        // #265: let the user back out instead of sitting through the whole load. The helper does
+        // the sbUnprepare itself -- see include/supportbase.h; skipping it breaks the NEXT launch.
+        if (!sbCheatsMissingContinue(&settings->common, result))
+            return;
     }
     sbLoadImage(pDeviceData->bdmPrefix, game->startup);
 
