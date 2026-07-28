@@ -13,7 +13,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    container: ps2max/dev:v20250725-2
+    container: ps2dev/ps2dev@sha256:c64ae69c9817865ed98ff054e4ae5360b9e280ed952c97946bca95d9d35be995
     steps:
       - name: git checkout
         uses: actions/checkout@v6
@@ -27,7 +27,7 @@ jobs:
 
       - name: Install newer-generation freepad (#254 pad death)
         # The GameID mmceman load kills pad input with these containers' stock freepad
-        # builds (PixeliGer: dead cursor, live menu, WOPLSDK+PS2MAXSDK). The ps2max job
+        # builds (PixeliGer: dead cursor, live menu). The digest-pinned job
         # in compilation.yml runs in the SAME container -- swap there too. Vendored
         # newer-generation bytes (modules/freepad/PROVENANCE.md), fail-loud checks.
         run: sh ./.github/scripts/install_coherent_freepad.sh
@@ -143,7 +143,7 @@ jobs:
         extra: [EXTRA_FEATURES=0, EXTRA_FEATURES=1]
         pademu: [PADEMU=0, PADEMU=1]
     runs-on: ubuntu-latest
-    container: ps2max/dev:v20250725-2
+    container: ps2dev/ps2dev@sha256:c64ae69c9817865ed98ff054e4ae5360b9e280ed952c97946bca95d9d35be995
     steps:
       - name: git checkout
         uses: actions/checkout@v6
@@ -157,7 +157,7 @@ jobs:
 
       - name: Install newer-generation freepad (#254 pad death)
         # The GameID mmceman load kills pad input with these containers' stock freepad
-        # builds (PixeliGer: dead cursor, live menu, WOPLSDK+PS2MAXSDK). The ps2max job
+        # builds (PixeliGer: dead cursor, live menu). The digest-pinned job
         # in compilation.yml runs in the SAME container -- swap there too. Vendored
         # newer-generation bytes (modules/freepad/PROVENANCE.md), fail-loud checks.
         run: sh ./.github/scripts/install_coherent_freepad.sh
@@ -294,7 +294,7 @@ jobs:
 
   build-lang:
     runs-on: ubuntu-latest
-    container: ps2max/dev:v20250725-2
+    container: ps2dev/ps2dev@sha256:c64ae69c9817865ed98ff054e4ae5360b9e280ed952c97946bca95d9d35be995
     steps:
       - name: git checkout
         uses: actions/checkout@v6
@@ -383,9 +383,9 @@ jobs:
       fail-fast: false
       matrix:
         debug: [iopcore_debug, ingame_debug, eesio_debug, iopcore_ppctty_debug, ingame_ppctty_debug, DTL_T10000=1]
-        container_commit: [":v20250725-2"]
+        container_commit: ["@sha256:c64ae69c9817865ed98ff054e4ae5360b9e280ed952c97946bca95d9d35be995"]
     runs-on: ubuntu-latest
-    container: ps2max/dev${{ matrix.container_commit }}
+    container: ps2dev/ps2dev${{ matrix.container_commit }}
     steps:
       - name: git checkout
         uses: actions/checkout@v6
@@ -399,7 +399,7 @@ jobs:
 
       - name: Install newer-generation freepad (#254 pad death)
         # The GameID mmceman load kills pad input with these containers' stock freepad
-        # builds (PixeliGer: dead cursor, live menu, WOPLSDK+PS2MAXSDK). The ps2max job
+        # builds (PixeliGer: dead cursor, live menu). The digest-pinned job
         # in compilation.yml runs in the SAME container -- swap there too. Vendored
         # newer-generation bytes (modules/freepad/PROVENANCE.md), fail-loud checks.
         run: sh ./.github/scripts/install_coherent_freepad.sh

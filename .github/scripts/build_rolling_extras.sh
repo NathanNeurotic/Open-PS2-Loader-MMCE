@@ -4,7 +4,7 @@
 #   * the debug configs                          -> rolling/debug/
 #
 # Called by EACH SDK build job in rolling-release.yml. $1 is the SDK suffix appended to each
-# filename: "-PS2MAXSDK" for the pinned ps2max
+# filename: "-PS2DEVPINNEDSDK" for the digest-pinned ps2dev snapshot
 # build, "-PS2DEVLATESTSDK" for the ps2dev:latest build -- so the VARIANTS and DEBUG zips carry
 # every SDK flavour of every build. $2 is the LOCALVERSION
 # toolchain brand ("PS2MAXSDK"/"PS2DEVLATESTSDK") embedded in each ELF's version string: filenames get renamed
