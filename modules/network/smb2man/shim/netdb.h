@@ -9,16 +9,16 @@
 #include <ps2ip.h>
 
 #ifndef EAI_AGAIN
-#define EAI_AGAIN    -3
+#define EAI_AGAIN -3
 #endif
 #ifndef EAI_FAIL
-#define EAI_FAIL     -4
+#define EAI_FAIL -4
 #endif
 #ifndef EAI_NONAME
-#define EAI_NONAME   -2
+#define EAI_NONAME -2
 #endif
 #ifndef EAI_MEMORY
-#define EAI_MEMORY   -10
+#define EAI_MEMORY -10
 #endif
 
 struct protoent

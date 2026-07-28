@@ -19,23 +19,23 @@
 #ifndef SMB2MAN_CONFIG_H
 #define SMB2MAN_CONFIG_H
 
-#define HAVE_STDINT_H  1
-#define HAVE_STDIO_H   1
-#define HAVE_STDLIB_H  1
-#define HAVE_STRING_H  1
-#define HAVE_ERRNO_H   1
-#define HAVE_TIME_H    1
-#define HAVE_UNISTD_H  1
-#define HAVE_FCNTL_H   1
+#define HAVE_STDINT_H    1
+#define HAVE_STDIO_H     1
+#define HAVE_STDLIB_H    1
+#define HAVE_STRING_H    1
+#define HAVE_ERRNO_H     1
+#define HAVE_TIME_H      1
+#define HAVE_UNISTD_H    1
+#define HAVE_FCNTL_H     1
 #define HAVE_SYS_TYPES_H 1
 
 /* ps2ip provides the BSD socket API surface libsmb2 needs. */
-#define HAVE_SYS_SOCKET_H  1
-#define HAVE_NETINET_IN_H  1
-#define HAVE_NETINET_TCP_H 1
-#define HAVE_ARPA_INET_H   1
-#define HAVE_NETDB_H       1
-#define HAVE_ADDRINFO      1
+#define HAVE_SYS_SOCKET_H     1
+#define HAVE_NETINET_IN_H     1
+#define HAVE_NETINET_TCP_H    1
+#define HAVE_ARPA_INET_H      1
+#define HAVE_NETDB_H          1
+#define HAVE_ADDRINFO         1
 #define HAVE_SOCKADDR_STORAGE 1
 
 /* HAVE_LINGER is deliberately OFF: this lwIP build has no struct linger. libsmb2 uses it only to
