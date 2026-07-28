@@ -89,7 +89,29 @@ struct pad_data_t
     unsigned char rumbleSmall; // 1 = drive the small engine too (bumps); taps are big-ERM-only
     int rumbleMsLeft;          // ms remaining; ticked down in readPads() (see the ms-vs-frames note there)
     int realignDelay;          // backoff for the actuator-alignment self-heal (padRumbleRealign)
+    u32 readMissMs;            // ms accumulated since the last successful read (see readPad's hold-carry)
 };
+
+/*
+  How long a still-connected pad's held buttons may be carried across failed reads, in MILLISECONDS.
+
+  Time, not frames: readPads() is called once per rendered frame, frames lengthen under exactly the
+  SIO2 contention that causes the misses, and a few call sites poll it more than once per frame. A
+  frame counter would therefore mean anything from 50 ms to several seconds. time_since_last is
+  already computed for the rumble/repeat timers, so bounding in ms is free and honest.
+
+  48 ms is chosen to sit UNDER the fastest key-repeat interval OPL ever uses for list movement
+  (gScrollSpeed "fast" = 100 ms, gui.c). That matters because the carry keeps getKeyPressed() true,
+  which keeps delaycnt counting down -- so if the window were longer than a repeat interval, a
+  release that landed inside a miss burst could emit repeats the user never asked for, which is the
+  very symptom this is meant to remove. Under the interval, at most one carried poll can sit inside
+  any repeat cycle.
+
+  Residual, stated rather than hidden: the colour picker runs a 1 ms repeat (dia.c), so a release
+  inside a burst can still cost a couple of extra steps there. That is bounded, cosmetic, and
+  reversible by the user, unlike the menu-wide input loss it replaces.
+*/
+#define PAD_READ_CARRY_MS 48
 
 // Pad commands are asynchronous. Keep every wait bounded so a transient SIO2/pad error cannot hang the
 // GUI thread, then retry DualShock recovery periodically for as long as the controller remains digital.
@@ -426,6 +448,7 @@ static int readPad(struct pad_data_t *pad)
         LOG("PAD pad %d,%d connected\n", pad->port, pad->slot);
         pad->analogCapable = -1;
         pad->analogRetryDelay = 0;
+        pad->readMissMs = 0;
         initializePad(pad);
     }
     // The pad may transit from any state to disconnected. So check only for the disconnected state.
@@ -433,6 +456,12 @@ static int readPad(struct pad_data_t *pad)
         LOG("PAD pad %d,%d disconnected\n", pad->port, pad->slot);
         pad->analogCapable = -1;
         pad->analogRetryDelay = 0;
+        // Drop any held buttons immediately on unplug rather than carrying them for the tolerance
+        // window: a real disconnect is not a transient miss, and the state gate below already stops
+        // contributing -- this just makes a re-plug start from a clean slate.
+        pad->readMissMs = 0;
+        pad->paddata = 0;
+        pad->oldpaddata = 0;
     }
 
     if ((pad->state == PAD_STATE_STABLE) || (pad->state == PAD_STATE_FINDCTP1)) {
@@ -490,6 +519,8 @@ static int readPad(struct pad_data_t *pad)
     }
 #endif
     if (padsRead > 0) {
+        pad->readMissMs = 0;
+
         newpdata = readLeftJoy(pad, newpdata);
 
         if (newpdata != 0x0) // something
@@ -502,6 +533,52 @@ static int readPad(struct pad_data_t *pad)
 
         // merge into the global vars
         paddata |= pad->paddata;
+    } else if ((pad->state == PAD_STATE_STABLE || pad->state == PAD_STATE_FINDCTP1) &&
+               pad->paddata != 0 && pad->readMissMs < PAD_READ_CARRY_MS) {
+        /*
+          TRANSIENT READ MISS -- carry the held buttons forward (#272, and the scroll-skip half of #271).
+
+          padRead() returns 0 whenever freepad has nothing fresh, which on real hardware happens
+          regularly: the pads share the SIO2 bus with the memory-card slots and MMCE, so cover-art and
+          config traffic makes reads intermittently come back empty. That is why this only shows up on
+          console and never in an emulator, and why it gets worse the more games (and therefore art
+          loads) are in the list.
+
+          Before this, a miss simply skipped the merge below, and since readPads() zeroes the global
+          `paddata` every frame, the pad's held bits vanished for that frame. Two bugs fell out of it,
+          both of which were reported as separate issues:
+
+            1. getKeyPressed() read false, so readPads()' loop reset delaycnt to the FULL initial delay.
+               Holding a direction re-armed the initial delay on every miss, so the auto-repeat leg
+               often never fired at all -- "sluggish and heavy, I have to press the D-pad several times
+               to move one item" (#272).
+            2. The next successful frame saw the bit set with the previous frame clear, so getKeyOn()
+               fired a fresh EDGE. One physical hold produced extra discrete moves -- the "scrolling
+               skips 2 to 3 games" half of #271.
+
+          Carrying pad->paddata into the GLOBAL paddata fixes both: getKeyPressed() stays true so the
+          repeat timer keeps running, and the bit never disappears, so the recovery frame is not an
+          edge. (Note the mechanism is the global staying set -- NOT pad->oldpaddata, which is written
+          but never read anywhere in the tree. Do not "simplify" this by clearing pad->paddata on a
+          miss in the belief that pad->oldpaddata protects the edge; it does not.)
+
+          Bounded three ways, because this synthesises input and must never invent a hold the user is
+          not performing:
+            - only while the pad still reports a ready state (an unplug drops to PAD_STATE_DISCONN and
+              stops contributing at once);
+            - only while something was actually held -- carrying an all-zero paddata is pointless and
+              would just keep a released pad "alive";
+            - only for PAD_READ_CARRY_MS of accumulated miss time, which is deliberately shorter than
+              the fastest repeat interval so a release inside a burst cannot manufacture list movement.
+
+          rcode is set for the same reason a real read sets it: guiReadPads() treats readPads() == 0 as
+          "user idle" and uses it to release background art/config IO (gui.c, guiInactiveFrames). A
+          carried hold that reported idle would schedule card traffic into precisely the SIO2 stall
+          this branch exists to ride out -- making the stall worse and the fix self-defeating.
+        */
+        pad->readMissMs += time_since_last;
+        paddata |= pad->paddata;
+        rcode = 1;
     }
 
     return rcode;
