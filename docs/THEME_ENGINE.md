@@ -120,7 +120,7 @@ Every element block starts with `type=<ElementType>` (see §5). Most also accept
 | `y` | int or `POS_MID` | element-specific | Negative = measured from the **bottom** edge. `POS_MID` = vertical center. |
 | `width` | int or `DIM_INF` | element-specific | `DIM_INF` = full screen width. |
 | `height` | int or `DIM_INF` | element-specific | `DIM_INF` = full screen height. |
-| `aligned` | `0` / `1` | element-specific | `0` = anchor top-left, `1` = center on (x, y). |
+| `aligned` | `0` / `1` / `2` | element-specific | `0` = anchor top-left, `1` = center on (x, y), `2` = right-justified + vertically centered (wOPL/uOPL key; regular OPL renders it centered). |
 | `scaled` | `0` / `1` | element-specific | `0` = raw pixels, `1` = ratio-correct (handles widescreen + pixel-aspect). Use `1` for images you want undistorted. |
 | `color` | `#RRGGBB` | `text_color` | Text/tint color. |
 | `font` | `0`…`15` | `0` | Font index (see §2). |
@@ -358,9 +358,9 @@ You can point `default=`/`overlay=` at any of OPL's embedded textures (no file n
 
 - **Covers / art:** `cover`, `coverapp`, `disc`, `screen`, `screens` (overlay), `missing`
 - **Case overlays:** `case` (the shared frame, layer 1), `case_overlay` (layer 2, drawn over `case`), `apps_case` (legacy apps-only frame)
-- **Device icons:** `usb`, `mmce`, `hdd`, `eth`, `app`, `usb_bd`, `ilk_bd`, `m4s_bd`, `hdd_bd`
+- **Device icons:** `usb`, `mmce`, `hdd`, `eth`, `app`, `fav`, `usb_bd`, `ilk_bd`, `m4s_bd`, `hdd_bd`, `udp_bd` (UDPBD), `udp_fs` (UDPFS)
 - **BDM indicators:** `Index_0` … `Index_4`
-- **Buttons:** `cross`, `circle`, `triangle`, `square`, `left`, `right`, `select`, `start`
+- **Buttons:** `cross`, `circle`, `triangle`, `square`, `left`, `right`, `select`, `start`, `L3`, `R3`, `fav_mark`
 - **Loading frames:** `load0` … `load7`
 - **Boot logo:** `logo`, `logo0` … `logo6`
 - **Backgrounds:** `incebtion` (default theme bg), `ip`

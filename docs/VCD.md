@@ -60,7 +60,7 @@ title and POPSTARTER finds the matching `*.VCD`. An APA one-game install instead
 with its literal, case-sensitive `PP.<name>` / `__.<name>` partition label so POPSTARTER can
 mount that partition and boot its fixed `IMAGE0.VCD`.
 
-Where `POPSTARTER.ELF` is loaded from is set by **Settings → General Settings →
+Where `POPSTARTER.ELF` is loaded from is set by **Settings → VCD Settings →
 POPSTARTER.ELF Device** — a driver-accurate picker (matching the Neutrino Device picker):
 
 | Choice | Loads `POPS/POPSTARTER.ELF` from |
@@ -73,6 +73,7 @@ POPSTARTER.ELF Device** — a driver-accurate picker (matching the Neutrino Devi
 | HDD (exFAT) | the mounted exFAT internal HDD |
 | HDD (APA) | see the note below — APA POPSTARTER only applies to HDD-page launches |
 | **Custom** | reveals a free-text path field — your own absolute `POPSTARTER.ELF` path |
+| **Game's Device** | the VCD's own device only (`<device>:/POPS/POPSTARTER.ELF`) — no boot/cwd fallback and no Default fallthrough; a miss aborts with the usual *Missing POPSTARTER.ELF* warning |
 
 The picker covers USB / MMCE / MX4SIO / iLink / SMB VCD launches. PS1 VCDs **on the internal
 APA HDD** always load `POPSTARTER.ELF` from the HDD (the `__common` then `+OPL` `POPS` folder, as
@@ -117,8 +118,9 @@ the same physical `IMAGE0.VCD` filename, so config and art use the displayed `<n
 
 POPSTARTER's stock driver reads FAT32. To boot PS1 games from an **exFAT** drive,
 POPSTARTER needs extra block-device modules (the BDMAssault / "BDMA" drivers). RiptOPL
-*equips* them for you from **General Settings** — you supply the module files, RiptOPL
-copies the right pair onto your memory card:
+*equips* them for you from **VCD Settings** — RiptOPL copies the right pair onto your memory
+card; your own module files win when present, and a gzipped built-in pair fills the gap when
+they aren't:
 
 RiptOPL prefers an existing `mc0:/POPSTARTER` or `mc1:/POPSTARTER` folder. On first setup it
 creates the folder on the first present card (slot 1, then slot 2). Both replacement modules are
@@ -146,14 +148,17 @@ staged before the live pair is changed, so a failed copy leaves the previous pai
 > **Module file names matter.** The two driver files in that `POPS/` folder must be named for the
 > BDMA **MODE** you pick: **`usbd.irx.<mode>`** and **`usbhdfsd.irx.<mode>`**. For `HDD (exFAT)` that
 > is **`usbd.irx.ata`** + **`usbhdfsd.irx.ata`** (other modes use `.usbexfat`, `.mx4sio`, `.mmce`).
-> Plain `usbd.irx` / `usbhdfsd.irx` with **no suffix** are ignored — that is what triggers the
-> *"BDMA module files not found"* message.
+> Plain `usbd.irx` / `usbhdfsd.irx` with **no suffix** are ignored — OPL then falls back to its
+> built-in embedded pair. The *"BDMA module files not found"* message now appears only when that
+> embedded fallback also fails to install.
 
 When you change either setting, RiptOPL copies the chosen variant's modules from the
 SOURCE device's `POPS` folder onto `mc?:/POPSTARTER/` and records the equipped state in a
-marker file there (compatible with POPSLoader). Nothing is embedded in the loader — you
-provide the module files, so there is no ELF bloat. SMB is network-only, so the BDMA
-equip does not apply to it.
+marker file there (compatible with POPSLoader). RiptOPL also ships a gzipped copy of each
+BDMAssault variant pair inside the ELF as a final fallback, so an MC-only boot with no `POPS/`
+folder anywhere still equips. Your own `usbd.irx.<mode>` / `usbhdfsd.irx.<mode>` files always win
+when found — the embedded pair only fills the gap when no seek-path device carries them. SMB is
+network-only, so the BDMA equip does not apply to it.
 
 The internal **exFAT HDD** (enable *BDM HDD* in Device Settings) mounts as a normal BDM
 block device, so its PS1 games in `massN:/POPS/` list and launch through the same VCD view
@@ -165,7 +170,7 @@ so POPSTARTER itself can read them off the exFAT volume.
 PS1 games on an SMB share need POPSTARTER's own network config (`IPCONFIG.DAT` +
 `SMBCONFIG.DAT`) on the memory card, plus its SMB modules. RiptOPL can write those config
 files for you: enable **Settings → Network Settings → Write POPSTARTER Network Config**
-(off by default). On save it mirrors the same IP / share values OPL already uses into
+(**on** by default). On save it mirrors the same IP / share values OPL already uses into
 `mc?:/POPSTARTER/`. The SMB modules themselves ship in the release's `POPSTARTER/` folder
 (copy them to `mc?:/POPSTARTER/`); if they're missing, an SMB VCD launch warns rather than
 hanging.
@@ -179,9 +184,8 @@ Work down this ladder; each step isolates a different stage (from the #154 foren
    the **APA HDD start mode OFF** — the two internal-HDD backends are mutually exclusive, and a
    hand-edited/cross-version config that enables both gets auto-reconciled at boot (you now get a
    toast when that happens; check Device Settings).
-2. **Do PS2 ISOs list from the device?** If yes, the filesystem/mount layer is proven working —
-   on the WOPLSDK build the exFAT driver is *byte-identical* to wOPL's, so "works in wOPL" adds
-   no new information past this step.
+2. **Do PS2 ISOs list from the device?** If yes, the filesystem/mount layer is proven working and
+   the problem is downstream of listing — skip to the VCD-specific steps below.
 3. **Press L3.** The VCD view is per device and only reachable when *Default game view* is
    "Both" (or the page is locked to VCD). No L3 response = check that setting.
 4. **VCDs are scanned from `<device-root>:/POPS/*.VCD`** — the game-folder prefix
@@ -199,8 +203,9 @@ Work down this ladder; each step isolates a different stage (from the #154 foren
 
 - VCD support reuses the normal device pipeline, so covers, favourites and the theme all
   work exactly as they do for disc games.
-- POPSTARTER, the BDMA module variants, and the patch file are supplied by you (or bundled
-  in the release `POPS/` folder) — RiptOPL embeds none of them.
+- POPSTARTER and the patch file are supplied by you (or bundled in the release `POPS/` folder)
+  — RiptOPL embeds neither. The BDMA module variants **are** embedded (gzipped) as a last-resort
+  fallback; your own copies still take priority.
 - The Loader Core, GSM, Cheats, PADEMU and similar per-game options do not apply to PS1
   games (POPSTARTER ignores them).
 

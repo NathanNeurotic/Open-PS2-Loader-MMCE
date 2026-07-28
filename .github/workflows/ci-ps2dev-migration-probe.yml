@@ -16,8 +16,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - container_image: ps2max/dev:v20250725-2
-            label: ps2max-dev-v20250725-2
+          - container_image: ps2dev/ps2dev@sha256:c64ae69c9817865ed98ff054e4ae5360b9e280ed952c97946bca95d9d35be995
+            label: ps2dev-pinned
           - container_image: ps2dev/ps2dev:latest
             label: ps2dev-latest
     container: ${{ matrix.container_image }}

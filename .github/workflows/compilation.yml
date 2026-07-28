@@ -63,13 +63,6 @@ jobs:
       - name: Install menu-coherent mmceman (#254)
         run: sh ./.github/scripts/install_coherent_mmce.sh
 
-      - name: Install newer-generation freepad (#254 pad death)
-        # The GameID mmceman load kills pad input with these containers' stock freepad
-        # builds (PixeliGer: dead cursor, live menu). The digest-pinned job
-        # in compilation.yml runs in the SAME container -- swap there too. Vendored
-        # newer-generation bytes (modules/freepad/PROVENANCE.md), fail-loud checks.
-        run: sh ./.github/scripts/install_coherent_freepad.sh
-
       - name: Compile -> make clean release
         run: make --trace clean && make --trace release
 
@@ -222,13 +215,6 @@ jobs:
 
       - name: Install menu-coherent mmceman (#254)
         run: sh ./.github/scripts/install_coherent_mmce.sh
-
-      - name: Install newer-generation freepad (#254 pad death)
-        # The GameID mmceman load kills pad input with these containers' stock freepad
-        # builds (PixeliGer: dead cursor, live menu). The digest-pinned job
-        # in compilation.yml runs in the SAME container -- swap there too. Vendored
-        # newer-generation bytes (modules/freepad/PROVENANCE.md), fail-loud checks.
-        run: sh ./.github/scripts/install_coherent_freepad.sh
 
       - name: Get version
         run: |
@@ -524,13 +510,6 @@ jobs:
 
       - name: Install menu-coherent mmceman (#254)
         run: sh ./.github/scripts/install_coherent_mmce.sh
-
-      - name: Install newer-generation freepad (#254 pad death)
-        # The GameID mmceman load kills pad input with these containers' stock freepad
-        # builds (PixeliGer: dead cursor, live menu). The digest-pinned job
-        # in compilation.yml runs in the SAME container -- swap there too. Vendored
-        # newer-generation bytes (modules/freepad/PROVENANCE.md), fail-loud checks.
-        run: sh ./.github/scripts/install_coherent_freepad.sh
 
       - name: Get version
         run: |

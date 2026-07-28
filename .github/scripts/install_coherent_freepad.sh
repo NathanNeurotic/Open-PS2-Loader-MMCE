@@ -1,7 +1,24 @@
 #!/bin/sh
+# CURRENTLY UNREFERENCED -- no workflow calls this script as of 2026-07-28.
+#
+# It existed for the two older build containers (ps2max/dev, ghcr ps2homebrew pin), both of which
+# are now RETIRED: the WOPLSDK flavour was dropped (#270/#273) and ps2max was replaced by a DIGEST
+# PIN of ps2dev/ps2dev itself (#285). Both surviving flavours are now ps2dev images, and the
+# vendored bytes are byte-identical to what they ship:
+#
+#   ps2dev/ps2dev@sha256:c64ae69c...be995  freepad.irx sha256 463fcb30cc4192dc...
+#   ps2dev/ps2dev:latest                   freepad.irx sha256 463fcb30cc4192dc...
+#   modules/freepad/freepad.irx (vendored) freepad.irx sha256 463fcb30cc4192dc...
+#
+# So running it would copy a file over itself. The call sites were removed rather than left as a
+# confusing no-op. Kept (not deleted) because the vendored bytes + PROVENANCE.md are the record of
+# the #254 investigation, and because it is the ready-made remedy if a future container ever ships
+# an older freepad generation again. Re-verify the hashes above before trusting it.
+#
+# Original rationale follows.
+#
 # Install the vendored NEWER-GENERATION freepad.irx (modules/freepad/, see
-# PROVENANCE.md there) over the container's stock freepad, for the two older
-# build containers (ps2max/dev, ghcr ps2homebrew pin). The PS2DEVLATESTSDK
+# PROVENANCE.md there) over the container's stock freepad. The PS2DEVLATESTSDK
 # container already ships these exact bytes natively -- do NOT run there.
 #
 # WHY (#254, hardware-confirmed by PixeliGer): with Game ID on (the default),

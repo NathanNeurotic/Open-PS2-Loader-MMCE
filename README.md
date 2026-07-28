@@ -33,7 +33,7 @@ It supports six categories of devices:
 2. MMCE (Memory Card Mass Storage protocol devices);
 3. MX4SIO (SD card connected to memory card port via adapter);
 4. iLink (SBP2 compliant storage devices via IEEE 1394);
-5. SMBv1 shares;
+5. SMB shares (SMBv1 or SMB2, selectable under Device Settings);
 6. ATA/IDE HDDs, including internal exFAT configurations (MBR/GPT).
 
 Plus an optional **network-block-device boot** (UDPBD / UDPFS, via Neutrino) that streams games
@@ -149,10 +149,13 @@ This build layers several features on top of upstream OPL:
   fork's **network protocol defaults to Off** — pick UDPFS or UDPBD in Device Settings and it
   loads live (a restart is only needed to *switch away* from a protocol already loaded). Run it from the
   **[PS2 Servers](https://github.com/NathanNeurotic/PS2-Servers)** all-in-one PC launcher. See the
-  network-boot section of **[docs/NEUTRINO.md](docs/NEUTRINO.md#4-network-boot--udpbd--udpfs-neutrino-only)**.
+  network-boot section of **[docs/NEUTRINO.md](docs/NEUTRINO.md#4-network-boot--the-network-protocol-selector)**.
 - **UDPFS network boot (Neutrino):** a newer network transport (Neutrino's UDPRDMA) offered
-  alongside UDPBD. The **Network Protocol** picker under **Device Settings** offers **Off / SMB /
-  UDPFS / UDPBD**; UDPFS launches via `-bsd=udpfsbd` with a bundled `bsd-udpfsbd.toml`. Use the
+  alongside UDPBD. Under **Device Settings** the network controls are four rows: **Network
+  Protocol** (Off / Manual / Auto), **Protocol** (**SMB / UDPFS / UDPBD**), **SMB Version**
+  (SMBv1 / SMB2, live only while Protocol is SMB), and **Access** (Files / IMG — locked to Files
+  for SMB and to IMG for UDPBD, free only for UDPFS). UDPFS launches via `-bsd=udpfsbd` with a
+  bundled `bsd-udpfsbd.toml`. Use the
   **[PS2 Servers](https://github.com/NathanNeurotic/PS2-Servers)** all-in-one PC launcher for UDPFS,
   SMB and UDPBD; advanced users can run **[pcm720/udpfsd](https://github.com/pcm720/udpfsd)** directly.
   Same static-IP and SMB-exclusivity rules as UDPBD.
@@ -171,21 +174,23 @@ This build layers several features on top of upstream OPL:
   1080i) plus a Neutrino-only **Mode 7** (`-gc=7`). See **[docs/NEUTRINO.md](docs/NEUTRINO.md)**.
 - **Device Settings hub:** the old "Settings" page is now **General Settings**, and a new
   **Device Settings** page consolidates the per-device options, cache sizes, Block-Devices
-  (BDM) settings, all MMCE settings, the network-boot controls (the UDPBD/UDPFS toggle + the
-  **Net Boot Protocol** picker, interlocked with SMB), and the Favourites tab toggle in one place.
+  (BDM) settings, all MMCE settings, the network-boot controls (the **Network Protocol** start
+  row plus the **Protocol**, **SMB Version** and **Access** pickers), and the Favourites tab
+  toggle in one place.
 - **DualSense / DualShock 5 (USB):** optional controller support — grab a ready-made
   `RIPTOPL-<version>-<SDK>-ds5.ELF` (one per SDK flavour) from the rolling release, or build
   with `make DUALSENSE=1`.
 - **Experimental 1080p GSM mode:** a re-added forced-1080p video mode (progressive
-  1920×1080) lives **only** in a dedicated `RIPTOPL-<version>-PS2DEVLATESTSDK-1080p.ELF` asset
+  1920×1080) lives **only** in a dedicated `RIPTOPL-PS2DEVLATESTSDK-1080p.ELF` asset
   (latest-SDK flavour only) so the hardware-unvalidated raster code never touches a mainline
   build. Selecting it in the per-game GSM picker requires clearing a **three-step confirmation**;
   if your display can't sync it, the **Triangle + Cross** boot combo forces safe 480p. Build your
   own with `make GSM1080P=1`.
 - **Ready-to-use defaults:** a fresh install boots with sensible options already enabled —
-  widescreen, cover art, notifications, sound effects + boot sound, USB, delete/rename, and
-  the PS2 logo, with the device tabs in **Manual** mode. Video mode stays **Auto**. Change
-  any of it under Settings.
+  widescreen, cover art, notifications, sound effects + boot sound, delete/rename, and
+  the PS2 logo. Video mode stays **Auto**. Every storage device ships **off**, so the first boot
+  lands on the start menu with no tabs — enable exactly the devices your console has under
+  **Device Settings**. Change any of it under Settings.
 - **Private settings, shared data:** RiptOPL saves its master config as **`settings_riptopl.cfg`**
   (auto-migrated from the older `conf_riptopl.cfg`; not `conf_opl.cfg`), so it can sit on the same memory card as official OPL or wOPL without
   either build clobbering the other's settings. Everything else under the `OPL/` folder —
@@ -255,7 +260,7 @@ work it is built on:
 
 Enormous thanks to the testers who run every rolling build on real consoles and file the
 reports that shape the fixes — **eliminator1403, lucaslmgv, AndrewBento, AcidReach, bodvenomz,
-nuno6573 and Blade1984**.
+nuno6573, zackcage6 and Blade1984**.
 
 ### Financial support (this fork)
 
@@ -269,13 +274,16 @@ because that upstream work is open for everyone to learn from.
 
 ## Releases
 
-RiptOPL ships **one full-feature build** — GSM video-mode handling, in-game
-screenshots (IGS), DS3/DS4 pad emulation (PADEMU), VMC, PS2RD cheats and parental
-controls are all included in the standard ELF (no upstream-style per-feature variants).
+RiptOPL ships **one full-feature build** — GSM video-mode handling, DS3/DS4 pad
+emulation (PADEMU), VMC, PS2RD cheats and parental controls are all included in the
+standard ELF (no upstream-style per-feature variants). The two upstream `EXTRA_FEATURES`
+extras — in-game screenshots (IGS) and right-to-left (RTL) language support — are **not**
+compiled into any published main ELF (`EXTRA_FEATURES ?= 0`); they ship only in the
+`EXTRA_FEATURES=1` builds inside the VARIANTS zip.
 DualSense / DualShock 5 (USB) support is the one optional extra: the rolling release ships it
 prebuilt as named `RIPTOPL-<version>-<SDK>-ds5.ELF` assets (one per SDK flavour), or build your
 own with `make DUALSENSE=1`. One further **experimental** variant — a forced-1080p GSM mode
-(hardware-unvalidated) — ships **only** as `RIPTOPL-<version>-PS2DEVLATESTSDK-1080p.ELF`
+(hardware-unvalidated) — ships **only** as `RIPTOPL-PS2DEVLATESTSDK-1080p.ELF`
 (latest-SDK flavour only, gated behind a three-step in-GUI confirmation), or `make GSM1080P=1`.
 Every other asset, including the `-ds5` loaders and the VARIANTS zip, is 1080p-free.
 
@@ -292,8 +300,9 @@ contains and how to pull it.
 > **Which rolling build?** The rolling zip ships two loader ELFs that differ only by build
 > toolchain — the RiptOPL code in each is identical. Recommended in order of reliability:
 > **`APP_RIPTOPL-PS2DEVLATESTSDK/`** (#1) — the current SDK with stock drivers, which is what
-> RiptOPL is developed and tested against. **`APP_RIPTOPL-PS2MAXSDK/`** (#2) is the safe fallback:
-> a pinned 2025 SDK, for when the moving `ps2dev:latest` tag regresses on a given console.
+> RiptOPL is developed and tested against. **`APP_RIPTOPL-PS2DEVPINNEDSDK/`** (#2) is the safe
+> fallback: the same ps2dev SDK pinned by image digest to a day it was known good, for when the
+> moving `ps2dev:latest` tag regresses on a given console.
 > (A third `WOPLSDK` flavour was dropped in 2026-07 — it crashed at the setup menu, issue #270.) See
 > [Which build should I use?](ROLLING_RELEASE.md#which-build-should-i-use).
 
@@ -356,14 +365,22 @@ on the host machine or NAS device and make sure that it has full read and
 write permissions. USB Advance/Extreme format is optional - \*.ISO images
 are supported using the folder structure above.
 
-> **RiptOPL network defaults:** the network protocol selector defaults to **UDPFS** — switch
-> it to **SMB** under **Device Settings** before the **NET Games** tab appears. Network Config
+> **SMB version:** **Device Settings** has an **SMB Version** row (SMBv1 / SMB2) directly under
+> **Protocol**, live only while **Protocol** is **SMB** (greyed out otherwise). It defaults to
+> **SMBv1**; setting it to **SMB2** switches *both* sides — browsing loads the SMB2 driver instead
+> of the SMBv1 one, and so does the in-game reader — so the server must speak SMB2 for the whole
+> session.
+
+> **RiptOPL network defaults:** the network protocol selector defaults to **Off** — under
+> **Device Settings** set **Network Protocol** to **Manual** or **Auto**, then set **Protocol**
+> to **SMB**, before the **NET Games** tab appears. Network Config
 > ships static defaults (PS2 `192.168.1.10`, PC `192.168.1.100`, share `games`, user `guest`);
 > adjust them to your LAN. The default **SMB Port is `1111`** — a non-privileged port (>1024), so a server
 > binds it without admin/root. **Network Config** now opens with **advanced options on**, so
 > the **Port** field (and ETH link mode) are editable immediately. If Windows 10/11 has
-> disabled SMB1/NTLMv1, use the **[PS2 Servers](https://github.com/NathanNeurotic/PS2-Servers)**
-> all-in-one launcher instead of Windows' SMB service. Choose its SMBv1 server, then set RiptOPL's
+> disabled SMB1/NTLMv1, set **SMB Version** to **SMB2**; the
+> **[PS2 Servers](https://github.com/NathanNeurotic/PS2-Servers)** all-in-one launcher remains the
+> fallback for SMBv1-only setups. Choose its SMBv1 server, then set RiptOPL's
 > IP, port, share and credentials to the values the launcher displays (PS2 Servers currently uses
 > port **1445** by default, so change RiptOPL's saved **1111** when prompted). Release packages
 > include **`PS2-Servers.url`** as a direct shortcut to the repository.
@@ -374,12 +391,12 @@ Both PS2 HDD types are **off by default** in RiptOPL — enable the one you use 
 Settings**. For PS2, 48-bit LBA internal HDDs are supported. The HDD can be formatted as:
 
 - APA partitioning with PFS filesystem (up to 2TB)
-	- OPL will create the `+OPL` partition on the HDD.  To avoid this, you can create a text file at the location `hdd0:__common:pfs:OPL/conf_hdd.txt` that contains the preferred partition name (for example `__common`).
+	- OPL will create the `+OPL` partition on the HDD.  To avoid this, create `hdd0:__common/OPL/conf_hdd.cfg` containing the entry `hdd_partition=__common` (or whichever partition you prefer) — the same file and key described above.
 - MBR partitioning (up to 2TB) or GPT partitioning (unlimited) with the exFAT filesystem
 	- Enable **BDM HDD** in **Device Settings**. The exFAT HDD then mounts through the Block Device Manager (BDMAssault / "BDMA") into the shared `massN:` namespace — the same path as USB/MX4SIO — and appears as an **HDD (exFAT)** games list with the HDD icon.
 	- Files should be added contiguously or synchronously to avoid fragmentation. For example, drag and drop files one at a time, or ensure that files are added sequentially.
 	- When formatting drives for the exFAT filesystem, please make sure the `Allocation unit size` is set to `Default`.
-	- **PS1 games:** PS1 `*.VCD` titles in the HDD's `POPS/` folder list under the **L3** VCD view like any other device. To boot them, equip **BDMA Mode → HDD (exFAT)** in **General Settings** so POPSTARTER can read the exFAT volume. See **[docs/VCD.md](docs/VCD.md)**.
+	- **PS1 games:** PS1 `*.VCD` titles in the HDD's `POPS/` folder list under the **L3** VCD view like any other device. To boot them, open **VCD Settings** from the main menu. **VCD BDMA Apply on Launch** is on by default and equips the matching exFAT driver automatically; turn it off to reveal the manual **BDMA Source** / **BDMA Mode** pickers and set **BDMA Mode → HDD (exFAT)** by hand so POPSTARTER can read the exFAT volume. See **[docs/VCD.md](docs/VCD.md)**.
 
 ## APPS
 
