@@ -26,3 +26,9 @@ jobs:
           extensions: 'h,c'
           clangFormatVersion: 12
           inplace: False
+          # Vendored third-party sources are excluded. libsmb2 is imported VERBATIM so it can be
+          # re-synced from upstream; reformatting it to this project's style would turn every future
+          # update into a conflict, and its 52 files would otherwise fail this check outright.
+          # Only the vendored subtree is excluded -- our own code in that module directory
+          # (smb2man.c, posix.c, iopheap.c, udivdi3.c, the shims) is still checked.
+          exclude: './modules/network/smb2man/libsmb2'
