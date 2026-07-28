@@ -136,7 +136,17 @@ int arp_add_entry(uint32_t ip, uint8_t mac[6])
 
     // Add new entry
     for (i = 0; i < MS_ARP_ENTRIES; i++) {
-        if (ip == 0) {
+        // Test the SLOT, not the argument. This read `if (ip == 0)`, i.e. it checked the peer IP
+        // being added rather than whether arp_table[i] was free -- so for any real peer (ip != 0)
+        // no free slot was ever found and arp_add_entry always returned -1, leaving the ARP cache
+        // permanently empty. udpfs_ministack (ministack_arp.c) has always had this right, which is
+        // why only the UDPBD monolith is affected.
+        //
+        // The consequence is not a hard failure, which is why it went unnoticed: every send site in
+        // this driver targets the broadcast MAC anyway, so traffic still flows -- as a BROADCAST to
+        // every host on the LAN, on every frame. On a busy network that is both a throughput
+        // problem and a good way to look like "UDPBD isn't working right".
+        if (arp_table[i].ip == 0) {
             arp_table[i].ip = ip;
             arp_table[i].mac[0] = mac[0];
             arp_table[i].mac[1] = mac[1];
