@@ -186,6 +186,31 @@ static u32 oldpaddata;
 static u32 edgedata;
 static u32 oldedgedata;
 
+/*
+  While set, readPads() keeps sampling but does NOT advance the edge baseline, so a key-on raised
+  during this window survives until someone is actually listening.
+
+  guiMainLoop() polls the pads EVERY frame (gui.c) but only runs screenHandler->handleInput() when no
+  screen transition is in flight. A fade is 26 frames -- about 430 ms at 60 Hz -- and every poll in
+  that window still shifted oldedgedata, so the edge was consumed by a poll with no consumer behind
+  it. Any button pressed during a screen fade was silently discarded: press a direction right after
+  switching screens and nothing happens.
+
+  Freezing the BASELINE rather than skipping the poll is deliberate. readPads() also expires rumble
+  taps, drives the pad state machine and detects (dis)connects, so simply not calling it during a
+  transition would leave a motor spinning and a replug unnoticed.
+
+  Scope note: this is armed only while a transition is running, so it cannot affect ordinary
+  same-screen navigation -- deliberately, so it does not disturb the #271/#272 read-miss work being
+  tested on hardware.
+*/
+static int edgeBaselineFrozen = 0;
+
+void padFreezeEdgeBaseline(int freeze)
+{
+    edgeBaselineFrozen = freeze ? 1 : 0;
+}
+
 static int delaycnt[16];
 static int paddelay[16];
 
@@ -965,7 +990,10 @@ int readPads()
     paddata = 0;
     // Same one-poll lifetime as paddata, so an edge still lasts exactly one poll and cannot re-fire;
     // the difference is only in how a MISSED read contributes below (see the edgedata note above).
-    oldedgedata = edgedata;
+    // Unless the baseline is frozen -- then a pending key-on is held for whoever is not listening yet
+    // (padFreezeEdgeBaseline; screen transitions).
+    if (!edgeBaselineFrozen)
+        oldedgedata = edgedata;
     edgedata = 0;
 
     /*
