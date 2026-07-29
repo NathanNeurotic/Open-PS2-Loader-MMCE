@@ -378,6 +378,13 @@ You can point `default=`/`overlay=` at any of OPL's embedded textures (no file n
 It behaves like a `GameImage` (uses the `COV` cover cache) but draws 3 or 5 covers with a
 slide animation.
 
+While the user is idle, the carousel also *prefetches* the covers just outside the visible
+window (up to 4 positions each side of the selection, wrapping around the list ends), so a
+scroll step reveals a cover that is usually already loaded instead of the placeholder
+(issue #296). The prefetch only starts once the selection's own cover has loaded, and it is
+skipped entirely on MMCE-backed items (including MMCE-sourced favourites) to keep the shared
+SIO2 bus quiet — those covers still load on selection, as before.
+
 ### Per-theme properties (in `conf_theme.cfg`)
 
 | Property | Notes |
