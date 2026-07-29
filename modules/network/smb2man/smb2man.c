@@ -63,6 +63,29 @@ static struct smb2man_file file_table[MAX_OPEN_FILES];
 #define LOCK()   WaitSema(smb2_sema)
 #define UNLOCK() SignalSema(smb2_sema)
 
+// Unix epoch -> the packed date iox_stat_t carries. Defined below, next to getstat which documents
+// why it matters; declared here because dread needs it first.
+static void smb2man_pack_time(uint64_t unixsec, unsigned char *out);
+
+/*
+  Which SMB2 timestamp belongs in iox_stat_t's `ctime`. The two namespaces disagree and it is an easy
+  thing to "fix" the wrong way:
+
+    POSIX ctime  = last metadata CHANGE  -> SMB2's smb2_ctime
+    PS2  ctime   = CREATION time         -> SMB2's smb2_btime (birth)
+
+  iox_stat_t descends from the FAT/Windows lineage the PS2's filesystems use, where the three stamps
+  are (creation, access, write) -- so creation is what belongs here, not change time.
+
+  Fall back to smb2_ctime when the server leaves birth time unset: some servers do not report it, and
+  a plausible-but-slightly-wrong stamp beats reporting 1970 for every file. Nothing in OPL keys off
+  ctime (mtime is the load-bearing one, see getstat), so the fallback cannot mislead any logic.
+*/
+static uint64_t smb2man_btime(const struct smb2_stat_64 *st)
+{
+    return st->smb2_btime ? st->smb2_btime : st->smb2_ctime;
+}
+
 /*
   OPL addresses shares with Windows-style backslashes ("\CD\FOO.ISO", built by ethsupport's
   ethPrefix). libsmb2 wants forward slashes and no leading separator, since every path is already
@@ -355,10 +378,68 @@ static int smb2man_dread(iop_file_t *f, iox_dirent_t *dirent)
     dirent->stat.mode = (ent->st.smb2_type == SMB2_TYPE_DIRECTORY) ? FIO_S_IFDIR : FIO_S_IFREG;
     dirent->stat.size = (unsigned int)ent->st.smb2_size;
     dirent->stat.hisize = (unsigned int)(ent->st.smb2_size >> 32);
+    // Same reason as getstat: a listing that reports every entry as epoch-zero breaks anything that
+    // compares timestamps, and costs nothing to fill correctly.
+    smb2man_pack_time(smb2man_btime(&ent->st), dirent->stat.ctime);
+    smb2man_pack_time(ent->st.smb2_atime, dirent->stat.atime);
+    smb2man_pack_time(ent->st.smb2_mtime, dirent->stat.mtime);
 
     UNLOCK();
 
     return 1;
+}
+
+/*
+  Convert a Unix epoch time to the packed date iox_stat_t carries in ctime/atime/mtime:
+
+      [0] unused   [1] second   [2] minute   [3] hour   [4] day   [5] month   [6..7] year (LE)
+
+  (The layout is confirmed by OPL's own reader at src/opl.c, which unpacks exactly these offsets to
+  set the PS2 clock.)
+
+  NOT cosmetic. ethsupport.c's change detector compares stat("<prefix>CD").st_mtime against the
+  previous value to decide whether the game list needs rebuilding. While these bytes were left zeroed
+  st_mtime was always 0, so the comparison never fired and OPL could not notice a game being ADDED to
+  an SMB2 share -- the list only refreshed if the total size happened to change. SMB1's smbman fills
+  them, so this is dialect parity.
+
+  32-bit math on purpose: Unix seconds fit in u32 until 2106, and staying out of 64-bit division
+  avoids dragging __udivdi3 into more of this module than necessary.
+
+  Timezone: SMB reports UTC and this converts as-is, matching what the SMB1 path does. The consumer
+  only ever tests these for INEQUALITY, so a fixed offset is immaterial to it.
+*/
+static void smb2man_pack_time(uint64_t unixsec, unsigned char *out)
+{
+    u32 t = (u32)unixsec;
+    u32 days = t / 86400u;
+    u32 rem = t % 86400u;
+    u32 y, m, d;
+
+    out[0] = 0;
+    out[1] = (unsigned char)(rem % 60u);
+    out[2] = (unsigned char)((rem / 60u) % 60u);
+    out[3] = (unsigned char)(rem / 3600u);
+
+    // Civil date from days since 1970-01-01, via the era-based algorithm (Howard Hinnant's
+    // civil_from_days). Shift the epoch to 0000-03-01 so leap days land at the end of the cycle.
+    {
+        u32 z = days + 719468u;
+        u32 era = z / 146097u;
+        u32 doe = z - era * 146097u;                                         // [0, 146096]
+        u32 yoe = (doe - doe / 1460u + doe / 36524u - doe / 146096u) / 365u; // [0, 399]
+        u32 doy = doe - (365u * yoe + yoe / 4u - yoe / 100u);                // [0, 365]
+        u32 mp = (5u * doy + 2u) / 153u;                                     // [0, 11], March = 0
+
+        d = doy - (153u * mp + 2u) / 5u + 1u;
+        m = mp + (mp < 10u ? 3u : (u32)-9);
+        y = yoe + era * 400u + (m <= 2u ? 1u : 0u);
+    }
+
+    out[4] = (unsigned char)d;
+    out[5] = (unsigned char)m;
+    out[6] = (unsigned char)(y & 0xff);
+    out[7] = (unsigned char)((y >> 8) & 0xff);
 }
 
 static int smb2man_getstat(iop_file_t *f, const char *filename, iox_stat_t *stat)
@@ -384,6 +465,9 @@ static int smb2man_getstat(iop_file_t *f, const char *filename, iox_stat_t *stat
     stat->mode = (st.smb2_type == SMB2_TYPE_DIRECTORY) ? FIO_S_IFDIR : FIO_S_IFREG;
     stat->size = (unsigned int)st.smb2_size;
     stat->hisize = (unsigned int)(st.smb2_size >> 32);
+    smb2man_pack_time(smb2man_btime(&st), stat->ctime);
+    smb2man_pack_time(st.smb2_atime, stat->atime);
+    smb2man_pack_time(st.smb2_mtime, stat->mtime);
 
     UNLOCK();
 
@@ -663,13 +747,22 @@ static int smb2man_devctl(iop_file_t *f, const char *name, int cmd, void *arg, u
 
         case SMB_DEVCTL_GETSHARELIST: {
             /*
-              Enumerating shares needs the srvsvc DCE/RPC pipe. libsmb2 ships it, but it is a
-              separate async state machine and OPL only uses this to populate the optional
-              share-picker; the configured share name path -- which is what actually lists games --
-              does not touch it. Report zero shares so the picker comes up empty rather than
-              wrong, and wire it up as a follow-up.
+              NOT SUPPORTED on SMB2, and this reports it rather than pretending.
+
+              Enumerating shares needs the srvsvc DCE/RPC pipe. libsmb2 has the coders for it
+              (libsmb2-dcerpc-srvsvc.c), but that file is a thin wrapper that #includes
+              "../libdcerpc/dcerpc-srvsvc.c" -- an upstream subtree that is NOT part of lib/ and was
+              therefore not vendored here. Wiring it up means vendoring a second tree and putting it
+              through the same GPREL/relocation gauntlet this module already needed, which is a
+              project rather than a loose end.
+
+              Returning 0 ("zero shares") was worse than useless: an empty picker is indistinguishable
+              from a server that genuinely exposes nothing, so the user is left guessing whether the
+              connection failed. -EINVAL makes ethsupport report the browse as unsupported, and the
+              user types the share name -- which is the ONLY path that ever mattered anyway: listing
+              and launching games use the configured share name and never touch srvsvc.
             */
-            return 0;
+            return -EINVAL;
         }
 
         case SMB_DEVCTL_QUERYDISKINFO: {
