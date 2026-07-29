@@ -1160,7 +1160,13 @@ static void menuUpdateHook()
         unsigned int gen = bdmGetGeneration();
         int genChanged = (gen != lastSeenBdmGeneration);
         clock_t now = clock();
-        lastSeenBdmGeneration = gen;
+        // Consume the generation bump only if every hotplug-driven enqueue is ACCEPTED (CodeRabbit,
+        // #294): ioPutRequest can fail (queue blocked during teardown, allocation failure), and
+        // committing lastSeenBdmGeneration up front would silently eat the one immediate-rescan
+        // event a hotplug gets -- the new device's tab then waits for the next steady-state probe,
+        // which after this change also needs a second of real idleness. Leaving the generation
+        // unconsumed makes the next 1 s tick retry the whole event instead.
+        int genConsumed = 1;
         for (i = 0; i < MODE_COUNT; i++) {
             if ((list_support[i].support && list_support[i].support->enabled) && (list_support[i].support->updateDelay == 0)) {
                 int mode = list_support[i].support->mode;
@@ -1171,14 +1177,22 @@ static void menuUpdateHook()
                 // next tap gap rather than after a second of stillness (#271). Only the recurring
                 // steady-state probe is quiet AND waits for real idleness.
                 if (genChanged || (longIdle && (now - lastBgRescan[mode]) >= MENU_BG_RESCAN_MIN_INTERVAL_TICKS)) {
+                    // Stamp the throttle only on an accepted request, so a rejected one retries on
+                    // the next tick instead of being silently skipped for a full interval.
+                    int accepted;
                     if (genChanged)
-                        ioPutRequest(IO_MENU_UPDATE_DEFFERED, &list_support[i].support->mode);
+                        accepted = (ioPutRequest(IO_MENU_UPDATE_DEFFERED, &list_support[i].support->mode) == IO_OK);
                     else
-                        ioPutRequestQuiet(IO_MENU_UPDATE_DEFFERED, &list_support[i].support->mode);
-                    lastBgRescan[mode] = now;
+                        accepted = (ioPutRequestQuiet(IO_MENU_UPDATE_DEFFERED, &list_support[i].support->mode) == IO_OK);
+                    if (accepted)
+                        lastBgRescan[mode] = now;
+                    else if (genChanged)
+                        genConsumed = 0;
                 }
             }
         }
+        if (genConsumed)
+            lastSeenBdmGeneration = gen;
     }
 }
 
