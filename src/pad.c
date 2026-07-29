@@ -118,6 +118,30 @@ struct pad_data_t
 #define PAD_WAIT_POLLS          25
 #define PAD_WAIT_POLL_US        1000
 #define PAD_ANALOG_RETRY_DELAY  60
+/*
+  Milliseconds without ANY button/stick input before the analog self-heal below may run (#271/#272).
+
+  The self-heal calls initializePad() INLINE on the GUI thread -- 250-600 ms of blocking polled
+  waits (the padSetMainMode leg alone needs >= 5 vblanks, see below) during which the pads are not
+  sampled and the frame does not advance. Its trigger is freepad dropping a pad to digital while
+  recovering from a read error, and read errors cluster under load -- so it fired precisely while
+  the user was navigating, ate 1-2 taps per attempt, and re-fired every PAD_ANALOG_RETRY_DELAY
+  reads (~1-2 s) for as long as the flap persisted. Frame analysis of zackcage6's Beta-3449
+  capture (#271) matches it twice over: missing-slide gaps of 0.43-0.63 s at 1.5-3.0 s spacing, on
+  a USB rig where the background-probe suspects are all integer-compare cheap. Because readPad()
+  runs inside every readPads() caller, this also fired inside the settings dialogs -- the "#272
+  still feels heavy in Settings" report the io-probe theory could not reach (menuUpdateHook does
+  not even run there).
+
+  Deferring costs little the user can feel: a digital-mode pad still delivers every d-pad press
+  (digital is exactly what menu navigation uses). What IS dead until the heal runs: the analog
+  stick, and L3/R3 -- which this fork binds to VCD-view and favourite toggles. All of it
+  self-corrects, because dead inputs produce no paddata bits and therefore cannot re-arm this
+  gate: the heal fires within a second of the last REGISTERED press. Known pathological residual:
+  a hardware-stuck button (or an object resting on a second pad) keeps paddata nonzero forever and
+  starves the heal for the session -- accepted, since real input always has >1 s gaps somewhere.
+*/
+#define PAD_SELF_HEAL_IDLE_MS   1000
 // Frames between actuator-alignment re-arm attempts (padRumbleRealign). Only ever runs while a pad
 // has NOT been aligned, so on a healthy pad it fires once and never again.
 #define PAD_REALIGN_RETRY_DELAY 60
@@ -139,6 +163,10 @@ struct pad_data_t
 
 /// current time in miliseconds (last update time)
 static u32 curtime = 0;
+// Last readPads() poll (curtime ms) on which ANY button/stick input was down. Drives the
+// self-heal idle gate (PAD_SELF_HEAL_IDLE_MS) -- see the define for why the heal must not run
+// while the user is actively navigating.
+static u32 lastInputActivityMs = 0;
 static u32 time_since_last = 0;
 // Raw-tick bookkeeping for the wrap-correct delta in readPads(). lastticks is the previous poll's
 // cpu_ticks(); tickrem carries the sub-millisecond remainder so dividing a delta stays drift-free.
@@ -507,7 +535,14 @@ static int readPad(struct pad_data_t *pad)
         pad->analogCapable = -1;
         pad->analogRetryDelay = 0;
         pad->readMissMs = 0;
-        initializePad(pad);
+        // Same idle gate as the analog self-heal below, for the same reason: this initializePad is
+        // the SAME 250-600 ms inline blackout, and a reconnect edge can be driven by the very read
+        // errors that cluster under load (sustained misses drop freepad to DISCONN, the recovery
+        // re-connects). If another pad is actively navigating, deferring costs the reconnected pad
+        // ~1 s in digital mode; eating the navigator's taps costs a bug report. With retry budget at
+        // 0 the self-heal branch below picks the init up on the first poll after a second of quiet.
+        if ((u32)(curtime - lastInputActivityMs) >= PAD_SELF_HEAL_IDLE_MS)
+            initializePad(pad);
     }
     // The pad may transit from any state to disconnected. So check only for the disconnected state.
     else if ((oldState != PAD_STATE_DISCONN) && (pad->state == PAD_STATE_DISCONN)) {
@@ -539,6 +574,15 @@ static int readPad(struct pad_data_t *pad)
                 // mode table proves that DualShock mode is absent.
                 if (pad->analogRetryDelay > 0) {
                     pad->analogRetryDelay--;
+                } else if (newpdata != 0 || (u32)(curtime - lastInputActivityMs) < PAD_SELF_HEAL_IDLE_MS) {
+                    // newpdata: THIS pad's buttons from THIS poll, already read above -- closes the
+                    // one-poll staleness hole (CodeRabbit, #295) where the first press after a full
+                    // second of quiet lands while lastInputActivityMs is still stale and a flap
+                    // beginning on that exact poll would heal right on top of it.
+                    // User is actively providing input: DEFER the heal (see PAD_SELF_HEAL_IDLE_MS).
+                    // initializePad here would block this thread 250-600 ms and eat the taps in
+                    // flight. The pad keeps working as digital meanwhile; leaving the retry budget
+                    // at 0 makes the heal fire on the first poll after a second of quiet.
                 } else {
                     gDiag.padSelfHeal++; // PAD HUD SH: analog self-heal re-init attempts
                     initializePad(pad);
@@ -1036,6 +1080,12 @@ int readPads()
     for (i = 0; i < pad_count; ++i) {
         rslt |= readPad(&pad_data[i]);
     }
+
+    // Stamp input activity AFTER the merge: any button or stick held this poll re-arms the
+    // self-heal idle gate. One-poll staleness inside readPad (it reads the previous stamp) is
+    // irrelevant at a 1000 ms threshold.
+    if (paddata != 0)
+        lastInputActivityMs = curtime;
 
     // Expire any rumble tap. Deliberately ms-based off time_since_last rather than a frame counter:
     // a few call sites poll readPads() twice within one frame to flush input, which would make a
