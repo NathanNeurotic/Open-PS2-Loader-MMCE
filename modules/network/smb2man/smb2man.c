@@ -68,6 +68,25 @@ static struct smb2man_file file_table[MAX_OPEN_FILES];
 static void smb2man_pack_time(uint64_t unixsec, unsigned char *out);
 
 /*
+  Which SMB2 timestamp belongs in iox_stat_t's `ctime`. The two namespaces disagree and it is an easy
+  thing to "fix" the wrong way:
+
+    POSIX ctime  = last metadata CHANGE  -> SMB2's smb2_ctime
+    PS2  ctime   = CREATION time         -> SMB2's smb2_btime (birth)
+
+  iox_stat_t descends from the FAT/Windows lineage the PS2's filesystems use, where the three stamps
+  are (creation, access, write) -- so creation is what belongs here, not change time.
+
+  Fall back to smb2_ctime when the server leaves birth time unset: some servers do not report it, and
+  a plausible-but-slightly-wrong stamp beats reporting 1970 for every file. Nothing in OPL keys off
+  ctime (mtime is the load-bearing one, see getstat), so the fallback cannot mislead any logic.
+*/
+static uint64_t smb2man_btime(const struct smb2_stat_64 *st)
+{
+    return st->smb2_btime ? st->smb2_btime : st->smb2_ctime;
+}
+
+/*
   OPL addresses shares with Windows-style backslashes ("\CD\FOO.ISO", built by ethsupport's
   ethPrefix). libsmb2 wants forward slashes and no leading separator, since every path is already
   relative to the connected share. Convert in one place so no caller has to care.
@@ -361,7 +380,7 @@ static int smb2man_dread(iop_file_t *f, iox_dirent_t *dirent)
     dirent->stat.hisize = (unsigned int)(ent->st.smb2_size >> 32);
     // Same reason as getstat: a listing that reports every entry as epoch-zero breaks anything that
     // compares timestamps, and costs nothing to fill correctly.
-    smb2man_pack_time(ent->st.smb2_ctime, dirent->stat.ctime);
+    smb2man_pack_time(smb2man_btime(&ent->st), dirent->stat.ctime);
     smb2man_pack_time(ent->st.smb2_atime, dirent->stat.atime);
     smb2man_pack_time(ent->st.smb2_mtime, dirent->stat.mtime);
 
@@ -446,7 +465,7 @@ static int smb2man_getstat(iop_file_t *f, const char *filename, iox_stat_t *stat
     stat->mode = (st.smb2_type == SMB2_TYPE_DIRECTORY) ? FIO_S_IFDIR : FIO_S_IFREG;
     stat->size = (unsigned int)st.smb2_size;
     stat->hisize = (unsigned int)(st.smb2_size >> 32);
-    smb2man_pack_time(st.smb2_ctime, stat->ctime);
+    smb2man_pack_time(smb2man_btime(&st), stat->ctime);
     smb2man_pack_time(st.smb2_atime, stat->atime);
     smb2man_pack_time(st.smb2_mtime, stat->mtime);
 
