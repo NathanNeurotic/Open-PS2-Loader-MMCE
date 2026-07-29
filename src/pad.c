@@ -574,7 +574,11 @@ static int readPad(struct pad_data_t *pad)
                 // mode table proves that DualShock mode is absent.
                 if (pad->analogRetryDelay > 0) {
                     pad->analogRetryDelay--;
-                } else if ((u32)(curtime - lastInputActivityMs) < PAD_SELF_HEAL_IDLE_MS) {
+                } else if (newpdata != 0 || (u32)(curtime - lastInputActivityMs) < PAD_SELF_HEAL_IDLE_MS) {
+                    // newpdata: THIS pad's buttons from THIS poll, already read above -- closes the
+                    // one-poll staleness hole (CodeRabbit, #295) where the first press after a full
+                    // second of quiet lands while lastInputActivityMs is still stale and a flap
+                    // beginning on that exact poll would heal right on top of it.
                     // User is actively providing input: DEFER the heal (see PAD_SELF_HEAL_IDLE_MS).
                     // initializePad here would block this thread 250-600 ms and eat the taps in
                     // flight. The pad keeps working as digital meanwhile; leaving the retry budget
