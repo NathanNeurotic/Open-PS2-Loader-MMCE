@@ -22,6 +22,10 @@
 
 int startPads();
 int readPads();
+// While frozen, readPads() keeps sampling but does not advance the key-on baseline, so an edge
+// raised now survives until it is consumed. Used across screen transitions, where the GUI polls
+// every frame but runs no input handler -- without this, presses made during a fade are discarded.
+void padFreezeEdgeBaseline(int freeze);
 void unloadPads();
 
 // Menu rumble (#172), gated by gEnableRumble. Tap/Bump arm a pulse on every capable pad and never
