@@ -1084,12 +1084,32 @@ void menuDeferredUpdate(void *data)
     }
 }
 
-#define MENU_GENERAL_UPDATE_DELAY         60
+#define MENU_GENERAL_UPDATE_DELAY          60
 // Minimum wall-clock gap between background rescans of the SAME updateDelay==0 device (Fix B). At
 // ~2 s this drops the steady SIO2/mass enumeration rate (and, for MMCE, the slot-probe drip) well
 // below the old every-60-frames cadence, cutting MX4SIO<->mmceman bus contention, while a real
 // device change still refreshes immediately (BdmGeneration bypass below). clock() = microseconds.
-#define MENU_BG_RESCAN_MIN_INTERVAL_TICKS (2 * CLOCKS_PER_SEC)
+#define MENU_BG_RESCAN_MIN_INTERVAL_TICKS  (2 * CLOCKS_PER_SEC)
+/*
+  Idle time required before STEADY-STATE background probes may run at all, in frames (~1 s NTSC).
+
+  The short gate (MENU_MIN_INACTIVE_FRAMES = 8, ~133 ms) is tuned for "the user paused between
+  inputs" -- right for waking cover-art loads, and WRONG for device probes. Frame analysis of
+  zackcage6's Beta-3449 capture (#271) showed why: tapping through the list at a steady ~4.3
+  taps/s leaves ~130 ms release gaps, which sit exactly AT the short gate, so the throttled
+  probes leaked into active navigation -- slides went missing at t=1.07/3.27/4.80/7.77 s,
+  spacings of 2.2/1.5/3.0 s, the quasi-periodic signature of the 1 s hook tick x 2 s per-device
+  throttle (multiple enabled devices desync, so events can land closer than 2 s). An MMCE/SIO2
+  presence probe contends with freepad on the same bus; the tap landing inside the resulting
+  read-miss burst is eaten. At 4.3 taps/s a ~2 s clock lands every ~9 games of a 7-game cycle,
+  drifting slowly -- his "it does hang on certain games casually, in a pattern".
+
+  60 frames of REAL idleness is far above any tap gap, so probes never fire mid-navigation, and a
+  parked console still probes within a second of the user stopping. Hotplug stays immediate-ish:
+  the BdmGeneration bypass below keeps the SHORT gate, so a plugged device is picked up in the
+  next tap gap rather than after a full second.
+*/
+#define MENU_BG_RESCAN_MIN_INACTIVE_FRAMES 60
 
 static void menuUpdateHook()
 {
@@ -1109,6 +1129,11 @@ static void menuUpdateHook()
     if (cacheHasPendingArt())
         return;
 
+    // Steady-state probes additionally require REAL idleness (see the define): a tap gap passes the
+    // short gate above, and a probe fired into it contends with the pads on SIO2 and eats the next
+    // tap (#271). Event-driven work (the genChanged hotplug bypass below) keeps the short gate.
+    int longIdle = (guiInactiveFrames >= MENU_BG_RESCAN_MIN_INACTIVE_FRAMES);
+
     // schedule updates of all the list handlers
     // Quiet on purpose (#290): these are periodic background rescans the user never asked for, and
     // their usual outcome is "nothing changed". Enqueued visibly, each slow presence scan faded the
@@ -1117,7 +1142,7 @@ static void menuUpdateHook()
     // the signal; there was never a toast for it), it just does so without the spinner. Known
     // residual: work a quiet rescan enqueues ONWARD (bdm module-load retries, favourites reload) is
     // still visible and can flash the spinner on rigs where those persistently re-fire.
-    if (gAutoRefresh) {
+    if (gAutoRefresh && longIdle) {
         for (i = 0; i < MODE_COUNT; i++) {
             if ((list_support[i].support && list_support[i].support->enabled) && ((list_support[i].support->updateDelay > 0) && (frameCounter % list_support[i].support->updateDelay == 0)))
                 ioPutRequestQuiet(IO_MENU_UPDATE_DEFFERED, &list_support[i].support->mode);
@@ -1135,25 +1160,39 @@ static void menuUpdateHook()
         unsigned int gen = bdmGetGeneration();
         int genChanged = (gen != lastSeenBdmGeneration);
         clock_t now = clock();
-        lastSeenBdmGeneration = gen;
+        // Consume the generation bump only if every hotplug-driven enqueue is ACCEPTED (CodeRabbit,
+        // #294): ioPutRequest can fail (queue blocked during teardown, allocation failure), and
+        // committing lastSeenBdmGeneration up front would silently eat the one immediate-rescan
+        // event a hotplug gets -- the new device's tab then waits for the next steady-state probe,
+        // which after this change also needs a second of real idleness. Leaving the generation
+        // unconsumed makes the next 1 s tick retry the whole event instead.
+        int genConsumed = 1;
         for (i = 0; i < MODE_COUNT; i++) {
             if ((list_support[i].support && list_support[i].support->enabled) && (list_support[i].support->updateDelay == 0)) {
                 int mode = list_support[i].support->mode;
-                // elapsed form is single-wrap-safe; zero-initialized timestamp allows one immediate rescan
-                if (genChanged || (now - lastBgRescan[mode]) >= MENU_BG_RESCAN_MIN_INTERVAL_TICKS) {
-                    // Quiet ONLY for the steady-state throttled rescan (#290). The genChanged branch
-                    // fires precisely BECAUSE a device changed (hotplug / Device-Settings apply) --
-                    // that scan populates a page the user is waiting on and can take seconds, so it
-                    // stays visible. The quiet rationale ("usual outcome is nothing changed") is
-                    // false by construction on that branch.
+                // elapsed form is single-wrap-safe; zero-initialized timestamp allows one immediate rescan.
+                // genChanged (hotplug / Device-Settings apply) deliberately requires NEITHER longIdle
+                // nor quiet: it fires precisely BECAUSE a device changed, the scan populates a page the
+                // user is waiting on (visible, #290), and a plugged device should be noticed in the
+                // next tap gap rather than after a second of stillness (#271). Only the recurring
+                // steady-state probe is quiet AND waits for real idleness.
+                if (genChanged || (longIdle && (now - lastBgRescan[mode]) >= MENU_BG_RESCAN_MIN_INTERVAL_TICKS)) {
+                    // Stamp the throttle only on an accepted request, so a rejected one retries on
+                    // the next tick instead of being silently skipped for a full interval.
+                    int accepted;
                     if (genChanged)
-                        ioPutRequest(IO_MENU_UPDATE_DEFFERED, &list_support[i].support->mode);
+                        accepted = (ioPutRequest(IO_MENU_UPDATE_DEFFERED, &list_support[i].support->mode) == IO_OK);
                     else
-                        ioPutRequestQuiet(IO_MENU_UPDATE_DEFFERED, &list_support[i].support->mode);
-                    lastBgRescan[mode] = now;
+                        accepted = (ioPutRequestQuiet(IO_MENU_UPDATE_DEFFERED, &list_support[i].support->mode) == IO_OK);
+                    if (accepted)
+                        lastBgRescan[mode] = now;
+                    else if (genChanged)
+                        genConsumed = 0;
                 }
             }
         }
+        if (genConsumed)
+            lastSeenBdmGeneration = gen;
     }
 }
 
@@ -2954,7 +2993,7 @@ static void setDefaults(void)
     gMMCEStartMode = START_MODE_DISABLED;
     gFAVStartMode = START_MODE_DISABLED;
 
-    gMMCESlot = 2; //Default to first Auto slot
+    gMMCESlot = 2; // Default to first Auto slot
     gMMCEIGRSlot = 3;
     /*
       Both GameID features now ship OFF (maintainer directive, 2026-07-28), matching the
