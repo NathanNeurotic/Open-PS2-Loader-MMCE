@@ -1110,10 +1110,17 @@ static void menuUpdateHook()
         return;
 
     // schedule updates of all the list handlers
+    // Quiet on purpose (#290): these are periodic background rescans the user never asked for, and
+    // their usual outcome is "nothing changed". Enqueued visibly, each slow presence scan faded the
+    // loading spinner in while the console sat idle -- the "spinner reappears every few seconds"
+    // report. A rescan that DOES find a change still rebuilds the list (the list itself changing is
+    // the signal; there was never a toast for it), it just does so without the spinner. Known
+    // residual: work a quiet rescan enqueues ONWARD (bdm module-load retries, favourites reload) is
+    // still visible and can flash the spinner on rigs where those persistently re-fire.
     if (gAutoRefresh) {
         for (i = 0; i < MODE_COUNT; i++) {
             if ((list_support[i].support && list_support[i].support->enabled) && ((list_support[i].support->updateDelay > 0) && (frameCounter % list_support[i].support->updateDelay == 0)))
-                ioPutRequest(IO_MENU_UPDATE_DEFFERED, &list_support[i].support->mode);
+                ioPutRequestQuiet(IO_MENU_UPDATE_DEFFERED, &list_support[i].support->mode);
         }
     }
 
@@ -1134,7 +1141,15 @@ static void menuUpdateHook()
                 int mode = list_support[i].support->mode;
                 // elapsed form is single-wrap-safe; zero-initialized timestamp allows one immediate rescan
                 if (genChanged || (now - lastBgRescan[mode]) >= MENU_BG_RESCAN_MIN_INTERVAL_TICKS) {
-                    ioPutRequest(IO_MENU_UPDATE_DEFFERED, &list_support[i].support->mode);
+                    // Quiet ONLY for the steady-state throttled rescan (#290). The genChanged branch
+                    // fires precisely BECAUSE a device changed (hotplug / Device-Settings apply) --
+                    // that scan populates a page the user is waiting on and can take seconds, so it
+                    // stays visible. The quiet rationale ("usual outcome is nothing changed") is
+                    // false by construction on that branch.
+                    if (genChanged)
+                        ioPutRequest(IO_MENU_UPDATE_DEFFERED, &list_support[i].support->mode);
+                    else
+                        ioPutRequestQuiet(IO_MENU_UPDATE_DEFFERED, &list_support[i].support->mode);
                     lastBgRescan[mode] = now;
                 }
             }

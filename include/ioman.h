@@ -28,6 +28,10 @@ int ioRegisterHandler(int type, io_request_handler_t handler);
 /** schedules a new request into the pending request list
  * @note The data are not freed! */
 int ioPutRequest(int type, void *data);
+// Same queue and drain semantics as ioPutRequest, but excluded from the busy-spinner count (#290).
+// BACKGROUND MAINTENANCE only -- work the user did not ask for, whose usual outcome is "nothing
+// changed" (menuUpdateHook's periodic device rescans). User-initiated work must stay visible.
+int ioPutRequestQuiet(int type, void *data);
 
 /** removes all requests of a given type from the queue
  * @param type the type of the requests to remove
@@ -39,6 +43,10 @@ int ioGetPendingRequestCount(void);
 
 /** returns nonzero if there are any pending io requests */
 int ioHasPendingRequests(void);
+// Pending requests excluding quiet background maintenance -- what the loading spinner keys off.
+// Queue drains/throttles must keep using ioHasPendingRequests (a quiet request still occupies the
+// worker and still delays a launch).
+int ioHasVisiblePendingRequests(void);
 
 /** returns nonzero if the io thread is running */
 int ioIsRunning(void);

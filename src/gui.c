@@ -2230,8 +2230,12 @@ static void guiDrawOverlays()
 {
     static int busyAlpha = 0x00; // Fully transparant
 
-    // are there any pending operations?
-    int pending = ioHasPendingRequests();
+    // Any pending operations the user should SEE? Visible-only on purpose (#290): the raw queue
+    // also carries menuUpdateHook's periodic background device rescans, and on a device where one
+    // presence scan takes a few hundred ms (MMCE SIO2 round-trips), keying the spinner off the raw
+    // queue made it fade in "every few seconds" while the console sat idle. Real work -- list
+    // loads, config saves, module loads, theme switches -- is still counted.
+    int pending = ioHasVisiblePendingRequests();
 
     // During the boot intro, when an animated boot logo is shown, suppress the
     // loading spinner -- the animated logo is the boot activity indicator there.
@@ -2292,7 +2296,11 @@ static void guiDrawOverlays()
 #endif
 
     // Last Played Auto Start
-    if (!pending && DisableCron == 0 && endIntro) {
+    // FULL queue check here, not the spinner's visible-only `pending` (#290): this gate previously
+    // shared that variable, and quieting the background rescans would otherwise have let the
+    // auto-start countdown run -- and fire the launch -- while a rescan still occupied the IO
+    // worker. Freezing the countdown during ANY in-flight work is the pre-#290 behaviour; keep it.
+    if (!ioHasPendingRequests() && DisableCron == 0 && endIntro) {
         if (CronStart == 0) {
             CronStart = clock() / CLOCKS_PER_SEC;
         } else {

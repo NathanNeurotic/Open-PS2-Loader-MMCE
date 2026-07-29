@@ -24,6 +24,9 @@ struct io_request_t
 {
     int type;
     void *data;
+    // Nonzero = background maintenance (periodic device rescans): excluded from the busy-spinner
+    // count below, still counted by everything that DRAINS the queue. See ioPutRequestQuiet.
+    int quiet;
     struct io_request_t *next;
 };
 
@@ -39,6 +42,28 @@ static struct io_request_t *gReqEnd;
 
 // Total number of queued requests currently stored in the list.
 static int gReqCount;
+
+/*
+  Number of NON-QUIET requests between enqueue and processing-complete -- what the GUI busy spinner
+  keys off (#290).
+
+  The spinner used to key off the raw queue (ioHasPendingRequests), which also counts the periodic
+  background device rescans menuUpdateHook enqueues every MENU_GENERAL_UPDATE_DELAY frames. On a
+  device where one presence scan takes a few hundred ms (MMCE's SIO2 round-trips, a busy USB stick),
+  each rescan held the queue non-empty long enough for the fade-in to become visible -- the loading
+  spinner "reappearing every few seconds" while the console sat idle, doing maintenance the user
+  never asked for and cannot see the result of. Upstream OPL and wOPL share this (same hook, same
+  raw-queue spinner, none of our scheduling gates), which is why the reporter reproduces it on the
+  main branch.
+
+  A request is visible from ioPutRequest until the worker has FINISHED processing it (the node is
+  unlinked only after its handler returns), so the spinner still spans the whole duration of real
+  work, exactly as before. Only who gets counted changed.
+
+  Updated under gEndSemaId in every path that links or unlinks a node; read without the sema by the
+  render loop, same single-word-read discipline as ioHasPendingRequests' pointer peek.
+*/
+static int gVisibleCount;
 
 static struct io_handler_t gRequestHandlers[MAX_IO_HANDLERS];
 
@@ -150,6 +175,8 @@ static void ioWorkerThread(void *arg)
 
             // can't be sure if the request was
             gReqList = req->next;
+            if (!req->quiet && gVisibleCount > 0)
+                gVisibleCount--; // processing done only now, so visibility spans the handler run
             free(req);
             if (gReqCount > 0)
                 gReqCount--;
@@ -166,6 +193,8 @@ static void ioWorkerThread(void *arg)
     while (gReqList) {
         struct io_request_t *req = gReqList;
         gReqList = gReqList->next;
+        if (!req->quiet && gVisibleCount > 0)
+            gVisibleCount--;
         free(req);
         if (gReqCount > 0)
             gReqCount--;
@@ -196,6 +225,7 @@ void ioInit(void)
     gReqList = NULL;
     gReqEnd = NULL;
     gReqCount = 0;
+    gVisibleCount = 0;
 
     gIOThreadId = 0;
 
@@ -222,7 +252,7 @@ void ioInit(void)
     StartThread(gIOThreadId, NULL);
 }
 
-int ioPutRequest(int type, void *data)
+static int ioPutRequestInternal(int type, void *data, int quiet)
 {
     if (isIOBlocked)
         return IO_ERR_IO_BLOCKED;
@@ -246,6 +276,7 @@ int ioPutRequest(int type, void *data)
     req->next = NULL;
     req->type = type;
     req->data = data;
+    req->quiet = quiet;
 
     if (!gReqEnd)
         gReqList = req;
@@ -253,12 +284,28 @@ int ioPutRequest(int type, void *data)
         gReqEnd->next = req;
     gReqEnd = req;
     gReqCount++;
+    if (!quiet)
+        gVisibleCount++;
 
     SignalSema(gEndSemaId);
 
     // Worker thread cannot wake itself up (WakeupThread will return an error), but it will find the new request before sleeping.
     WakeupThread(gIOThreadId);
     return IO_OK;
+}
+
+int ioPutRequest(int type, void *data)
+{
+    return ioPutRequestInternal(type, data, 0);
+}
+
+// Same queue, same handlers, same drain semantics -- but excluded from the busy-spinner count
+// (ioHasVisiblePendingRequests). For BACKGROUND MAINTENANCE only: work the user did not ask for and
+// whose usual outcome is "nothing changed", like menuUpdateHook's periodic device rescans. Anything
+// user-initiated (device enable, manual refresh, config save, module loads) must stay visible.
+int ioPutRequestQuiet(int type, void *data)
+{
+    return ioPutRequestInternal(type, data, 1);
 }
 
 int ioRemoveRequests(int type)
@@ -285,6 +332,8 @@ int ioRemoveRequests(int type)
                 gReqEnd = last;
 
             count++;
+            if (!req->quiet && gVisibleCount > 0)
+                gVisibleCount--;
             free(req);
             if (gReqCount > 0)
                 gReqCount--;
@@ -339,6 +388,15 @@ int ioGetPendingRequestCount(void)
 int ioHasPendingRequests(void)
 {
     return gReqList != NULL ? 1 : 0;
+}
+
+// Pending requests EXCLUDING quiet background maintenance -- what the loading spinner shows (#290).
+// Everything that drains or throttles the queue must keep using ioHasPendingRequests: a quiet
+// request still occupies the worker, still delays a launch, and must still hold off the next
+// background rescan.
+int ioHasVisiblePendingRequests(void)
+{
+    return gVisibleCount > 0 ? 1 : 0;
 }
 
 #ifdef __EESIO_DEBUG
