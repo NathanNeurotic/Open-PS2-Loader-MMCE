@@ -689,6 +689,50 @@ static int favGetImage(item_list_t *itemList, char *folder, int isRelative, char
     return -1;
 }
 
+// Resolve an art-cache `value` (a source item's startup, or a VCD favourite's .VCD name /
+// strict PS1 id) to the favourite's SOURCE device mode, using the same matching favGetImage
+// uses to route the actual read. Lets texcache's cacheGetEffectiveMode key every mode-gated
+// protection (the MMCE prefetch exemption, the MMCE/HDD nav-time defer, the MMCE abort
+// sweeps, the MMCE/HDD load-priority drop) on the device the read really lands on, instead
+// of the FAV wrapper mode -- without this, an MMCE-sourced favourite's SIO2 art read was
+// invisible to all four. Returns -1 when no favourite matches (e.g. a theme attribute-image
+// value, which takes the passthrough path in favGetImage). Pure in-memory scan, no IO.
+//
+// Thread safety: callers are GUI-thread render paths (prio 31), but favArray is rebuilt
+// UNLOCKED by favUpdateItemList on the prio-30 IO worker (menuDeferredUpdate). Safe today
+// because the IO thread outranks the GUI thread (a rebuild in progress keeps us off-CPU),
+// favFreeArray NULLs favArray/favCount before the rebuild's first blocking point (favReadFile)
+// so a scan started around a rebuild hits the NULL guard, entries become visible only after
+// full population (favCount++ last), and the FAV submenu rows that drive these scans are torn
+// down (clearMenuGameList) before the rebuild starts. Do NOT raise the GUI thread's priority
+// to/above the IO worker's or add a yield inside favFreeArray without adding real
+// synchronization here.
+int favGetArtMode(const char *value)
+{
+    if (favArray == NULL || value == NULL)
+        return -1;
+    for (int i = 0; i < favCount; i++) {
+        item_list_t *o = favArray[i].owner;
+        if (o == NULL)
+            continue;
+        if (favArray[i].isVcd) {
+            if (strcmp(favArray[i].text, value) != 0) {
+                char fallbackKey[VCD_ID_MAX];
+                if (!vcdExtractGameId(favArray[i].text, fallbackKey, sizeof(fallbackKey)) ||
+                    strcmp(fallbackKey, value) != 0)
+                    continue;
+            }
+            return favArray[i].mode;
+        }
+        if (o->itemGetStartup == NULL || !favOwnerHasId(o, favArray[i].id))
+            continue;
+        char *s = o->itemGetStartup(o, favArray[i].id);
+        if (s != NULL && strcmp(s, value) == 0)
+            return favArray[i].mode;
+    }
+    return -1;
+}
+
 // Rename/Delete are blocked for favourites (also guarded at the menu level).
 static void favDeleteItem(item_list_t *itemList, int id) {}
 static void favRenameItem(item_list_t *itemList, int id, char *newName) {}

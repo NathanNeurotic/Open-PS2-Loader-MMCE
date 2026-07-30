@@ -22,6 +22,13 @@ unsigned char favGetFlags(item_list_t *itemList);
 // theme engine to draw APP favourites with the apps element (proper art box + overlay).
 int favGetItemSourceMode(int id);
 
+// Source device mode of the favourite whose art-cache value (source startup / VCD name) matches,
+// or -1 if none does. Used by texcache's cacheGetEffectiveMode so every mode-keyed art gate
+// (MMCE prefetch exemption, MMCE/HDD nav defer, MMCE abort sweeps, load-priority drop) applies
+// to the device a FAV-tab read actually lands on. GUI thread only -- favArray is rebuilt
+// unlocked on the IO worker; see favGetArtMode's safety note in favsupport.c.
+int favGetArtMode(const char *value);
+
 // R3-toggle helpers (called from opl.c). add/remove rewrite favourites.bin and return 1 on a
 // successful write, 0 on failure (so the caller won't set a lying star). add returns 1 if the
 // item is already present. removeFavouriteByIdAndText matches mode (BDM-lenient) + id + text + isVcd.

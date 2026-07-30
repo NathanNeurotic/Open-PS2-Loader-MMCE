@@ -841,6 +841,12 @@ static void prefetchGameImageTexture(image_cache_t *cache, void *support, struct
     if (cache == NULL || item == NULL || guiInactiveFrames < minInactiveFrames)
         return;
 
+    // Folder rows have no cover art -- same guard getGameImageTexture applies on the
+    // interactive path, so a prefetch walk that crosses a folder row cannot thrash the
+    // cache with the folder's non-art startup key.
+    if (item->item.isFolder)
+        return;
+
     list = (item_list_t *)support;
     if (list == NULL)
         return;
@@ -1125,6 +1131,8 @@ static void drawCoverFlow(struct menu_list *menu, struct submenu_list *item, con
     int drawFirst = cfIsAnimating ? 0 : COVERFLOW_PAD;
     int drawLast = cfIsAnimating ? coverTotal : coverTotal - COVERFLOW_PAD;
 
+    GSTEXTURE *centerTexture = NULL; // the selection's LOADED art, if any -- gates the neighbor prefetch below
+
     for (i = drawFirst; i < drawLast; i++) {
         if (!covers[i])
             continue;
@@ -1142,6 +1150,8 @@ static void drawCoverFlow(struct menu_list *menu, struct submenu_list *item, con
 
         GSTEXTURE *texture = getGameImageTexture(cimg->cache, sourceList, &covers[i]->item);
         int hasArt = (texture && texture->Mem);
+        if (i == centerIdx && hasArt)
+            centerTexture = texture;
         // #2 (Nadwislanski): a no-art Favourites entry (a favourited app / PS1 title / game with no
         // ART/<id>_COV.png) must NOT draw the embedded cover placeholder wrapped in the two-layer case
         // frame -- that reads as a hollow grey "empty tray" box. Skip the whole cover instead (draw
@@ -1204,6 +1214,63 @@ static void drawCoverFlow(struct menu_list *menu, struct submenu_list *item, con
     }
 
     rmSetReflectionYOffset(0); // don't leak the offset to any other reflection draw
+
+    /*
+      Idle prefetch of the OFF-SCREEN neighbors (issue #296). Two gates keep every cover off the
+      carousel until the user pauses: interactive requests are settle-gated (guiInactiveFrames
+      resets to 0 while any button is held), and at rest the two padding covers are not drawn at
+      all (the #271 rest-state optimization above), so the incoming cover's FIRST request happens
+      mid-slide -- exactly when the settle gate blocks it. Every step therefore slides in the
+      placeholder, which then pops to real art only after the user settles -- the "art only loads
+      when I focus each game" report.
+
+      Warm those neighbors during the SAME idle windows the list-mode cover panel already uses
+      (prefetchAdjacentGameImages, drawGameImage): PREFETCH priority, so MMCE stays exempt (SIO2)
+      -- including an MMCE-SOURCED FAVOURITE on the FAV tab, whose owner mode texcache resolves
+      per value (cacheGetEffectiveMode -> favGetArtMode) before applying the exemption -- and APP
+      keeps its longer settle + pending-interactive check via canPrefetchAdjacentGameImages. The
+      walk also only runs once the selection's own art has landed, so the focused cover always
+      wins the queue. The walk wraps last<->first exactly like the covers[]
+      build; distance is bounded so the whole warmed window (visible + pads + lookahead) fits the
+      cache's slot count with no LRU thrash: (count-1)/2 = 4 each side on the 10-slot COV cache,
+      i.e. one cover beyond the pad slot in 5-up mode, two in 3-up. Per-item element redirect
+      (thmGetElemForItem) keeps a FAV-tab APP favourite prefetching into the apps cache, matching
+      its draw. Duplicate visits (small wrapped lists) dedupe inside the cache by value.
+    */
+    if (elem->extended != NULL) {
+        mutable_image_t *baseImg = (mutable_image_t *)elem->extended;
+        if (baseImg->cache != NULL && baseImg->cache->suffix != NULL && strcmp(baseImg->cache->suffix, "COV") == 0 &&
+            canPrefetchAdjacentGameImages(baseImg->cache, sourceList, centerTexture)) {
+            int prefetchInactiveFrames = (sourceList != NULL && sourceList->mode == APP_MODE) ? APP_PREFETCH_IDLE_FRAMES : MENU_MIN_INACTIVE_FRAMES;
+            int maxDistance = (baseImg->cache->count - 1) / 2;
+            struct submenu_list *next = item;
+            struct submenu_list *prev = item;
+
+            for (i = 1; i <= maxDistance; i++) {
+                if (next != NULL) {
+                    next = next->next ? next->next : menu->item->submenu;
+                    if (next == item)
+                        next = NULL; // wrapped full circle
+                }
+                if (prev != NULL) {
+                    prev = prev->prev ? prev->prev : menu->item->last;
+                    if (prev == item)
+                        prev = NULL; // wrapped full circle (or no tail yet)
+                }
+
+                if (next != NULL) {
+                    mutable_image_t *nimg = (mutable_image_t *)thmGetElemForItem(menu, next, elem)->extended;
+                    if (nimg != NULL)
+                        prefetchGameImageTexture(nimg->cache, sourceList, next, prefetchInactiveFrames);
+                }
+                if (prev != NULL && prev != next) {
+                    mutable_image_t *pimg = (mutable_image_t *)thmGetElemForItem(menu, prev, elem)->extended;
+                    if (pimg != NULL)
+                        prefetchGameImageTexture(pimg->cache, sourceList, prev, prefetchInactiveFrames);
+                }
+            }
+        }
+    }
 }
 
 static void initCoverflow(const char *themePath, config_set_t *themeConfig, theme_t *theme, theme_element_t *elem, const char *name)

@@ -1,6 +1,7 @@
 #include "include/opl.h"
 #include "include/diag.h"
 #include "include/appsupport.h"
+#include "include/favsupport.h"
 #include "include/pad.h"
 #include "include/texcache.h"
 #include "include/textures.h"
@@ -397,6 +398,23 @@ static int cacheGetEffectiveMode(const item_list_t *list, const char *value)
         return -1;
 
     mode = list->mode;
+    // A FAV-tab read proxies to the favourite's OWNER device (favGetImage), so resolve to the
+    // owner's mode FIRST or every mode-keyed gate below and at the call sites (MMCE prefetch
+    // exemption, MMCE/HDD nav-time defer, MMCE abort sweeps, MMCE/HDD load-priority drop) is
+    // blind to e.g. an MMCE-sourced favourite's SIO2 read -- the #116/#120 class of contention
+    // with the FAV wrapper stripping the mode. An APP-sourced favourite falls through to the
+    // existing APP branch (value is the app's startup, exactly what appGetArtMode keys on).
+    // Thread contract: this runs on the GUI thread only (all callers are render-path); the art
+    // WORKER's defer check reads the request's stamped effectiveMode instead
+    // (cacheShouldDeferInteractiveArtOnInputMode). favArray itself is rebuilt UNLOCKED on the
+    // prio-30 IO worker (menuDeferredUpdate) -- see favGetArtMode's safety note for why the
+    // GUI-thread scan is safe against that rebuild.
+    if (mode == FAV_MODE && value != NULL) {
+        int srcMode = favGetArtMode(value);
+
+        if (srcMode >= 0)
+            mode = srcMode;
+    }
     if (mode == APP_MODE && value != NULL) {
         int artMode = appGetArtMode(value);
 
@@ -415,10 +433,11 @@ static int cacheGetBaseDelay(const item_list_t *list)
     return MENU_MIN_INACTIVE_FRAMES;
 }
 
-static int cacheGetInteractiveDelay(const item_list_t *list, const char *value)
+// Delay helpers take the caller's already-resolved effective mode: cacheGetEffectiveMode's FAV
+// resolution scans favArray per call, so resolve ONCE per cacheGetTextureInternal invocation.
+static int cacheGetInteractiveDelay(const item_list_t *list, int mode)
 {
     int delay = cacheGetBaseDelay(list);
-    int mode = cacheGetEffectiveMode(list, value);
 
     if (list != NULL && list->mode == APP_MODE) {
         if (mode != MMCE_MODE)
@@ -437,10 +456,9 @@ static int cacheGetInteractiveDelay(const item_list_t *list, const char *value)
     return delay;
 }
 
-static int cacheGetPrefetchDelay(const item_list_t *list, const char *value)
+static int cacheGetPrefetchDelay(const item_list_t *list, int mode)
 {
     int delay = cacheGetBaseDelay(list);
-    int mode = cacheGetEffectiveMode(list, value);
 
     if (mode == APP_MODE && delay < CACHE_APP_PREFETCH_DELAY)
         delay = CACHE_APP_PREFETCH_DELAY;
@@ -506,20 +524,19 @@ static int cacheIsNavigationActive(void)
     return gNavInputActive;
 }
 
-static int cacheShouldDeferInteractiveArtOnInput(const item_list_t *list, const char *value)
+// Defer interactive cover reads while the user is actively scrolling on the SLOW filesystem
+// backends -- MMCE (SIO2) and APA-HDD (PFS over ATA). Both read art through the single fileXio
+// channel the menu also uses for badge/config IO, so starting a read mid-scroll stalls nav (the
+// "HDD is not very responsive... like the MMCE was" report). USB/exFAT BDM is fast and stays
+// unthrottled. Covers still land once navigation goes idle (the per-value settle below).
+static int cacheShouldDeferInteractiveArtOnInputMode(int effectiveMode)
 {
-    int effectiveMode = cacheGetEffectiveMode(list, value);
-
-    // Defer interactive cover reads while the user is actively scrolling on the SLOW filesystem
-    // backends -- MMCE (SIO2) and APA-HDD (PFS over ATA). Both read art through the single fileXio
-    // channel the menu also uses for badge/config IO, so starting a read mid-scroll stalls nav (the
-    // "HDD is not very responsive... like the MMCE was" report). USB/exFAT BDM is fast and stays
-    // unthrottled. Covers still land once navigation goes idle (the per-value settle below).
-    if (list != NULL && (effectiveMode == MMCE_MODE || effectiveMode == HDD_MODE))
+    if (effectiveMode == MMCE_MODE || effectiveMode == HDD_MODE)
         return cacheIsNavigationActive();
 
     return 0;
 }
+
 
 static int cacheGetLoadThreadPriority(const load_image_request_t *req)
 {
@@ -654,7 +671,7 @@ static void cacheInvalidateEntryLocked(cache_entry_t *entry, int freeTxt, int pr
                 // (#116 "held in reserve", #120 static-screen gate) cancelled the in-flight read on
                 // every held-nav carousel step, discarding partial SIO2 progress and forcing a full
                 // re-read after settle -- the residual "backs up like it's buffering". It bought
-                // nothing: during a hold, cacheShouldDeferInteractiveArtOnInput already blocks new
+                // nothing: during a hold, cacheShouldDeferInteractiveArtOnInputMode already blocks new
                 // MMCE/HDD enqueues (cacheGetTextureInternal) AND worker dequeues (cacheDequeueRequest),
                 // so at most this ONE read finishes into an otherwise idle bus.
                 if (!preserveLoaded)
@@ -828,7 +845,10 @@ static load_image_request_t *cacheDequeueRequest(void)
     cacheLock();
 
     if (gArtInteractiveReqList != NULL) {
-        if (cacheShouldDeferInteractiveArtOnInput(gArtInteractiveReqList->list, gArtInteractiveReqList->value)) {
+        // Mode variant, NOT the (list, value) resolver: this runs on the art worker thread, and
+        // the resolver's FAV lookup scans favArray unlocked. effectiveMode was stamped on the
+        // GUI thread at enqueue.
+        if (cacheShouldDeferInteractiveArtOnInputMode(gArtInteractiveReqList->effectiveMode)) {
             cacheUnlock();
             return NULL;
         }
@@ -842,7 +862,7 @@ static load_image_request_t *cacheDequeueRequest(void)
     } else if (gArtPrefetchReqList != NULL) {
         // Same nav-time defer the interactive head gets: a prewarm (or HDD cover) prefetch read
         // must never START mid-scroll on a slow shared bus.
-        if (cacheShouldDeferInteractiveArtOnInput(gArtPrefetchReqList->list, gArtPrefetchReqList->value)) {
+        if (cacheShouldDeferInteractiveArtOnInputMode(gArtPrefetchReqList->effectiveMode)) {
             cacheUnlock();
             return NULL;
         }
@@ -1591,18 +1611,18 @@ static GSTEXTURE *cacheGetTextureInternal(image_cache_t *cache, item_list_t *lis
          * global left by the previous draw, re-arm the window, and return "defer" -- so no MMCE
          * cover was ever enqueued and art never loaded on those themes. It was also redundant:
          * the interactive settle is already enforced below by guiInactiveFrames < delay (4-12
-         * MMCE frames) and, during an active scroll, by cacheShouldDeferInteractiveArtOnInput.
+         * MMCE frames) and, during an active scroll, by cacheShouldDeferInteractiveArtOnInputMode.
          * The 2-frame debounce window was strictly shorter than that settle, so its only
          * distinct effect was to block a cover that scrolled into view while the user was
          * already settled -- exactly when it should load. Removed; the two gates below are the
          * complete throttle. */
-        if (cacheShouldDeferInteractiveArtOnInput(list, value)) {
+        if (cacheShouldDeferInteractiveArtOnInputMode(effectiveMode)) {
             cacheUnlock();
             return NULL;
         }
 
         if (!skipSettle) {
-            int delay = cacheGetInteractiveDelay(list, value);
+            int delay = cacheGetInteractiveDelay(list, effectiveMode);
             /* In MMCE mode, give Cover art a 1-frame inactivity head start over
              * other art types (Background, Screenshot, etc.).  The default theme
              * draws Background (main0) before Cover (main5) every frame, so
@@ -1624,7 +1644,7 @@ static GSTEXTURE *cacheGetTextureInternal(image_cache_t *cache, item_list_t *lis
         // MMCE is prefetch-exempt (browse-time prefetch hurt nav on the SIO2 bus) EXCEPT for an
         // explicit info-art prewarm, whose caller only fires after a long settle with the art
         // pipeline idle.
-        if (list == NULL || (effectiveMode == MMCE_MODE && !prewarm) || guiInactiveFrames < cacheGetPrefetchDelay(list, value)) {
+        if (list == NULL || (effectiveMode == MMCE_MODE && !prewarm) || guiInactiveFrames < cacheGetPrefetchDelay(list, effectiveMode)) {
             cacheUnlock();
             return NULL;
         }
@@ -1639,7 +1659,7 @@ static GSTEXTURE *cacheGetTextureInternal(image_cache_t *cache, item_list_t *lis
     if (req != NULL && req->entry != NULL) {
         if (priority == CACHE_REQ_PRIORITY_INTERACTIVE) {
             cachePromoteQueuedRequestLocked(req);
-            if (!cacheShouldDeferInteractiveArtOnInput(list, value))
+            if (!cacheShouldDeferInteractiveArtOnInputMode(effectiveMode))
                 wakeWorker = 1;
         }
 
@@ -1708,7 +1728,14 @@ static GSTEXTURE *cacheGetTextureInternal(image_cache_t *cache, item_list_t *lis
     req->entry = oldestEntry;
     req->list = list;
     req->effectiveMode = effectiveMode;
-    req->vcdFallback = vcdViewActive(effectiveMode);
+    // Key the strict-PS1-id retry on the REQUESTING list's view, not the resolved backend mode:
+    // the FAV->owner resolution in cacheGetEffectiveMode would otherwise read the OWNER page's
+    // independent L3 view (default ISO under GAME_VIEW_BOTH) and silently disarm the retry for a
+    // VCD favourite the FAV tab is displaying right now -- the FAV tab only lists VCD favourites
+    // while ITS OWN view is VCD, so the requesting-list stamp is 1 exactly when it should be.
+    // Behavior-identical for device lists (list->mode == the pre-resolution mode) and for APP
+    // lists (vcdModeSupported(APP_MODE) == 0, and an app value never yields a strict-ID retry).
+    req->vcdFallback = (list != NULL) ? vcdViewActive(list->mode) : 0;
     req->priority = priority;
     req->generation = gCacheGeneration;
     req->failEpoch = gCacheFailEpoch; // pin the absence epoch to when the load STARTED, not when it finishes
