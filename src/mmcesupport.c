@@ -26,10 +26,12 @@
 static char mmcePrefix[40]; // Contains the full path to the folder where all the games are.
 static char mmceArtPrimary[40];
 static int mmceULSizePrev = -2;
-// VCD-scan self-heal (HW batch S6): vcdFillGameList cannot tell an ABSENT POPS folder from a
-// CONTENDED one (-1 both), so ONE failed scan on a busy bus used to latch an empty VCD page under
-// NOUPDATE with no rescan for the session. Bounded retry, same shape as the ISO first-scan sentinel:
-// ~15 passes at the ~2s cadence, re-armed by a fresh L3 toggle, self-quiescing on success/expiry.
+// VCD-scan self-heal (HW batch S6): a failed vcdFillGameList on a CONTENDED bus (-1) used to latch
+// an empty VCD page under NOUPDATE with no rescan for the session. Bounded retry, same shape as the
+// ISO first-scan sentinel: ~15 passes at the ~2s cadence, re-armed by a fresh L3 toggle, self-
+// quiescing on success/expiry. (The other half of the old "-1 for both" ambiguity is now split at
+// the source: vcdScanOpenDir returns 0 for a genuinely-ABSENT POPS folder -- #154 residual -- so
+// only contention ever arms this budget.)
 static unsigned char mmceVcdScanFailed = 0;
 static unsigned char mmceVcdScanRetries = 0;
 #define MMCE_VCD_SCAN_RETRY_MAX 15
@@ -56,6 +58,18 @@ static int mmceResolvedDevice = -1;
 static char mmceFoldersCreatedFor[40] = {0};
 #define MMCE_FOLDER_RETRY_MAX 5 // bounded CFG-create retries per card before declaring it obstructed
 static unsigned char mmceFolderRetries = 0;
+// Auto-slot presence debounce (#154 audit residual): the cache-hit probe in mmceSetPrefix used to
+// invalidate the slot on ONE failed presence devctl -- and mmceUpdateGameList then frees BOTH game
+// lists -- so a transiently contended SIO2 bus (list scan + art read + MX4SIO traffic all sharing
+// it) read as "card pulled" and both lists vanished until the next ~2s refresh re-detected.
+// Require MMCE_PRESENCE_PROBE_MAX CONSECUTIVE failures before invalidating, re-probing INLINE with
+// a short gap (the same 200 ms DelayThread cadence the GameID settle loops use): worst case ~1.0 s
+// on a genuine pull (3x the devctl's own 200 ms timeout + 2 gaps), still inside the ~2s refresh
+// cadence, so a pull is still detected on THIS pass -- just two probes later -- while a bus-quiet
+// window between probes absorbs the transient. No persistent counter: any successful probe breaks
+// the loop and declares the card present.
+#define MMCE_PRESENCE_PROBE_MAX 3
+#define MMCE_PRESENCE_RETRY_US  (200 * 1000)
 
 // Card-switch wait: poll the MMCE busy bit every 500 ms for up to ~7.5 s, matching mmceman's own
 // switch handshake. On a CROSS-DEVICE launch (a USB/HDD/SMB game whose per-game card lives on the
@@ -326,13 +340,23 @@ void mmceSetPrefix(void)
         sprintf(mmcePrefix, "mmce1:/%s", gMMCEPrefix);
     else if (gMMCESlot == 2) {
         // Auto: reuse the previously-detected slot instead of probing BOTH slots every refresh.
-        // On a cache hit, ONE presence devctl on the resolved slot confirms the card is still there
-        // (mmcePrefix from the prior detect is still correct); a miss means the card was pulled, so
-        // invalidate and fall through to a full re-detect. Net: 1 SIO2 probe/cycle instead of 2, and
-        // card removal is now noticed (mmceDetectSlot alone leaves a stale prefix on a lost card).
+        // On a cache hit, a presence devctl on the resolved slot confirms the card is still there
+        // (mmcePrefix from the prior detect is still correct); only MMCE_PRESENCE_PROBE_MAX
+        // CONSECUTIVE misses mean the card was pulled (#154 debounce, below), so invalidate and fall
+        // through to a full re-detect. Net: 1 SIO2 probe/cycle instead of 2 on the happy path, and
+        // card removal is still noticed (mmceDetectSlot alone leaves a stale prefix on a lost card).
         if (mmceResolvedDevice > 0) {
             const char *root = (mmceResolvedDevice == 2) ? "mmce0:/" : "mmce1:/";
-            if (fileXioDevctl(root, 0x1, NULL, 0, NULL, 0) == -1) {
+            // Debounced presence check (#154): invalidate only after MMCE_PRESENCE_PROBE_MAX
+            // consecutive failed devctls -- see the define block above. One success = present.
+            int probe;
+            for (probe = 0; probe < MMCE_PRESENCE_PROBE_MAX; probe++) {
+                if (fileXioDevctl(root, 0x1, NULL, 0, NULL, 0) != -1)
+                    break;
+                if (probe + 1 < MMCE_PRESENCE_PROBE_MAX)
+                    DelayThread(MMCE_PRESENCE_RETRY_US); // let a contended bus quiet, then re-probe
+            }
+            if (probe >= MMCE_PRESENCE_PROBE_MAX) {
                 mmceResolvedDevice = -1;
                 mmcePrefix[0] = '\0';
             } else {

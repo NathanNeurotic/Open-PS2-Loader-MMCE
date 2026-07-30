@@ -13,6 +13,7 @@
 #include <string.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <errno.h>    // errno/ENOENT in the vcdScanOpenDir absent-vs-contended split (#154)
 #include <sys/stat.h> // mkdir (POSIX, used like util.c / OSDHistory.c)
 
 #include "include/opl.h"         // pulls <dirent.h> (opendir/readdir/DIR) + strcasecmp, like supportbase.c
@@ -107,13 +108,32 @@ static int vcdEntryCmp(const void *a, const void *b)
 // IO only (newlib-port rule). Shared by vcdScanDir (POPS subfolder) and vcdScanDirRoot (path as-is).
 static int vcdScanOpenDir(const char *dirPath, vcd_entry_t **outList)
 {
+    errno = 0; // clear BEFORE opendir so the NULL branch reads THIS call's errno, not a stale one
     DIR *dir = opendir(dirPath);
-    if (dir == NULL)
-        return -1; // could NOT read the dir (absent OR device momentarily unreadable / bus contended).
-                   // Signal a scan FAILURE -- distinct from a readable-but-empty dir (opens fine, count
-                   // 0) -- so the caller PRESERVES its last-good list instead of blanking it on a
-                   // transient wedge. Mirrors scanForISO (the ISO path) -- the #120 fix: the VCD & ISO
-                   // views share one backing store, and returning 0 here zeroed BOTH on a contended bus.
+    if (dir == NULL) {
+        // Absent-vs-contended split (#154 audit residual): returning -1 for BOTH made a card with
+        // NO POPS folder burn mmcesupport's bounded rescan budget (MMCE_VCD_SCAN_RETRY_MAX) on
+        // every refresh. errno IS faithful here: newlib's opendir is a plain open() that returns
+        // NULL without touching errno (verified in the toolchain's libc disassembly), so the glue's
+        // __transform_errno result survives -- the same propagation textures.c's mmce art classifier
+        // and supportbase.c's sbRename already rely on. ENOENT = the folder is GENUINELY absent ->
+        // return 0 ("readable, no VCDs here"): the caller treats it as an empty scan and arms NO
+        // retry. Every other errno keeps the -1 failure semantics below.
+        if (errno == ENOENT)
+            return 0;
+        // could NOT read the dir (device momentarily unreadable / bus contended). Signal a scan
+        // FAILURE -- distinct from a readable-but-empty dir (opens fine, count 0) -- so the caller
+        // PRESERVES its last-good list instead of blanking it on a transient wedge. Mirrors
+        // scanForISO (the ISO path) -- the #120 fix: the VCD & ISO views share one backing store,
+        // and returning 0 here zeroed BOTH on a contended bus.
+        // MMCE caveat: mmceman's dopen collapses EVERY failure -- including the card's explicit
+        // not-found reply -- into a bare -1 (EE sees EPERM, not ENOENT), so on mmceN: an absent
+        // POPS still lands on this -1 path unless the paired mmceman-fs-dopen-enoent.patch is in
+        // the build (install_coherent_mmce.sh applies it, same doctrine as the fs-open ENOENT
+        // patch behind textures.c's classifier). Without it, MMCE behavior is exactly the old one:
+        // bounded retries, then quiesce -- never worse.
+        return -1;
+    }
 
     vcd_entry_t *list = (vcd_entry_t *)calloc(VCD_MAX_ITEMS, sizeof(vcd_entry_t));
     if (list == NULL) {

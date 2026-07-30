@@ -1,0 +1,20 @@
+diff --git a/mmceman/src/mmce_fs.c b/mmceman/src/mmce_fs.c
+--- a/mmceman/src/mmce_fs.c
++++ b/mmceman/src/mmce_fs.c
+@@ -644,9 +644,15 @@ int mmce_fs_dopen(iomanX_iop_file_t *file, const char *name)
+     if (rdbuf[0x1] != 0xff) {
+         *(int*)file->privdata = rdbuf[0x1];
+     } else {
++        // -ENOENT, not a bare -1: this is the ONLY dopen-failure path where the CARD ITSELF
++        // answered "no such directory" -- the timeout/garbled-reply paths above stay -1 (EE sees
++        // a non-ENOENT errno) so callers can tell genuine absence from a transient bus failure.
++        // Downstream, OPL's VCD scan (vcdScanOpenDir) treats ENOENT as "no POPS folder -> empty,
++        // no retry"; without it every contended dopen was indistinguishable from an absent dir
++        // and burned the bounded rescan budget. Same doctrine as the mmce_fs_open ENOENT fix.
+         DPRINTF("%s ERROR: Got invalid fd: %i\n", __func__, rdbuf[0x1]);
+         file->privdata = NULL;
+-        return -1;
++        return -ENOENT;
+     }
+ 
+     return 0;
