@@ -387,7 +387,13 @@ static int cacheGetPrefetchLimit(const image_cache_t *cache)
     if (cache == NULL || cache->count <= 1)
         return 0;
 
-    return cache->count - 1 < 4 ? cache->count - 1 : 4;
+    // #296 walk/cap consistency: drawCoverFlow's idle prefetch walks +/-(count-1)/2 covers --
+    // 8 requests on the 10-slot COV cache -- so a cap of 4 silently dropped the far half of
+    // every walk (the +/-3 and +/-4 covers never queued, then re-missed when the user stepped
+    // again). Size the cap to the walk: count-1 admits the whole warmed window (walk + the
+    // visible selection still fits the slots, so the LRU never has to evict a visible cover --
+    // the #297 anti-thrash invariant), and the 8 ceiling bounds the queue for larger caches.
+    return cache->count - 1 < 8 ? cache->count - 1 : 8;
 }
 
 static int cacheGetEffectiveMode(const item_list_t *list, const char *value)
