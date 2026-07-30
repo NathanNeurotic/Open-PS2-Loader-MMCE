@@ -1595,8 +1595,12 @@ static GSTEXTURE *cacheGetTextureInternal(image_cache_t *cache, item_list_t *lis
             entry->value != NULL && strcmp(entry->value, value) == 0) {
             switch (entry->state) {
                 case CACHE_ENTRY_QUEUED:
-                    if (priority == CACHE_REQ_PRIORITY_INTERACTIVE && entry->qr != NULL)
+                    if (priority == CACHE_REQ_PRIORITY_INTERACTIVE && entry->qr != NULL) {
                         cachePromoteQueuedRequestLocked((load_image_request_t *)entry->qr);
+                        /* Same yield as the by-value path below: the promoted cover must not
+                         * queue behind an unrelated in-flight prefetch read. */
+                        cacheYieldInFlightPrefetchLocked();
+                    }
                     cacheUnlock();
                     return NULL;
                 case CACHE_ENTRY_LOADING:
