@@ -1842,6 +1842,20 @@ static void guiDrawBusy(int alpha)
     }
 }
 
+// One hand-pumped loader frame for the synchronous launch path (#299). itemExecSelect() blocks the
+// GUI thread from confirm to the ELF handoff, so guiDrawOverlays()' busy animation never runs there
+// and the user stares at a frozen menu for the whole launch prep. Callers pump this around/between
+// the blocking steps: it leaves menu + loader (at full alpha -- no fade wait, the fade is a
+// guiDrawOverlays concern) scanned out while the next step blocks, and each pump ticks guiFrameId so
+// the animation frame advances. Pure rendering -- no IO-queue traffic, safe any time the GUI is up.
+void guiRenderBusyFrame(void)
+{
+    guiStartFrame();
+    guiShow();
+    guiDrawBusy(0x80);
+    guiEndFrame();
+}
+
 // Boot-splash status line setter (#297). Pass NULL to clear. Main-thread only (writes gBootStatus, which
 // only guiRenderGreeting on the same thread reads). guiRenderGreeting prefers any IO-thread sticky label
 // over this, so a main-thread scan/Ready set no longer needs to guard against the IO thread.
@@ -2226,9 +2240,22 @@ void guiDrawSubMenuHints(void)
 }
 
 static int endIntro = 0; // Break intro loop and start 'Last Played Auto Start' countdown
+// Loader-visibility tuning (#299). With the original 0x02/frame fade-in a genuine op needed ~64
+// frames (~1.1s @60fps) of CONTINUOUS visible IO before the loader reached full alpha, and a
+// sub-second one (fast-USB save, manual refresh, device enable) faded back out before ever becoming
+// perceptible -- the loader was unreachable in practice. The retune: a fast fade-in (full 0x80 in
+// 0x80/BUSY_FADE_IN_STEP = 8 frames, ~133ms; clearly visible in ~4) plus a minimum on-screen latch,
+// so even a ~200ms op is seen for roughly latch + fade-out ~= 1.5s. The TRIGGER is unchanged --
+// ioHasVisiblePendingRequests() only, so quiet background rescans/prefetch still never show it
+// (#290) -- as are the boot suppression below and the slow fade-out.
+#define BUSY_FADE_IN_STEP    0x10 // alpha per frame while visible work is pending (or latched)
+#define BUSY_FADE_OUT_STEP   0x02 // alpha per frame once done: unchanged, ~64 frames (~1.1s) from full
+#define BUSY_MIN_HOLD_FRAMES 30   // latch: once triggered, stay up at least this many frames (~0.5s @60fps)
+
 static void guiDrawOverlays()
 {
     static int busyAlpha = 0x00; // Fully transparant
+    static int busyLatch = 0;    // #299: guaranteed on-screen frames remaining once triggered
 
     // Any pending operations the user should SEE? Visible-only on purpose (#290): the raw queue
     // also carries menuUpdateHook's periodic background device rescans, and on a device where one
@@ -2243,14 +2270,23 @@ static void guiDrawOverlays()
     // without animated logo frames, so a slow boot still shows activity).
     int showBusy = endIntro || (gTheme->logoFrameCount < 1);
     if (showBusy) {
-        if (!pending) {
+        // Arm/re-arm the latch for every pending frame (#299), so the loader stays up at least
+        // BUSY_MIN_HOLD_FRAMES past the END of the operation. Inside the showBusy gate on purpose:
+        // boot-visible ops must not leak a latched spinner past the intro.
+        if (pending)
+            busyLatch = BUSY_MIN_HOLD_FRAMES;
+        else if (busyLatch > 0)
+            busyLatch--;
+
+        if (!pending && busyLatch == 0) {
             // Fade out
             if (busyAlpha > 0x00)
-                busyAlpha -= 0x02;
+                busyAlpha -= BUSY_FADE_OUT_STEP;
         } else {
-            // Fade in
+            // Fade in (fast -- the latch keeps the fade-in branch while it runs down, pinning
+            // the loader at full alpha for the hold)
             if (busyAlpha < 0x80)
-                busyAlpha += 0x02;
+                busyAlpha += BUSY_FADE_IN_STEP;
         }
 
         if (busyAlpha > 0x00)
@@ -2796,22 +2832,27 @@ void guiShowGameID(const char *startup)
         return;
 
     // Hold the barcode on a clean black field for a few frames so an HDMI scaler can latch it.
+    // The loader rides these already-pumped frames (#299): this hold is the one place on the
+    // synchronous launch path that still renders, so drawing the busy animation here makes it
+    // genuinely cycle during launch prep. Bars drawn LAST so the barcode strip stays on top.
     for (frame = 0; frame < GAMEID_HOLD_FRAMES; frame++) {
         guiStartFrame();
         rmDrawRect(0, 0, screenWidth, screenHeight, GS_SETREG_RGBA(0x00, 0x00, 0x00, 0x80));
+        guiDrawBusy(0x80);
         gameIDDrawBars(startup);
         guiEndFrame();
     }
 
     /*
-      Leave a CLEAN black frame behind (#269).
+      Leave a CLEAN black frame behind (#269) -- clean of the BARCODE, that is; the loader is drawn
+      on these frames on purpose (#299, below).
 
-      This is the last thing OPL renders: itemExecSelect() calls us and then goes straight into
-      itemLaunch() -> deinit() -> ExecPS2(), and on a default config nothing in between draws
-      anything (gRememberLastPlayed is off, so there is no save toast; no cheats, no VMC, no
-      MX4SIO warning). Neither deinit() nor sysLaunchLoaderElf() reprograms a GS display register,
-      so whatever buffer rmEndFrame last pointed DISPFB2 at keeps being scanned out until the GAME
-      programs the GS -- which on USB is minutes away.
+      This is the last thing the GameID path renders: itemExecSelect() calls us and then goes
+      straight into itemLaunch() -> deinit() -> ExecPS2(), and on a default config nothing in
+      between draws anything (gRememberLastPlayed is off, so there is no save toast; no cheats, no
+      VMC, no MX4SIO warning). Neither deinit() nor sysLaunchLoaderElf() reprograms a GS display
+      register, so whatever buffer rmEndFrame last pointed DISPFB2 at keeps being scanned out until
+      the GAME programs the GS -- which on USB is minutes away.
 
       Without this, that buffer is "black field + barcode strip", and the strip is drawn at
       1-virtual-pixel pitch (magenta column immediately followed by cyan/yellow). That is below the
@@ -2821,10 +2862,18 @@ void guiShowGameID(const char *startup)
 
       Two frames because rendering is double-buffered -- one alone leaves the barcode in the OTHER
       buffer, which is the one a scaler may resync to across the video-mode change.
+
+      #299: the busy animation is drawn onto both clean frames, so nothing but "black field +
+      loader" is left in EITHER buffer -- the loading indicator issue #299 asks for. The themed
+      load*.png pixmaps are ordinary composite-safe art, nothing like the 1-pixel-pitch barcode
+      strip above, so the #269 premise is untouched. (itemExecSelect also pumps one more
+      guiRenderBusyFrame() after us, which is what covers the GameID-off config where this whole
+      function is a no-op.)
     */
     for (frame = 0; frame < 2; frame++) {
         guiStartFrame();
         rmDrawRect(0, 0, screenWidth, screenHeight, GS_SETREG_RGBA(0x00, 0x00, 0x00, 0x80));
+        guiDrawBusy(0x80);
         guiEndFrame();
     }
 }
