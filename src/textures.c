@@ -3,7 +3,7 @@
 #include "include/textures.h"
 #include "include/util.h"
 #include "include/ioman.h"
-#include <errno.h> // errno/ENOENT in the mmce staging-arm open classifier (transitively via opl.h, but be explicit)
+#include <errno.h> // errno/ENOENT in the staging-arm open classifier (transitively via opl.h, but be explicit)
 #include <kernel.h>
 #include <png.h>
 
@@ -111,7 +111,8 @@ extern void *case_overlay_png;
 
 // Not related to screen size, just to limit at some point
 static int maxSize = 720 * 512 * 4;
-// Per-read() chunk for staging an MMCE cover into RAM. Each read() is one COMPLETE mmceman FS RPC
+// Per-read() chunk for staging an MMCE or BDM-mass cover into RAM. Each MMCE read() is one
+// COMPLETE mmceman FS RPC
 // over the shared SIO2 channel (command handshake + bulk DMA + trailer + a card-side seek/read-ahead
 // prime), and mmceman has NO read-size cap (its length field is a full 32 bits), so a big chunk is
 // served in ONE RPC. At 4 KB a ~100 KB cover cost ~25 RPCs; 32 KB serves it in ~4 -- an ~8x cut in
@@ -421,10 +422,16 @@ static void texReadFileFunction(png_structp pngPtr, png_bytep data, png_size_t l
 
 static int texShouldUseMemoryReader(const char *filePath)
 {
-    return filePath != NULL && (!strncmp(filePath, "mmce0:", 6) || !strncmp(filePath, "mmce1:", 6));
+    // #296 baseline restore: stage BDM USB/MX4SIO art ("massN:" and the bare "mass:") whole-file
+    // into RAM too, not just MMCE. uOPL/official read each cover in ONE transfer; our streaming
+    // reader pays one read() RPC per small chunk DURING decode (texReadFileFunction), so USB
+    // covers decode at chunk granularity. One staged read per cover is uOPL's single biggest USB
+    // win. HDD (pfs:) and ETH (smb:) keep the streaming reader: different perf profiles, no
+    // evidence staging helps there.
+    return filePath != NULL && (!strncmp(filePath, "mmce0:", 6) || !strncmp(filePath, "mmce1:", 6) || !strncmp(filePath, "mass", 4));
 }
 
-static int texStageExternalFileIntoMemory(int fd, void **buffer)
+static int texStageExternalFileIntoMemory(int fd, void **buffer, int shortReadIsEof)
 {
     int bytesRead = 0;
     int capacity;
@@ -435,10 +442,11 @@ static int texStageExternalFileIntoMemory(int fd, void **buffer)
 
     // Do NOT size the file with lseek(SEEK_END) first: the MMCE newlib device (mmceman) does not
     // support SEEK_END, so it returned <= 0 and EVERY MMCE cover failed here with ERR_BAD_FILE (ISO
-    // and VCD alike) while USB -- which streams via read() only -- worked. Grow a heap buffer as we
-    // read the file sequentially (read()-only, the same access the working USB reader uses) and stop
-    // at EOF, so no up-front file length is needed. We keep the bulk-into-RAM staging (the reason this
-    // path exists: MMCE streaming reads during decode are unreliable) -- only the size probe changes.
+    // and VCD alike) while USB -- which streamed via read() only -- worked. Grow a heap buffer as we
+    // read the file sequentially (read()-only, the same access the old USB streaming reader uses)
+    // and stop at EOF, so no up-front file length is needed. We keep the bulk-into-RAM staging
+    // (the reason this path exists: MMCE streaming reads during decode are unreliable, and USB
+    // streaming pays one read() RPC per chunk -- #296) -- only the size probe changes.
     capacity = TEX_MMCE_STAGE_READ_SIZE * 2; // 64 KB; doubles on demand for larger covers
     fileBuffer = malloc(capacity);
     if (fileBuffer == NULL)
@@ -469,14 +477,19 @@ static int texStageExternalFileIntoMemory(int fd, void **buffer)
         }
         bytesRead += result;
 
-        // A SHORT read means EOF here -- break without the extra read()==0 RPC (and the buffer
-        // realloc it would trigger). This is safe ONLY because of how mmceman serves an FS read
-        // (verified against ps2-mmce/mmceman mmce_fs_read + mmce_sio2_rx_mixed @ db3e93f0): the card
-        // always transfers the FULL requested size on the wire and reports the valid byte count
-        // separately, and any mid-transfer stall returns -1 (handled above) -- never a partial
-        // positive count. So result<SIZE is only ever the card's file running out, i.e. EOF; there
-        // is no "short now, more later" case. Do NOT copy this short==EOF break to a non-mmce reader.
-        if (result < TEX_MMCE_STAGE_READ_SIZE)
+        if (result == 0)
+            break; // real EOF, every device
+
+        // For MMCE a SHORT read also means EOF -- break without the extra read()==0 RPC (and the
+        // buffer realloc it would trigger). This is safe ONLY because of how mmceman serves an FS
+        // read (verified against ps2-mmce/mmceman mmce_fs_read + mmce_sio2_rx_mixed @ db3e93f0):
+        // the card always transfers the FULL requested size on the wire and reports the valid byte
+        // count separately, and any mid-transfer stall returns -1 (handled above) -- never a
+        // partial positive count. So result<SIZE is only ever the card's file running out, i.e.
+        // EOF; there is no "short now, more later" case. Non-mmce readers (BDM mass, gated by the
+        // caller's shortReadIsEof) make no such guarantee, so they keep reading until the
+        // result==0 EOF above instead of breaking on a short count.
+        if (shortReadIsEof && result < TEX_MMCE_STAGE_READ_SIZE)
             break;
     }
 
@@ -671,21 +684,25 @@ static int texLoadAll(GSTEXTURE *texture, const char *filePath, int texId, const
             fd = open(filePath, O_RDONLY, 0);
             if (fd < 0) {
                 // Memoize as PERMANENTLY absent (ERR_BAD_FILE -> the fail-epoch memo) only on a real
-                // ENOENT. This is the MMCE staging arm, and mmceman used to return ONE bare -1 for six
-                // different open failures -- fd-pool exhausted, three packet timeouts, a garbled reply,
-                // AND the card's genuine not-found -- so a rapid-nav contention storm branded every
-                // browsed game's art "nonexistent" for the whole session (HW batch S3: art dies, never
-                // recovers). The paired mmceman patch makes the driver return -ENOENT only for the
-                // card's explicit not-found reply; every other failure lands in the EXISTING transient
-                // lane (ERR_FILE_IO, re-probed lazily once per generation) so art self-heals when the
-                // bus quiets. If the newlib glue ever maps errno unfaithfully, the degradation is a
-                // bounded once-per-generation re-probe -- never a hard failure. The generic loose-file
-                // branch below keeps its unconditional ERR_BAD_FILE (BDM/HDD semantics unchanged).
-                LOG("texLoadAll: mmce art open failed: %s (errno %d)\n", filePath, errno);
+                // ENOENT. This is the MMCE/USB staging arm, and mmceman used to return ONE bare -1
+                // for six different open failures -- fd-pool exhausted, three packet timeouts, a
+                // garbled reply, AND the card's genuine not-found -- so a rapid-nav contention storm
+                // branded every browsed game's art "nonexistent" for the whole session (HW batch S3:
+                // art dies, never recovers). The paired mmceman patch makes the driver return
+                // -ENOENT only for the card's explicit not-found reply; every other failure lands in
+                // the EXISTING transient lane (ERR_FILE_IO, re-probed lazily once per generation) so
+                // art self-heals when the bus quiets. The same self-heal applies to BDM USB (#296):
+                // a contended-bus open failure there must not brand the cover absent either. If the
+                // newlib glue ever maps errno unfaithfully, the degradation is a bounded
+                // once-per-generation re-probe -- never a hard failure. The generic loose-file
+                // branch below keeps its unconditional ERR_BAD_FILE (HDD/ETH semantics unchanged).
+                LOG("texLoadAll: staged art open failed: %s (errno %d)\n", filePath, errno);
                 return (errno == ENOENT) ? ERR_BAD_FILE : ERR_FILE_IO;
             }
 
-            result = texStageExternalFileIntoMemory(fd, &pFileBuffer);
+            // mmceman's short-read==EOF guarantee (see the staging function) is MMCE-only; BDM
+            // mass must stage until a real result==0 EOF.
+            result = texStageExternalFileIntoMemory(fd, &pFileBuffer, !strncmp(filePath, "mmce", 4));
 
             close(fd);
             fd = -1;
