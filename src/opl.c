@@ -2652,7 +2652,11 @@ static int loadLwnbdSvr(void)
 
 static void unloadLwnbdSvr(void)
 {
-    ethDeinitModules();
+    // Bookkeeping-only (#307): reset() below reboots the IOP (sysReset -> SifIopReset), which
+    // wipes the whole network stack regardless -- and the graceful RPC teardown in
+    // ethDeinitModules is exactly what wedges after a failed offline bring-up (no cable/link),
+    // freezing the console before the reset is ever reached.
+    ethInvalidateModules();
     unloadPads();
 
     reset();
