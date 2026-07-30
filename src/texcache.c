@@ -599,6 +599,24 @@ static void cacheEnqueueRequestLocked(load_image_request_t *req)
         req->cache->queuedPrefetchRequests++;
 }
 
+/* Speculative work always yields to real demand: when INTERACTIVE demand arrives while a
+ * prefetch read is in flight, flag that read for abort so the selected item's cover does not
+ * queue behind up to a whole cover read it never asked for. This is the #296 patterned ~1 s
+ * stall (Beta-3457, zackcage6): #297's settle-triggered prefetch bursts monopolized the single
+ * art worker exactly when the user was most likely to tap again, in-flight USB reads were not
+ * preemptible (the MMCE abort sweeps don't cover fast modes), and the burst re-armed each time
+ * the cursor exited the warmed +/-4 window -- i.e. every ~5 items. Both readers check
+ * texLoadAbortRequested() between chunks, so the yield lands within one read chunk (~32 KB).
+ * A same-value in-flight prefetch never reaches here (the loading-entry path returns first),
+ * and an aborted prefetch is safe by construction: ERR_LOAD_ABORTED clears the entry and the
+ * walk re-requests it at the next settle. Mode-agnostic on purpose: prefetch is by definition
+ * speculative on every backend. */
+static void cacheYieldInFlightPrefetchLocked(void)
+{
+    if (gArtCurrentReq != NULL && gArtCurrentReq->priority == CACHE_REQ_PRIORITY_PREFETCH)
+        gArtCurrentReq->abortRequested = 1;
+}
+
 static int cacheRemoveQueuedRequestLocked(load_image_request_t *target)
 {
     load_image_request_t *req = *cacheGetQueueHead(target->priority);
@@ -1687,6 +1705,7 @@ static GSTEXTURE *cacheGetTextureInternal(image_cache_t *cache, item_list_t *lis
     if (req != NULL && req->entry != NULL) {
         if (priority == CACHE_REQ_PRIORITY_INTERACTIVE) {
             cachePromoteQueuedRequestLocked(req);
+            cacheYieldInFlightPrefetchLocked();
             if (!cacheShouldDeferInteractiveArtOnInputMode(effectiveMode))
                 wakeWorker = 1;
         }
@@ -1805,6 +1824,8 @@ static GSTEXTURE *cacheGetTextureInternal(image_cache_t *cache, item_list_t *lis
 
     cache->activeRequests++;
     cacheEnqueueRequestLocked(req);
+    if (req->priority == CACHE_REQ_PRIORITY_INTERACTIVE)
+        cacheYieldInFlightPrefetchLocked();
     cacheUnlock();
 
     cacheWakeWorker();
