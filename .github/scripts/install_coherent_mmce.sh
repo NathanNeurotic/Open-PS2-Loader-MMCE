@@ -79,6 +79,20 @@ fi
 echo "== Applying mmceman open-ENOENT fix (distinct errno for genuine not-found) =="
 git -C "$WORK/mmceman" apply --verbose "$FS_ENOENT_PATCH"
 
+# Same split for DIRECTORY open (RiptOPL #154 audit residual): mmce_fs_dopen also returned one bare
+# -1 for every failure, so an absent POPS folder was indistinguishable from a contended bus and
+# burned OPL's bounded VCD rescan budget (MMCE_VCD_SCAN_RETRY_MAX) on every refresh. This patch
+# makes ONLY the card's explicit invalid-fd reply return -ENOENT; vcdScanOpenDir then treats ENOENT
+# as "no POPS folder -> empty, no retry" while contention keeps the -1 preserve-last-good path.
+# Applies on top of the two patches above (disjoint hunks); fail LOUD if it stops applying.
+FS_DOPEN_ENOENT_PATCH="$SCRIPT_DIR/../patches/mmceman-fs-dopen-enoent.patch"
+if [ ! -f "$FS_DOPEN_ENOENT_PATCH" ]; then
+    echo "ERROR: expected mmceman dopen-ENOENT patch not found at $FS_DOPEN_ENOENT_PATCH" >&2
+    exit 1
+fi
+echo "== Applying mmceman dopen-ENOENT fix (distinct errno for genuinely-absent dir) =="
+git -C "$WORK/mmceman" apply --verbose "$FS_DOPEN_ENOENT_PATCH"
+
 # Older-SDK make quirk: the per-module obj dir isn't auto-created by every Makefile.iopglobal
 # vintage -- pre-create it so the first compile step doesn't fail on a missing directory.
 mkdir -p "$WORK/mmceman/mmceman/obj"
