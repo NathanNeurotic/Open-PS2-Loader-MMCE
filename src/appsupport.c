@@ -11,6 +11,7 @@
 #include "include/ethsupport.h"
 #include "include/hddsupport.h"
 #include "include/texcache.h"
+#include "include/textures.h"
 
 #include <elf-loader.h>
 
@@ -815,6 +816,17 @@ static config_set_t *appGetConfig(item_list_t *itemList, int id)
 static int appGetImage(item_list_t *itemList, char *folder, int isRelative, char *value, char *suffix, GSTEXTURE *resultTex, short psm)
 {
     app_info_t *app;
+
+    // Absolute (theme-folder) requests (#298): info-page attribute caches (Rating/Players/Vmode/Scan)
+    // are created with an absolute prefix and key their request on the attribute VALUE ("4", "ntsc",
+    // ...) -- never an app startup -- so the appLookupByStartup gate below must not run for them, or
+    // texcache would memoize a bogus miss and the placeholder renders forever. `folder` is the theme
+    // path; build it directly like hddGetImage does.
+    if (!isRelative) {
+        char path[256];
+        snprintf(path, sizeof(path), "%s%s_%s", folder, value, suffix);
+        return texDiscoverLoad(resultTex, path, -1);
+    }
 
     app = appLookupByStartup(value);
     if (app == NULL || app->artMode < 0)
