@@ -125,6 +125,11 @@ static int maxSize = 720 * 512 * 4;
 // crossing the watchdog. A one-shot getStat+single-read is rejected for the same reason.
 #define TEX_MMCE_STAGE_READ_SIZE 32768
 
+// Hard cap on the staged payload. Legitimate art is <= a few MB even at 1080p; anything bigger is
+// corrupt or misplaced content, and letting the doubling buffer chase it would eat the 32 MB EE
+// RAM before malloc can fail (CodeRabbit review of #306 -- vetted, accepted).
+#define TEX_STAGE_MAX_SIZE (8 * 1024 * 1024)
+
 typedef struct
 {
     int id;
@@ -431,13 +436,13 @@ static int texShouldUseMemoryReader(const char *filePath)
     return filePath != NULL && (!strncmp(filePath, "mmce0:", 6) || !strncmp(filePath, "mmce1:", 6) || !strncmp(filePath, "mass", 4));
 }
 
-static int texStageExternalFileIntoMemory(int fd, void **buffer, int shortReadIsEof)
+static int texStageExternalFileIntoMemory(int fd, void **buffer, u32 *stagedSize, int shortReadIsEof)
 {
     int bytesRead = 0;
     int capacity;
     unsigned char *fileBuffer;
 
-    if (buffer == NULL)
+    if (buffer == NULL || stagedSize == NULL)
         return ERR_FILE_IO;
 
     // Do NOT size the file with lseek(SEEK_END) first: the MMCE newlib device (mmceman) does not
@@ -461,7 +466,17 @@ static int texStageExternalFileIntoMemory(int fd, void **buffer, int shortReadIs
         }
 
         if (capacity - bytesRead < TEX_MMCE_STAGE_READ_SIZE) {
-            unsigned char *grown = realloc(fileBuffer, capacity * 2);
+            unsigned char *grown;
+
+            if (capacity >= TEX_STAGE_MAX_SIZE) {
+                // Over the staged-payload cap: not art anyone ships, and NOT transient -- memo it
+                // absent like any other broken file or every generation re-reads 8 MB of garbage.
+                LOG("texStage: refusing oversized art file (> %d bytes staged)\n", TEX_STAGE_MAX_SIZE);
+                free(fileBuffer);
+                return ERR_BAD_FILE;
+            }
+
+            grown = realloc(fileBuffer, capacity * 2);
             if (grown == NULL) {
                 free(fileBuffer);
                 return ERR_FILE_IO;
@@ -499,6 +514,7 @@ static int texStageExternalFileIntoMemory(int fd, void **buffer, int shortReadIs
     }
 
     *buffer = fileBuffer;
+    *stagedSize = (u32)bytesRead;
     return 0;
 }
 
@@ -702,7 +718,8 @@ static int texLoadAll(GSTEXTURE *texture, const char *filePath, int texId, const
 
             // mmceman's short-read==EOF guarantee (see the staging function) is MMCE-only; BDM
             // mass must stage until a real result==0 EOF.
-            result = texStageExternalFileIntoMemory(fd, &pFileBuffer, !strncmp(filePath, "mmce", 4));
+            u32 stagedSize = 0;
+            result = texStageExternalFileIntoMemory(fd, &pFileBuffer, &stagedSize, !strncmp(filePath, "mmce", 4));
 
             close(fd);
             fd = -1;
@@ -710,9 +727,16 @@ static int texLoadAll(GSTEXTURE *texture, const char *filePath, int texId, const
                 LOG("texLoadAll: failed to stage file %s\n", filePath);
                 return result;
             }
-            PngFileBufferPtr = pFileBuffer;
-            readData = &PngFileBufferPtr;
-            readFunction = &texReadMemFunction;
+            // Decode through the BOUNDED memory reader, not texReadMemFunction's raw memcpy: the
+            // staged buffer is user-supplied media and may be truncated/corrupt, and libpng keeps
+            // requesting bytes until it has a full stream -- an unbounded reader would walk past
+            // the staged allocation (CodeRabbit review of #306; pre-existing on the MMCE arm since
+            // the staging path landed, this PR only widened the exposure to USB). Over-read here
+            // png_errors -> the setjmp cleanup below frees the texture, same as the tar arm.
+            memReader.ptr = (const u8 *)pFileBuffer;
+            memReader.remaining = stagedSize;
+            readData = &memReader;
+            readFunction = &texReadMemBoundedFunction;
         } else {
             fd = open(filePath, O_RDONLY, 0);
             if (fd < 0) {
