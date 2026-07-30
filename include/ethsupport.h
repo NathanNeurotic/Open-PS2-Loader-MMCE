@@ -17,6 +17,7 @@ typedef struct
 
 void ethInit(item_list_t *itemList); // Full initialization (Start ETH + SMB and apply configuration). GUI must be already initialized, used by GUI to start SMB mode.
 void ethDeinitModules(void);         // Module-only deinitialization, without the GUI's knowledge (for specific reasons, otherwise unused).
+void ethInvalidateModules(void);     // Bookkeeping-only deinit for paths that immediately reboot the IOP (NBD unload): the IOP reset wipes the stack, so no RPC teardown is needed (or safe, #307).
 int ethLoadInitModules(void);        // Initializes Ethernet and applies configuration.
 int ethGetModulesLoaded(void);       // 1 if the SMB NIC stack is loaded (UDPBD must not load on top).
 void ethDisplayErrorStatus(void);    // Displays the current error status (if any). GUI must be already initialized.
