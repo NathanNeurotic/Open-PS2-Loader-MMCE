@@ -439,7 +439,12 @@ static int cacheGetInteractiveDelay(const item_list_t *list, int mode)
 {
     int delay = cacheGetBaseDelay(list);
 
-    if (list != NULL && list->mode == APP_MODE) {
+    // #297 follow-up: key the APP cases off the RESOLVED mode too. list->mode covers the apps
+    // list itself (its resolved mode is the art DEVICE mode, and a non-MMCE device must still
+    // skip the settle via the early return below); mode == APP_MODE adds the app-sourced FAV
+    // favourite whose art has no device configured (cacheGetEffectiveMode leaves APP_MODE when
+    // appGetArtMode < 0), which must behave exactly like the same app on the apps page.
+    if (list != NULL && (list->mode == APP_MODE || mode == APP_MODE)) {
         if (mode != MMCE_MODE)
             return 0;
     }
@@ -447,7 +452,7 @@ static int cacheGetInteractiveDelay(const item_list_t *list, int mode)
     if ((mode == APP_MODE || mode == MMCE_MODE) && delay < CACHE_SLOW_MODE_INTERACTIVE_DELAY)
         delay = CACHE_SLOW_MODE_INTERACTIVE_DELAY;
 
-    if (list != NULL && list->mode == APP_MODE && delay > CACHE_APP_INTERACTIVE_MAX_DELAY)
+    if (list != NULL && (list->mode == APP_MODE || mode == APP_MODE) && delay > CACHE_APP_INTERACTIVE_MAX_DELAY)
         delay = CACHE_APP_INTERACTIVE_MAX_DELAY;
 
     if (mode == MMCE_MODE && delay > CACHE_MMCE_INTERACTIVE_MAX_DELAY)
@@ -1649,7 +1654,11 @@ static GSTEXTURE *cacheGetTextureInternal(image_cache_t *cache, item_list_t *lis
             return NULL;
         }
 
-        if (list->mode == APP_MODE && cacheHasPendingInteractiveArtLocked()) {
+        // #297 follow-up: key the APP case off the RESOLVED mode too -- effectiveMode == APP_MODE
+        // is the app-sourced FAV favourite with no art device (cacheGetEffectiveMode leaves
+        // APP_MODE when appGetArtMode < 0); it must yield to pending interactive art exactly like
+        // the same app on the apps page. list is guaranteed non-NULL by the guard above.
+        if ((list->mode == APP_MODE || effectiveMode == APP_MODE) && cacheHasPendingInteractiveArtLocked()) {
             cacheUnlock();
             return NULL;
         }
