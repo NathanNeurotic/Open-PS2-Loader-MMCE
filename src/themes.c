@@ -1133,6 +1133,17 @@ static void drawCoverFlow(struct menu_list *menu, struct submenu_list *item, con
 
     GSTEXTURE *centerTexture = NULL; // the selection's LOADED art, if any -- gates the neighbor prefetch below
 
+    // #296 baseline restore: the left->right draw loop below doubles as the interactive ENQUEUE
+    // order (getGameImageTexture queues a request on a cache miss), so on a cold settle the
+    // SELECTED cover used to load 2nd/3rd, behind its left neighbours. Fire the selection's
+    // request FIRST; the loop's own call for the center then dedups against the queued request
+    // (cacheFindQueuedRequestLocked), so nothing else about draw or queue behaviour changes.
+    if (covers[centerIdx]) {
+        mutable_image_t *centerImg = (mutable_image_t *)thmGetElemForItem(menu, covers[centerIdx], elem)->extended;
+        if (centerImg)
+            getGameImageTexture(centerImg->cache, sourceList, &covers[centerIdx]->item);
+    }
+
     for (i = drawFirst; i < drawLast; i++) {
         if (!covers[i])
             continue;

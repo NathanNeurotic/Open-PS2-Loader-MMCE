@@ -387,7 +387,13 @@ static int cacheGetPrefetchLimit(const image_cache_t *cache)
     if (cache == NULL || cache->count <= 1)
         return 0;
 
-    return cache->count - 1 < 4 ? cache->count - 1 : 4;
+    // #296 walk/cap consistency: drawCoverFlow's idle prefetch walks +/-(count-1)/2 covers --
+    // 8 requests on the 10-slot COV cache -- so a cap of 4 silently dropped the far half of
+    // every walk (the +/-3 and +/-4 covers never queued, then re-missed when the user stepped
+    // again). Size the cap to the walk: count-1 admits the whole warmed window (walk + the
+    // visible selection still fits the slots, so the LRU never has to evict a visible cover --
+    // the #297 anti-thrash invariant), and the 8 ceiling bounds the queue for larger caches.
+    return cache->count - 1 < 8 ? cache->count - 1 : 8;
 }
 
 static int cacheGetEffectiveMode(const item_list_t *list, const char *value)
@@ -448,6 +454,19 @@ static int cacheGetInteractiveDelay(const item_list_t *list, int mode)
         if (mode != MMCE_MODE)
             return 0;
     }
+
+    // #296/#299 baseline restore: fast devices (USB/ETH, and any list-less caller) get NO
+    // interactive settle -- fire the art request on draw, mid-hold-scroll included. This is
+    // official OPL's behaviour: upstream texcache.c gates on guiInactiveFrames < list->delay
+    // with the delay DEFAULTING TO 0 (the *_frames_delay config keys are unset by default),
+    // and uOPL feels instant for the same reason. cacheGetBaseDelay's 8-frame floor
+    // (MENU_MIN_INACTIVE_FRAMES) was built for slow devices, so the slow-mode protections
+    // below stay untouched: MMCE keeps its floor/cap, APP its caps, and HDD keeps the floor
+    // (its spin-up reads contend with the GUI far worse than BDM USB). Fail-storm protection
+    // is unaffected (epoch fail memos) and duplicate requests still dedup via
+    // cacheFindQueuedRequestLocked.
+    if (mode != MMCE_MODE && mode != APP_MODE && mode != HDD_MODE)
+        return 0;
 
     if ((mode == APP_MODE || mode == MMCE_MODE) && delay < CACHE_SLOW_MODE_INTERACTIVE_DELAY)
         delay = CACHE_SLOW_MODE_INTERACTIVE_DELAY;
@@ -578,6 +597,24 @@ static void cacheEnqueueRequestLocked(load_image_request_t *req)
 
     if (req->priority == CACHE_REQ_PRIORITY_PREFETCH && req->cache != NULL)
         req->cache->queuedPrefetchRequests++;
+}
+
+/* Speculative work always yields to real demand: when INTERACTIVE demand arrives while a
+ * prefetch read is in flight, flag that read for abort so the selected item's cover does not
+ * queue behind up to a whole cover read it never asked for. This is the #296 patterned ~1 s
+ * stall (Beta-3457, zackcage6): #297's settle-triggered prefetch bursts monopolized the single
+ * art worker exactly when the user was most likely to tap again, in-flight USB reads were not
+ * preemptible (the MMCE abort sweeps don't cover fast modes), and the burst re-armed each time
+ * the cursor exited the warmed +/-4 window -- i.e. every ~5 items. Both readers check
+ * texLoadAbortRequested() between chunks, so the yield lands within one read chunk (~32 KB).
+ * A same-value in-flight prefetch never reaches here (the loading-entry path returns first),
+ * and an aborted prefetch is safe by construction: ERR_LOAD_ABORTED clears the entry and the
+ * walk re-requests it at the next settle. Mode-agnostic on purpose: prefetch is by definition
+ * speculative on every backend. */
+static void cacheYieldInFlightPrefetchLocked(void)
+{
+    if (gArtCurrentReq != NULL && gArtCurrentReq->priority == CACHE_REQ_PRIORITY_PREFETCH)
+        gArtCurrentReq->abortRequested = 1;
 }
 
 static int cacheRemoveQueuedRequestLocked(load_image_request_t *target)
@@ -1558,8 +1595,12 @@ static GSTEXTURE *cacheGetTextureInternal(image_cache_t *cache, item_list_t *lis
             entry->value != NULL && strcmp(entry->value, value) == 0) {
             switch (entry->state) {
                 case CACHE_ENTRY_QUEUED:
-                    if (priority == CACHE_REQ_PRIORITY_INTERACTIVE && entry->qr != NULL)
+                    if (priority == CACHE_REQ_PRIORITY_INTERACTIVE && entry->qr != NULL) {
                         cachePromoteQueuedRequestLocked((load_image_request_t *)entry->qr);
+                        /* Same yield as the by-value path below: the promoted cover must not
+                         * queue behind an unrelated in-flight prefetch read. */
+                        cacheYieldInFlightPrefetchLocked();
+                    }
                     cacheUnlock();
                     return NULL;
                 case CACHE_ENTRY_LOADING:
@@ -1668,6 +1709,7 @@ static GSTEXTURE *cacheGetTextureInternal(image_cache_t *cache, item_list_t *lis
     if (req != NULL && req->entry != NULL) {
         if (priority == CACHE_REQ_PRIORITY_INTERACTIVE) {
             cachePromoteQueuedRequestLocked(req);
+            cacheYieldInFlightPrefetchLocked();
             if (!cacheShouldDeferInteractiveArtOnInputMode(effectiveMode))
                 wakeWorker = 1;
         }
@@ -1786,6 +1828,8 @@ static GSTEXTURE *cacheGetTextureInternal(image_cache_t *cache, item_list_t *lis
 
     cache->activeRequests++;
     cacheEnqueueRequestLocked(req);
+    if (req->priority == CACHE_REQ_PRIORITY_INTERACTIVE)
+        cacheYieldInFlightPrefetchLocked();
     cacheUnlock();
 
     cacheWakeWorker();

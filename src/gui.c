@@ -2245,9 +2245,11 @@ static int endIntro = 0; // Break intro loop and start 'Last Played Auto Start' 
 // sub-second one (fast-USB save, manual refresh, device enable) faded back out before ever becoming
 // perceptible -- the loader was unreachable in practice. The retune: a fast fade-in (full 0x80 in
 // 0x80/BUSY_FADE_IN_STEP = 8 frames, ~133ms; clearly visible in ~4) plus a minimum on-screen latch,
-// so even a ~200ms op is seen for roughly latch + fade-out ~= 1.5s. The TRIGGER is unchanged --
-// ioHasVisiblePendingRequests() only, so quiet background rescans/prefetch still never show it
-// (#290) -- as are the boot suppression below and the slow fade-out.
+// so even a ~200ms op is seen for roughly latch + fade-out ~= 1.5s. The trigger's IO half is
+// unchanged -- ioHasVisiblePendingRequests(), so quiet background rescans never show it (#290) --
+// as are the boot suppression below and the slow fade-out. (The ART half widened to interactive +
+// prefetch in the #296 baseline restore; prefetch bursts only exist post-settle, so this still
+// never flashes at idle.)
 #define BUSY_FADE_IN_STEP    0x10 // alpha per frame while visible work is pending (or latched)
 #define BUSY_FADE_OUT_STEP   0x02 // alpha per frame once done: unchanged, ~64 frames (~1.1s) from full
 #define BUSY_MIN_HOLD_FRAMES 30   // latch: once triggered, stay up at least this many frames (~0.5s @60fps)
@@ -2262,14 +2264,16 @@ static void guiDrawOverlays()
     // presence scan takes a few hundred ms (MMCE SIO2 round-trips), keying the spinner off the raw
     // queue made it fade in "every few seconds" while the console sat idle. Real work -- list
     // loads, config saves, module loads, theme switches -- is still counted.
-    // #299 follow-up: also count pending INTERACTIVE art (the selected item's cover/BG/icon).
-    // Browsing enqueues no IO-queue requests at all -- art loads on the texcache worker -- so
-    // without this the loader could never trigger in the game listings, only on screens that
-    // read per-game config through the queue (the info screen). Interactive-only on purpose:
-    // neighbor prefetch (#296) and quiet background IO must never show the loader (#290), and
-    // during a held scroll the interactive defer gate hasn't enqueued anything yet, so the
-    // loader pulses only once the selection settles and its art is actually loading.
-    int pending = ioHasVisiblePendingRequests() || cacheHasPendingInteractiveArt();
+    // #299 follow-up: also count pending art (covers/BG/icons). Browsing enqueues no IO-queue
+    // requests at all -- art loads on the texcache worker -- so without this the loader could
+    // never trigger in the game listings, only on screens that read per-game config through the
+    // queue (the info screen).
+    // #296 baseline restore: count ALL art (interactive + prefetch), not just interactive -- this
+    // mirrors official OPL, whose loader trigger is "IO queue non-empty" with ALL art on that
+    // queue. This does NOT resurrect the idle-flash #290 killed: prefetch bursts only exist
+    // post-settle (the walk runs once navigation stops), so the loader pulses while art is
+    // genuinely loading, and quiet background rescans stay excluded via ioHasVisiblePendingRequests.
+    int pending = ioHasVisiblePendingRequests() || cacheHasPendingArt();
 
     // During the boot intro, when an animated boot logo is shown, suppress the
     // loading spinner -- the animated logo is the boot activity indicator there.
