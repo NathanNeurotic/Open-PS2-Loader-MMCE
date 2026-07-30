@@ -92,6 +92,22 @@ typedef struct
     volatile unsigned int padRumbleDropped;
     volatile unsigned int padRumbleArmed;
     volatile unsigned int padRealignOk;
+    // MISS sub-line (#272 settings-scroll freeze instrument, 2026-07-30; all writers on the EE main
+    // thread inside readPads/readPad). This line is drawn by dia.c, because diaExecuteDialog renders
+    // directly and never reaches guiDrawOverlays -- so the other lines are invisible in exactly the
+    // dialogs where the #272 freeze repro lives. Read with Debug ON while holding a direction
+    // through a hitch:
+    //   PT  - max time_since_last (ms) seen by any readPads poll this session: the poll-period
+    //         spike that accompanies an SIO2 stall (~16/17 at a steady 60 Hz).
+    //   MB  - current consecutive-read-miss burst length in polls, max across pads.
+    //   MX  - longest such burst this session. MX >= 4 at 60 Hz means a burst outlasted the 48 ms
+    //         carry window -- the trigger the pause-on-miss fix in readPads() now covers.
+    //   CD  - carry-drops: times a held button's hold fell out of the level view because readMissMs
+    //         exceeded PAD_READ_CARRY_MS. On the pre-fix build, each CD was one ~900 ms re-arm.
+    volatile unsigned int padPollMaxMs;
+    volatile unsigned int padMissStreak;
+    volatile unsigned int padMissStreakMax;
+    volatile unsigned int padCarryDrops;
 } opl_diag_t;
 
 extern opl_diag_t gDiag;
