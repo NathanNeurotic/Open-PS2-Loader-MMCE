@@ -174,6 +174,12 @@ void guiRenderTextScreen(const char *message);
  */
 void guiShowGameID(const char *startup);
 
+/** Renders a single frame of the game menu with the loading animation at full alpha (#299).
+ *  Pumped by hand around the blocking launch-prep steps in itemExecSelect(), where the main
+ *  loop's busy animation never runs.
+ */
+void guiRenderBusyFrame(void);
+
 /** Renders a single boot-splash (greeting) frame, used as the boot loading screen
  *  so the menu is not drawn before it is ready.
  */

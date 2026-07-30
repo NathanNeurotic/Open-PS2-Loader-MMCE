@@ -350,10 +350,22 @@ static void itemExecSelect(struct menu_item *curMenu)
                 // Costs ~90ms at most, on a path that already takes seconds. No-op when rumble is off.
                 padRumbleFlush();
 
+                // #299 launch-prep loader: everything from here to the handoff blocks the GUI
+                // thread, so guiDrawOverlays' busy animation never runs and the user stares at a
+                // frozen menu for the whole load. Pump loader frames by hand around the blocking
+                // steps -- this one leaves menu+loader scanned out while the config read blocks,
+                // and guiShowGameID's frame hold (when enabled) cycles the animation for real.
+                guiRenderBusyFrame();
                 config_set_t *configSet = menuLoadConfigDirect();
                 // Flash the GameID barcode (Pixel FX/RetroGEM HDMI auto-profile) before handoff; this
                 // single menu chokepoint covers both the Neutrino and OPL-native cores. No-op when off.
                 guiShowGameID(support->itemGetStartup(support, curMenu->current->item.id));
+                // Final pre-handoff frame (#299): the last thing drawn before itemLaunch's blocking
+                // prep, so menu+loader -- not a stale menu or the GameID barcode -- is what stays
+                // scanned out until deinit()/ExecPS2. On a launch FAILURE itemLaunch returns and the
+                // next guiMainLoop frame replaces this, so the loader can never wedge on-screen.
+                // Both pumps run BEFORE itemLaunch, i.e. before deinit starts tearing the theme down.
+                guiRenderBusyFrame();
                 support->itemLaunch(support, curMenu->current->item.id, configSet);
             }
         } else {
