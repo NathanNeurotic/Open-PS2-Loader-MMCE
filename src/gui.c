@@ -2262,7 +2262,14 @@ static void guiDrawOverlays()
     // presence scan takes a few hundred ms (MMCE SIO2 round-trips), keying the spinner off the raw
     // queue made it fade in "every few seconds" while the console sat idle. Real work -- list
     // loads, config saves, module loads, theme switches -- is still counted.
-    int pending = ioHasVisiblePendingRequests();
+    // #299 follow-up: also count pending INTERACTIVE art (the selected item's cover/BG/icon).
+    // Browsing enqueues no IO-queue requests at all -- art loads on the texcache worker -- so
+    // without this the loader could never trigger in the game listings, only on screens that
+    // read per-game config through the queue (the info screen). Interactive-only on purpose:
+    // neighbor prefetch (#296) and quiet background IO must never show the loader (#290), and
+    // during a held scroll the interactive defer gate hasn't enqueued anything yet, so the
+    // loader pulses only once the selection settles and its art is actually loading.
+    int pending = ioHasVisiblePendingRequests() || cacheHasPendingInteractiveArt();
 
     // During the boot intro, when an animated boot logo is shown, suppress the
     // loading spinner -- the animated logo is the boot activity indicator there.
