@@ -449,6 +449,19 @@ static int cacheGetInteractiveDelay(const item_list_t *list, int mode)
             return 0;
     }
 
+    // #296/#299 baseline restore: fast devices (USB/ETH, and any list-less caller) get NO
+    // interactive settle -- fire the art request on draw, mid-hold-scroll included. This is
+    // official OPL's behaviour: upstream texcache.c gates on guiInactiveFrames < list->delay
+    // with the delay DEFAULTING TO 0 (the *_frames_delay config keys are unset by default),
+    // and uOPL feels instant for the same reason. cacheGetBaseDelay's 8-frame floor
+    // (MENU_MIN_INACTIVE_FRAMES) was built for slow devices, so the slow-mode protections
+    // below stay untouched: MMCE keeps its floor/cap, APP its caps, and HDD keeps the floor
+    // (its spin-up reads contend with the GUI far worse than BDM USB). Fail-storm protection
+    // is unaffected (epoch fail memos) and duplicate requests still dedup via
+    // cacheFindQueuedRequestLocked.
+    if (mode != MMCE_MODE && mode != APP_MODE && mode != HDD_MODE)
+        return 0;
+
     if ((mode == APP_MODE || mode == MMCE_MODE) && delay < CACHE_SLOW_MODE_INTERACTIVE_DELAY)
         delay = CACHE_SLOW_MODE_INTERACTIVE_DELAY;
 
