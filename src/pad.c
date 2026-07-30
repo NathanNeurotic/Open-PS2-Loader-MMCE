@@ -90,6 +90,8 @@ struct pad_data_t
     int rumbleMsLeft;          // ms remaining; ticked down in readPads() (see the ms-vs-frames note there)
     int realignDelay;          // backoff for the actuator-alignment self-heal (padRumbleRealign)
     u32 readMissMs;            // ms accumulated since the last successful read (see readPad's hold-carry)
+    unsigned int missStreak;   // consecutive missed reads while ready, in polls (gDiag HUD MB/MX)
+    unsigned char carryLapsed; // 1 once the carry window lapses mid-hold, until the next good read (HUD CD)
 };
 
 /*
@@ -535,6 +537,8 @@ static int readPad(struct pad_data_t *pad)
         pad->analogCapable = -1;
         pad->analogRetryDelay = 0;
         pad->readMissMs = 0;
+        pad->missStreak = 0;
+        pad->carryLapsed = 0;
         // Same idle gate as the analog self-heal below, for the same reason: this initializePad is
         // the SAME 250-600 ms inline blackout, and a reconnect edge can be driven by the very read
         // errors that cluster under load (sustained misses drop freepad to DISCONN, the recovery
@@ -553,6 +557,8 @@ static int readPad(struct pad_data_t *pad)
         // window: a real disconnect is not a transient miss, and the state gate below already stops
         // contributing -- this just makes a re-plug start from a clean slate.
         pad->readMissMs = 0;
+        pad->missStreak = 0;
+        pad->carryLapsed = 0;
         pad->paddata = 0;
         pad->oldpaddata = 0;
     }
@@ -622,6 +628,8 @@ static int readPad(struct pad_data_t *pad)
 #endif
     if (padsRead > 0) {
         pad->readMissMs = 0;
+        pad->missStreak = 0;
+        pad->carryLapsed = 0;
 
         newpdata = readLeftJoy(pad, newpdata);
 
@@ -649,6 +657,7 @@ static int readPad(struct pad_data_t *pad)
           whole release gap falls inside a stall), the following press is suppressed -- an extra move
           becomes a dropped one. That is the better failure of the two, but it is real.
         */
+        pad->missStreak++; // #272 diag (HUD MB/MX): this poll is one more consecutive miss
         edgedata |= pad->paddata;
     }
 
@@ -698,6 +707,14 @@ static int readPad(struct pad_data_t *pad)
         pad->readMissMs += time_since_last;
         paddata |= pad->paddata;
         rcode = 1;
+    } else if (padsRead == 0 && (pad->state == PAD_STATE_STABLE || pad->state == PAD_STATE_FINDCTP1) &&
+               pad->paddata != 0 && !pad->carryLapsed) {
+        // #272 diag (HUD CD): the carry window just lapsed MID-HOLD -- from this poll until the
+        // next good read the level view shows the button up although the finger never moved.
+        // Counted once per miss burst (carryLapsed latches until the recovery read), because this
+        // is exactly the poll where readPads()' delaycnt re-arm used to fire.
+        pad->carryLapsed = 1;
+        gDiag.padCarryDrops++;
     }
 
     return rcode;
@@ -1074,12 +1091,26 @@ int readPads()
     time_since_last = dticks / CLOCKS_PER_MILISEC;
     tickrem = dticks % CLOCKS_PER_MILISEC;
     curtime += time_since_last;
+    // #272 diag (HUD PT): worst poll period this session -- the spike that accompanies an SIO2 stall
+    if (time_since_last > gDiag.padPollMaxMs)
+        gDiag.padPollMaxMs = time_since_last;
 
     int rslt = 0;
 
     for (i = 0; i < pad_count; ++i) {
         rslt |= readPad(&pad_data[i]);
     }
+
+    // #272 diag (HUD MB/MX): longest consecutive-miss run any pad is currently riding, and the
+    // session peak. MX reaching 4+ at a 60 Hz poll rate means a burst outlasted the 48 ms carry
+    // window -- the trigger the pause-on-miss below now covers.
+    unsigned int streak = 0;
+    for (i = 0; i < pad_count; ++i)
+        if (pad_data[i].missStreak > streak)
+            streak = pad_data[i].missStreak;
+    gDiag.padMissStreak = streak;
+    if (streak > gDiag.padMissStreakMax)
+        gDiag.padMissStreakMax = streak;
 
     // Stamp input activity AFTER the merge: any button or stick held this poll re-arms the
     // self-heal idle gate. One-poll staleness inside readPad (it reads the previous stamp) is
@@ -1125,11 +1156,34 @@ int readPads()
             pad->rumbleOn = 0; // else retry next frame: the IOP briefly drops it outside TASK_UPDATE_PAD
     }
 
+    // #272: buttons a still-connected pad holds but this poll cannot SEE. pad->paddata is the last
+    // SAMPLED hold; readMissMs > 0 says every read since has come back empty. Inside the carry
+    // window the #288 carry keeps getKeyPressed() true, so this mask only matters once the window
+    // lapses and the held bits fall out of the global level view mid-burst.
+    u32 missHeld = 0;
+    for (i = 0; i < pad_count; ++i) {
+        struct pad_data_t *pad = &pad_data[i];
+        if (isPadReadyState(pad->state) && pad->readMissMs > 0)
+            missHeld |= pad->paddata;
+    }
+
     for (i = 0; i < 16; ++i) {
         if (getKeyPressed(i + 1))
             delaycnt[i] -= time_since_last;
-        else
+        else if (!(missHeld & keyToPad[i + 1]))
             delaycnt[i] = getKeyDelay(i + 1, 0);
+        // else: the button reads up ONLY because the pad is mid-read-miss -- PAUSE the countdown
+        // instead of re-arming the full 3x initial delay. A miss is "unknown", not "released";
+        // resetting here is what turned a ~67 ms SIO2 burst into a ~1 s dead cursor, with every
+        // remaining poll of the burst re-arming 900 ms. The reset still fires where it must: a
+        // SAMPLED release clears readMissMs on the recovery read, and a disconnect fails
+        // isPadReadyState -- both take the else-if above.
+        //
+        // Pause composes with the carry window rather than replacing it, so the window stays sized
+        // for the game list's 100 ms repeat: inside the window the countdown keeps running (the
+        // hold is almost certainly real, so the repeat clock should not get free extra time); past
+        // it the clock freezes mid-burst and resumes on recovery. Either way the re-arm now fires
+        // only on a release the hardware actually reported.
     }
 
     return rslt;
