@@ -719,6 +719,9 @@ static int hddResolveHddPopstarter(char *elfOut, int elfLen)
         fileXioUmount(hddPrefix);
         if (fileXioMount(hddPrefix, cands[i], FIO_MT_RDONLY) < 0)
             continue; // partition absent / unmountable -> try the next
+        // The APA contract is hdd0:__common/POPS/ (with +OPL retained as the existing fallback).
+        // Install directly from whichever candidate is mounted before checking its POPSTARTER.ELF.
+        (void)vcdInstallPopstarterMc("pfs0:/");
         int fd = open("pfs0:/POPS/POPSTARTER.ELF", O_RDONLY);
         if (fd >= 0) {
             close(fd);

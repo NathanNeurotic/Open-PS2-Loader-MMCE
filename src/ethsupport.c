@@ -645,7 +645,10 @@ static void ethLaunchVcd(item_list_t *itemList, const char *vcdName, config_set_
         guiMsgBox(_l(_STR_POPSTARTER_NOT_FOUND), 0, NULL);
         return;
     }
-    // POPSTARTER needs its SMB network IRX on the card to read a VCD over the network.
+    // Fill every missing external from this share's direct POPS/ folder, including optional icons
+    // and utility IRX even when the required network stack was already complete. SMB keeps its hard
+    // gate: all four network modules must exist after this best-effort install.
+    (void)vcdInstallPopstarterMc(ethPrefix);
     if (!vcdSmbModulesPresent()) {
         guiMsgBox(_l(_STR_POPSTARTER_SMB_MISSING), 0, NULL);
         return;

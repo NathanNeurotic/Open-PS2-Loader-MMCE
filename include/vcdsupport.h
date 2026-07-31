@@ -124,8 +124,14 @@ int vcdReadBdmaMode(void);
 // owns everything after the exec). See vcdsupport.c.
 void vcdEnsureBdmaForLaunch(int source, int mode);
 
+// Install POPSTARTER's missing MC-side externals from the VCD device's direct POPS/ folder.
+// Existing card files always win. This copies only the SMB/utility IRX, .icn and icon.sys files;
+// IPCONFIG.DAT, SMBCONFIG.DAT and bdma_config.txt remain owned by their dedicated settings flows.
+// Returns 0 when every file was already present or copied, otherwise the first copy error (-1/-2/-3).
+int vcdInstallPopstarterMc(const char *devPrefix);
+
 // Are POPSTARTER's SMB network modules (smbman/ps2ip/ps2smap/ps2dev9) present on a card? 1 = yes.
-// Gate SMB/ETH VCD launches on this -- we don't install these from the ELF.
+// Gate SMB/ETH VCD launches on this after the direct-POPS/ installer gets one chance to self-heal.
 int vcdSmbModulesPresent(void);
 
 // ---- POPStarter network files (IPCONFIG.DAT / SMBCONFIG.DAT) --------------------------------

@@ -704,6 +704,8 @@ static void mmceLaunchVcd(item_list_t *itemList, const char *vcdName, config_set
         return;
     }
     vcdBuildSelector(mmcePrefix, VCD_PREFIX_MASS, vcdName, vcdSelector, sizeof(vcdSelector));
+    // Source MC-side externals from this MMCE card's direct POPS/ folder; never overwrite card files.
+    (void)vcdInstallPopstarterMc(mmcePrefix);
     // Best-effort card prep: try to equip the .mmce BDMAssault variant so the driver pair POPSTARTER
     // reloads from the MC fits this drive. NEVER a launch gate -- the handoff below always proceeds
     // (POPSTARTER owns everything past the exec); a failed equip just toasts its diagnostic in passing.

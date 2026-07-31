@@ -788,6 +788,10 @@ static void bdmLaunchVcd(item_list_t *itemList, const char *vcdName, config_set_
     // unit-numbered mount -- POPSTARTER remounts under "mass:" after its own IOP reset (see the function).
     vcdBuildSelector(vcdPrefix, VCD_PREFIX_MASS, vcdName, vcdSelector, sizeof(vcdSelector));
 
+    // Populate mc?:/POPSTARTER from this game's own direct POPS/ folder. Best effort: local VCD
+    // launches keep their existing handoff behavior when optional files are absent or the card is full.
+    (void)vcdInstallPopstarterMc(vcdPrefix);
+
     // Best-effort card prep: POPSTARTER reloads its block-device driver pair from the MC after its OWN
     // IOP reset, so try to equip the device-matching BDMAssault variant first. NEVER a launch gate --
     // the handoff below always proceeds (POPSTARTER owns everything past the exec); a failed equip just
