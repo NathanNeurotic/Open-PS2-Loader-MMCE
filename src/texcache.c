@@ -6,6 +6,7 @@
 #include "include/texcache.h"
 #include "include/textures.h"
 #include "include/gui.h"
+#include "include/ioman.h"
 #include "include/util.h"
 #include "include/renderman.h"
 #include "include/vcdsupport.h"
@@ -909,6 +910,17 @@ static load_image_request_t *cacheDequeueRequest(void)
             return NULL;
         }
 
+        /* #296: speculative reads also yield the bus to real IO. Official OPL serializes art
+         * BEHIND everything else on the single IO queue; here the art worker has its own
+         * channel, so a prefetch staged read can collide with queued io work (boot-time
+         * module/list/config loads) and lose with a contended-bus EIO -- which then
+         * poisons the entry's failure memo. Don't START a prefetch while the io queue has
+         * work pending; interactive dequeues stay aggressive. */
+        if (ioHasPendingRequests()) {
+            cacheUnlock();
+            return NULL;
+        }
+
         req = gArtPrefetchReqList;
         gArtPrefetchReqList = req->next;
         req->next = NULL;
@@ -1574,8 +1586,19 @@ static GSTEXTURE *cacheGetTextureInternal(image_cache_t *cache, item_list_t *lis
         *UID = -1;
     } else if (*cacheId == -3) {
         if (*UID == gCacheGeneration) {
-            cacheUnlock();
-            return NULL;
+            /* #296: the generation only advances on cursor move/screen switch, so a
+             * transient failure memo written in the boot window (art worker racing the
+             * io worker for the bus) NEVER heals while the console sits parked -- that
+             * game's art stays dead until the user scrolls, the exact "assets load only
+             * when highlighted" report. On fast devices, drop the memo once idle and
+             * re-probe: a contended-bus EIO heals within ~8 idle frames, while the memo
+             * still suppresses hammering DURING navigation (guiInactiveFrames is low)
+             * and MMCE keeps the generation-keyed behavior (failing opens are expensive
+             * on SIO2; the memo is load-bearing there). */
+            if (effectiveMode == MMCE_MODE || guiInactiveFrames < MENU_MIN_INACTIVE_FRAMES) {
+                cacheUnlock();
+                return NULL;
+            }
         }
 
         *cacheId = -1;
