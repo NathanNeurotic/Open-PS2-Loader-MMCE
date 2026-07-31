@@ -29,13 +29,16 @@ Three files under `iop/sio/mx4sio_bd/src/`:
 - `sio2man_hook.c` — any sio2man version > 1.1 that is not 1.2/2.7 now gets the
   **proven pre-2026-06 hook model** (the driver's own semaphore pair wrapping every
   transfer_init / transfer / transfer_reset export, v1.x layout 49/50 vs v2.x layout
-  49-52) instead of a hard rejection. The new 1.2/2.7 path is untouched. Two
-  deliberate deviations from the old model: (1) no export-23/26 call while hooking —
-  the new architecture hooks with interrupts suspended, where a blocking sio2man call
-  can deadlock; the semaphore wrappers arbitrate from the moment they are installed;
+  49-52) instead of a hard rejection. The new 1.2/2.7 path is untouched. Details:
+  (1) no export-23/26 call while hooking — the new architecture hooks with
+  interrupts suspended, where a blocking sio2man call can deadlock; the semaphore
+  wrappers arbitrate from the moment they are installed;
   (2) `sio2man_hook_sio2_lock/unlock()` fall back to the v1.x library when only one
   is resident (upstream left that as a silent no-op = zero arbitration on
-  v1.x-only systems).
+  v1.x-only systems);
+  (3) both `CreateSema` results are validated and the legacy hook stays uninstalled
+  when semaphore creation fails — an invalid semaphore id would otherwise make
+  every lock a silent no-op, which is exactly the dead-card failure this fixes.
 - `ioplib.c` / `ioplib.h` — restore `ioplib_hookExportEntry()` (single-entry hook;
   PR #862 kept only `ioplib_hookSameExportEntries`, which the legacy model cannot
   use: hooking several entries that may alias one function needs per-entry
@@ -46,10 +49,19 @@ embedded sources it derives from. Upstream is welcome to take the patch.
 
 ## Bytes (built 2026-07-31, sha256)
 
+Built in `ps2dev/ps2dev:latest` — at build time that tag resolved to
+`ps2dev/ps2dev@sha256:c64ae69c9817865ed98ff054e4ae5360b9e280ed952c97946bca95d9d35be995`
+(the same digest the CI PS2DEVPINNEDSDK flavour pins). The tag is deliberately NOT
+digest-pinned for rebuilds: any toolchain drift shows up as an output-hash change
+and is stopped by the verification gate in the rebuild script / CI.
+
 | file | bytes | sha256 |
 |---|---|---|
-| mx4sio_bd.irx      | 14401 | 35fa32e90127466492f6253affc663df1a64a9ac688f6023d568d62c0a3b4555 |
-| mx4sio_bd_mini.irx | 13329 | 94c1d6dee9e8e96b66a80068dfad685215d5c05b480a2bde54864e1d971e4e72 |
+| mx4sio_bd.irx      | 14465 | a2dcc719c7ef5f07b4f05cad9f1f108c3846dab3b44894dccda6b4c1949d40f8 |
+| mx4sio_bd_mini.irx | 13393 | 9eab5475eb3270d435039e1045b4500baabe102802e5fea175439923cc15677e |
+
+These hashes are also machine-checked: `SHA256SUMS` in this directory is verified by
+CI on every rolling build, and by `build_vendored_mx4sio.sh` on every rebuild.
 
 Stock (BROKEN) bytes in `ps2dev/ps2dev:latest` @ 2026-07-26, for comparison:
 
@@ -60,12 +72,13 @@ Stock (BROKEN) bytes in `ps2dev/ps2dev:latest` @ 2026-07-26, for comparison:
 
 ## Rebuild / re-vendor
 
-Run `.github/scripts/build_vendored_mx4sio.sh` (host needs docker; uses the
-`ps2dev/ps2dev:latest` toolchain image). It clones ps2sdk at the pinned base commit,
-applies the patch from this directory, builds both variants, verifies the sha256s
-above, and copies the IRXs here. To re-base the patch onto a newer ps2sdk: clone,
-`git checkout <new-base>`, `git apply` the patch (resolve conflicts), rebuild, then
-update the base commit, the patch, and both tables above.
+Run `.github/scripts/build_vendored_mx4sio.sh` (host needs docker, git, sha256sum,
+awk; uses the `ps2dev/ps2dev:latest` toolchain image). It clones ps2sdk at the
+pinned base commit, applies the patch from this directory, builds both variants,
+verifies the sha256s above, and copies the IRXs here. To re-base the patch onto a
+newer ps2sdk: clone, `git checkout <new-base>`, `git apply` the patch (resolve
+conflicts), rebuild, then update ALL of: the base commit and both tables above, the
+patch, the `BASE_COMMIT`/`WANT_*` constants in the script, and `SHA256SUMS`.
 
 ## Retirement condition
 

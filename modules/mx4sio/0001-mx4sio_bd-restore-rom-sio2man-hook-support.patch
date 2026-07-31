@@ -44,10 +44,10 @@ index d0f0e17..f030759 100644
  
  
 diff --git a/iop/sio/mx4sio_bd/src/sio2man_hook.c b/iop/sio/mx4sio_bd/src/sio2man_hook.c
-index 808ed98..0724272 100644
+index 808ed98..4238f2d 100644
 --- a/iop/sio/mx4sio_bd/src/sio2man_hook.c
 +++ b/iop/sio/mx4sio_bd/src/sio2man_hook.c
-@@ -81,6 +81,172 @@ static int _1_25_sio2_transfer(sio2_transfer_data_t *td) { return _sio2_transfer
+@@ -81,6 +81,180 @@ static int _1_25_sio2_transfer(sio2_transfer_data_t *td) { return _sio2_transfer
  static int _2_25_sio2_transfer(sio2_transfer_data_t *td) { return _sio2_transfer(g_hook_data[1].m_25_psio2_transfer, td); }
  #endif
  
@@ -154,6 +154,14 @@ index 808ed98..0724272 100644
 +
 +    M_DEBUG("Installing legacy sio2man hooks for version 0x%x\n", lib->version);
 +
++    // Without both semaphores the legacy model cannot arbitrate; leave the
++    // library unhooked rather than install hooks that silently do not lock
++    // (same dead-card failure as an unsupported version).
++    if (g_legacy_lock_sema < 0 || g_legacy_lock_sema2 < 0) {
++        M_DEBUG("ERROR: legacy sio2man hooks unavailable (no semaphores)\n");
++        return;
++    }
++
 +    // NOTE: unlike the pre-2026-06 driver this does NOT call export 23/26 to
 +    // lock the bus while hooking: we run with interrupts suspended (see
 +    // _sio2man_hook), where a blocking sio2man call could deadlock. The
@@ -220,7 +228,7 @@ index 808ed98..0724272 100644
  static void unhook_loadcore(void);
  #if SIO2MAN_HOOK_SUPPORT_SET_INTR_HANDLER
  static void unhook_intrman(void);
-@@ -120,11 +286,17 @@ static void _sio2man_hook(iop_library_t *lib)
+@@ -120,11 +294,17 @@ static void _sio2man_hook(iop_library_t *lib)
          }
          default:
          {
@@ -240,7 +248,7 @@ index 808ed98..0724272 100644
          unhook_loadcore();
      CpuResumeIntr(state);
  }
-@@ -213,7 +385,7 @@ static int sio2man_hook_iterate_cb(iop_library_t *lib, void *userdata)
+@@ -213,7 +393,7 @@ static int sio2man_hook_iterate_cb(iop_library_t *lib, void *userdata)
          case 2:
          {
              _sio2man_hook(lib);
@@ -249,7 +257,7 @@ index 808ed98..0724272 100644
          }
          default:
              return 1;
-@@ -222,8 +394,21 @@ static int sio2man_hook_iterate_cb(iop_library_t *lib, void *userdata)
+@@ -222,8 +402,23 @@ static int sio2man_hook_iterate_cb(iop_library_t *lib, void *userdata)
  
  int sio2man_hook_init()
  {
@@ -267,11 +275,13 @@ index 808ed98..0724272 100644
 +    sema.option  = 0;
 +    g_legacy_lock_sema  = CreateSema(&sema);
 +    g_legacy_lock_sema2 = CreateSema(&sema);
++    if (g_legacy_lock_sema < 0 || g_legacy_lock_sema2 < 0)
++        M_DEBUG("ERROR: CreateSema failed (%i/%i), legacy sio2man hook model disabled\n", g_legacy_lock_sema, g_legacy_lock_sema2);
 +
  #if SIO2MAN_HOOK_SUPPORT_SET_INTR_HANDLER
      {
          intrman_internals_t *intrman_internals;
-@@ -280,6 +465,17 @@ void sio2man_hook_deinit()
+@@ -280,6 +475,17 @@ void sio2man_hook_deinit()
          }
      }
  
@@ -289,7 +299,7 @@ index 808ed98..0724272 100644
      unhook_loadcore();
  #if SIO2MAN_HOOK_SUPPORT_SET_INTR_HANDLER
      unhook_intrman();
-@@ -289,15 +485,31 @@ void sio2man_hook_deinit()
+@@ -289,15 +495,31 @@ void sio2man_hook_deinit()
  void sio2man_hook_sio2_lock()
  {
      // Lock sio2man driver so we can use it exclusively
