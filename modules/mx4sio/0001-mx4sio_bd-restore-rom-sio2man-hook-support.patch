@@ -1,0 +1,335 @@
+diff --git a/iop/sio/mx4sio_bd/src/ioplib.c b/iop/sio/mx4sio_bd/src/ioplib.c
+index 0b88857..5451d3b 100644
+--- a/iop/sio/mx4sio_bd/src/ioplib.c
++++ b/iop/sio/mx4sio_bd/src/ioplib.c
+@@ -85,6 +85,22 @@ void *ioplib_hookSameExportEntries(iop_library_t *lib, unsigned int entry, void
+     return oldfunc;
+ }
+ 
++void *ioplib_hookExportEntry(iop_library_t *lib, unsigned int entry, void *func)
++{
++    int oldstate;
++    void *oldfunc;
++
++    if (entry >= ioplib_getTableSize(lib))
++        return NULL;
++
++    CpuSuspendIntr(&oldstate);
++    oldfunc = lib->exports[entry];
++    lib->exports[entry] = func;
++    CpuResumeIntr(oldstate);
++
++    return oldfunc;
++}
++
+ void ioplib_relinkExports(iop_library_t *lib)
+ {
+     struct irx_import_table *table;
+diff --git a/iop/sio/mx4sio_bd/src/ioplib.h b/iop/sio/mx4sio_bd/src/ioplib.h
+index d0f0e17..f030759 100644
+--- a/iop/sio/mx4sio_bd/src/ioplib.h
++++ b/iop/sio/mx4sio_bd/src/ioplib.h
+@@ -34,6 +34,13 @@ extern unsigned int ioplib_getTableSize(iop_library_t *lib);
+  * @return on error: NULL | on success: original function pointer
+  */
+ extern void *ioplib_hookSameExportEntries(iop_library_t *lib, unsigned int entry, void *func);
++/** @brief Hook one IRX module exported function (the specified entry only).
++ * @param lib Library object of the module to hook
++ * @param entry Export number to be hooked
++ * @param func Hook function
++ * @return on error: NULL | on success: original function pointer
++ */
++extern void *ioplib_hookExportEntry(iop_library_t *lib, unsigned int entry, void *func);
+ extern void ioplib_relinkExports(iop_library_t *lib);
+ 
+ 
+diff --git a/iop/sio/mx4sio_bd/src/sio2man_hook.c b/iop/sio/mx4sio_bd/src/sio2man_hook.c
+index 808ed98..4238f2d 100644
+--- a/iop/sio/mx4sio_bd/src/sio2man_hook.c
++++ b/iop/sio/mx4sio_bd/src/sio2man_hook.c
+@@ -81,6 +81,180 @@ static int _1_25_sio2_transfer(sio2_transfer_data_t *td) { return _sio2_transfer
+ static int _2_25_sio2_transfer(sio2_transfer_data_t *td) { return _sio2_transfer(g_hook_data[1].m_25_psio2_transfer, td); }
+ #endif
+ 
++// ---------------------------------------------------------------------------
++// Legacy (ROM) sio2man support
++//
++// The hook model above only works with libraries that lock ALL devices with a
++// single semaphore taken by export 23 (sio2_pad_transfer_init) and released by
++// export 26 (sio2_transfer_reset), and whose per-device transfer entry points
++// alias the same functions. That has only been verified for rom0:XSIO2MAN 1.2
++// and ps2sdk's sio2man 2.7; every other library -- notably the rom1:SIO2MAN
++// v2.x that games load on DECKARD consoles -- was rejected outright, leaving
++// MX4SIO without bus arbitration (dead card, black screen in game loaders).
++//
++// For those libraries we install the proven pre-2026-06 hook model instead:
++// our own pair of semaphores wrapped around every transfer_init / transfer /
++// transfer_reset export, so no assumption about the library's internals is
++// needed. The export layout follows the same version rules the old driver
++// used:
++//   v1.x (>= 1.2): "2nd interface" transfer at export 49, reset at 50
++//   v2.x         : rm/unk transfer_init at 49/50, transfer at 51, reset at 52
++// ---------------------------------------------------------------------------
++
++typedef struct
++{
++    iop_library_t *m_lib;
++    u16 m_version;
++    // Original sio2man function pointers
++    psio2_transfer_init m_23_pad_transfer_init;
++    psio2_transfer_init m_24_mc_transfer_init;
++    psio2_transfer_init m_46_pad_transfer_init;
++    psio2_transfer_init m_47_mc_transfer_init;
++    psio2_transfer_init m_48_mtap_transfer_init;
++    psio2_transfer_init m_49_rm_transfer_init;
++    psio2_transfer_init m_50_unk_transfer_init;
++    psio2_transfer m_25_transfer;
++    psio2_transfer m_51_transfer;
++    psio2_transfer_reset m_26_transfer_reset;
++    psio2_transfer_reset m_52_transfer_reset;
++} sio2man_legacy_hook_data_t;
++
++static sio2man_legacy_hook_data_t g_legacy_hook;
++static int g_legacy_lock_sema  = -1;
++static int g_legacy_lock_sema2 = -1;
++
++// Generic legacy sio2man init function
++static void _legacy_sio2_transfer_init(psio2_transfer_init init_func)
++{
++    WaitSema(g_legacy_lock_sema);
++    init_func();
++}
++
++// Generic legacy sio2man transfer function
++static int _legacy_sio2_transfer(psio2_transfer transfer_func, sio2_transfer_data_t *td)
++{
++    int rv;
++    unsigned int i;
++
++    // Do not allow transfers to/from our used port
++    for (i = 0; i < (sizeof(td->regdata)/sizeof(td->regdata[0])); i++) {
++        // Last transfer, we're ok.
++        if (td->regdata[i] == 0)
++            break;
++
++        // Wrong port, abort.
++        if ((td->regdata[i] & 3) == PORT_NR)
++            return 1;
++    }
++
++    WaitSema(g_legacy_lock_sema2);
++    rv = transfer_func(td);
++    SignalSema(g_legacy_lock_sema2);
++
++    return rv;
++}
++
++// Generic legacy sio2man transfer_reset function
++static void _legacy_sio2_transfer_reset(psio2_transfer_reset reset_func)
++{
++    reset_func();
++    SignalSema(g_legacy_lock_sema);
++}
++
++// Hooked legacy sio2man functions
++static void _l23_sio2_pad_transfer_init()  { _legacy_sio2_transfer_init(g_legacy_hook.m_23_pad_transfer_init); }
++static void _l24_sio2_mc_transfer_init()   { _legacy_sio2_transfer_init(g_legacy_hook.m_24_mc_transfer_init); }
++static void _l46_sio2_pad_transfer_init()  { _legacy_sio2_transfer_init(g_legacy_hook.m_46_pad_transfer_init); }
++static void _l47_sio2_mc_transfer_init()   { _legacy_sio2_transfer_init(g_legacy_hook.m_47_mc_transfer_init); }
++static void _l48_sio2_mtap_transfer_init() { _legacy_sio2_transfer_init(g_legacy_hook.m_48_mtap_transfer_init); }
++static void _l49_sio2_rm_transfer_init()   { _legacy_sio2_transfer_init(g_legacy_hook.m_49_rm_transfer_init); }
++static void _l50_sio2_unk_transfer_init()  { _legacy_sio2_transfer_init(g_legacy_hook.m_50_unk_transfer_init); }
++static int _l25_sio2_transfer(sio2_transfer_data_t *td) { return _legacy_sio2_transfer(g_legacy_hook.m_25_transfer, td); }
++static int _l51_sio2_transfer(sio2_transfer_data_t *td) { return _legacy_sio2_transfer(g_legacy_hook.m_51_transfer, td); }
++static void _l26_sio2_transfer_reset() { _legacy_sio2_transfer_reset(g_legacy_hook.m_26_transfer_reset); }
++static void _l52_sio2_transfer_reset() { _legacy_sio2_transfer_reset(g_legacy_hook.m_52_transfer_reset); }
++
++static void _sio2man_legacy_hook(iop_library_t *lib)
++{
++    if (g_legacy_hook.m_lib) {
++        M_DEBUG("Warning: trying to hook sio2man version 0x%x\n", lib->version);
++        M_DEBUG("         while version 0x%x already hooked (legacy)\n", g_legacy_hook.m_version);
++        return;
++    }
++
++    M_DEBUG("Installing legacy sio2man hooks for version 0x%x\n", lib->version);
++
++    // Without both semaphores the legacy model cannot arbitrate; leave the
++    // library unhooked rather than install hooks that silently do not lock
++    // (same dead-card failure as an unsupported version).
++    if (g_legacy_lock_sema < 0 || g_legacy_lock_sema2 < 0) {
++        M_DEBUG("ERROR: legacy sio2man hooks unavailable (no semaphores)\n");
++        return;
++    }
++
++    // NOTE: unlike the pre-2026-06 driver this does NOT call export 23/26 to
++    // lock the bus while hooking: we run with interrupts suspended (see
++    // _sio2man_hook), where a blocking sio2man call could deadlock. The
++    // semaphore wrappers alone arbitrate from the moment they are installed.
++    g_legacy_hook.m_23_pad_transfer_init  = ioplib_hookExportEntry(lib, 23, _l23_sio2_pad_transfer_init);
++    g_legacy_hook.m_24_mc_transfer_init   = ioplib_hookExportEntry(lib, 24, _l24_sio2_mc_transfer_init);
++    g_legacy_hook.m_25_transfer           = ioplib_hookExportEntry(lib, 25, _l25_sio2_transfer);
++    g_legacy_hook.m_26_transfer_reset     = ioplib_hookExportEntry(lib, 26, _l26_sio2_transfer_reset);
++    g_legacy_hook.m_46_pad_transfer_init  = ioplib_hookExportEntry(lib, 46, _l46_sio2_pad_transfer_init);
++    g_legacy_hook.m_47_mc_transfer_init   = ioplib_hookExportEntry(lib, 47, _l47_sio2_mc_transfer_init);
++    g_legacy_hook.m_48_mtap_transfer_init = ioplib_hookExportEntry(lib, 48, _l48_sio2_mtap_transfer_init);
++
++    if ((lib->version >= IRX_VER(1, 2)) && (lib->version < IRX_VER(2, 0))) {
++        // Only for the newer rom0:XSIO2MAN
++        // Assume all v1.x libraries to use this interface (reset at 50)
++        g_legacy_hook.m_51_transfer       = ioplib_hookExportEntry(lib, 49, _l51_sio2_transfer);
++        g_legacy_hook.m_52_transfer_reset = ioplib_hookExportEntry(lib, 50, _l52_sio2_transfer_reset);
++    } else /* if (lib->version >= IRX_VER(2, 0)) */ {
++        // Only for the newer rom1:SIO2MAN
++        // Assume all v2.x libraries to use this interface (reset at 52)
++        g_legacy_hook.m_49_rm_transfer_init  = ioplib_hookExportEntry(lib, 49, _l49_sio2_rm_transfer_init);
++        g_legacy_hook.m_50_unk_transfer_init = ioplib_hookExportEntry(lib, 50, _l50_sio2_unk_transfer_init);
++        g_legacy_hook.m_51_transfer          = ioplib_hookExportEntry(lib, 51, _l51_sio2_transfer);
++        g_legacy_hook.m_52_transfer_reset    = ioplib_hookExportEntry(lib, 52, _l52_sio2_transfer_reset);
++    }
++
++    g_legacy_hook.m_version = lib->version;
++    g_legacy_hook.m_lib     = lib;
++    ioplib_relinkExports(lib);
++}
++
++static void _sio2man_legacy_unhook(void)
++{
++    iop_library_t *lib = g_legacy_hook.m_lib;
++
++    if (lib == NULL)
++        return;
++
++    ioplib_hookExportEntry(lib, 23, g_legacy_hook.m_23_pad_transfer_init);
++    ioplib_hookExportEntry(lib, 24, g_legacy_hook.m_24_mc_transfer_init);
++    ioplib_hookExportEntry(lib, 25, g_legacy_hook.m_25_transfer);
++    ioplib_hookExportEntry(lib, 26, g_legacy_hook.m_26_transfer_reset);
++    ioplib_hookExportEntry(lib, 46, g_legacy_hook.m_46_pad_transfer_init);
++    ioplib_hookExportEntry(lib, 47, g_legacy_hook.m_47_mc_transfer_init);
++    ioplib_hookExportEntry(lib, 48, g_legacy_hook.m_48_mtap_transfer_init);
++
++    if ((g_legacy_hook.m_version >= IRX_VER(1, 2)) && (g_legacy_hook.m_version < IRX_VER(2, 0))) {
++        // v1.x layout (transfer at 49, reset at 50)
++        ioplib_hookExportEntry(lib, 49, g_legacy_hook.m_51_transfer);
++        ioplib_hookExportEntry(lib, 50, g_legacy_hook.m_52_transfer_reset);
++    } else {
++        // v2.x layout (rm/unk init at 49/50, transfer at 51, reset at 52)
++        ioplib_hookExportEntry(lib, 49, g_legacy_hook.m_49_rm_transfer_init);
++        ioplib_hookExportEntry(lib, 50, g_legacy_hook.m_50_unk_transfer_init);
++        ioplib_hookExportEntry(lib, 51, g_legacy_hook.m_51_transfer);
++        ioplib_hookExportEntry(lib, 52, g_legacy_hook.m_52_transfer_reset);
++    }
++
++    ioplib_relinkExports(lib);
++    g_legacy_hook.m_lib     = NULL;
++    g_legacy_hook.m_version = 0;
++}
++
+ static void unhook_loadcore(void);
+ #if SIO2MAN_HOOK_SUPPORT_SET_INTR_HANDLER
+ static void unhook_intrman(void);
+@@ -120,11 +294,17 @@ static void _sio2man_hook(iop_library_t *lib)
+         }
+         default:
+         {
+-            M_DEBUG("ERROR: sio2man version 0x%x not supported\n", lib->version);
++            // Libraries the new model does not cover (e.g. the rom1:SIO2MAN
++            // v2.x games load on DECKARD consoles) get the proven pre-2026-06
++            // hook model instead of a hard rejection.
++            if (lib->version > IRX_VER(1, 1))
++                _sio2man_legacy_hook(lib);
++            else
++                M_DEBUG("ERROR: sio2man version 0x%x not supported\n", lib->version);
+             break;
+         }
+     }
+-    if (g_hook_data[0].m_lib && g_hook_data[1].m_lib)
++    if (g_hook_data[0].m_lib && (g_hook_data[1].m_lib || g_legacy_hook.m_lib))
+         unhook_loadcore();
+     CpuResumeIntr(state);
+ }
+@@ -213,7 +393,7 @@ static int sio2man_hook_iterate_cb(iop_library_t *lib, void *userdata)
+         case 2:
+         {
+             _sio2man_hook(lib);
+-            return (g_hook_data[0].m_lib && g_hook_data[1].m_lib) ? 1 : 0;
++            return (g_hook_data[0].m_lib && (g_hook_data[1].m_lib || g_legacy_hook.m_lib)) ? 1 : 0;
+         }
+         default:
+             return 1;
+@@ -222,8 +402,23 @@ static int sio2man_hook_iterate_cb(iop_library_t *lib, void *userdata)
+ 
+ int sio2man_hook_init()
+ {
++    iop_sema_t sema;
++
+     M_DEBUG("%s\n", __FUNCTION__);
+ 
++    // Semaphores for the legacy (ROM sio2man) hook model: lock_sema is held by
++    // a client from transfer_init to transfer_reset, lock_sema2 only around the
++    // transfer itself. sio2man_hook_sio2_lock() takes both (in this order) to
++    // get the bus exclusively.
++    sema.attr    = 1;
++    sema.initial = 1;
++    sema.max     = 1;
++    sema.option  = 0;
++    g_legacy_lock_sema  = CreateSema(&sema);
++    g_legacy_lock_sema2 = CreateSema(&sema);
++    if (g_legacy_lock_sema < 0 || g_legacy_lock_sema2 < 0)
++        M_DEBUG("ERROR: CreateSema failed (%i/%i), legacy sio2man hook model disabled\n", g_legacy_lock_sema, g_legacy_lock_sema2);
++
+ #if SIO2MAN_HOOK_SUPPORT_SET_INTR_HANDLER
+     {
+         intrman_internals_t *intrman_internals;
+@@ -280,6 +475,17 @@ void sio2man_hook_deinit()
+         }
+     }
+ 
++    // Unhook a legacy-hooked 'sio2man' (ROM library)
++    _sio2man_legacy_unhook();
++    if (g_legacy_lock_sema >= 0) {
++        DeleteSema(g_legacy_lock_sema);
++        g_legacy_lock_sema = -1;
++    }
++    if (g_legacy_lock_sema2 >= 0) {
++        DeleteSema(g_legacy_lock_sema2);
++        g_legacy_lock_sema2 = -1;
++    }
++
+     unhook_loadcore();
+ #if SIO2MAN_HOOK_SUPPORT_SET_INTR_HANDLER
+     unhook_intrman();
+@@ -289,15 +495,31 @@ void sio2man_hook_deinit()
+ void sio2man_hook_sio2_lock()
+ {
+     // Lock sio2man driver so we can use it exclusively
+-    if (g_hook_data[1].m_23_psio2_pad_transfer_init)
++    if (g_legacy_hook.m_lib) {
++        // Legacy model: our own semaphores wrap every sio2man entry point
++        WaitSema(g_legacy_lock_sema);
++        WaitSema(g_legacy_lock_sema2);
++    } else if (g_hook_data[1].m_23_psio2_pad_transfer_init) {
+         g_hook_data[1].m_23_psio2_pad_transfer_init();
++    } else if (g_hook_data[0].m_23_psio2_pad_transfer_init) {
++        // Only a v1.x library is resident: lock through it (upstream left this
++        // as a silent no-op, i.e. no arbitration at all on v1.x-only systems)
++        g_hook_data[0].m_23_psio2_pad_transfer_init();
++    }
+ }
+ 
+ void sio2man_hook_sio2_unlock()
+ {
+     // Unlock sio2man driver
+-    if (g_hook_data[1].m_26_psio2_transfer_reset)
++    if (g_legacy_hook.m_lib) {
++        // Legacy model: release in reverse order
++        SignalSema(g_legacy_lock_sema2);
++        SignalSema(g_legacy_lock_sema);
++    } else if (g_hook_data[1].m_26_psio2_transfer_reset) {
+         g_hook_data[1].m_26_psio2_transfer_reset();
++    } else if (g_hook_data[0].m_26_psio2_transfer_reset) {
++        g_hook_data[0].m_26_psio2_transfer_reset();
++    }
+ }
+ 
+ #if SIO2MAN_HOOK_SUPPORT_SET_INTR_HANDLER
