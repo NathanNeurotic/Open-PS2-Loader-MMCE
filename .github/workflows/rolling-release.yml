@@ -119,6 +119,13 @@ jobs:
       # fallback differ from the build it is meant to fall back FROM, which defeats the purpose.
       # The two flavours must now differ by SDK DATE ONLY.
 
+      - name: Verify vendored mx4sio driver hashes
+        # The Makefile embeds modules/mx4sio/mx4sio_bd{,_mini}.irx (NOT the container's stock
+        # copies -- those black-screen MX4SIO launches on DECKARD, #317). Fail the build loudly
+        # if the vendored bytes ever drift from SHA256SUMS; a corrupted IRX ships as a
+        # green-looking build that black-screens on hardware.
+        run: sha256sum -c modules/mx4sio/SHA256SUMS
+
       - name: Build (make clean release)
         # LOCALVERSION brands the in-ELF version string ("-PS2DEVPINNEDSDK") so hardware reports
         # self-identify which toolchain's binary produced them (Makefile appends it).
@@ -236,6 +243,11 @@ jobs:
         # mmcedrv/mmceigr stay the SDK stock prebuilts (same source as the pin, and the stock
         # binaries are field-proven in-game where our rebuild was not -- see the script header).
         run: sh ./.github/scripts/install_coherent_mmce.sh
+
+      - name: Verify vendored mx4sio driver hashes
+        # Same gate as the pinned job: the embedded mx4sio driver is the vendored,
+        # ROM-sio2man-fixed pair (#317), not this container's stock copy.
+        run: sha256sum -c modules/mx4sio/SHA256SUMS
 
       - name: Build (make clean release)
         # LOCALVERSION brands the in-ELF version string ("-PS2DEVLATESTSDK") so hardware reports
