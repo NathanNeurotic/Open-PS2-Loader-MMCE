@@ -936,6 +936,14 @@ void thmTriggerCoverflowAnim(int dir)
     cfAnimStartTime = clock();
 }
 
+// Poll-side read of the slide state. The Debug-Colors HUD (gui.c) steps aside while a slide is
+// in flight: binding the font atlas every frame can evict cover textures from the VRAM arena
+// mid-animation (the historic #120 HUD note).
+int thmCoverflowIsAnimating(void)
+{
+    return cfIsAnimating;
+}
+
 static void drawCoverFlow(struct menu_list *menu, struct submenu_list *item, config_set_t *config, struct theme_element *elem)
 {
     if (!item)
@@ -1064,6 +1072,60 @@ static void drawCoverFlow(struct menu_list *menu, struct submenu_list *item, con
         mutable_image_t *centerImg = (mutable_image_t *)thmGetElemForItem(menu, covers[centerIdx], elem)->extended;
         if (centerImg)
             getGameImageTexture(centerImg->cache, sourceList, &covers[centerIdx]->item);
+    }
+
+    /*
+      Lookahead warming (#296). The draw loop below only ever requests the covers on screen
+      (plus the slide padding), so scrolling faster than a decode leaves every incoming cover
+      cold -- "CF covers load only on focus". Walk the ring outward from the selection,
+      wrap-aware like the window builder above, and request neighbours beyond the window while
+      the cache budget lasts. Depth is (cache->count - 1)/2 per side, so one frame touches at
+      most cache->count distinct keys (selected + both walks) and warming can never evict the
+      selected cover; the per-cache request budget mirrors drawItemsList (a Favourites tab can
+      resolve covers into TWO caches via thmGetElemForItem). Folders carry no cover. Themes
+      tune the depth with the existing main0_count knob -- more cache slots, deeper warming.
+    */
+    mutable_image_t *elemImg = (mutable_image_t *)elem->extended;
+    int warmRadius = (elemImg != NULL && elemImg->cache != NULL) ? (elemImg->cache->count - 1) / 2 : 0;
+    struct
+    {
+        image_cache_t *cache;
+        int left;
+    } cfWarm[2] = {{NULL, 0}, {NULL, 0}};
+    struct submenu_list *walkSide[2] = {item, item}; // [0] = forward, [1] = backward
+    int step;
+    for (step = 0; step < warmRadius; step++) {
+        int side;
+        for (side = 0; side < 2; side++) {
+            struct submenu_list *walk = walkSide[side];
+            struct submenu_list *next = side ? (walk->prev ? walk->prev : menu->item->last)
+                                             : (walk->next ? walk->next : menu->item->submenu);
+            if (!next || next == walk || next == item)
+                continue;
+            walkSide[side] = next;
+            if (next->item.isFolder)
+                continue;
+
+            mutable_image_t *wimg = (mutable_image_t *)thmGetElemForItem(menu, next, elem)->extended;
+            if (wimg == NULL || wimg->cache == NULL || wimg->cache->count < 2)
+                continue;
+            if (step >= (wimg->cache->count - 1) / 2)
+                continue; // deeper than THIS resolved cache can hold
+
+            int b;
+            for (b = 0; b < 2 && cfWarm[b].cache != NULL && cfWarm[b].cache != wimg->cache; b++)
+                ;
+            if (b == 2)
+                continue;
+            if (cfWarm[b].cache == NULL) {
+                cfWarm[b].cache = wimg->cache;
+                cfWarm[b].left = wimg->cache->count - 1; // selected's slot stays reserved
+            }
+            if (cfWarm[b].left > 0) {
+                cfWarm[b].left--;
+                getGameImageTexture(wimg->cache, sourceList, &next->item);
+            }
+        }
     }
 
     for (i = drawFirst; i < drawLast; i++) {

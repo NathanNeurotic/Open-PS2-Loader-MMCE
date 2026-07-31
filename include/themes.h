@@ -173,6 +173,7 @@ extern theme_t *gTheme;
 
 extern int gCoverflowCount, gCoverflowCenterScale, gCoverflowAnimSpeed, gCoverflowDimCovers;
 void thmTriggerCoverflowAnim(int dir);
+int thmCoverflowIsAnimating(void);
 
 void thmInit(void);
 void thmReinit(const char *path);
