@@ -2335,7 +2335,7 @@ static void guiReadPads()
 
     if (readPads())
         guiInactiveFrames = 0;
-    else
+    else if (guiInactiveFrames < INT_MAX)
         guiInactiveFrames++;
 
     cachePumpPendingArt();

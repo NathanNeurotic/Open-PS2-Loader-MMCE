@@ -81,6 +81,7 @@ enum {
 #define CACHE_TRANSIENT_RETRY_FRAMES    30
 #define CACHE_END_WAIT_TICKS_LAUNCH     500
 #define CACHE_END_WAIT_TICKS_TERMINAL   120
+#define CACHE_MAX_ENTRIES               256
 
 extern void *_gp;
 
@@ -591,9 +592,9 @@ static void cacheWorkerThread(void *arg)
     }
 
     cacheLock();
-    gArtRunning = 0;
     cacheUnlock();
 
+    gArtRunning = 0;
     ExitDeleteThread();
 }
 
@@ -722,7 +723,7 @@ image_cache_t *cacheInitCache(int userId, const char *prefix, int isPrefixRelati
     int length;
     int i;
 
-    if (suffix == NULL || count <= 0)
+    if (suffix == NULL || count <= 0 || count > CACHE_MAX_ENTRIES)
         return NULL;
 
     cache = malloc(sizeof(*cache));
@@ -754,7 +755,7 @@ image_cache_t *cacheInitCache(int userId, const char *prefix, int isPrefixRelati
     }
     memcpy(cache->suffix, suffix, length);
 
-    cache->content = malloc(count * sizeof(*cache->content));
+    cache->content = calloc((size_t)count, sizeof(*cache->content));
     if (cache->content == NULL) {
         free(cache->prefix);
         free(cache->suffix);
@@ -763,7 +764,6 @@ image_cache_t *cacheInitCache(int userId, const char *prefix, int isPrefixRelati
     }
 
     cache->nextUID = 1;
-    memset(cache->content, 0, count * sizeof(*cache->content));
     for (i = 0; i < count; i++)
         cacheClearItem(&cache->content[i], 0);
 
