@@ -1129,11 +1129,51 @@ void vcdEnsureBdmaForLaunch(int source, int mode)
         guiWarning(_l(_STR_BDMA_ERR_IO), 6);
 }
 
-// ---- SMB requirements guard ---------------------------------------------------------
-// Launching a VCD over SMB needs POPSTARTER's network IRX in mc?:/POPSTARTER/. We don't install
-// these from the ELF (they ship in the release POPSTARTER/ folder for the user to copy), so before
-// an SMB/ETH VCD launch we confirm they're present and soft-refuse otherwise.
+// ---- POPSTARTER memory-card externals -----------------------------------------------
+// POPSTARTER reads its external modules/icons from mc?:/POPSTARTER/ after its own IOP reset. Keep
+// the release copies directly beside the games in each device's POPS/ folder and install only files
+// missing from the card. Existing card files are user-managed and always win. Network configs and
+// RiptOPL's BDMA marker are deliberately excluded; their dedicated settings flows own those files.
+static const char *vcdPopstarterMcFile[9] = {
+    "smbman.irx", "ps2ip.irx", "ps2smap.irx", "ps2dev9.irx", "SMSUTILS.irx", "poweroff.irx", "del.icn", "list.icn", "icon.sys"};
 static const char *vcdSmbModule[4] = {"smbman.irx", "ps2ip.irx", "ps2smap.irx", "ps2dev9.irx"};
+
+int vcdInstallPopstarterMc(const char *devPrefix)
+{
+    char mcDir[64], src[320], dst[96];
+    int firstError = 0;
+
+    if (devPrefix == NULL || devPrefix[0] == '\0')
+        return -1;
+    if (!vcdResolvePopstarterMc(mcDir, sizeof(mcDir)))
+        return -3;
+
+    for (unsigned int i = 0; i < sizeof(vcdPopstarterMcFile) / sizeof(vcdPopstarterMcFile[0]); i++) {
+        snprintf(dst, sizeof(dst), "%s/%s", mcDir, vcdPopstarterMcFile[i]);
+        int fd = open(dst, O_RDONLY);
+        if (fd < 0 && !strcmp(vcdPopstarterMcFile[i], "SMSUTILS.irx")) {
+            char altDst[96];
+            snprintf(altDst, sizeof(altDst), "%s/smsutils.irx", mcDir);
+            fd = open(altDst, O_RDONLY);
+        }
+        if (fd >= 0) {
+            close(fd);
+            continue; // install-if-missing: never replace a user-managed card file
+        }
+
+        snprintf(src, sizeof(src), "%s%s%c%s", devPrefix, POPS_FOLDER, vcdSep(devPrefix), vcdPopstarterMcFile[i]);
+        int result = vcdSafeCopyFile(src, dst);
+        if (result == 0)
+            LOG("[POPSTARTER] installed %s from %s\n", vcdPopstarterMcFile[i], src);
+        else {
+            LOG("[POPSTARTER] could not install %s from %s (%d)\n", vcdPopstarterMcFile[i], src, result);
+            if (firstError == 0)
+                firstError = result;
+        }
+    }
+
+    return firstError;
+}
 
 int vcdSmbModulesPresent(void)
 {

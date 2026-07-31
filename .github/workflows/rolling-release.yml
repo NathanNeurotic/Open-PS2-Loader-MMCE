@@ -441,8 +441,8 @@ jobs:
           #   APP_RIPTOPL-PS2DEVPINNEDSDK/RIPTOPL.ELF   -- digest pin of ps2dev:latest; SAFE FALLBACK.
           #   APP_RIPTOPL-PS2DEVLATESTSDK/RIPTOPL.ELF -- ps2dev:latest (bleeding-edge MOVING tag; may not
           #                                              boot, issue #102). No unlabeled default folder.
-          #   POPSTARTER/                     -- SMB network stack (popsmb/) + bdma_config.txt=fat32.
-          #   POPS/                           -- POPSTARTER.ELF + BDMA variants + patch (from POPSLoader).
+          #   POPSTARTER/                     -- Legacy manual MC bundle + network templates/marker.
+          #   POPS/                           -- POPSTARTER.ELF + every auto-installed MC external + BDMA variants.
           #   neutrino/                       -- the official latest Neutrino core (rickgaiser/neutrino), extracted for drag-and-drop.
           #   PS2-Servers.url                 -- link to the UDPFS / SMB / UDPBD all-in-one PC server.
           PKG=riptopl_pkg
@@ -464,8 +464,9 @@ jobs:
           else
             echo "WARN: pinned fallback build missing this run; package ships without APP_RIPTOPL-PS2DEVPINNEDSDK" >&2
           fi
+          cp -f POPS/{smbman.irx,ps2ip.irx,ps2smap.irx,ps2dev9.irx,SMSUTILS.irx,poweroff.irx,del.icn,list.icn,icon.sys} "$PKG/POPSTARTER/"
           cp -f popsmb/* "$PKG/POPSTARTER/"
-          cp -f pops/* "$PKG/POPS/"
+          cp -f POPS/* "$PKG/POPS/"
           # Keep PC-side servers in their dedicated release stream. The shortcut opens the maintained
           # PS2 Servers all-in-one launcher for UDPFS, SMBv1 and UDPBD; no server binaries or source are
           # embedded in the RiptOPL install package.
