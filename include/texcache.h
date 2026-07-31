@@ -100,10 +100,6 @@ void cacheAdvanceGeneration(void);
 // Drop the genuine-absence art memos (see texcache.c). Call only on a deliberate settings/theme apply.
 void cacheInvalidateFailMemo(void);
 
-/** Advances the failure-retry generation without canceling queued art loads.
- */
-void cacheBumpGeneration(void);
-
 /** Invalidates stale interactive art loads while keeping queued prefetch work.
  */
 void cacheAdvanceGenerationPreservePrefetch(void);

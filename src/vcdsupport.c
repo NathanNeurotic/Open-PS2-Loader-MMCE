@@ -180,7 +180,7 @@ static int vcdScanOpenDir(const char *dirPath, vcd_entry_t **outList)
     // #195 (Blade, HW): VCD lists arrived in readdir order -- i.e. FAT directory-entry order, which is
     // effectively random after any add/delete churn -- while every other list reads alphabetical. Sort
     // the BACKING array here at the scan, not the menu rows: every consumer then agrees (device pages,
-    // the FAV VCD view, art prewarm), ids stay in lockstep with parallel arrays (the HDD path keeps a
+    // the FAV VCD view), ids stay in lockstep with parallel arrays (the HDD path keeps a
     // per-id partition-label array), and it holds no matter which publish path builds the rows.
     // Gated on the same Automatic Sorting switch the game lists honour: Autosort off = raw dir order,
     // as for every other list. Launch/favourites are unaffected either way -- VCDs resolve BY NAME.

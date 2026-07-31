@@ -495,8 +495,8 @@ static int cacheHasPendingInteractiveArtLocked(void)
     return gArtInteractiveReqList != NULL || gArtInteractiveActiveCount > 0;
 }
 
-// Mode checks span BOTH queues: since the info-art prewarm, MMCE-backed requests can sit on the
-// PREFETCH queue too, and every quiesce path (launch, theme swap, config IO) must drain those as well.
+// Mode checks span BOTH queues: MMCE-backed requests can sit on either queue, and every
+// quiesce path (launch, theme swap, config IO) must drain those as well.
 static int cacheHasQueuedModeLocked(int mode)
 {
     load_image_request_t *req;
@@ -521,7 +521,7 @@ static int cacheHasActiveModeLocked(int mode)
 static int cacheIsAbortableMmceRequest(load_image_request_t *req)
 {
     // Any MMCE-backed read is abortable, whatever its queue: the abort flag is polled by the same
-    // 4KB staging loop regardless of priority, and a prewarm PREFETCH read holds the SIO2 bus just
+    // 4KB staging loop regardless of priority, and a PREFETCH read holds the SIO2 bus just
     // like an interactive one.
     return req != NULL && req->effectiveMode == MMCE_MODE;
 }
@@ -902,8 +902,8 @@ static load_image_request_t *cacheDequeueRequest(void)
         if (gArtInteractiveReqEnd == req)
             gArtInteractiveReqEnd = NULL;
     } else if (gArtPrefetchReqList != NULL) {
-        // Same nav-time defer the interactive head gets: a prewarm (or HDD cover) prefetch read
-        // must never START mid-scroll on a slow shared bus.
+        // Same nav-time defer the interactive head gets: a prefetch read on a slow shared
+        // bus must never START mid-scroll.
         if (cacheShouldDeferInteractiveArtOnInputMode(gArtPrefetchReqList->effectiveMode)) {
             cacheUnlock();
             return NULL;
@@ -1336,7 +1336,7 @@ int cacheAbortMmceImageLoadsTimed(int timeoutTicks)
         if (req->effectiveMode == MMCE_MODE)
             cacheDropQueuedRequestLocked(req);
     }
-    // Prewarm can queue MMCE art at PREFETCH priority too -- every quiesce caller (launch, theme
+    // MMCE art can sit at PREFETCH priority too -- every quiesce caller (launch, theme
     // swap, deferred config IO, deinit) needs those off the SIO2 bus just the same.
     for (load_image_request_t *req = gArtPrefetchReqList, *next; req != NULL; req = next) {
         next = req->next;
@@ -1398,13 +1398,6 @@ void cacheInvalidateFailMemo(void)
         gCacheFailEpoch = 1;
     else
         gCacheFailEpoch++;
-    cacheUnlock();
-}
-
-void cacheBumpGeneration(void)
-{
-    cacheLock();
-    cacheNextGenerationLocked();
     cacheUnlock();
 }
 
@@ -1486,8 +1479,8 @@ void cacheWakeInteractiveArtOnInputIdle(void)
     int wakeWorker = 0;
 
     cacheLock();
-    // Prefetch heads can be nav-parked too (prewarm / HDD covers defer at dequeue), so wake the
-    // worker for parked work on EITHER queue once input goes idle.
+    // Prefetch heads can be nav-parked too (prefetch reads defer at dequeue on the slow
+    // backends), so wake the worker for parked work on EITHER queue once input goes idle.
     if (gArtRunning && gArtThreadId >= 0 && gArtActiveCount == 0 &&
         (gArtInteractiveReqList != NULL || gArtPrefetchReqList != NULL))
         wakeWorker = 1;
@@ -1539,10 +1532,7 @@ GSTEXTURE *cacheGetTextureIfReady(image_cache_t *cache, int *cacheId, int *UID)
     return result;
 }
 
-// prewarm: an explicit info-art prewarm request -- lifts the MMCE prefetch exemption and the
-// per-cache prefetch cap for THIS call only (the caller bounds when it fires). skipSettle: skip the
-// interactive inactivity settle (Square-entry prewarm fires the reads immediately, under the fade).
-static GSTEXTURE *cacheGetTextureInternal(image_cache_t *cache, item_list_t *list, int *cacheId, int *UID, char *value, unsigned char priority, int prewarm, int skipSettle)
+static GSTEXTURE *cacheGetTextureInternal(image_cache_t *cache, item_list_t *list, int *cacheId, int *UID, char *value, unsigned char priority)
 {
     cache_entry_t *entry;
     cache_entry_t *oldestEntry = NULL;
@@ -1667,30 +1657,26 @@ static GSTEXTURE *cacheGetTextureInternal(image_cache_t *cache, item_list_t *lis
             return NULL;
         }
 
-        if (!skipSettle) {
-            int delay = cacheGetInteractiveDelay(list, effectiveMode);
-            /* In MMCE mode, give Cover art a 1-frame inactivity head start over
-             * other art types (Background, Screenshot, etc.).  The default theme
-             * draws Background (main0) before Cover (main5) every frame, so
-             * without this adjustment BG would always queue first and block COV
-             * with a potentially slow open() failure on cards that lack BG art.
-             * A single extra inactivity frame guarantees COV queues on frame N
-             * while BG/SCR are deferred to frame N+1, by which time COV is
-             * already in-flight and the MMCE one-at-a-time throttle keeps the
-             * others waiting naturally. */
-            if (effectiveMode == MMCE_MODE && cache->suffix != NULL &&
-                strcmp(cache->suffix, "COV") != 0)
-                delay++;
-            if (guiInactiveFrames < delay) {
-                cacheUnlock();
-                return NULL;
-            }
+        int delay = cacheGetInteractiveDelay(list, effectiveMode);
+        /* In MMCE mode, give Cover art a 1-frame inactivity head start over
+         * other art types (Background, Screenshot, etc.).  The default theme
+         * draws Background (main0) before Cover (main5) every frame, so
+         * without this adjustment BG would always queue first and block COV
+         * with a potentially slow open() failure on cards that lack BG art.
+         * A single extra inactivity frame guarantees COV queues on frame N
+         * while BG/SCR are deferred to frame N+1, by which time COV is
+         * already in-flight and the MMCE one-at-a-time throttle keeps the
+         * others waiting naturally. */
+        if (effectiveMode == MMCE_MODE && cache->suffix != NULL &&
+            strcmp(cache->suffix, "COV") != 0)
+            delay++;
+        if (guiInactiveFrames < delay) {
+            cacheUnlock();
+            return NULL;
         }
     } else {
-        // MMCE is prefetch-exempt (browse-time prefetch hurt nav on the SIO2 bus) EXCEPT for an
-        // explicit info-art prewarm, whose caller only fires after a long settle with the art
-        // pipeline idle.
-        if (list == NULL || (effectiveMode == MMCE_MODE && !prewarm) || guiInactiveFrames < cacheGetPrefetchDelay(list, effectiveMode)) {
+        // MMCE is prefetch-exempt (browse-time prefetch hurt nav on the SIO2 bus).
+        if (list == NULL || effectiveMode == MMCE_MODE || guiInactiveFrames < cacheGetPrefetchDelay(list, effectiveMode)) {
             cacheUnlock();
             return NULL;
         }
@@ -1739,7 +1725,7 @@ static GSTEXTURE *cacheGetTextureInternal(image_cache_t *cache, item_list_t *lis
     // worker; match that. The queue is still bounded by the 10-slot LRU cache (a full cache yields no
     // free victim, so no unbounded growth).
 
-    if (priority == CACHE_REQ_PRIORITY_PREFETCH && !prewarm && cache->queuedPrefetchRequests >= cacheGetPrefetchLimit(cache)) {
+    if (priority == CACHE_REQ_PRIORITY_PREFETCH && cache->queuedPrefetchRequests >= cacheGetPrefetchLimit(cache)) {
         cacheUnlock();
         return NULL;
     }
@@ -1839,10 +1825,10 @@ static GSTEXTURE *cacheGetTextureInternal(image_cache_t *cache, item_list_t *lis
 
 GSTEXTURE *cacheGetTexture(image_cache_t *cache, item_list_t *list, int *cacheId, int *UID, char *value)
 {
-    return cacheGetTextureInternal(cache, list, cacheId, UID, value, CACHE_REQ_PRIORITY_INTERACTIVE, 0, 0);
+    return cacheGetTextureInternal(cache, list, cacheId, UID, value, CACHE_REQ_PRIORITY_INTERACTIVE);
 }
 
 GSTEXTURE *cachePrefetchTexture(image_cache_t *cache, item_list_t *list, int *cacheId, int *UID, char *value)
 {
-    return cacheGetTextureInternal(cache, list, cacheId, UID, value, CACHE_REQ_PRIORITY_PREFETCH, 0, 0);
+    return cacheGetTextureInternal(cache, list, cacheId, UID, value, CACHE_REQ_PRIORITY_PREFETCH);
 }
