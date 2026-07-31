@@ -455,17 +455,16 @@ static int cacheGetInteractiveDelay(const item_list_t *list, int mode)
             return 0;
     }
 
-    // #296/#299 baseline restore: fast devices (USB/ETH, and any list-less caller) get NO
+    // #296/#299 baseline restore: fast devices (USB/ETH, HDD, and any list-less caller) get NO
     // interactive settle -- fire the art request on draw, mid-hold-scroll included. This is
     // official OPL's behaviour: upstream texcache.c gates on guiInactiveFrames < list->delay
     // with the delay DEFAULTING TO 0 (the *_frames_delay config keys are unset by default),
     // and uOPL feels instant for the same reason. cacheGetBaseDelay's 8-frame floor
     // (MENU_MIN_INACTIVE_FRAMES) was built for slow devices, so the slow-mode protections
-    // below stay untouched: MMCE keeps its floor/cap, APP its caps, and HDD keeps the floor
-    // (its spin-up reads contend with the GUI far worse than BDM USB). Fail-storm protection
+    // below stay untouched: MMCE keeps its floor/cap and APP its caps. Fail-storm protection
     // is unaffected (epoch fail memos) and duplicate requests still dedup via
     // cacheFindQueuedRequestLocked.
-    if (mode != MMCE_MODE && mode != APP_MODE && mode != HDD_MODE)
+    if (mode != MMCE_MODE && mode != APP_MODE)
         return 0;
 
     if ((mode == APP_MODE || mode == MMCE_MODE) && delay < CACHE_SLOW_MODE_INTERACTIVE_DELAY)
@@ -548,14 +547,14 @@ static int cacheIsNavigationActive(void)
     return gNavInputActive;
 }
 
-// Defer interactive cover reads while the user is actively scrolling on the SLOW filesystem
-// backends -- MMCE (SIO2) and APA-HDD (PFS over ATA). Both read art through the single fileXio
-// channel the menu also uses for badge/config IO, so starting a read mid-scroll stalls nav (the
-// "HDD is not very responsive... like the MMCE was" report). USB/exFAT BDM is fast and stays
-// unthrottled. Covers still land once navigation goes idle (the per-value settle below).
+// Defer interactive cover reads while the user is actively scrolling on the MMCE (SIO2)
+// backend: it reads art through the single fileXio channel the menu also uses for badge/config
+// IO, so starting a read mid-scroll stalls nav. USB/exFAT BDM and APA-HDD are fast and stay
+// unthrottled, matching official OPL. Covers still land once navigation goes idle (the
+// per-value settle below).
 static int cacheShouldDeferInteractiveArtOnInputMode(int effectiveMode)
 {
-    if (effectiveMode == MMCE_MODE || effectiveMode == HDD_MODE)
+    if (effectiveMode == MMCE_MODE)
         return cacheIsNavigationActive();
 
     return 0;
@@ -565,10 +564,10 @@ static int cacheShouldDeferInteractiveArtOnInputMode(int effectiveMode)
 static int cacheGetLoadThreadPriority(const load_image_request_t *req)
 {
     if (req != NULL && req->list != NULL) {
-        // MMCE and APA-HDD both read art through the single slow fileXio channel; deprioritize the
+        // MMCE reads art through the single slow fileXio channel; deprioritize the
         // art worker (higher number = lower EE priority) so an in-flight read yields that channel to
         // the priority-30 IO worker's nav-time badge/config reads instead of starving them.
-        if (req->effectiveMode == MMCE_MODE || req->effectiveMode == HDD_MODE)
+        if (req->effectiveMode == MMCE_MODE)
             return CACHE_MMCE_LOAD_THREAD_PRIORITY;
 
         if (req->list->mode == APP_MODE)
