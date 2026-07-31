@@ -92,8 +92,8 @@ struct pad_data_t
 
 // Pad commands are asynchronous. Keep every wait bounded so a transient SIO2/pad error cannot hang the
 // GUI thread.
-#define PAD_WAIT_POLLS     25
-#define PAD_WAIT_POLL_US   1000
+#define PAD_WAIT_POLLS         25
+#define PAD_WAIT_POLL_US       1000
 // How long a still-connected pad's held buttons may be carried across failed reads, in MILLISECONDS.
 // Bounded UNDER the fastest list key-repeat OPL uses (gScrollSpeed "fast" = 100 ms) so a release
 // hidden inside a miss burst cannot manufacture repeats: inside the window at most one carried
@@ -114,7 +114,7 @@ struct pad_data_t
 // ~83-100 ms. The generic 25 ms budget above therefore ALWAYS timed out on this leg, so analog
 // arming worked only when the IOP happened to finish in the background and the pressure/rumble
 // setup below it was unreachable. Give request-completion waits a budget above the happy path.
-#define PAD_REQ_WAIT_POLLS 150
+#define PAD_REQ_WAIT_POLLS     150
 
 #define PAD_INIT_RETRY       -1
 #define PAD_INIT_UNSUPPORTED 0

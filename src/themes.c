@@ -1098,8 +1098,7 @@ static void drawCoverFlow(struct menu_list *menu, struct submenu_list *item, con
         int side;
         for (side = 0; side < 2; side++) {
             struct submenu_list *walk = walkSide[side];
-            struct submenu_list *next = side ? (walk->prev ? walk->prev : menu->item->last)
-                                             : (walk->next ? walk->next : menu->item->submenu);
+            struct submenu_list *next = side ? (walk->prev ? walk->prev : menu->item->last) : (walk->next ? walk->next : menu->item->submenu);
             if (!next || next == walk || next == item)
                 continue;
             walkSide[side] = next;
