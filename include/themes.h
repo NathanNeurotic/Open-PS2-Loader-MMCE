@@ -72,6 +72,10 @@ typedef struct
 
     const char *decorator;
     mutable_image_t *decoratorImage;
+    // Non-owning link to the family's COV game-image element, set at theme validation for
+    // Lists WITHOUT a decorator: lets drawItemsList warm the visible page's covers through
+    // the normal cache path instead of loading them one highlight at a time (#296).
+    struct theme_element *coverElem;
 } items_list_t;
 
 typedef struct theme_element
