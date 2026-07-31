@@ -99,6 +99,8 @@ struct pad_data_t
 // hidden inside a miss burst cannot manufacture repeats: inside the window at most one carried
 // poll sits in any repeat cycle. The EDGE view needs no such bound (see edgedata below).
 #define PAD_READ_CARRY_MS      48
+// Successful-read polls between analog self-heal attempts -- a POLL COUNT, decremented once per
+// good read, not milliseconds like its neighbours.
 #define PAD_ANALOG_RETRY_DELAY 60
 // Milliseconds without registered input before an inline initializePad() -- reconnect edge or
 // analog self-heal -- may run (#271/#272). That init is 250-600 ms of polled waits ON THE GUI
