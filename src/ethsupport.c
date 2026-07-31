@@ -359,21 +359,6 @@ void ethDeinitModules(void)
     }
 }
 
-// Bookkeeping-only deinit for teardown paths that IMMEDIATELY reboot the IOP (unloadLwnbdSvr ->
-// reset -> sysReset -> SifIopReset). The IOP reboot wipes netman/smap/ps2ip/ps2ips/lwnbdsvr
-// outright, so ethDeinitModules' graceful RPC teardown is redundant there -- and it is also the
-// only part of that path that can deadlock: after a FAILED network bring-up (no cable, no link,
-// no DHCP -- issue #307) NetManDeinit/ps2ip_deinit can park the EE on a SIF reply the
-// half-configured stack never sends, freezing the console (pads dead, hard reset required).
-// Skip the RPC calls entirely and just clear the EE-side state. ethInitSemaID is an EE kernel
-// object -- it survives the IOP reboot and ethInitSema() reuses it, so it is deliberately kept.
-// ethReadNetConfig's sync is pointless here: NBD never reconfigures the interface.
-void ethInvalidateModules(void)
-{
-    ethModulesLoaded = 0;
-    gNetworkStartup = ERROR_ETH_NOT_STARTED;
-}
-
 int ethLoadInitModules(void)
 {
     int ret;
