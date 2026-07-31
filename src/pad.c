@@ -113,37 +113,22 @@ static u32 paddata;
 static u32 oldpaddata;
 
 /*
-  While set, readPads() keeps sampling but does NOT advance the input baseline, so a key-on raised
-  during this window survives until someone is actually listening.
-
-  guiMainLoop() polls the pads EVERY frame (gui.c) but only runs screenHandler->handleInput() when no
-  screen transition is in flight. A fade is 26 frames -- about 430 ms at 60 Hz -- and every poll in
-  that window still shifted oldpaddata, so the edge was consumed by a poll with no consumer behind
-  it. Any button pressed during a screen fade was silently discarded: press a direction right after
-  switching screens and nothing happens.
-
-  Freezing the BASELINE rather than skipping the poll is deliberate. readPads() also expires rumble
-  taps, drives the pad state machine and detects (dis)connects, so simply not calling it during a
-  transition would leave a motor spinning and a replug unnoticed.
-
-  Scope note: this is armed only while a transition is running, so it cannot affect ordinary
-  same-screen navigation -- deliberately, so it does not disturb the #271/#272 read-miss work being
-  tested on hardware.
-*/
+ * Screen transitions keep polling pads but do not dispatch input. Freeze the
+ * baseline so a different button held when the destination appears can be
+ * consumed there. Seed it from the transition-triggering sample on entry: that
+ * button is already consumed and must not toggle the destination back.
+ *
+ * A tap pressed and released entirely inside the fade remains intentionally
+ * ignored. Polling continues for rumble timing, pad state, and reconnects.
+ */
 static int edgeBaselineFrozen = 0;
-static int edgeBaselineReleasePending = 0;
-static u32 edgeFrozenPresses = 0;
 
 void padFreezeEdgeBaseline(int freeze)
 {
     int next = freeze ? 1 : 0;
 
-    if (next && !edgeBaselineFrozen) {
-        edgeFrozenPresses = 0;
-        edgeBaselineReleasePending = 0;
-    } else if (!next && edgeBaselineFrozen) {
-        edgeBaselineReleasePending = 1;
-    }
+    if (next && !edgeBaselineFrozen)
+        oldpaddata = paddata;
 
     edgeBaselineFrozen = next;
 }
@@ -694,7 +679,7 @@ int readPads()
     int i;
     int result = 0;
 
-    if (!edgeBaselineFrozen && !edgeBaselineReleasePending)
+    if (!edgeBaselineFrozen)
         oldpaddata = paddata;
     paddata = 0;
 
@@ -716,15 +701,6 @@ int readPads()
 
     for (i = 0; i < pad_count; ++i)
         result |= readPad(&pad_data[i]);
-
-    if (edgeBaselineFrozen) {
-        edgeFrozenPresses |= paddata;
-    } else if (edgeBaselineReleasePending) {
-        paddata |= edgeFrozenPresses;
-        result |= edgeFrozenPresses != 0;
-        edgeFrozenPresses = 0;
-        edgeBaselineReleasePending = 0;
-    }
 
     // Rumble duration is millisecond-based because some paths poll twice in one frame.
     for (i = 0; i < pad_count; ++i) {

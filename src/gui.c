@@ -2329,9 +2329,8 @@ static void guiDrawOverlays()
 
 static void guiReadPads()
 {
-    // A transition means handleInput() will not run this frame (see guiMainLoop). Hold the key-on
-    // baseline so a press made during the ~430ms fade is still pending when the new screen takes
-    // over, instead of being consumed by a poll that nobody is listening behind.
+    // A transition polls without dispatching input. Freeze against the triggering sample so that
+    // button cannot replay on the destination, while a different button held through the fade can.
     padFreezeEdgeBaseline(screenHandlerTarget != NULL);
 
     if (readPads())
