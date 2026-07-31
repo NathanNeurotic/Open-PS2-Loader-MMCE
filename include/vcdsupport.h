@@ -128,8 +128,47 @@ void vcdEnsureBdmaForLaunch(int source, int mode);
 // Gate SMB/ETH VCD launches on this -- we don't install these from the ELF.
 int vcdSmbModulesPresent(void);
 
-// Write POPSTARTER's IPCONFIG.DAT + SMBCONFIG.DAT into mc?:/POPSTARTER/ (caller formats the lines)
-// through the free-space-gated safe-write. 0 ok, -2 card full, -3 IO error. NULL skips that file.
-int vcdWritePopstarterNet(const char *ipconfig, const char *smbconfig);
+// ---- POPStarter network files (IPCONFIG.DAT / SMBCONFIG.DAT) --------------------------------
+// POPSLoader-parity flow: READ existing values when available, otherwise stay blank until the
+// user explicitly enters or imports values. Absence means "unknown/unconfigured", never "use
+// OPL defaults". Locations: mc0:/POPSTARTER -> mc1:/POPSTARTER, in that precedence order --
+// POPSTARTER reads its network files from the memory card ONLY (OPL's own settings live in the
+// boot dir/cwd, but that is OUR convention, not POPSTARTER's).
+//
+// Formats (POPStarter):
+//   IPCONFIG.DAT: one line "<PS2 IP> <NETMASK> <GATEWAY>"; a BLANK file = DHCP. The file should
+//                 exist even for DHCP -- it is never deleted, only overwritten/created.
+//   SMBCONFIG.DAT: line 1 "<SERVER IP>[:PORT] <SHARE NAME>" (port optional, default 445),
+//                 line 2 username, line 3 plain-text password; empty lines 2/3 = guest.
+typedef struct
+{
+    int smbExists; // SMBCONFIG.DAT was found (smbDir names where)
+    int ipExists;  // IPCONFIG.DAT was found (ipDir names where)
+    int ipDhcp;    // 1 = DHCP (file blank or absent); 0 = static triple below is valid
+    int ps2Ip[4];
+    int ps2Mask[4];
+    int ps2Gw[4];
+    int smbIp[4];
+    int smbPort; // 0 or 445 = default (written bare, no ":PORT")
+    char smbShare[32];
+    char smbUser[32];
+    char smbPass[32];
+    char smbDir[96];    // dir SMBCONFIG.DAT was read from ("" when absent)
+    char ipDir[96];     // dir IPCONFIG.DAT was read from ("" when absent)
+    char createDir[96]; // where files that don't exist yet get created ("" = nowhere available)
+} vcd_popsnet_t;
+
+// Scan the candidate dirs and fill *out. Absence of both files is DATA (all fields blank, the
+// exists-flags 0, ipDhcp 1), not an error. Returns 0, or -3 on a genuine mid-read IO error.
+int vcdReadPopstarterNet(vcd_popsnet_t *out);
+
+// Change detection vs the read-time snapshot, for the save matrix: bit 0 = SMB fields differ,
+// bit 1 = IP fields differ. Compares semantic content only (never the dirs/exists flags).
+int vcdPopsNetChanged(const vcd_popsnet_t *orig, const vcd_popsnet_t *cur);
+
+// Write SMBCONFIG.DAT (writeSmb) and/or IPCONFIG.DAT (writeIp). Each file goes to its origin dir
+// when it existed, else to createDir (mkdir best-effort). A DHCP ipconfig is written BLANK --
+// the file must exist either way. Returns 0, or the first vcdSafeWriteFile error (-2/-3).
+int vcdWritePopstarterNetFiles(const vcd_popsnet_t *cfg, int writeSmb, int writeIp);
 
 #endif

@@ -1067,13 +1067,14 @@ reselect_video_mode:
 
 static int netConfigUpdater(int modified)
 {
-    int showAdvancedOptions, isNetBIOS, isDHCPEnabled, i;
+    int showAdvancedOptions, isNetBIOS, isDHCPEnabled, isPopsDhcp, i;
 
     if (modified) {
         diaGetInt(diaNetConfig, NETCFG_SHOW_ADVANCED_OPTS, &showAdvancedOptions);
 
         diaGetInt(diaNetConfig, NETCFG_PS2_IP_ADDR_TYPE, &isDHCPEnabled);
         diaGetInt(diaNetConfig, NETCFG_SHARE_ADDR_TYPE, &isNetBIOS);
+        diaGetInt(diaNetConfig, NETCFG_POPS_IPTYPE, &isPopsDhcp);
         // The SMB-server block is always shown (it is its own configuration, not tied to the active
         // protocol -- hiding it made users think fields were removed). The NetBIOS-vs-IP toggle still
         // picks which address widget shows.
@@ -1086,6 +1087,11 @@ static int netConfigUpdater(int modified)
             diaSetEnabled(diaNetConfig, NETCFG_PS2_NETMASK_0 + i, !isDHCPEnabled);
             diaSetEnabled(diaNetConfig, NETCFG_PS2_GATEWAY_0 + i, !isDHCPEnabled);
             diaSetEnabled(diaNetConfig, NETCFG_PS2_DNS_0 + i, !isDHCPEnabled);
+
+            // Same greying for the POPStarter static-IP rows below (DHCP = no static triple).
+            diaSetEnabled(diaNetConfig, NETCFG_POPS_IP_0 + i, !isPopsDhcp);
+            diaSetEnabled(diaNetConfig, NETCFG_POPS_MASK_0 + i, !isPopsDhcp);
+            diaSetEnabled(diaNetConfig, NETCFG_POPS_GW_0 + i, !isPopsDhcp);
         }
 
         for (i = 0; i < 3; i++)
@@ -1104,9 +1110,14 @@ void guiShowNetConfig(void)
     const char *ethOpModes[] = {_l(_STR_AUTO), _l(_STR_ETH_100MFDX), _l(_STR_ETH_100MHDX), _l(_STR_ETH_10MFDX), _l(_STR_ETH_10MHDX), NULL};
     const char *addrConfModes[] = {_l(_STR_ADDR_TYPE_IP), _l(_STR_ADDR_TYPE_NETBIOS), NULL};
     const char *ipAddrConfModes[] = {_l(_STR_IP_ADDRESS_TYPE_STATIC), _l(_STR_IP_ADDRESS_TYPE_DHCP), NULL};
+    // POPStarter read-time snapshot for the change-detection save matrix, + static storage for the
+    // "Loaded from %s" notice (diaSetLabel stores a RAW POINTER -- it must outlive the dialog).
+    static vcd_popsnet_t popsOriginal;
+    static char popsNotice[128];
     diaSetEnum(diaNetConfig, NETCFG_PS2_IP_ADDR_TYPE, ipAddrConfModes);
     diaSetEnum(diaNetConfig, NETCFG_SHARE_ADDR_TYPE, addrConfModes);
     diaSetEnum(diaNetConfig, NETCFG_ETHOPMODE, ethOpModes);
+    diaSetEnum(diaNetConfig, NETCFG_POPS_IPTYPE, ipAddrConfModes); // same Static/DHCP index convention
 
     // upload current values
     // RiptOPL: open the Network Config with advanced options ON so the SMB Port + ETH op-mode are
@@ -1160,8 +1171,36 @@ void guiShowNetConfig(void)
     diaSetString(diaNetConfig, NETCFG_SHARE_NAME, gPCShareName);
     diaSetString(diaNetConfig, NETCFG_SHARE_USERNAME, gPCUserName);
     diaSetString(diaNetConfig, NETCFG_SHARE_PASSWORD, gPCPassword);
-    diaSetInt(diaNetConfig, NETCFG_WRITE_POPSTARTER, gWritePopstarterNet);
     diaSetInt(diaNetConfig, NETCFG_ETHOPMODE, gETHOpMode);
+
+    // POPStarter section: show POPSTARTER's OWN IPCONFIG.DAT / SMBCONFIG.DAT contents. Absent files
+    // leave the fields blank with the notice visible -- absence means unknown/unconfigured, NEVER
+    // "use OPL's values". Only an explicit edit or the Import button fills them, and only an actual
+    // change vs this snapshot is written back on OK (the save matrix below).
+    vcdReadPopstarterNet(&popsOriginal);
+    diaSetInt(diaNetConfig, NETCFG_POPS_IPTYPE, popsOriginal.ipDhcp);
+    for (i = 0; i < 4; ++i) {
+        diaSetInt(diaNetConfig, NETCFG_POPS_IP_0 + i, popsOriginal.ps2Ip[i]);
+        diaSetInt(diaNetConfig, NETCFG_POPS_MASK_0 + i, popsOriginal.ps2Mask[i]);
+        diaSetInt(diaNetConfig, NETCFG_POPS_GW_0 + i, popsOriginal.ps2Gw[i]);
+        diaSetInt(diaNetConfig, NETCFG_POPS_SMB_IP_0 + i, popsOriginal.smbIp[i]);
+
+        diaSetEnabled(diaNetConfig, NETCFG_POPS_IP_0 + i, !popsOriginal.ipDhcp);
+        diaSetEnabled(diaNetConfig, NETCFG_POPS_MASK_0 + i, !popsOriginal.ipDhcp);
+        diaSetEnabled(diaNetConfig, NETCFG_POPS_GW_0 + i, !popsOriginal.ipDhcp);
+    }
+    diaSetInt(diaNetConfig, NETCFG_POPS_SMB_PORT, popsOriginal.smbPort);
+    diaSetString(diaNetConfig, NETCFG_POPS_SMB_SHARE, popsOriginal.smbShare);
+    diaSetString(diaNetConfig, NETCFG_POPS_SMB_USER, popsOriginal.smbUser);
+    diaSetString(diaNetConfig, NETCFG_POPS_SMB_PASS, popsOriginal.smbPass);
+
+    if (popsOriginal.smbExists || popsOriginal.ipExists) {
+        snprintf(popsNotice, sizeof(popsNotice), _l(_STR_POPS_LOADED_FROM),
+                 popsOriginal.smbExists ? popsOriginal.smbDir : popsOriginal.ipDir);
+        diaSetLabel(diaNetConfig, NETCFG_POPS_NOTICE, popsNotice);
+    } else {
+        diaSetLabel(diaNetConfig, NETCFG_POPS_NOTICE, _l(_STR_POPS_NONE_DETECTED));
+    }
 
     // Update the spacer item between the OK and reconnect buttons (See dialogs.c).
     if (gNetworkStartup == 0) {
@@ -1175,7 +1214,52 @@ void guiShowNetConfig(void)
         diaSetVisible(diaNetConfig, NETCFG_RECONNECT, 0);
     }
 
-    int result = diaExecuteDialog(diaNetConfig, -1, 1, &netConfigUpdater);
+    int result;
+    do {
+        result = diaExecuteDialog(diaNetConfig, -1, 1, &netConfigUpdater);
+        if (result == NETCFG_POPS_IMPORT) {
+            // IMPORT: the ONE sanctioned path that copies OPL's own Network Settings (as currently
+            // shown in this dialog, saved or not) into the POPStarter fields. Pressing the button
+            // exits the dialog with its id; the dialog struct keeps every field's value across the
+            // re-execution, so nothing the user typed elsewhere is lost.
+            int isDhcp, isNetBIOS, v;
+            char s[32];
+
+            diaGetInt(diaNetConfig, NETCFG_PS2_IP_ADDR_TYPE, &isDhcp);
+            diaSetInt(diaNetConfig, NETCFG_POPS_IPTYPE, isDhcp);
+            for (i = 0; i < 4; ++i) {
+                diaGetInt(diaNetConfig, NETCFG_PS2_IP_ADDR_0 + i, &v);
+                diaSetInt(diaNetConfig, NETCFG_POPS_IP_0 + i, v);
+                diaGetInt(diaNetConfig, NETCFG_PS2_NETMASK_0 + i, &v);
+                diaSetInt(diaNetConfig, NETCFG_POPS_MASK_0 + i, v);
+                diaGetInt(diaNetConfig, NETCFG_PS2_GATEWAY_0 + i, &v);
+                diaSetInt(diaNetConfig, NETCFG_POPS_GW_0 + i, v);
+
+                diaSetEnabled(diaNetConfig, NETCFG_POPS_IP_0 + i, !isDhcp);
+                diaSetEnabled(diaNetConfig, NETCFG_POPS_MASK_0 + i, !isDhcp);
+                diaSetEnabled(diaNetConfig, NETCFG_POPS_GW_0 + i, !isDhcp);
+            }
+
+            // A NetBIOS share name can't be turned into an IP -- leave the POPStarter server IP
+            // untouched in that case instead of importing a wrong value.
+            diaGetInt(diaNetConfig, NETCFG_SHARE_ADDR_TYPE, &isNetBIOS);
+            if (!isNetBIOS) {
+                for (i = 0; i < 4; ++i) {
+                    diaGetInt(diaNetConfig, NETCFG_SHARE_IP_ADDR_0 + i, &v);
+                    diaSetInt(diaNetConfig, NETCFG_POPS_SMB_IP_0 + i, v);
+                }
+            }
+            diaGetInt(diaNetConfig, NETCFG_SHARE_PORT, &v);
+            diaSetInt(diaNetConfig, NETCFG_POPS_SMB_PORT, v);
+            diaGetString(diaNetConfig, NETCFG_SHARE_NAME, s, sizeof(s));
+            diaSetString(diaNetConfig, NETCFG_POPS_SMB_SHARE, s);
+            diaGetString(diaNetConfig, NETCFG_SHARE_USERNAME, s, sizeof(s));
+            diaSetString(diaNetConfig, NETCFG_POPS_SMB_USER, s);
+            diaGetString(diaNetConfig, NETCFG_SHARE_PASSWORD, s, sizeof(s));
+            diaSetString(diaNetConfig, NETCFG_POPS_SMB_PASS, s);
+        }
+    } while (result == NETCFG_POPS_IMPORT);
+
     if (result) {
         // Store values
         diaGetInt(diaNetConfig, NETCFG_PS2_IP_ADDR_TYPE, &ps2_ip_use_dhcp);
@@ -1195,23 +1279,43 @@ void guiShowNetConfig(void)
         diaGetString(diaNetConfig, NETCFG_SHARE_NAME, gPCShareName, sizeof(gPCShareName));
         diaGetString(diaNetConfig, NETCFG_SHARE_USERNAME, gPCUserName, sizeof(gPCUserName));
         diaGetString(diaNetConfig, NETCFG_SHARE_PASSWORD, gPCPassword, sizeof(gPCPassword));
-        diaGetInt(diaNetConfig, NETCFG_WRITE_POPSTARTER, &gWritePopstarterNet);
 
-        // POPSTARTER needs the same IP/share data we just collected, so when the user opts in we
-        // mirror it into POPSTARTER's own config files (mc?:/POPSTARTER/IPCONFIG.DAT + SMBCONFIG.DAT)
-        // instead of asking twice. Opt-in (default off) so non-POPSTARTER users never touch the card;
-        // the write is free-space-gated + truncation-safe, so a failure can't corrupt the card.
-        if (gWritePopstarterNet) {
-            char ipcfg[64], smbcfg[96];
-            snprintf(ipcfg, sizeof(ipcfg), "%d.%d.%d.%d %d.%d.%d.%d %d.%d.%d.%d",
-                     ps2_ip[0], ps2_ip[1], ps2_ip[2], ps2_ip[3],
-                     ps2_netmask[0], ps2_netmask[1], ps2_netmask[2], ps2_netmask[3],
-                     ps2_gateway[0], ps2_gateway[1], ps2_gateway[2], ps2_gateway[3]);
-            snprintf(smbcfg, sizeof(smbcfg), "%d.%d.%d.%d:%d %s",
-                     pc_ip[0], pc_ip[1], pc_ip[2], pc_ip[3], gPCPort, gPCShareName);
-            if (vcdWritePopstarterNet(ipcfg, smbcfg) != 0)
-                guiMsgBox(_l(_STR_POPSTARTER_NET_ERR), 0, NULL);
+        // POPStarter save matrix (POPSLoader parity): compare the dialog's POPStarter fields against
+        // the read-time snapshot and write ONLY what actually changed -- and only when the file
+        // already exists (overwrite at its origin dir) or the user supplied complete values (create
+        // at createDir). Blank/incomplete fields with no existing file create NOTHING: absence must
+        // never turn into a fabricated configuration.
+        vcd_popsnet_t popsCur = popsOriginal; // carries the origin dirs + exists flags over
+        diaGetInt(diaNetConfig, NETCFG_POPS_IPTYPE, &popsCur.ipDhcp);
+        for (i = 0; i < 4; ++i) {
+            diaGetInt(diaNetConfig, NETCFG_POPS_IP_0 + i, &popsCur.ps2Ip[i]);
+            diaGetInt(diaNetConfig, NETCFG_POPS_MASK_0 + i, &popsCur.ps2Mask[i]);
+            diaGetInt(diaNetConfig, NETCFG_POPS_GW_0 + i, &popsCur.ps2Gw[i]);
+            diaGetInt(diaNetConfig, NETCFG_POPS_SMB_IP_0 + i, &popsCur.smbIp[i]);
         }
+        diaGetInt(diaNetConfig, NETCFG_POPS_SMB_PORT, &popsCur.smbPort);
+        diaGetString(diaNetConfig, NETCFG_POPS_SMB_SHARE, popsCur.smbShare, sizeof(popsCur.smbShare));
+        diaGetString(diaNetConfig, NETCFG_POPS_SMB_USER, popsCur.smbUser, sizeof(popsCur.smbUser));
+        diaGetString(diaNetConfig, NETCFG_POPS_SMB_PASS, popsCur.smbPass, sizeof(popsCur.smbPass));
+
+        int popsMask = vcdPopsNetChanged(&popsOriginal, &popsCur);
+        int popsSmbComplete = popsCur.smbShare[0] != '\0' &&
+                              (popsCur.smbIp[0] | popsCur.smbIp[1] | popsCur.smbIp[2] | popsCur.smbIp[3]) != 0;
+        int popsIpComplete = (popsCur.ps2Ip[0] | popsCur.ps2Ip[1] | popsCur.ps2Ip[2] | popsCur.ps2Ip[3]) != 0 &&
+                             (popsCur.ps2Mask[0] | popsCur.ps2Mask[1] | popsCur.ps2Mask[2] | popsCur.ps2Mask[3]) != 0 &&
+                             (popsCur.ps2Gw[0] | popsCur.ps2Gw[1] | popsCur.ps2Gw[2] | popsCur.ps2Gw[3]) != 0;
+        int writeSmb = (popsMask & 1) && (popsOriginal.smbExists || popsSmbComplete);
+        int writeIp = (popsMask & 2) && (popsOriginal.ipExists || popsCur.ipDhcp || popsIpComplete);
+        // Creating a fresh SMBCONFIG.DAT with no IPCONFIG.DAT anywhere: create the pair -- POPStarter
+        // expects IPCONFIG.DAT to exist even when blank (DHCP). An incomplete static entry becomes a
+        // BLANK file (never garbage); the user can complete it later and it will overwrite.
+        if (writeSmb && !popsOriginal.smbExists && !popsOriginal.ipExists) {
+            writeIp = 1;
+            if (!popsCur.ipDhcp && !popsIpComplete)
+                popsCur.ipDhcp = 1;
+        }
+        if ((writeSmb || writeIp) && vcdWritePopstarterNetFiles(&popsCur, writeSmb, writeIp) != 0)
+            guiMsgBox(_l(_STR_POPSTARTER_NET_ERR), 0, NULL);
 
         if (result == NETCFG_RECONNECT && gNetworkStartup < ERROR_ETH_SMB_CONN)
             gNetworkStartup = ERROR_ETH_SMB_LOGON;

@@ -113,7 +113,6 @@ enum CONFIG_INDEX {
 #define CONFIG_OPL_BDMA_APPLY           "bdma_apply_launch"
 #define CONFIG_OPL_VCD_HIDE_GAMEID      "vcd_hide_gameid"     // display-only: hide a leading PS1 game-ID prefix from the VCD list
 #define CONFIG_OPL_VCD_FIRST_DISC_ONLY  "vcd_first_disc_only" // #118: hide discs 2+ of a multi-disc PS1 set from the device VCD lists
-#define CONFIG_OPL_WRITE_POPS_NET       "write_popstarter_net"
 #define CONFIG_OPL_HDD_GAME_LIST_CACHE  "hdd_game_list_cache"
 #define CONFIG_OPL_EXIT_PATH            "exit_path"
 #define CONFIG_OPL_AUTO_SORT            "autosort"

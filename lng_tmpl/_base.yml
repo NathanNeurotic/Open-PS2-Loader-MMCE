@@ -1007,3 +1007,15 @@ gui_strings:
   string: No memory card found -- settings cannot be saved. OPL was booted from a network device, whose settings must live on a local card.
 - label: MMCE_GAMEID_UNSETTLED
   string: MMCE card switch not confirmed -- launching anyway
+- label: POPS_SMB_SECTION
+  string: POPStarter SMB Network
+- label: POPS_NONE_DETECTED
+  string: No existing POPStarter SMB configuration was detected. Enter the correct network settings before creating one.
+- label: POPS_IMPORT
+  string: Import POPSLoader Settings
+- label: HINT_POPS_IMPORT
+  string: Copy OPL's own Network Settings values (above) into these POPStarter fields. Nothing is written until you confirm with OK.
+- label: HINT_POPS_PORT
+  string: SMB port on the server -- 445 is the default. Leave at 0 (or 445) for a normal share; use 139 for older SMB1 servers.
+- label: POPS_LOADED_FROM
+  string: Loaded from %s

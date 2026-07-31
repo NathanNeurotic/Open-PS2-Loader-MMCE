@@ -125,9 +125,88 @@ struct UIItem diaNetConfig[] = {
     {UI_PASSWORD, NETCFG_SHARE_PASSWORD, 1, 1, _STR_HINT_GUEST, 0, 0, {.stringvalue = {"", "", NULL}}},
     {UI_BREAK},
 
-    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {NULL, _STR_WRITE_POPSTARTER_NET}}},
+    // ---- POPStarter network (VCD over SMB) -----------------------------------------------
+    // POPSLoader-parity flow: these fields show POPSTARTER's OWN IPCONFIG.DAT / SMBCONFIG.DAT
+    // contents (read on dialog open), NOT OPL's settings. Absent files leave the fields blank
+    // with the notice visible; only an explicit edit or the Import button changes them, and
+    // only an actual change is written back on OK (see guiShowNetConfig).
+    {UI_LABEL, 0, 1, 1, -1, 0, 0, {.label = {NULL, _STR_POPS_SMB_SECTION}}},
+    {UI_BREAK},
+
+    {UI_LABEL, NETCFG_POPS_NOTICE, 1, 1, -1, -40, 0, {.label = {NULL, _STR_POPS_NONE_DETECTED}}},
+    {UI_BREAK},
+
     {UI_SPACER},
-    {UI_BOOL, NETCFG_WRITE_POPSTARTER, 1, 1, _STR_HINT_WRITE_POPSTARTER_NET, 0, 0, {.intvalue = {0, 0}}},
+    {UI_BUTTON, NETCFG_POPS_IMPORT, 1, 1, _STR_HINT_POPS_IMPORT, -40, 0, {.label = {NULL, _STR_POPS_IMPORT}}},
+    {UI_BREAK},
+
+    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {NULL, _STR_IP_ADDRESS_TYPE}}},
+    {UI_SPACER},
+    {UI_ENUM, NETCFG_POPS_IPTYPE, 1, 1, -1, 0, 0, {.intvalue = {0, 0}}},
+    {UI_BREAK},
+
+    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {NULL, _STR_IP_ADDRESS}}},
+    {UI_SPACER},
+    {UI_INT, NETCFG_POPS_IP_0, 1, 1, -1, 0, 0, {.intvalue = {0, 0, 0, 255}}},
+    {UI_LABEL, 0, 1, 1, -1, 0, 0, {.label = {".", -1}}},
+    {UI_INT, NETCFG_POPS_IP_1, 1, 1, -1, 0, 0, {.intvalue = {0, 0, 0, 255}}},
+    {UI_LABEL, 0, 1, 1, -1, 0, 0, {.label = {".", -1}}},
+    {UI_INT, NETCFG_POPS_IP_2, 1, 1, -1, 0, 0, {.intvalue = {0, 0, 0, 255}}},
+    {UI_LABEL, 0, 1, 1, -1, 0, 0, {.label = {".", -1}}},
+    {UI_INT, NETCFG_POPS_IP_3, 1, 1, -1, 0, 0, {.intvalue = {0, 0, 0, 255}}},
+    {UI_BREAK},
+
+    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {NULL, _STR_MASK}}},
+    {UI_SPACER},
+    {UI_INT, NETCFG_POPS_MASK_0, 1, 1, -1, 0, 0, {.intvalue = {0, 0, 0, 255}}},
+    {UI_LABEL, 0, 1, 1, -1, 0, 0, {.label = {".", -1}}},
+    {UI_INT, NETCFG_POPS_MASK_1, 1, 1, -1, 0, 0, {.intvalue = {0, 0, 0, 255}}},
+    {UI_LABEL, 0, 1, 1, -1, 0, 0, {.label = {".", -1}}},
+    {UI_INT, NETCFG_POPS_MASK_2, 1, 1, -1, 0, 0, {.intvalue = {0, 0, 0, 255}}},
+    {UI_LABEL, 0, 1, 1, -1, 0, 0, {.label = {".", -1}}},
+    {UI_INT, NETCFG_POPS_MASK_3, 1, 1, -1, 0, 0, {.intvalue = {0, 0, 0, 255}}},
+    {UI_BREAK},
+
+    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {NULL, _STR_GATEWAY}}},
+    {UI_SPACER},
+    {UI_INT, NETCFG_POPS_GW_0, 1, 1, -1, 0, 0, {.intvalue = {0, 0, 0, 255}}},
+    {UI_LABEL, 0, 1, 1, -1, 0, 0, {.label = {".", -1}}},
+    {UI_INT, NETCFG_POPS_GW_1, 1, 1, -1, 0, 0, {.intvalue = {0, 0, 0, 255}}},
+    {UI_LABEL, 0, 1, 1, -1, 0, 0, {.label = {".", -1}}},
+    {UI_INT, NETCFG_POPS_GW_2, 1, 1, -1, 0, 0, {.intvalue = {0, 0, 0, 255}}},
+    {UI_LABEL, 0, 1, 1, -1, 0, 0, {.label = {".", -1}}},
+    {UI_INT, NETCFG_POPS_GW_3, 1, 1, -1, 0, 0, {.intvalue = {0, 0, 0, 255}}},
+    {UI_BREAK},
+
+    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {NULL, _STR_ADDRESS}}},
+    {UI_SPACER},
+    {UI_INT, NETCFG_POPS_SMB_IP_0, 1, 1, -1, 0, 0, {.intvalue = {0, 0, 0, 255}}},
+    {UI_LABEL, 0, 1, 1, -1, 0, 0, {.label = {".", -1}}},
+    {UI_INT, NETCFG_POPS_SMB_IP_1, 1, 1, -1, 0, 0, {.intvalue = {0, 0, 0, 255}}},
+    {UI_LABEL, 0, 1, 1, -1, 0, 0, {.label = {".", -1}}},
+    {UI_INT, NETCFG_POPS_SMB_IP_2, 1, 1, -1, 0, 0, {.intvalue = {0, 0, 0, 255}}},
+    {UI_LABEL, 0, 1, 1, -1, 0, 0, {.label = {".", -1}}},
+    {UI_INT, NETCFG_POPS_SMB_IP_3, 1, 1, -1, 0, 0, {.intvalue = {0, 0, 0, 255}}},
+    {UI_BREAK},
+
+    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {NULL, _STR_PORT}}},
+    {UI_SPACER},
+    {UI_INT, NETCFG_POPS_SMB_PORT, 1, 1, _STR_HINT_POPS_PORT, 0, 0, {.intvalue = {0, 0, 0, 65535}}},
+    {UI_BREAK},
+
+    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {NULL, _STR_SHARE}}},
+    {UI_SPACER},
+    {UI_STRING, NETCFG_POPS_SMB_SHARE, 1, 1, -1, 0, 0, {.stringvalue = {"", "", NULL}}},
+    {UI_BREAK},
+
+    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {NULL, _STR_USER}}},
+    {UI_SPACER},
+    {UI_STRING, NETCFG_POPS_SMB_USER, 1, 1, _STR_HINT_GUEST, 0, 0, {.stringvalue = {"", "", NULL}}},
+    {UI_BREAK},
+
+    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {NULL, _STR_PASSWORD}}},
+    {UI_SPACER},
+    {UI_PASSWORD, NETCFG_POPS_SMB_PASS, 1, 1, _STR_HINT_GUEST, 0, 0, {.stringvalue = {"", "", NULL}}},
     {UI_BREAK},
 
     // buttons

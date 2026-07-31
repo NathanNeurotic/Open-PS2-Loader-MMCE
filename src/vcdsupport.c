@@ -1156,20 +1156,257 @@ int vcdSmbModulesPresent(void)
     return 0;
 }
 
-int vcdWritePopstarterNet(const char *ipconfig, const char *smbconfig)
+// ---- POPStarter network files (IPCONFIG.DAT / SMBCONFIG.DAT) --------------------------------
+// POPSLoader-parity flow (see include/vcdsupport.h for the formats). The central rule: read
+// existing values when available, otherwise stay blank -- absence of POPStarter's files means
+// "unknown/unconfigured", NEVER "use OPL's defaults". Candidate dirs, in POPStarter's
+// precedence order: mc0:/POPSTARTER -> mc1:/POPSTARTER. That's it -- POPSTARTER reads its
+// network files from the memory card ONLY (OPL's own settings live in the boot dir/cwd, but
+// that is OUR convention, not POPSTARTER's). Nothing here touches VCD files.
+static int vcdPopstarterNetDirs(char dirs[][96], int maxDirs)
 {
-    char mcDir[64];
-    if (!vcdResolvePopstarterMc(mcDir, sizeof(mcDir)))
+    int n = 0;
+
+    snprintf(dirs[n++], 96, "mc0:/POPSTARTER");
+    if (n < maxDirs)
+        snprintf(dirs[n++], 96, "mc1:/POPSTARTER");
+
+    return n;
+}
+
+// Read a small text config file fully. Returns the length (>= 0), -1 when absent, -2 on a real
+// IO error. Absence is data (unknown/unconfigured), not a failure.
+static int vcdReadNetFile(const char *path, char *buf, int bufSize)
+{
+    int fd = open(path, O_RDONLY);
+    if (fd < 0)
+        return -1;
+    int size = lseek(fd, 0, SEEK_END);
+    if (size < 0 || lseek(fd, 0, SEEK_SET) < 0) {
+        close(fd);
+        return -2;
+    }
+    if (size >= bufSize)
+        size = bufSize - 1; // a bigger file is garbage/truncated, but never smashes the buffer
+    int rd = read(fd, buf, size);
+    close(fd);
+    if (rd < 0)
+        return -2;
+    buf[rd] = '\0';
+    return rd;
+}
+
+static int vcdQuadOk(const int q[4])
+{
+    for (int i = 0; i < 4; i++)
+        if (q[i] < 0 || q[i] > 255)
+            return 0;
+    return 1;
+}
+
+// Parse "<IP> <NETMASK> <GATEWAY>". Returns 1 when a full valid triple was read; 0 means the
+// file is blank/garbage -- the caller treats that as DHCP and shows NO invented values.
+static int vcdParseIpConfig(const char *buf, vcd_popsnet_t *out)
+{
+    int n = sscanf(buf, "%d.%d.%d.%d %d.%d.%d.%d %d.%d.%d.%d",
+                   &out->ps2Ip[0], &out->ps2Ip[1], &out->ps2Ip[2], &out->ps2Ip[3],
+                   &out->ps2Mask[0], &out->ps2Mask[1], &out->ps2Mask[2], &out->ps2Mask[3],
+                   &out->ps2Gw[0], &out->ps2Gw[1], &out->ps2Gw[2], &out->ps2Gw[3]);
+    return n == 12 && vcdQuadOk(out->ps2Ip) && vcdQuadOk(out->ps2Mask) && vcdQuadOk(out->ps2Gw);
+}
+
+// Parse line 1 "<SERVER IP>[:PORT] <SHARE NAME>" + line 2 user + line 3 password. The share name
+// may contain spaces, so only the FIRST token is the host; lines 2/3 are verbatim (missing =
+// guest). Invalid/absent content simply leaves fields blank -- never invented.
+static void vcdParseSmbConfig(const char *buf, vcd_popsnet_t *out)
+{
+    char work[256];
+    snprintf(work, sizeof(work), "%s", buf);
+
+    char *lines[3] = {NULL, NULL, NULL};
+    int nlines = 0;
+    char *p = work;
+    while (nlines < 3 && p != NULL && *p != '\0') {
+        lines[nlines++] = p;
+        p = strchr(p, '\n');
+        if (p != NULL)
+            *p++ = '\0';
+    }
+    for (int i = 0; i < nlines; i++) {
+        size_t l = strlen(lines[i]);
+        while (l > 0 && (lines[i][l - 1] == '\r' || lines[i][l - 1] == ' ' || lines[i][l - 1] == '\t'))
+            lines[i][--l] = '\0';
+    }
+
+    if (nlines > 0) {
+        char host[32];
+        const char *share = lines[0];
+        while (*share == ' ' || *share == '\t')
+            share++;
+        const char *sp = share;
+        while (*sp != '\0' && *sp != ' ' && *sp != '\t')
+            sp++;
+        size_t hostLen = (size_t)(sp - share);
+        if (hostLen >= sizeof(host))
+            hostLen = sizeof(host) - 1;
+        memcpy(host, share, hostLen);
+        host[hostLen] = '\0';
+        while (*sp == ' ' || *sp == '\t')
+            sp++;
+        snprintf(out->smbShare, sizeof(out->smbShare), "%s", sp);
+
+        char *colon = strchr(host, ':');
+        int port = 0;
+        if (colon != NULL) {
+            *colon = '\0';
+            port = atoi(colon + 1);
+            if (port <= 0 || port > 65535)
+                port = 0; // garbage port -> default, not a saved value
+        }
+        int q[4] = {0, 0, 0, 0};
+        if (sscanf(host, "%d.%d.%d.%d", &q[0], &q[1], &q[2], &q[3]) == 4 && vcdQuadOk(q)) {
+            memcpy(out->smbIp, q, sizeof(q));
+            out->smbPort = port;
+        }
+    }
+    if (nlines > 1)
+        snprintf(out->smbUser, sizeof(out->smbUser), "%s", lines[1]);
+    if (nlines > 2)
+        snprintf(out->smbPass, sizeof(out->smbPass), "%s", lines[2]);
+}
+
+int vcdReadPopstarterNet(vcd_popsnet_t *out)
+{
+    if (out == NULL)
         return -3;
-    char path[96];
-    int r1 = 0, r2 = 0;
-    if (ipconfig != NULL) {
-        snprintf(path, sizeof(path), "%s/IPCONFIG.DAT", mcDir);
-        r1 = vcdSafeWriteFile(path, ipconfig, (int)strlen(ipconfig));
+    memset(out, 0, sizeof(*out));
+    out->ipDhcp = 1; // absent/blank IPCONFIG.DAT displays as DHCP, with no invented values
+
+    char dirs[2][96];
+    int ndirs = vcdPopstarterNetDirs(dirs, 2);
+    char buf[256];
+
+    for (int i = 0; i < ndirs && (!out->smbExists || !out->ipExists); i++) {
+        char path[128];
+        if (!out->smbExists) {
+            snprintf(path, sizeof(path), "%s/SMBCONFIG.DAT", dirs[i]);
+            int rd = vcdReadNetFile(path, buf, sizeof(buf));
+            if (rd == -2)
+                return -3;
+            if (rd >= 0) {
+                out->smbExists = 1;
+                snprintf(out->smbDir, sizeof(out->smbDir), "%s", dirs[i]);
+                vcdParseSmbConfig(buf, out);
+            }
+        }
+        if (!out->ipExists) {
+            snprintf(path, sizeof(path), "%s/IPCONFIG.DAT", dirs[i]);
+            int rd = vcdReadNetFile(path, buf, sizeof(buf));
+            if (rd == -2)
+                return -3;
+            if (rd >= 0) {
+                out->ipExists = 1;
+                snprintf(out->ipDir, sizeof(out->ipDir), "%s", dirs[i]);
+                if (vcdParseIpConfig(buf, out))
+                    out->ipDhcp = 0;
+            }
+        }
     }
-    if (smbconfig != NULL) {
-        snprintf(path, sizeof(path), "%s/SMBCONFIG.DAT", mcDir);
-        r2 = vcdSafeWriteFile(path, smbconfig, (int)strlen(smbconfig));
+
+    // Create-target for files that don't exist yet: the first candidate dir that EXISTS; else
+    // mc0:/POPSTARTER, created best-effort at write time. Empty when no card is present at all --
+    // creation then reports IO.
+    for (int i = 0; i < ndirs; i++) {
+        DIR *d = opendir(dirs[i]);
+        if (d != NULL) {
+            closedir(d);
+            snprintf(out->createDir, sizeof(out->createDir), "%s", dirs[i]);
+            break;
+        }
     }
-    return (r1 != 0) ? r1 : r2; // surface the first failure (-2 card full / -3 IO)
+    if (out->createDir[0] == '\0' && ndirs > 0)
+        snprintf(out->createDir, sizeof(out->createDir), "mc0:/POPSTARTER");
+
+    return 0;
+}
+
+int vcdPopsNetChanged(const vcd_popsnet_t *orig, const vcd_popsnet_t *cur)
+{
+    int mask = 0;
+
+    if (memcmp(orig->smbIp, cur->smbIp, sizeof(orig->smbIp)) != 0 ||
+        orig->smbPort != cur->smbPort ||
+        strcmp(orig->smbShare, cur->smbShare) != 0 ||
+        strcmp(orig->smbUser, cur->smbUser) != 0 ||
+        strcmp(orig->smbPass, cur->smbPass) != 0)
+        mask |= 1;
+
+    if (orig->ipDhcp != cur->ipDhcp ||
+        (!cur->ipDhcp && (memcmp(orig->ps2Ip, cur->ps2Ip, sizeof(orig->ps2Ip)) != 0 ||
+                          memcmp(orig->ps2Mask, cur->ps2Mask, sizeof(orig->ps2Mask)) != 0 ||
+                          memcmp(orig->ps2Gw, cur->ps2Gw, sizeof(orig->ps2Gw)) != 0)))
+        mask |= 2;
+
+    return mask;
+}
+
+// Serialize IPCONFIG.DAT: the static triple, or EMPTY for DHCP -- the file must exist either way.
+static int vcdBuildIpConfig(const vcd_popsnet_t *cfg, char *buf, int bufSize)
+{
+    if (cfg->ipDhcp)
+        return 0;
+    return snprintf(buf, bufSize, "%d.%d.%d.%d %d.%d.%d.%d %d.%d.%d.%d\n",
+                    cfg->ps2Ip[0], cfg->ps2Ip[1], cfg->ps2Ip[2], cfg->ps2Ip[3],
+                    cfg->ps2Mask[0], cfg->ps2Mask[1], cfg->ps2Mask[2], cfg->ps2Mask[3],
+                    cfg->ps2Gw[0], cfg->ps2Gw[1], cfg->ps2Gw[2], cfg->ps2Gw[3]);
+}
+
+// Serialize SMBCONFIG.DAT. The whole file's byte shape lives in this ONE function: if the exact
+// POPStarter/POPSLoader convention ever needs a tweak (CRLF, trailing newline), it is a one-line
+// change here. Port 0/445 is written bare; lines 2/3 empty = guest.
+static int vcdBuildSmbConfig(const vcd_popsnet_t *cfg, char *buf, int bufSize)
+{
+    char host[24];
+    if (cfg->smbPort > 0 && cfg->smbPort != 445)
+        snprintf(host, sizeof(host), "%d.%d.%d.%d:%d", cfg->smbIp[0], cfg->smbIp[1], cfg->smbIp[2], cfg->smbIp[3], cfg->smbPort);
+    else
+        snprintf(host, sizeof(host), "%d.%d.%d.%d", cfg->smbIp[0], cfg->smbIp[1], cfg->smbIp[2], cfg->smbIp[3]);
+    return snprintf(buf, bufSize, "%s %s\n%s\n%s\n", host, cfg->smbShare, cfg->smbUser, cfg->smbPass);
+}
+
+int vcdWritePopstarterNetFiles(const vcd_popsnet_t *cfg, int writeSmb, int writeIp)
+{
+    if (cfg == NULL)
+        return -3;
+    char buf[256];
+
+    if (writeSmb) {
+        const char *dir = cfg->smbExists ? cfg->smbDir : cfg->createDir;
+        if (dir[0] == '\0')
+            return -3;
+        if (!cfg->smbExists)
+            mkdir(dir, 0777); // best-effort; exists already -> error, ignored
+        char path[128];
+        snprintf(path, sizeof(path), "%s/SMBCONFIG.DAT", dir);
+        int len = vcdBuildSmbConfig(cfg, buf, sizeof(buf));
+        int rc = vcdSafeWriteFile(path, buf, len);
+        if (rc != 0)
+            return rc;
+    }
+
+    if (writeIp) {
+        const char *dir = cfg->ipExists ? cfg->ipDir : cfg->createDir;
+        if (dir[0] == '\0')
+            return -3;
+        if (!cfg->ipExists)
+            mkdir(dir, 0777);
+        char path[128];
+        snprintf(path, sizeof(path), "%s/IPCONFIG.DAT", dir);
+        int len = vcdBuildIpConfig(cfg, buf, sizeof(buf));
+        int rc = vcdSafeWriteFile(path, buf, len);
+        if (rc != 0)
+            return rc;
+    }
+
+    return 0;
 }
