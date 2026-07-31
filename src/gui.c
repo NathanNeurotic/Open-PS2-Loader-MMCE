@@ -2372,7 +2372,12 @@ static void guiDrawOverlays()
     // debug info), no special build. Rendered here on the EE main thread every frame, independent of the
     // (possibly wedged) art worker, reading plain volatile counters -> zero MMCE-bus traffic. TK > 0 is
     // the smoking gun (art watchdog corrupted the shared RPC channel).
-    if (gEnableDebug) {
+    // Gate on coverflow slides: each line below binds the font atlas through gsKit's TexManager
+    // every frame (fntRenderString -> rmDrawQuad -> gsKit_TexManager_bind), and on a near-saturated
+    // 4 MB VRAM arena those binds evict cover textures mid-slide, causing a rolling evict/re-upload
+    // ping-pong and a visible pop/jump of covers during the wall-clock animation. The HUD the fork
+    // ships stays live at rest and during list-mode navigation; it only steps aside during slides.
+    if (gEnableDebug && !thmCoverflowIsAnimating()) {
         char diag[128];
         snprintf(diag, sizeof(diag), "#120 AO:%u MH:%u MM:%u TK:%u Vp:%u Ip:%u SE:%d",
                  gDiag.artOpens, gDiag.memoHit, gDiag.memoMiss, gDiag.artTerminate,

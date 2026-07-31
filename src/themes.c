@@ -1017,6 +1017,13 @@ void thmTriggerCoverflowAnim(int dir)
     cfAnimStartTime = clock();
 }
 
+// Exposes the slide state so per-frame diagnostic overlays (gui.c guiDrawOverlays) can step
+// aside mid-slide; see the gate there for the VRAM/TexManager rationale.
+int thmCoverflowIsAnimating(void)
+{
+    return cfIsAnimating;
+}
+
 static void drawCoverFlow(struct menu_list *menu, struct submenu_list *item, config_set_t *config, struct theme_element *elem)
 {
     if (!item)
