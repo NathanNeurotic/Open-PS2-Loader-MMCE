@@ -1115,7 +1115,12 @@ int readPads()
     // Stamp input activity AFTER the merge: any button or stick held this poll re-arms the
     // self-heal idle gate. One-poll staleness inside readPad (it reads the previous stamp) is
     // irrelevant at a 1000 ms threshold.
-    if (paddata != 0)
+    // #272: an active miss burst (streak != 0) counts as activity too -- same "a miss is unknown,
+    // not released" principle the delaycnt pause uses. Without it, a burst outlasting the 48 ms
+    // carry drops the held bits out of paddata while the user is still tapping, the stamp goes
+    // stale, and after 1 s of this registered-input starvation the idle gate opens and readPad()
+    // runs initializePad() INLINE on the GUI thread -- a 250-600 ms blackout that eats every tap.
+    if (paddata != 0 || streak != 0)
         lastInputActivityMs = curtime;
 
     // Expire any rumble tap. Deliberately ms-based off time_since_last rather than a frame counter:
