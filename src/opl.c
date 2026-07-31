@@ -217,7 +217,6 @@ int gBdmaMode;               // BDMA MODE last reflected from the mc?:/POPSTARTE
 int gBdmaApplyOnLaunch;      // auto-equip the launched VCD's matching exFAT driver before boot (1=on, default)
 int gVcdHideGameId;          // display-only: hide a leading PS1 game-ID prefix from the VCD list (1=on, default off)
 int gVcdFirstDiscOnly;       // #118: hide discs 2+ of a multi-disc PS1 set from the device VCD lists (1=on, default off)
-int gWritePopstarterNet;     // mirror the network settings into POPSTARTER's IPCONFIG/SMBCONFIG on save
 int gEnableDebug;
 int gPS2Logo;
 int gDefaultDevice;
@@ -1898,7 +1897,6 @@ static void _loadConfig()
             configGetInt(configOPL, CONFIG_OPL_BDMA_APPLY, &gBdmaApplyOnLaunch);
             configGetInt(configOPL, CONFIG_OPL_VCD_HIDE_GAMEID, &gVcdHideGameId);
             configGetInt(configOPL, CONFIG_OPL_VCD_FIRST_DISC_ONLY, &gVcdFirstDiscOnly);
-            configGetInt(configOPL, CONFIG_OPL_WRITE_POPS_NET, &gWritePopstarterNet);
         }
 
         // Booted from the internal exFAT HDD (BDM-ATA): the boot-dir resolver force-loaded the HDD
@@ -2213,7 +2211,6 @@ static void _saveConfig()
         configSetInt(configOPL, CONFIG_OPL_BDMA_APPLY, gBdmaApplyOnLaunch);
         configSetInt(configOPL, CONFIG_OPL_VCD_HIDE_GAMEID, gVcdHideGameId);
         configSetInt(configOPL, CONFIG_OPL_VCD_FIRST_DISC_ONLY, gVcdFirstDiscOnly);
-        configSetInt(configOPL, CONFIG_OPL_WRITE_POPS_NET, gWritePopstarterNet);
         configSetInt(configOPL, CONFIG_OPL_XSENSITIVITY, gXSensitivity);
         configSetInt(configOPL, CONFIG_OPL_YSENSITIVITY, gYSensitivity);
 
@@ -3029,7 +3026,6 @@ static void setDefaults(void)
     gBdmaApplyOnLaunch = 1; // auto-equip on launch by default (the MX4SIO->OSDSYS fix)
     gVcdHideGameId = 1;     // hide the PS1 game-ID prefix by default (display-only; raw names one toggle away)
     gVcdFirstDiscOnly = 1;  // #118: hide discs 2+ of multi-disc PS1 sets by default (POPSLoader parity)
-    gWritePopstarterNet = 1;
     gDefaultDevice = APP_MODE;
     gAutosort = 1;
     gAutoRefresh = 0;
