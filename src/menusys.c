@@ -5,7 +5,7 @@
 */
 
 #include "include/opl.h"
-#include "include/diag.h" // gDiag.lastSaveErrno -- surfaced in the per-game save-failure toast (#245)
+#include "include/diag.h"
 #include "include/menusys.h"
 #include "include/iosupport.h"
 #include "include/supportbase.h" // sbSetConfigStatSize -- defer the #Size stat off the scroll path
@@ -93,48 +93,16 @@ static ee_sema_t menuSema;
 #define MENU_MMCE_CONFIG_IDLE_FRAMES 20
 #define MENU_APP_CONFIG_IDLE_FRAMES  1
 
-static void menuInvalidateArtSelection(void)
-{
-    cacheAdvanceGeneration();
-}
-
 static int menuCanRequestItemConfig(item_list_t *list)
 {
     if (list != NULL && list->mode == APP_MODE)
         return guiInactiveFrames >= MENU_APP_CONFIG_IDLE_FRAMES;
 
-    // MMCE: same piping as the hardware-proven DIRECT config path (menuLoadConfigDirectInternal),
-    // which every launch/settings press has always used: the single CFG open/read/close simply
-    // serializes behind the current art chunk at the fileXio RPC layer (typically <= 20 ms) -- no
-    // waiting for the WHOLE interactive art set (cover + background + overlays) to drain. That
-    // drain-wait was the ~5 s disc-badge latency on a slow single step (issue #49, AcidReach; on a
-    // cold MMCE page the set takes seconds while cacheHasPendingInteractiveArt() stays true the
-    // entire time). Unlike the direct path we do NOT send the art-abort signal: the settled item's
-    // own cover is still loading and must not restart. The 20-frame settle below keeps the read off
-    // the active-scroll path, so there is at most ONE CFG open per settled selection -- the same
-    // per-press cost the direct path has always put on the card.
+    // Keep automatic MMCE metadata off the active-scroll path.
     if (list != NULL && list->mode == MMCE_MODE)
         return guiInactiveFrames >= MENU_MMCE_CONFIG_IDLE_FRAMES;
 
-    // BDM / ETH / HDD / FAV: the per-item config carries only the cheap, metadata-derived
-    // #DiscType/#System/#Media badge values -- it must NOT wait for the whole interactive-art set
-    // (cover + background + overlays) to finish draining. On a cold page the cover shows in ~0.2s
-    // but the rest of that set takes seconds to drain, and cacheHasPendingInteractiveArt() stays
-    // true the whole time -- which used to stall the disc badge for ~5s on a slow single step while
-    // a rapid scroll (prefetch-warmed art) stayed instant (issue #49). The guiInactiveFrames idle
-    // throttle in _menuRequestConfig still serializes the load off the scroll path (no thrash).
     return 1;
-}
-
-static void menuAdvanceArtSelectionOnMove(void)
-{
-    item_list_t *support = selected_item != NULL ? (item_list_t *)selected_item->item->userdata : NULL;
-
-    /* Keep APP prefetch, but drop stale interactive work from prior selections. */
-    if (support != NULL && support->mode == APP_MODE)
-        cacheAdvanceGenerationPreservePrefetch();
-    else
-        cacheAdvanceGeneration();
 }
 
 static void menuRenameGame(submenu_list_t **submenu)
@@ -312,16 +280,17 @@ static void _menuSaveConfig()
     if (!result)
         // #245 (AndrewBento, MMCE): name WHERE and the errno instead of a bare "Error writing
         // settings!". itemConfig->filename is the per-game write target (e.g. mmceN:/CFG/<id>.cfg) and
-        // gDiag.lastSaveErrno was latched inside configWrite at the real failure site -- together they
+        // gLastSaveErrno was latched inside configWrite at the real failure site -- together they
         // distinguish a genuine mmceman write/close failure (nonzero errno: EIO/ENOSPC/ENOENT/EROFS)
         // from our strict close check tripping on a write that actually landed (errno 0). Matches the
         // diagnostic the global saveConfig failure already prints.
-        setErrorMessagePathCode(_STR_ERROR_SAVING_SETTINGS_TO, itemConfig ? itemConfig->filename : "", gDiag.lastSaveErrno);
+        setErrorMessagePathCode(_STR_ERROR_SAVING_SETTINGS_TO, itemConfig ? itemConfig->filename : "", gLastSaveErrno);
 }
 
 static void _menuRequestConfig()
 {
     int shouldQueueLoad = 0;
+    int visibleLoad = 0;
 
     WaitSema(menuSemaId);
     if (selected_item == NULL || selected_item->item == NULL || selected_item->item->current == NULL) {
@@ -337,16 +306,26 @@ static void _menuRequestConfig()
         if (itemConfigId == -1 || guiInactiveFrames >= configIdleFrames) {
             itemConfigId = selected_item->item->current->item.id;
             shouldQueueLoad = 1;
+            visibleLoad = actionStatus != 0;
         }
     } else if (itemConfig == NULL && actionStatus != 0) {
         shouldQueueLoad = 1;
+        visibleLoad = 1;
     } else
         actionStatus = 0;
 
     SignalSema(menuSemaId);
 
-    if (shouldQueueLoad && ioPutRequest(IO_CUSTOM_SIMPLEACTION, &_menuLoadConfig) != IO_OK) {
+    int queueResult = IO_OK;
+    if (shouldQueueLoad) {
+        queueResult = visibleLoad ? ioPutRequest(IO_CUSTOM_SIMPLEACTION, &_menuLoadConfig)
+                                  : ioPutRequestQuiet(IO_CUSTOM_SIMPLEACTION, &_menuLoadConfig);
+    }
+
+    if (queueResult != IO_OK) {
         WaitSema(menuSemaId);
+        if (itemConfig == NULL)
+            itemConfigId = -1;
         actionStatus = 0;
         SignalSema(menuSemaId);
     }
@@ -386,13 +365,7 @@ static config_set_t *menuLoadConfigDirectInternal(void)
         return result;
 
     if (list->mode == MMCE_MODE) {
-        /* Signal the art loader to abort, but do not block waiting for it to
-         * drain.  The MMCE config read that follows will simply be serialised
-         * behind the current art chunk in the IOP queue (typically ≤ 20 ms).
-         * A blocking wait here froze navigation for up to 60 ms on every
-         * CROSS/CIRCLE press and – if the abort timed out – triggered a
-         * TerminateThread that corrupted the fileXio RPC channel, causing art
-         * to stop loading for the rest of the session. */
+        // Request an abort without delaying the explicit config read.
         cacheAbortMmceImageLoadsTimed(0);
     } else
         (void)cacheCancelPendingImageLoadsTimed(MENU_MIN_INACTIVE_FRAMES);
@@ -426,7 +399,7 @@ config_set_t *menuLoadConfigDirect(void)
 // Queued when the info screen opens: resolve #Size for the current item without blocking the UI.
 void menuRequestInfoSize(void)
 {
-    ioPutRequest(IO_CUSTOM_SIMPLEACTION, &_menuResolveInfoSize);
+    ioPutRequestQuiet(IO_CUSTOM_SIMPLEACTION, &_menuResolveInfoSize);
 }
 
 // we don't want a pop up when transitioning to or refreshing Game Menu gui.
@@ -641,7 +614,6 @@ static void refreshMenuPosition(void)
         selected_item = cur;
     }
 
-    menuInvalidateArtSelection();
 }
 
 void submenuRebuildCache(submenu_list_t *submenu)
@@ -920,7 +892,6 @@ static void menuNextH()
         menuFolderResetLeaving(selected_item);
         selected_item = next;
         itemConfigId = -1;
-        menuInvalidateArtSelection();
         sfxPlay(SFX_CURSOR);
     }
 }
@@ -935,7 +906,6 @@ static void menuPrevH()
         menuFolderResetLeaving(selected_item);
         selected_item = prev;
         itemConfigId = -1;
-        menuInvalidateArtSelection();
         sfxPlay(SFX_CURSOR);
     }
 }
@@ -950,7 +920,6 @@ static void menuFirstPage()
 
         selected_item->item->current = selected_item->item->submenu;
         selected_item->item->pagestart = selected_item->item->current;
-        menuInvalidateArtSelection();
     }
 }
 
@@ -971,7 +940,6 @@ static void menuLastPage()
             cur = cur->prev;
 
         selected_item->item->pagestart = cur;
-        menuInvalidateArtSelection();
     }
 }
 
@@ -982,7 +950,6 @@ static void menuNextV()
     if (cur && cur->next) {
         selected_item->item->current = cur->next;
         sfxPlay(SFX_CURSOR);
-        menuAdvanceArtSelectionOnMove();
         // coverflow slide animation; the wrap branch below stays instant
         if (gTheme->coverflow)
             thmTriggerCoverflowAnim(1);
@@ -1034,7 +1001,6 @@ static void menuPrevV()
                 selected_item->item->pagestart = selected_item->item->pagestart->prev;
         }
 
-        menuAdvanceArtSelectionOnMove();
         // coverflow slide animation; the wrap branch below stays instant
         if (gTheme->coverflow)
             thmTriggerCoverflowAnim(-1);
@@ -1068,7 +1034,6 @@ static void menuNextPage()
 
         selected_item->item->current = cur;
         selected_item->item->pagestart = selected_item->item->current;
-        menuInvalidateArtSelection();
     }
 }
 
@@ -1085,7 +1050,6 @@ static void menuPrevPage()
 
         selected_item->item->current = cur;
         selected_item->item->pagestart = selected_item->item->current;
-        menuInvalidateArtSelection();
     }
     // else: already on the first page -> no action. Page scroll CLAMPS at the
     // boundary (like R1/menuNextPage), it does not wrap. The old wrap called
@@ -1109,7 +1073,6 @@ void menuSetSelectedItem(menu_item_t *item)
     while (itm) {
         if (itm->item == item) {
             selected_item = itm;
-            menuInvalidateArtSelection();
             return;
         }
 

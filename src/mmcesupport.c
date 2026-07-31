@@ -79,13 +79,8 @@ static unsigned char mmceFolderRetries = 0;
 // gutted the wait so it returned in well under a second; a real sleep restores it.
 #define MMCE_GAMEID_WAIT_TICKS    15           // max polls of the card-switch busy bit
 #define MMCE_GAMEID_POLL_US       (200 * 1000) // 200 ms between polls -> ~3 s total budget (was 500 ms x 15 = 7.5 s)
-/* Allow up to 500 ms for the art thread to drain before resorting to
- * TerminateThread.  The MMCE worker checks the abort flag between every
- * staged read chunk (TEX_MMCE_STAGE_READ_SIZE = 32 KB, ~128 ms at the
- * pessimistic ~256 KB/s slow-card rate), so 500 ms keeps a ~4x margin
- * even on a slow card and avoids the fileXio RPC corruption that
- * TerminateThread can cause mid-read. (If that chunk is ever enlarged,
- * re-check this margin: 128 KB would approach the 500 ms watchdog.) */
+/* The MMCE worker checks its abort flag between 32 KB staged reads. A
+ * 500 ms wait gives a slow card time to reach the next safe checkpoint. */
 #define MMCE_ART_ABORT_WAIT_TICKS 500
 
 // forward declaration
@@ -752,13 +747,8 @@ void mmceLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
     // by nature, which is why it "worked until it didn't". Idea source: PR #236's quiesce-reorder,
     // vetted against this tree and re-landed with the full #120 rationale kept.
     if (!cacheAbortMmceImageLoadsTimed(MMCE_ART_ABORT_WAIT_TICKS)) {
-        // #120: the art worker is wedged in a blocking fileXio on a slow/desynced card. Do NOT cacheEnd(1)
-        // here -- its TerminateThread(gArtThreadId) kills the worker MID-RPC and orphans the SHARED mmceman
-        // channel (TK>0). The launch reads below then FAIL and RETURN to a still-running OPL (unlike a launch
-        // that LoadExecPS2's away), poisoning every later card read. Abandon-and-retry instead (mirrors
-        // thmLoad's redesign): toast and bail so the user retries once the card is calm. NEVER a hard
-        // freeze -- guiWarning is non-blocking. Applies to the VCD handoff too: POPSTARTER's own reads
-        // would hit the same wedged channel and dead-launch to OSDSYS.
+        // The card is still busy. Leave the menu and worker intact so the user
+        // can retry after the current read returns.
         guiWarning(_l(_STR_ERR_FILE_INVALID), 8);
         return;
     }

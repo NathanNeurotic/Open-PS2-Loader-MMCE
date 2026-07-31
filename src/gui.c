@@ -5,7 +5,6 @@
  */
 
 #include "include/opl.h"
-#include "include/diag.h"
 #include "include/gui.h"
 #include "include/renderman.h"
 #include "include/menusys.h"
@@ -1764,7 +1763,6 @@ static void guiHandleOp(struct gui_update_t *item)
             item->menu.menu->current = NULL;
             item->menu.menu->pagestart = NULL;
             item->menu.menu->last = NULL; // coverflow wrap tail
-            cacheAdvanceGeneration();
             break;
 
         case GUI_OP_SORT: {
@@ -1787,7 +1785,6 @@ static void guiHandleOp(struct gui_update_t *item)
                 item->menu.menu->current = item->menu.menu->submenu;
 
             item->menu.menu->pagestart = item->menu.menu->current;
-            cacheAdvanceGeneration();
             break;
 
         case GUI_OP_ADD_HINT:
@@ -2240,42 +2237,15 @@ void guiDrawSubMenuHints(void)
 }
 
 static int endIntro = 0; // Break intro loop and start 'Last Played Auto Start' countdown
-// Loader-visibility tuning (#299). With the original 0x02/frame fade-in a genuine op needed ~64
-// frames (~1.1s @60fps) of CONTINUOUS visible IO before the loader reached full alpha, and a
-// sub-second one (fast-USB save, manual refresh, device enable) faded back out before ever becoming
-// perceptible -- the loader was unreachable in practice. The retune: a fast fade-in (full 0x80 in
-// 0x80/BUSY_FADE_IN_STEP = 8 frames, ~133ms; clearly visible in ~4) plus a minimum on-screen latch,
-// so even a ~200ms op is seen for roughly latch + fade-out ~= 1.5s. The trigger's IO half is
-// unchanged -- ioHasVisiblePendingRequests(), so quiet background rescans never show it (#290) --
-// as are the boot suppression below and the slow fade-out. (The ART half widened to interactive +
-// prefetch in the #296 baseline restore; prefetch bursts only exist post-settle, so this still
-// never flashes at idle.)
-#define BUSY_FADE_IN_STEP    0x10 // alpha per frame while visible work is pending (or latched)
-#define BUSY_FADE_OUT_STEP   0x02 // alpha per frame once done: unchanged, ~64 frames (~1.1s) from full
-#define BUSY_MIN_HOLD_FRAMES 30   // latch: once triggered, stay up at least this many frames (~0.5s @60fps)
+#define BUSY_FADE_STEP 0x10
 
 static void guiDrawOverlays()
 {
     static int busyAlpha = 0x00; // Fully transparant
-    static int busyLatch = 0;    // #299: guaranteed on-screen frames remaining once triggered
 
-    // Any pending operations the user should SEE? Visible-only on purpose (#290): the raw queue
-    // also carries menuUpdateHook's periodic background device rescans, and on a device where one
-    // presence scan takes a few hundred ms (MMCE SIO2 round-trips), keying the spinner off the raw
-    // queue made it fade in "every few seconds" while the console sat idle. Real work -- list
-    // loads, config saves, module loads, theme switches -- is still counted.
-    // #299 follow-up: also count pending art (covers/BG/icons). Browsing enqueues no IO-queue
-    // requests at all -- art loads on the texcache worker -- so without this the loader could
-    // never trigger in the game listings, only on screens that read per-game config through the
-    // queue (the info screen).
-    // #296 Beta-3482 regression: counting ALL art (interactive + prefetch) pinned the loader on
-    // every browsing frame -- queued prefetch SURVIVES each scroll step (generation advance
-    // preserves it), so pending was effectively continuous while scrolling ("orb spins every
-    // time I scroll past games"). Count interactive art only: prefetch is speculative by
-    // definition, and the art the user is actually waiting on (the highlighted item's
-    // cover/BG/icons) is always an interactive request, so #299's loader-in-listings keeps
-    // working without the pinned orb.
-    int pending = ioHasVisiblePendingRequests() || cacheHasPendingInteractiveArt();
+    // Only explicit foreground IO owns the global loader. Art is rendered with
+    // placeholders while its worker runs, and quiet metadata/rescan work stays quiet.
+    int pending = ioHasVisiblePendingRequests();
 
     // During the boot intro, when an animated boot logo is shown, suppress the
     // loading spinner -- the animated logo is the boot activity indicator there.
@@ -2283,23 +2253,12 @@ static void guiDrawOverlays()
     // without animated logo frames, so a slow boot still shows activity).
     int showBusy = endIntro || (gTheme->logoFrameCount < 1);
     if (showBusy) {
-        // Arm/re-arm the latch for every pending frame (#299), so the loader stays up at least
-        // BUSY_MIN_HOLD_FRAMES past the END of the operation. Inside the showBusy gate on purpose:
-        // boot-visible ops must not leak a latched spinner past the intro.
-        if (pending)
-            busyLatch = BUSY_MIN_HOLD_FRAMES;
-        else if (busyLatch > 0)
-            busyLatch--;
-
-        if (!pending && busyLatch == 0) {
-            // Fade out
+        if (!pending) {
             if (busyAlpha > 0x00)
-                busyAlpha -= BUSY_FADE_OUT_STEP;
+                busyAlpha -= BUSY_FADE_STEP;
         } else {
-            // Fade in (fast -- the latch keeps the fade-in branch while it runs down, pinning
-            // the loader at full alpha for the hold)
             if (busyAlpha < 0x80)
-                busyAlpha += BUSY_FADE_IN_STEP;
+                busyAlpha += BUSY_FADE_STEP;
         }
 
         if (busyAlpha > 0x00)
@@ -2367,36 +2326,6 @@ static void guiDrawOverlays()
     // if (gEnableDebug)
     //     fntRenderString(gTheme->fonts[0], 0, screenHeight - 24, ALIGN_NONE, 0, 0, blurttext, GS_SETREG_RGBA(255, 255, 0, 128));
 
-    // #120 MMCE-cascade diagnostic line (see include/diag.h). Ships in the RELEASE binary (NOT behind
-    // __DEBUG) so a hardware tester can surface it by flipping one already-existing switch (Settings ->
-    // debug info), no special build. Rendered here on the EE main thread every frame, independent of the
-    // (possibly wedged) art worker, reading plain volatile counters -> zero MMCE-bus traffic. TK > 0 is
-    // the smoking gun (art watchdog corrupted the shared RPC channel).
-    // Gate on coverflow slides: each line below binds the font atlas through gsKit's TexManager
-    // every frame (fntRenderString -> rmDrawQuad -> gsKit_TexManager_bind), and on a near-saturated
-    // 4 MB VRAM arena those binds evict cover textures mid-slide, causing a rolling evict/re-upload
-    // ping-pong and a visible pop/jump of covers during the wall-clock animation. The HUD the fork
-    // ships stays live at rest and during list-mode navigation; it only steps aside during slides.
-    if (gEnableDebug && !thmCoverflowIsAnimating()) {
-        char diag[128];
-        snprintf(diag, sizeof(diag), "#120 AO:%u MH:%u MM:%u TK:%u Vp:%u Ip:%u SE:%d",
-                 gDiag.artOpens, gDiag.memoHit, gDiag.memoMiss, gDiag.artTerminate,
-                 gDiag.vcdRescanPreserved, gDiag.isoScanPreserved, gDiag.lastSaveErrno);
-        fntRenderString(gTheme->fonts[0], 0, screenHeight - 24, ALIGN_NONE, 0, 0, diag, GS_SETREG_RGBA(255, 255, 0, 128));
-        // PAD dead-analog diagnostic line (see include/diag.h): md:2 with a zero t-entry = freepad
-        // published a half-built mode table; AC:0 = digital-only latched (the dead-analog state).
-        snprintf(diag, sizeof(diag), "PAD md:%d t0:%d t1:%d AC:%d SH:%u UN:%u SM:%u TO:%u",
-                 gDiag.padModes, gDiag.padMode0, gDiag.padMode1, gDiag.padAnalogCapable,
-                 gDiag.padSelfHeal, gDiag.padUnsupported, gDiag.padSetMainModeOk, gDiag.padReqTimeout);
-        fntRenderString(gTheme->fonts[0], 0, screenHeight - 40, ALIGN_NONE, 0, 0, diag, GS_SETREG_RGBA(255, 255, 0, 128));
-        // #172 rumble sub-line (see include/diag.h). Splits "we never asked the motor" (RA/RS 0) from
-        // "we asked and it ignored us" (RS climbing, pad still) -- the one thing source reading cannot
-        // tell us, and the reason this ships instead of another blind fix.
-        snprintf(diag, sizeof(diag), "RUM AN:%d AK:%d RA:%u RS:%u RD:%u RL:%u",
-                 gDiag.padActuators, gDiag.padActAligned, gDiag.padRumbleArmed,
-                 gDiag.padRumbleSent, gDiag.padRumbleDropped, gDiag.padRealignOk);
-        fntRenderString(gTheme->fonts[0], 0, screenHeight - 56, ALIGN_NONE, 0, 0, diag, GS_SETREG_RGBA(255, 255, 0, 128));
-    }
 }
 
 static void guiReadPads()
@@ -2408,13 +2337,10 @@ static void guiReadPads()
 
     if (readPads())
         guiInactiveFrames = 0;
-    else {
-        int wasActive = (guiInactiveFrames == 0);
-
+    else
         guiInactiveFrames++;
-        if (wasActive)
-            cacheWakeInteractiveArtOnInputIdle();
-    }
+
+    cachePumpPendingArt();
 }
 
 // renders the screen and handles inputs. Also handles screen transitions between numerous
@@ -2493,7 +2419,6 @@ void guiIntroLoop(void)
         if (!screenHandlerTarget && screenHandler)
             screenHandler->handleInput();
 
-        cachePrimeReadyTexture();
     }
 }
 
@@ -2535,8 +2460,6 @@ void guiMainLoop(void)
         if (!screenHandlerTarget && screenHandler)
             screenHandler->handleInput();
 
-        cachePrimeReadyTexture();
-
         if (gFrameHook)
             gFrameHook();
     }
@@ -2562,7 +2485,6 @@ void guiSwitchScreen(int target)
         return;
     }
 
-    cacheAdvanceGeneration();
     sfxPlay(SFX_TRANSITION);
     transIndex = 0;
     screenHandlerTarget = &screenHandlers[target];

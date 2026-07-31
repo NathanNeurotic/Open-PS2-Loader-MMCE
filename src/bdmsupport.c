@@ -546,8 +546,8 @@ static int bdmNeedsUpdate(item_list_t *itemList)
     // Why this reaches far past the invisible case: the BDM list scans essentially ONCE, on the publish
     // pass. Every later refresh hits bdmUpdateDeviceData's "no change to the device state" return 0
     // below, so whatever the list held at that single instant is what the user has for the rest of the
-    // boot -- and sbReadList PRESERVES its last-good list on a failed read (gDiag.isoScanPreserved),
-    // which on a FIRST scan means an empty list with no error shown. A network block device (UDPBD) is
+    // boot -- and sbReadList preserves its last-good list on a failed read, which on a FIRST scan
+    // means an empty list with no error shown. A network block device (UDPBD) is
     // precisely where that instant can be too early: the volume is mounted but the server round-trip
     // behind the CD/DVD opendir can still fail, and the page then reads "0 games" permanently and
     // silently. UDPFS already rescues itself with the identical idea (udpfssupport.c:134-135,

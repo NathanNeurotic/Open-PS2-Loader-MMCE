@@ -5,7 +5,7 @@
 */
 
 #include "include/opl.h"
-#include "include/diag.h" // #120 diag: latch the config-write errno at the failure site (below)
+#include "include/diag.h"
 #include "include/util.h"
 #include "include/ioman.h"
 #include "include/sound.h"
@@ -1209,7 +1209,7 @@ int configWrite(config_set_t *configSet)
 
             ok = (closeFileBuffer(fileBuffer) == 0);
             if (!ok)
-                gDiag.lastSaveErrno = errno; // #120 diag: flush/close failure errno, captured before bgmUnMute
+                gLastSaveErrno = errno;
 
             // EVIDENCE OVER STATUS CODES (#245, temporal bisect): on some MMCE clone firmware the
             // write can LAND while the close reply is junk/timed out -- and honoring that status
@@ -1238,7 +1238,7 @@ int configWrite(config_set_t *configSet)
                                 LOG("CONFIG write to %s: close reported failure but read-back verifies all %u bytes -- treating as SAVED\n",
                                     configSet->filename, intendedLen);
                                 ok = 1;
-                                gDiag.lastSaveErrno = 0; // the save is ruled a success; don't leave a failure errno on the HUD
+                                gLastSaveErrno = 0;
                             }
                             free(readBack);
                         }
@@ -1249,7 +1249,7 @@ int configWrite(config_set_t *configSet)
             free(intended);
             bgmUnMute();
         } else {
-            gDiag.lastSaveErrno = errno; // #120 diag: write-open failure errno (wedged card = EIO/ENODEV),
+            gLastSaveErrno = errno;
                                          // captured HERE before the restore-path opens below clobber it
         }
 

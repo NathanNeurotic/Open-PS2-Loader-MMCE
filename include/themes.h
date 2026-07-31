@@ -27,15 +27,8 @@ typedef struct
 
 typedef struct
 {
-    // Attributes for: AttributeImage
-    // currentCacheId + currentUid are ONE logical pair -- cacheGetTexture's two out-params must BOTH
-    // persist across frames or its negative (FAILED) memo cannot work: a failed load writes
-    // *cacheId = -2 and *UID = gCacheGeneration, and the skip gate is (*cacheId == -2 && *UID ==
-    // gCacheGeneration). drawAttributeImage used to pass a STACK-LOCAL for the cacheId, so the -2 was
-    // thrown away every frame and each frame re-enqueued a fresh FAILING device open -- an unbounded
-    // read storm on whatever device the theme lives on. That was the "baseline info-entry read burst"
-    // (86da2023) behind the #120/#154 MMCE wedge. Every other cacheGetTexture caller already passes a
-    // persistent field/array (see getGameImageTexture).
+    // AttributeImage cache identity. Both fields persist so genuine absence is
+    // memoized rather than reopened every frame.
     int currentCacheId;
     int currentUid;
     u32 currentConfigId;
@@ -79,9 +72,6 @@ typedef struct
 
     const char *decorator;
     mutable_image_t *decoratorImage;
-
-    int lastSelectedItemId;
-    char lastSelectedStartup[256];
 } items_list_t;
 
 typedef struct theme_element
@@ -179,7 +169,6 @@ extern theme_t *gTheme;
 
 extern int gCoverflowCount, gCoverflowCenterScale, gCoverflowAnimSpeed, gCoverflowDimCovers;
 void thmTriggerCoverflowAnim(int dir);
-int thmCoverflowIsAnimating(void);
 
 void thmInit(void);
 void thmReinit(const char *path);

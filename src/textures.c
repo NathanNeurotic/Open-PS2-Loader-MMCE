@@ -1,5 +1,4 @@
 #include "include/opl.h"
-#include "include/diag.h"
 #include "include/textures.h"
 #include "include/util.h"
 #include "include/ioman.h"
@@ -118,11 +117,8 @@ static int maxSize = 720 * 512 * 4;
 // served in ONE RPC. At 4 KB a ~100 KB cover cost ~25 RPCs; 32 KB serves it in ~4 -- an ~8x cut in
 // that fixed per-RPC overhead (the actual cause of slow MMCE art), moving the same bytes and keeping
 // the card's sequential read-ahead saturated. This is the same "few large reads" the in-game mmcedrv
-// block driver uses. DO NOT raise past 32 KB: the art worker only checks the abort flag BETWEEN
-// chunks, and mmcesupport.c's MMCE_ART_ABORT_WAIT_TICKS gives it 500 ms to reach a checkpoint before
-// TerminateThread (which corrupts the fileXio RPC channel = issue #120). 32 KB ~= 128 ms at the
-// pessimistic ~256 KB/s slow-card rate = a ~4x margin; 64 KB halves it for little gain, 128 KB+ risks
-// crossing the watchdog. A one-shot getStat+single-read is rejected for the same reason.
+// block driver uses. Keep chunks at 32 KB so an abort reaches a checkpoint comfortably inside the
+// MMCE launch/theme drain budgets. A one-shot getStat+single-read is rejected for the same reason.
 #define TEX_MMCE_STAGE_READ_SIZE 32768
 
 // Hard cap on the staged payload. Legitimate art is <= a few MB even at 1080p; anything bigger is
@@ -469,8 +465,7 @@ static int texStageExternalFileIntoMemory(int fd, void **buffer, u32 *stagedSize
             unsigned char *grown;
 
             if (capacity >= TEX_STAGE_MAX_SIZE) {
-                // Over the staged-payload cap: not art anyone ships, and NOT transient -- memo it
-                // absent like any other broken file or every generation re-reads 8 MB of garbage.
+                // Over the staged-payload cap: not art anyone ships, and not transient.
                 LOG("texStage: refusing oversized art file (> %d bytes staged)\n", TEX_STAGE_MAX_SIZE);
                 free(fileBuffer);
                 return ERR_BAD_FILE;
@@ -706,11 +701,11 @@ static int texLoadAll(GSTEXTURE *texture, const char *filePath, int texId, const
                 // branded every browsed game's art "nonexistent" for the whole session (HW batch S3:
                 // art dies, never recovers). The paired mmceman patch makes the driver return
                 // -ENOENT only for the card's explicit not-found reply; every other failure lands in
-                // the EXISTING transient lane (ERR_FILE_IO, re-probed lazily once per generation) so
+                // the transient lane (ERR_FILE_IO, retried after a short delay) so
                 // art self-heals when the bus quiets. The same self-heal applies to BDM USB (#296):
                 // a contended-bus open failure there must not brand the cover absent either. If the
-                // newlib glue ever maps errno unfaithfully, the degradation is a bounded
-                // once-per-generation re-probe -- never a hard failure. The generic loose-file
+                // newlib glue ever maps errno unfaithfully, the degradation is a delayed
+                // re-probe -- never a permanent failure. The generic loose-file
                 // branch below keeps its unconditional ERR_BAD_FILE (HDD/ETH semantics unchanged).
                 LOG("texLoadAll: staged art open failed: %s (errno %d)\n", filePath, errno);
                 return (errno == ENOENT) ? ERR_BAD_FILE : ERR_FILE_IO;
@@ -887,7 +882,6 @@ int texDiscoverLoad(GSTEXTURE *texture, const char *path, int texId)
     char filePath[256];
     int result;
 
-    gDiag.artOpens++; // #120 diag: the single funnel for every ISO+VCD cover/bg/screenshot open probe
 
     LOG("texDiscoverLoad(%s)\n", path);
 
