@@ -21,6 +21,8 @@ void audioSetVolume(void);
 int sfxInit(int bootSnd);
 int sfxGetSoundDuration(int id);
 void sfxPlay(int id);
+// Debug-Colors instrumentation (#271/#272): wall time of the last / worst audsrv play RPC.
+void sfxGetPlayDiag(unsigned int *lastMs, unsigned int *maxMs);
 
 void bgmStart(void);
 void bgmStop(void);

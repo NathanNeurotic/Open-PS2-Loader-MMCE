@@ -28,6 +28,25 @@ int readPads();
 void padFreezeEdgeBaseline(int freeze);
 void unloadPads();
 
+// Debug-Colors instrumentation snapshot (#271/#272). Counters are cumulative and maintained on
+// the EE main thread regardless of the setting; they are only RENDERED when Settings -> Debug
+// Colors is on (gui.c / dia.c). Field semantics live with the writers in pad.c.
+typedef struct
+{
+    unsigned int readMisses;   // total failed ready-state pad reads
+    unsigned int missBurst;    // current consecutive-miss run, max across pads (polls)
+    unsigned int missBurstMax; // session peak of the above
+    unsigned int pollMaxMs;    // worst readPads() period this session
+    unsigned int stateFlaps;   // DISCONN -> ready reconnect edges seen
+    unsigned int reinitRuns;   // initializePad runs (reconnect edge + analog self-heal)
+    unsigned int reinitDefers; // reconnect-edge inits deferred by the idle gate
+    unsigned int reinitLastMs; // wall time of the last initializePad
+    unsigned int reinitMaxMs;  // worst initializePad this session
+    int analogCapable;         // last verdict (-1 unknown / 0 digital-only / 1 DualShock-capable)
+} pad_diag_t;
+
+void padGetDiag(pad_diag_t *out);
+
 // Menu rumble (#172), gated by gEnableRumble. Tap/Bump arm a pulse on every capable pad and never
 // block -- safe to call from the GUI thread; they no-op when disabled or the pad can't rumble.
 // Rumble is INERT until this is called (once, from main(), when the boot is over and guiMainLoop is

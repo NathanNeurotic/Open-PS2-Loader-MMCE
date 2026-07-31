@@ -2239,6 +2239,30 @@ void guiDrawSubMenuHints(void)
 static int endIntro = 0; // Break intro loop and start 'Last Played Auto Start' countdown
 #define BUSY_FADE_STEP 0x10
 
+// #271/#272/#296 on-screen instrumentation. Draws ONE line with the pad and SFX counters that
+// the fixes in this file's input path are instrumented by -- miss bursts, reconnect flaps,
+// inline initializePad blackouts (count + last/worst ms, deferred count), worst poll period,
+// and per-press audsrv RPC cost. Rendered ONLY when the user turns Settings -> Debug Colors on,
+// so the normal path pays nothing but the integer bumps in pad.c/sound.c. A hardware tester can
+// then film the line while reproducing a hitch instead of us guessing at the mechanism.
+void guiDrawDebugLine(void)
+{
+    if (!gEnableDebug)
+        return;
+
+    pad_diag_t pd;
+    unsigned int sfxLastMs, sfxMaxMs;
+    char dbg[160];
+
+    padGetDiag(&pd);
+    sfxGetPlayDiag(&sfxLastMs, &sfxMaxMs);
+    snprintf(dbg, sizeof(dbg), "PAD miss:%u brst:%u/%u flap:%u init:%u(%u/%ums) def:%u poll:%ums AC:%d SFX:%u/%ums",
+             pd.readMisses, pd.missBurst, pd.missBurstMax, pd.stateFlaps,
+             pd.reinitRuns, pd.reinitLastMs, pd.reinitMaxMs, pd.reinitDefers,
+             pd.pollMaxMs, pd.analogCapable, sfxLastMs, sfxMaxMs);
+    fntRenderString(gTheme->fonts[0], 0, screenHeight - 24, ALIGN_NONE, 0, 0, dbg, GS_SETREG_RGBA(255, 255, 0, 128));
+}
+
 static void guiDrawOverlays()
 {
     static int busyAlpha = 0x00; // Fully transparant
@@ -2325,6 +2349,12 @@ static void guiDrawOverlays()
     // BLURT output
     // if (gEnableDebug)
     //     fntRenderString(gTheme->fonts[0], 0, screenHeight - 24, ALIGN_NONE, 0, 0, blurttext, GS_SETREG_RGBA(255, 255, 0, 128));
+
+    // Debug-Colors instrumentation (#271/#272/#296). Steps aside during coverflow slides:
+    // binding the font atlas every frame can evict cover textures from the near-saturated VRAM
+    // arena mid-animation (the historic #120 HUD note).
+    if (!thmCoverflowIsAnimating())
+        guiDrawDebugLine();
 }
 
 static void guiReadPads()
