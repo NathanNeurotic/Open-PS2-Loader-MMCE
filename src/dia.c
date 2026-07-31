@@ -1097,6 +1097,10 @@ int diaExecuteDialog(struct UIItem *ui, int uiId, short inMenu, int (*updater)(i
     while (1) {
         rmStartFrame();
         diaRenderUI(ui, inMenu, cur, haveFocus);
+        // Settings dialogs render directly, never reaching guiDrawOverlays -- so the Debug-
+        // Colors instrumentation line (#271/#272) must be drawn here too, in exactly the
+        // dialogs where the settings-scroll reports live. No-op unless Debug Colors is on.
+        guiDrawDebugLine();
         rmEndFrame();
 
         readPads();

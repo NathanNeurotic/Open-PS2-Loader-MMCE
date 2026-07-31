@@ -5,6 +5,7 @@
  */
 
 #include <audsrv.h>
+#include <timer.h>
 #include <vorbis/vorbisfile.h>
 
 #include "include/sound.h"
@@ -257,6 +258,22 @@ int sfxGetSoundDuration(int id)
     return sfx_files[id].duration_ms;
 }
 
+// Debug-Colors instrumentation (#271/#272): per-press audsrv RPC wall time. audsrv_ch_play_adpcm
+// is a SYNCHRONOUS SIF RPC on the GUI thread (one per nav press); under IOP contention it stalls
+// the menu mid-navigation. Always measured (two tick reads), rendered only when Settings ->
+// Debug Colors is on (gui.c / dia.c).
+#define SFX_CLOCKS_PER_MS 147456 // EE cpu_ticks() rate, same constant as pad.c's CLOCKS_PER_MILISEC
+static unsigned int sfxLastPlayMs = 0;
+static unsigned int sfxMaxPlayMs = 0;
+
+void sfxGetPlayDiag(unsigned int *lastMs, unsigned int *maxMs)
+{
+    if (lastMs)
+        *lastMs = sfxLastPlayMs;
+    if (maxMs)
+        *maxMs = sfxMaxPlayMs;
+}
+
 void sfxPlay(int id)
 {
     int channel;
@@ -299,6 +316,7 @@ void sfxPlay(int id)
     }
 
     if (gEnableSFX) {
+        u32 sfxStartTicks = cpu_ticks();
         if (id == SFX_CURSOR) {
             int chosenSlot = cursorChannelIndex;
 
@@ -311,6 +329,11 @@ void sfxPlay(int id)
         } else {
             audsrv_ch_play_adpcm(id, &sfx[id]);
         }
+
+        unsigned int costMs = (unsigned int)((cpu_ticks() - sfxStartTicks) / SFX_CLOCKS_PER_MS);
+        sfxLastPlayMs = costMs;
+        if (costMs > sfxMaxPlayMs)
+            sfxMaxPlayMs = costMs;
     }
 }
 

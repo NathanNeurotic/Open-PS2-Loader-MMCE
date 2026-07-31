@@ -197,6 +197,11 @@ void guiSetBootStatusSticky(const char *label);
 
 void guiWarning(const char *text, int count);
 
+/** Debug-Colors instrumentation line (#271/#272/#296). Renders the pad/SFX diagnostic counters
+ *  at the bottom of the frame; NO-OP unless Settings -> Debug Colors is on, so the normal path
+ *  pays nothing. Safe to call from any EE-main-thread render loop (guiDrawOverlays, dialogs). */
+void guiDrawDebugLine(void);
+
 int guiConfirmVideoMode(void);
 
 int guiGameShowRemoveSettings(config_set_t *configSet, config_set_t *configGame);
