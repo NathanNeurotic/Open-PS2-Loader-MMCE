@@ -84,15 +84,15 @@ struct pad_data_t
 
 // Pad commands are asynchronous. Keep every wait bounded so a transient SIO2/pad error cannot hang the
 // GUI thread.
-#define PAD_WAIT_POLLS          25
-#define PAD_WAIT_POLL_US        1000
+#define PAD_WAIT_POLLS     25
+#define PAD_WAIT_POLL_US   1000
 // A padSetMainMode round-trip can NEVER finish under freepad's own minimum latency: the IOP main
 // thread dispatches the task on the next vblank, SetMainModeThread needs three vblank-gated SIO2
 // transfers, and the request only flips COMPLETE after the next good ReadData -- >= 5 vblanks,
 // ~83-100 ms. The generic 25 ms budget above therefore ALWAYS timed out on this leg, so analog
 // arming worked only when the IOP happened to finish in the background and the pressure/rumble
 // setup below it was unreachable. Give request-completion waits a budget above the happy path.
-#define PAD_REQ_WAIT_POLLS      150
+#define PAD_REQ_WAIT_POLLS 150
 
 #define PAD_INIT_RETRY       -1
 #define PAD_INIT_UNSUPPORTED 0

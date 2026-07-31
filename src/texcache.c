@@ -655,8 +655,7 @@ void cacheInit(void)
 
 void cacheEnd(int forceStop)
 {
-    int waitTicks = forceStop ? CACHE_END_WAIT_TICKS_TERMINAL
-                              : CACHE_END_WAIT_TICKS_LAUNCH;
+    int waitTicks = forceStop ? CACHE_END_WAIT_TICKS_TERMINAL : CACHE_END_WAIT_TICKS_LAUNCH;
     int savedPriority;
 
     if (!gArtRunning)

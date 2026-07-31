@@ -487,7 +487,7 @@ int vcdFillGameList(const char *devPrefix, base_game_info_t **outGames)
     vcd_entry_t *vcds = NULL;
     int n = vcdScanDir(devPrefix, &vcds); // NOTE: does NOT touch *outGames
     if (n < 0) {
-        return -1;                  // could not read the device -> preserve the caller's current list
+        return -1; // could not read the device -> preserve the caller's current list
     }
     // NOTE: the art miss-memo invalidation now lives in vcdScanOpenDir (the shared scan success path) so
     // it also covers the HDD vcdScanDirRoot path -- do NOT re-invalidate here (it already fired).

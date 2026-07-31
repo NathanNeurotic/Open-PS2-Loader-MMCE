@@ -16,9 +16,9 @@
 #include <time.h>
 #include <math.h>
 
-#define MENU_POS_V               50
-#define HINT_HEIGHT              32
-#define DECORATOR_SIZE           20
+#define MENU_POS_V             50
+#define HINT_HEIGHT            32
+#define DECORATOR_SIZE         20
 // Cache slots per AttributeImage element. An AttributeImage is NOT a per-game image -- it is a small FIXED
 // SET of glyphs keyed by the attribute's value, so the cache only ever needs to hold that attribute's whole
 // value set to be thrash-free. Our built-in attributes are tiny (#Format = ISO/ZSO/VCD/UL/ELF/HDL = 6,
@@ -1145,7 +1145,6 @@ static void drawCoverFlow(struct menu_list *menu, struct submenu_list *item, con
     }
 
     rmSetReflectionYOffset(0); // don't leak the offset to any other reflection draw
-
 }
 
 static void initCoverflow(const char *themePath, config_set_t *themeConfig, theme_t *theme, theme_element_t *elem, const char *name)
@@ -1965,7 +1964,6 @@ static void validateGUIElems(const char *themePath, config_set_t *themeConfig, t
     // The L3 VCD view reuses the device's own game list (same item ids), so its selected/carousel covers
     // must not share a COV cache with the ISO list -- otherwise toggling thrashes the same cache slots.
     separateVcdCoverCache(theme);
-
 }
 
 static int addGUIElem(const char *themePath, config_set_t *themeConfig, theme_t *theme, theme_elems_t *elems, const char *type, const char *name)

@@ -1250,7 +1250,7 @@ int configWrite(config_set_t *configSet)
             bgmUnMute();
         } else {
             gLastSaveErrno = errno;
-                                         // captured HERE before the restore-path opens below clobber it
+            // captured HERE before the restore-path opens below clobber it
         }
 
         if (!ok) {

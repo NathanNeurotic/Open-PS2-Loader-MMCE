@@ -318,8 +318,7 @@ static void _menuRequestConfig()
 
     int queueResult = IO_OK;
     if (shouldQueueLoad) {
-        queueResult = visibleLoad ? ioPutRequest(IO_CUSTOM_SIMPLEACTION, &_menuLoadConfig)
-                                  : ioPutRequestQuiet(IO_CUSTOM_SIMPLEACTION, &_menuLoadConfig);
+        queueResult = visibleLoad ? ioPutRequest(IO_CUSTOM_SIMPLEACTION, &_menuLoadConfig) : ioPutRequestQuiet(IO_CUSTOM_SIMPLEACTION, &_menuLoadConfig);
     }
 
     if (queueResult != IO_OK) {
@@ -613,7 +612,6 @@ static void refreshMenuPosition(void)
     } else {
         selected_item = cur;
     }
-
 }
 
 void submenuRebuildCache(submenu_list_t *submenu)
