@@ -817,16 +817,24 @@ static GSTEXTURE *getGameImageTexture(image_cache_t *cache, void *support, struc
     return NULL;
 }
 
-static int canPrefetchAdjacentGameImages(image_cache_t *cache, item_list_t *list, GSTEXTURE *selectedTexture)
+static int canPrefetchAdjacentGameImages(image_cache_t *cache, item_list_t *list)
 {
-    if (cache == NULL || list == NULL || selectedTexture == NULL || selectedTexture->Mem == NULL)
+    if (cache == NULL || list == NULL)
         return 0;
 
     if (list->mode == MMCE_MODE)
         return 0;
 
+    /* #296: gate on pending INTERACTIVE art for every mode -- not on the selected
+     * cover's success. Requiring selectedTexture->Mem != NULL disabled the whole walk
+     * whenever the parked game had no art (or its boot-window load failed), so nothing
+     * ever warmed. Selected-first is already guaranteed by interactive queue priority,
+     * which dequeues ahead of prefetch regardless of enqueue order. */
+    if (cacheHasPendingInteractiveArt())
+        return 0;
+
     if (list->mode == APP_MODE) {
-        if (guiInactiveFrames < APP_PREFETCH_IDLE_FRAMES || cacheHasPendingInteractiveArt())
+        if (guiInactiveFrames < APP_PREFETCH_IDLE_FRAMES)
             return 0;
     }
 
@@ -895,7 +903,7 @@ static void drawGameImage(struct menu_list *menu, struct submenu_list *item, con
         GSTEXTURE *texture = getGameImageTexture(gameImage->cache, menu->item->userdata, &item->item);
 
         if (gameImage->cache != NULL && gameImage->cache->suffix != NULL && strcmp(gameImage->cache->suffix, "COV") == 0 &&
-            canPrefetchAdjacentGameImages(gameImage->cache, list, texture)) {
+            canPrefetchAdjacentGameImages(gameImage->cache, list)) {
             int prefetchInactiveFrames = (list != NULL && list->mode == APP_MODE) ? APP_PREFETCH_IDLE_FRAMES : MENU_MIN_INACTIVE_FRAMES;
             prefetchAdjacentGameImages(gameImage->cache, menu->item->userdata, item, 1, prefetchInactiveFrames);
         }
@@ -1131,8 +1139,6 @@ static void drawCoverFlow(struct menu_list *menu, struct submenu_list *item, con
     int drawFirst = cfIsAnimating ? 0 : COVERFLOW_PAD;
     int drawLast = cfIsAnimating ? coverTotal : coverTotal - COVERFLOW_PAD;
 
-    GSTEXTURE *centerTexture = NULL; // the selection's LOADED art, if any -- gates the neighbor prefetch below
-
     // #296 baseline restore: the left->right draw loop below doubles as the interactive ENQUEUE
     // order (getGameImageTexture queues a request on a cache miss), so on a cold settle the
     // SELECTED cover used to load 2nd/3rd, behind its left neighbours. Fire the selection's
@@ -1161,8 +1167,6 @@ static void drawCoverFlow(struct menu_list *menu, struct submenu_list *item, con
 
         GSTEXTURE *texture = getGameImageTexture(cimg->cache, sourceList, &covers[i]->item);
         int hasArt = (texture && texture->Mem);
-        if (i == centerIdx && hasArt)
-            centerTexture = texture;
         // #2 (Nadwislanski): a no-art Favourites entry (a favourited app / PS1 title / game with no
         // ART/<id>_COV.png) must NOT draw the embedded cover placeholder wrapped in the two-layer case
         // frame -- that reads as a hollow grey "empty tray" box. Skip the whole cover instead (draw
@@ -1239,9 +1243,9 @@ static void drawCoverFlow(struct menu_list *menu, struct submenu_list *item, con
       (prefetchAdjacentGameImages, drawGameImage): PREFETCH priority, so MMCE stays exempt (SIO2)
       -- including an MMCE-SOURCED FAVOURITE on the FAV tab, whose owner mode texcache resolves
       per value (cacheGetEffectiveMode -> favGetArtMode) before applying the exemption -- and APP
-      keeps its longer settle + pending-interactive check via canPrefetchAdjacentGameImages. The
-      walk also only runs once the selection's own art has landed, so the focused cover always
-      wins the queue. The walk wraps last<->first exactly like the covers[]
+      keeps its longer settle via canPrefetchAdjacentGameImages. The walk yields to pending
+      interactive art (canPrefetchAdjacentGameImages) and interactive requests dequeue ahead
+      of prefetch regardless of enqueue order, so the focused cover always wins the queue. The walk wraps last<->first exactly like the covers[]
       build; distance is bounded so the whole warmed window (visible + pads + lookahead) fits the
       cache's slot count with no LRU thrash: (count-1)/2 = 4 each side on the 10-slot COV cache,
       i.e. one cover beyond the pad slot in 5-up mode, two in 3-up. Per-item element redirect
@@ -1251,7 +1255,7 @@ static void drawCoverFlow(struct menu_list *menu, struct submenu_list *item, con
     if (elem->extended != NULL) {
         mutable_image_t *baseImg = (mutable_image_t *)elem->extended;
         if (baseImg->cache != NULL && baseImg->cache->suffix != NULL && strcmp(baseImg->cache->suffix, "COV") == 0 &&
-            canPrefetchAdjacentGameImages(baseImg->cache, sourceList, centerTexture)) {
+            canPrefetchAdjacentGameImages(baseImg->cache, sourceList)) {
             int prefetchInactiveFrames = (sourceList != NULL && sourceList->mode == APP_MODE) ? APP_PREFETCH_IDLE_FRAMES : MENU_MIN_INACTIVE_FRAMES;
             int maxDistance = (baseImg->cache->count - 1) / 2;
             struct submenu_list *next = item;

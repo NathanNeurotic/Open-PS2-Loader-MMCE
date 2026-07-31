@@ -2268,12 +2268,14 @@ static void guiDrawOverlays()
     // requests at all -- art loads on the texcache worker -- so without this the loader could
     // never trigger in the game listings, only on screens that read per-game config through the
     // queue (the info screen).
-    // #296 baseline restore: count ALL art (interactive + prefetch), not just interactive -- this
-    // mirrors official OPL, whose loader trigger is "IO queue non-empty" with ALL art on that
-    // queue. This does NOT resurrect the idle-flash #290 killed: prefetch bursts only exist
-    // post-settle (the walk runs once navigation stops), so the loader pulses while art is
-    // genuinely loading, and quiet background rescans stay excluded via ioHasVisiblePendingRequests.
-    int pending = ioHasVisiblePendingRequests() || cacheHasPendingArt();
+    // #296 Beta-3482 regression: counting ALL art (interactive + prefetch) pinned the loader on
+    // every browsing frame -- queued prefetch SURVIVES each scroll step (generation advance
+    // preserves it), so pending was effectively continuous while scrolling ("orb spins every
+    // time I scroll past games"). Count interactive art only: prefetch is speculative by
+    // definition, and the art the user is actually waiting on (the highlighted item's
+    // cover/BG/icons) is always an interactive request, so #299's loader-in-listings keeps
+    // working without the pinned orb.
+    int pending = ioHasVisiblePendingRequests() || cacheHasPendingInteractiveArt();
 
     // During the boot intro, when an animated boot logo is shown, suppress the
     // loading spinner -- the animated logo is the boot activity indicator there.
