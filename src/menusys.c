@@ -1457,8 +1457,7 @@ void menuHandleInputMain()
 }
 
 // Info-element family for a list: mirrors menuRenderInfo's dispatch (VCD view first -- it also
-// covers the Favourites tab's L3 VCD view -- then FAV/APP, else the games family). Shared with the
-// info-art prewarm so render and prewarm can never pick different families.
+// covers the Favourites tab's L3 VCD view -- then FAV/APP, else the games family).
 //
 // A page-specific info family (VCD / Favourites / Apps) falls back to the theme's OWN games info family
 // when the LOADED theme does not define it -- NEVER to the built-in/baked theme (gTheme is always the

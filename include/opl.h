@@ -51,7 +51,6 @@
 // IO type IDs
 #define IO_CUSTOM_SIMPLEACTION    1 // handler for parameter-less actions
 #define IO_MENU_UPDATE_DEFFERED   2
-#define IO_CACHE_LOAD_ART         3 // io call to handle the loading of covers
 #define IO_COMPAT_UPDATE_DEFFERED 4
 
 // Codes have been planned to fit the design of the GUI functions within gui.c.
