@@ -441,11 +441,14 @@ static int readPad(struct pad_data_t *pad)
     }
 
     /*
-     * A failed read is not a sampled release. Keep the last valid sample until
-     * the next successful read or an explicit disconnect. This one rule feeds
-     * level, edge, repeat, and inactivity handling consistently.
+     * Aggregate button data only from successful reads (upstream semantics).
+     * Merging the retained sample after a FAILED ready-state read would carry
+     * "pressed" indefinitely when the missed poll was a release: the next real
+     * tap then has no observed release-to-press edge and is swallowed, and the
+     * stale hold eventually reaches repeat handling as a multi-item skip
+     * (#271/#272).
      */
-    if (padsRead > 0 || isPadReadyState(pad->state))
+    if (padsRead > 0)
         paddata |= pad->paddata;
 
     return pad->paddata != 0;

@@ -1054,6 +1054,27 @@ GSTEXTURE *cacheGetTexture(image_cache_t *cache, item_list_t *list, int *cacheId
         }
     }
 
+    /*
+     * Latest-selection-wins, ONE-SLOT "BG" cache only (#296): a background queued
+     * or loading for a selection the user has already left must not block the
+     * current selection for the whole load (~2s on a slow device). A stale QUEUED
+     * background is dropped so the slot scan below recycles it in this same frame;
+     * a stale LOADING one is aborted and the normal ERR_LOAD_ABORTED completion
+     * clears the slot, so the current selection enqueues on the next frame. READY
+     * backgrounds keep plain LRU eviction; every other suffix and cache size is
+     * untouched.
+     */
+    if (cache->count == 1 && cache->suffix != NULL && strcmp(cache->suffix, "BG") == 0) {
+        cache_entry_t *only = &cache->content[0];
+
+        if (only->value != NULL && strcmp(only->value, value) != 0) {
+            if (only->state == CACHE_ENTRY_QUEUED && only->qr != NULL)
+                cacheDropQueuedRequestLocked(only->qr);
+            else if (only->state == CACHE_ENTRY_LOADING && only->qr != NULL)
+                ((load_image_request_t *)only->qr)->abortRequested = 1;
+        }
+    }
+
     if (effectiveMode == MMCE_MODE &&
         (cacheIsNavigationActive() ||
          guiInactiveFrames < cacheGetMmceIdleFrames(cache))) {

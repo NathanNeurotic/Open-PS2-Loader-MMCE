@@ -1489,6 +1489,26 @@ static void drawItemsList(struct menu_list *menu, struct submenu_list *item, con
         // reuses the same value-keyed cache entry.
         if (itemsList->decoratorImage != NULL && !item->item.isFolder)
             getGameImageTexture(itemsList->decoratorImage->cache, menu->item->userdata, &item->item);
+        else if (itemsList->coverElem != NULL && !item->item.isFolder) {
+            // No decorator: the plain List only ever demanded the selected cover (via the
+            // separately drawn COV element), so artwork arrived one highlight at a time
+            // (#296). Warm the selected cover first through the family COV element;
+            // thmGetElemForItem keeps Favourites game/APP routing intact.
+            mutable_image_t *selImg = (mutable_image_t *)thmGetElemForItem(menu, item, itemsList->coverElem)->extended;
+            if (selImg != NULL && selImg->cache != NULL)
+                getGameImageTexture(selImg->cache, menu->item->userdata, &item->item);
+        }
+
+        // Budget viewport warming PER RESOLVED CACHE, minus one slot kept for the
+        // selected cover requested above, so row warming can never evict it. Two
+        // slots suffice: thmGetElemForItem routes a row to either the family COV
+        // cache or (Favourites APP rows) the apps COV cache, whose slot count may
+        // differ. Rows past a budget are simply not requested this frame.
+        struct
+        {
+            image_cache_t *cache;
+            int left;
+        } warmBudget[2] = {{NULL, 0}, {NULL, 0}};
 
         submenu_list_t *ps = menu->item->pagestart;
         int others = 0;
@@ -1525,8 +1545,31 @@ static void drawItemsList(struct menu_list *menu, struct submenu_list *item, con
                         rmDrawPixmap(&itemsList->decoratorImage->defaultTexture->source, posX, posY, elem->aligned, DECORATOR_SIZE, DECORATOR_SIZE, elem->scaled, gDefaultCol, 0);
                 }
                 textEndX = fntRenderString(elem->font, elem->posX + DECORATOR_SIZE, posY, elem->aligned, elem->width, elem->height, dispText, color);
-            } else
+            } else {
+                // No decorator: warm this visible row's cover so scrolling never waits on a
+                // cold cache (#296). The selected row was already requested above; folders
+                // carry no cover. Warming stops when the resolved cache's frame budget is
+                // spent (selected's slot stays reserved).
+                if (ps != item && !ps->item.isFolder && itemsList->coverElem != NULL) {
+                    mutable_image_t *rowImg = (mutable_image_t *)thmGetElemForItem(menu, ps, itemsList->coverElem)->extended;
+                    if (rowImg != NULL && rowImg->cache != NULL) {
+                        int b;
+                        for (b = 0; b < 2 && warmBudget[b].cache != NULL && warmBudget[b].cache != rowImg->cache; b++)
+                            ;
+                        if (b < 2) {
+                            if (warmBudget[b].cache == NULL) {
+                                warmBudget[b].cache = rowImg->cache;
+                                warmBudget[b].left = rowImg->cache->count - 1; // selected's reserved slot
+                            }
+                            if (warmBudget[b].left > 0) {
+                                warmBudget[b].left--;
+                                getGameImageTexture(rowImg->cache, list, &ps->item);
+                            }
+                        }
+                    }
+                }
                 textEndX = fntRenderString(elem->font, elem->posX, posY, elem->aligned, elem->width, elem->height, dispText, color);
+            }
 
             // Favourites: draw a small star just after the item text.
             if (ps->item.favourited) {
@@ -1563,6 +1606,7 @@ static void initItemsList(const char *themePath, config_set_t *themeConfig, them
         itemsList->decorator = decorator; // Will be used later (thmValidate)
 
     itemsList->decoratorImage = NULL;
+    itemsList->coverElem = NULL;
     elem->extended = itemsList;
     // elem->endElem = &endBasic; does the job
 
@@ -1907,6 +1951,26 @@ static void separateVcdCoverCache(theme_t *theme)
         cacheDestroyCache(replacement);
 }
 
+// Link every non-decorator ItemsList of a family to that family's existing COV element (the
+// selected-cover game-image / coverflow carousel). Runs AFTER the cache splits above, so the
+// linked element's cache pointer is already final; the link itself is to the element, which
+// survives the splits untouched. Families without a COV element simply get no warming.
+static void linkItemsListCoverElems(theme_elems_t *elems)
+{
+    theme_element_t *e;
+
+    for (e = elems->first; e != NULL; e = e->next) {
+        items_list_t *itemsList;
+
+        if (e->type != ELEM_TYPE_ITEMS_LIST || e->extended == NULL)
+            continue;
+
+        itemsList = (items_list_t *)e->extended;
+        if (itemsList->decoratorImage == NULL)
+            itemsList->coverElem = thmFindElemBySuffix(elems, "COV");
+    }
+}
+
 static void validateGUIElems(const char *themePath, config_set_t *themeConfig, theme_t *theme)
 {
     // 1. check we have a valid Background elements
@@ -1964,6 +2028,20 @@ static void validateGUIElems(const char *themePath, config_set_t *themeConfig, t
     // The L3 VCD view reuses the device's own game list (same item ids), so its selected/carousel covers
     // must not share a COV cache with the ISO list -- otherwise toggling thrashes the same cache slots.
     separateVcdCoverCache(theme);
+
+    // Default (decorator-less) Lists never demanded covers beyond the selection, so viewport
+    // artwork loaded one highlight at a time (#296). Give each such List a non-owning link to
+    // its family's COV element; drawItemsList uses it to warm the visible page through the
+    // normal per-frame cache path. After the splits, so linked caches are final. Info
+    // families too: a devices=-filtered ItemsList can live there (validateFilteredItemsLists).
+    linkItemsListCoverElems(&theme->mainElems);
+    linkItemsListCoverElems(&theme->infoElems);
+    linkItemsListCoverElems(&theme->appsMainElems);
+    linkItemsListCoverElems(&theme->appsInfoElems);
+    linkItemsListCoverElems(&theme->favsMainElems);
+    linkItemsListCoverElems(&theme->favsInfoElems);
+    linkItemsListCoverElems(&theme->vcdMainElems);
+    linkItemsListCoverElems(&theme->vcdInfoElems);
 }
 
 static int addGUIElem(const char *themePath, config_set_t *themeConfig, theme_t *theme, theme_elems_t *elems, const char *type, const char *name)
