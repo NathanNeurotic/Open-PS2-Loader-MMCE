@@ -23,9 +23,9 @@ unsigned char favGetFlags(item_list_t *itemList);
 int favGetItemSourceMode(int id);
 
 // Source device mode of the favourite whose art-cache value (source startup / VCD name) matches,
-// or -1 if none does. Used by texcache's cacheGetEffectiveMode so every mode-keyed art gate
-// (MMCE prefetch exemption, MMCE/HDD nav defer, MMCE abort sweeps, load-priority drop) applies
-// to the device a FAV-tab read actually lands on. GUI thread only -- favArray is rebuilt
+// or -1 if none does. Used by texcache's cacheGetEffectiveMode so MMCE idle
+// deferral, abort, and worker-priority rules follow the device a FAV-tab read
+// actually lands on. GUI thread only -- favArray is rebuilt
 // unlocked on the IO worker; see favGetArtMode's safety note in favsupport.c.
 int favGetArtMode(const char *value);
 

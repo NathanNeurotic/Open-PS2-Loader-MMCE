@@ -17,7 +17,6 @@
 #include <sys/stat.h> // mkdir (POSIX, used like util.c / OSDHistory.c)
 
 #include "include/opl.h"         // pulls <dirent.h> (opendir/readdir/DIR) + strcasecmp, like supportbase.c
-#include "include/diag.h"        // #120 diagnostic counters (memo hit/miss, VCD rescan preserve)
 #include "include/system.h"      // POPS_FOLDER
 #include "include/ioman.h"       // LOG (BDMA equip probe trace)
 #include "include/bdmsupport.h"  // BDM_TYPE_* + bdmGetDeviceRootByType (BDMA source differentiation)
@@ -488,8 +487,7 @@ int vcdFillGameList(const char *devPrefix, base_game_info_t **outGames)
     vcd_entry_t *vcds = NULL;
     int n = vcdScanDir(devPrefix, &vcds); // NOTE: does NOT touch *outGames
     if (n < 0) {
-        gDiag.vcdRescanPreserved++; // #120 diag: VCD list kept last-good on a failed device read
-        return -1;                  // could not read the device -> preserve the caller's current list
+        return -1; // could not read the device -> preserve the caller's current list
     }
     // NOTE: the art miss-memo invalidation now lives in vcdScanOpenDir (the shared scan success path) so
     // it also covers the HDD vcdScanDirRoot path -- do NOT re-invalidate here (it already fired).

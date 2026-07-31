@@ -691,11 +691,9 @@ static int favGetImage(item_list_t *itemList, char *folder, int isRelative, char
 
 // Resolve an art-cache `value` (a source item's startup, or a VCD favourite's .VCD name /
 // strict PS1 id) to the favourite's SOURCE device mode, using the same matching favGetImage
-// uses to route the actual read. Lets texcache's cacheGetEffectiveMode key every mode-gated
-// protection (the MMCE prefetch exemption, the MMCE/HDD nav-time defer, the MMCE abort
-// sweeps, the MMCE/HDD load-priority drop) on the device the read really lands on, instead
-// of the FAV wrapper mode -- without this, an MMCE-sourced favourite's SIO2 art read was
-// invisible to all four. Returns -1 when no favourite matches (e.g. a theme attribute-image
+// uses to route the actual read. Lets texcache apply MMCE idle deferral, abort,
+// and load priority to the device the read really lands on instead of the FAV
+// wrapper mode. Returns -1 when no favourite matches (e.g. a theme attribute-image
 // value, which takes the passthrough path in favGetImage). Pure in-memory scan, no IO.
 //
 // Thread safety: callers are GUI-thread render paths (prio 31), but favArray is rebuilt

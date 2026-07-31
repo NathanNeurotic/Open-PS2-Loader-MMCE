@@ -22,9 +22,9 @@
 
 int startPads();
 int readPads();
-// While frozen, readPads() keeps sampling but does not advance the key-on baseline, so an edge
-// raised now survives until it is consumed. Used across screen transitions, where the GUI polls
-// every frame but runs no input handler -- without this, presses made during a fade are discarded.
+// During a screen transition, seed and freeze the key-on baseline with the triggering sample.
+// This prevents the trigger from replaying on the destination while preserving a different button
+// that is still held when the destination appears.
 void padFreezeEdgeBaseline(int freeze);
 void unloadPads();
 

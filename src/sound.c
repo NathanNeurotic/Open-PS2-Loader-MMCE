@@ -305,13 +305,8 @@ void sfxPlay(int id)
             cursorChannelIndex = (cursorChannelIndex + 1) % CURSOR_SFX_CHANNEL_COUNT;
             channel = sfxGetCursorChannel(chosenSlot);
 
-            // Cut off the tail on the one channel about to be reused so the next navigation sound
-            // feels immediate. #272: do NOT sweep all six rotation channels here -- every
-            // audsrv_adpcm_set_volume_and_pan is a blocking SIF RPC, so the sweep made each scroll
-            // step issue ~8 RPCs on the GUI thread. Zeroing only the reused channel (whose old
-            // sample is being cut anyway) plus the volume set and the play is 3.
-            audsrv_adpcm_set_volume_and_pan(channel, 0, 0);
-            audsrv_adpcm_set_volume_and_pan(channel, gSFXVolume, 0);
+            // Volumes are configured once by audioSetVolume(). Replaying a
+            // rotation channel replaces its old sample in one SIF RPC.
             audsrv_ch_play_adpcm(channel, &sfx[id]);
         } else {
             audsrv_ch_play_adpcm(id, &sfx[id]);

@@ -132,9 +132,7 @@ int ps2_ip[4];
 int ps2_netmask[4];
 int ps2_gateway[4];
 int ps2_dns[4];
-// #120 diagnostic counters (see include/diag.h). Ships in the release binary; visible only when the
-// user enables the debug-info overlay. The sole definition; every other TU externs it via diag.h.
-opl_diag_t gDiag = {0};
+volatile int gLastSaveErrno = 0;
 
 int gETHOpMode; // See ETH_OP_MODES.
 int gPCShareAddressIsNetBIOS;
@@ -1234,7 +1232,7 @@ void setErrorMessage(int strId)
 }
 
 // Two-argument (path + errno) variant, for a write failure that wants to name WHERE and WHY. The
-// per-game save path (#245) uses it to surface the config target and gDiag.lastSaveErrno, matching
+// per-game save path (#245) uses it to surface the config target and gLastSaveErrno, matching
 // the diagnostic the global saveConfig failure already prints -- so a failed mmceN:/CFG write reports
 // the errno on screen instead of a bare "Error writing settings!".
 void setErrorMessagePathCode(int strId, const char *path, int error)
@@ -2284,7 +2282,7 @@ static void _saveConfig()
         if (lscret > 0)
             writeConfigPathRedirect(configGetDir());
     }
-    // #120 diag: gDiag.lastSaveErrno is latched at the actual write-failure site inside configWrite()
+    // gLastSaveErrno is latched at the actual write-failure site inside configWrite()
     // (config.c) -- NOT here, where later config-set snapshot-opens have already clobbered errno with a
     // spurious ENOENT (adversarial review). See config.c.
     lscstatus = 0;
@@ -2292,10 +2290,8 @@ static void _saveConfig()
 
 void applyConfig(int themeID, int langID, int skipDeviceRefresh)
 {
-    // A deliberate settings/theme apply is the one moment art the user just added (or a theme they just
-    // switched to) could newly exist, so clear the genuine-absence art memo and let cover-less items be
-    // probed once more. This is NOT cacheAdvanceGeneration (screen-switch/scroll churn -- the very thing
-    // the fail epoch ignores) and NOT the background rescan poll (re-hammering that reintroduces #120).
+    // A deliberate settings/theme apply may make new art available, so clear the
+    // genuine-absence memo and let cover-less items be probed once more.
     cacheInvalidateFailMemo();
 
     if (gDefaultDevice < 0 || gDefaultDevice > FAV_MODE)
@@ -2389,9 +2385,9 @@ int saveConfig(int types, int showUI)
         } else {
             // Say WHERE and WHY. A bare "Error writing settings!" cost a maintainer an afternoon on a
             // network boot: the write was failing against a home he had no way to see, and the errno
-            // was already sitting in gDiag.lastSaveErrno (latched at the real failure site in
+            // was already sitting in gLastSaveErrno (latched at the real failure site in
             // config.c) with nothing putting it on screen.
-            snprintf(notification, sizeof(notification), _l(_STR_ERROR_SAVING_SETTINGS_TO), path, gDiag.lastSaveErrno);
+            snprintf(notification, sizeof(notification), _l(_STR_ERROR_SAVING_SETTINGS_TO), path, gLastSaveErrno);
 
             guiMsgBox(notification, 0, NULL);
         }
@@ -2658,10 +2654,22 @@ int oplUpdateGameCompatSingle(int id, item_list_t *support, config_set_t *config
 // -------------------- NBD SRV Support ---------------------
 // ----------------------------------------------------------
 
+#define LWNBD_ART_DRAIN_TICKS 500
+#define LWNBD_IO_DRAIN_TICKS  1000
 
-static int loadLwnbdSvr(void)
+static void shutdownLwnbdNetwork(void)
 {
-    int ret, padStatus;
+    int ethWasLoaded = ethGetModulesLoaded();
+
+    ethDeinitModules();
+    if (ethWasLoaded)
+        sysShutdownDev9();
+}
+
+static int loadLwnbdSvr(int *teardownStarted)
+{
+    int ret, padStatus, padTries;
+    int ethWasLoadedBeforePreflight;
     struct lwnbd_config
     {
         char defaultexport[32];
@@ -2669,20 +2677,7 @@ static int loadLwnbdSvr(void)
     };
     struct lwnbd_config config;
 
-    // deint audio lib while nbd server is running
-    audioEnd();
-
-    // block all io ops, wait for the ones still running to finish
-    ioBlockOps(1);
-    guiExecDeferredOps();
-
-    // Deinitialize all support without shutting down the HDD unit.
-    deinitAllSupport(NO_EXCEPTION, IO_MODE_SELECTED_ALL, -1);
-    clearErrorMessage(); /* At this point, an error might have been displayed (since background tasks were completed).
-                            Clear it, otherwise it will get displayed after the server is closed. */
-
-    unloadPads();
-    // sysReset(0); // usefull ? printf doesn't work with it.
+    *teardownStarted = 0;
 
     /* compat stuff for user not providing name export (useless when there was only one export) */
     ret = strlen(gExportName);
@@ -2693,7 +2688,62 @@ static int loadLwnbdSvr(void)
 
     config.readonly = !gEnableWrite;
 
-    // see gETHStartMode, gNetworkStartup ? this is slow, so if we don't have to do it (like debug build).
+    /*
+     * Prove that the NIC can establish link and configuration while the live menu
+     * is still intact. In particular, an unplugged cable must not send the failure
+     * path through audioEnd(), unloadPads(), or the IOP reset used to restore a
+     * successfully-started server.
+     */
+    ethWasLoadedBeforePreflight = ethGetModulesLoaded();
+    ret = ethLoadInitModules();
+    if (ret != 0) {
+        if (!ethWasLoadedBeforePreflight)
+            shutdownLwnbdNetwork();
+        return ret;
+    }
+
+    /*
+     * If preflight brought up the stack solely for this check, return DEV9 to its
+     * prior ownership state. The normal post-teardown load below then starts from
+     * the same clean state as every other NBD launch.
+     */
+    if (!ethWasLoadedBeforePreflight)
+        shutdownLwnbdNetwork();
+
+    /*
+     * Support cleanup invalidates device-owned lists used by art requests.
+     * If the bounded drain cannot make that ownership safe, keep the live menu
+     * intact and let the user retry.
+     */
+    if (!cacheAbortMmceImageLoadsTimed(LWNBD_ART_DRAIN_TICKS) ||
+        !cacheCancelPendingImageLoadsTimed(LWNBD_ART_DRAIN_TICKS))
+        return -1;
+
+    /*
+     * Block new foreground work and bound the drain while the rest of the menu
+     * is still live. A stuck request therefore fails the start instead of
+     * freezing after audio and pads have already been dismantled.
+     */
+    ioBlockOpsTimed(1, LWNBD_IO_DRAIN_TICKS);
+    if (ioHasPendingRequests()) {
+        ioBlockOps(0);
+        return -1;
+    }
+
+    *teardownStarted = 1;
+
+    // deinit audio lib while nbd server is running
+    audioEnd();
+
+    guiExecDeferredOps();
+
+    // Deinitialize all support without shutting down the HDD unit.
+    deinitAllSupport(NO_EXCEPTION, IO_MODE_SELECTED_ALL, -1);
+    clearErrorMessage(); /* At this point, an error might have been displayed (since background tasks were completed).
+                            Clear it, otherwise it will get displayed after the server is closed. */
+
+    unloadPads();
+
     ret = ethLoadInitModules();
     if (ret == 0) {
         ret = sysLoadModuleBuffer(&ps2atad_irx, size_ps2atad_irx, 0, NULL); /* gHDDStartMode ? */
@@ -2704,28 +2754,21 @@ static int loadLwnbdSvr(void)
         }
     }
 
-    if (ret != 0) {
-        /* The server is not starting, so nothing will ever consume the network stack a
-         * FAILED bring-up just left resident (netman/smap/ps2ip, DEV9 powered). Tear it
-         * down NOW, while the state is fresh and known (#307): unloadLwnbdSvr reboots the
-         * IOP via reset() -> sysReset(), whose unbounded SifIopReset/SifIopSync waits are
-         * the wedge when they run against a live, half-configured stack. Every other
-         * network teardown in the tree (ethCleanUp/ethShutdown) does deinit + DEV9
-         * shutdown and never reboots afterwards; this makes the NBD lifecycle match.
-         * The loaded-check mirrors ethShutdown: DEV9's refcount is shared with BDM/HDD,
-         * so only release it when the eth path actually holds it. */
-        int ethWasLoaded = ethGetModulesLoaded();
-        ethDeinitModules();
-        if (ethWasLoaded)
-            sysShutdownDev9();
-    }
+    if (ret != 0)
+        shutdownLwnbdNetwork();
 
     padInit(0);
 
-    // init all pads
+    // init all pads, but never wedge the status screen on a failed reconnect
     padStatus = 0;
-    while (!padStatus)
+    padTries = 0;
+    while (!padStatus && padTries++ < 100) {
         padStatus = startPads();
+        if (!padStatus)
+            delay(50);
+    }
+    if (!padStatus)
+        LOG("loadLwnbdSvr: pads did not start after teardown (%d tries)\n", padTries);
 
     // now ready to display some status
 
@@ -2734,19 +2777,8 @@ static int loadLwnbdSvr(void)
 
 static void unloadLwnbdSvr(void)
 {
-    /* Graceful teardown BEFORE the IOP reboot (#307): reset() -> sysReset() parks the EE in
-     * unbounded SifIopReset/SifIopSync waits, and those wedge when they run against a live,
-     * DEV9-powered, half-configured network stack (failed offline bring-up). The first #307
-     * attempt skipped the RPC teardown entirely and the console still froze, proving the
-     * reset -- not the teardown -- is the hazardous step. So do here what every other
-     * network teardown in the tree does (ethShutdown: deinit + DEV9 power-off, no reboot
-     * after) and let the reset below reboot a clean IOP. The loaded-check mirrors
-     * ethShutdown: DEV9's refcount is shared with BDM/HDD, so only release it when the eth
-     * path actually holds it (a failed bring-up already released it in loadLwnbdSvr). */
-    int ethWasLoaded = ethGetModulesLoaded();
-    ethDeinitModules();
-    if (ethWasLoaded)
-        sysShutdownDev9();
+    // Release the live server stack before resetting the IOP.
+    shutdownLwnbdNetwork();
     unloadPads();
 
     reset();
@@ -2757,10 +2789,8 @@ static void unloadLwnbdSvr(void)
     // reinit the input pads
     padInit(0);
 
-    /* Bounded retry (#307): an unbounded startPads loop turns a half-completed IOP reset
-     * into a hard freeze at exactly the reported "NBD Server unloading..." screen. ~5 s of
-     * retries covers a slow IOP; if pads still won't start, degrade (log + continue, the
-     * menu's own pad handling recovers on later polls) instead of wedging forever. */
+    /* Bound pad startup so a half-completed IOP reset cannot leave the EE in an
+     * infinite loop on the "NBD Server unloading..." screen. */
     int ret = 0, tries = 0;
     while (!ret && tries++ < 100) {
         ret = startPads();
@@ -2785,17 +2815,21 @@ static void unloadLwnbdSvr(void)
 void handleLwnbdSrv()
 {
     char temp[256];
+    int teardownStarted;
+
     // prepare for lwnbd, display screen with info
     guiRenderTextScreen(_l(_STR_STARTINGNBD));
-    if (loadLwnbdSvr() == 0) {
+    if (loadLwnbdSvr(&teardownStarted) == 0) {
         snprintf(temp, sizeof(temp), "%s", _l(_STR_RUNNINGNBD));
         guiMsgBox(temp, 0, NULL);
     } else
         guiMsgBox(_l(_STR_STARTFAILNBD), 0, NULL);
 
-    // restore normal functionality again
-    guiRenderTextScreen(_l(_STR_UNLOADNBD));
-    unloadLwnbdSvr();
+    // Only a path that actually dismantled the menu needs the reset-and-restore cycle.
+    if (teardownStarted) {
+        guiRenderTextScreen(_l(_STR_UNLOADNBD));
+        unloadLwnbdSvr();
+    }
 }
 
 // ----------------------------------------------------------
@@ -3131,8 +3165,6 @@ static void init(void)
     guiInit();
     ioInit();
     menuInit();
-
-    startPads();
 
     bdmInitSemaphore();
 

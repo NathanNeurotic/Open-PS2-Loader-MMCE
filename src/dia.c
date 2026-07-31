@@ -14,7 +14,6 @@
 #include "include/themes.h"
 #include "include/util.h"
 #include "include/sound.h"
-#include "include/diag.h" // gDiag pad-miss line, drawn in diaRenderUI (dialogs never reach guiDrawOverlays)
 
 // UI spacing of the dialogues (pixels between consecutive items)
 #define UI_SPACING_H      10
@@ -800,18 +799,6 @@ void diaRenderUI(struct UIItem *ui, short inMenu, struct UIItem *cur, int haveFo
     uiX = guiDrawIconAndText(gSelectButton == KEY_CIRCLE ? uiIcons[0] : uiIcons[1], uiHints[0], gTheme->fonts[0], uiX, uiY, gTheme->textColor);
     uiX += 12;
     uiX = guiDrawIconAndText(gSelectButton == KEY_CIRCLE ? uiIcons[1] : uiIcons[0], uiHints[1], gTheme->fonts[0], uiX, uiY, gTheme->textColor);
-
-    // #272 pad-miss diagnostic line (see include/diag.h). diaExecuteDialog renders directly
-    // (rmStartFrame/diaRenderUI/rmEndFrame) and never reaches guiDrawOverlays, so without this the
-    // gDiag HUD is invisible in exactly the settings dialogs the freeze repro lives in. Same gate
-    // (gEnableDebug), font and colour convention as the gui.c lines; reads plain volatile counters,
-    // no IO -- the overlay must not add traffic to the bus under observation.
-    if (gEnableDebug) {
-        char diag[64];
-        snprintf(diag, sizeof(diag), "MISS PT:%u MB:%u MX:%u CD:%u",
-                 gDiag.padPollMaxMs, gDiag.padMissStreak, gDiag.padMissStreakMax, gDiag.padCarryDrops);
-        fntRenderString(gTheme->fonts[0], 0, screenHeight - 24, ALIGN_NONE, 0, 0, diag, GS_SETREG_RGBA(255, 255, 0, 128));
-    }
 }
 
 /// sets the ui item value to the default again
@@ -903,8 +890,6 @@ static int diaHandleInput(struct UIItem *item, int *modified)
             ecount++;
         if (item->intvalue.current < 0 || item->intvalue.current >= ecount)
             item->intvalue.current = 0;
-
-        int cur = item->intvalue.current;
 
         if (getKey(KEY_UP) && (item->intvalue.current > 0)) {
             item->intvalue.current--;

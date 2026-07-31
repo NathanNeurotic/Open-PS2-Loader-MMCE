@@ -16,11 +16,9 @@
 #include <time.h>
 #include <math.h>
 
-#define MENU_POS_V               50
-#define HINT_HEIGHT              32
-#define DECORATOR_SIZE           20
-#define APP_PREFETCH_IDLE_FRAMES 10
-
+#define MENU_POS_V             50
+#define HINT_HEIGHT            32
+#define DECORATOR_SIZE         20
 // Cache slots per AttributeImage element. An AttributeImage is NOT a per-game image -- it is a small FIXED
 // SET of glyphs keyed by the attribute's value, so the cache only ever needs to hold that attribute's whole
 // value set to be thrash-free. Our built-in attributes are tiny (#Format = ISO/ZSO/VCD/UL/ELF/HDL = 6,
@@ -738,16 +736,8 @@ static mutable_image_t *initMutableImage(const char *themePath, config_set_t *th
 
     if (cachePattern && !mutableImage->cache) {
         if (type == ELEM_TYPE_ATTRIBUTE_IMAGE)
-            // An AttributeImage is a small FIXED SET of glyphs keyed by the attribute's value, not a
-            // per-game image: #DiscType has three (PS1CD/PS2CD/PS2DVD), #Media two (CD/DVD), #System two
-            // (PS1/PS2), #Format a handful. With ONE slot the cache could hold exactly one of them, so
-            // every move between a DVD game and a CD game EVICTED it and re-read the PNG off the device --
-            // and that re-read rides the single art worker, queued BEHIND the whole interactive art set
-            // (the cover shows in ~0.2s but the rest drains for seconds). That is AcidReach's #49 report
-            // exactly: ~5s on a slow step to a new game, ~0.5s back to a previous one, and -- the tell --
-            // ~0.2s when scrolling FAST, because scrolling defers the art set and the badge jumps a clear
-            // queue. ATTR_IMAGE_CACHE_SLOTS covers the largest attribute's value set, so each glyph is read
-            // ONCE per session and every later selection is a RAM hit with zero device IO.
+            // Attribute images use a small fixed glyph set, so retain each glyph
+            // instead of re-reading it whenever the selected value changes.
             mutableImage->cache = cacheInitCache(-1, themePath, 0, cachePattern, ATTR_IMAGE_CACHE_SLOTS);
         else
             mutableImage->cache = cacheInitCache(theme->gameCacheCount++, "ART", 1, cachePattern, cacheCount);
@@ -817,71 +807,6 @@ static GSTEXTURE *getGameImageTexture(image_cache_t *cache, void *support, struc
     return NULL;
 }
 
-static int canPrefetchAdjacentGameImages(image_cache_t *cache, item_list_t *list)
-{
-    if (cache == NULL || list == NULL)
-        return 0;
-
-    if (list->mode == MMCE_MODE)
-        return 0;
-
-    /* #296: gate on pending INTERACTIVE art for every mode -- not on the selected
-     * cover's success. Requiring selectedTexture->Mem != NULL disabled the whole walk
-     * whenever the parked game had no art (or its boot-window load failed), so nothing
-     * ever warmed. Selected-first is already guaranteed by interactive queue priority,
-     * which dequeues ahead of prefetch regardless of enqueue order. */
-    if (cacheHasPendingInteractiveArt())
-        return 0;
-
-    if (list->mode == APP_MODE) {
-        if (guiInactiveFrames < APP_PREFETCH_IDLE_FRAMES)
-            return 0;
-    }
-
-    return 1;
-}
-
-static void prefetchGameImageTexture(image_cache_t *cache, void *support, struct submenu_list *item, int minInactiveFrames)
-{
-    item_list_t *list;
-    char *startup;
-
-    if (cache == NULL || item == NULL || guiInactiveFrames < minInactiveFrames)
-        return;
-
-    // Folder rows have no cover art -- same guard getGameImageTexture applies on the
-    // interactive path, so a prefetch walk that crosses a folder row cannot thrash the
-    // cache with the folder's non-art startup key.
-    if (item->item.isFolder)
-        return;
-
-    list = (item_list_t *)support;
-    if (list == NULL)
-        return;
-
-    startup = list->itemGetStartup(list, item->item.id);
-    cachePrefetchTexture(cache, list, &item->item.cache_id[cache->userId], &item->item.cache_uid[cache->userId], startup);
-}
-
-static void prefetchAdjacentGameImages(image_cache_t *cache, void *support, struct submenu_list *item, int distance, int minInactiveFrames)
-{
-    struct submenu_list *nextItem = item;
-    struct submenu_list *prevItem = item;
-
-    if (item == NULL || distance <= 0)
-        return;
-
-    for (int i = 0; i < distance; i++) {
-        if (nextItem != NULL)
-            nextItem = nextItem->next;
-        if (prevItem != NULL)
-            prevItem = prevItem->prev;
-
-        prefetchGameImageTexture(cache, support, nextItem, minInactiveFrames);
-        prefetchGameImageTexture(cache, support, prevItem, minInactiveFrames);
-    }
-}
-
 // Favourites element redirection (defined in the Coverflow section below; used by both draw
 // paths so an APP favourite renders with the apps element, not the game cover element).
 static theme_element_t *thmGetElemForItem(struct menu_list *menu, struct submenu_list *item, theme_element_t *elem);
@@ -901,12 +826,6 @@ static void drawGameImage(struct menu_list *menu, struct submenu_list *item, con
             return;
 
         GSTEXTURE *texture = getGameImageTexture(gameImage->cache, menu->item->userdata, &item->item);
-
-        if (gameImage->cache != NULL && gameImage->cache->suffix != NULL && strcmp(gameImage->cache->suffix, "COV") == 0 &&
-            canPrefetchAdjacentGameImages(gameImage->cache, list)) {
-            int prefetchInactiveFrames = (list != NULL && list->mode == APP_MODE) ? APP_PREFETCH_IDLE_FRAMES : MENU_MIN_INACTIVE_FRAMES;
-            prefetchAdjacentGameImages(gameImage->cache, menu->item->userdata, item, 1, prefetchInactiveFrames);
-        }
 
         if (!texture || !texture->Mem) {
             // #2: on the Favourites page a COVER element with no real art must not draw the embedded
@@ -1015,13 +934,6 @@ void thmTriggerCoverflowAnim(int dir)
     cfIsAnimating = 1;
     cfAnimDirection = dir;
     cfAnimStartTime = clock();
-}
-
-// Exposes the slide state so per-frame diagnostic overlays (gui.c guiDrawOverlays) can step
-// aside mid-slide; see the gate there for the VRAM/TexManager rationale.
-int thmCoverflowIsAnimating(void)
-{
-    return cfIsAnimating;
 }
 
 static void drawCoverFlow(struct menu_list *menu, struct submenu_list *item, config_set_t *config, struct theme_element *elem)
@@ -1146,11 +1058,8 @@ static void drawCoverFlow(struct menu_list *menu, struct submenu_list *item, con
     int drawFirst = cfIsAnimating ? 0 : COVERFLOW_PAD;
     int drawLast = cfIsAnimating ? coverTotal : coverTotal - COVERFLOW_PAD;
 
-    // #296 baseline restore: the left->right draw loop below doubles as the interactive ENQUEUE
-    // order (getGameImageTexture queues a request on a cache miss), so on a cold settle the
-    // SELECTED cover used to load 2nd/3rd, behind its left neighbours. Fire the selection's
-    // request FIRST; the loop's own call for the center then dedups against the queued request
-    // (cacheFindQueuedRequestLocked), so nothing else about draw or queue behaviour changes.
+    // Submit the selected cover before the left-to-right draw loop so the FIFO
+    // cannot place neighbouring covers ahead of it on a cold cache.
     if (covers[centerIdx]) {
         mutable_image_t *centerImg = (mutable_image_t *)thmGetElemForItem(menu, covers[centerIdx], elem)->extended;
         if (centerImg)
@@ -1236,63 +1145,6 @@ static void drawCoverFlow(struct menu_list *menu, struct submenu_list *item, con
     }
 
     rmSetReflectionYOffset(0); // don't leak the offset to any other reflection draw
-
-    /*
-      Idle prefetch of the OFF-SCREEN neighbors (issue #296). Two gates keep every cover off the
-      carousel until the user pauses: interactive requests are settle-gated (guiInactiveFrames
-      resets to 0 while any button is held), and at rest the two padding covers are not drawn at
-      all (the #271 rest-state optimization above), so the incoming cover's FIRST request happens
-      mid-slide -- exactly when the settle gate blocks it. Every step therefore slides in the
-      placeholder, which then pops to real art only after the user settles -- the "art only loads
-      when I focus each game" report.
-
-      Warm those neighbors during the SAME idle windows the list-mode cover panel already uses
-      (prefetchAdjacentGameImages, drawGameImage): PREFETCH priority, so MMCE stays exempt (SIO2)
-      -- including an MMCE-SOURCED FAVOURITE on the FAV tab, whose owner mode texcache resolves
-      per value (cacheGetEffectiveMode -> favGetArtMode) before applying the exemption -- and APP
-      keeps its longer settle via canPrefetchAdjacentGameImages. The walk yields to pending
-      interactive art (canPrefetchAdjacentGameImages) and interactive requests dequeue ahead
-      of prefetch regardless of enqueue order, so the focused cover always wins the queue. The walk wraps last<->first exactly like the covers[]
-      build; distance is bounded so the whole warmed window (visible + pads + lookahead) fits the
-      cache's slot count with no LRU thrash: (count-1)/2 = 4 each side on the 10-slot COV cache,
-      i.e. one cover beyond the pad slot in 5-up mode, two in 3-up. Per-item element redirect
-      (thmGetElemForItem) keeps a FAV-tab APP favourite prefetching into the apps cache, matching
-      its draw. Duplicate visits (small wrapped lists) dedupe inside the cache by value.
-    */
-    if (elem->extended != NULL) {
-        mutable_image_t *baseImg = (mutable_image_t *)elem->extended;
-        if (baseImg->cache != NULL && baseImg->cache->suffix != NULL && strcmp(baseImg->cache->suffix, "COV") == 0 &&
-            canPrefetchAdjacentGameImages(baseImg->cache, sourceList)) {
-            int prefetchInactiveFrames = (sourceList != NULL && sourceList->mode == APP_MODE) ? APP_PREFETCH_IDLE_FRAMES : MENU_MIN_INACTIVE_FRAMES;
-            int maxDistance = (baseImg->cache->count - 1) / 2;
-            struct submenu_list *next = item;
-            struct submenu_list *prev = item;
-
-            for (i = 1; i <= maxDistance; i++) {
-                if (next != NULL) {
-                    next = next->next ? next->next : menu->item->submenu;
-                    if (next == item)
-                        next = NULL; // wrapped full circle
-                }
-                if (prev != NULL) {
-                    prev = prev->prev ? prev->prev : menu->item->last;
-                    if (prev == item)
-                        prev = NULL; // wrapped full circle (or no tail yet)
-                }
-
-                if (next != NULL) {
-                    mutable_image_t *nimg = (mutable_image_t *)thmGetElemForItem(menu, next, elem)->extended;
-                    if (nimg != NULL)
-                        prefetchGameImageTexture(nimg->cache, sourceList, next, prefetchInactiveFrames);
-                }
-                if (prev != NULL && prev != next) {
-                    mutable_image_t *pimg = (mutable_image_t *)thmGetElemForItem(menu, prev, elem)->extended;
-                    if (pimg != NULL)
-                        prefetchGameImageTexture(pimg->cache, sourceList, prev, prefetchInactiveFrames);
-                }
-            }
-        }
-    }
 }
 
 static void initCoverflow(const char *themePath, config_set_t *themeConfig, theme_t *theme, theme_element_t *elem, const char *name)
@@ -1335,13 +1187,8 @@ static void drawAttributeImage(struct menu_list *menu, struct submenu_list *item
     mutable_image_t *attributeImage = (mutable_image_t *)elem->extended;
     if (config) {
         if (attributeImage->currentConfigId != config->uid) {
-            // force refresh
-            // Reset the cacheId TOO, and note this is mandatory rather than tidiness: the -2 memo gate
-            // in cacheGetTexture short-circuits WITHOUT comparing the value string (unlike the identity
-            // gate below it, which does strcmp entry->value). A -2 left over from the previous game
-            // would therefore suppress THIS game's badge for the rest of the generation -- i.e. the
-            // badge would stop updating / keep the old glyph. currentValue can only change inside this
-            // same branch, so clearing both here is airtight.
+            // A -2 cache id is a genuine-absence memo for the old value. Clear
+            // both identity fields before switching to the new attribute.
             attributeImage->currentCacheId = -1;
             attributeImage->currentUid = -1;
             attributeImage->currentConfigId = config->uid;
@@ -1356,14 +1203,8 @@ static void drawAttributeImage(struct menu_list *menu, struct submenu_list *item
 
                 return;
             } else {
-                // Pass the PERSISTENT cacheId, not a stack local: cacheGetTexture's FAILED memo writes
-                // *cacheId = -2 (+ *UID = gCacheGeneration) and its skip gate reads BOTH back next
-                // frame. With a per-frame `int posZ = 0` the -2 was discarded, the gate was
-                // unreachable, and every frame re-enqueued a fresh FAILING open -- the unbounded
-                // info-page read storm behind #120/#154 (a badge whose glyph the theme does not ship
-                // is the NORMAL case; that is why the embedded-glyph fallback above exists). This is
-                // the same pattern getGameImageTexture has always used, which is exactly why main-page
-                // covers/screenshots never wedged (AndrewBento's bisect, #154).
+                // Keep the cache identity persistent so a missing optional glyph
+                // is memoized instead of being reopened every frame.
                 GSTEXTURE *texture = cacheGetTexture(attributeImage->cache, menu->item->userdata, &attributeImage->currentCacheId, &attributeImage->currentUid, attributeImage->currentValue);
                 if (texture && texture->Mem) {
                     if (attributeImage->overlayTexture) {
@@ -1636,26 +1477,18 @@ static void drawItemsList(struct menu_list *menu, struct submenu_list *item, con
     if (item) {
         items_list_t *itemsList = (items_list_t *)elem->extended;
         item_list_t *list = menu->item->userdata;
-        int mmceSelectionChanged = 0;
-        char *selectedStartup = NULL;
-
-        if (list != NULL && list->mode == MMCE_MODE && itemsList->decoratorImage != NULL && itemsList->decoratorImage->cache != NULL) {
-            selectedStartup = list->itemGetStartup(list, item->item.id);
-            if (selectedStartup == NULL)
-                selectedStartup = "";
-
-            if (itemsList->lastSelectedItemId != item->item.id || strcmp(itemsList->lastSelectedStartup, selectedStartup) != 0) {
-                mmceSelectionChanged = 1;
-                itemsList->lastSelectedItemId = item->item.id;
-                snprintf(itemsList->lastSelectedStartup, sizeof(itemsList->lastSelectedStartup), "%s", selectedStartup);
-            }
-        }
 
         int posX = elem->posX, posY = elem->posY;
         if (elem->aligned) {
             posX -= elem->width >> 1;
             posY -= elem->height >> 1;
         }
+
+        // The row loop starts at pagestart, which may put several visible covers
+        // ahead of the selection. Submit the selected row first; its loop lookup
+        // reuses the same value-keyed cache entry.
+        if (itemsList->decoratorImage != NULL && !item->item.isFolder)
+            getGameImageTexture(itemsList->decoratorImage->cache, menu->item->userdata, &item->item);
 
         submenu_list_t *ps = menu->item->pagestart;
         int others = 0;
@@ -1682,13 +1515,6 @@ static void drawItemsList(struct menu_list *menu, struct submenu_list *item, con
 
                 if (ps->item.isFolder) {
                     itemIconTex = NULL; // folders never carry a cover
-                } else if (list != NULL && list->mode == MMCE_MODE && itemsList->decoratorImage->cache != NULL) {
-                    image_cache_t *cache = itemsList->decoratorImage->cache;
-
-                    if (mmceSelectionChanged && ps == item)
-                        itemIconTex = getGameImageTexture(cache, menu->item->userdata, &ps->item);
-                    else
-                        itemIconTex = cacheGetTextureIfReady(cache, &ps->item.cache_id[cache->userId], &ps->item.cache_uid[cache->userId]);
                 } else
                     itemIconTex = getGameImageTexture(itemsList->decoratorImage->cache, menu->item->userdata, &ps->item);
 
@@ -1737,9 +1563,6 @@ static void initItemsList(const char *themePath, config_set_t *themeConfig, them
         itemsList->decorator = decorator; // Will be used later (thmValidate)
 
     itemsList->decoratorImage = NULL;
-    itemsList->lastSelectedItemId = -1;
-    itemsList->lastSelectedStartup[0] = '\0';
-
     elem->extended = itemsList;
     // elem->endElem = &endBasic; does the job
 
@@ -1867,17 +1690,6 @@ static void validateFilteredItemsLists(const char *themePath, config_set_t *them
     }
 }
 
-static int isDecoratorCoverCache(theme_element_t *list, image_cache_t *cache)
-{
-    items_list_t *itemsList;
-
-    if (list == NULL || list->extended == NULL || cache == NULL)
-        return 0;
-
-    itemsList = (items_list_t *)list->extended;
-    return itemsList->decoratorImage != NULL && itemsList->decoratorImage->cache == cache;
-}
-
 // devices=-filtered ItemsLists own no slot, so the four slot checks in isDecoratorCoverImage never
 // see their decorators. Recognizing them here is the CASCADE KILLER for the filtered-decorator
 // cache split below: without it, each split's replaceSharedCoverCache treats another filtered
@@ -1944,8 +1756,6 @@ static image_cache_t *cloneImageCache(theme_t *theme, image_cache_t *source)
         return NULL;
 
     cache = cacheInitCache(theme->gameCacheCount++, source->prefix, source->isPrefixRelative, source->suffix, source->count);
-    if (cache != NULL)
-        cache->allowPrime = source->allowPrime;
 
     return cache;
 }
@@ -2029,49 +1839,6 @@ static void splitFilteredDecoratorCoverCaches(theme_t *theme)
                 splitDecoratorCoverCache(theme, e);
             e = e->next;
         }
-    }
-}
-
-// Cache-based twin of isFilteredDecoratorCoverImage for the clamp below: true when `cache` backs a
-// devices=-filtered ItemsList's decorator in ANY family. Zero-cost for devices=-free themes.
-static int isFilteredDecoratorCoverCache(theme_t *theme, image_cache_t *cache)
-{
-    int g;
-
-    if (theme == NULL || cache == NULL) // unreachable from the current callers; matches the sibling helpers' guards (Gemini, #168)
-        return 0;
-
-    theme_elems_t *groups[8] = {&theme->mainElems, &theme->infoElems, &theme->appsMainElems, &theme->appsInfoElems,
-                                &theme->favsMainElems, &theme->favsInfoElems, &theme->vcdMainElems, &theme->vcdInfoElems};
-
-    for (g = 0; g < 8; g++) {
-        theme_element_t *e = groups[g]->first;
-        while (e != NULL) {
-            if (e->type == ELEM_TYPE_ITEMS_LIST && e->deviceFilter && isDecoratorCoverCache(e, cache))
-                return 1;
-            e = e->next;
-        }
-    }
-    return 0;
-}
-
-static void clampSelectedCoverCaches(theme_t *theme, theme_elems_t *elems)
-{
-    theme_element_t *elem = elems->first;
-
-    while (elem != NULL) {
-        if (elem->type == ELEM_TYPE_GAME_IMAGE) {
-            mutable_image_t *gameImage = (mutable_image_t *)elem->extended;
-
-            if (gameImage != NULL && gameImage->cache != NULL && gameImage->cache->suffix != NULL && strcmp(gameImage->cache->suffix, "COV") == 0 &&
-                !isDecoratorCoverCache(theme->gamesItemsList, gameImage->cache) && !isDecoratorCoverCache(theme->appsItemsList, gameImage->cache) &&
-                !isDecoratorCoverCache(theme->favsItemsList, gameImage->cache) && !isDecoratorCoverCache(theme->vcdItemsList, gameImage->cache) &&
-                !isFilteredDecoratorCoverCache(theme, gameImage->cache)) {
-                gameImage->cache->allowPrime = 0;
-            }
-        }
-
-        elem = elem->next;
     }
 }
 
@@ -2159,9 +1926,8 @@ static void validateGUIElems(const char *themePath, config_set_t *themeConfig, t
     // devices=-filtered ItemsList overrides: link their decorators (they own no slot, so the pass
     // above never reaches them). Info families too -- a filtered ItemsList can be declared there
     // and its decorator string must not be left pointing into themeConfig (freed at end of load).
-    // Their decorators are ALSO cache-split (splitFilteredDecoratorCoverCaches below) and
-    // clamp-exempt (isFilteredDecoratorCoverCache), the same treatment the slot lists get --
-    // isDecoratorCoverImage recognizes them, which is what keeps repeated splits from cascading.
+    // Their decorators are also cache-split below; isDecoratorCoverImage recognizes
+    // them, which keeps repeated splits from cascading.
     validateFilteredItemsLists(themePath, themeConfig, theme, &theme->mainElems);
     validateFilteredItemsLists(themePath, themeConfig, theme, &theme->infoElems);
     validateFilteredItemsLists(themePath, themeConfig, theme, &theme->appsMainElems);
@@ -2183,7 +1949,7 @@ static void validateGUIElems(const char *themePath, config_set_t *themeConfig, t
     thmComputeDeviceCoverage(&theme->vcdMainElems);
     thmComputeDeviceCoverage(&theme->vcdInfoElems);
 
-    // Items-list decorator covers need their own cache; sharing with selected covers defeats MMCE cover clamping.
+    // Keep list-row decorator covers from evicting the selected cover.
     splitDecoratorCoverCache(theme, theme->gamesItemsList);
     splitDecoratorCoverCache(theme, theme->appsItemsList);
     splitDecoratorCoverCache(theme, theme->favsItemsList);
@@ -2198,16 +1964,6 @@ static void validateGUIElems(const char *themePath, config_set_t *themeConfig, t
     // The L3 VCD view reuses the device's own game list (same item ids), so its selected/carousel covers
     // must not share a COV cache with the ISO list -- otherwise toggling thrashes the same cache slots.
     separateVcdCoverCache(theme);
-
-    // Selected-cover caches do not need history unless a real items list decorator uses them.
-    clampSelectedCoverCaches(theme, &theme->mainElems);
-    clampSelectedCoverCaches(theme, &theme->infoElems);
-    clampSelectedCoverCaches(theme, &theme->appsMainElems);
-    clampSelectedCoverCaches(theme, &theme->appsInfoElems);
-    clampSelectedCoverCaches(theme, &theme->favsMainElems);
-    clampSelectedCoverCaches(theme, &theme->favsInfoElems);
-    clampSelectedCoverCaches(theme, &theme->vcdMainElems);
-    clampSelectedCoverCaches(theme, &theme->vcdInfoElems);
 }
 
 static int addGUIElem(const char *themePath, config_set_t *themeConfig, theme_t *theme, theme_elems_t *elems, const char *type, const char *name)
@@ -2508,10 +2264,8 @@ static void thmLoadFonts(config_set_t *themeConfig, const char *themePath, theme
     }
 }
 
-// #120: how long a theme (re)load waits for MMCE-backed art to abort before giving up (mirrors
-// mmcesupport.c's MMCE_ART_ABORT_WAIT_TICKS). A wedged MMCE read that never returns makes thmLoad
-// ABANDON the swap and keep the current theme (never cacheEnd(1): its TerminateThread would kill the
-// worker mid-fileXio and orphan the shared RPC channel), so a theme swap can never hang.
+// Bound the MMCE-art drain before a theme swap. On timeout the current theme
+// remains active and a later trigger can retry.
 #define THM_MMCE_ART_ABORT_WAIT_TICKS 500
 
 // Returns 0 on success, -1 when the load was ABANDONED because the art worker would not drain (a
@@ -2556,17 +2310,8 @@ static int thmLoad(const char *themePath)
     newT->loadingIcon = NULL;
     newT->loadingIconCount = LOAD7_ICON - LOAD0_ICON + 1;
 
-    // #120: a wedged MMCE art read (SD2PSX / MemCard PRO2 card still mid-mount at boot or right after an
-    // IGR return) holds the single shared fileXio channel; this theme (re)load's own blocking reads
-    // below -- and the pre-swap art drain at the end -- would then wait on it forever, freezing the
-    // whole screen (game list stuck at 0,0) and needing a power cycle. Abort MMCE-backed art with a
-    // timeout FIRST so the channel is free before we touch storage; if the worker will NOT drain (a
-    // truly wedged read), BAIL OUT: keep the current theme and let a later trigger retry. NEVER force-
-    // reset here (cacheEnd(1)): its TerminateThread would kill the worker mid-fileXio and orphan the
-    // SHARED RPC channel while OPL keeps running, hanging every later fileXio user -- including this
-    // function's own reads. (mmceLaunchGame can afford that reset only because it execs away right
-    // after.) The very first load (curT == NULL) never bails: pre-cacheInit there are no requests, so
-    // the abort returns success immediately.
+    // Do not begin blocking theme reads while an MMCE art read still owns the
+    // shared fileXio channel. Keep the current theme if it will not drain.
     if (!cacheAbortMmceImageLoadsTimed(THM_MMCE_ART_ABORT_WAIT_TICKS) && curT != NULL) {
         LOG("THEMES Load: MMCE art worker wedged -- keeping the current theme (retry later)\n");
         free(newT);
@@ -2805,13 +2550,8 @@ static int thmLoad(const char *themePath)
 
     configFree(themeConfig); // all themeConfig reads are done now (last was use_settings_bg above)
 
-    // #120: bound the pre-swap art drain too (the UNBOUNDED cacheCancelPendingImageLoads() here was the
-    // original hard-freeze site). Abort MMCE art first so the drain normally waits only on fast local
-    // (USB / MC / VCD) reads; if either step times out on a wedged worker, BAIL: free the fully-built
-    // newT -- it was never rendered, so its caches have no outstanding requests and thmFree returns
-    // instantly -- and keep rendering the current theme. No force-reset, for the same RPC-orphaning
-    // reason as the top abort; and thmFree(curT) must never run while an in-flight request may still
-    // reference the old theme's caches (use-after-free), which the successful timed drain rules out.
+    // The old theme cannot be freed while its caches are still referenced by the
+    // worker. Keep it if the bounded drain does not complete.
     if (curT != NULL &&
         (!cacheAbortMmceImageLoadsTimed(THM_MMCE_ART_ABORT_WAIT_TICKS) ||
          !cacheCancelPendingImageLoadsTimed(THM_MMCE_ART_ABORT_WAIT_TICKS))) {

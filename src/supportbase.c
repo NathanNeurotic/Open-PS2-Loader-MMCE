@@ -1,5 +1,4 @@
 #include "include/opl.h"
-#include "include/diag.h"
 #include "include/lang.h"
 #include "include/util.h"
 #include "include/iosupport.h"
@@ -621,7 +620,6 @@ int sbReadList(base_game_info_t **list, const char *prefix, const char *sub, int
     // TOTAL device-read failure (both dir scans failed to open AND no ul.cfg): keep the caller's
     // current list rather than blanking it. newlist is NULL here; nothing to publish or leak.
     if (cdRet < 0 && dvdRet < 0 && fd < 0) {
-        gDiag.isoScanPreserved++; // #120 diag: ISO list kept last-good on a failed read (the PS2-toggle no-op)
         free(newlist);
         return *gamecount; // *list / *gamecount / *fsize untouched -> last-good list stays on screen
     }
