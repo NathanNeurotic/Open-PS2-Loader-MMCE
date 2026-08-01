@@ -617,9 +617,9 @@ static int getKeyDelay(int id, int repeat)
 {
     int delay = paddelay[id - 1];
 
-    // if not in repeat, the delay is enlarged
+    // if not in repeat, the delay is enlarged. Reduced multiplier to improve first-step responsiveness.
     if (!repeat)
-        delay *= 3;
+        delay *= 2;
 
     return delay;
 }
