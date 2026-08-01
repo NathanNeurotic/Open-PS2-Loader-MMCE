@@ -1266,7 +1266,7 @@ static void drawAttributeImage(struct menu_list *menu, struct submenu_list *item
             configGetStr(config, attributeImage->cache->suffix, (const char **)&attributeImage->currentValue);
         }
         if (attributeImage->currentValue) {
-            if (thmGetGuiValue() == 0) {
+            if (thmGetGuiValue() == 0 || thmGetGuiValue() == nThemes + 1) {
                 GSTEXTURE *texture = thmGetTexture(thmAttributeTexId(attributeImage));
                 if (texture && texture->Mem)
                     rmDrawPixmap(texture, elem->posX, elem->posY, elem->aligned, elem->width, elem->height, elem->scaled, gDefaultCol, 0);
@@ -2859,7 +2859,7 @@ int thmSetGuiValue(int themeID, int reload)
 
             guiThemeID = themeID;
             return 1;
-        } else if (guiThemeID == 0)
+        } else if (guiThemeID == 0 || guiThemeID == nThemes + 1)
             thmSetColors(gTheme);
     }
     return 0;
