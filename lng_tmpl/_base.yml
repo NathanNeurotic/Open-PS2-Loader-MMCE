@@ -67,6 +67,54 @@ gui_strings:
   string: Device Settings
 - label: LAUNCH_PS2_DISC
   string: Launch PS2 Disc
+- label: GAME_SOURCES
+  string: Game Sources
+- label: INTERFACE_SETTINGS
+  string: Interface
+- label: DISPLAY_SETTINGS
+  string: Display
+- label: GAME_LAUNCHING
+  string: Game Launching
+- label: POPSTARTER
+  string: POPStarter
+- label: MENU_NETWORK
+  string: Network
+- label: MENU_CONTROLLER
+  string: Controller
+- label: MENU_AUDIO
+  string: Audio
+- label: SECURITY_SETTINGS
+  string: Security
+- label: ADVANCED_SETTINGS
+  string: Advanced
+- label: TOOLS
+  string: Tools
+- label: ARTWORK_SETTINGS
+  string: Artwork Settings
+- label: COLORS_SETTINGS
+  string: Colors
+- label: BDMA_SETTINGS
+  string: BDMA Settings
+- label: GAME_LIST_SETTINGS
+  string: Game List Settings
+- label: COMM_SETTINGS
+  string: Communication Settings
+- label: PATH_SETTINGS
+  string: Path Settings
+- label: NEUTRINO_DEFAULTS
+  string: Neutrino Defaults
+- label: ADVANCED_ARGUMENTS
+  string: Advanced Arguments
+- label: OSD_DEFAULTS
+  string: OSD Defaults
+- label: STORAGE_CACHE
+  string: Storage and Cache
+- label: PATH_PREFIXES
+  string: Path Prefixes
+- label: CONTROLLER_EMULATION
+  string: Controller Emulation
+- label: CONTROLLER_MACROS
+  string: Controller Macros
 - label: DISC_LAUNCH_ERR
   string: No PS2 disc in the drive.
 - label: MENU
@@ -640,6 +688,16 @@ gui_strings:
   string: Network (UDP) games can only boot via the Neutrino core. Check that neutrino.elf is present and the format is supported.
 - label: VCD_NOT_ON_NET
   string: 'PS1 (.VCD) games can''t be launched over the network device.'
+- label: VCD_USB_MODE_TITLE
+  string: USB VCD Mode
+- label: VCD_USB_MODE_QUESTION
+  string: fat32 or exFAT USB Mode?
+- label: VCD_USB_MODE_HINT
+  string: fat32 is recommended for non exFAT USB users.
+- label: VCD_USB_MODE_FAT32
+  string: fat32
+- label: VCD_USB_MODE_EXFAT
+  string: exFAT
 - label: MX4SIO_PADEMU_WARN
   string: MX4SIO and pad emulation share the SIO2 bus and the game may fail to boot.
 - label: PADMACROCONFIG

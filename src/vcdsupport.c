@@ -1129,6 +1129,40 @@ void vcdEnsureBdmaForLaunch(int source, int mode)
         guiWarning(_l(_STR_BDMA_ERR_IO), 6);
 }
 
+// Explicit USB mode application for the per-launch fat32/exFAT dialog (bdmLaunchVcd, USB devices).
+// The user JUST picked this driver, so the choice applies even when gBdmaApplyOnLaunch is off (that
+// setting only gates the AUTOMATIC equip). FAT32 is a real equip here: it removes the exFAT module
+// pair so POPSTARTER falls back to its built-in USB stack. The unmarked-manual-pair guard still
+// holds for BOTH choices -- a pair the user manages by hand (no marker file) is never deleted or
+// replaced as collateral; the exFAT pair reads FAT32 too, so leaving it in place still boots.
+// CARD PREP ONLY, same as vcdEnsureBdmaForLaunch: a failure toasts in passing, never blocks the handoff.
+void vcdApplyUsbModeForLaunch(int mode)
+{
+    char diag[160];
+
+    if (mode != VCD_BDMA_FAT32 && mode != VCD_BDMA_USBEXFAT)
+        return; // the USB dialog only offers these two
+    if (vcdReadBdmaMode() == mode)
+        return; // the picked driver is already on the card
+    if (vcdBdmaManualPairPresent()) {
+        LOG("[BDMA] unmarked manual pair on the card -- NOT applying the %s pick (Settings equip once to take over)\n",
+            vcdBdmaSuffix[mode]);
+        return;
+    }
+
+    int er = vcdEquipBdma(VCD_BDMA_SRC_USB, mode, diag, sizeof(diag));
+    if (er == 0)
+        return;
+
+    LOG("VCD USB-mode equip failed (%d: %s) -- launching as-is (card keeps its current driver pair)\n", er, diag);
+    if (er == -4)
+        guiWarning(_l(_STR_BDMA_ERR_SRC), 6);
+    else if (er == -2)
+        guiWarning(_l(_STR_BDMA_ERR_SPACE), 6);
+    else
+        guiWarning(_l(_STR_BDMA_ERR_IO), 6);
+}
+
 // ---- POPSTARTER memory-card externals -----------------------------------------------
 // POPSTARTER reads its external modules/icons from mc?:/POPSTARTER/ after its own IOP reset. Keep
 // the release copies directly beside the games in each device's POPS/ folder and install only files

@@ -240,6 +240,25 @@ enum UI_ITEMS {
     OSD_TVASPECT_VALUE,
     OSD_VMODE_VALUE,
 
+    VCDUSB_BTN_FAT32,
+    VCDUSB_BTN_EXFAT,
+
+    // Settings-layout restructure: sub-page buttons (chained dialogs, goto-reshow pattern)
+    UICFG_ARTWORK_BUTTON,
+    UICFG_COLORS_BUTTON,
+    LAUNCH_NEUTRINO_DEFAULTS_BUTTON,
+    LAUNCH_OSD_DEFAULTS_BUTTON,
+    VCD_BDMA_BUTTON,
+    VCD_LIST_BUTTON,
+    VCD_NET_BUTTON,
+    MMCE_COMM_BUTTON,
+    MMCE_PATH_BUTTON,
+    SECURITY_PARENTAL_BUTTON,
+    ADV_PREFIX_BUTTON,
+    ADV_STORAGE_BUTTON,
+    TOOLS_NET_UPDATE_BUTTON,
+    TOOLS_NBD_BUTTON,
+
 #ifdef PADEMU
     PADEMU_GLOBAL_BUTTON,
     PADCFG_PADEMU_SOURCE,
@@ -323,5 +342,21 @@ extern struct UIItem diaNeutrinoArgs[];
 extern struct UIItem diaDeviceConfig[];
 extern struct UIItem diaVcdConfig[];
 extern struct UIItem diaMmceConfig[];
+extern struct UIItem diaVcdUsbMode[];
+extern struct UIItem diaArtworkConfig[];
+extern struct UIItem diaColorsConfig[];
+extern struct UIItem diaDisplayConfig[];
+extern struct UIItem diaLaunchConfig[];
+extern struct UIItem diaNeutrinoDefaults[];
+extern struct UIItem diaBdmaConfig[];
+extern struct UIItem diaVcdListConfig[];
+extern struct UIItem diaPopsNetConfig[];
+extern struct UIItem diaMmceCommConfig[];
+extern struct UIItem diaMmcePathConfig[];
+extern struct UIItem diaSecurityConfig[];
+extern struct UIItem diaAdvancedConfig[];
+extern struct UIItem diaPathPrefixConfig[];
+extern struct UIItem diaStorageConfig[];
+extern struct UIItem diaToolsConfig[];
 
 #endif

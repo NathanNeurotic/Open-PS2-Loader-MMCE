@@ -123,6 +123,11 @@ int vcdReadBdmaMode(void);
 // launch proceeds (the VCD launch is a plain POPSTARTER.ELF + argv[0]-selector handoff; POPSTARTER
 // owns everything after the exec). See vcdsupport.c.
 void vcdEnsureBdmaForLaunch(int source, int mode);
+// Explicit per-launch USB mode pick (the fat32/exFAT dialog on USB VCD launches). Unlike
+// vcdEnsureBdmaForLaunch this HONOURS the just-made choice regardless of gBdmaApplyOnLaunch, and it
+// accepts VCD_BDMA_FAT32 (de-equip to POPSTARTER's built-in USB stack) as well as VCD_BDMA_USBEXFAT.
+// Same non-blocking contract: card prep only, a failed equip toasts in passing and the launch proceeds.
+void vcdApplyUsbModeForLaunch(int mode);
 
 // Install POPSTARTER's missing MC-side externals from the VCD device's direct POPS/ folder.
 // Existing card files always win. This copies only the SMB/utility IRX, .icn and icon.sys files;

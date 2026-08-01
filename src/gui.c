@@ -481,40 +481,41 @@ void guiShowNetCompatUpdateSingle(int id, item_list_t *support, config_set_t *co
 static int guiUpdater(int modified)
 {
     int showAutoStartLast;
-    int neutrinoVideoDef;
 
     if (modified) {
         diaGetInt(diaConfig, CFG_LASTPLAYED, &showAutoStartLast);
         diaSetVisible(diaConfig, CFG_LBL_AUTOSTARTLAST, showAutoStartLast);
         diaSetVisible(diaConfig, CFG_AUTOSTARTLAST, showAutoStartLast);
-
-        // The ":c" comp half is only ever emitted alongside a video mode (-gsm=v:c grammar) --
-        // grey it while the global Neutrino Video default is Off (same rule as the per-game rows).
-        diaGetInt(diaConfig, CFG_NEUTRINO_VIDEO, &neutrinoVideoDef);
-        diaSetEnabled(diaConfig, CFG_NEUTRINO_GSMCOMP, neutrinoVideoDef != 0);
     }
     return 0;
 }
 
-// VCD Settings live-updater: same BDMA-apply + POPSTARTER-Custom visibility logic that used to run
-// in guiUpdater, now bound to the diaVcdConfig dialog.
+// POPStarter page live-updater: reveal the free-text POPSTARTER.ELF Path field only when the
+// device picker is "Custom".
 static int guiVcdUpdater(int modified)
 {
-    int bdmaApply;
     int popsDev;
 
     if (modified) {
-        // Hide the manual BDMA Source/Mode pickers while "VCD BDMA Apply on Launch" is ON (it auto-equips).
-        diaGetInt(diaVcdConfig, CFG_BDMA_APPLY, &bdmaApply);
-        diaSetVisible(diaVcdConfig, CFG_LBL_BDMASOURCE, !bdmaApply);
-        diaSetVisible(diaVcdConfig, CFG_BDMASOURCE, !bdmaApply);
-        diaSetVisible(diaVcdConfig, CFG_LBL_BDMAMODE, !bdmaApply);
-        diaSetVisible(diaVcdConfig, CFG_BDMAMODE, !bdmaApply);
-
-        // Reveal the free-text POPSTARTER.ELF Path field only when the device picker is "Custom".
         diaGetInt(diaVcdConfig, CFG_POPSTARTER_DEVICE, &popsDev);
         diaSetVisible(diaVcdConfig, CFG_LBL_POPSTARTER_PATH, popsDev == POPS_DEV_CUSTOM);
         diaSetVisible(diaVcdConfig, CFG_POPSTARTER_PATH, popsDev == POPS_DEV_CUSTOM);
+    }
+    return 0;
+}
+
+// BDMA Settings live-updater: hide the manual BDMA Source/Mode pickers while "VCD BDMA Apply on
+// Launch" is ON (it auto-equips); re-reveal them live when toggled off.
+static int guiBdmaUpdater(int modified)
+{
+    int bdmaApply;
+
+    if (modified) {
+        diaGetInt(diaBdmaConfig, CFG_BDMA_APPLY, &bdmaApply);
+        diaSetVisible(diaBdmaConfig, CFG_LBL_BDMASOURCE, !bdmaApply);
+        diaSetVisible(diaBdmaConfig, CFG_BDMASOURCE, !bdmaApply);
+        diaSetVisible(diaBdmaConfig, CFG_LBL_BDMAMODE, !bdmaApply);
+        diaSetVisible(diaBdmaConfig, CFG_BDMAMODE, !bdmaApply);
     }
     return 0;
 }
@@ -556,88 +557,28 @@ int guiIoModeToDeviceType(int ioMode)
     return 0;
 }
 
+// Settings page (settings-layout restructure): the slim "Settings" category -- remember/auto-start
+// last played, folder navigation and Exit To. Everything else moved to the Game Launching,
+// Security, Controller, Advanced, POPStarter and MMCE pages.
 void guiShowConfig()
 {
-    diaSetInt(diaConfig, CFG_DEBUG, gEnableDebug);
-    diaSetInt(diaConfig, CFG_PS2LOGO, gPS2Logo);
-    diaSetString(diaConfig, CFG_EXITTO, gExitPath);
-    // Global default Loader Core: the core a game uses when its per-game selector is "Default".
-    // <OPL> = OPL's native ee-core; Neutrino = the external neutrino.elf. Indices 0/1 match the
-    // stored value (0=<OPL>, 1=Neutrino) and the first two per-game COMPAT_LOADER options.
-    const char *defaultCoreStrs[] = {"<OPL>", "Neutrino", NULL};
-    diaSetEnum(diaConfig, CFG_DEFAULT_CORE, defaultCoreStrs);
-    diaSetInt(diaConfig, CFG_DEFAULT_CORE, gDefaultCoreLoader);
-    // Neutrino lives at <root>:/neutrino/neutrino.elf on ANY device -- offer the common roots.
-    // MUST stay in sync with the roots[] table in sbResolveNeutrinoPath() (supportbase.c).
-    const char *neutrinoDevStrs[] = {_l(_STR_AUTO), "Memory Card", "USB", "MX4SIO", "MMCE", "HDD (exFAT)", "HDD (APA)", _l(_STR_GAMES_DEVICE), NULL}; // device TYPE holding /neutrino/neutrino.elf (NEUTRINO_DEV_*); "Game's Device" (NEUTRINO_DEV_GAME) appended last to match the enum tail
-    diaSetEnum(diaConfig, CFG_NEUTRINO_DEVICE, neutrinoDevStrs);
-    diaSetInt(diaConfig, CFG_NEUTRINO_DEVICE, gNeutrinoDevice);
-    // Global default Neutrino Video (-gsm) + comp half: same indices as the per-game picker
-    // (system.c gsmVideoTokens). static: literals only, and diaSetEnum stores the raw pointer.
-    static const char *neutrinoVideoDefStrs[] = {"Off", "240p", "480p", "1080i x1", "1080i x2", "1080i x3", NULL};
-    static const char *neutrinoGsmCompDefStrs[] = {"Off", "Type 1 (GSM/OPL)", "Type 2", "Type 3", NULL};
-    diaSetEnum(diaConfig, CFG_NEUTRINO_VIDEO, neutrinoVideoDefStrs);
-    diaSetInt(diaConfig, CFG_NEUTRINO_VIDEO, gNeutrinoVideoDefault);
-    diaSetEnum(diaConfig, CFG_NEUTRINO_GSMCOMP, neutrinoGsmCompDefStrs);
-    diaSetInt(diaConfig, CFG_NEUTRINO_GSMCOMP, gNeutrinoGsmCompDefault);
-    // IGR Path auto-resolves a built-in default when blank, so show a dim "Default" placeholder
-    // rather than "<not set>" -- the empty value (and thus the fallback) is kept. (VCD/POPSTARTER
-    // and BDMA settings moved to their own "VCD Settings" page -- see guiShowVcdConfig.)
+    // Exit To auto-resolves a built-in default when blank, so show a dim "Default" placeholder
+    // rather than "<not set>" -- the empty value (and thus the fallback) is kept.
     diaSetShowDefaultWhenEmpty(diaConfig, CFG_EXITTO, 1);
+    diaSetString(diaConfig, CFG_EXITTO, gExitPath);
 
-    diaSetInt(diaConfig, CFG_ENWRITEOP, gEnableWrite);
     diaSetInt(diaConfig, CFG_LASTPLAYED, gRememberLastPlayed);
     diaSetInt(diaConfig, CFG_FOLDERNAV, gEnableFolderNav);
-    diaSetInt(diaConfig, CFG_RUMBLE, gEnableRumble);
     diaSetInt(diaConfig, CFG_AUTOSTARTLAST, gAutoStartLastPlayed);
     diaSetVisible(diaConfig, CFG_AUTOSTARTLAST, gRememberLastPlayed);
     diaSetVisible(diaConfig, CFG_LBL_AUTOSTARTLAST, gRememberLastPlayed);
 
-    // Device prefix paths (moved from Device Settings to General Settings)
-    diaSetString(diaConfig, CFG_BDMPREFIX, gBDMPrefix);
-    diaSetString(diaConfig, CFG_ETHPREFIX, gETHPrefix);
-    diaSetString(diaConfig, CFG_MMCEPREFIX, gMMCEPrefix);
-
-    // Cache & Storage -- relocated here from Device Settings (same CFG ids + globals)
-    diaSetInt(diaConfig, CFG_HDDSPINDOWN, gHDDSpindown);
-    diaSetInt(diaConfig, CFG_HDDGAMELISTCACHE, gHDDGameListCache);
-    diaSetInt(diaConfig, CFG_BDMCACHE, bdmCacheSize);
-    diaSetInt(diaConfig, CFG_HDDCACHE, hddCacheSize);
-    diaSetInt(diaConfig, CFG_SMBCACHE, smbCacheSize);
-
-    guiUpdater(1); // apply the initial comp-half grey before the dialog is drawn
-
-    int ret;
-reshow_config:
-    ret = diaExecuteDialog(diaConfig, -1, 1, &guiUpdater);
-    if (ret == CFG_NEUTRINO_ARGS) {
-        // the "Neutrino Launch Args" button -> open the structured args sub-screen, then re-enter
-        guiShowNeutrinoArgsConfig(gNeutrinoArgs, sizeof(gNeutrinoArgs));
-        goto reshow_config;
-    }
+    int ret = diaExecuteDialog(diaConfig, -1, 1, &guiUpdater);
     if (ret) {
-        diaGetInt(diaConfig, CFG_DEBUG, &gEnableDebug);
-        diaGetInt(diaConfig, CFG_PS2LOGO, &gPS2Logo);
         diaGetString(diaConfig, CFG_EXITTO, gExitPath, sizeof(gExitPath));
-        diaGetInt(diaConfig, CFG_DEFAULT_CORE, &gDefaultCoreLoader);
-        diaGetInt(diaConfig, CFG_NEUTRINO_DEVICE, &gNeutrinoDevice);
-        diaGetInt(diaConfig, CFG_NEUTRINO_VIDEO, &gNeutrinoVideoDefault);
-        diaGetInt(diaConfig, CFG_NEUTRINO_GSMCOMP, &gNeutrinoGsmCompDefault);
-        diaGetInt(diaConfig, CFG_ENWRITEOP, &gEnableWrite);
         diaGetInt(diaConfig, CFG_LASTPLAYED, &gRememberLastPlayed);
         diaGetInt(diaConfig, CFG_FOLDERNAV, &gEnableFolderNav);
-        diaGetInt(diaConfig, CFG_RUMBLE, &gEnableRumble);
         diaGetInt(diaConfig, CFG_AUTOSTARTLAST, &gAutoStartLastPlayed);
-        diaGetString(diaConfig, CFG_BDMPREFIX, gBDMPrefix, sizeof(gBDMPrefix));
-        diaGetString(diaConfig, CFG_ETHPREFIX, gETHPrefix, sizeof(gETHPrefix));
-        diaGetString(diaConfig, CFG_MMCEPREFIX, gMMCEPrefix, sizeof(gMMCEPrefix));
-
-        // Cache & Storage -- relocated here from Device Settings (same CFG ids + globals)
-        diaGetInt(diaConfig, CFG_HDDSPINDOWN, &gHDDSpindown);
-        diaGetInt(diaConfig, CFG_HDDGAMELISTCACHE, &gHDDGameListCache);
-        diaGetInt(diaConfig, CFG_BDMCACHE, &bdmCacheSize);
-        diaGetInt(diaConfig, CFG_HDDCACHE, &hddCacheSize);
-        diaGetInt(diaConfig, CFG_SMBCACHE, &smbCacheSize);
 
         DisableCron = 1; // Disable Auto Start Last Played counter (we don't want to call it right after enable it on GUI)
 
@@ -646,9 +587,198 @@ reshow_config:
     }
 }
 
-// VCD Settings: PS1-via-POPSTARTER launch config (POPSTARTER.ELF device/path), BDMA exFAT-driver
-// equip, and VCD list display options. All relocated out of General Settings; CFG ids are shared with
-// the old General rows, so saved config values map through unchanged.
+// Game Launching page: launch-time behavior (PS2 logo, global default Loader Core) + the global
+// Neutrino and OSD defaults as chained sub-dialogs.
+void guiShowLaunchConfig(void)
+{
+    // Global default Loader Core: the core a game uses when its per-game selector is "Default".
+    // <OPL> = OPL's native ee-core; Neutrino = the external neutrino.elf. Indices 0/1 match the
+    // stored value (0=<OPL>, 1=Neutrino) and the first two per-game COMPAT_LOADER options.
+    const char *defaultCoreStrs[] = {"<OPL>", "Neutrino", NULL};
+    diaSetEnum(diaLaunchConfig, CFG_DEFAULT_CORE, defaultCoreStrs);
+    diaSetInt(diaLaunchConfig, CFG_DEFAULT_CORE, gDefaultCoreLoader);
+    diaSetInt(diaLaunchConfig, CFG_PS2LOGO, gPS2Logo);
+
+    int ret;
+reshow_launch:
+    ret = diaExecuteDialog(diaLaunchConfig, -1, 1, NULL);
+    if (ret == LAUNCH_NEUTRINO_DEFAULTS_BUTTON) {
+        guiShowNeutrinoDefaults();
+        goto reshow_launch;
+    }
+    if (ret == LAUNCH_OSD_DEFAULTS_BUTTON) {
+        guiGameShowOSDLanguageConfig(1);
+        goto reshow_launch;
+    }
+    if (ret) {
+        diaGetInt(diaLaunchConfig, CFG_PS2LOGO, &gPS2Logo);
+        diaGetInt(diaLaunchConfig, CFG_DEFAULT_CORE, &gDefaultCoreLoader);
+
+        applyConfig(-1, -1, 0);
+        menuReinitMainMenu();
+    }
+}
+
+// Neutrino Defaults live-updater: the ":c" comp half is only ever emitted alongside a video mode
+// (-gsm=v:c grammar) -- grey it while the global Neutrino Video default is Off (same rule as the
+// per-game rows).
+static int guiNeutrinoDefaultsUpdater(int modified)
+{
+    int neutrinoVideoDef;
+
+    if (modified) {
+        diaGetInt(diaNeutrinoDefaults, CFG_NEUTRINO_VIDEO, &neutrinoVideoDef);
+        diaSetEnabled(diaNeutrinoDefaults, CFG_NEUTRINO_GSMCOMP, neutrinoVideoDef != 0);
+    }
+    return 0;
+}
+
+// Game Launching -> Neutrino Defaults: the global Neutrino device/video/gsm-comp defaults + the
+// structured Advanced Arguments editor.
+void guiShowNeutrinoDefaults(void)
+{
+    // Neutrino lives at <root>:/neutrino/neutrino.elf on ANY device -- offer the common roots.
+    // MUST stay in sync with the roots[] table in sbResolveNeutrinoPath() (supportbase.c).
+    const char *neutrinoDevStrs[] = {_l(_STR_AUTO), "Memory Card", "USB", "MX4SIO", "MMCE", "HDD (exFAT)", "HDD (APA)", _l(_STR_GAMES_DEVICE), NULL}; // device TYPE holding /neutrino/neutrino.elf (NEUTRINO_DEV_*); "Game's Device" (NEUTRINO_DEV_GAME) appended last to match the enum tail
+    diaSetEnum(diaNeutrinoDefaults, CFG_NEUTRINO_DEVICE, neutrinoDevStrs);
+    diaSetInt(diaNeutrinoDefaults, CFG_NEUTRINO_DEVICE, gNeutrinoDevice);
+    // Global default Neutrino Video (-gsm) + comp half: same indices as the per-game picker
+    // (system.c gsmVideoTokens). static: literals only, and diaSetEnum stores the raw pointer.
+    static const char *neutrinoVideoDefStrs[] = {"Off", "240p", "480p", "1080i x1", "1080i x2", "1080i x3", NULL};
+    static const char *neutrinoGsmCompDefStrs[] = {"Off", "Type 1 (GSM/OPL)", "Type 2", "Type 3", NULL};
+    diaSetEnum(diaNeutrinoDefaults, CFG_NEUTRINO_VIDEO, neutrinoVideoDefStrs);
+    diaSetInt(diaNeutrinoDefaults, CFG_NEUTRINO_VIDEO, gNeutrinoVideoDefault);
+    diaSetEnum(diaNeutrinoDefaults, CFG_NEUTRINO_GSMCOMP, neutrinoGsmCompDefStrs);
+    diaSetInt(diaNeutrinoDefaults, CFG_NEUTRINO_GSMCOMP, gNeutrinoGsmCompDefault);
+    diaSetEnabled(diaNeutrinoDefaults, CFG_NEUTRINO_GSMCOMP, gNeutrinoVideoDefault != 0);
+
+    int ret;
+reshow_neutrino:
+    ret = diaExecuteDialog(diaNeutrinoDefaults, -1, 1, &guiNeutrinoDefaultsUpdater);
+    if (ret == CFG_NEUTRINO_ARGS) {
+        // the "Advanced Arguments" button -> open the structured args sub-screen, then re-enter
+        guiShowNeutrinoArgsConfig(gNeutrinoArgs, sizeof(gNeutrinoArgs));
+        goto reshow_neutrino;
+    }
+    if (ret) {
+        diaGetInt(diaNeutrinoDefaults, CFG_NEUTRINO_DEVICE, &gNeutrinoDevice);
+        diaGetInt(diaNeutrinoDefaults, CFG_NEUTRINO_VIDEO, &gNeutrinoVideoDefault);
+        diaGetInt(diaNeutrinoDefaults, CFG_NEUTRINO_GSMCOMP, &gNeutrinoGsmCompDefault);
+
+        applyConfig(-1, -1, 0);
+    }
+}
+
+// Security page: the write-operations gate + the Parental Lock password as a chained sub-dialog.
+void guiShowSecurityConfig(void)
+{
+    diaSetInt(diaSecurityConfig, CFG_ENWRITEOP, gEnableWrite);
+
+    int ret;
+reshow_security:
+    ret = diaExecuteDialog(diaSecurityConfig, -1, 1, NULL);
+    if (ret == SECURITY_PARENTAL_BUTTON) {
+        guiShowParentalLockConfig();
+        goto reshow_security;
+    }
+    if (ret) {
+        diaGetInt(diaSecurityConfig, CFG_ENWRITEOP, &gEnableWrite);
+
+        applyConfig(-1, -1, 0);
+        menuReinitMainMenu();
+    }
+}
+
+// Advanced page: debug display + path prefixes and storage/cache as chained sub-dialogs.
+void guiShowAdvancedConfig(void)
+{
+    diaSetInt(diaAdvancedConfig, CFG_DEBUG, gEnableDebug);
+
+    int ret;
+reshow_advanced:
+    ret = diaExecuteDialog(diaAdvancedConfig, -1, 1, NULL);
+    if (ret == ADV_PREFIX_BUTTON) {
+        guiShowPathPrefixConfig();
+        goto reshow_advanced;
+    }
+    if (ret == ADV_STORAGE_BUTTON) {
+        guiShowStorageConfig();
+        goto reshow_advanced;
+    }
+    if (ret) {
+        diaGetInt(diaAdvancedConfig, CFG_DEBUG, &gEnableDebug);
+
+        applyConfig(-1, -1, 0);
+        menuReinitMainMenu();
+    }
+}
+
+// Advanced -> Path Prefixes (BDM / Network library prefixes).
+void guiShowPathPrefixConfig(void)
+{
+    diaSetString(diaPathPrefixConfig, CFG_BDMPREFIX, gBDMPrefix);
+    diaSetString(diaPathPrefixConfig, CFG_ETHPREFIX, gETHPrefix);
+
+    int ret = diaExecuteDialog(diaPathPrefixConfig, -1, 1, NULL);
+    if (ret) {
+        diaGetString(diaPathPrefixConfig, CFG_BDMPREFIX, gBDMPrefix, sizeof(gBDMPrefix));
+        diaGetString(diaPathPrefixConfig, CFG_ETHPREFIX, gETHPrefix, sizeof(gETHPrefix));
+
+        applyConfig(-1, -1, 0);
+    }
+}
+
+// Advanced -> Storage and Cache (HDD spindown, HDD game-list cache, BDM/HDD/SMB cache sizes).
+void guiShowStorageConfig(void)
+{
+    diaSetInt(diaStorageConfig, CFG_HDDSPINDOWN, gHDDSpindown);
+    diaSetInt(diaStorageConfig, CFG_HDDGAMELISTCACHE, gHDDGameListCache);
+    diaSetInt(diaStorageConfig, CFG_BDMCACHE, bdmCacheSize);
+    diaSetInt(diaStorageConfig, CFG_HDDCACHE, hddCacheSize);
+    diaSetInt(diaStorageConfig, CFG_SMBCACHE, smbCacheSize);
+
+    int ret = diaExecuteDialog(diaStorageConfig, -1, 1, NULL);
+    if (ret) {
+        diaGetInt(diaStorageConfig, CFG_HDDSPINDOWN, &gHDDSpindown);
+        diaGetInt(diaStorageConfig, CFG_HDDGAMELISTCACHE, &gHDDGameListCache);
+        diaGetInt(diaStorageConfig, CFG_BDMCACHE, &bdmCacheSize);
+        diaGetInt(diaStorageConfig, CFG_HDDCACHE, &hddCacheSize);
+        diaGetInt(diaStorageConfig, CFG_SMBCACHE, &smbCacheSize);
+
+        applyConfig(-1, -1, 0);
+    }
+}
+
+// Tools page: one-shot actions that used to be top-level menu entries. No persistent state of its
+// own -- each button runs its tool, then the page re-opens.
+void guiShowToolsConfig(void)
+{
+    int ret;
+reshow_tools:
+    ret = diaExecuteDialog(diaToolsConfig, -1, 1, NULL);
+    if (ret == TOOLS_NET_UPDATE_BUTTON) {
+        guiShowNetCompatUpdate();
+        goto reshow_tools;
+    }
+    if (ret == TOOLS_NBD_BUTTON) {
+        handleLwnbdSrv();
+        goto reshow_tools;
+    }
+}
+
+// USB .VCD launches only: force the fat32/exFAT POPSTARTER driver pick EVERY launch -- the PS2
+// cannot detect the filesystem a USB stick is actually formatted with, so the user chooses per
+// launch. Returns the pressed button's id (VCDUSB_BTN_FAT32 / VCDUSB_BTN_EXFAT) or UIID_BTN_CANCEL.
+int guiShowVcdUsbMode(void)
+{
+    return diaExecuteDialog(diaVcdUsbMode, -1, 1, NULL);
+}
+
+// POPStarter page (settings-layout restructure, was VCD Settings): PS1-via-POPSTARTER launch
+// config (POPSTARTER.ELF device/path). The BDMA equip, VCD list display options and POPStarter
+// network settings are chained sub-dialogs (guiShowBdmaConfig / guiShowVcdListConfig /
+// guiShowPopsNetConfig). CFG ids are shared with the old rows, so saved config values map through
+// unchanged.
 void guiShowVcdConfig(void)
 {
     // POPSTARTER.ELF device TYPE (POPS_DEV_*). MUST stay in sync with vcdResolvePopstarter() (vcdsupport.c).
@@ -657,79 +787,70 @@ void guiShowVcdConfig(void)
     diaSetInt(diaVcdConfig, CFG_POPSTARTER_DEVICE, gPopstarterDevice);
     diaSetString(diaVcdConfig, CFG_POPSTARTER_PATH, gPopstarterPath);
     diaSetShowDefaultWhenEmpty(diaVcdConfig, CFG_POPSTARTER_PATH, 1);
-
-    // BDMA (BDMAssault exFAT driver) equip. MODE reflects what's ACTUALLY on the card (marker read),
-    // so the menu is honest even if POPSLoader or a prior session set it.
-    const char *bdmaSourceStrs[] = {_l(_STR_BDMA_SRC_USB), _l(_STR_BDMA_SRC_MX4SIO), _l(_STR_BDMA_SRC_MMCE), _l(_STR_BDMA_SRC_HDD), NULL};
-    const char *bdmaModeStrs[] = {_l(_STR_BDMA_MODE_FAT32), _l(_STR_BDMA_MODE_USBEXFAT), _l(_STR_BDMA_MODE_MX4SIO), _l(_STR_BDMA_MODE_MMCE), _l(_STR_BDMA_MODE_ATA), NULL};
-    gBdmaMode = vcdReadBdmaMode();
-    diaSetEnum(diaVcdConfig, CFG_BDMASOURCE, bdmaSourceStrs);
-    diaSetEnum(diaVcdConfig, CFG_BDMAMODE, bdmaModeStrs);
-    diaSetInt(diaVcdConfig, CFG_BDMASOURCE, gBdmaSource);
-    diaSetInt(diaVcdConfig, CFG_BDMAMODE, gBdmaMode);
-    diaSetInt(diaVcdConfig, CFG_BDMA_APPLY, gBdmaApplyOnLaunch);
-    diaSetInt(diaVcdConfig, CFG_VCD_HIDE_GAMEID, gVcdHideGameId);
-    diaSetInt(diaVcdConfig, CFG_VCD_FIRST_DISC_ONLY, gVcdFirstDiscOnly);
-    // "VCD BDMA Apply on Launch" ON auto-equips, so hide the manual SOURCE/MODE pickers (guiVcdUpdater
-    // re-reveals them live when toggled off). POPSTARTER Path is the Custom-only escape hatch.
-    diaSetVisible(diaVcdConfig, CFG_LBL_BDMASOURCE, !gBdmaApplyOnLaunch);
-    diaSetVisible(diaVcdConfig, CFG_BDMASOURCE, !gBdmaApplyOnLaunch);
-    diaSetVisible(diaVcdConfig, CFG_LBL_BDMAMODE, !gBdmaApplyOnLaunch);
-    diaSetVisible(diaVcdConfig, CFG_BDMAMODE, !gBdmaApplyOnLaunch);
+    // POPSTARTER Path is the Custom-only escape hatch (guiVcdUpdater re-reveals it live).
     diaSetVisible(diaVcdConfig, CFG_LBL_POPSTARTER_PATH, gPopstarterDevice == POPS_DEV_CUSTOM);
     diaSetVisible(diaVcdConfig, CFG_POPSTARTER_PATH, gPopstarterDevice == POPS_DEV_CUSTOM);
 
-    int rebuildVcdLists = 0;
-    int ret = diaExecuteDialog(diaVcdConfig, -1, 1, &guiVcdUpdater);
+    int ret;
+reshow_vcd:
+    ret = diaExecuteDialog(diaVcdConfig, -1, 1, &guiVcdUpdater);
+    if (ret == VCD_BDMA_BUTTON) {
+        guiShowBdmaConfig();
+        goto reshow_vcd;
+    }
+    if (ret == VCD_LIST_BUTTON) {
+        guiShowVcdListConfig();
+        goto reshow_vcd;
+    }
+    if (ret == VCD_NET_BUTTON) {
+        guiShowPopsNetConfig();
+        goto reshow_vcd;
+    }
     if (ret) {
         diaGetInt(diaVcdConfig, CFG_POPSTARTER_DEVICE, &gPopstarterDevice);
         {
             // The dialog field is char[32]; only adopt the typed value if it actually changed, so
-            // opening+saving VCD Settings never truncates a longer path stored via the cfg.
+            // opening+saving this page never truncates a longer path stored via the cfg.
             char tmpPop[sizeof(gPopstarterPath)];
             diaGetString(diaVcdConfig, CFG_POPSTARTER_PATH, tmpPop, sizeof(tmpPop));
             if (strncmp(tmpPop, gPopstarterPath, 31) != 0)
                 snprintf(gPopstarterPath, sizeof(gPopstarterPath), "%s", tmpPop);
         }
-        diaGetInt(diaVcdConfig, CFG_BDMA_APPLY, &gBdmaApplyOnLaunch);
-        {
-            // #195: hide-gameid is NO LONGER purely cosmetic -- it is now a SORT KEY. The menu sort
-            // (submenuSort) orders by the DISPLAYED title, i.e. past the hidden prefix, so a change must
-            // re-sort every VCD-capable page. vcdMarkAllDirty() + rebuildVcdLists forces that menu rebuild
-            // and its submenuSort re-runs against the new vcdDisplayName key -- WITHOUT re-reading any
-            // device. Do NOT invalidate the HDD VCD cache here (unlike first-disc-only below): this toggle
-            // changes only the DISPLAY ORDER, not the list CONTENTS, and submenuSort reorders the cached
-            // rows in place. hddVcdInvalidateCache() would force an unnecessary full re-walk of every
-            // __.POPS partition (pfs1: remount) plus a transient empty HDD VCD page on every flip (audit
-            // 2026-07-17 of the CodeRabbit #200 fix -- my "sorted with the old key" note was true but
-            // irrelevant, the menu sort fixes the order regardless of the backing array).
-            int previousHideGameId = gVcdHideGameId;
-            diaGetInt(diaVcdConfig, CFG_VCD_HIDE_GAMEID, &gVcdHideGameId);
-            if (gVcdHideGameId != previousHideGameId) {
-                vcdMarkAllDirty();
-                rebuildVcdLists = 1;
-            }
-        }
-        {
-            // #118: first-disc-only changes the VCD list CONTENTS (discs hidden/shown), so unlike the
-            // cosmetic hide-gameid it must rebuild every VCD-capable device page when toggled. Device
-            // lists only -- Favourites are intentionally left unfiltered (an explicit user pick).
-            int previousFirstDiscOnly = gVcdFirstDiscOnly;
-            diaGetInt(diaVcdConfig, CFG_VCD_FIRST_DISC_ONLY, &gVcdFirstDiscOnly);
-            if (gVcdFirstDiscOnly != previousFirstDiscOnly) {
-                vcdMarkAllDirty();
-                hddVcdInvalidateCache(); // scan-time filter changed -> the cached HDD VCD list is stale
-                rebuildVcdLists = 1;
-            }
-        }
+        applyConfig(-1, -1, 0);
+        menuReinitMainMenu();
+    }
+}
+
+// POPStarter -> BDMA Settings (BDMAssault exFAT-driver equip). MODE reflects what's ACTUALLY on the
+// card (marker read), so the page is honest even if POPSLoader or a prior session set it.
+void guiShowBdmaConfig(void)
+{
+    const char *bdmaSourceStrs[] = {_l(_STR_BDMA_SRC_USB), _l(_STR_BDMA_SRC_MX4SIO), _l(_STR_BDMA_SRC_MMCE), _l(_STR_BDMA_SRC_HDD), NULL};
+    const char *bdmaModeStrs[] = {_l(_STR_BDMA_MODE_FAT32), _l(_STR_BDMA_MODE_USBEXFAT), _l(_STR_BDMA_MODE_MX4SIO), _l(_STR_BDMA_MODE_MMCE), _l(_STR_BDMA_MODE_ATA), NULL};
+    gBdmaMode = vcdReadBdmaMode();
+    diaSetEnum(diaBdmaConfig, CFG_BDMASOURCE, bdmaSourceStrs);
+    diaSetEnum(diaBdmaConfig, CFG_BDMAMODE, bdmaModeStrs);
+    diaSetInt(diaBdmaConfig, CFG_BDMASOURCE, gBdmaSource);
+    diaSetInt(diaBdmaConfig, CFG_BDMAMODE, gBdmaMode);
+    diaSetInt(diaBdmaConfig, CFG_BDMA_APPLY, gBdmaApplyOnLaunch);
+    // "VCD BDMA Apply on Launch" ON auto-equips, so hide the manual SOURCE/MODE pickers
+    // (guiBdmaUpdater re-reveals them live when toggled off).
+    diaSetVisible(diaBdmaConfig, CFG_LBL_BDMASOURCE, !gBdmaApplyOnLaunch);
+    diaSetVisible(diaBdmaConfig, CFG_BDMASOURCE, !gBdmaApplyOnLaunch);
+    diaSetVisible(diaBdmaConfig, CFG_LBL_BDMAMODE, !gBdmaApplyOnLaunch);
+    diaSetVisible(diaBdmaConfig, CFG_BDMAMODE, !gBdmaApplyOnLaunch);
+
+    int ret = diaExecuteDialog(diaBdmaConfig, -1, 1, &guiBdmaUpdater);
+    if (ret) {
+        diaGetInt(diaBdmaConfig, CFG_BDMA_APPLY, &gBdmaApplyOnLaunch);
         {
             // Equip BDMA modules only when SOURCE or MODE actually changed (the equip copies files to
             // the memory card). vcdEquipBdma is free-space-gated + truncation-safe, so a failure never
             // corrupts the card; report it and resync MODE to what's really equipped.
             int oldSrc = gBdmaSource, oldMode = gBdmaMode; // baselines (MODE = card's actual state)
             int newSrc = oldSrc, newMode = oldMode;
-            diaGetInt(diaVcdConfig, CFG_BDMASOURCE, &newSrc);
-            diaGetInt(diaVcdConfig, CFG_BDMAMODE, &newMode);
+            diaGetInt(diaBdmaConfig, CFG_BDMASOURCE, &newSrc);
+            diaGetInt(diaBdmaConfig, CFG_BDMAMODE, &newMode);
             // Re-equip on any MODE change, and on a SOURCE change only when MODE installs modules. FAT32
             // ignores the source, so a SOURCE-only move while already FAT32 must NOT re-run the pointless work.
             if (newMode != oldMode || (newMode != VCD_BDMA_FAT32 && newSrc != oldSrc)) {
@@ -748,6 +869,49 @@ void guiShowVcdConfig(void)
             gBdmaSource = newSrc; // remember the source preference regardless of equip outcome
         }
         applyConfig(-1, -1, 0);
+    }
+}
+
+// POPStarter -> Game List Settings (VCD list display options).
+void guiShowVcdListConfig(void)
+{
+    diaSetInt(diaVcdListConfig, CFG_VCD_HIDE_GAMEID, gVcdHideGameId);
+    diaSetInt(diaVcdListConfig, CFG_VCD_FIRST_DISC_ONLY, gVcdFirstDiscOnly);
+
+    int rebuildVcdLists = 0;
+    int ret = diaExecuteDialog(diaVcdListConfig, -1, 1, NULL);
+    if (ret) {
+        {
+            // #195: hide-gameid is NO LONGER purely cosmetic -- it is now a SORT KEY. The menu sort
+            // (submenuSort) orders by the DISPLAYED title, i.e. past the hidden prefix, so a change must
+            // re-sort every VCD-capable page. vcdMarkAllDirty() + rebuildVcdLists forces that menu rebuild
+            // and its submenuSort re-runs against the new vcdDisplayName key -- WITHOUT re-reading any
+            // device. Do NOT invalidate the HDD VCD cache here (unlike first-disc-only below): this toggle
+            // changes only the DISPLAY ORDER, not the list CONTENTS, and submenuSort reorders the cached
+            // rows in place. hddVcdInvalidateCache() would force an unnecessary full re-walk of every
+            // __.POPS partition (pfs1: remount) plus a transient empty HDD VCD page on every flip (audit
+            // 2026-07-17 of the CodeRabbit #200 fix -- my "sorted with the old key" note was true but
+            // irrelevant, the menu sort fixes the order regardless of the backing array).
+            int previousHideGameId = gVcdHideGameId;
+            diaGetInt(diaVcdListConfig, CFG_VCD_HIDE_GAMEID, &gVcdHideGameId);
+            if (gVcdHideGameId != previousHideGameId) {
+                vcdMarkAllDirty();
+                rebuildVcdLists = 1;
+            }
+        }
+        {
+            // #118: first-disc-only changes the VCD list CONTENTS (discs hidden/shown), so unlike the
+            // cosmetic hide-gameid it must rebuild every VCD-capable device page when toggled. Device
+            // lists only -- Favourites are intentionally left unfiltered (an explicit user pick).
+            int previousFirstDiscOnly = gVcdFirstDiscOnly;
+            diaGetInt(diaVcdListConfig, CFG_VCD_FIRST_DISC_ONLY, &gVcdFirstDiscOnly);
+            if (gVcdFirstDiscOnly != previousFirstDiscOnly) {
+                vcdMarkAllDirty();
+                hddVcdInvalidateCache(); // scan-time filter changed -> the cached HDD VCD list is stale
+                rebuildVcdLists = 1;
+            }
+        }
+        applyConfig(-1, -1, 0);
         menuReinitMainMenu();
         // Queue after applyConfig/menu reinit so the IO worker cannot rebuild a submenu concurrently
         // with their support/menu bookkeeping on the GUI thread.
@@ -756,13 +920,12 @@ void guiShowVcdConfig(void)
     }
 }
 
-// MMCE Settings: SD2PSX / MemCard PRO2 tuning (memory-card slot, IGR slot, GameID push, SIO2 ack-wait
-// pacing, alarm usage). Relocated out of Device Settings; CFG ids shared with the old Device rows.
+// MMCE page (settings-layout restructure, was MMCE Settings): SD2PSX / MemCard PRO2 basics (memory-
+// card slot, IGR slot, GameID push). Communication tuning and the path prefix are chained
+// sub-dialogs; CFG ids shared with the old rows.
 void guiShowMmceConfig(void)
 {
     const char *deviceSlots[] = {"0", "1", _l(_STR_AUTO), NULL};
-    const char *deviceAckWaitCycles[] = {"0", "1", "2", "3", "4", "5", NULL};
-    const char *deviceOnOff[] = {"OFF", "ON", NULL};
     const char *deviceIGRSlots[] = {"NONE", "0", "1", "BOTH", NULL};
 
     diaSetEnum(diaMmceConfig, CFG_MMCESLOT, deviceSlots);
@@ -770,89 +933,80 @@ void guiShowMmceConfig(void)
     diaSetEnum(diaMmceConfig, CFG_MMCEIGRSLOT, deviceIGRSlots);
     diaSetInt(diaMmceConfig, CFG_MMCEIGRSLOT, gMMCEIGRSlot);
     diaSetInt(diaMmceConfig, CFG_MMCEGAMEID, gMMCEEnableGameID);
-    diaSetEnum(diaMmceConfig, CFG_MMCE_WAIT_CYCLES, deviceAckWaitCycles);
-    diaSetInt(diaMmceConfig, CFG_MMCE_WAIT_CYCLES, gMMCEAckWaitCycles);
-    diaSetEnum(diaMmceConfig, CFG_MMCE_USE_ALARMS, deviceOnOff);
-    diaSetInt(diaMmceConfig, CFG_MMCE_USE_ALARMS, gMMCEUseAlarms);
 
-    int ret = diaExecuteDialog(diaMmceConfig, -1, 1, NULL);
+    int ret;
+reshow_mmce:
+    ret = diaExecuteDialog(diaMmceConfig, -1, 1, NULL);
+    if (ret == MMCE_COMM_BUTTON) {
+        guiShowMmceCommConfig();
+        goto reshow_mmce;
+    }
+    if (ret == MMCE_PATH_BUTTON) {
+        guiShowMmcePathConfig();
+        goto reshow_mmce;
+    }
     if (ret) {
         diaGetInt(diaMmceConfig, CFG_MMCESLOT, &gMMCESlot);
         diaGetInt(diaMmceConfig, CFG_MMCEIGRSLOT, &gMMCEIGRSlot);
         diaGetInt(diaMmceConfig, CFG_MMCEGAMEID, &gMMCEEnableGameID);
-        diaGetInt(diaMmceConfig, CFG_MMCE_WAIT_CYCLES, &gMMCEAckWaitCycles);
-        diaGetInt(diaMmceConfig, CFG_MMCE_USE_ALARMS, &gMMCEUseAlarms);
         applyConfig(-1, -1, 0);
         menuReinitMainMenu();
     }
 }
 
-static int curTheme = -1;
+// MMCE -> Communication Settings (SIO2 ack-wait pacing, alarm usage).
+void guiShowMmceCommConfig(void)
+{
+    const char *deviceAckWaitCycles[] = {"0", "1", "2", "3", "4", "5", NULL};
+    const char *deviceOnOff[] = {"OFF", "ON", NULL};
 
-static int guiUIUpdater(int modified)
+    diaSetEnum(diaMmceCommConfig, CFG_MMCE_WAIT_CYCLES, deviceAckWaitCycles);
+    diaSetInt(diaMmceCommConfig, CFG_MMCE_WAIT_CYCLES, gMMCEAckWaitCycles);
+    diaSetEnum(diaMmceCommConfig, CFG_MMCE_USE_ALARMS, deviceOnOff);
+    diaSetInt(diaMmceCommConfig, CFG_MMCE_USE_ALARMS, gMMCEUseAlarms);
+
+    int ret = diaExecuteDialog(diaMmceCommConfig, -1, 1, NULL);
+    if (ret) {
+        diaGetInt(diaMmceCommConfig, CFG_MMCE_WAIT_CYCLES, &gMMCEAckWaitCycles);
+        diaGetInt(diaMmceCommConfig, CFG_MMCE_USE_ALARMS, &gMMCEUseAlarms);
+        applyConfig(-1, -1, 0);
+        menuReinitMainMenu();
+    }
+}
+
+// MMCE -> Path Settings (MMCE library prefix).
+void guiShowMmcePathConfig(void)
+{
+    diaSetString(diaMmcePathConfig, CFG_MMCEPREFIX, gMMCEPrefix);
+
+    int ret = diaExecuteDialog(diaMmcePathConfig, -1, 1, NULL);
+    if (ret) {
+        diaGetString(diaMmcePathConfig, CFG_MMCEPREFIX, gMMCEPrefix, sizeof(gMMCEPrefix));
+        applyConfig(-1, -1, 0);
+        menuReinitMainMenu();
+    }
+}
+
+// Display page live-updater: the geometry/aspect rows apply live so the user sees the change as
+// they adjust it (moved out of the old guiUIUpdater).
+static int guiDisplayUpdater(int modified)
 {
     if (modified) {
         int temp, x, y;
-        diaGetInt(diaUIConfig, UICFG_THEME, &temp);
-        if (temp != curTheme) {
-            curTheme = temp;
-            if (temp == 0) {
-                // Display the default theme's colours.
-                diaSetItemType(diaUIConfig, UICFG_BGCOL, UI_COLOUR); // Must be correctly set before doing the diaS/GetColor !!
-                diaSetItemType(diaUIConfig, UICFG_UICOL, UI_COLOUR);
-                diaSetItemType(diaUIConfig, UICFG_TXTCOL, UI_COLOUR);
-                diaSetItemType(diaUIConfig, UICFG_SELCOL, UI_COLOUR);
-                diaSetItemType(diaUIConfig, UICFG_PLASCOL, UI_COLOUR);
-                diaSetColor(diaUIConfig, UICFG_BGCOL, gDefaultBgColor);
-                diaSetColor(diaUIConfig, UICFG_UICOL, gDefaultUITextColor);
-                diaSetColor(diaUIConfig, UICFG_TXTCOL, gDefaultTextColor);
-                diaSetColor(diaUIConfig, UICFG_SELCOL, gDefaultSelTextColor);
-                diaSetColor(diaUIConfig, UICFG_PLASCOL, gDefaultPlasBlendColor);
-            } else if (temp == thmGetGuiValue()) {
-                // Display the current theme's colours.
-                diaSetItemType(diaUIConfig, UICFG_BGCOL, UI_COLOUR);
-                diaSetItemType(diaUIConfig, UICFG_UICOL, UI_COLOUR);
-                diaSetItemType(diaUIConfig, UICFG_TXTCOL, UI_COLOUR);
-                diaSetItemType(diaUIConfig, UICFG_SELCOL, UI_COLOUR);
-                diaSetItemType(diaUIConfig, UICFG_PLASCOL, UI_COLOUR);
-                diaSetColor(diaUIConfig, UICFG_BGCOL, gTheme->bgColor);
-                diaSetColor(diaUIConfig, UICFG_PLASCOL, gTheme->plasBlendColor); // raw uchar[3] like bgColor -- NOT the U64 form
-                diaSetU64Color(diaUIConfig, UICFG_UICOL, gTheme->uiTextColor);
-                diaSetU64Color(diaUIConfig, UICFG_TXTCOL, gTheme->textColor);
-                diaSetU64Color(diaUIConfig, UICFG_SELCOL, gTheme->selTextColor);
-            } else {
-                // When another theme is highlighted in the list, its colours are not known. Don't show any colours.
-                diaSetItemType(diaUIConfig, UICFG_BGCOL, UI_SPACER);
-                diaSetItemType(diaUIConfig, UICFG_UICOL, UI_SPACER);
-                diaSetItemType(diaUIConfig, UICFG_TXTCOL, UI_SPACER);
-                diaSetItemType(diaUIConfig, UICFG_SELCOL, UI_SPACER);
-                diaSetItemType(diaUIConfig, UICFG_PLASCOL, UI_SPACER);
-            }
-
-            // The user cannot adjust the current theme's colours.
-            temp = !temp;
-            diaSetEnabled(diaUIConfig, UICFG_BGCOL, temp);
-            diaSetEnabled(diaUIConfig, UICFG_UICOL, temp);
-            diaSetEnabled(diaUIConfig, UICFG_TXTCOL, temp);
-            diaSetEnabled(diaUIConfig, UICFG_SELCOL, temp);
-            diaSetEnabled(diaUIConfig, UICFG_PLASCOL, temp);
-            diaSetEnabled(diaUIConfig, UICFG_RESETCOL, temp);
-        }
-
-        diaGetInt(diaUIConfig, UICFG_XOFF, &x);
-        diaGetInt(diaUIConfig, UICFG_YOFF, &y);
+        diaGetInt(diaDisplayConfig, UICFG_XOFF, &x);
+        diaGetInt(diaDisplayConfig, UICFG_YOFF, &y);
         if ((x != gXOff) || (y != gYOff)) {
             gXOff = x;
             gYOff = y;
             rmSetDisplayOffset(x, y);
         }
-        diaGetInt(diaUIConfig, UICFG_OVERSCAN, &temp);
+        diaGetInt(diaDisplayConfig, UICFG_OVERSCAN, &temp);
         if (temp != gOverscan) {
             gOverscan = temp;
             rmSetOverscan(gOverscan);
             guiUpdateScreenScale();
         }
-        diaGetInt(diaUIConfig, UICFG_WIDESCREEN, &temp);
+        diaGetInt(diaDisplayConfig, UICFG_WIDESCREEN, &temp);
         if (temp != gWideScreen) {
             gWideScreen = temp;
             rmSetAspectRatio((gWideScreen == 0) ? RM_ARATIO_4_3 : RM_ARATIO_16_9);
@@ -910,45 +1064,28 @@ static void guiFreeNameList(const char **list)
     free((void *)list);
 }
 
+// Interface page (settings-layout restructure, was Display Settings): theme, language and game-list
+// behavior. Artwork, Coverflow and Colors are chained sub-dialogs; the video/geometry/GameID-barcode
+// rows moved to the Display page (guiShowDisplayConfig).
 void guiShowUIConfig(void)
 {
     int themeID = -1, langID = -1;
-    curTheme = -1;
     showCfgPopup = 0;
     guiResetNotifications();
 
     const char **themeNamesSnap = NULL;
     const char **langNamesSnap = NULL;
 
-    // clang-format off
-    const char *vmodeNames[] = {_l(_STR_AUTO)
-        , "PAL 640x512i @50Hz 24bit"
-        , "NTSC 640x448i @60Hz 24bit"
-        , "EDTV 640x448p @60Hz 24bit"
-        , "EDTV 640x512p @50Hz 24bit"
-        , "VGA 640x480p @60Hz 24bit"
-        , "PAL 704x576i @50Hz 24bit (HIRES)"
-        , "NTSC 704x480i @60Hz 24bit (HIRES)"
-        , "EDTV 704x480p @60Hz 24bit (HIRES)"
-        , "EDTV 704x576p @50Hz 24bit (HIRES)"
-        , "HDTV 1280x720p @60Hz 16bit (HIRES)"
-        , "HDTV 1920x1080i @60Hz 16bit (HIRES)"
-        , "PAL 640x256p @50Hz 24bit"
-        , "NTSC 640x224p @60Hz 24bit"
-        , NULL};
-    // clang-format on
-    int previousVMode;
     int previousTheme;
 
-reselect_video_mode:
-    previousVMode = gVMode;
+reshow_ui:
     previousTheme = thmGetGuiValue();
     // Snapshot the theme/language name lists into dialog-owned copies: diaSetEnum stores raw
     // pointers, and BOTH the outer arrays (thmRebuildGuiNames/lngRebuildLangNames free+realloc)
     // AND the theme name strings (thmReinit frees them on device removal) are rebuilt on the IO
     // worker when a deferred device update lands. Dialog frames render OUTSIDE guiStartFrame's
     // lock, so a device event draining mid-dialog dereferenced freed memory. Re-snapshot on every
-    // reselect pass (applyConfig below can legitimately change the lists); on OOM fall back to
+    // reshow pass (applyConfig below can legitimately change the lists); on OOM fall back to
     // the live list -- the pre-existing narrow race, not a new failure mode.
     guiFreeNameList(themeNamesSnap);
     guiFreeNameList(langNamesSnap);
@@ -958,27 +1095,30 @@ reselect_video_mode:
     guiUnlock();
     diaSetEnum(diaUIConfig, UICFG_THEME, themeNamesSnap != NULL ? themeNamesSnap : (const char **)thmGetGuiList());
     diaSetEnum(diaUIConfig, UICFG_LANG, langNamesSnap != NULL ? langNamesSnap : (const char **)lngGetGuiList());
-    diaSetEnum(diaUIConfig, UICFG_VMODE, vmodeNames);
     diaSetInt(diaUIConfig, UICFG_THEME, thmGetGuiValue());
     diaSetInt(diaUIConfig, UICFG_LANG, lngGetGuiValue());
     diaSetInt(diaUIConfig, UICFG_AUTOSORT, gAutosort);
     diaSetInt(diaUIConfig, UICFG_AUTOREFRESH, gAutoRefresh);
     diaSetInt(diaUIConfig, UICFG_NOTIFICATIONS, gEnableNotifications);
-    diaSetInt(diaUIConfig, UICFG_COVERART, gEnableArt);
-    diaSetInt(diaUIConfig, UICFG_ENABLE_ART_TAR, gEnableArtTar);
-    diaSetInt(diaUIConfig, UICFG_WIDESCREEN, gWideScreen);
-    diaSetInt(diaUIConfig, CFG_APPLYGAMEID, gApplyGameID); // RetroGEM/Pixel FX GameID barcode (moved from Device Settings)
-    diaSetInt(diaUIConfig, UICFG_VMODE, gVMode);
-    diaSetInt(diaUIConfig, UICFG_XOFF, gXOff);
-    diaSetInt(diaUIConfig, UICFG_YOFF, gYOff);
-    diaSetInt(diaUIConfig, UICFG_OVERSCAN, gOverscan);
     diaSetVisible(diaUIConfig, UICFG_COVERFLOW_BUTTON, gTheme->coverflow != NULL);
     const char *gameViewNames[] = {"Both", "ISO", "VCD", NULL};
     diaSetEnum(diaUIConfig, UICFG_GAMEVIEW, gameViewNames);
     diaSetInt(diaUIConfig, UICFG_GAMEVIEW, gDefaultGameView);
-    guiUIUpdater(1);
 
-    int ret = diaExecuteDialog(diaUIConfig, -1, 1, guiUIUpdater);
+    int ret = diaExecuteDialog(diaUIConfig, -1, 1, NULL);
+
+    if (ret == UICFG_ARTWORK_BUTTON) {
+        guiShowArtworkConfig();
+        goto reshow_ui;
+    }
+    if (ret == UICFG_COVERFLOW_BUTTON) {
+        guiShowCoverflowConfig();
+        goto reshow_ui;
+    }
+    if (ret == UICFG_COLORS_BUTTON) {
+        guiShowColorsConfig();
+        goto reshow_ui;
+    }
 
     // Play out the confirm bump the dialog just armed, before applyConfig() below tears down and
     // rebuilds the GS (rmSetMode), reloads the theme and its textures, and holds guiLock over a
@@ -986,49 +1126,21 @@ reselect_video_mode:
     // (#172, "really intense ... after changing the resolution"). Deliberately HERE and not at the top
     // of applyConfig(): applyConfig is ALSO reached off the GUI thread, from _loadConfig() on the IO
     // worker (opl.c: guiHandleDeferedIO with IO_CUSTOM_SIMPLEACTION), and every libpad call in pad.c
-    // is documented GUI-thread-only. This one site dominates BOTH applyConfig calls below, including
-    // the video-mode revert on the reselect path.
+    // is documented GUI-thread-only.
     padRumbleFlush();
 
     if (ret) {
         diaGetInt(diaUIConfig, UICFG_LANG, &langID);
         diaGetInt(diaUIConfig, UICFG_THEME, &themeID);
-        if (themeID == 0) {
-            diaGetColor(diaUIConfig, UICFG_BGCOL, gDefaultBgColor);
-            diaGetColor(diaUIConfig, UICFG_UICOL, gDefaultUITextColor);
-            diaGetColor(diaUIConfig, UICFG_TXTCOL, gDefaultTextColor);
-            diaGetColor(diaUIConfig, UICFG_SELCOL, gDefaultSelTextColor);
-            diaGetColor(diaUIConfig, UICFG_PLASCOL, gDefaultPlasBlendColor);
-        }
         diaGetInt(diaUIConfig, UICFG_AUTOSORT, &gAutosort);
         diaGetInt(diaUIConfig, UICFG_AUTOREFRESH, &gAutoRefresh);
         diaGetInt(diaUIConfig, UICFG_NOTIFICATIONS, &gEnableNotifications);
-        diaGetInt(diaUIConfig, UICFG_COVERART, &gEnableArt);
-        {
-            // Re-arm the .tar probe when the toggle actually flips. tarFind's "no archive anywhere"
-            // latch is write-once and process-wide, and NOTHING was clearing it (tarInvalidate had no
-            // callers at all) -- so a user who turned the loader on after boot kept getting nothing
-            // until a reboot, which looks exactly like "the toggle does nothing".
-            int previousArtTar = gEnableArtTar;
-            diaGetInt(diaUIConfig, UICFG_ENABLE_ART_TAR, &gEnableArtTar);
-            if (gEnableArtTar != previousArtTar)
-                tarInvalidate(TAR_KIND_ART);
-        }
-        diaGetInt(diaUIConfig, UICFG_WIDESCREEN, &gWideScreen);
-        diaGetInt(diaUIConfig, CFG_APPLYGAMEID, &gApplyGameID);
-        diaGetInt(diaUIConfig, UICFG_VMODE, &gVMode);
-        diaGetInt(diaUIConfig, UICFG_XOFF, &gXOff);
-        diaGetInt(diaUIConfig, UICFG_YOFF, &gYOff);
-        diaGetInt(diaUIConfig, UICFG_OVERSCAN, &gOverscan);
         int previousGameView = gDefaultGameView;
         diaGetInt(diaUIConfig, UICFG_GAMEVIEW, &gDefaultGameView);
         int gameViewChanged = gDefaultGameView != previousGameView;
         if (gameViewChanged) {
             vcdMarkAllDirty(); // rebuild every VCD-capable page so the new default view takes effect
         }
-
-        if (ret == UICFG_RESETCOL)
-            setDefaultColors();
 
         if (previousTheme != themeID && isBgmPlaying())
             bgmStop();
@@ -1047,34 +1159,150 @@ reselect_video_mode:
             bgmStart();
     }
 
-    if (ret == UICFG_COVERFLOW_BUTTON) {
-        guiShowCoverflowConfig();
-        goto reselect_video_mode;
-    }
-
-    if (previousVMode != gVMode) {
-        if (guiConfirmVideoMode() == 0) {
-            // Restore previous video mode, without changing the theme & language settings.
-            gVMode = previousVMode;
-            applyConfig(themeID, langID, 1);
-            goto reselect_video_mode;
-        }
-    }
-
     guiFreeNameList(themeNamesSnap);
     guiFreeNameList(langNamesSnap);
 }
 
+// Interface -> Artwork Settings (cover art display + ART.TAR loading).
+void guiShowArtworkConfig(void)
+{
+    diaSetInt(diaArtworkConfig, UICFG_COVERART, gEnableArt);
+    diaSetInt(diaArtworkConfig, UICFG_ENABLE_ART_TAR, gEnableArtTar);
+
+    int ret = diaExecuteDialog(diaArtworkConfig, -1, 1, NULL);
+    if (ret) {
+        diaGetInt(diaArtworkConfig, UICFG_COVERART, &gEnableArt);
+        {
+            // Re-arm the .tar probe when the toggle actually flips. tarFind's "no archive anywhere"
+            // latch is write-once and process-wide, and NOTHING was clearing it (tarInvalidate had no
+            // callers at all) -- so a user who turned the loader on after boot kept getting nothing
+            // until a reboot, which looks exactly like "the toggle does nothing".
+            int previousArtTar = gEnableArtTar;
+            diaGetInt(diaArtworkConfig, UICFG_ENABLE_ART_TAR, &gEnableArtTar);
+            if (gEnableArtTar != previousArtTar)
+                tarInvalidate(TAR_KIND_ART);
+        }
+        applyConfig(-1, -1, 1);
+    }
+}
+
+// Interface -> Colors. Only the DEFAULT theme's colours are user-adjustable -- with any other theme
+// active the page shows that theme's own colours read-only (the old layout tied this to the theme
+// picker in the same dialog; the picker lives on the Interface page now).
+void guiShowColorsConfig(void)
+{
+    int themeID = thmGetGuiValue();
+    int editable = (themeID == 0);
+
+    if (editable) {
+        // Display the default theme's colours.
+        diaSetColor(diaColorsConfig, UICFG_BGCOL, gDefaultBgColor);
+        diaSetColor(diaColorsConfig, UICFG_UICOL, gDefaultUITextColor);
+        diaSetColor(diaColorsConfig, UICFG_TXTCOL, gDefaultTextColor);
+        diaSetColor(diaColorsConfig, UICFG_SELCOL, gDefaultSelTextColor);
+        diaSetColor(diaColorsConfig, UICFG_PLASCOL, gDefaultPlasBlendColor);
+    } else {
+        // Display the current theme's colours (read-only).
+        diaSetColor(diaColorsConfig, UICFG_BGCOL, gTheme->bgColor);
+        diaSetColor(diaColorsConfig, UICFG_PLASCOL, gTheme->plasBlendColor); // raw uchar[3] like bgColor -- NOT the U64 form
+        diaSetU64Color(diaColorsConfig, UICFG_UICOL, gTheme->uiTextColor);
+        diaSetU64Color(diaColorsConfig, UICFG_TXTCOL, gTheme->textColor);
+        diaSetU64Color(diaColorsConfig, UICFG_SELCOL, gTheme->selTextColor);
+    }
+    diaSetEnabled(diaColorsConfig, UICFG_BGCOL, editable);
+    diaSetEnabled(diaColorsConfig, UICFG_UICOL, editable);
+    diaSetEnabled(diaColorsConfig, UICFG_TXTCOL, editable);
+    diaSetEnabled(diaColorsConfig, UICFG_SELCOL, editable);
+    diaSetEnabled(diaColorsConfig, UICFG_PLASCOL, editable);
+    diaSetEnabled(diaColorsConfig, UICFG_RESETCOL, editable);
+
+    int ret = diaExecuteDialog(diaColorsConfig, -1, 1, NULL);
+    if (ret) {
+        if (editable) {
+            diaGetColor(diaColorsConfig, UICFG_BGCOL, gDefaultBgColor);
+            diaGetColor(diaColorsConfig, UICFG_UICOL, gDefaultUITextColor);
+            diaGetColor(diaColorsConfig, UICFG_TXTCOL, gDefaultTextColor);
+            diaGetColor(diaColorsConfig, UICFG_SELCOL, gDefaultSelTextColor);
+            diaGetColor(diaColorsConfig, UICFG_PLASCOL, gDefaultPlasBlendColor);
+        }
+        if (ret == UICFG_RESETCOL)
+            setDefaultColors();
+
+        applyConfig(themeID, -1, 1);
+    }
+}
+
+// Display page (settings-layout restructure): video mode, widescreen, offsets, overscan and the
+// GameID barcode toggle. Geometry/aspect rows apply live (guiDisplayUpdater); a video-mode change
+// keeps the confirm-or-revert flow from the old Display Settings.
+void guiShowDisplayConfig(void)
+{
+    // clang-format off
+    const char *vmodeNames[] = {_l(_STR_AUTO)
+        , "PAL 640x512i @50Hz 24bit"
+        , "NTSC 640x448i @60Hz 24bit"
+        , "EDTV 640x448p @60Hz 24bit"
+        , "EDTV 640x512p @50Hz 24bit"
+        , "VGA 640x480p @60Hz 24bit"
+        , "PAL 704x576i @50Hz 24bit (HIRES)"
+        , "NTSC 704x480i @60Hz 24bit (HIRES)"
+        , "EDTV 704x480p @60Hz 24bit (HIRES)"
+        , "EDTV 704x576p @50Hz 24bit (HIRES)"
+        , "HDTV 1280x720p @60Hz 16bit (HIRES)"
+        , "HDTV 1920x1080i @60Hz 16bit (HIRES)"
+        , "PAL 640x256p @50Hz 24bit"
+        , "NTSC 640x224p @60Hz 24bit"
+        , NULL};
+    // clang-format on
+    int previousVMode;
+
+reselect_video_mode:
+    previousVMode = gVMode;
+    diaSetEnum(diaDisplayConfig, UICFG_VMODE, vmodeNames);
+    diaSetInt(diaDisplayConfig, UICFG_VMODE, gVMode);
+    diaSetInt(diaDisplayConfig, UICFG_WIDESCREEN, gWideScreen);
+    diaSetInt(diaDisplayConfig, UICFG_XOFF, gXOff);
+    diaSetInt(diaDisplayConfig, UICFG_YOFF, gYOff);
+    diaSetInt(diaDisplayConfig, UICFG_OVERSCAN, gOverscan);
+    diaSetInt(diaDisplayConfig, CFG_APPLYGAMEID, gApplyGameID); // RetroGEM/Pixel FX GameID barcode
+
+    int ret = diaExecuteDialog(diaDisplayConfig, -1, 1, guiDisplayUpdater);
+
+    // Same padRumbleFlush rationale as the Interface page: flush the confirm bump before
+    // applyConfig() tears down and rebuilds the GS without polling readPads() (#172).
+    padRumbleFlush();
+
+    if (ret) {
+        diaGetInt(diaDisplayConfig, UICFG_VMODE, &gVMode);
+        diaGetInt(diaDisplayConfig, UICFG_WIDESCREEN, &gWideScreen);
+        diaGetInt(diaDisplayConfig, UICFG_XOFF, &gXOff);
+        diaGetInt(diaDisplayConfig, UICFG_YOFF, &gYOff);
+        diaGetInt(diaDisplayConfig, UICFG_OVERSCAN, &gOverscan);
+        diaGetInt(diaDisplayConfig, CFG_APPLYGAMEID, &gApplyGameID);
+
+        applyConfig(-1, -1, 1);
+    }
+
+    if (previousVMode != gVMode) {
+        if (guiConfirmVideoMode() == 0) {
+            // Restore previous video mode.
+            gVMode = previousVMode;
+            applyConfig(-1, -1, 1);
+            goto reselect_video_mode;
+        }
+    }
+}
+
 static int netConfigUpdater(int modified)
 {
-    int showAdvancedOptions, isNetBIOS, isDHCPEnabled, isPopsDhcp, i;
+    int showAdvancedOptions, isNetBIOS, isDHCPEnabled, netProto, i;
 
     if (modified) {
         diaGetInt(diaNetConfig, NETCFG_SHOW_ADVANCED_OPTS, &showAdvancedOptions);
 
         diaGetInt(diaNetConfig, NETCFG_PS2_IP_ADDR_TYPE, &isDHCPEnabled);
         diaGetInt(diaNetConfig, NETCFG_SHARE_ADDR_TYPE, &isNetBIOS);
-        diaGetInt(diaNetConfig, NETCFG_POPS_IPTYPE, &isPopsDhcp);
+        diaGetInt(diaNetConfig, CFG_NETPROTOCOL, &netProto);
         // The SMB-server block is always shown (it is its own configuration, not tied to the active
         // protocol -- hiding it made users think fields were removed). The NetBIOS-vs-IP toggle still
         // picks which address widget shows.
@@ -1087,11 +1315,6 @@ static int netConfigUpdater(int modified)
             diaSetEnabled(diaNetConfig, NETCFG_PS2_NETMASK_0 + i, !isDHCPEnabled);
             diaSetEnabled(diaNetConfig, NETCFG_PS2_GATEWAY_0 + i, !isDHCPEnabled);
             diaSetEnabled(diaNetConfig, NETCFG_PS2_DNS_0 + i, !isDHCPEnabled);
-
-            // Same greying for the POPStarter static-IP rows below (DHCP = no static triple).
-            diaSetEnabled(diaNetConfig, NETCFG_POPS_IP_0 + i, !isPopsDhcp);
-            diaSetEnabled(diaNetConfig, NETCFG_POPS_MASK_0 + i, !isPopsDhcp);
-            diaSetEnabled(diaNetConfig, NETCFG_POPS_GW_0 + i, !isPopsDhcp);
         }
 
         for (i = 0; i < 3; i++)
@@ -1099,6 +1322,24 @@ static int netConfigUpdater(int modified)
 
         diaSetEnabled(diaNetConfig, NETCFG_SHARE_PORT, showAdvancedOptions);
         diaSetEnabled(diaNetConfig, NETCFG_ETHOPMODE, showAdvancedOptions);
+
+        // Protocol (moved from Game Sources): lock Access to Files for SMB and to IMG for UDPBD
+        // (only UDPFS offers the free toggle) -- snap the value so a stale IMG left over from UDPFS
+        // can never mis-derive to UDPFSBD under SMB, AND grey the control so the lock is visible.
+        // SMB Version qualifies SMB: live only when SMB is the selected protocol. Value is NOT
+        // snapped when greyed -- a stale dialect cannot mis-derive anything (the OK read-back
+        // ignores it unless protocol == SMB), and preserving it means flipping away to UDPFS and
+        // back does not silently reset the user to SMBv1.
+        diaSetEnabled(diaNetConfig, CFG_SMBDIALECT, netProto == 0);
+        if (netProto == 0) { // SMB -> Files, locked
+            diaSetInt(diaNetConfig, CFG_UDPFSMODE, 0);
+            diaSetEnabled(diaNetConfig, CFG_UDPFSMODE, 0);
+        } else if (netProto == 2) { // UDPBD -> IMG, locked
+            diaSetInt(diaNetConfig, CFG_UDPFSMODE, 1);
+            diaSetEnabled(diaNetConfig, CFG_UDPFSMODE, 0);
+        } else { // UDPFS -> Files/IMG free
+            diaSetEnabled(diaNetConfig, CFG_UDPFSMODE, 1);
+        }
     }
 
     return 0;
@@ -1110,14 +1351,18 @@ void guiShowNetConfig(void)
     const char *ethOpModes[] = {_l(_STR_AUTO), _l(_STR_ETH_100MFDX), _l(_STR_ETH_100MHDX), _l(_STR_ETH_10MFDX), _l(_STR_ETH_10MHDX), NULL};
     const char *addrConfModes[] = {_l(_STR_ADDR_TYPE_IP), _l(_STR_ADDR_TYPE_NETBIOS), NULL};
     const char *ipAddrConfModes[] = {_l(_STR_IP_ADDRESS_TYPE_STATIC), _l(_STR_IP_ADDRESS_TYPE_DHCP), NULL};
-    // POPStarter read-time snapshot for the change-detection save matrix, + static storage for the
-    // "Loaded from %s" notice (diaSetLabel stores a RAW POINTER -- it must outlive the dialog).
-    static vcd_popsnet_t popsOriginal;
-    static char popsNotice[128];
+    const char *netProtocols[] = {"SMB", "UDPFS", "UDPBD", NULL}; // UDPBD = SUDPBDv2 server -- protocol names, not translated
+    const char *udpfsModes[] = {"Files", "IMG", NULL};            // Access: Files=udpfs_ioman filesystem, IMG=udpfs_bd block
+    // SMB version row. SMB3 is intentionally absent: it mandates packet signing, which does not
+    // exist in this tree yet, so offering it would be a picker that silently does something else.
+    // Index order matches enum SMB_DIALECT. Protocol names, not translated -- same as the rows above.
+    const char *smbDialects[] = {"SMBv1", "SMB2", NULL};
     diaSetEnum(diaNetConfig, NETCFG_PS2_IP_ADDR_TYPE, ipAddrConfModes);
     diaSetEnum(diaNetConfig, NETCFG_SHARE_ADDR_TYPE, addrConfModes);
     diaSetEnum(diaNetConfig, NETCFG_ETHOPMODE, ethOpModes);
-    diaSetEnum(diaNetConfig, NETCFG_POPS_IPTYPE, ipAddrConfModes); // same Static/DHCP index convention
+    diaSetEnum(diaNetConfig, CFG_NETPROTOCOL, netProtocols);
+    diaSetEnum(diaNetConfig, CFG_UDPFSMODE, udpfsModes);
+    diaSetEnum(diaNetConfig, CFG_SMBDIALECT, smbDialects);
 
     // upload current values
     // RiptOPL: open the Network Config with advanced options ON so the SMB Port + ETH op-mode are
@@ -1173,34 +1418,23 @@ void guiShowNetConfig(void)
     diaSetString(diaNetConfig, NETCFG_SHARE_PASSWORD, gPCPassword);
     diaSetInt(diaNetConfig, NETCFG_ETHOPMODE, gETHOpMode);
 
-    // POPStarter section: show POPSTARTER's OWN IPCONFIG.DAT / SMBCONFIG.DAT contents. Absent files
-    // leave the fields blank with the notice visible -- absence means unknown/unconfigured, NEVER
-    // "use OPL's values". Only an explicit edit or the Import button fills them, and only an actual
-    // change vs this snapshot is written back on OK (the save matrix below).
-    vcdReadPopstarterNet(&popsOriginal);
-    diaSetInt(diaNetConfig, NETCFG_POPS_IPTYPE, popsOriginal.ipDhcp);
-    for (i = 0; i < 4; ++i) {
-        diaSetInt(diaNetConfig, NETCFG_POPS_IP_0 + i, popsOriginal.ps2Ip[i]);
-        diaSetInt(diaNetConfig, NETCFG_POPS_MASK_0 + i, popsOriginal.ps2Mask[i]);
-        diaSetInt(diaNetConfig, NETCFG_POPS_GW_0 + i, popsOriginal.ps2Gw[i]);
-        diaSetInt(diaNetConfig, NETCFG_POPS_SMB_IP_0 + i, popsOriginal.smbIp[i]);
-
-        diaSetEnabled(diaNetConfig, NETCFG_POPS_IP_0 + i, !popsOriginal.ipDhcp);
-        diaSetEnabled(diaNetConfig, NETCFG_POPS_MASK_0 + i, !popsOriginal.ipDhcp);
-        diaSetEnabled(diaNetConfig, NETCFG_POPS_GW_0 + i, !popsOriginal.ipDhcp);
-    }
-    diaSetInt(diaNetConfig, NETCFG_POPS_SMB_PORT, popsOriginal.smbPort);
-    diaSetString(diaNetConfig, NETCFG_POPS_SMB_SHARE, popsOriginal.smbShare);
-    diaSetString(diaNetConfig, NETCFG_POPS_SMB_USER, popsOriginal.smbUser);
-    diaSetString(diaNetConfig, NETCFG_POPS_SMB_PASS, popsOriginal.smbPass);
-
-    if (popsOriginal.smbExists || popsOriginal.ipExists) {
-        snprintf(popsNotice, sizeof(popsNotice), _l(_STR_POPS_LOADED_FROM),
-                 popsOriginal.smbExists ? popsOriginal.smbDir : popsOriginal.ipDir);
-        diaSetLabel(diaNetConfig, NETCFG_POPS_NOTICE, popsNotice);
-    } else {
-        diaSetLabel(diaNetConfig, NETCFG_POPS_NOTICE, _l(_STR_POPS_NONE_DETECTED));
-    }
+    // Protocol rows (moved from Game Sources), seeded from the authoritative gNetworkProtocol.
+    //   Protocol: SMB(0)/UDPFS(1)/UDPBD(2)  -- OFF and UDPFSBD both collapse to their protocol
+    //   Access:   Files(0)/IMG(1); IMG only distinct for UDPFS (-> UDPFSBD backend)
+    // A NET_PROTO_OFF backend has no protocol memory, so seed the protocol row to SMB -- the common
+    // default a user reaches when they switch the Game Sources Start row from Off to Manual/Auto.
+    int netProtoVal = (gNetworkProtocol == NET_PROTO_UDPBD)                                          ? 2 :
+                      (gNetworkProtocol == NET_PROTO_UDPFS || gNetworkProtocol == NET_PROTO_UDPFSBD) ? 1 :
+                                                                                                       0; // SMB / OFF
+    // IMG for the udpfs block backend AND UDPBD (IMG-locked), so the seed already matches the lock.
+    int netAccessVal = (gNetworkProtocol == NET_PROTO_UDPFSBD || gNetworkProtocol == NET_PROTO_UDPBD) ? 1 : 0;
+    diaSetInt(diaNetConfig, CFG_NETPROTOCOL, netProtoVal);
+    diaSetInt(diaNetConfig, CFG_UDPFSMODE, netAccessVal);
+    diaSetInt(diaNetConfig, CFG_SMBDIALECT, gSMBDialect);
+    // Seed the initial grey/lock: diaExecuteDialog renders the FIRST frame before it calls
+    // netConfigUpdater, so without this the first frame flashes every row enabled.
+    diaSetEnabled(diaNetConfig, CFG_UDPFSMODE, netProtoVal == 1);
+    diaSetEnabled(diaNetConfig, CFG_SMBDIALECT, netProtoVal == 0);
 
     // Update the spacer item between the OK and reconnect buttons (See dialogs.c).
     if (gNetworkStartup == 0) {
@@ -1214,51 +1448,7 @@ void guiShowNetConfig(void)
         diaSetVisible(diaNetConfig, NETCFG_RECONNECT, 0);
     }
 
-    int result;
-    do {
-        result = diaExecuteDialog(diaNetConfig, -1, 1, &netConfigUpdater);
-        if (result == NETCFG_POPS_IMPORT) {
-            // IMPORT: the ONE sanctioned path that copies OPL's own Network Settings (as currently
-            // shown in this dialog, saved or not) into the POPStarter fields. Pressing the button
-            // exits the dialog with its id; the dialog struct keeps every field's value across the
-            // re-execution, so nothing the user typed elsewhere is lost.
-            int isDhcp, isNetBIOS, v;
-            char s[32];
-
-            diaGetInt(diaNetConfig, NETCFG_PS2_IP_ADDR_TYPE, &isDhcp);
-            diaSetInt(diaNetConfig, NETCFG_POPS_IPTYPE, isDhcp);
-            for (i = 0; i < 4; ++i) {
-                diaGetInt(diaNetConfig, NETCFG_PS2_IP_ADDR_0 + i, &v);
-                diaSetInt(diaNetConfig, NETCFG_POPS_IP_0 + i, v);
-                diaGetInt(diaNetConfig, NETCFG_PS2_NETMASK_0 + i, &v);
-                diaSetInt(diaNetConfig, NETCFG_POPS_MASK_0 + i, v);
-                diaGetInt(diaNetConfig, NETCFG_PS2_GATEWAY_0 + i, &v);
-                diaSetInt(diaNetConfig, NETCFG_POPS_GW_0 + i, v);
-
-                diaSetEnabled(diaNetConfig, NETCFG_POPS_IP_0 + i, !isDhcp);
-                diaSetEnabled(diaNetConfig, NETCFG_POPS_MASK_0 + i, !isDhcp);
-                diaSetEnabled(diaNetConfig, NETCFG_POPS_GW_0 + i, !isDhcp);
-            }
-
-            // A NetBIOS share name can't be turned into an IP -- leave the POPStarter server IP
-            // untouched in that case instead of importing a wrong value.
-            diaGetInt(diaNetConfig, NETCFG_SHARE_ADDR_TYPE, &isNetBIOS);
-            if (!isNetBIOS) {
-                for (i = 0; i < 4; ++i) {
-                    diaGetInt(diaNetConfig, NETCFG_SHARE_IP_ADDR_0 + i, &v);
-                    diaSetInt(diaNetConfig, NETCFG_POPS_SMB_IP_0 + i, v);
-                }
-            }
-            diaGetInt(diaNetConfig, NETCFG_SHARE_PORT, &v);
-            diaSetInt(diaNetConfig, NETCFG_POPS_SMB_PORT, v);
-            diaGetString(diaNetConfig, NETCFG_SHARE_NAME, s, sizeof(s));
-            diaSetString(diaNetConfig, NETCFG_POPS_SMB_SHARE, s);
-            diaGetString(diaNetConfig, NETCFG_SHARE_USERNAME, s, sizeof(s));
-            diaSetString(diaNetConfig, NETCFG_POPS_SMB_USER, s);
-            diaGetString(diaNetConfig, NETCFG_SHARE_PASSWORD, s, sizeof(s));
-            diaSetString(diaNetConfig, NETCFG_POPS_SMB_PASS, s);
-        }
-    } while (result == NETCFG_POPS_IMPORT);
+    int result = diaExecuteDialog(diaNetConfig, -1, 1, &netConfigUpdater);
 
     if (result) {
         // Store values
@@ -1280,202 +1470,29 @@ void guiShowNetConfig(void)
         diaGetString(diaNetConfig, NETCFG_SHARE_USERNAME, gPCUserName, sizeof(gPCUserName));
         diaGetString(diaNetConfig, NETCFG_SHARE_PASSWORD, gPCPassword, sizeof(gPCPassword));
 
-        // POPStarter save matrix (POPSLoader parity): compare the dialog's POPStarter fields against
-        // the read-time snapshot and write ONLY what actually changed -- and only when the file
-        // already exists (overwrite at its origin dir) or the user supplied complete values (create
-        // at createDir). Blank/incomplete fields with no existing file create NOTHING: absence must
-        // never turn into a fabricated configuration.
-        vcd_popsnet_t popsCur = popsOriginal; // carries the origin dirs + exists flags over
-        diaGetInt(diaNetConfig, NETCFG_POPS_IPTYPE, &popsCur.ipDhcp);
-        for (i = 0; i < 4; ++i) {
-            diaGetInt(diaNetConfig, NETCFG_POPS_IP_0 + i, &popsCur.ps2Ip[i]);
-            diaGetInt(diaNetConfig, NETCFG_POPS_MASK_0 + i, &popsCur.ps2Mask[i]);
-            diaGetInt(diaNetConfig, NETCFG_POPS_GW_0 + i, &popsCur.ps2Gw[i]);
-            diaGetInt(diaNetConfig, NETCFG_POPS_SMB_IP_0 + i, &popsCur.smbIp[i]);
-        }
-        diaGetInt(diaNetConfig, NETCFG_POPS_SMB_PORT, &popsCur.smbPort);
-        diaGetString(diaNetConfig, NETCFG_POPS_SMB_SHARE, popsCur.smbShare, sizeof(popsCur.smbShare));
-        diaGetString(diaNetConfig, NETCFG_POPS_SMB_USER, popsCur.smbUser, sizeof(popsCur.smbUser));
-        diaGetString(diaNetConfig, NETCFG_POPS_SMB_PASS, popsCur.smbPass, sizeof(popsCur.smbPass));
-
-        int popsMask = vcdPopsNetChanged(&popsOriginal, &popsCur);
-        int popsSmbComplete = popsCur.smbShare[0] != '\0' &&
-                              (popsCur.smbIp[0] | popsCur.smbIp[1] | popsCur.smbIp[2] | popsCur.smbIp[3]) != 0;
-        int popsIpComplete = (popsCur.ps2Ip[0] | popsCur.ps2Ip[1] | popsCur.ps2Ip[2] | popsCur.ps2Ip[3]) != 0 &&
-                             (popsCur.ps2Mask[0] | popsCur.ps2Mask[1] | popsCur.ps2Mask[2] | popsCur.ps2Mask[3]) != 0 &&
-                             (popsCur.ps2Gw[0] | popsCur.ps2Gw[1] | popsCur.ps2Gw[2] | popsCur.ps2Gw[3]) != 0;
-        int writeSmb = (popsMask & 1) && (popsOriginal.smbExists || popsSmbComplete);
-        int writeIp = (popsMask & 2) && (popsOriginal.ipExists || popsCur.ipDhcp || popsIpComplete);
-        // Creating a fresh SMBCONFIG.DAT with no IPCONFIG.DAT anywhere: create the pair -- POPStarter
-        // expects IPCONFIG.DAT to exist even when blank (DHCP). An incomplete static entry becomes a
-        // BLANK file (never garbage); the user can complete it later and it will overwrite.
-        if (writeSmb && !popsOriginal.smbExists && !popsOriginal.ipExists) {
-            writeIp = 1;
-            if (!popsCur.ipDhcp && !popsIpComplete)
-                popsCur.ipDhcp = 1;
-        }
-        if ((writeSmb || writeIp) && vcdWritePopstarterNetFiles(&popsCur, writeSmb, writeIp) != 0)
-            guiMsgBox(_l(_STR_POPSTARTER_NET_ERR), 0, NULL);
-
-        if (result == NETCFG_RECONNECT && gNetworkStartup < ERROR_ETH_SMB_CONN)
-            gNetworkStartup = ERROR_ETH_SMB_LOGON;
-
-        applyConfig(-1, -1, 0);
-    }
-}
-
-static int guiDeviceUpdater(int modified)
-{
-    if (modified) {
-        // APA + BDM-HDD interlock REMOVED (coexistence directive 2026-07-21): both rows stay
-        // enabled; per-drive arbitration lives in hddDetectNonSonyFileSystem, not the dialog.
-
-        // Network 3-row live logic. Row 1 Start (Off/Manual/Auto), Row 2 Protocol (SMB/UDPFS/UDPBD),
-        // Row 3 Access (Files/IMG). While Start=Off, grey Protocol + Access. Lock Access to Files for
-        // SMB and to IMG for UDPBD (only UDPFS offers the free toggle) -- snap the value so a stale IMG
-        // left over from UDPFS can never mis-derive to UDPFSBD under SMB, AND grey the control so the
-        // lock is visible. (The OK read-back is protocol-first too, so this is belt-and-braces.)
-        int netStart = 0, netProto = 0;
-        diaGetInt(diaDeviceConfig, CFG_NETSTART, &netStart);
-        diaGetInt(diaDeviceConfig, CFG_NETPROTOCOL, &netProto);
-        int netOn = (netStart != START_MODE_DISABLED);
-        diaSetEnabled(diaDeviceConfig, CFG_NETPROTOCOL, netOn);
-        // SMB Version qualifies SMB the way Access qualifies UDPFS: live only when this protocol is
-        // actually the one selected. Value is NOT snapped when greyed -- unlike Access, a stale
-        // dialect cannot mis-derive anything (the OK read-back ignores it unless protocol == SMB),
-        // and preserving it means flipping away to UDPFS and back does not silently reset the user
-        // to SMBv1.
-        diaSetEnabled(diaDeviceConfig, CFG_SMBDIALECT, netOn && netProto == 0);
-        if (!netOn) {
-            diaSetEnabled(diaDeviceConfig, CFG_UDPFSMODE, 0);
-        } else if (netProto == 0) { // SMB -> Files, locked
-            diaSetInt(diaDeviceConfig, CFG_UDPFSMODE, 0);
-            diaSetEnabled(diaDeviceConfig, CFG_UDPFSMODE, 0);
-        } else if (netProto == 2) { // UDPBD -> IMG, locked
-            diaSetInt(diaDeviceConfig, CFG_UDPFSMODE, 1);
-            diaSetEnabled(diaDeviceConfig, CFG_UDPFSMODE, 0);
-        } else { // UDPFS -> Files/IMG free
-            diaSetEnabled(diaDeviceConfig, CFG_UDPFSMODE, 1);
-        }
-    }
-
-    return 0;
-}
-
-void guiShowDeviceConfig(void)
-{
-    const char *deviceNames[] = {_l(_STR_BDM_GAMES), _l(_STR_NET_GAMES), _l(_STR_HDD_GAMES), _l(_STR_APPS), _l(_STR_MMCE), _l(_STR_FAV), NULL};
-    const char *deviceModes[] = {_l(_STR_OFF), _l(_STR_MANUAL), _l(_STR_AUTO), NULL};
-    const char *netProtocols[] = {"SMB", "UDPFS", "UDPBD", NULL}; // Row 2 (Off moved to Row 1); UDPBD = SUDPBDv2 server -- protocol names, not translated
-    const char *udpfsModes[] = {"Files", "IMG", NULL};            // Row 3: Files=udpfs_ioman filesystem, IMG=udpfs_bd block
-    // SMB version row. SMB3 is intentionally absent: it mandates packet signing, which does not
-    // exist in this tree yet, so offering it would be a picker that silently does something else.
-    // Index order matches enum SMB_DIALECT. Protocol names, not translated -- same as the rows above.
-    const char *smbDialects[] = {"SMBv1", "SMB2", NULL};
-
-    // Devices & modes
-    diaSetEnum(diaDeviceConfig, CFG_DEFDEVICE, deviceNames);
-    diaSetEnum(diaDeviceConfig, CFG_BDMMODE, deviceModes);
-    diaSetEnum(diaDeviceConfig, CFG_HDDMODE, deviceModes);
-    diaSetEnum(diaDeviceConfig, CFG_APPMODE, deviceModes);
-    diaSetEnum(diaDeviceConfig, CFG_FAVMODE, deviceModes);
-
-    int deviceModeIndex = guiIoModeToDeviceType(gDefaultDevice);
-    diaSetInt(diaDeviceConfig, CFG_DEFDEVICE, deviceModeIndex);
-    diaSetInt(diaDeviceConfig, CFG_BDMMODE, gBDMStartMode);
-    diaSetInt(diaDeviceConfig, CFG_HDDMODE, gHDDStartMode);
-    diaSetInt(diaDeviceConfig, CFG_APPMODE, gAPPStartMode);
-    diaSetInt(diaDeviceConfig, CFG_FAVMODE, gFAVStartMode);
-
-    // Block devices (inlined; interlocked with the APA HDD mode)
-    diaSetInt(diaDeviceConfig, CFG_ENABLEUSB, gEnableUSB);
-    diaSetInt(diaDeviceConfig, CFG_ENABLEILK, gEnableILK);
-    diaSetInt(diaDeviceConfig, CFG_ENABLEMX4SIO, gEnableMX4SIO);
-    diaSetInt(diaDeviceConfig, CFG_ENABLEBDMHDD, gEnableBdmHDD);
-    diaSetEnabled(diaDeviceConfig, CFG_ENABLEBDMHDD, 1); // coexists with APA (directive 2026-07-21)
-    diaSetEnabled(diaDeviceConfig, CFG_HDDMODE, 1);
-    // Network: 3 orthogonal rows seeded from the authoritative gNetworkProtocol + gNetStartMode.
-    //   Row 1 Start:    Off/Manual/Auto == gNetStartMode (START_MODE_*)
-    //   Row 2 Protocol: SMB(0)/UDPFS(1)/UDPBD(2)  -- OFF and UDPFSBD both collapse to their protocol
-    //   Row 3 Access:   Files(0)/IMG(1); IMG only distinct for UDPFS (-> UDPFSBD backend)
-    // guiDeviceUpdater does the greying + the Access lock (SMB->Files, UDPBD->IMG). A NET_PROTO_OFF
-    // backend has no protocol memory, so seed the protocol row to SMB -- the common default a user
-    // reaches when they switch Start from Off to Manual/Auto.
-    int netStartVal = gNetStartMode;
-    int netProtoVal = (gNetworkProtocol == NET_PROTO_UDPBD)                                          ? 2 :
-                      (gNetworkProtocol == NET_PROTO_UDPFS || gNetworkProtocol == NET_PROTO_UDPFSBD) ? 1 :
-                                                                                                       0; // SMB / OFF
-    // IMG for the udpfs block backend AND UDPBD (IMG-locked), so the seed already matches the lock.
-    int netAccessVal = (gNetworkProtocol == NET_PROTO_UDPFSBD || gNetworkProtocol == NET_PROTO_UDPBD) ? 1 : 0;
-    // Row 1 == START_MODE_DISABLED/MANUAL/AUTO -- the SAME three options (and indices) as every other
-    // device's start row, so reuse the localized deviceModes rather than a hardcoded English duplicate
-    // (Gemini review of #199). Same function scope as the dialog it feeds, so the diaSetEnum raw-pointer
-    // rule (#154) still holds.
-    diaSetEnum(diaDeviceConfig, CFG_NETSTART, deviceModes);
-    diaSetInt(diaDeviceConfig, CFG_NETSTART, netStartVal);
-    diaSetEnum(diaDeviceConfig, CFG_NETPROTOCOL, netProtocols);
-    diaSetInt(diaDeviceConfig, CFG_NETPROTOCOL, netProtoVal);
-    diaSetEnum(diaDeviceConfig, CFG_UDPFSMODE, udpfsModes);
-    diaSetInt(diaDeviceConfig, CFG_UDPFSMODE, netAccessVal);
-    // Same function scope as the dialog it feeds, so the diaSetEnum raw-pointer rule (#154) holds.
-    diaSetEnum(diaDeviceConfig, CFG_SMBDIALECT, smbDialects);
-    diaSetInt(diaDeviceConfig, CFG_SMBDIALECT, gSMBDialect);
-    // Seed the initial grey/lock: diaExecuteDialog renders the FIRST frame before it calls
-    // guiDeviceUpdater, so without this the first frame flashes every row enabled.
-    diaSetEnabled(diaDeviceConfig, CFG_NETPROTOCOL, netStartVal != START_MODE_DISABLED);
-    diaSetEnabled(diaDeviceConfig, CFG_UDPFSMODE, netStartVal != START_MODE_DISABLED && netProtoVal == 1);
-    diaSetEnabled(diaDeviceConfig, CFG_SMBDIALECT, netStartVal != START_MODE_DISABLED && netProtoVal == 0);
-
-    // Cache & storage (spindown, game-list cache, BDM/HDD/SMB caches) moved to General Settings
-    // (guiShowConfig / diaConfig) -- Device Settings is now strictly device selection.
-
-    // MMCE Start Mode stays with the other device start modes; the MMCE game-config (slot / IGR slot /
-    // GameID / ack-wait / alarms) moved to its own "MMCE Settings" page -- see guiShowMmceConfig.
-    diaSetEnum(diaDeviceConfig, CFG_MMCEMODE, deviceModes);
-    diaSetInt(diaDeviceConfig, CFG_MMCEMODE, gMMCEStartMode);
-
-    int ret = diaExecuteDialog(diaDeviceConfig, -1, 1, &guiDeviceUpdater);
-    if (ret) {
-        int netProtocolWas = gNetworkProtocol;
-        diaGetInt(diaDeviceConfig, CFG_DEFDEVICE, &deviceModeIndex);
-        gDefaultDevice = guiDeviceTypeToIoMode(deviceModeIndex);
-        diaGetInt(diaDeviceConfig, CFG_BDMMODE, &gBDMStartMode);
-        diaGetInt(diaDeviceConfig, CFG_HDDMODE, &gHDDStartMode);
-        diaGetInt(diaDeviceConfig, CFG_APPMODE, &gAPPStartMode);
-        diaGetInt(diaDeviceConfig, CFG_FAVMODE, &gFAVStartMode);
-
-        diaGetInt(diaDeviceConfig, CFG_ENABLEUSB, &gEnableUSB);
-        diaGetInt(diaDeviceConfig, CFG_ENABLEILK, &gEnableILK);
-        diaGetInt(diaDeviceConfig, CFG_ENABLEMX4SIO, &gEnableMX4SIO);
-        diaGetInt(diaDeviceConfig, CFG_ENABLEBDMHDD, &gEnableBdmHDD);
-        // Fold the 3 rows back into the authoritative gNetworkProtocol + gNetStartMode. PROTOCOL-FIRST:
+        // Fold the Protocol/Access rows back into the authoritative gNetworkProtocol. PROTOCOL-FIRST:
         // the Access value is consulted ONLY for UDPFS, so a stale IMG under SMB/UDPBD can never
-        // mis-derive. Start=Off -> OFF regardless of the (greyed) protocol/access. Then re-derive the
-        // legacy shadows (gEnableUDPBD / gNetBootProtocol / gETHStartMode) downstream consumers read.
-        int netStartVal = 0, netProtoVal = 0, netAccessVal = 0;
+        // mis-derive. The Game Sources "Network Start Mode" row decides whether the stack runs at
+        // all: Start=Off -> OFF regardless of the protocol picked here. Then re-derive the legacy
+        // shadows (gEnableUDPBD / gNetBootProtocol / gETHStartMode) downstream consumers read.
+        int netProtocolWas = gNetworkProtocol;
         int smbDialectWas = gSMBDialect;
-        diaGetInt(diaDeviceConfig, CFG_NETSTART, &netStartVal);
-        diaGetInt(diaDeviceConfig, CFG_NETPROTOCOL, &netProtoVal);
-        diaGetInt(diaDeviceConfig, CFG_UDPFSMODE, &netAccessVal);
+        diaGetInt(diaNetConfig, CFG_NETPROTOCOL, &netProtoVal);
+        diaGetInt(diaNetConfig, CFG_UDPFSMODE, &netAccessVal);
         // Read the dialect unconditionally -- it is a property of the SMB backend, not of the
         // current selection, so it survives a detour through another protocol. Everything
         // downstream consults it only when the live protocol is SMB.
-        diaGetInt(diaDeviceConfig, CFG_SMBDIALECT, &gSMBDialect);
-        gNetStartMode = netStartVal; // 0/1/2 == START_MODE_DISABLED/MANUAL/AUTO
-        gNetworkProtocol = (netStartVal == START_MODE_DISABLED) ? NET_PROTO_OFF :
-                           (netProtoVal == 0)                   ? NET_PROTO_SMB :
-                           (netProtoVal == 2)                   ? NET_PROTO_UDPBD :
-                           (netAccessVal == 1)                  ? NET_PROTO_UDPFSBD :
-                                                                  NET_PROTO_UDPFS; // UDPFS + Files
+        diaGetInt(diaNetConfig, CFG_SMBDIALECT, &gSMBDialect);
+        gNetworkProtocol = (gNetStartMode == START_MODE_DISABLED) ? NET_PROTO_OFF :
+                           (netProtoVal == 0)                     ? NET_PROTO_SMB :
+                           (netProtoVal == 2)                     ? NET_PROTO_UDPBD :
+                           (netAccessVal == 1)                    ? NET_PROTO_UDPFSBD :
+                                                                    NET_PROTO_UDPFS; // UDPFS + Files
         gEnableUDPBD = (gNetworkProtocol == NET_PROTO_UDPBD || gNetworkProtocol == NET_PROTO_UDPFSBD);
         gNetBootProtocol = (gNetworkProtocol == NET_PROTO_UDPFSBD) ? NET_BOOT_UDPFS : NET_BOOT_UDPBD;
-        // SMB's start mode IS the network start row now (Auto = boot connect, Manual = on-entry);
+        // SMB's start mode IS the network start row (Auto = boot connect, Manual = on-entry);
         // every non-SMB protocol forces the SMB/ETH stack off so only one transport claims the NIC.
         gETHStartMode = (gNetworkProtocol == NET_PROTO_SMB) ? gNetStartMode : START_MODE_DISABLED;
-
-        // Cache & storage read-back now lives in guiShowConfig (moved to General Settings).
-
-        diaGetInt(diaDeviceConfig, CFG_MMCEMODE, &gMMCEStartMode);
 
         // The UDP transports' ministack has no DHCP client; with DHCP on, ps2_ip[] is never refreshed, so
         // they need a static PS2 IP. Warn when switching TO a UDP protocol (UDPFS/UDPFSBD/UDPBD) from a
@@ -1529,6 +1546,234 @@ void guiShowDeviceConfig(void)
         // switches SMBv1 <-> SMB2 with the stack already up is not left wondering why nothing moved.
         if ((gNetworkProtocol != netProtocolWas ||
              (gNetworkProtocol == NET_PROTO_SMB && gSMBDialect != smbDialectWas)) &&
+            (bdmIsUDPBDLoaded() || ethGetModulesLoaded() || udpfsGetModulesLoaded()))
+            guiMsgBox(_l(_STR_NETBOOT_RESTART), 0, NULL);
+
+        if (result == NETCFG_RECONNECT && gNetworkStartup < ERROR_ETH_SMB_CONN)
+            gNetworkStartup = ERROR_ETH_SMB_LOGON;
+
+        applyConfig(-1, -1, 0);
+    }
+}
+
+// POPStarter -> Network Settings live-updater: DHCP = no static IP/mask/gateway triple.
+static int guiPopsNetUpdater(int modified)
+{
+    int isPopsDhcp, i;
+
+    if (modified) {
+        diaGetInt(diaPopsNetConfig, NETCFG_POPS_IPTYPE, &isPopsDhcp);
+        for (i = 0; i < 4; i++) {
+            diaSetEnabled(diaPopsNetConfig, NETCFG_POPS_IP_0 + i, !isPopsDhcp);
+            diaSetEnabled(diaPopsNetConfig, NETCFG_POPS_MASK_0 + i, !isPopsDhcp);
+            diaSetEnabled(diaPopsNetConfig, NETCFG_POPS_GW_0 + i, !isPopsDhcp);
+        }
+    }
+
+    return 0;
+}
+
+// POPStarter -> Network Settings (VCD over SMB). Shows POPSTARTER's OWN IPCONFIG.DAT /
+// SMBCONFIG.DAT contents. Absent files leave the fields blank with the notice visible -- absence
+// means unknown/unconfigured, NEVER "use OPL's values". Only an explicit edit or the Import button
+// fills them, and only an actual change vs the read-time snapshot is written back on OK (the save
+// matrix below). Moved out of guiShowNetConfig by the settings-layout restructure; the Import
+// source is now the SAVED OPL network globals (the OPL fields no longer share this dialog).
+void guiShowPopsNetConfig(void)
+{
+    size_t i;
+    const char *ipAddrConfModes[] = {_l(_STR_IP_ADDRESS_TYPE_STATIC), _l(_STR_IP_ADDRESS_TYPE_DHCP), NULL};
+    // POPStarter read-time snapshot for the change-detection save matrix, + static storage for the
+    // "Loaded from %s" notice (diaSetLabel stores a RAW POINTER -- it must outlive the dialog).
+    static vcd_popsnet_t popsOriginal;
+    static char popsNotice[128];
+    diaSetEnum(diaPopsNetConfig, NETCFG_POPS_IPTYPE, ipAddrConfModes); // same Static/DHCP index convention
+
+    vcdReadPopstarterNet(&popsOriginal);
+    diaSetInt(diaPopsNetConfig, NETCFG_POPS_IPTYPE, popsOriginal.ipDhcp);
+    for (i = 0; i < 4; ++i) {
+        diaSetInt(diaPopsNetConfig, NETCFG_POPS_IP_0 + i, popsOriginal.ps2Ip[i]);
+        diaSetInt(diaPopsNetConfig, NETCFG_POPS_MASK_0 + i, popsOriginal.ps2Mask[i]);
+        diaSetInt(diaPopsNetConfig, NETCFG_POPS_GW_0 + i, popsOriginal.ps2Gw[i]);
+        diaSetInt(diaPopsNetConfig, NETCFG_POPS_SMB_IP_0 + i, popsOriginal.smbIp[i]);
+
+        diaSetEnabled(diaPopsNetConfig, NETCFG_POPS_IP_0 + i, !popsOriginal.ipDhcp);
+        diaSetEnabled(diaPopsNetConfig, NETCFG_POPS_MASK_0 + i, !popsOriginal.ipDhcp);
+        diaSetEnabled(diaPopsNetConfig, NETCFG_POPS_GW_0 + i, !popsOriginal.ipDhcp);
+    }
+    diaSetInt(diaPopsNetConfig, NETCFG_POPS_SMB_PORT, popsOriginal.smbPort);
+    diaSetString(diaPopsNetConfig, NETCFG_POPS_SMB_SHARE, popsOriginal.smbShare);
+    diaSetString(diaPopsNetConfig, NETCFG_POPS_SMB_USER, popsOriginal.smbUser);
+    diaSetString(diaPopsNetConfig, NETCFG_POPS_SMB_PASS, popsOriginal.smbPass);
+
+    if (popsOriginal.smbExists || popsOriginal.ipExists) {
+        snprintf(popsNotice, sizeof(popsNotice), _l(_STR_POPS_LOADED_FROM),
+                 popsOriginal.smbExists ? popsOriginal.smbDir : popsOriginal.ipDir);
+        diaSetLabel(diaPopsNetConfig, NETCFG_POPS_NOTICE, popsNotice);
+    } else {
+        diaSetLabel(diaPopsNetConfig, NETCFG_POPS_NOTICE, _l(_STR_POPS_NONE_DETECTED));
+    }
+
+    int result;
+    do {
+        result = diaExecuteDialog(diaPopsNetConfig, -1, 1, &guiPopsNetUpdater);
+        if (result == NETCFG_POPS_IMPORT) {
+            // IMPORT: the ONE sanctioned path that copies OPL's saved Network Settings into the
+            // POPStarter fields. Pressing the button exits the dialog with its id; the dialog
+            // struct keeps every field's value across the re-execution, so nothing the user typed
+            // elsewhere is lost.
+            char s[32];
+
+            diaSetInt(diaPopsNetConfig, NETCFG_POPS_IPTYPE, ps2_ip_use_dhcp);
+            for (i = 0; i < 4; ++i) {
+                diaSetInt(diaPopsNetConfig, NETCFG_POPS_IP_0 + i, ps2_ip[i]);
+                diaSetInt(diaPopsNetConfig, NETCFG_POPS_MASK_0 + i, ps2_netmask[i]);
+                diaSetInt(diaPopsNetConfig, NETCFG_POPS_GW_0 + i, ps2_gateway[i]);
+
+                diaSetEnabled(diaPopsNetConfig, NETCFG_POPS_IP_0 + i, !ps2_ip_use_dhcp);
+                diaSetEnabled(diaPopsNetConfig, NETCFG_POPS_MASK_0 + i, !ps2_ip_use_dhcp);
+                diaSetEnabled(diaPopsNetConfig, NETCFG_POPS_GW_0 + i, !ps2_ip_use_dhcp);
+            }
+
+            // A NetBIOS share name can't be turned into an IP -- leave the POPStarter server IP
+            // untouched in that case instead of importing a wrong value.
+            if (!gPCShareAddressIsNetBIOS) {
+                for (i = 0; i < 4; ++i)
+                    diaSetInt(diaPopsNetConfig, NETCFG_POPS_SMB_IP_0 + i, pc_ip[i]);
+            }
+            diaSetInt(diaPopsNetConfig, NETCFG_POPS_SMB_PORT, gPCPort);
+            snprintf(s, sizeof(s), "%s", gPCShareName);
+            diaSetString(diaPopsNetConfig, NETCFG_POPS_SMB_SHARE, s);
+            snprintf(s, sizeof(s), "%s", gPCUserName);
+            diaSetString(diaPopsNetConfig, NETCFG_POPS_SMB_USER, s);
+            snprintf(s, sizeof(s), "%s", gPCPassword);
+            diaSetString(diaPopsNetConfig, NETCFG_POPS_SMB_PASS, s);
+        }
+    } while (result == NETCFG_POPS_IMPORT);
+
+    if (result) {
+        // POPStarter save matrix (POPSLoader parity): compare the dialog's POPStarter fields against
+        // the read-time snapshot and write ONLY what actually changed -- and only when the file
+        // already exists (overwrite at its origin dir) or the user supplied complete values (create
+        // at createDir). Blank/incomplete fields with no existing file create NOTHING: absence must
+        // never turn into a fabricated configuration.
+        vcd_popsnet_t popsCur = popsOriginal; // carries the origin dirs + exists flags over
+        diaGetInt(diaPopsNetConfig, NETCFG_POPS_IPTYPE, &popsCur.ipDhcp);
+        for (i = 0; i < 4; ++i) {
+            diaGetInt(diaPopsNetConfig, NETCFG_POPS_IP_0 + i, &popsCur.ps2Ip[i]);
+            diaGetInt(diaPopsNetConfig, NETCFG_POPS_MASK_0 + i, &popsCur.ps2Mask[i]);
+            diaGetInt(diaPopsNetConfig, NETCFG_POPS_GW_0 + i, &popsCur.ps2Gw[i]);
+            diaGetInt(diaPopsNetConfig, NETCFG_POPS_SMB_IP_0 + i, &popsCur.smbIp[i]);
+        }
+        diaGetInt(diaPopsNetConfig, NETCFG_POPS_SMB_PORT, &popsCur.smbPort);
+        diaGetString(diaPopsNetConfig, NETCFG_POPS_SMB_SHARE, popsCur.smbShare, sizeof(popsCur.smbShare));
+        diaGetString(diaPopsNetConfig, NETCFG_POPS_SMB_USER, popsCur.smbUser, sizeof(popsCur.smbUser));
+        diaGetString(diaPopsNetConfig, NETCFG_POPS_SMB_PASS, popsCur.smbPass, sizeof(popsCur.smbPass));
+
+        int popsMask = vcdPopsNetChanged(&popsOriginal, &popsCur);
+        int popsSmbComplete = popsCur.smbShare[0] != '\0' &&
+                              (popsCur.smbIp[0] | popsCur.smbIp[1] | popsCur.smbIp[2] | popsCur.smbIp[3]) != 0;
+        int popsIpComplete = (popsCur.ps2Ip[0] | popsCur.ps2Ip[1] | popsCur.ps2Ip[2] | popsCur.ps2Ip[3]) != 0 &&
+                             (popsCur.ps2Mask[0] | popsCur.ps2Mask[1] | popsCur.ps2Mask[2] | popsCur.ps2Mask[3]) != 0 &&
+                             (popsCur.ps2Gw[0] | popsCur.ps2Gw[1] | popsCur.ps2Gw[2] | popsCur.ps2Gw[3]) != 0;
+        int writeSmb = (popsMask & 1) && (popsOriginal.smbExists || popsSmbComplete);
+        int writeIp = (popsMask & 2) && (popsOriginal.ipExists || popsCur.ipDhcp || popsIpComplete);
+        // Creating a fresh SMBCONFIG.DAT with no IPCONFIG.DAT anywhere: create the pair -- POPStarter
+        // expects IPCONFIG.DAT to exist even when blank (DHCP). An incomplete static entry becomes a
+        // BLANK file (never garbage); the user can complete it later and it will overwrite.
+        if (writeSmb && !popsOriginal.smbExists && !popsOriginal.ipExists) {
+            writeIp = 1;
+            if (!popsCur.ipDhcp && !popsIpComplete)
+                popsCur.ipDhcp = 1;
+        }
+        if ((writeSmb || writeIp) && vcdWritePopstarterNetFiles(&popsCur, writeSmb, writeIp) != 0)
+            guiMsgBox(_l(_STR_POPSTARTER_NET_ERR), 0, NULL);
+    }
+}
+
+// Game Sources page (settings-layout restructure, was Device Settings): device selection + start
+// modes. The Protocol/Access/SMB-Version rows moved to the Network page (guiShowNetConfig); only
+// the Network Start Mode row stays here.
+void guiShowDeviceConfig(void)
+{
+    const char *deviceNames[] = {_l(_STR_BDM_GAMES), _l(_STR_NET_GAMES), _l(_STR_HDD_GAMES), _l(_STR_APPS), _l(_STR_MMCE), _l(_STR_FAV), NULL};
+    const char *deviceModes[] = {_l(_STR_OFF), _l(_STR_MANUAL), _l(_STR_AUTO), NULL};
+
+    // Devices & modes
+    diaSetEnum(diaDeviceConfig, CFG_DEFDEVICE, deviceNames);
+    diaSetEnum(diaDeviceConfig, CFG_BDMMODE, deviceModes);
+    diaSetEnum(diaDeviceConfig, CFG_HDDMODE, deviceModes);
+    diaSetEnum(diaDeviceConfig, CFG_APPMODE, deviceModes);
+    diaSetEnum(diaDeviceConfig, CFG_FAVMODE, deviceModes);
+
+    int deviceModeIndex = guiIoModeToDeviceType(gDefaultDevice);
+    diaSetInt(diaDeviceConfig, CFG_DEFDEVICE, deviceModeIndex);
+    diaSetInt(diaDeviceConfig, CFG_BDMMODE, gBDMStartMode);
+    diaSetInt(diaDeviceConfig, CFG_HDDMODE, gHDDStartMode);
+    diaSetInt(diaDeviceConfig, CFG_APPMODE, gAPPStartMode);
+    diaSetInt(diaDeviceConfig, CFG_FAVMODE, gFAVStartMode);
+
+    // Block devices (inlined; interlocked with the APA HDD mode)
+    diaSetInt(diaDeviceConfig, CFG_ENABLEUSB, gEnableUSB);
+    diaSetInt(diaDeviceConfig, CFG_ENABLEILK, gEnableILK);
+    diaSetInt(diaDeviceConfig, CFG_ENABLEMX4SIO, gEnableMX4SIO);
+    diaSetInt(diaDeviceConfig, CFG_ENABLEBDMHDD, gEnableBdmHDD);
+    diaSetEnabled(diaDeviceConfig, CFG_ENABLEBDMHDD, 1); // coexists with APA (directive 2026-07-21)
+    diaSetEnabled(diaDeviceConfig, CFG_HDDMODE, 1);
+    // Network Start Mode (Off/Manual/Auto) == gNetStartMode (START_MODE_*); the SAME three options
+    // (and indices) as every other device's start row, so reuse the localized deviceModes (Gemini
+    // review of #199). Protocol/Access/SMB-Version live on the Network page now.
+    diaSetEnum(diaDeviceConfig, CFG_NETSTART, deviceModes);
+    diaSetInt(diaDeviceConfig, CFG_NETSTART, gNetStartMode);
+
+    diaSetEnum(diaDeviceConfig, CFG_MMCEMODE, deviceModes);
+    diaSetInt(diaDeviceConfig, CFG_MMCEMODE, gMMCEStartMode);
+
+    int ret = diaExecuteDialog(diaDeviceConfig, -1, 1, NULL);
+    if (ret) {
+        int netProtocolWas = gNetworkProtocol;
+        diaGetInt(diaDeviceConfig, CFG_DEFDEVICE, &deviceModeIndex);
+        gDefaultDevice = guiDeviceTypeToIoMode(deviceModeIndex);
+        diaGetInt(diaDeviceConfig, CFG_BDMMODE, &gBDMStartMode);
+        diaGetInt(diaDeviceConfig, CFG_HDDMODE, &gHDDStartMode);
+        diaGetInt(diaDeviceConfig, CFG_APPMODE, &gAPPStartMode);
+        diaGetInt(diaDeviceConfig, CFG_FAVMODE, &gFAVStartMode);
+
+        diaGetInt(diaDeviceConfig, CFG_ENABLEUSB, &gEnableUSB);
+        diaGetInt(diaDeviceConfig, CFG_ENABLEILK, &gEnableILK);
+        diaGetInt(diaDeviceConfig, CFG_ENABLEMX4SIO, &gEnableMX4SIO);
+        diaGetInt(diaDeviceConfig, CFG_ENABLEBDMHDD, &gEnableBdmHDD);
+        // Network Start Mode read-back: Start=Off forces the protocol OFF; switching Start back on
+        // with no protocol memory (was OFF) lands on SMB, the common default. The protocol itself is
+        // picked on the Network page. Then re-derive the legacy shadows downstream consumers read.
+        diaGetInt(diaDeviceConfig, CFG_NETSTART, &gNetStartMode);
+        if (gNetStartMode == START_MODE_DISABLED)
+            gNetworkProtocol = NET_PROTO_OFF;
+        else if (gNetworkProtocol == NET_PROTO_OFF)
+            gNetworkProtocol = NET_PROTO_SMB;
+        gEnableUDPBD = (gNetworkProtocol == NET_PROTO_UDPBD || gNetworkProtocol == NET_PROTO_UDPFSBD);
+        gNetBootProtocol = (gNetworkProtocol == NET_PROTO_UDPFSBD) ? NET_BOOT_UDPFS : NET_BOOT_UDPBD;
+        // SMB's start mode IS the network start row now (Auto = boot connect, Manual = on-entry);
+        // every non-SMB protocol forces the SMB/ETH stack off so only one transport claims the NIC.
+        gETHStartMode = (gNetworkProtocol == NET_PROTO_SMB) ? gNetStartMode : START_MODE_DISABLED;
+
+        diaGetInt(diaDeviceConfig, CFG_MMCEMODE, &gMMCEStartMode);
+
+        // "Nothing happens" guard (hardware report on Beta-2937): enabling a network protocol gave NO
+        // feedback -- the UDPFS tab joins the ring silently and then waits for a Confirm-press inside
+        // it (Manual start), and the block transports show a tab only once the PC server answers.
+        if (gNetworkProtocol != netProtocolWas) {
+            if (gNetworkProtocol == NET_PROTO_UDPFS)
+                guiMsgBox(_l(_STR_NET_UDPFS_TAB_HINT), 0, NULL);
+            else if (gNetworkProtocol == NET_PROTO_UDPFSBD || gNetworkProtocol == NET_PROTO_UDPBD)
+                guiMsgBox(_l(_STR_NET_UDPBD_TAB_HINT), 0, NULL);
+        }
+
+        // Each network transport loads its IOP module chain once per boot (the load latch is not
+        // cleared live). If any network stack is already up and the Start toggle changed the active
+        // protocol, the switch takes effect only after a restart -- say so instead of silently
+        // doing nothing.
+        if (gNetworkProtocol != netProtocolWas &&
             (bdmIsUDPBDLoaded() || ethGetModulesLoaded() || udpfsGetModulesLoaded()))
             guiMsgBox(_l(_STR_NETBOOT_RESTART), 0, NULL);
 
@@ -1751,12 +1996,14 @@ void guiShowControllerConfig(void)
     diaSetInt(diaControllerConfig, CFG_SELECTBUTTON, gSelectButton == KEY_CIRCLE ? 0 : 1);
     diaSetInt(diaControllerConfig, CFG_XSENSITIVITY, gXSensitivity);
     diaSetInt(diaControllerConfig, CFG_YSENSITIVITY, gYSensitivity);
+    diaSetInt(diaControllerConfig, CFG_RUMBLE, gEnableRumble);
 
     int result = diaExecuteDialog(diaControllerConfig, -1, 1, NULL);
     if (result) {
         diaGetInt(diaControllerConfig, UICFG_SCROLL, &gScrollSpeed);
         diaGetInt(diaControllerConfig, CFG_XSENSITIVITY, &gXSensitivity);
         diaGetInt(diaControllerConfig, CFG_YSENSITIVITY, &gYSensitivity);
+        diaGetInt(diaControllerConfig, CFG_RUMBLE, &gEnableRumble);
 
         if (diaGetInt(diaControllerConfig, CFG_SELECTBUTTON, &value))
             gSelectButton = value == 0 ? KEY_CIRCLE : KEY_CROSS;

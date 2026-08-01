@@ -22,7 +22,7 @@ just a different list. An on-screen hint shows whether you're looking at discs o
 
 ## 2. Lock a page with "Default game view"
 
-If you don't want to press L3 every time, open **Settings → Display Settings** and set
+If you don't want to press L3 every time, open **Interface** and set
 **Default game view**:
 
 | Value | Behaviour |
@@ -60,7 +60,7 @@ title and POPSTARTER finds the matching `*.VCD`. An APA one-game install instead
 with its literal, case-sensitive `PP.<name>` / `__.<name>` partition label so POPSTARTER can
 mount that partition and boot its fixed `IMAGE0.VCD`.
 
-Where `POPSTARTER.ELF` is loaded from is set by **Settings → VCD Settings →
+Where `POPSTARTER.ELF` is loaded from is set by **POPStarter →
 POPSTARTER.ELF Device** — a driver-accurate picker (matching the Neutrino Device picker):
 
 | Choice | Loads `POPS/POPSTARTER.ELF` from |
@@ -118,7 +118,7 @@ the same physical `IMAGE0.VCD` filename, so config and art use the displayed `<n
 
 POPSTARTER's stock driver reads FAT32. To boot PS1 games from an **exFAT** drive,
 POPSTARTER needs extra block-device modules (the BDMAssault / "BDMA" drivers). RiptOPL
-*equips* them for you from **VCD Settings** — RiptOPL copies the right pair onto your memory
+*equips* them for you from **POPStarter → BDMA Settings** — RiptOPL copies the right pair onto your memory
 card; your own module files win when present, and a gzipped built-in pair fills the gap when
 they aren't:
 
@@ -130,8 +130,14 @@ staged before the live pair is changed, so a failed copy leaves the previous pai
   its block-device driver from the memory card, so the right exFAT variant must already be on
   the card or the game drops to OSDSYS. When **On**, RiptOPL equips the variant matching the
   PS1 game you're launching (read from that game's own device) automatically, right before
-  boot — so an MX4SIO / USB / HDD exFAT game just works with no manual step. Turn it **Off** to
+  boot — so an MX4SIO / HDD exFAT game just works with no manual step. Turn it **Off** to
   manage the driver yourself; that reveals the **BDMA Source** / **BDMA Mode** pickers below.
+- **USB launches always ask** — the PS2 cannot detect whether a USB stick is fat32 or exFAT
+  formatted, so every USB .VCD launch first shows a **"fat32 or exFAT USB Mode?"** dialog
+  (fat32 is recommended for non-exFAT USB users). Picking **fat32** de-equips to POPSTARTER's
+  built-in USB stack (preserving any complete, unmarked manually-managed module pair); picking
+  **exFAT** equips the BDMAssault `usbexfat` pair. The pick applies even when Apply-on-Launch is Off,
+  and backing out of the dialog cancels the launch.
 - **BDMA MODE** *(manual; shown when Apply-on-Launch is Off)* — which driver variant POPSTARTER should use: `USB (FAT32)` (none —
   removes the exFAT modules so POPSTARTER falls back to its built-in FAT32 driver),
   `USB (exFAT)`, `MX4SIO (exFAT)`, `MMCE (exFAT)`, or `HDD (exFAT)` (the internal ATA
@@ -160,7 +166,7 @@ folder anywhere still equips. Your own `usbd.irx.<mode>` / `usbhdfsd.irx.<mode>`
 when found — the embedded pair only fills the gap when no seek-path device carries them. SMB is
 network-only, so the BDMA equip does not apply to it.
 
-The internal **exFAT HDD** (enable *BDM HDD* in Device Settings) mounts as a normal BDM
+The internal **exFAT HDD** (enable *BDM HDD* in **Game Sources**) mounts as a normal BDM
 block device, so its PS1 games in `massN:/POPS/` list and launch through the same VCD view
 (press **L3**) as USB/MX4SIO — there's no separate page. Equip the `HDD (exFAT)` BDMA mode
 so POPSTARTER itself can read them off the exFAT volume.
@@ -183,7 +189,7 @@ Work down this ladder; each step isolates a different stage (from the #154 foren
    iLink need their toggles on; the **internal exFAT** page needs *BDM devices* + *BDM HDD* ON and
    the **APA HDD start mode OFF** — the two internal-HDD backends are mutually exclusive, and a
    hand-edited/cross-version config that enables both gets auto-reconciled at boot (you now get a
-   toast when that happens; check Device Settings).
+   toast when that happens; check **Game Sources**).
 2. **Do PS2 ISOs list from the device?** If yes, the filesystem/mount layer is proven working and
    the problem is downstream of listing — skip to the VCD-specific steps below.
 3. **Press L3.** The VCD view is per device and only reachable when *Default game view* is

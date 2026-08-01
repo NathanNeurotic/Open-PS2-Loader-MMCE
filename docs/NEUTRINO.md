@@ -19,7 +19,7 @@ order is:
 
 | Priority | Where OPL looks |
 |---|---|
-| 1 | The device chosen in **Settings → General Settings → Neutrino Device** (see below) |
+| 1 | The device chosen in **Game Launching → Neutrino Defaults → Default Device** (see below) |
 | 2 | The custom **Neutrino ELF Path** (`neutrino_path`) |
 | 3 | The active game's own device — `<games prefix>/neutrino/`, then `<device root>/neutrino/` |
 | 4 | `mc0:` / `mc1:` — `NEUTRINO/neutrino.elf` and its lowercase / `NEUTRINO.ELF` variants |
@@ -27,14 +27,14 @@ order is:
 If no complete install is found when you launch a game set to the Neutrino core, OPL shows a
 warning and falls back to the `<OPL>` core for that launch.
 
-**Settings → General Settings → Neutrino Device** picks the device *type* holding
+**Game Launching → Neutrino Defaults → Default Device** picks the device *type* holding
 `<root>:/neutrino/neutrino.elf` — **Auto** / Memory Card / USB / MX4SIO / MMCE / HDD (exFAT) /
 HDD (APA) / **Game's Device**. A miss on the device you picked is not a dead end: OPL falls
 through to the AUTO tiers above. The exception is **Game's Device**, which only ever looks on
 the game's own device and reports "not found" instead of falling back.
 
-You can also point OPL at a **custom location** via **Settings → General Settings → Neutrino
-ELF Path**. When that field is set and the file exists it takes **priority** over the
+You can also point OPL at a **custom location** via the **Neutrino ELF Path** (`neutrino_path` key
+in `settings_riptopl.cfg`). When that field is set and the file exists it takes **priority** over the
 auto-detected tiers above (the game's own device and `mc0:`/`mc1:`) — only the **Neutrino
 Device** picker outranks it; leave it blank to use the auto-detection. The custom path is
 honoured only when its install passes the same `config/system.toml` completeness check (a path
@@ -94,7 +94,7 @@ per-game**, so a game can extend the global set.
 
 ### Global default args — applies to every Neutrino launch
 
-**Settings → General Settings → Neutrino Launch Args** (config key `neutrino_args` in
+**Game Launching → Neutrino Defaults → Advanced Arguments** (config key `neutrino_args` in
 `settings_riptopl.cfg`).
 
 ### Per-game args — applies to one title
@@ -134,8 +134,9 @@ For the full list of flags Neutrino accepts, see the
 
 ## 4. Network boot — the Network Protocol selector
 
-RiptOPL streams games from a PC over the LAN, chosen with a single **Device Settings → Network
-Protocol** selector with four choices — **Off / SMB / UDPFS / UDPBD**. **UDPFS** is the modern
+RiptOPL streams games from a PC over the LAN, chosen with the **Game Sources → Network Start
+Mode** row (**Off** / Manual / Auto) plus the **Network → Protocol** selector — **SMB / UDPFS /
+UDPBD**. **UDPFS** is the modern
 network-boot protocol (Rick Gaiser's **UDPRDMA** transport); **UDPBD** is the older SUDPBDv2 protocol,
 kept for users still running the `udpbd-server`. Both appear in OPL as their own games list — with
 covers and per-game settings — and boot via the external Neutrino core. **SMB** is the exception: it's
@@ -148,7 +149,7 @@ reading, so an SMBv1-only server (including the bundled PS2-Servers tool) will l
 | Choice | Wire protocol | On the PS2 | Core | PC server |
 |---|---|---|---|---|
 | **Off** | — | no network device (default) | — | — |
-| **SMB** | SMBv1 (default) or SMB2 — Device Settings → **SMB Version** | a mounted file share | OPL's *own* core (not Neutrino) | [PS2 Servers](https://github.com/NathanNeurotic/PS2-Servers) (recommended) / Samba |
+| **SMB** | SMBv1 (default) or SMB2 — **Network → SMB Version** | a mounted file share | OPL's *own* core (not Neutrino) | [PS2 Servers](https://github.com/NathanNeurotic/PS2-Servers) (recommended) / Samba |
 | **UDPFS** | UDPRDMA | a games source served over UDP (see **UDPFS Access** below) | Neutrino only | [PS2 Servers](https://github.com/NathanNeurotic/PS2-Servers) (recommended) / [`udpfsd`](https://github.com/pcm720/udpfsd) |
 | **UDPBD** | SUDPBDv2 | a served disk image mounted as `massN:` | Neutrino only | [PS2 Servers](https://github.com/NathanNeurotic/PS2-Servers) (recommended) / [`udpbd-server`](https://github.com/israpps/udpbd-server) |
 

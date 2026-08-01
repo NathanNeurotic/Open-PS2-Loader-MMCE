@@ -13,7 +13,7 @@ Review the LICENSE file for further details.<br><br>
 [![Documentation](https://img.shields.io/badge/Documentation-RiptOPL-skyblue?style=flat&logo=githubpages&logoColor=white&labelColor=navy)](https://nathanneurotic.github.io/Open-PS2-Loader/)
 [![MEGA Archive](https://img.shields.io/badge/MEGA-Rolling%20Archive-%23D90007?style=flat&logo=mega&logoColor=white)](https://mega.nz/folder/74pRHKRB#9SLDkrkvZAbeKO4Qvxg9LQ)
 
-> **What is RiptOPL?** A downstream fork of Open PS2 Loader with a built-in cover-art **Coverflow** theme (default), a **Favourites** tab, per-game **Neutrino** external-core launching, a consolidated **Device Settings** hub, DualSense support, and ready-to-use opinionated defaults. Its settings live in their own **`settings_riptopl.cfg`** so they never collide with official OPL or wOPL installed on the same memory card — while artwork, themes, VMCs and **favourites stay shared**. See **[This Fork's Additions](#this-forks-additions)**. For the canonical project, use [ps2homebrew/Open-PS2-Loader](https://github.com/ps2homebrew/Open-PS2-Loader).
+> **What is RiptOPL?** A downstream fork of Open PS2 Loader with a built-in cover-art **Coverflow** theme (default), a **Favourites** tab, per-game **Neutrino** external-core launching, a reorganized category **settings layout**, DualSense support, and ready-to-use opinionated defaults. Its settings live in their own **`settings_riptopl.cfg`** so they never collide with official OPL or wOPL installed on the same memory card — while artwork, themes, VMCs and **favourites stay shared**. See **[This Fork's Additions](#this-forks-additions)**. For the canonical project, use [ps2homebrew/Open-PS2-Loader](https://github.com/ps2homebrew/Open-PS2-Loader).
 
 > 📖 **Full documentation & guides:** **<https://nathanneurotic.github.io/Open-PS2-Loader/>** — a complete, searchable docs site covering every storage backend, the Neutrino core, PS1/VCD, the Theme Engine (with worked examples and an annotated sample theme), a full settings reference, and troubleshooting.
 
@@ -33,12 +33,12 @@ It supports six categories of devices:
 2. MMCE (Memory Card Mass Storage protocol devices);
 3. MX4SIO (SD card connected to memory card port via adapter);
 4. iLink (SBP2 compliant storage devices via IEEE 1394);
-5. SMB shares (SMBv1 or SMB2, selectable under Device Settings);
+5. SMB shares (SMBv1 or SMB2, selectable under **Network**);
 6. ATA/IDE HDDs, including internal exFAT configurations (MBR/GPT).
 
 Plus an optional **network-block-device boot** (UDPBD / UDPFS, via Neutrino) that streams games
 from a PC over the LAN as their own game list — the network protocol defaults to **Off**; the
-first protocol you pick in Device Settings comes up live. (Network stacks share the one adapter
+first protocol you pick in **Network** comes up live. (Network stacks share the one adapter
 and stay loaded for the whole boot, so *switching away* from a loaded protocol still needs a
 restart — OPL says so when it applies.)
 See [This Fork's Additions](#this-forks-additions).
@@ -116,12 +116,12 @@ This build layers several features on top of upstream OPL:
   **`ART/art.tar`** (entries named `<GAMEID>_<suffix>.png`; VCD entries first use the filename without
   `.VCD`, or the displayed `PP.<name>` / `__.<name>` install name, then fall back to a parsed PS1 ID)
   instead of thousands of loose files.
-  Enable **Cover Art .tar Archive** under **Display Settings** (default **off**); when on, each
+  Enable **Cover Art .tar Archive** under **Interface → Artwork Settings** (default **off**); when on, each
   cover is read from the archive and *falls back to the loose `.png`* when it isn't there, so the
   two coexist. A small `art_cache.bin` index written beside the archive lets later boots skip the
   re-scan. The format matches wOPL/sOPL art packs, so existing `.tar` packs work unchanged.
 - **Favourites tab:** press **R3** on any game to star it; a virtual **Favourites** page
-  (alongside the device tabs, switched on in **Device Settings**) gathers your starred games
+  (alongside the device tabs, switched on in **Game Sources**) gathers your starred games
   from every device into one list, and a star marks favourited titles everywhere. Favourites
   are stored in a shared `favourites.bin`, and RiptOPL will **import an existing uOPL / wOPL
   favourites file** if it finds one — so your favourites carry over from those builds.
@@ -146,14 +146,15 @@ This build layers several features on top of upstream OPL:
   device — they show up as a **UDPBD Games** list with full covers and per-game settings, just
   like a local drive. UDPBD launches via Neutrino, is mutually exclusive with SMB (they share
   the one network adapter), and needs a static PS2 IP (the default is `192.168.1.10`); the
-  fork's **network protocol defaults to Off** — pick UDPFS or UDPBD in Device Settings and it
+  fork's **network protocol defaults to Off** — pick UDPFS or UDPBD in **Network** and it
   loads live (a restart is only needed to *switch away* from a protocol already loaded). Run it from the
   **[PS2 Servers](https://github.com/NathanNeurotic/PS2-Servers)** all-in-one PC launcher. See the
   network-boot section of **[docs/NEUTRINO.md](docs/NEUTRINO.md#4-network-boot--the-network-protocol-selector)**.
 - **UDPFS network boot (Neutrino):** a newer network transport (Neutrino's UDPRDMA) offered
-  alongside UDPBD. Under **Device Settings** the network controls are four rows: **Network
-  Protocol** (Off / Manual / Auto), **Protocol** (**SMB / UDPFS / UDPBD**), **SMB Version**
-  (SMBv1 / SMB2, live only while Protocol is SMB), and **Access** (Files / IMG — locked to Files
+  alongside UDPBD. The network controls are split across two pages: **Game Sources** holds the
+  **Network Start Mode** row (Off / Manual / Auto), and **Network** holds **Protocol**
+  (**SMB / UDPFS / UDPBD**), **SMB Version** (SMBv1 / SMB2, live only while Protocol is SMB),
+  and **Access** (Files / IMG — locked to Files
   for SMB and to IMG for UDPBD, free only for UDPFS). UDPFS launches via `-bsd=udpfsbd` with a
   bundled `bsd-udpfsbd.toml`. Use the
   **[PS2 Servers](https://github.com/NathanNeurotic/PS2-Servers)** all-in-one PC launcher for UDPFS,
@@ -172,11 +173,11 @@ This build layers several features on top of upstream OPL:
   under Neutrino it greys the panels Neutrino ignores (GSM, Cheats, PADEMU, OSD Language and the
   OPL-only compat modes) and offers a structured **Neutrino Video** picker (Off / 240p / 480p /
   1080i) plus a Neutrino-only **Mode 7** (`-gc=7`). See **[docs/NEUTRINO.md](docs/NEUTRINO.md)**.
-- **Device Settings hub:** the old "Settings" page is now **General Settings**, and a new
-  **Device Settings** page consolidates the per-device options, cache sizes, Block-Devices
-  (BDM) settings, all MMCE settings, the network-boot controls (the **Network Protocol** start
-  row plus the **Protocol**, **SMB Version** and **Access** pickers), and the Favourites tab
-  toggle in one place.
+- **Category settings layout:** the start menu's settings are organized into category pages —
+  **Settings**, **Game Sources** (device selection + start modes), **Interface**, **Display**,
+  **Game Launching** (incl. the global Neutrino/OSD defaults), **POPStarter**, **MMCE**,
+  **Network**, **Controller**, **Audio**, **Security**, **Advanced** (debug, path prefixes,
+  storage/cache), **Tools** and **About** — each with chained sub-pages instead of one flat list.
 - **DualSense / DualShock 5 (USB):** optional controller support — grab a ready-made
   `RIPTOPL-<version>-<SDK>-ds5.ELF` (one per SDK flavour) from the rolling release, or build
   with `make DUALSENSE=1`.
@@ -190,7 +191,7 @@ This build layers several features on top of upstream OPL:
   widescreen, cover art, notifications, sound effects + boot sound, delete/rename, and
   the PS2 logo. Video mode stays **Auto**. Every storage device ships **off**, so the first boot
   lands on the start menu with no tabs — enable exactly the devices your console has under
-  **Device Settings**. Change any of it under Settings.
+  **Game Sources**. Change any of it under Settings.
 - **Private settings, shared data:** RiptOPL saves its master config as **`settings_riptopl.cfg`**
   (auto-migrated from the older `conf_riptopl.cfg`; not `conf_opl.cfg`), so it can sit on the same memory card as official OPL or wOPL without
   either build clobbering the other's settings. Everything else under the `OPL/` folder —
@@ -367,15 +368,15 @@ on the host machine or NAS device and make sure that it has full read and
 write permissions. USB Advance/Extreme format is optional - \*.ISO images
 are supported using the folder structure above.
 
-> **SMB version:** **Device Settings** has an **SMB Version** row (SMBv1 / SMB2) directly under
+> **SMB version:** the **Network** page has an **SMB Version** row (SMBv1 / SMB2) directly under
 > **Protocol**, live only while **Protocol** is **SMB** (greyed out otherwise). It defaults to
 > **SMBv1**; setting it to **SMB2** switches *both* sides — browsing loads the SMB2 driver instead
 > of the SMBv1 one, and so does the in-game reader — so the server must speak SMB2 for the whole
 > session.
 >
 > **RiptOPL network defaults:** the network protocol selector defaults to **Off** — under
-> **Device Settings** set **Network Protocol** to **Manual** or **Auto**, then set **Protocol**
-> to **SMB**, before the **NET Games** tab appears. Network Config
+> **Game Sources** set **Network Start Mode** to **Manual** or **Auto**, then in **Network** set
+> **Protocol** to **SMB**, before the **NET Games** tab appears. Network Config
 > ships static defaults (PS2 `192.168.1.10`, PC `192.168.1.100`, share `games`, user `guest`);
 > adjust them to your LAN. The default **SMB Port is `1111`** — a non-privileged port (>1024), so a server
 > binds it without admin/root. **Network Config** now opens with **advanced options on**, so
@@ -395,10 +396,10 @@ Settings**. For PS2, 48-bit LBA internal HDDs are supported. The HDD can be form
 - APA partitioning with PFS filesystem (up to 2TB)
 	- OPL will create the `+OPL` partition on the HDD.  To avoid this, create `hdd0:__common/OPL/conf_hdd.cfg` containing the entry `hdd_partition=__common` (or whichever partition you prefer) — the same file and key described above.
 - MBR partitioning (up to 2TB) or GPT partitioning (unlimited) with the exFAT filesystem
-	- Enable **BDM HDD** in **Device Settings**. The exFAT HDD then mounts through the Block Device Manager (BDMAssault / "BDMA") into the shared `massN:` namespace — the same path as USB/MX4SIO — and appears as an **HDD (exFAT)** games list with the HDD icon.
+	- Enable **BDM HDD** in **Game Sources**. The exFAT HDD then mounts through the Block Device Manager (BDMAssault / "BDMA") into the shared `massN:` namespace — the same path as USB/MX4SIO — and appears as an **HDD (exFAT)** games list with the HDD icon.
 	- Files should be added contiguously or synchronously to avoid fragmentation. For example, drag and drop files one at a time, or ensure that files are added sequentially.
 	- When formatting drives for the exFAT filesystem, please make sure the `Allocation unit size` is set to `Default`.
-	- **PS1 games:** PS1 `*.VCD` titles in the HDD's `POPS/` folder list under the **L3** VCD view like any other device. To boot them, open **VCD Settings** from the main menu. **VCD BDMA Apply on Launch** is on by default and equips the matching exFAT driver automatically; turn it off to reveal the manual **BDMA Source** / **BDMA Mode** pickers and set **BDMA Mode → HDD (exFAT)** by hand so POPSTARTER can read the exFAT volume. See **[docs/VCD.md](docs/VCD.md)**.
+	- **PS1 games:** PS1 `*.VCD` titles in the HDD's `POPS/` folder list under the **L3** VCD view like any other device. To boot them, open **POPStarter → BDMA Settings** from the main menu. **VCD BDMA Apply on Launch** is on by default and equips the matching exFAT driver automatically; turn it off to reveal the manual **BDMA Source** / **BDMA Mode** pickers and set **BDMA Mode → HDD (exFAT)** by hand so POPSTARTER can read the exFAT volume. See **[docs/VCD.md](docs/VCD.md)**.
 
 ## APPS
 
