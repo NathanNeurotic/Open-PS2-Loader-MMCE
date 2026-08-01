@@ -28,17 +28,18 @@
 
 enum MENU_IDs {
     MENU_SETTINGS = 0,
-    MENU_DEVICE_SETTINGS,
-    MENU_VCD_SETTINGS,
-    MENU_MMCE_SETTINGS,
-    MENU_GFX_SETTINGS,
-    MENU_AUDIO_SETTINGS,
-    MENU_CONTROLLER_SETTINGS,
-    MENU_OSD_LANGUAGE_SETTINGS,
-    MENU_PARENTAL_LOCK,
-    MENU_NET_CONFIG,
-    MENU_NET_UPDATE,
-    MENU_START_NBD,
+    MENU_GAME_SOURCES,
+    MENU_INTERFACE,
+    MENU_DISPLAY,
+    MENU_GAME_LAUNCHING,
+    MENU_POPSTARTER,
+    MENU_MMCE,
+    MENU_NETWORK,
+    MENU_CONTROLLER,
+    MENU_AUDIO,
+    MENU_SECURITY,
+    MENU_ADVANCED,
+    MENU_TOOLS,
     MENU_ABOUT,
     MENU_SAVE_CHANGES,
     MENU_EXIT,
@@ -425,18 +426,19 @@ static void menuInitMainMenu(void)
 
     // initialize the menu
     submenuAppendItem(&mainMenu, -1, NULL, MENU_LAUNCH_PS2_DISC, _STR_LAUNCH_PS2_DISC, NULL);
-    submenuAppendItem(&mainMenu, -1, NULL, MENU_SETTINGS, _STR_GENERAL_SETTINGS, NULL);
-    submenuAppendItem(&mainMenu, -1, NULL, MENU_DEVICE_SETTINGS, _STR_DEVICE_SETTINGS, NULL);
-    submenuAppendItem(&mainMenu, -1, NULL, MENU_VCD_SETTINGS, _STR_VCD_SETTINGS, NULL);
-    submenuAppendItem(&mainMenu, -1, NULL, MENU_MMCE_SETTINGS, _STR_MMCE_SETTINGS, NULL);
-    submenuAppendItem(&mainMenu, -1, NULL, MENU_GFX_SETTINGS, _STR_GFX_SETTINGS, NULL);
-    submenuAppendItem(&mainMenu, -1, NULL, MENU_AUDIO_SETTINGS, _STR_AUDIO_SETTINGS, NULL);
-    submenuAppendItem(&mainMenu, -1, NULL, MENU_CONTROLLER_SETTINGS, _STR_CONTROLLER_SETTINGS, NULL);
-    submenuAppendItem(&mainMenu, -1, NULL, MENU_OSD_LANGUAGE_SETTINGS, _STR_OSD_SETTINGS, NULL);
-    submenuAppendItem(&mainMenu, -1, NULL, MENU_PARENTAL_LOCK, _STR_PARENLOCKCONFIG, NULL);
-    submenuAppendItem(&mainMenu, -1, NULL, MENU_NET_CONFIG, _STR_NETCONFIG, NULL);
-    submenuAppendItem(&mainMenu, -1, NULL, MENU_NET_UPDATE, _STR_NET_UPDATE, NULL);
-    submenuAppendItem(&mainMenu, -1, NULL, MENU_START_NBD, _STR_STARTNBD, NULL);
+    submenuAppendItem(&mainMenu, -1, NULL, MENU_SETTINGS, _STR_SETTINGS, NULL);
+    submenuAppendItem(&mainMenu, -1, NULL, MENU_GAME_SOURCES, _STR_GAME_SOURCES, NULL);
+    submenuAppendItem(&mainMenu, -1, NULL, MENU_INTERFACE, _STR_INTERFACE_SETTINGS, NULL);
+    submenuAppendItem(&mainMenu, -1, NULL, MENU_DISPLAY, _STR_DISPLAY_SETTINGS, NULL);
+    submenuAppendItem(&mainMenu, -1, NULL, MENU_GAME_LAUNCHING, _STR_GAME_LAUNCHING, NULL);
+    submenuAppendItem(&mainMenu, -1, NULL, MENU_POPSTARTER, _STR_POPSTARTER, NULL);
+    submenuAppendItem(&mainMenu, -1, NULL, MENU_MMCE, _STR_MMCE, NULL);
+    submenuAppendItem(&mainMenu, -1, NULL, MENU_NETWORK, _STR_MENU_NETWORK, NULL);
+    submenuAppendItem(&mainMenu, -1, NULL, MENU_CONTROLLER, _STR_MENU_CONTROLLER, NULL);
+    submenuAppendItem(&mainMenu, -1, NULL, MENU_AUDIO, _STR_MENU_AUDIO, NULL);
+    submenuAppendItem(&mainMenu, -1, NULL, MENU_SECURITY, _STR_SECURITY_SETTINGS, NULL);
+    submenuAppendItem(&mainMenu, -1, NULL, MENU_ADVANCED, _STR_ADVANCED_SETTINGS, NULL);
+    submenuAppendItem(&mainMenu, -1, NULL, MENU_TOOLS, _STR_TOOLS, NULL);
     submenuAppendItem(&mainMenu, -1, NULL, MENU_ABOUT, _STR_ABOUT, NULL);
     submenuAppendItem(&mainMenu, -1, NULL, MENU_SAVE_CHANGES, _STR_SAVE_CHANGES, NULL);
     submenuAppendItem(&mainMenu, -1, NULL, MENU_EXIT, _STR_EXIT, NULL);
@@ -461,8 +463,8 @@ void menuInitGameMenu(void)
     submenuAppendItem(&gameMenu, -1, NULL, GAME_GSM_SETTINGS, _STR_GSCONFIG, NULL);
     submenuAppendItem(&gameMenu, -1, NULL, GAME_VMC_SETTINGS, _STR_VMC_SCREEN, NULL);
 #ifdef PADEMU
-    submenuAppendItem(&gameMenu, -1, NULL, GAME_PADEMU_SETTINGS, _STR_PADEMUCONFIG, NULL);
-    submenuAppendItem(&gameMenu, -1, NULL, GAME_PADMACRO_SETTINGS, _STR_PADMACROCONFIG, NULL);
+    submenuAppendItem(&gameMenu, -1, NULL, GAME_PADEMU_SETTINGS, _STR_CONTROLLER_EMULATION, NULL);
+    submenuAppendItem(&gameMenu, -1, NULL, GAME_PADMACRO_SETTINGS, _STR_CONTROLLER_MACROS, NULL);
 #endif
     submenuAppendItem(&gameMenu, -1, NULL, GAME_OSD_LANGUAGE_SETTINGS, _STR_OSD_SETTINGS, NULL);
     submenuAppendItem(&gameMenu, -1, NULL, GAME_SAVE_CHANGES, _STR_SAVE_CHANGES, NULL);
@@ -1107,7 +1109,7 @@ void menuRenderMenu()
         // render, advance
         fntRenderString(gTheme->fonts[0], 320, y, ALIGN_CENTER, 0, 0, submenuItemGetText(&it->item), (cp == sitem) ? gTheme->selTextColor : gTheme->textColor);
         y += spacing;
-        if (cp == (MENU_ABOUT - 1))
+        if (it->item.id == MENU_TOOLS) // extra half-gap before the About/Save/Exit/PowerOff tail block
             y += spacing / 2;
     }
 
@@ -1199,39 +1201,42 @@ void menuHandleInputMenu()
         } else if (id == MENU_SETTINGS) {
             if (menuCheckParentalLock() == 0)
                 guiShowConfig();
-        } else if (id == MENU_DEVICE_SETTINGS) {
+        } else if (id == MENU_GAME_SOURCES) {
             if (menuCheckParentalLock() == 0)
                 guiShowDeviceConfig();
-        } else if (id == MENU_VCD_SETTINGS) {
-            if (menuCheckParentalLock() == 0)
-                guiShowVcdConfig();
-        } else if (id == MENU_MMCE_SETTINGS) {
-            if (menuCheckParentalLock() == 0)
-                guiShowMmceConfig();
-        } else if (id == MENU_GFX_SETTINGS) {
+        } else if (id == MENU_INTERFACE) {
             if (menuCheckParentalLock() == 0)
                 guiShowUIConfig();
-        } else if (id == MENU_AUDIO_SETTINGS) {
+        } else if (id == MENU_DISPLAY) {
             if (menuCheckParentalLock() == 0)
-                guiShowAudioConfig();
-        } else if (id == MENU_CONTROLLER_SETTINGS) {
+                guiShowDisplayConfig();
+        } else if (id == MENU_GAME_LAUNCHING) {
             if (menuCheckParentalLock() == 0)
-                guiShowControllerConfig();
-        } else if (id == MENU_OSD_LANGUAGE_SETTINGS) {
+                guiShowLaunchConfig();
+        } else if (id == MENU_POPSTARTER) {
             if (menuCheckParentalLock() == 0)
-                guiGameShowOSDLanguageConfig(1);
-        } else if (id == MENU_PARENTAL_LOCK) {
+                guiShowVcdConfig();
+        } else if (id == MENU_MMCE) {
             if (menuCheckParentalLock() == 0)
-                guiShowParentalLockConfig();
-        } else if (id == MENU_NET_CONFIG) {
+                guiShowMmceConfig();
+        } else if (id == MENU_NETWORK) {
             if (menuCheckParentalLock() == 0)
                 guiShowNetConfig();
-        } else if (id == MENU_NET_UPDATE) {
+        } else if (id == MENU_CONTROLLER) {
             if (menuCheckParentalLock() == 0)
-                guiShowNetCompatUpdate();
-        } else if (id == MENU_START_NBD) {
+                guiShowControllerConfig();
+        } else if (id == MENU_AUDIO) {
             if (menuCheckParentalLock() == 0)
-                handleLwnbdSrv();
+                guiShowAudioConfig();
+        } else if (id == MENU_SECURITY) {
+            if (menuCheckParentalLock() == 0)
+                guiShowSecurityConfig();
+        } else if (id == MENU_ADVANCED) {
+            if (menuCheckParentalLock() == 0)
+                guiShowAdvancedConfig();
+        } else if (id == MENU_TOOLS) {
+            if (menuCheckParentalLock() == 0)
+                guiShowToolsConfig();
         } else if (id == MENU_ABOUT) {
             guiShowAbout();
         } else if (id == MENU_SAVE_CHANGES) {

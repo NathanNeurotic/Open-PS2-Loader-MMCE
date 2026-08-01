@@ -148,6 +148,23 @@ void guiShowVcdConfig(void);
 int guiShowVcdUsbMode(void);
 void guiShowMmceConfig(void);
 void guiShowParentalLockConfig();
+// Settings-layout restructure: new menu-called category pages.
+void guiShowDisplayConfig(void);
+void guiShowLaunchConfig(void);
+void guiShowSecurityConfig(void);
+void guiShowAdvancedConfig(void);
+void guiShowToolsConfig(void);
+// Chained sub-dialogs (opened from a category page above).
+void guiShowNeutrinoDefaults(void);
+void guiShowPathPrefixConfig(void);
+void guiShowStorageConfig(void);
+void guiShowBdmaConfig(void);
+void guiShowVcdListConfig(void);
+void guiShowPopsNetConfig(void);
+void guiShowMmceCommConfig(void);
+void guiShowMmcePathConfig(void);
+void guiShowArtworkConfig(void);
+void guiShowColorsConfig(void);
 
 void guiCheckNotifications(int checkTheme, int checkLang);
 

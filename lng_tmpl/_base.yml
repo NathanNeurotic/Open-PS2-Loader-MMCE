@@ -67,6 +67,54 @@ gui_strings:
   string: Device Settings
 - label: LAUNCH_PS2_DISC
   string: Launch PS2 Disc
+- label: GAME_SOURCES
+  string: Game Sources
+- label: INTERFACE_SETTINGS
+  string: Interface
+- label: DISPLAY_SETTINGS
+  string: Display
+- label: GAME_LAUNCHING
+  string: Game Launching
+- label: POPSTARTER
+  string: POPStarter
+- label: MENU_NETWORK
+  string: Network
+- label: MENU_CONTROLLER
+  string: Controller
+- label: MENU_AUDIO
+  string: Audio
+- label: SECURITY_SETTINGS
+  string: Security
+- label: ADVANCED_SETTINGS
+  string: Advanced
+- label: TOOLS
+  string: Tools
+- label: ARTWORK_SETTINGS
+  string: Artwork Settings
+- label: COLORS_SETTINGS
+  string: Colors
+- label: BDMA_SETTINGS
+  string: BDMA Settings
+- label: GAME_LIST_SETTINGS
+  string: Game List Settings
+- label: COMM_SETTINGS
+  string: Communication Settings
+- label: PATH_SETTINGS
+  string: Path Settings
+- label: NEUTRINO_DEFAULTS
+  string: Neutrino Defaults
+- label: ADVANCED_ARGUMENTS
+  string: Advanced Arguments
+- label: OSD_DEFAULTS
+  string: OSD Defaults
+- label: STORAGE_CACHE
+  string: Storage and Cache
+- label: PATH_PREFIXES
+  string: Path Prefixes
+- label: CONTROLLER_EMULATION
+  string: Controller Emulation
+- label: CONTROLLER_MACROS
+  string: Controller Macros
 - label: DISC_LAUNCH_ERR
   string: No PS2 disc in the drive.
 - label: MENU
