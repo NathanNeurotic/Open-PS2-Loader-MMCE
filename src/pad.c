@@ -88,11 +88,6 @@ struct pad_data_t
 // GUI thread.
 #define PAD_WAIT_POLLS   25
 #define PAD_WAIT_POLL_US 1000
-// How long a still-connected pad's held buttons may be carried across failed reads, in MILLISECONDS.
-// Bounded UNDER the fastest list key-repeat OPL uses (gScrollSpeed "fast" = 100 ms) so a release
-// hidden inside a miss burst cannot manufacture repeats: inside the window at most one carried
-// poll sits in any repeat cycle. The EDGE view needs no such bound (see edgedata below).
-
 
 // Successful-read polls between analog self-heal attempts -- a POLL COUNT, decremented once per
 // good read, not milliseconds like its neighbours.
@@ -119,8 +114,7 @@ struct pad_data_t
 
 /// current time in miliseconds (last update time)
 static u32 curtime = 0;
-// Last readPads() poll (curtime ms) on which ANY button/stick input was down -- or a miss burst
-// was active, since a miss is "unknown", not idle. Drives the PAD_SELF_HEAL_IDLE_MS gate.
+// Last readPads() poll (curtime ms) on which ANY button/stick input was down. Drives the PAD_SELF_HEAL_IDLE_MS gate.
 static u32 lastInputActivityMs = 0;
 static u32 time_since_last = 0;
 // Raw-tick bookkeeping for the wrap-correct delta in readPads(). lastticks is the previous poll's
@@ -809,12 +803,7 @@ int readPads()
     for (i = 0; i < pad_count; ++i)
         result |= readPad(&pad_data[i]);
 
-    // Stamp input activity AFTER the merge: any held button/stick -- OR an active miss burst,
-    // since a miss is "unknown", not idle -- re-arms the PAD_SELF_HEAL_IDLE_MS gate. Without the
-    // burst term, a burst outlasting the carry window drops the held bits out of paddata while
-    // the user is still tapping, the stamp goes stale, and after a second of this registered-
-    // input starvation the idle gate opens and readPad() runs initializePad() INLINE on the GUI
-    // thread -- a 250-600 ms blackout that eats every tap (#271).
+    // Stamp input activity AFTER the merge: any held button/stick re-arms the PAD_SELF_HEAL_IDLE_MS gate.
     if (paddata != 0)
         lastInputActivityMs = curtime;
 
