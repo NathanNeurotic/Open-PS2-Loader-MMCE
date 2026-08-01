@@ -539,13 +539,14 @@ static int readPad(struct pad_data_t *pad)
 
         // merge into the global vars
         paddata |= pad->paddata;
-        edgedata |= pad->paddata;
 
         if (newpdata != 0x0) // something
             rcode = 1;
     } else {
         // no successful read: baseline behavior (do not carry state)
     }
+
+    edgedata |= pad->paddata;
 
     return rcode;
 }
