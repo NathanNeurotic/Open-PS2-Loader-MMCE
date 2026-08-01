@@ -2632,24 +2632,20 @@ static int thmLoad(const char *themePath)
             break;
     }
 
-    // Busy-icon animation frames, each frame probed INDEPENDENTLY: the theme's own load<N>.png
-    // first (disk themes), the baked frame only when use_default=1 opts into it. thmLoadResource's
-    // return is the DISK load's result only (it discards the embedded fallback's result), so a
-    // frame counts as loaded only when its texture slot actually got data. loadingIconCount is the
-    // number of CONTIGUOUS frames from load0 -- a gap (e.g. load2.png missing on a use_default=0
-    // theme) ends the count instead of letting guiDrawBusy's `LOAD0_ICON + frame % count` wander
-    // into texture IDs that hold no frame. The old loop latched themePath_temp=NULL off the FIRST
-    // failed custom probe (so one missing/unreadable load0.png silently replaced the theme's whole
-    // animation with the baked set -- or, with use_default=0, dropped frames that did exist), which
-    // is why custom frames appeared "randomly" (#213).
-    newT->loadingIconCount = 0;
+    // First start with busy icon
+    const char *themePath_temp = themePath;
+    int customBusy = 0;
     for (i = LOAD0_ICON; i <= LOAD7_ICON; i++) {
-        thmLoadResource(&newT->textures[i], i, themePath, GS_PSM_CT32, newT->useDefault);
-        if (newT->textures[i].Mem != NULL)
-            newT->loadingIconCount++;
-        else
-            break;
+        if (thmLoadResource(&newT->textures[i], i, themePath_temp, GS_PSM_CT32, newT->useDefault) >= 0)
+            customBusy = 1;
+        else {
+            if (customBusy)
+                break;
+            else
+                themePath_temp = NULL;
+        }
     }
+    newT->loadingIconCount = i;
 
     // Customizable icons
     for (i = BDM_ICON; i <= START_ICON; i++)
