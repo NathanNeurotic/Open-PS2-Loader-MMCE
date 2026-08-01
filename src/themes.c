@@ -925,6 +925,8 @@ static theme_element_t *thmGetElemForItem(struct menu_list *menu, struct submenu
     return (appsElem != NULL) ? appsElem : elem;
 }
 
+static int cfAnimFrameCount = 0;
+
 // Arms a slide animation in direction dir (+1 next / -1 prev). No-op (instant move) when
 // animation speed is 0. Called from menusys.c via the themes.h extern.
 void thmTriggerCoverflowAnim(int dir)
@@ -934,6 +936,7 @@ void thmTriggerCoverflowAnim(int dir)
     cfIsAnimating = 1;
     cfAnimDirection = dir;
     cfAnimStartTime = clock();
+    cfAnimFrameCount = 0;
 }
 
 // Poll-side read of the slide state. The Debug-Colors HUD (gui.c) steps aside while a slide is
@@ -1047,9 +1050,15 @@ static void drawCoverFlow(struct menu_list *menu, struct submenu_list *item, con
             elapsed = durTicks; // clock wrap -> finish now
         float t = (float)elapsed / (float)durTicks;
         if (t >= 1.0f) {
-            t = 1.0f;
-            cfIsAnimating = 0;
+            if (cfAnimFrameCount == 0) {
+                // Guarantee at least one intermediate 3D slide frame if a frame hitch occurred on start
+                t = 0.5f;
+            } else {
+                t = 1.0f;
+                cfIsAnimating = 0;
+            }
         }
+        cfAnimFrameCount++;
         eased = 1.0f - powf(1.0f - t, 3.0f);
         animOffset = (int)(cfAnimDirection * coverDistance * (1.0f - eased));
     }

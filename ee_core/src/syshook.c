@@ -92,7 +92,8 @@ void sysLoadElf(char *filename, int argc, char **argv)
     DPRINTF("t_loadElf: cleaning user memory...");
 
     // wipe user memory
-    WipeUserMemory((void *)&_end, (void *)config->ModStorageStart);
+    if (config->ModStorageStart != NULL && (u32)config->ModStorageStart > (u32)&_end)
+        WipeUserMemory((void *)&_end, (void *)config->ModStorageStart);
     // The upper half (from ModStorageEnd to GetMemorySize()) is taken care of by LoadExecPS2().
     // WipeUserMemory((void *)ModStorageEnd, (void *)GetMemorySize());
 

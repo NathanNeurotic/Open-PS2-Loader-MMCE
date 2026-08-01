@@ -920,9 +920,12 @@ int readPads()
     }
 
     for (i = 0; i < 16; ++i) {
-        if (getKeyPressed(i + 1))
+        if (getKeyPressed(i + 1)) {
             delaycnt[i] -= (int)time_since_last;
-        else if (!(missHeld & keyToPad[i + 1]))
+            int rdelay = getKeyDelay(i + 1, 1);
+            if (delaycnt[i] < -rdelay)
+                delaycnt[i] = -rdelay;
+        } else if (!(missHeld & keyToPad[i + 1]))
             delaycnt[i] = getKeyDelay(i + 1, 0);
         // else: the button reads up ONLY because the pad is mid-read-miss -- PAUSE the countdown
         // instead of re-arming the full 3x initial delay. A miss is "unknown", not "released";
