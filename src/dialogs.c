@@ -487,6 +487,28 @@ struct UIItem diaVcdConfig[] = {
     // end of dialog
     {UI_TERMINATOR}};
 
+// USB VCD launch mode pick: shown on EVERY USB .VCD launch (bdmLaunchVcd). The PS2 cannot detect the
+// filesystem a USB stick is actually formatted with, so the user picks the POPSTARTER driver per
+// launch -- fat32 (POPSTARTER's built-in USB stack, recommended for non-exFAT users) or exFAT (the
+// BDMAssault usbexfat pair). The pressed button's id IS the result; Back cancels the launch.
+struct UIItem diaVcdUsbMode[] = {
+    {UI_HEADER, 0, 1, 1, -1, 0, 0, {.label = {NULL, _STR_VCD_USB_MODE_TITLE}}},
+    {UI_SPLITTER},
+
+    {UI_LABEL, 0, 1, 1, -1, 0, 0, {.label = {NULL, _STR_VCD_USB_MODE_QUESTION}}},
+    {UI_BREAK},
+    {UI_LABEL, 0, 1, 1, -1, 0, 0, {.label = {NULL, _STR_VCD_USB_MODE_HINT}}},
+    {UI_BREAK},
+
+    // buttons (each returns its own id from diaExecuteDialog)
+    {UI_BUTTON, VCDUSB_BTN_FAT32, 1, 1, -1, 0, 0, {.label = {NULL, _STR_VCD_USB_MODE_FAT32}}},
+    {UI_BREAK},
+    {UI_BUTTON, VCDUSB_BTN_EXFAT, 1, 1, -1, 0, 0, {.label = {NULL, _STR_VCD_USB_MODE_EXFAT}}},
+    {UI_BREAK},
+
+    // end of dialog
+    {UI_TERMINATOR}};
+
 // MMCE Settings Menu (SD2PSX / MemCard PRO2 tuning). Relocated out of Device Settings; CFG ids unchanged.
 struct UIItem diaMmceConfig[] = {
     {UI_HEADER, 0, 1, 1, -1, 0, 0, {.label = {NULL, _STR_MMCE_SETTINGS}}},

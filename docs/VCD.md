@@ -130,8 +130,13 @@ staged before the live pair is changed, so a failed copy leaves the previous pai
   its block-device driver from the memory card, so the right exFAT variant must already be on
   the card or the game drops to OSDSYS. When **On**, RiptOPL equips the variant matching the
   PS1 game you're launching (read from that game's own device) automatically, right before
-  boot — so an MX4SIO / USB / HDD exFAT game just works with no manual step. Turn it **Off** to
+  boot — so an MX4SIO / HDD exFAT game just works with no manual step. Turn it **Off** to
   manage the driver yourself; that reveals the **BDMA Source** / **BDMA Mode** pickers below.
+- **USB launches always ask** — the PS2 cannot detect whether a USB stick is fat32 or exFAT
+  formatted, so every USB .VCD launch first shows a **"fat32 or exFAT USB Mode?"** dialog
+  (fat32 is recommended for non-exFAT USB users). Picking **fat32** de-equips to POPSTARTER's
+  built-in USB stack; picking **exFAT** equips the BDMAssault `usbexfat` pair. The pick applies
+  even when Apply-on-Launch is Off, and backing out of the dialog cancels the launch.
 - **BDMA MODE** *(manual; shown when Apply-on-Launch is Off)* — which driver variant POPSTARTER should use: `USB (FAT32)` (none —
   removes the exFAT modules so POPSTARTER falls back to its built-in FAT32 driver),
   `USB (exFAT)`, `MX4SIO (exFAT)`, `MMCE (exFAT)`, or `HDD (exFAT)` (the internal ATA

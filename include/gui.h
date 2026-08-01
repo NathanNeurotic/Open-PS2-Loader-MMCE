@@ -143,6 +143,9 @@ void guiShowNeutrinoArgsConfig(char *argsBuf, int bufSize);
 void guiShowNetConfig();
 void guiShowDeviceConfig(void);
 void guiShowVcdConfig(void);
+// USB VCD launch mode pick (fat32/exFAT). Returns VCDUSB_BTN_FAT32 / VCDUSB_BTN_EXFAT, or
+// UIID_BTN_CANCEL when the user backs out (== abort the launch).
+int guiShowVcdUsbMode(void);
 void guiShowMmceConfig(void);
 void guiShowParentalLockConfig();
 

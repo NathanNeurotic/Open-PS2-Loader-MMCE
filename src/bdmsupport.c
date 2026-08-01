@@ -797,13 +797,20 @@ static void bdmLaunchVcd(item_list_t *itemList, const char *vcdName, config_set_
     // the handoff below always proceeds (POPSTARTER owns everything past the exec); a failed equip just
     // toasts its diagnostic in passing. iLink/UDPBD/unknown have no BDMA variant and are left as-is.
     switch (pDeviceData->bdmDeviceType) {
-        case BDM_TYPE_USB:
-            // AUTO (gBdmaApplyOnLaunch) always equips the USBEXFAT pair for USB (maintainer
-            // directive 2026-07-25): that driver reads FAT32 too, so ONE variant plays every
-            // USB stick and nobody has to guess the filesystem. FAT32/no-BDMA (POPSTARTER's
-            // built-in USB stack) is a MANUAL-only choice (VCD Settings, apply-on-launch OFF).
-            vcdEnsureBdmaForLaunch(VCD_BDMA_SRC_USB, VCD_BDMA_USBEXFAT);
+        case BDM_TYPE_USB: {
+            // USB is special: the PS2 cannot detect whether the stick is fat32 or exFAT formatted,
+            // so the user picks the POPSTARTER USB driver on EVERY USB VCD launch (maintainer
+            // directive 2026-08-01). fat32 = POPSTARTER's built-in USB stack (recommended for
+            // non-exFAT users); exFAT = the BDMAssault usbexfat pair. Back cancels the launch.
+            int usbMode = guiShowVcdUsbMode();
+            if (usbMode == VCDUSB_BTN_FAT32)
+                vcdApplyUsbModeForLaunch(VCD_BDMA_FAT32);
+            else if (usbMode == VCDUSB_BTN_EXFAT)
+                vcdApplyUsbModeForLaunch(VCD_BDMA_USBEXFAT);
+            else
+                return; // dialog cancelled -- abort the launch, nothing equipped
             break;
+        }
         case BDM_TYPE_SDC:
             vcdEnsureBdmaForLaunch(VCD_BDMA_SRC_MX4SIO, VCD_BDMA_MX4SIO);
             break;

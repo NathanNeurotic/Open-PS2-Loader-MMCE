@@ -240,6 +240,9 @@ enum UI_ITEMS {
     OSD_TVASPECT_VALUE,
     OSD_VMODE_VALUE,
 
+    VCDUSB_BTN_FAT32,
+    VCDUSB_BTN_EXFAT,
+
 #ifdef PADEMU
     PADEMU_GLOBAL_BUTTON,
     PADCFG_PADEMU_SOURCE,
@@ -323,5 +326,6 @@ extern struct UIItem diaNeutrinoArgs[];
 extern struct UIItem diaDeviceConfig[];
 extern struct UIItem diaVcdConfig[];
 extern struct UIItem diaMmceConfig[];
+extern struct UIItem diaVcdUsbMode[];
 
 #endif

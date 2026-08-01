@@ -646,6 +646,14 @@ reshow_config:
     }
 }
 
+// USB .VCD launches only: force the fat32/exFAT POPSTARTER driver pick EVERY launch -- the PS2
+// cannot detect the filesystem a USB stick is actually formatted with, so the user chooses per
+// launch. Returns the pressed button's id (VCDUSB_BTN_FAT32 / VCDUSB_BTN_EXFAT) or UIID_BTN_CANCEL.
+int guiShowVcdUsbMode(void)
+{
+    return diaExecuteDialog(diaVcdUsbMode, -1, 1, NULL);
+}
+
 // VCD Settings: PS1-via-POPSTARTER launch config (POPSTARTER.ELF device/path), BDMA exFAT-driver
 // equip, and VCD list display options. All relocated out of General Settings; CFG ids are shared with
 // the old General rows, so saved config values map through unchanged.
