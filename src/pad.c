@@ -82,7 +82,6 @@ struct pad_data_t
     unsigned char rumbleLevel; // big-engine level for the pulse in flight (0 = none armed)
     unsigned char rumbleSmall; // 1 = drive the small engine too (bumps); taps are big-ERM-only
     int rumbleMsLeft;          // ms remaining; ticked down in readPads() (see the ms-vs-frames note there)
-
 };
 
 // Pad commands are asynchronous. Keep every wait bounded so a transient SIO2/pad error cannot hang the
@@ -167,7 +166,6 @@ void padFreezeEdgeBaseline(int freeze)
 
     if (next && !edgeBaselineFrozen) {
         oldpaddata = paddata;
-        
     }
 
     edgeBaselineFrozen = next;
