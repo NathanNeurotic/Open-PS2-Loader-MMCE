@@ -1132,13 +1132,8 @@ static void menuUpdateHook()
     int longIdle = (guiInactiveFrames >= MENU_BG_RESCAN_MIN_INACTIVE_FRAMES);
 
     // schedule updates of all the list handlers
-    // Quiet on purpose (#290): these are periodic background rescans the user never asked for, and
-    // their usual outcome is "nothing changed". Enqueued visibly, each slow presence scan faded the
-    // loading spinner in while the console sat idle -- the "spinner reappears every few seconds"
-    // report. A rescan that DOES find a change still rebuilds the list (the list itself changing is
-    // the signal; there was never a toast for it), it just does so without the spinner. Known
-    // residual: work a quiet rescan enqueues ONWARD (bdm module-load retries, favourites reload) is
-    // still visible and can flash the spinner on rigs where those persistently re-fire.
+    // Periodic background rescans. Both steady-state rescans enqueue standard requests and are
+    // rendered with the unified busy overlay.
     if (gAutoRefresh && longIdle) {
         for (i = 0; i < MODE_COUNT; i++) {
             if ((list_support[i].support && list_support[i].support->enabled) && ((list_support[i].support->updateDelay > 0) && (frameCounter % list_support[i].support->updateDelay == 0)))
@@ -1168,11 +1163,10 @@ static void menuUpdateHook()
             if ((list_support[i].support && list_support[i].support->enabled) && (list_support[i].support->updateDelay == 0)) {
                 int mode = list_support[i].support->mode;
                 // elapsed form is single-wrap-safe; zero-initialized timestamp allows one immediate rescan.
-                // genChanged (hotplug / Device-Settings apply) deliberately requires NEITHER longIdle
-                // nor quiet: it fires precisely BECAUSE a device changed, the scan populates a page the
-                // user is waiting on (visible, #290), and a plugged device should be noticed in the
-                // next tap gap rather than after a second of stillness (#271). Only the recurring
-                // steady-state probe is quiet AND waits for real idleness.
+                // genChanged (hotplug / Device-Settings apply) deliberately requires NEITHER longIdle:
+                // it fires precisely BECAUSE a device changed, the scan populates a page the
+                // user is waiting on, and a plugged device should be noticed in the
+                // next tap gap rather than after a second of stillness (#271).
                 if (genChanged || (longIdle && (now - lastBgRescan[mode]) >= MENU_BG_RESCAN_MIN_INTERVAL_TICKS)) {
                     // Stamp the throttle only on an accepted request, so a rejected one retries on
                     // the next tick instead of being silently skipped for a full interval.
