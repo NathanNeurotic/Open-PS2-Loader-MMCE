@@ -318,6 +318,14 @@ void sfxPlay(int id)
     if (gEnableSFX) {
         u32 sfxStartTicks = cpu_ticks();
         if (id == SFX_CURSOR) {
+            static u32 lastCursorTicks = 0;
+            if (lastCursorTicks != 0) {
+                u32 interval = (sfxStartTicks - lastCursorTicks) / SFX_CLOCKS_PER_MS;
+                if (interval < 45)
+                    return;
+            }
+            lastCursorTicks = sfxStartTicks;
+
             int chosenSlot = cursorChannelIndex;
 
             cursorChannelIndex = (cursorChannelIndex + 1) % CURSOR_SFX_CHANNEL_COUNT;
