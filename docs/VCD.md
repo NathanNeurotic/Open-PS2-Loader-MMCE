@@ -135,8 +135,9 @@ staged before the live pair is changed, so a failed copy leaves the previous pai
 - **USB launches always ask** — the PS2 cannot detect whether a USB stick is fat32 or exFAT
   formatted, so every USB .VCD launch first shows a **"fat32 or exFAT USB Mode?"** dialog
   (fat32 is recommended for non-exFAT USB users). Picking **fat32** de-equips to POPSTARTER's
-  built-in USB stack; picking **exFAT** equips the BDMAssault `usbexfat` pair. The pick applies
-  even when Apply-on-Launch is Off, and backing out of the dialog cancels the launch.
+  built-in USB stack (preserving any complete, unmarked manually-managed module pair); picking
+  **exFAT** equips the BDMAssault `usbexfat` pair. The pick applies even when Apply-on-Launch is Off,
+  and backing out of the dialog cancels the launch.
 - **BDMA MODE** *(manual; shown when Apply-on-Launch is Off)* — which driver variant POPSTARTER should use: `USB (FAT32)` (none —
   removes the exFAT modules so POPSTARTER falls back to its built-in FAT32 driver),
   `USB (exFAT)`, `MX4SIO (exFAT)`, `MMCE (exFAT)`, or `HDD (exFAT)` (the internal ATA
