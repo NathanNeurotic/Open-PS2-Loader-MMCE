@@ -2178,30 +2178,13 @@ void guiExecDeferredOps(void)
 
 static void guiDrawBusy(int alpha)
 {
-    // loadingIconCount is now a true contiguous-frame count (themes.c) and CAN be 0 -- a disk theme
-    // shipping no load*.png with use_default=0 -- so gate the modulo on it (no div-by-zero, no
-    // garbage texture id).
-    if (gTheme->loadingIcon && gTheme->loadingIconCount > 0) {
+    if (gTheme->loadingIcon) {
         GSTEXTURE *texture = thmGetTexture(LOAD0_ICON + (guiFrameId >> 1) % gTheme->loadingIconCount);
         if (texture && texture->Mem) {
             u64 mycolor = GS_SETREG_RGBA(0x80, 0x80, 0x80, alpha);
             rmDrawPixmap(texture, gTheme->loadingIcon->posX, gTheme->loadingIcon->posY, gTheme->loadingIcon->aligned, gTheme->loadingIcon->width, gTheme->loadingIcon->height, gTheme->loadingIcon->scaled, mycolor, 0);
         }
     }
-}
-
-// One hand-pumped loader frame for the synchronous launch path (#299). itemExecSelect() blocks the
-// GUI thread from confirm to the ELF handoff, so guiDrawOverlays()' busy animation never runs there
-// and the user stares at a frozen menu for the whole launch prep. Callers pump this around/between
-// the blocking steps: it leaves menu + loader (at full alpha -- no fade wait, the fade is a
-// guiDrawOverlays concern) scanned out while the next step blocks, and each pump ticks guiFrameId so
-// the animation frame advances. Pure rendering -- no IO-queue traffic, safe any time the GUI is up.
-void guiRenderBusyFrame(void)
-{
-    guiStartFrame();
-    guiShow();
-    guiDrawBusy(0x80);
-    guiEndFrame();
 }
 
 // Boot-splash status line setter (#297). Pass NULL to clear. Main-thread only (writes gBootStatus, which
@@ -2588,14 +2571,7 @@ void guiDrawSubMenuHints(void)
 }
 
 static int endIntro = 0; // Break intro loop and start 'Last Played Auto Start' countdown
-#define BUSY_FADE_STEP 0x10
 
-// #271/#272/#296 on-screen instrumentation. Draws ONE line with the pad and SFX counters that
-// the fixes in this file's input path are instrumented by -- miss bursts, reconnect flaps,
-// inline initializePad blackouts (count + last/worst ms, deferred count), worst poll period,
-// and per-press audsrv RPC cost. Rendered ONLY when the user turns Settings -> Debug Colors on,
-// so the normal path pays nothing but the integer bumps in pad.c/sound.c. A hardware tester can
-// then film the line while reproducing a hitch instead of us guessing at the mechanism.
 void guiDrawDebugLine(void)
 {
     if (!gEnableDebug)
@@ -2616,29 +2592,22 @@ void guiDrawDebugLine(void)
 
 static void guiDrawOverlays()
 {
+    // are there any pending operations?
+    int pending = ioHasPendingRequests();
     static int busyAlpha = 0x00; // Fully transparant
 
-    // Only explicit foreground IO owns the global loader. Art is rendered with
-    // placeholders while its worker runs, and quiet metadata/rescan work stays quiet.
-    int pending = ioHasVisiblePendingRequests();
-
-    // During the boot intro, when an animated boot logo is shown, suppress the
-    // loading spinner -- the animated logo is the boot activity indicator there.
-    // The spinner is used normally everywhere else (and on boot for themes/builds
-    // without animated logo frames, so a slow boot still shows activity).
-    int showBusy = endIntro || (gTheme->logoFrameCount < 1);
-    if (showBusy) {
-        if (!pending) {
-            if (busyAlpha > 0x00)
-                busyAlpha -= BUSY_FADE_STEP;
-        } else {
-            if (busyAlpha < 0x80)
-                busyAlpha += BUSY_FADE_STEP;
-        }
-
+    if (!pending) {
+        // Fade out
         if (busyAlpha > 0x00)
-            guiDrawBusy(busyAlpha);
+            busyAlpha -= 0x02;
+    } else {
+        // Fade in
+        if (busyAlpha < 0x80)
+            busyAlpha += 0x02;
     }
+
+    if (busyAlpha > 0x00)
+        guiDrawBusy(busyAlpha);
 
 #ifdef __DEBUG
     char text[20];

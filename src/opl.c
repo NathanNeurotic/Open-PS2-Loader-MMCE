@@ -347,22 +347,10 @@ static void itemExecSelect(struct menu_item *curMenu)
                 // Costs ~90ms at most, on a path that already takes seconds. No-op when rumble is off.
                 padRumbleFlush();
 
-                // #299 launch-prep loader: everything from here to the handoff blocks the GUI
-                // thread, so guiDrawOverlays' busy animation never runs and the user stares at a
-                // frozen menu for the whole load. Pump loader frames by hand around the blocking
-                // steps -- this one leaves menu+loader scanned out while the config read blocks,
-                // and guiShowGameID's frame hold (when enabled) cycles the animation for real.
-                guiRenderBusyFrame();
                 config_set_t *configSet = menuLoadConfigDirect();
                 // Flash the GameID barcode (Pixel FX/RetroGEM HDMI auto-profile) before handoff; this
                 // single menu chokepoint covers both the Neutrino and OPL-native cores. No-op when off.
                 guiShowGameID(support->itemGetStartup(support, curMenu->current->item.id));
-                // Final pre-handoff frame (#299): the last thing drawn before itemLaunch's blocking
-                // prep, so menu+loader -- not a stale menu or the GameID barcode -- is what stays
-                // scanned out until deinit()/ExecPS2. On a launch FAILURE itemLaunch returns and the
-                // next guiMainLoop frame replaces this, so the loader can never wedge on-screen.
-                // Both pumps run BEFORE itemLaunch, i.e. before deinit starts tearing the theme down.
-                guiRenderBusyFrame();
                 support->itemLaunch(support, curMenu->current->item.id, configSet);
             }
         } else {
@@ -1144,17 +1132,12 @@ static void menuUpdateHook()
     int longIdle = (guiInactiveFrames >= MENU_BG_RESCAN_MIN_INACTIVE_FRAMES);
 
     // schedule updates of all the list handlers
-    // Quiet on purpose (#290): these are periodic background rescans the user never asked for, and
-    // their usual outcome is "nothing changed". Enqueued visibly, each slow presence scan faded the
-    // loading spinner in while the console sat idle -- the "spinner reappears every few seconds"
-    // report. A rescan that DOES find a change still rebuilds the list (the list itself changing is
-    // the signal; there was never a toast for it), it just does so without the spinner. Known
-    // residual: work a quiet rescan enqueues ONWARD (bdm module-load retries, favourites reload) is
-    // still visible and can flash the spinner on rigs where those persistently re-fire.
+    // Periodic background rescans. Both steady-state rescans enqueue standard requests and are
+    // rendered with the unified busy overlay.
     if (gAutoRefresh && longIdle) {
         for (i = 0; i < MODE_COUNT; i++) {
             if ((list_support[i].support && list_support[i].support->enabled) && ((list_support[i].support->updateDelay > 0) && (frameCounter % list_support[i].support->updateDelay == 0)))
-                ioPutRequestQuiet(IO_MENU_UPDATE_DEFFERED, &list_support[i].support->mode);
+                ioPutRequest(IO_MENU_UPDATE_DEFFERED, &list_support[i].support->mode);
         }
     }
 
@@ -1180,19 +1163,14 @@ static void menuUpdateHook()
             if ((list_support[i].support && list_support[i].support->enabled) && (list_support[i].support->updateDelay == 0)) {
                 int mode = list_support[i].support->mode;
                 // elapsed form is single-wrap-safe; zero-initialized timestamp allows one immediate rescan.
-                // genChanged (hotplug / Device-Settings apply) deliberately requires NEITHER longIdle
-                // nor quiet: it fires precisely BECAUSE a device changed, the scan populates a page the
-                // user is waiting on (visible, #290), and a plugged device should be noticed in the
-                // next tap gap rather than after a second of stillness (#271). Only the recurring
-                // steady-state probe is quiet AND waits for real idleness.
+                // genChanged (hotplug / Device-Settings apply) deliberately requires NEITHER longIdle:
+                // it fires precisely BECAUSE a device changed, the scan populates a page the
+                // user is waiting on, and a plugged device should be noticed in the
+                // next tap gap rather than after a second of stillness (#271).
                 if (genChanged || (longIdle && (now - lastBgRescan[mode]) >= MENU_BG_RESCAN_MIN_INTERVAL_TICKS)) {
                     // Stamp the throttle only on an accepted request, so a rejected one retries on
                     // the next tick instead of being silently skipped for a full interval.
-                    int accepted;
-                    if (genChanged)
-                        accepted = (ioPutRequest(IO_MENU_UPDATE_DEFFERED, &list_support[i].support->mode) == IO_OK);
-                    else
-                        accepted = (ioPutRequestQuiet(IO_MENU_UPDATE_DEFFERED, &list_support[i].support->mode) == IO_OK);
+                    int accepted = (ioPutRequest(IO_MENU_UPDATE_DEFFERED, &list_support[i].support->mode) == IO_OK);
                     if (accepted)
                         lastBgRescan[mode] = now;
                     else if (genChanged)

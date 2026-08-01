@@ -319,7 +319,7 @@ static void _menuRequestConfig()
 
     int queueResult = IO_OK;
     if (shouldQueueLoad) {
-        queueResult = visibleLoad ? ioPutRequest(IO_CUSTOM_SIMPLEACTION, &_menuLoadConfig) : ioPutRequestQuiet(IO_CUSTOM_SIMPLEACTION, &_menuLoadConfig);
+        queueResult = ioPutRequest(IO_CUSTOM_SIMPLEACTION, &_menuLoadConfig);
     }
 
     if (queueResult != IO_OK) {
@@ -399,7 +399,7 @@ config_set_t *menuLoadConfigDirect(void)
 // Queued when the info screen opens: resolve #Size for the current item without blocking the UI.
 void menuRequestInfoSize(void)
 {
-    ioPutRequestQuiet(IO_CUSTOM_SIMPLEACTION, &_menuResolveInfoSize);
+    ioPutRequest(IO_CUSTOM_SIMPLEACTION, &_menuResolveInfoSize);
 }
 
 // we don't want a pop up when transitioning to or refreshing Game Menu gui.

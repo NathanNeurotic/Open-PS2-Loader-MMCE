@@ -442,7 +442,7 @@ static load_image_request_t *cacheDequeueRequest(void)
          * The regular IO worker owns foreground list/config/module work. Art
          * remains queued until that work is clear, then drains in FIFO order.
          */
-        if (ioHasPendingRequests() || cacheShouldDeferRequest(gArtReqList)) {
+        if (cacheShouldDeferRequest(gArtReqList)) {
             cacheUnlock();
             return NULL;
         }
@@ -956,7 +956,6 @@ void cachePumpPendingArt(void)
         gArtThreadId >= 0 &&
         gArtActiveCount == 0 &&
         gArtReqList != NULL &&
-        !ioHasPendingRequests() &&
         !cacheShouldDeferRequest(gArtReqList))
         wakeWorker = 1;
     cacheUnlock();
