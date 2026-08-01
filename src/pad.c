@@ -87,8 +87,8 @@ struct pad_data_t
 
 // Pad commands are asynchronous. Keep every wait bounded so a transient SIO2/pad error cannot hang the
 // GUI thread.
-#define PAD_WAIT_POLLS         25
-#define PAD_WAIT_POLL_US       1000
+#define PAD_WAIT_POLLS   25
+#define PAD_WAIT_POLL_US 1000
 // How long a still-connected pad's held buttons may be carried across failed reads, in MILLISECONDS.
 // Bounded UNDER the fastest list key-repeat OPL uses (gScrollSpeed "fast" = 100 ms) so a release
 // hidden inside a miss burst cannot manufacture repeats: inside the window at most one carried
