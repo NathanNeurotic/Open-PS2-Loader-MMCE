@@ -78,20 +78,11 @@ struct pad_data_t
     int analogCapable; // -1 unknown/not ready, 0 digital-only (fully published table), 1 DualShock-capable
     int analogRetryDelay;
 
-    // Read-miss state for the two-view sampling below (#271/#272). A failed ready-state read is
-    // "unknown", not "released": missStreak counts the current burst (diag), readMissMs bounds
-    // the level-view carry.
-    u32 readMissMs;
-    unsigned int missStreak;
-
     unsigned char rumbleOn;    // 1 = an "on" was sent that still owes its matching "off"
     unsigned char rumbleLevel; // big-engine level for the pulse in flight (0 = none armed)
     unsigned char rumbleSmall; // 1 = drive the small engine too (bumps); taps are big-ERM-only
     int rumbleMsLeft;          // ms remaining; ticked down in readPads() (see the ms-vs-frames note there)
 
-    // Set when this pad transitioned from a read-miss burst to a successful read; used to
-    // re-arm repeat timers conservatively on recovery to avoid immediate rapid repeats.
-    unsigned char justRecovered;
 };
 
 // Pad commands are asynchronous. Keep every wait bounded so a transient SIO2/pad error cannot hang the
@@ -102,9 +93,6 @@ struct pad_data_t
 // Bounded UNDER the fastest list key-repeat OPL uses (gScrollSpeed "fast" = 100 ms) so a release
 // hidden inside a miss burst cannot manufacture repeats: inside the window at most one carried
 // poll sits in any repeat cycle. The EDGE view needs no such bound (see edgedata below).
-#define PAD_READ_CARRY_MS      96 // increased from 48 to better survive short SIO2 miss bursts
-// Jitter on recovery to avoid simultaneous immediate repeats across keys/pads
-#define RECOVERY_STABILIZE_JITTER_MS 10
 
 
 // Successful-read polls between analog self-heal attempts -- a POLL COUNT, decremented once per
@@ -149,24 +137,6 @@ static struct pad_data_t pad_data[MAX_PADS];
 static u32 paddata;
 static u32 oldpaddata;
 
-/*
-  SECOND, SEPARATELY-CARRIED VIEW OF THE SAME BUTTONS, used ONLY by getKeyOn()/getKeyOff() (#271).
-
-  paddata above is the LEVEL view: "is the button down right now". Its read-miss carry is bounded
-  to PAD_READ_CARRY_MS because it feeds getKeyPressed() and therefore delaycnt, where carrying too
-  long would manufacture auto-repeats the user never asked for.
-
-  edgedata is the EDGE view: "was the button newly pressed". It carries a missed poll's bits
-  WITHOUT a time bound, because the two detectors fail in opposite directions and cannot share one
-  budget: over-carrying the LEVEL view INVENTS movement (phantom repeats), while over-carrying the
-  EDGE view can only ever SUPPRESS a second edge -- an edge needs a 0 -> 1 transition and carrying
-  a 1 forward never produces one. It self-corrects the instant a successful read shows the button
-  clear. Sharing one view (or dropping the carried bit on a miss) is exactly what made one ~150 ms
-  tap move the list 2-3 times: the bit vanished mid-tap, the recovery read saw 0 -> 1 again, and
-  getKeyOn re-fired.
-*/
-static u32 edgedata;
-static u32 oldedgedata;
 
 // Debug-Colors instrumentation (#271/#272). All writers run on the EE main thread inside
 // readPads/readPad/initializePad, and the HUD (gui.c/dia.c) reads on the same thread, so no
@@ -197,7 +167,7 @@ void padFreezeEdgeBaseline(int freeze)
 
     if (next && !edgeBaselineFrozen) {
         oldpaddata = paddata;
-        oldedgedata = edgedata;
+        
     }
 
     edgeBaselineFrozen = next;
@@ -279,7 +249,6 @@ static int initializePadInner(struct pad_data_t *pad)
     // Menu rumble state belongs to the current connection.
     pad->rumbleOn = 0;
     pad->rumbleMsLeft = 0;
-    pad->justRecovered = 0;
 
     // is there any device connected to that port?
     state = waitPadReady(pad);
@@ -489,8 +458,6 @@ static int readPad(struct pad_data_t *pad)
         LOG("PAD pad %d,%d connected\n", pad->port, pad->slot);
         pad->analogCapable = -1;
         pad->analogRetryDelay = 0;
-        pad->readMissMs = 0;
-        pad->missStreak = 0;
         padDiag.stateFlaps++;
         // Idle-gated (#271): this init is the same 250-600 ms inline blackout as the self-heal
         // below, and a reconnect edge can be DRIVEN by the very read errors that cluster under
@@ -507,8 +474,6 @@ static int readPad(struct pad_data_t *pad)
         LOG("PAD pad %d,%d disconnected\n", pad->port, pad->slot);
         pad->analogCapable = -1;
         pad->analogRetryDelay = 0;
-        pad->readMissMs = 0;
-        pad->missStreak = 0;
         pad->paddata = 0;
     }
 
@@ -574,50 +539,17 @@ static int readPad(struct pad_data_t *pad)
 #endif
 
     if (padsRead > 0) {
-        // If this pad had an active miss streak and now produced a successful read,
-        // mark it as recovered so higher-level code can reset repeat timers to avoid
-        // immediate rapid repeats on recovery.
-        if (pad->missStreak > 0)
-            pad->justRecovered = 1;
-
-        pad->readMissMs = 0;
-        pad->missStreak = 0;
         newpdata = readLeftJoy(pad, newpdata);
+        pad->oldpaddata = pad->paddata;
         pad->paddata = newpdata;
 
+        // merge into the global vars
         paddata |= pad->paddata;
-        edgedata |= pad->paddata;
 
         if (newpdata != 0x0) // something
             rcode = 1;
-    } else if (isPadReadyState(pad->state)) {
-        // FAILED ready-state read: "unknown", not "released" (#271/#272). padRead() returns 0
-        // whenever freepad has nothing fresh, which on real hardware happens regularly: the pads
-        // share the SIO2 bus with the memory-card slots and MMCE, so cover-art and config traffic
-        // makes reads intermittently come back empty. That is why this only shows on console,
-        // never in an emulator, and why it gets worse the more art loads the list triggers.
-        pad->missStreak++;
-        padDiag.readMisses++;
-
-        // EDGE view, carried UNBOUNDED: a missed poll must not make getKeyOn() see the button go
-        // away, or the recovery read fires a second key-on from ONE physical tap ("scrolling
-        // skips 2-3 games"). Carrying a 1 can never invent an edge -- only suppress one -- and
-        // self-corrects on the next good read.
-        edgedata |= pad->paddata;
-
-        if (pad->paddata != 0 && pad->readMissMs < PAD_READ_CARRY_MS) {
-            // LEVEL view, carried BOUNDED: keeps getKeyPressed() true so the repeat timers keep
-            // running instead of re-arming the full initial delay on every miss ("sluggish and
-            // heavy, have to press the D-pad several times"). Bounded so a release hidden inside
-            // a burst cannot manufacture repeats; past the window the countdown PAUSES (see
-            // readPads' missHeld) rather than inventing movement.
-            pad->readMissMs += time_since_last;
-            paddata |= pad->paddata;
-            // Counts as activity for the same reason a real read does: guiReadPads() treats a 0
-            // return as "user idle" and releases background art/config IO -- scheduling card
-            // traffic into precisely the SIO2 stall this branch exists to ride out.
-            rcode = 1;
-        }
+    } else {
+        // no successful read: baseline behavior (do not carry state)
     }
 
     return rcode;
@@ -632,9 +564,9 @@ static int getKeyDelay(int id, int repeat)
 {
     int delay = paddelay[id - 1];
 
-    // if not in repeat, the delay is enlarged. Reduced multiplier to improve first-step responsiveness.
+    // if not in repeat, the delay is enlarged (baseline behavior).
     if (!repeat)
-        delay *= 2;
+        delay *= 3;
 
     return delay;
 }
@@ -853,10 +785,8 @@ int readPads()
 
     if (!edgeBaselineFrozen) {
         oldpaddata = paddata;
-        oldedgedata = edgedata;
     }
     paddata = 0;
-    edgedata = 0;
 
     /*
      * Difference the raw 32-bit clock before converting to milliseconds, then
@@ -888,14 +818,7 @@ int readPads()
     // the user is still tapping, the stamp goes stale, and after a second of this registered-
     // input starvation the idle gate opens and readPad() runs initializePad() INLINE on the GUI
     // thread -- a 250-600 ms blackout that eats every tap (#271).
-    unsigned int streak = 0;
-    for (i = 0; i < pad_count; ++i)
-        if (pad_data[i].missStreak > streak)
-            streak = pad_data[i].missStreak;
-    padDiag.missBurst = streak;
-    if (streak > padDiag.missBurstMax)
-        padDiag.missBurstMax = streak;
-    if (paddata != 0 || streak != 0)
+    if (paddata != 0)
         lastInputActivityMs = curtime;
 
     // Rumble duration is millisecond-based because some paths poll twice in one frame.
@@ -923,54 +846,13 @@ int readPads()
             pad->rumbleOn = 0;
     }
 
-    // Buttons a still-connected pad holds but this poll cannot SEE: pad->paddata is the last
-    // SAMPLED hold; readMissMs > 0 says every read since has come back empty. Inside the carry
-    // window the level carry keeps getKeyPressed() true, so this mask only matters once the
-    // window lapses and the held bits fall out of the global level view mid-burst.
-    u32 missHeld = 0;
-    for (i = 0; i < pad_count; ++i) {
-        struct pad_data_t *pad = &pad_data[i];
-        if (isPadReadyState(pad->state) && pad->readMissMs > 0)
-            missHeld |= pad->paddata;
-    }
-
-    // If any pad just recovered from a miss burst, re-arm initial delays for held keys so the
-    // recovery does not immediately trigger multiple repeats (which looks like a jump).
-    int anyRecovered = 0;
-    for (i = 0; i < pad_count; ++i) {
-        if (pad_data[i].justRecovered) {
-            anyRecovered = 1;
-            break;
-        }
-    }
-    if (anyRecovered) {
-        for (i = 0; i < 16; ++i) {
-            if (getKeyPressed(i + 1)) {
-                // set the initial (non-repeat) delay to avoid an immediate repeat on recovery
-                int baseDelay = getKeyDelay(i + 1, 0);
-                int jitter = rand() % (RECOVERY_STABILIZE_JITTER_MS + 1);
-                delaycnt[i] = baseDelay + jitter;
-            }
-        }
-        // clear recovery flags
-        for (i = 0; i < pad_count; ++i)
-            pad_data[i].justRecovered = 0;
-    }
-
+    // Simple baseline repeat handling (wOPL-style): decrement per-key counters when held,
+    // otherwise reset to the initial delay. This removes read-miss carry/pausing behavior.
     for (i = 0; i < 16; ++i) {
-        if (getKeyPressed(i + 1)) {
+        if (getKeyPressed(i + 1))
             delaycnt[i] -= (int)time_since_last;
-            int rdelay = getKeyDelay(i + 1, 1);
-            if (delaycnt[i] < -rdelay)
-                delaycnt[i] = -rdelay;
-        } else if (!(missHeld & keyToPad[i + 1]))
+        else
             delaycnt[i] = getKeyDelay(i + 1, 0);
-        // else: the button reads up ONLY because the pad is mid-read-miss -- PAUSE the countdown
-        // instead of re-arming the full 3x initial delay. A miss is "unknown", not "released";
-        // resetting here is what turned a ~67 ms SIO2 burst into a ~1 s dead cursor, with every
-        // remaining poll of the burst re-arming 900 ms (#272). The reset still fires where it
-        // must: a SAMPLED release clears readMissMs on the recovery read, and a disconnect fails
-        // isPadReadyState -- both take the else-if above.
     }
 
     return result;
@@ -1021,9 +903,8 @@ int getKeyOn(int id)
     // old v.s. new pad data
     int keyid = keyToPad[id];
 
-    // EDGE view, not the level view: a transient read miss must not read as release-then-press,
-    // or the recovery read manufactures a second key-on from ONE tap (#271 "skips 2-3 games").
-    return (edgedata & keyid) && (!(oldedgedata & keyid));
+    // baseline edge: compare current vs previous sampled level only (wOPL-style)
+    return (paddata & keyid) && (!(oldpaddata & keyid));
 }
 
 /** Detects key-off event. Returns true if the button was pressed the last frame but is not pressed this frame.
@@ -1038,8 +919,8 @@ int getKeyOff(int id)
     // old v.s. new pad data
     int keyid = keyToPad[id];
 
-    // Edge view, for the same reason as getKeyOn: a miss is "unknown", not "released".
-    return (!(edgedata & keyid)) && (oldedgedata & keyid);
+    // baseline edge-off: compare current vs previous sampled level only (wOPL-style)
+    return (!(paddata & keyid)) && (oldpaddata & keyid);
 }
 
 /** Returns true (nonzero) if the button is currently pressed
