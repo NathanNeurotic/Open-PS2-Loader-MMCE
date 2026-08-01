@@ -98,7 +98,8 @@ struct pad_data_t
 // Bounded UNDER the fastest list key-repeat OPL uses (gScrollSpeed "fast" = 100 ms) so a release
 // hidden inside a miss burst cannot manufacture repeats: inside the window at most one carried
 // poll sits in any repeat cycle. The EDGE view needs no such bound (see edgedata below).
-#define PAD_READ_CARRY_MS      48
+#define PAD_READ_CARRY_MS      96 // increased from 48 to better survive short SIO2 miss bursts
+
 // Successful-read polls between analog self-heal attempts -- a POLL COUNT, decremented once per
 // good read, not milliseconds like its neighbours.
 #define PAD_ANALOG_RETRY_DELAY 60
