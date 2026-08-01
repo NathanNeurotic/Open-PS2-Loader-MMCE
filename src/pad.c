@@ -88,6 +88,10 @@ struct pad_data_t
     unsigned char rumbleLevel; // big-engine level for the pulse in flight (0 = none armed)
     unsigned char rumbleSmall; // 1 = drive the small engine too (bumps); taps are big-ERM-only
     int rumbleMsLeft;          // ms remaining; ticked down in readPads() (see the ms-vs-frames note there)
+
+    // Set when this pad transitioned from a read-miss burst to a successful read; used to
+    // re-arm repeat timers conservatively on recovery to avoid immediate rapid repeats.
+    unsigned char justRecovered;
 };
 
 // Pad commands are asynchronous. Keep every wait bounded so a transient SIO2/pad error cannot hang the
@@ -99,6 +103,9 @@ struct pad_data_t
 // hidden inside a miss burst cannot manufacture repeats: inside the window at most one carried
 // poll sits in any repeat cycle. The EDGE view needs no such bound (see edgedata below).
 #define PAD_READ_CARRY_MS      96 // increased from 48 to better survive short SIO2 miss bursts
+// Jitter on recovery to avoid simultaneous immediate repeats across keys/pads
+#define RECOVERY_STABILIZE_JITTER_MS 10
+
 
 // Successful-read polls between analog self-heal attempts -- a POLL COUNT, decremented once per
 // good read, not milliseconds like its neighbours.
@@ -272,6 +279,7 @@ static int initializePadInner(struct pad_data_t *pad)
     // Menu rumble state belongs to the current connection.
     pad->rumbleOn = 0;
     pad->rumbleMsLeft = 0;
+    pad->justRecovered = 0;
 
     // is there any device connected to that port?
     state = waitPadReady(pad);
@@ -566,6 +574,12 @@ static int readPad(struct pad_data_t *pad)
 #endif
 
     if (padsRead > 0) {
+        // If this pad had an active miss streak and now produced a successful read,
+        // mark it as recovered so higher-level code can reset repeat timers to avoid
+        // immediate rapid repeats on recovery.
+        if (pad->missStreak > 0)
+            pad->justRecovered = 1;
+
         pad->readMissMs = 0;
         pad->missStreak = 0;
         newpdata = readLeftJoy(pad, newpdata);
@@ -918,6 +932,29 @@ int readPads()
         struct pad_data_t *pad = &pad_data[i];
         if (isPadReadyState(pad->state) && pad->readMissMs > 0)
             missHeld |= pad->paddata;
+    }
+
+    // If any pad just recovered from a miss burst, re-arm initial delays for held keys so the
+    // recovery does not immediately trigger multiple repeats (which looks like a jump).
+    int anyRecovered = 0;
+    for (i = 0; i < pad_count; ++i) {
+        if (pad_data[i].justRecovered) {
+            anyRecovered = 1;
+            break;
+        }
+    }
+    if (anyRecovered) {
+        for (i = 0; i < 16; ++i) {
+            if (getKeyPressed(i + 1)) {
+                // set the initial (non-repeat) delay to avoid an immediate repeat on recovery
+                int baseDelay = getKeyDelay(i + 1, 0);
+                int jitter = rand() % (RECOVERY_STABILIZE_JITTER_MS + 1);
+                delaycnt[i] = baseDelay + jitter;
+            }
+        }
+        // clear recovery flags
+        for (i = 0; i < pad_count; ++i)
+            pad_data[i].justRecovered = 0;
     }
 
     for (i = 0; i < 16; ++i) {
