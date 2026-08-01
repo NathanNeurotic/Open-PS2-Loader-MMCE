@@ -152,6 +152,8 @@ void padGetDiag(pad_diag_t *out)
  * A tap pressed and released entirely inside the fade remains intentionally
  * ignored. Polling continues for rumble timing, pad state, and reconnects.
  */
+static u32 edgedata;
+static u32 oldedgedata;
 static int edgeBaselineFrozen = 0;
 
 void padFreezeEdgeBaseline(int freeze)
@@ -160,6 +162,7 @@ void padFreezeEdgeBaseline(int freeze)
 
     if (next && !edgeBaselineFrozen) {
         oldpaddata = paddata;
+        oldedgedata = edgedata;
     }
 
     edgeBaselineFrozen = next;
@@ -543,6 +546,8 @@ static int readPad(struct pad_data_t *pad)
         // no successful read: baseline behavior (do not carry state)
     }
 
+    edgedata |= pad->paddata;
+
     return rcode;
 }
 
@@ -776,8 +781,10 @@ int readPads()
 
     if (!edgeBaselineFrozen) {
         oldpaddata = paddata;
+        oldedgedata = edgedata;
     }
     paddata = 0;
+    edgedata = 0;
 
     /*
      * Difference the raw 32-bit clock before converting to milliseconds, then
@@ -889,8 +896,7 @@ int getKeyOn(int id)
     // old v.s. new pad data
     int keyid = keyToPad[id];
 
-    // baseline edge: compare current vs previous sampled level only (wOPL-style)
-    return (paddata & keyid) && (!(oldpaddata & keyid));
+    return (edgedata & keyid) && (!(oldedgedata & keyid));
 }
 
 /** Detects key-off event. Returns true if the button was pressed the last frame but is not pressed this frame.
@@ -905,8 +911,7 @@ int getKeyOff(int id)
     // old v.s. new pad data
     int keyid = keyToPad[id];
 
-    // baseline edge-off: compare current vs previous sampled level only (wOPL-style)
-    return (!(paddata & keyid)) && (oldpaddata & keyid);
+    return (!(edgedata & keyid)) && (oldedgedata & keyid);
 }
 
 /** Returns true (nonzero) if the button is currently pressed
