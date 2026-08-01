@@ -538,7 +538,6 @@ static int readPad(struct pad_data_t *pad)
 
     if (padsRead > 0) {
         newpdata = readLeftJoy(pad, newpdata);
-        pad->oldpaddata = pad->paddata;
         pad->paddata = newpdata;
 
         // merge into the global vars
