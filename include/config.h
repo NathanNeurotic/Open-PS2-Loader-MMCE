@@ -107,7 +107,7 @@ enum CONFIG_INDEX {
 #define CONFIG_OPL_NEUTRINO_PATH        "neutrino_path"
 #define CONFIG_OPL_NEUTRINO_DEVICE      "neutrino_device"   // legacy device-INDEX (mc0/mass0/mmce0); read-only, migrated
 #define CONFIG_OPL_NEUTRINO_DEVTYPE     "neutrino_devtype"  // device-TYPE (NEUTRINO_DEV_*); the live key
-#define CONFIG_OPL_NEUTRINO_ELF_ARG     "neutrino_elf_arg"  // opt-in (no UI row): auto-emit -elf=cdrom0:\<startup>;1 (parity Delta-10)
+#define CONFIG_OPL_NEUTRINO_ELF_ARG     "neutrino_elf_arg"  // default-on (no UI row): auto-emit -elf=cdrom0:\<startup>;1 (parity Delta-10)
 #define CONFIG_OPL_POPSTARTER_PATH      "popstarter_path"   // free-text custom path (used only when device=Custom)
 #define CONFIG_OPL_POPSTARTER_DEVICE    "popstarter_device" // device TYPE holding POPS/POPSTARTER.ELF (POPS_DEV_*)
 #define CONFIG_OPL_BDMA_SOURCE          "bdma_source"

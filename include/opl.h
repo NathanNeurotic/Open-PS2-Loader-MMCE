@@ -272,7 +272,7 @@ extern int gNeutrinoDevice;         // Neutrino ELF device (NEUTRINO_DEV_*); Aut
 extern int gDefaultCoreLoader;      // global default Loader Core: 0 = <OPL> (native), 1 = Neutrino. A game's per-game $CoreLoader overrides it; absent per-game key = follow this global.
 extern int gNeutrinoVideoDefault;   // global default Neutrino -gsm video mode (0=Off..5=1080i x3, indices = system.c gsmVideoTokens). Per-game $NeutrinoVideo overrides; absent per-game key = follow this.
 extern int gNeutrinoGsmCompDefault; // global default -gsm ":c" field-flip half (0=off, 1-3=type); only emitted when the effective video mode is set.
-extern int gNeutrinoElfArg;         // opt-in (settings key only, no UI): auto-emit -elf=cdrom0:\<startup>;1 on Neutrino launches
+extern int gNeutrinoElfArg;         // default-on (settings key only, no UI): auto-emit -elf=cdrom0:\<startup>;1 on Neutrino launches
 extern char gPopstarterPath[256];   // custom POPSTARTER.ELF path (used only when gPopstarterDevice == POPS_DEV_CUSTOM)
 extern char gBootDir[256];          // boot directory (cwd) OPL launched from, e.g. "mass0:/APPS"; "" if undeterminable
 extern int gDeinitTerminal;         // 1 while deinit() runs for exit/poweroff, 0 for a game/app LAUNCH teardown.
