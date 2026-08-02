@@ -1168,9 +1168,12 @@ static const int artDelayValues[] = {0, 2, 5, 8};
 
 static int artDelayToEnum(int delay)
 {
-    if (delay <= 0) return 0;
-    if (delay <= 3) return 1;
-    if (delay <= 6) return 2;
+    if (delay <= 0)
+        return 0;
+    if (delay <= 3)
+        return 1;
+    if (delay <= 6)
+        return 2;
     return 3;
 }
 
