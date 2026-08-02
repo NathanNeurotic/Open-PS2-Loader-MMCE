@@ -1662,6 +1662,8 @@ static void _loadConfig()
             configGetInt(configOPL, CONFIG_OPL_ENABLE_COVERART, &gEnableArt);
             configGetInt(configOPL, CONFIG_OPL_ENABLE_ART_TAR, &gEnableArtTar);
             configGetInt(configOPL, CONFIG_OPL_ART_DELAY, &gArtDelay);
+            if (gArtDelay != 0 && gArtDelay != 2 && gArtDelay != 5 && gArtDelay != 8)
+                gArtDelay = 2;
             configGetInt(configOPL, CONFIG_OPL_WIDESCREEN, &gWideScreen);
             configGetInt(configOPL, CONFIG_OPL_DEFAULT_GAME_VIEW, &gDefaultGameView);
             // Clamp: an out-of-enum value (hand-edited/corrupt config) is UNRECOVERABLE on-console --
