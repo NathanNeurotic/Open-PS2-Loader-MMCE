@@ -205,8 +205,9 @@ static int cacheShouldDeferRequest(const load_image_request_t *request)
     if (request == NULL || request->effectiveMode != MMCE_MODE)
         return 0;
 
+    int delay = (request->list != NULL) ? request->list->delay : gArtDelay;
     return cacheIsNavigationActive() ||
-           guiInactiveFrames < cacheGetArtIdleFrames(request->cache, gArtDelay);
+           guiInactiveFrames < cacheGetArtIdleFrames(request->cache, delay);
 }
 
 int cacheLowerCallerPriority(void)
