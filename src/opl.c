@@ -210,7 +210,7 @@ int gNeutrinoDevice;         // Neutrino ELF device (NEUTRINO_DEV_*); Auto scans
 int gDefaultCoreLoader;      // global default Loader Core (0=<OPL>, 1=Neutrino); per-game $CoreLoader overrides, absent key = follow this
 int gNeutrinoVideoDefault;   // global default Neutrino -gsm video mode (0=Off..5=1080i x3); per-game $NeutrinoVideo overrides, absent key = follow this (R3Z3N's 1080i x3 "1080p impression" trick, now global)
 int gNeutrinoGsmCompDefault; // global default -gsm ":c" field-flip half (0=off, 1-3=type)
-int gNeutrinoElfArg;         // opt-in (settings key only, no UI): auto-emit -elf=cdrom0: on Neutrino launches (parity Delta-10)
+int gNeutrinoElfArg;         // default-on (settings key only, no UI): auto-emit -elf=cdrom0: on Neutrino launches (parity Delta-10)
 char gPopstarterPath[256];   // custom POPSTARTER.ELF path (used only when gPopstarterDevice == POPS_DEV_CUSTOM)
 int gPopstarterDevice;       // POPSTARTER.ELF device (POPS_DEV_*); Default = cwd then VCD device; legacy path -> Custom
 int gBdmaSource;             // BDMA SOURCE device family (VCD_BDMA_SRC_*) to read exFAT driver variants from
@@ -1600,7 +1600,7 @@ static void resolveBootDirToMass(void)
     }
 }
 
-// Shared reader for the Neutrino-launch globals (args/path/-elf opt-in/global default core/device
+// Shared reader for the Neutrino-launch globals (args/path/-elf switch/global default core/device
 // TYPE incl. the legacy device-INDEX migration). Factored out so the interactive _loadConfig and the
 // autolaunch miniInit can never drift again -- the argv/autolaunch path previously read none of these
 // (then only DEFAULT_CORE), so a keyless "Default" game booted Neutrino with a stale AUTO device and
@@ -2998,7 +2998,7 @@ static void setDefaults(void)
     gDefaultCoreLoader = 0;      // <OPL> (native) -- preserves pre-existing behaviour until the user opts into Neutrino globally
     gNeutrinoVideoDefault = 0;   // no global -gsm until the user opts in
     gNeutrinoGsmCompDefault = 0; // no field-flip comp half
-    gNeutrinoElfArg = 0;         // experimental Delta-10 -elf emission stays opt-in
+    gNeutrinoElfArg = 1;         // auto-emit the game ELF for Neutrino compatibility lookup by default
     gPopstarterPath[0] = '\0';
     gPopstarterDevice = POPS_DEV_DEFAULT;
     gBdmaSource = VCD_BDMA_SRC_USB;

@@ -120,14 +120,14 @@ The stored format is unchanged — a space-separated string, e.g.:
 > config file only when a single field needs more than 31 characters — OPL reads and forwards the
 > full string at launch.
 
-### Experimental: automatic `-elf=` (config key only)
+### Automatic `-elf=` (enabled by default; config key only)
 
-Setting `neutrino_elf_arg = 1` by hand in `settings_riptopl.cfg` (there is deliberately no
-settings-screen row for this) makes every Neutrino launch also pass
+RiptOPL defaults `neutrino_elf_arg` to `1` (there is deliberately no settings-screen row for
+this), making every Neutrino launch also pass
 `-elf=cdrom0:\<STARTUP>;1` -- the game's boot-file path -- so Neutrino's per-GameID
 `config/<GameID>.toml` compatibility lookup can resolve before its IOP reset. It is only
 emitted for retail-shaped startups (`AAAA_NNN.NN`) and never when your own args already carry
-an `-elf=`. Off by default; if a launch misbehaves with it on, remove the key and report.
+an `-elf=`. Set `neutrino_elf_arg = 0` by hand to disable it if a launch misbehaves.
 
 For the full list of flags Neutrino accepts, see the
 [Neutrino documentation](https://github.com/rickgaiser/neutrino).

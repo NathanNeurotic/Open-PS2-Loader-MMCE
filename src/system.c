@@ -1376,8 +1376,8 @@ void sysLaunchNeutrino(const char *driver, const char *path, const char *startup
         argv[argc++] = gsmArg;
     }
 
-    // Parity Delta-10, OPT-IN via settings_riptopl.cfg "neutrino_elf_arg"=1 (deliberately no UI
-    // row -- experimental): hand neutrino the boot ELF path directly so its per-GameID
+    // Parity Delta-10, enabled by default via settings_riptopl.cfg "neutrino_elf_arg"=1
+    // (deliberately no UI row): hand neutrino the boot ELF path directly so its per-GameID
     // config/<GameID>.toml compat lookup can resolve pre-reset. Shape-guarded to AAAA_NNN.NN
     // startups and skipped when the user already forwards an -elf= (structured field or free
     // text) -- neutrino must see exactly one.
