@@ -1204,8 +1204,8 @@ void guiShowArtworkConfig(void)
         diaGetInt(diaArtworkConfig, UICFG_ART_DELAY, &artDelayIdx);
         if (artDelayIdx >= 0 && artDelayIdx < 4) {
             gArtDelay = artDelayValues[artDelayIdx];
-            item_list_t *lists[] = {appGetObject(1), bdmGetObject(1), hddGetObject(1), ethGetObject(1), mmceGetObject(1), udpfsGetObject(1), favGetObject(1)};
-            for (int i = 0; i < 7; i++) {
+            item_list_t *lists[] = {appGetObject(1), hddGetObject(1), ethGetObject(1), mmceGetObject(1), udpfsGetObject(1), favGetObject(1)};
+            for (int i = 0; i < 6; i++) {
                 if (lists[i] != NULL)
                     lists[i]->delay = gArtDelay;
             }
