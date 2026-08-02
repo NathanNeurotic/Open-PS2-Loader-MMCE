@@ -641,12 +641,8 @@ $(EE_ASM_DIR)bdmfs_fatfs.c: $(PS2SDK)/iop/irx/bdmfs_fatfs.irx | $(EE_ASM_DIR)
 $(EE_ASM_DIR)iLinkman.c: $(PS2SDK)/iop/irx/iLinkman.irx | $(EE_ASM_DIR)
 	$(BIN2C) $< $@ $(*F)_irx
 
-# mx4sio_bd comes from modules/mx4sio/ (vendored, see PROVENANCE.md there): ps2sdk master +
-# the fork's patch restoring ROM-sio2man (rom1:SIO2MAN v2.x, DECKARD) hook support that
-# ps2sdk PR #862 (2026-06-16) removed -- the stock SDK copies black-screen MX4SIO game
-# launches on 75000+ consoles (#317, upstream OPL #1731). Rebuild via
-# .github/scripts/build_vendored_mx4sio.sh; do NOT repoint at $(PS2SDK) until upstream
-# restores the support.
+# Keep mx4sio_bd and freesio2 (embedded below as sio2man) from the same PS2SDK.
+# The current MX4SIO driver requires PS2SDK's sio2man after the game-side IOP reset.
 ifeq ($(DEBUG),1)
 # block device drivers with printf's
 $(EE_ASM_DIR)usbmass_bd.c: $(PS2SDK)/iop/irx/usbmass_bd.irx | $(EE_ASM_DIR)
@@ -655,7 +651,7 @@ $(EE_ASM_DIR)usbmass_bd.c: $(PS2SDK)/iop/irx/usbmass_bd.irx | $(EE_ASM_DIR)
 $(EE_ASM_DIR)IEEE1394_bd.c: $(PS2SDK)/iop/irx/IEEE1394_bd.irx | $(EE_ASM_DIR)
 	$(BIN2C) $< $@ $(*F)_irx
 
-$(EE_ASM_DIR)mx4sio_bd.c: modules/mx4sio/mx4sio_bd.irx | $(EE_ASM_DIR)
+$(EE_ASM_DIR)mx4sio_bd.c: $(PS2SDK)/iop/irx/mx4sio_bd.irx | $(EE_ASM_DIR)
 	$(BIN2C) $< $@ $(*F)_irx
 else
 # block device drivers without printf's
@@ -665,7 +661,7 @@ $(EE_ASM_DIR)usbmass_bd.c: $(PS2SDK)/iop/irx/usbmass_bd_mini.irx | $(EE_ASM_DIR)
 $(EE_ASM_DIR)IEEE1394_bd.c: $(PS2SDK)/iop/irx/IEEE1394_bd_mini.irx | $(EE_ASM_DIR)
 	$(BIN2C) $< $@ $(*F)_irx
 
-$(EE_ASM_DIR)mx4sio_bd.c: modules/mx4sio/mx4sio_bd_mini.irx | $(EE_ASM_DIR)
+$(EE_ASM_DIR)mx4sio_bd.c: $(PS2SDK)/iop/irx/mx4sio_bd_mini.irx | $(EE_ASM_DIR)
 	$(BIN2C) $< $@ $(*F)_irx
 endif
 
