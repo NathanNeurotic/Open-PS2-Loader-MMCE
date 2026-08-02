@@ -173,6 +173,7 @@ int gAutoRefresh;
 int gEnableNotifications;
 int gEnableArt;
 int gEnableArtTar;
+int gEnableAnalogNav;
 int gArtDelay;
 int gWideScreen;
 int gDefaultGameView;
@@ -1662,6 +1663,7 @@ static void _loadConfig()
             configGetInt(configOPL, CONFIG_OPL_ENABLE_NOTIFICATIONS, &gEnableNotifications);
             configGetInt(configOPL, CONFIG_OPL_ENABLE_COVERART, &gEnableArt);
             configGetInt(configOPL, CONFIG_OPL_ENABLE_ART_TAR, &gEnableArtTar);
+            configGetInt(configOPL, CONFIG_OPL_ENABLE_ANALOG_NAV, &gEnableAnalogNav);
             configGetInt(configOPL, CONFIG_OPL_ART_DELAY, &gArtDelay);
             if (gArtDelay != 0 && gArtDelay != 2 && gArtDelay != 5 && gArtDelay != 8)
                 gArtDelay = 2;
@@ -1731,7 +1733,11 @@ static void _loadConfig()
                 gSelectButton = value == 0 ? KEY_CIRCLE : KEY_CROSS;
 
             configGetInt(configOPL, CONFIG_OPL_XSENSITIVITY, &gXSensitivity);
+            if (gXSensitivity < 0 || gXSensitivity > 3)
+                gXSensitivity = 1;
             configGetInt(configOPL, CONFIG_OPL_YSENSITIVITY, &gYSensitivity);
+            if (gYSensitivity < 0 || gYSensitivity > 3)
+                gYSensitivity = 1;
             configGetInt(configOPL, CONFIG_OPL_DISABLE_DEBUG, &gEnableDebug);
             configGetInt(configOPL, CONFIG_OPL_PS2LOGO, &gPS2Logo);
             configGetInt(configOPL, CONFIG_OPL_HDD_GAME_LIST_CACHE, &gHDDGameListCache);
@@ -2119,6 +2125,7 @@ static void _saveConfig()
         configSetInt(configOPL, CONFIG_OPL_ENABLE_NOTIFICATIONS, gEnableNotifications);
         configSetInt(configOPL, CONFIG_OPL_ENABLE_COVERART, gEnableArt);
         configSetInt(configOPL, CONFIG_OPL_ENABLE_ART_TAR, gEnableArtTar);
+        configSetInt(configOPL, CONFIG_OPL_ENABLE_ANALOG_NAV, gEnableAnalogNav);
         configSetInt(configOPL, CONFIG_OPL_ART_DELAY, gArtDelay);
         configSetInt(configOPL, CONFIG_OPL_WIDESCREEN, gWideScreen);
         configSetInt(configOPL, CONFIG_OPL_DEFAULT_GAME_VIEW, gDefaultGameView);
@@ -3034,6 +3041,7 @@ static void setDefaults(void)
     // reverted at NathanNeurotic's call -- users who want the archive turn it on. The engine fixes from
     // #207 (uncapped-seek index integrity, no stat()-latch, toggle re-arm, the [48] filename bound) stay.
     gEnableArtTar = 0;
+    gEnableAnalogNav = 1;
     gArtDelay = 2;
     gWideScreen = 1;
     gDefaultGameView = GAME_VIEW_BOTH;
