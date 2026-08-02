@@ -3058,27 +3058,6 @@ static void setDefaults(void)
 
     gMMCESlot = 2; // Default to first Auto slot
     gMMCEIGRSlot = 3;
-    /*
-      Both GameID features now ship OFF (maintainer directive, 2026-07-28), matching the
-      every-device-ships-OFF doctrine above: opt in to exactly what your rig has.
-
-      gMMCEEnableGameID -- sends the game id to an MMCE card. Default-ON meant deferredInit armed the
-      transport on EVERY boot, including consoles with no MMCE hardware, which pushed a blocking
-      mmceman.irx load into the IO worker. mmceman hooks sio2man, the same bus freepad polls the PADS
-      over, and on some containers' freepad build that kills pad input AFTER the menu is already
-      drawn -- PixeliGer's "live menu, dead cursor" (#254), unrecoverable in-app because the only
-      cure is a settings toggle you need a working cursor to reach. Shipping it off removes that
-      exposure without gating the feature: enabling it still arms immediately and still works on
-      every device, which is the #51 contract.
-
-      gApplyGameID -- the visual RetroGEM / Pixel FX barcode. It was flipped on in 120045d0 on the
-      premise it is "imperceptible otherwise". That premise is unproven and is under active doubt:
-      zackcage6 reports a white bar during load that survived the clean-frame fix, so the barcode is
-      either still implicated or was never the cause. Either way it is an experimental feature for
-      specific HDMI scalers and does not belong on by default.
-
-      Existing saved configs override both, so nobody who has turned them on loses anything.
-    */
     gMMCEEnableGameID = 0;
     gApplyGameID = 0;
     // Restore the fork's long-standing known-good MMCE SIO2 pacing (was flipped to 0/0 in 519f520d,
