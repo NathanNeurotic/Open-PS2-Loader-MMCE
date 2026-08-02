@@ -257,7 +257,6 @@ static int tarParseFile(TarKind kind, const char *path)
         goto fail;
 
     u32 nameMax = entrySize - sizeof(TarEntryBase) - 1;
-    u32 copyLen = (nameMax < 100) ? nameMax : 100;
 
     while (1) {
         unsigned char header[TAR_BLOCK_SIZE] __attribute__((aligned(64)));
@@ -273,16 +272,17 @@ static int tarParseFile(TarKind kind, const char *path)
         if (isZeroBlock(header))
             break;
 
-        // Derive the seek distance from the UNCAPPED header size. Clamping rawSize FIRST and computing
-        // paddedSize from the clamped value made any member larger than MAX_FILE_SIZE seek SHORT, so the
-        // walk landed mid-data and indexed every SUBSEQUENT entry at a garbage offset -- and tarWriteCache
-        // then PERSISTED that corrupt index to art_cache.bin, where it passes revalidation (which only
-        // rejects rawSize > MAX_FILE_SIZE, and the clamped value is exactly ==) and survives reboots until
-        // the archive's size changes. wOPL refuses such an archive outright; skipping just the oversized
-        // member keeps the rest of the archive usable while never desynchronising the walk.
+        char typeflag = (char)header[156];
         u64 rawSize = parseOctal((char *)header + 124, 12);
         u64 paddedSize = ((rawSize + 511) / 512) * 512;
         int oversized = (rawSize > MAX_FILE_SIZE); // too big to serve (rawSize/paddedSize are u32) -> don't index it
+
+        if (typeflag != '\0' && typeflag != '0') {
+            // Skip directory or non-file entries (e.g. typeflag '5')
+            if (lseek64(fd, paddedSize, SEEK_CUR) == (u64)-1)
+                goto fail;
+            continue;
+        }
 
         u64 dataOffset = lseek64(fd, 0, SEEK_CUR);
         if (dataOffset == (u64)-1)
@@ -310,9 +310,44 @@ static int tarParseFile(TarKind kind, const char *path)
         base->rawSize = rawSize;
         base->paddedSize = paddedSize;
 
+        // Parse full USTAR path from 100-byte name (offset 0) and 155-byte prefix (offset 345)
+        char nameBuf[101];
+        memcpy(nameBuf, header, 100);
+        nameBuf[100] = '\0';
+        for (int i = 99; i >= 0; i--) {
+            if (nameBuf[i] == ' ')
+                nameBuf[i] = '\0';
+            else if (nameBuf[i] != '\0')
+                break;
+        }
+
+        char prefix[156];
+        memcpy(prefix, header + 345, 155);
+        prefix[155] = '\0';
+        for (int i = 154; i >= 0; i--) {
+            if (prefix[i] == ' ')
+                prefix[i] = '\0';
+            else if (prefix[i] != '\0')
+                break;
+        }
+
+        char fullPath[256];
+        if (prefix[0] != '\0')
+            snprintf(fullPath, sizeof(fullPath), "%s/%s", prefix, nameBuf);
+        else
+            snprintf(fullPath, sizeof(fullPath), "%s", nameBuf);
+        fullPath[sizeof(fullPath) - 1] = '\0';
+
+        // Canonical filename normalization: strip leading directory prefixes
+        const char *cleanName = fullPath;
+        if (!strncasecmp(cleanName, "./", 2))
+            cleanName += 2;
+        if (!strncasecmp(cleanName, "ART/", 4) || !strncasecmp(cleanName, "CFG/", 4) || !strncasecmp(cleanName, "CHT/", 4))
+            cleanName += 4;
+
         char *fname = entry + sizeof(TarEntryBase);
-        memcpy(fname, header, copyLen);
-        fname[copyLen] = '\0';
+        strncpy(fname, cleanName, nameMax);
+        fname[nameMax - 1] = '\0';
 
         s_count[kind]++;
 
@@ -408,13 +443,25 @@ TarEntryBase *tarFind(TarKind kind, const char *filename)
         if (tarLoadFromAnyDevice(kind) < 0)
             return NULL;
 
+    const char *queryClean = filename;
+    if (!strncasecmp(queryClean, "./", 2))
+        queryClean += 2;
+    if (!strncasecmp(queryClean, "ART/", 4) || !strncasecmp(queryClean, "CFG/", 4) || !strncasecmp(queryClean, "CHT/", 4))
+        queryClean += 4;
+
     u32 entrySize = gTarInfo[kind].entrySize;
     char *base = (char *)s_index[kind];
 
     for (u32 i = 0; i < s_count[kind]; i++) {
         char *entry = base + entrySize * i;
         char *fname = entry + sizeof(TarEntryBase);
-        if (strcasecmp(fname, filename) == 0)
+
+        if (strcasecmp(fname, filename) == 0 || strcasecmp(fname, queryClean) == 0)
+            return (TarEntryBase *)entry;
+
+        const char *baseFname = strrchr(fname, '/');
+        baseFname = baseFname ? baseFname + 1 : fname;
+        if (strcasecmp(baseFname, queryClean) == 0)
             return (TarEntryBase *)entry;
     }
 

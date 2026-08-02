@@ -2266,8 +2266,9 @@ static void _saveConfig()
 void applyConfig(int themeID, int langID, int skipDeviceRefresh)
 {
     // A deliberate settings/theme apply may make new art available, so clear the
-    // genuine-absence memo and let cover-less items be probed once more.
+    // genuine-absence memo and tar inactive latch to let cover art be probed once more.
     cacheInvalidateFailMemo();
+    tarInvalidate(TAR_KIND_ART);
 
     if (gDefaultDevice < 0 || gDefaultDevice > FAV_MODE)
         gDefaultDevice = MMCE_MODE;
