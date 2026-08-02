@@ -1163,11 +1163,24 @@ reshow_ui:
     guiFreeNameList(langNamesSnap);
 }
 
+static const char *artDelayNames[] = {"0 (Instant)", "2 (Fast)", "5 (Medium)", "8 (Standard)", NULL};
+static const int artDelayValues[] = {0, 2, 5, 8};
+
+static int artDelayToEnum(int delay)
+{
+    if (delay <= 0) return 0;
+    if (delay <= 3) return 1;
+    if (delay <= 6) return 2;
+    return 3;
+}
+
 // Interface -> Artwork Settings (cover art display + ART.TAR loading).
 void guiShowArtworkConfig(void)
 {
     diaSetInt(diaArtworkConfig, UICFG_COVERART, gEnableArt);
     diaSetInt(diaArtworkConfig, UICFG_ENABLE_ART_TAR, gEnableArtTar);
+    diaSetEnum(diaArtworkConfig, UICFG_ART_DELAY, artDelayNames);
+    diaSetInt(diaArtworkConfig, UICFG_ART_DELAY, artDelayToEnum(gArtDelay));
 
     int ret = diaExecuteDialog(diaArtworkConfig, -1, 1, NULL);
     if (ret) {
@@ -1182,6 +1195,11 @@ void guiShowArtworkConfig(void)
             if (gEnableArtTar != previousArtTar)
                 tarInvalidate(TAR_KIND_ART);
         }
+        int artDelayIdx = 0;
+        diaGetInt(diaArtworkConfig, UICFG_ART_DELAY, &artDelayIdx);
+        if (artDelayIdx >= 0 && artDelayIdx < 4)
+            gArtDelay = artDelayValues[artDelayIdx];
+
         applyConfig(-1, -1, 1);
     }
 }
