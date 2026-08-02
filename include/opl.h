@@ -195,6 +195,7 @@ extern int gAutosort;
 extern int gAutoRefresh;
 extern int gEnableNotifications;
 extern int gEnableArt;
+extern int gEnableBGArt;
 extern int gEnableArtTar; // opt-in .tar cover-art loader (ART/art.tar), default OFF
 extern int gArtDelay;     // artwork inactive frame delay (0=instant, 2=fast default, 5=medium, 8=standard)
 extern int gWideScreen;

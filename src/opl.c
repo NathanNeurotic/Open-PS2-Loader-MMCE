@@ -172,6 +172,7 @@ int gAutosort;
 int gAutoRefresh;
 int gEnableNotifications;
 int gEnableArt;
+int gEnableBGArt;
 int gEnableArtTar;
 int gArtDelay;
 int gWideScreen;
@@ -1661,6 +1662,7 @@ static void _loadConfig()
             configGetColor(configOPL, CONFIG_OPL_SEL_TEXTCOLOR, gDefaultSelTextColor);
             configGetInt(configOPL, CONFIG_OPL_ENABLE_NOTIFICATIONS, &gEnableNotifications);
             configGetInt(configOPL, CONFIG_OPL_ENABLE_COVERART, &gEnableArt);
+            configGetInt(configOPL, CONFIG_OPL_ENABLE_BGART, &gEnableBGArt);
             configGetInt(configOPL, CONFIG_OPL_ENABLE_ART_TAR, &gEnableArtTar);
             configGetInt(configOPL, CONFIG_OPL_ART_DELAY, &gArtDelay);
             if (gArtDelay != 0 && gArtDelay != 2 && gArtDelay != 5 && gArtDelay != 8)
@@ -2118,6 +2120,7 @@ static void _saveConfig()
         configSetColor(configOPL, CONFIG_OPL_SEL_TEXTCOLOR, gDefaultSelTextColor);
         configSetInt(configOPL, CONFIG_OPL_ENABLE_NOTIFICATIONS, gEnableNotifications);
         configSetInt(configOPL, CONFIG_OPL_ENABLE_COVERART, gEnableArt);
+        configSetInt(configOPL, CONFIG_OPL_ENABLE_BGART, gEnableBGArt);
         configSetInt(configOPL, CONFIG_OPL_ENABLE_ART_TAR, gEnableArtTar);
         configSetInt(configOPL, CONFIG_OPL_ART_DELAY, gArtDelay);
         configSetInt(configOPL, CONFIG_OPL_WIDESCREEN, gWideScreen);
@@ -3028,6 +3031,7 @@ static void setDefaults(void)
     gETHPrefix[0] = '\0';
     gEnableNotifications = 1;
     gEnableArt = 1;
+    gEnableBGArt = 1;
     // .tar cover-art loader is OPT-IN (default OFF) -- the fork's deliberate opinionated default (#54).
     // The reporter's "art.tar doesn't work" was DISCOVERABILITY, not the default: the toggle lives in
     // Display Settings ("Cover Art .tar Archive"). PR #207 briefly flipped this ON for wOPL parity;
