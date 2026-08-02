@@ -107,8 +107,6 @@ void udpfsInit(item_list_t *itemList)
     udpfsGameCount = 0;
     udpfsGames = NULL;
     udpfsGameList.delay = gArtDelay;
-    // Reuse ETH's frames-delay knob (this is a network device with the same latency profile).
-    configGetInt(configGetByType(CONFIG_OPL), "eth_frames_delay", &udpfsGameList.delay);
     ioPutRequest(IO_CUSTOM_SIMPLEACTION, &udpfsLoadModules);
     udpfsGameList.enabled = 1;
 }

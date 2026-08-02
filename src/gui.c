@@ -17,7 +17,9 @@
 #include "include/config.h"
 #include "include/system.h"
 #include "include/vcdsupport.h" // BDMA equip (vcdEquipBdma/vcdReadBdmaMode + VCD_BDMA_* enums)
+#include "include/appsupport.h"
 #include "include/ethsupport.h"
+#include "include/mmcesupport.h"
 #include "include/udpfssupport.h" // udpfsGetModulesLoaded() -- network-protocol restart-notice check
 #include "include/bdmsupport.h"   // bdmForceDeviceRefresh() -- re-show a latched-hidden BDM tab after a device-enable toggle
 #include "include/hddsupport.h"   // hddVcdInvalidateCache() -- first-disc-only is a scan-time filter
@@ -1200,8 +1202,14 @@ void guiShowArtworkConfig(void)
         }
         int artDelayIdx = 0;
         diaGetInt(diaArtworkConfig, UICFG_ART_DELAY, &artDelayIdx);
-        if (artDelayIdx >= 0 && artDelayIdx < 4)
+        if (artDelayIdx >= 0 && artDelayIdx < 4) {
             gArtDelay = artDelayValues[artDelayIdx];
+            item_list_t *lists[] = {appGetObject(1), bdmGetObject(1), hddGetObject(1), ethGetObject(1), mmceGetObject(1), udpfsGetObject(1), favGetObject(1)};
+            for (int i = 0; i < 7; i++) {
+                if (lists[i] != NULL)
+                    lists[i]->delay = gArtDelay;
+            }
+        }
 
         applyConfig(-1, -1, 1);
     }
