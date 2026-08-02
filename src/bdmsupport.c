@@ -452,7 +452,7 @@ static void bdmInit(item_list_t *itemList)
     pDeviceData->bdmDeviceType = BDM_TYPE_UNKNOWN;
     pDeviceData->bdmHddIsLBA48 = -1;
     pDeviceData->ataHighestUDMAMode = -1;
-    configGetInt(configGetByType(CONFIG_OPL), "usb_frames_delay", &itemList->delay);
+    itemList->delay = gArtDelay;
     bdmLoadModules();
     itemList->enabled = 1;
 }

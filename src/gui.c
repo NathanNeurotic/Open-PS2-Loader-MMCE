@@ -17,7 +17,9 @@
 #include "include/config.h"
 #include "include/system.h"
 #include "include/vcdsupport.h" // BDMA equip (vcdEquipBdma/vcdReadBdmaMode + VCD_BDMA_* enums)
+#include "include/appsupport.h"
 #include "include/ethsupport.h"
+#include "include/mmcesupport.h"
 #include "include/udpfssupport.h" // udpfsGetModulesLoaded() -- network-protocol restart-notice check
 #include "include/bdmsupport.h"   // bdmForceDeviceRefresh() -- re-show a latched-hidden BDM tab after a device-enable toggle
 #include "include/hddsupport.h"   // hddVcdInvalidateCache() -- first-disc-only is a scan-time filter
@@ -1163,11 +1165,27 @@ reshow_ui:
     guiFreeNameList(langNamesSnap);
 }
 
+static const char *artDelayNames[] = {"0 (Instant)", "2 (Fast)", "5 (Medium)", "8 (Standard)", NULL};
+static const int artDelayValues[] = {0, 2, 5, 8};
+
+static int artDelayToEnum(int delay)
+{
+    if (delay <= 0)
+        return 0;
+    if (delay <= 3)
+        return 1;
+    if (delay <= 6)
+        return 2;
+    return 3;
+}
+
 // Interface -> Artwork Settings (cover art display + ART.TAR loading).
 void guiShowArtworkConfig(void)
 {
     diaSetInt(diaArtworkConfig, UICFG_COVERART, gEnableArt);
     diaSetInt(diaArtworkConfig, UICFG_ENABLE_ART_TAR, gEnableArtTar);
+    diaSetEnum(diaArtworkConfig, UICFG_ART_DELAY, artDelayNames);
+    diaSetInt(diaArtworkConfig, UICFG_ART_DELAY, artDelayToEnum(gArtDelay));
 
     int ret = diaExecuteDialog(diaArtworkConfig, -1, 1, NULL);
     if (ret) {
@@ -1182,6 +1200,17 @@ void guiShowArtworkConfig(void)
             if (gEnableArtTar != previousArtTar)
                 tarInvalidate(TAR_KIND_ART);
         }
+        int artDelayIdx = 0;
+        diaGetInt(diaArtworkConfig, UICFG_ART_DELAY, &artDelayIdx);
+        if (artDelayIdx >= 0 && artDelayIdx < 4) {
+            gArtDelay = artDelayValues[artDelayIdx];
+            item_list_t *lists[] = {appGetObject(1), hddGetObject(1), ethGetObject(1), mmceGetObject(1), udpfsGetObject(1), favGetObject(1)};
+            for (int i = 0; i < 6; i++) {
+                if (lists[i] != NULL)
+                    lists[i]->delay = gArtDelay;
+            }
+        }
+
         applyConfig(-1, -1, 1);
     }
 }

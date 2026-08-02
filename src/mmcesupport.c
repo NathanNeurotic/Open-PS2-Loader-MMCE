@@ -413,7 +413,7 @@ void mmceInit(item_list_t *itemList)
     mmceFoldersCreatedFor[0] = '\0';
     mmceFolderRetries = 0;
 
-    configGetInt(configGetByType(CONFIG_OPL), "usb_frames_delay", &mmceGameList.delay);
+    mmceGameList.delay = gArtDelay;
     mmceGameList.updateDelay = MMCE_MODE_UPDATE_DELAY;
 
     mmceLoadModules();
