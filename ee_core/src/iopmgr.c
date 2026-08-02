@@ -141,7 +141,8 @@ static void ResetIopSpecial(const char *args, unsigned int arglen)
             LoadOPLModule(OPL_MODULE_ID_ILINKBD, 0, 0, NULL);
             break;
         case BDM_M4S_MODE:
-            if (LoadOPLModule(OPL_MODULE_ID_SIO2MAN, 0, 0, NULL) >= 0)
+            // mx4sio_bd requires PS2SDK's sio2man. Do not start it if that dependency failed.
+            if (LoadOPLModule(OPL_MODULE_ID_SIO2MAN, 0, 0, NULL) > 0)
                 LoadOPLModule(OPL_MODULE_ID_MX4SIOBD, 0, 0, NULL);
             break;
         case BDM_HDD_MODE:
