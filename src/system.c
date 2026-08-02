@@ -723,6 +723,8 @@ static unsigned int sendIrxKernelRAM(const char *startup, const char *mode_str, 
         irxptr_tab[modcount++].ptr = (void *)&IEEE1394_bd_irx;
     }
     if (modules & CORE_IRX_MX4SIO) {
+        irxptr_tab[modcount].info = size_sio2man_irx | SET_OPL_MOD_ID(OPL_MODULE_ID_SIO2MAN);
+        irxptr_tab[modcount++].ptr = (void *)&sio2man_irx;
         irxptr_tab[modcount].info = size_mx4sio_bd_irx | SET_OPL_MOD_ID(OPL_MODULE_ID_MX4SIOBD);
         irxptr_tab[modcount++].ptr = (void *)&mx4sio_bd_irx;
     }
