@@ -2813,9 +2813,9 @@ void handleLwnbdSrv()
     guiRenderTextScreen(_l(_STR_STARTINGNBD));
     if (loadLwnbdSvr(&teardownStarted) == 0) {
         snprintf(temp, sizeof(temp), "%s", _l(_STR_RUNNINGNBD));
-        guiMsgBox(temp, 0, diaToolsConfig);
+        guiMsgBox(temp, 0, NULL);
     } else
-        guiMsgBox(_l(_STR_STARTFAILNBD), 0, diaToolsConfig);
+        guiMsgBox(_l(_STR_STARTFAILNBD), 0, NULL);
 
     // Only a path that actually dismantled the menu needs the reset-and-restore cycle.
     if (teardownStarted) {
