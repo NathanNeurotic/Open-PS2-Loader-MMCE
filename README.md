@@ -1,4 +1,18 @@
 ![logo](https://github.com/user-attachments/assets/bdf46f3c-a749-4128-a4c3-e0f968a31897)
+```HAS THIS EVER HAPPENED TO YOU?```
+```You download another OPL fork. It has a new theme. A new menu. Maybe even a file browser, because apparently launching games was too direct and somebody needed a side quest.```
+```Then the game still does not work.```
+```Introducing RiptOPL, for people who wanted OPL to get better instead of just getting redecorated.```
+```Thanks to serious testing from @PixeliGer, @zackcage6, and others, RiptOPL has reached a stable, reliable state overall. Bug reports, suggestions, feature requests, and questions are still welcome, because unlike a paintjob, actual progress requires feedback.```
+```RiptOPL is not just a frontend. It is not just a theme pack with confidence. It is not OPL wearing a fake mustache and introducing itself as innovation.```
+```RiptOPL keeps compatibility work moving in both places that matter: the OPL core and Neutrino. That means two real launch systems in one setup. If a game does not like one mode, change the game setting and try the other. No app swapping. No fork roulette. No pretending five copies of the same idea equals five solutions.```
+```You get the options that can actually change results. You get fewer pointless blockers. You get less feature clutter pretending to be engineering.```
+```Fast. Simple. Compatible.```
+```Stop chasing the same thing with a new name.```
+```Stop mistaking decoration for development.```
+```A turd in glitter is still a turd.```
+```Get one and done.```
+```Get RiptOPL.```
 # RiptOPL
 **An opinionated [Open PS2 Loader](https://github.com/ps2homebrew/Open-PS2-Loader) fork — aiming to be the "definitive build."**
 <br>
