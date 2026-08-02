@@ -2016,7 +2016,7 @@ void guiShowControllerConfig(void)
     // configure the enumerations
     const char *scrollSpeeds[] = {_l(_STR_SLOW), _l(_STR_MEDIUM), _l(_STR_FAST), NULL};
     const char *selectButtons[] = {_l(_STR_CIRCLE), _l(_STR_CROSS), NULL};
-    const char *sensitivity[] = {_l(_STR_LOW), _l(_STR_MEDIUM), _l(_STR_HIGH), NULL};
+    const char *sensitivity[] = {_l(_STR_OFF), _l(_STR_LOW), _l(_STR_MEDIUM), _l(_STR_HIGH), NULL};
 
     diaSetEnum(diaControllerConfig, UICFG_SCROLL, scrollSpeeds);
     diaSetEnum(diaControllerConfig, CFG_SELECTBUTTON, selectButtons);

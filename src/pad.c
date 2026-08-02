@@ -395,41 +395,51 @@ static u32 readLeftJoy(struct pad_data_t *pad, u32 pdata)
     if ((pad->buttons.mode >> 4) == 0x07) {
         switch (gXSensitivity) {
             case 0:
-                xDeadzone = 100;
+                xDeadzone = 128;
                 break;
             case 1:
-                xDeadzone = 80;
+                xDeadzone = 100;
                 break;
             case 2:
+                xDeadzone = 80;
+                break;
+            case 3:
                 xDeadzone = 60;
                 break;
             default:
-                xDeadzone = 80;
+                xDeadzone = 100;
         }
 
         switch (gYSensitivity) {
             case 0:
-                yDeadzone = 100;
+                yDeadzone = 128;
                 break;
             case 1:
-                yDeadzone = 80;
+                yDeadzone = 100;
                 break;
             case 2:
+                yDeadzone = 80;
+                break;
+            case 3:
                 yDeadzone = 60;
                 break;
             default:
-                yDeadzone = 80;
+                yDeadzone = 100;
         }
 
-        if (pad->buttons.ljoy_h < 127 - xDeadzone)
-            padData |= PAD_LEFT;
-        else if (pad->buttons.ljoy_h > 127 + xDeadzone)
-            padData |= PAD_RIGHT;
+        if (xDeadzone < 128) {
+            if (pad->buttons.ljoy_h < 127 - xDeadzone)
+                padData |= PAD_LEFT;
+            else if (pad->buttons.ljoy_h > 127 + xDeadzone)
+                padData |= PAD_RIGHT;
+        }
 
-        if (pad->buttons.ljoy_v < 127 - yDeadzone)
-            padData |= PAD_UP;
-        else if (pad->buttons.ljoy_v > 127 + yDeadzone)
-            padData |= PAD_DOWN;
+        if (yDeadzone < 128) {
+            if (pad->buttons.ljoy_v < 127 - yDeadzone)
+                padData |= PAD_UP;
+            else if (pad->buttons.ljoy_v > 127 + yDeadzone)
+                padData |= PAD_DOWN;
+        }
     }
 
     return padData;
@@ -560,9 +570,13 @@ static int getKeyDelay(int id, int repeat)
 {
     int delay = paddelay[id - 1];
 
-    // if not in repeat, the delay is enlarged (baseline behavior).
-    if (!repeat)
-        delay *= 3;
+    // Initial press delay before auto-repeat begins: add a modest initial offset (+100ms)
+    // rather than multiplying the millisecond delay by 3 (which bloated 300ms up to 900ms!).
+    if (!repeat) {
+        delay += 100;
+        if (delay > 350)
+            delay = 350;
+    }
 
     return delay;
 }
