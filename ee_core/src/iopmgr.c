@@ -141,6 +141,7 @@ static void ResetIopSpecial(const char *args, unsigned int arglen)
             LoadOPLModule(OPL_MODULE_ID_ILINKBD, 0, 0, NULL);
             break;
         case BDM_M4S_MODE:
+            LoadOPLModule(OPL_MODULE_ID_SIO2MAN, 0, 0, NULL);
             LoadOPLModule(OPL_MODULE_ID_MX4SIOBD, 0, 0, NULL);
             break;
         case BDM_HDD_MODE:
