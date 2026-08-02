@@ -411,7 +411,6 @@ void appInit(item_list_t *itemList)
     LOG("APPSUPPORT Init\n");
     appForceUpdate = 1;
     appItemList.delay = gArtDelay;
-    configGetInt(configGetByType(CONFIG_OPL), "app_frames_delay", &appItemList.delay);
     if (configApps != NULL)
         configFree(configApps);
     configApps = oplGetLegacyAppsConfig();

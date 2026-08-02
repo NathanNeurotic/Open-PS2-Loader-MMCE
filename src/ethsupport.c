@@ -473,7 +473,6 @@ void ethInit(item_list_t *itemList)
         ethGameCount = 0;
         ethGames = NULL;
         ethGameList.delay = gArtDelay;
-        configGetInt(configGetByType(CONFIG_OPL), "eth_frames_delay", &ethGameList.delay);
         gNetworkStartup = ERROR_ETH_NOT_STARTED;
         ioPutRequest(IO_CUSTOM_SIMPLEACTION, &smbLoadModules);
         ethGameList.enabled = 1;
