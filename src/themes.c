@@ -1136,7 +1136,32 @@ static void drawCoverFlow(struct menu_list *menu, struct submenu_list *item, con
         }
     }
 
-    for (i = drawFirst; i < drawLast; i++) {
+    /*
+      Draw order (#343): painter's algorithm renders back-to-front (outermost covers first,
+      center cover last) so that inner/center covers cleanly overlap outer ones on BOTH
+      left and right sides without geometry clipping.
+    */
+    int drawOrder[COVERFLOW_MAX];
+    int drawCount = 0;
+    int maxDist = centerIdx - drawFirst;
+    if (drawLast - 1 - centerIdx > maxDist)
+        maxDist = drawLast - 1 - centerIdx;
+
+    int d;
+    for (d = maxDist; d > 0; d--) {
+        int leftIdx = centerIdx - d;
+        if (leftIdx >= drawFirst && leftIdx < drawLast)
+            drawOrder[drawCount++] = leftIdx;
+        int rightIdx = centerIdx + d;
+        if (rightIdx >= drawFirst && rightIdx < drawLast)
+            drawOrder[drawCount++] = rightIdx;
+    }
+    if (centerIdx >= drawFirst && centerIdx < drawLast)
+        drawOrder[drawCount++] = centerIdx;
+
+    int idx;
+    for (idx = 0; idx < drawCount; idx++) {
+        i = drawOrder[idx];
         if (!covers[i])
             continue;
 
