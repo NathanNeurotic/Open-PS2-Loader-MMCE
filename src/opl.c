@@ -3069,34 +3069,6 @@ static void setDefaults(void)
     gMMCEAckWaitCycles = 5;
     gMMCEUseAlarms = 1;
 
-      gMMCEEnableGameID -- sends the game id to an MMCE card. Default-ON meant deferredInit armed the
-      transport on EVERY boot, including consoles with no MMCE hardware, which pushed a blocking
-      mmceman.irx load into the IO worker. mmceman hooks sio2man, the same bus freepad polls the PADS
-      over, and on some containers' freepad build that kills pad input AFTER the menu is already
-      drawn -- PixeliGer's "live menu, dead cursor" (#254), unrecoverable in-app because the only
-      cure is a settings toggle you need a working cursor to reach. Shipping it off removes that
-      exposure without gating the feature: enabling it still arms immediately and still works on
-      every device, which is the #51 contract.
-
-      gApplyGameID -- the visual RetroGEM / Pixel FX barcode. It was flipped on in 120045d0 on the
-      premise it is "imperceptible otherwise". That premise is unproven and is under active doubt:
-      zackcage6 reports a white bar during load that survived the clean-frame fix, so the barcode is
-      either still implicated or was never the cause. Either way it is an experimental feature for
-      specific HDMI scalers and does not belong on by default.
-
-      Existing saved configs override both, so nobody who has turned them on loses anything.
-    */
-    gMMCEEnableGameID = 0;
-    gApplyGameID = 0;
-    // Restore the fork's long-standing known-good MMCE SIO2 pacing (was flipped to 0/0 in 519f520d,
-    // mislabeled "safer" -- 0 cycles + alarms OFF is the aggressive/perf extreme the in-app hints warn
-    // about: lower cycles = "instabilities", alarms OFF = "can cause MMCE timeouts to result in freezes").
-    // 5 + alarms ON is what build 2421 shipped and ran cleanly (incl. FMV/audio) on real hardware; a slow
-    // late-slim SD2PSX loses the very first SIO2 handshake at 0/0 and freezes at the first read. Opinionated
-    // safe default per the fork philosophy -- do NOT re-flip to upstream's 0/0.
-    gMMCEAckWaitCycles = 5;
-    gMMCEUseAlarms = 1;
-
     gEnableUSB = 0; // all block-device toggles OFF by default too (same opt-in doctrine)
     gEnableILK = 0;
     gEnableMX4SIO = 0;
