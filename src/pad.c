@@ -570,13 +570,9 @@ static int getKeyDelay(int id, int repeat)
 {
     int delay = paddelay[id - 1];
 
-    // Initial press delay before auto-repeat begins: add a modest initial offset (+100ms)
-    // rather than multiplying the millisecond delay by 3 (which bloated 300ms up to 900ms!).
-    if (!repeat) {
-        delay += 100;
-        if (delay > 350)
-            delay = 350;
-    }
+    // Initial press delay before auto-repeat begins (3x repeat delay).
+    if (!repeat)
+        delay *= 3;
 
     return delay;
 }
