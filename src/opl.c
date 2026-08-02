@@ -15,6 +15,7 @@
 #include "include/textures.h"
 #include "include/pad.h"
 #include "include/texcache.h"
+#include "include/tar.h"
 #include "include/dia.h"
 #include "include/dialogs.h"
 #include "include/menusys.h"
