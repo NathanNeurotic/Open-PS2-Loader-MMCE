@@ -186,17 +186,18 @@ static int cacheIsNavigationActive(void)
     return gNavInputActive;
 }
 
-static int cacheGetMmceIdleFrames(const image_cache_t *cache)
+static int cacheGetArtIdleFrames(const image_cache_t *cache, int modeDelay)
 {
+    int baseDelay = (modeDelay >= 0) ? modeDelay : gArtDelay;
     /*
      * The default theme draws background art before cover art. Let the selected
      * cover enter the FIFO one frame first so a slow missing-background probe
      * cannot sit in front of it.
      */
     if (cache != NULL && cache->suffix != NULL && strcmp(cache->suffix, "COV") != 0)
-        return MENU_MIN_INACTIVE_FRAMES + 1;
+        return baseDelay + 1;
 
-    return MENU_MIN_INACTIVE_FRAMES;
+    return baseDelay;
 }
 
 static int cacheShouldDeferRequest(const load_image_request_t *request)
@@ -205,7 +206,7 @@ static int cacheShouldDeferRequest(const load_image_request_t *request)
         return 0;
 
     return cacheIsNavigationActive() ||
-           guiInactiveFrames < cacheGetMmceIdleFrames(request->cache);
+           guiInactiveFrames < cacheGetArtIdleFrames(request->cache, gArtDelay);
 }
 
 int cacheLowerCallerPriority(void)
@@ -1076,7 +1077,7 @@ GSTEXTURE *cacheGetTexture(image_cache_t *cache, item_list_t *list, int *cacheId
 
     if (effectiveMode == MMCE_MODE &&
         (cacheIsNavigationActive() ||
-         guiInactiveFrames < cacheGetMmceIdleFrames(cache))) {
+         guiInactiveFrames < cacheGetArtIdleFrames(cache, (list != NULL) ? list->delay : gArtDelay))) {
         cacheUnlock();
         return NULL;
     }

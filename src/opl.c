@@ -172,6 +172,7 @@ int gAutoRefresh;
 int gEnableNotifications;
 int gEnableArt;
 int gEnableArtTar;
+int gArtDelay;
 int gWideScreen;
 int gDefaultGameView;
 int gVMode; // 0 - Auto, 1 - PAL, 2 - NTSC
@@ -1660,6 +1661,7 @@ static void _loadConfig()
             configGetInt(configOPL, CONFIG_OPL_ENABLE_NOTIFICATIONS, &gEnableNotifications);
             configGetInt(configOPL, CONFIG_OPL_ENABLE_COVERART, &gEnableArt);
             configGetInt(configOPL, CONFIG_OPL_ENABLE_ART_TAR, &gEnableArtTar);
+            configGetInt(configOPL, CONFIG_OPL_ART_DELAY, &gArtDelay);
             configGetInt(configOPL, CONFIG_OPL_WIDESCREEN, &gWideScreen);
             configGetInt(configOPL, CONFIG_OPL_DEFAULT_GAME_VIEW, &gDefaultGameView);
             // Clamp: an out-of-enum value (hand-edited/corrupt config) is UNRECOVERABLE on-console --
@@ -2114,6 +2116,7 @@ static void _saveConfig()
         configSetInt(configOPL, CONFIG_OPL_ENABLE_NOTIFICATIONS, gEnableNotifications);
         configSetInt(configOPL, CONFIG_OPL_ENABLE_COVERART, gEnableArt);
         configSetInt(configOPL, CONFIG_OPL_ENABLE_ART_TAR, gEnableArtTar);
+        configSetInt(configOPL, CONFIG_OPL_ART_DELAY, gArtDelay);
         configSetInt(configOPL, CONFIG_OPL_WIDESCREEN, gWideScreen);
         configSetInt(configOPL, CONFIG_OPL_DEFAULT_GAME_VIEW, gDefaultGameView);
         configSetInt(configOPL, CONFIG_OPL_COVERFLOW_COUNT, gCoverflowCount);
@@ -3027,6 +3030,7 @@ static void setDefaults(void)
     // reverted at NathanNeurotic's call -- users who want the archive turn it on. The engine fixes from
     // #207 (uncapped-seek index integrity, no stat()-latch, toggle re-arm, the [48] filename bound) stay.
     gEnableArtTar = 0;
+    gArtDelay = 2;
     gWideScreen = 1;
     gDefaultGameView = GAME_VIEW_BOTH;
     gEnableSFX = 1;
