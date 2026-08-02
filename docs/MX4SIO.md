@@ -62,8 +62,8 @@ For a controlled hardware check:
    game reaches its first screen.
 4. Verify controller input and a real memory card, then repeat with any normally used VMC
    or PADEMU options separately.
-5. Test the SCPH-77008 report case and, if available, an SCPH-50000-series console as a
-   non-DECKARD control.
+5. Test the SCPH-77008 report case and, if available, prefer an SCPH-50004 as the
+   non-DECKARD control. Record other SCPH-50000-series models separately.
 
 Until that A/B test is reported, this is a source- and build-validated fix with hardware
 confirmation still pending.

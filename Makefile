@@ -645,25 +645,24 @@ $(EE_ASM_DIR)iLinkman.c: $(PS2SDK)/iop/irx/iLinkman.irx | $(EE_ASM_DIR)
 # The current MX4SIO driver requires PS2SDK's sio2man after the game-side IOP reset.
 ifeq ($(DEBUG),1)
 # block device drivers with printf's
-$(EE_ASM_DIR)usbmass_bd.c: $(PS2SDK)/iop/irx/usbmass_bd.irx | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)_irx
-
-$(EE_ASM_DIR)IEEE1394_bd.c: $(PS2SDK)/iop/irx/IEEE1394_bd.irx | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)_irx
-
-$(EE_ASM_DIR)mx4sio_bd.c: $(PS2SDK)/iop/irx/mx4sio_bd.irx | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)_irx
+USBBD_IRX = usbmass_bd.irx
+IEEE1394BD_IRX = IEEE1394_bd.irx
+MX4SIOBD_IRX = mx4sio_bd.irx
 else
 # block device drivers without printf's
-$(EE_ASM_DIR)usbmass_bd.c: $(PS2SDK)/iop/irx/usbmass_bd_mini.irx | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)_irx
-
-$(EE_ASM_DIR)IEEE1394_bd.c: $(PS2SDK)/iop/irx/IEEE1394_bd_mini.irx | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)_irx
-
-$(EE_ASM_DIR)mx4sio_bd.c: $(PS2SDK)/iop/irx/mx4sio_bd_mini.irx | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)_irx
+USBBD_IRX = usbmass_bd_mini.irx
+IEEE1394BD_IRX = IEEE1394_bd_mini.irx
+MX4SIOBD_IRX = mx4sio_bd_mini.irx
 endif
+
+$(EE_ASM_DIR)usbmass_bd.c: $(PS2SDK)/iop/irx/$(USBBD_IRX) | $(EE_ASM_DIR)
+	$(BIN2C) $< $@ $(*F)_irx
+
+$(EE_ASM_DIR)IEEE1394_bd.c: $(PS2SDK)/iop/irx/$(IEEE1394BD_IRX) | $(EE_ASM_DIR)
+	$(BIN2C) $< $@ $(*F)_irx
+
+$(EE_ASM_DIR)mx4sio_bd.c: $(PS2SDK)/iop/irx/$(MX4SIOBD_IRX) | $(EE_ASM_DIR)
+	$(BIN2C) $< $@ $(*F)_irx
 
 modules/bdmevent/bdmevent.irx: modules/bdmevent
 	$(MAKE) -C $<
