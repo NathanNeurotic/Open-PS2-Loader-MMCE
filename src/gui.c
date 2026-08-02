@@ -1183,6 +1183,7 @@ static int artDelayToEnum(int delay)
 void guiShowArtworkConfig(void)
 {
     diaSetInt(diaArtworkConfig, UICFG_COVERART, gEnableArt);
+    diaSetInt(diaArtworkConfig, UICFG_ENABLE_BGART, gEnableBGArt);
     diaSetInt(diaArtworkConfig, UICFG_ENABLE_ART_TAR, gEnableArtTar);
     diaSetEnum(diaArtworkConfig, UICFG_ART_DELAY, artDelayNames);
     diaSetInt(diaArtworkConfig, UICFG_ART_DELAY, artDelayToEnum(gArtDelay));
@@ -1190,6 +1191,7 @@ void guiShowArtworkConfig(void)
     int ret = diaExecuteDialog(diaArtworkConfig, -1, 1, NULL);
     if (ret) {
         diaGetInt(diaArtworkConfig, UICFG_COVERART, &gEnableArt);
+        diaGetInt(diaArtworkConfig, UICFG_ENABLE_BGART, &gEnableBGArt);
         {
             // Re-arm the .tar probe when the toggle actually flips. tarFind's "no archive anywhere"
             // latch is write-once and process-wide, and NOTHING was clearing it (tarInvalidate had no

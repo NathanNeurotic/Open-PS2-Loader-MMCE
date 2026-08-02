@@ -799,6 +799,9 @@ static GSTEXTURE *getGameImageTexture(image_cache_t *cache, void *support, struc
         return NULL;
 
     if (gEnableArt) {
+        if (cache != NULL && cache->suffix != NULL && strcmp(cache->suffix, "BG") == 0 && !gEnableBGArt)
+            return NULL;
+
         item_list_t *list = (item_list_t *)support;
         char *startup = list->itemGetStartup(list, item->id);
         return cacheGetTexture(cache, list, &item->cache_id[cache->userId], &item->cache_uid[cache->userId], startup);

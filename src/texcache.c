@@ -188,16 +188,7 @@ static int cacheIsNavigationActive(void)
 
 static int cacheGetArtIdleFrames(const image_cache_t *cache, int modeDelay)
 {
-    int baseDelay = (modeDelay >= 0) ? modeDelay : gArtDelay;
-    /*
-     * The default theme draws background art before cover art. Let the selected
-     * cover enter the FIFO one frame first so a slow missing-background probe
-     * cannot sit in front of it.
-     */
-    if (cache != NULL && cache->suffix != NULL && strcmp(cache->suffix, "COV") != 0)
-        return baseDelay + 1;
-
-    return baseDelay;
+    return (modeDelay >= 0) ? modeDelay : gArtDelay;
 }
 
 static int cacheShouldDeferRequest(const load_image_request_t *request)
