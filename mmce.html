@@ -107,20 +107,26 @@ automatically on first launch.</p>
 <p>The device prefix is <code>mmce0:/</code> (slot 0) or <code>mmce1:/</code> (slot 1). In
 <code>conf_apps.cfg</code>, reference ELFs on the MMCE card as <code>mmce:APPS/MYAPP.ELF</code>.</p>
 
-<h2 id="device-settings">Device Settings</h2>
-<p>All MMCE options live in <b>Device Settings</b> (the consolidated hub reached from the RiptOPL main menu).
-The MMCE section is near the bottom of that page under the <b>MMCE Settings</b> heading.</p>
+<h2 id="device-settings">Where the MMCE settings live</h2>
+<p>MMCE is configured across <b>three</b> pages of the RiptOPL main menu. <b>MMCE Start Mode</b> stays in
+<b>Device Settings</b>, alongside the other device start modes. The MMCE tuning rows — <b>Slot</b>,
+<b>IGR Bootcard Slot(s)</b>, <b>Send GameID on Launch</b>, <b>Wait Cycles after /ACK low</b> and
+<b>Use Timeout Alarms</b> — moved out to their own <b>Settings &rarr; MMCE Settings</b> page.
+<b>MMCE Prefix Path</b> is on a third page: <b>Settings &rarr; General Settings</b>, under the
+<b>Prefix Paths</b> group with the BDM and ETH prefixes.</p>
 
 <h3 id="start-mode">MMCE Start Mode</h3>
 <p>Controls when OPL loads the MMCE driver and shows the MMCE Games tab.</p>
 <table data-sortable>
 <thead><tr><th>Value</th><th>Behaviour</th></tr></thead>
 <tbody>
-<tr><td><b>Off</b></td><td>MMCE driver not loaded; no MMCE tab.</td></tr>
-<tr><td><b>Manual</b></td><td>Tab is shown; driver loads when you navigate to the MMCE tab for the first time. Default.</td></tr>
+<tr><td><b>Off</b></td><td>MMCE driver not loaded; no MMCE tab. Default.</td></tr>
+<tr><td><b>Manual</b></td><td>Tab is shown; driver loads when you navigate to the MMCE tab for the first time.</td></tr>
 <tr><td><b>Auto</b></td><td>Driver loads at boot and the tab is shown immediately if a device is detected.</td></tr>
 </tbody>
 </table>
+<p>Every device on the Devices page ships <b>Off</b>: a fresh install boots to the start menu with no tabs, and
+you enable exactly what your rig has. A saved config overrides the shipped default on load.</p>
 
 <h3 id="slot">MMCE Slot</h3>
 <p>Selects which memory-card slot the MMCE device occupies.</p>
@@ -134,8 +140,9 @@ The MMCE section is near the bottom of that page under the <b>MMCE Settings</b> 
 </table>
 
 <h3 id="prefix-path">MMCE Prefix Path</h3>
-<p>An optional sub-path appended after the device root before OPL looks for game folders. Useful when your SD card
-serves multiple purposes and you want to keep OPL files in a subdirectory — for example, setting the prefix to
+<p><i>(<b>Settings &rarr; General Settings</b>, under <b>Prefix Paths</b> — not Device Settings or MMCE
+Settings.)</i> An optional sub-path appended after the device root before OPL looks for game folders.
+Useful when your SD card serves multiple purposes and you want to keep OPL files in a subdirectory — for example, setting the prefix to
 <code>OPL</code> causes OPL to look for games in <code>mmce0:/OPL/DVD/</code> instead of
 <code>mmce0:/DVD/</code>. Leave blank (the default) to use the root of the SD card.</p>
 
@@ -193,11 +200,13 @@ meaning POPSTARTER can read BDMA module files from the MMCE card when you use an
 Loader Core is set to Neutrino, OPL hands the launch to <code>neutrino.elf</code>. Neutrino itself can be stored
 on the MMCE card at <code>mmce0:/neutrino/neutrino.elf</code> (or <code>mmce1:/</code>) — select
 <b>MMCE</b> in the Neutrino ELF Path device picker under General Settings. That picker lists device
-<i>types</i> (Auto, Memory Card, USB, MX4SIO, MMCE, HDD (exFAT), HDD (APA)), not per-slot entries, so there is
+<i>types</i> (Auto, Memory Card, USB, MX4SIO, MMCE, HDD (exFAT), HDD (APA), Game's Device), not per-slot entries, so there is
 no separate <code>mmce0</code>/<code>mmce1</code> choice. <b>Auto</b> also works: it probes the active game device
 for a co-located <code>neutrino/neutrino.elf</code> before falling back to <code>mc0:</code>/<code>mc1:</code>, so a
 neutrino.elf on the MMCE card is found automatically when you launch an MMCE game — an explicit device pick is no
-longer required.</p>
+longer required. <b>Game's Device</b> is the stricter variant: it probes <i>only</i> the active game's own device
+for a co-located <code>neutrino/neutrino.elf</code>, with no legacy-path and no <code>mc0:</code>/<code>mc1:</code>
+fallback — a miss toasts "not found" and aborts the launch instead of quietly using a core you did not pick.</p>
 
 <div class="callout info"><div class="h">ℹ USBExtreme (.ul) and ZSO on MMCE</div>
 USBExtreme multi-chunk format (<code>ul.*</code>) and ZSO compressed images are both supported on MMCE, subject

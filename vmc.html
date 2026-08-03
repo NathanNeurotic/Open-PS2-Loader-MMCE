@@ -68,7 +68,7 @@ A Virtual Memory Card (VMC) is a <code>.bin</code> file that the IOP mcemu drive
 </tbody>
 </table>
 
-<p>The folder must exist before OPL can create a VMC image inside it. On most devices this folder is created automatically when OPL first sets up its directory structure. If the <b>Configure VMC</b> screen reports an error locating the file, check that the <code>VMC/</code> folder is present on the drive.</p>
+<p>The folder must exist before OPL can create a VMC image inside it. On most devices OPL creates it for you the first time it initialises that device <em>after you have enabled the device in Device Settings</em> — not on first boot, so a device you have never turned on will not have one yet. If the <b>Configure VMC</b> screen reports an error locating the file, check that the <code>VMC/</code> folder is present on the drive.</p>
 
 <div class="callout info"><div class="h">ℹ File naming</div>
 Each VMC image is a plain file named <code>&lt;name&gt;.bin</code> — for example <code>MySaves_0.bin</code>. The name you type in the Configure VMC dialog is the base name without extension. OPL appends <code>.bin</code> automatically when reading or creating the file.
@@ -153,10 +153,18 @@ VMC images on an internal APA/PFS HDD are stored inside the PFS filesystem and a
 <p>When a game is launched via <a href="neutrino.html">Neutrino</a>, VMC images are passed differently. Instead of the IOP mcemu module, Neutrino receives a <code>-mc0=&lt;path&gt;</code> and/or <code>-mc1=&lt;path&gt;</code> argument pointing at the <code>.bin</code> file. RiptOPL builds these arguments from the same per-game <code>$VMC_0</code> / <code>$VMC_1</code> config keys — so if you have assigned a VMC via Game Settings it will be handed to Neutrino automatically on launch.</p>
 
 <ul class="checklist">
-<li><b>USB, iLink, MX4SIO, exFAT HDD (BDM), and MMCE</b> — VMC is passed to Neutrino via <code>-mcN=</code> argument. Fully supported.</li>
+<li><b>USB, iLink, MX4SIO, exFAT HDD (BDM), UDPBD, MMCE, and UDPFS</b> — VMC is passed to Neutrino via <code>-mcN=</code> argument. Fully supported. For UDPFS the card is a file under the PC server's shared folder (<code>VMC/&lt;name&gt;.bin</code>) and the server must <b>not</b> run in read-only mode, or saves fail.</li>
 <li><b>SMB</b> — not supported for Neutrino VMC (SMB transport is separate from BDM).</li>
-<li><b>Internal HDD (APA)</b> — HDD VMC-to-Neutrino is currently deferred; Neutrino will use whatever card is physically present.</li>
+<li><b>Internal HDD (APA)</b> — not possible: Neutrino has no APA/pfs backing store to open the <code>.bin</code> from (the game itself streams from raw APA via <code>-bsd=ata -bsdfs=hdl</code>), and a VMC must live on the same device as the game (Neutrino loads exactly one backing-store driver per launch). The game boots with whatever card is physically present, and OPL shows a warning that the configured VMC was dropped. The OPL core honors the same VMC on HDD normally.</li>
 </ul>
+<p><b>Rules that follow from Neutrino's design:</b> the <code>.bin</code> must already exist —
+Neutrino opens it read-write with no create and <em>aborts the whole boot</em> if it can't, which is
+why RiptOPL creates cards at config time (per-game VMC menu) and verifies at launch, skipping a
+missing card with a warning instead of black-screening. Upstream caveats (Neutrino's
+<code>mc_emu</code>, as of mid-2026): only <b>port&nbsp;1 (<code>-mc0</code>)</b> is actually
+emulated — <code>-mc1</code> is accepted but the second port stays inactive — and the advertised
+card geometry is hardcoded (≈ the first 4&nbsp;MB of the image is addressed). Prefer slot&nbsp;1 and
+8&nbsp;MB cards for predictable results.</p>
 
 <div class="callout info"><div class="h">ℹ VMC names with spaces</div>
 Earlier OPL builds had a bug where VMC filenames containing spaces were truncated at launch because the args string was split on whitespace. RiptOPL delivers each <code>-mcN=</code> argument as a discrete argv entry, so spaces in VMC names are safe.

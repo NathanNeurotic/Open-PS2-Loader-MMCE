@@ -52,8 +52,10 @@
 <h1>Internal HDD (APA &amp; exFAT)</h1>
 <p class="lead">RiptOPL supports two completely different ways to use the PS2's internal ATA/IDE hard drive: the traditional
 <b>APA/PFS partition scheme</b> (HDLoader format, used by HDL-Dump and virtually all legacy tools), and the modern
-<b>exFAT filesystem</b> routed through the Block Device Manager (BDMAssault). Both formats are supported, but you must choose one per boot — they are
-mutually exclusive in RiptOPL: enabling APA/PFS HDD mode greys out the exFAT BDM HDD toggle, and vice versa. Only 48-bit LBA drives are supported; that covers every IDE drive manufactured after ~2003 and all CF-to-IDE adapters.</p>
+<b>exFAT filesystem</b> routed through the Block Device Manager (BDMAssault). Both formats are supported and both can be enabled at the same time — one shared
+<code>ata_bd</code> stack serves APA and BDM, and neither toggle greys the other. Arbitration happens per
+<i>drive</i> at mount time rather than in the dialog: APA is kept off an MBR/GPT/exFAT disk, and BDM only
+publishes a <code>massN:</code> slot where a FAT/exFAT partition exists. Only 48-bit LBA drives are supported; that covers every IDE drive manufactured after ~2003 and all CF-to-IDE adapters.</p>
 
 <div class="callout info"><div class="h">ℹ Which format should I use?</div>
 <b>APA/PFS</b> is the classic choice: maximum compatibility with every existing tool (HDL-Dump, uLaunchELF, ps2-packer,
@@ -80,9 +82,11 @@ name can be overridden by placing a config file on the drive before OPL first ru
 <p>That file is an OPL config with a single key:</p>
 <pre>hdd_partition=__common</pre>
 <p>The value is the APA partition name (without the <code>hdd0:</code> prefix). If the file is absent OPL writes <code>conf_hdd.cfg</code> into
-<code>hdd0:__common</code> (at <code>pfs0:OPL/conf_hdd.cfg</code>) recording <code>hdd_partition=+OPL</code>, then creates and mounts <code>hdd0:+OPL</code> as the data partition. The OPL folder tree
-(<code>CFG/</code>, <code>ART/</code>, <code>VMC/</code>, <code>THM/</code>, etc.) lives inside that partition under
-<code>pfs0:OPL/</code>.</p>
+<code>hdd0:__common</code> (at <code>pfs0:OPL/conf_hdd.cfg</code>) recording <code>hdd_partition=+OPL</code>, then creates and mounts <code>hdd0:+OPL</code> as the data partition. With that
+default partition the OPL folder tree (<code>CFG/</code>, <code>ART/</code>, <code>VMC/</code>, <code>THM/</code>, etc.)
+sits at the partition <b>root</b> — <code>pfs0:CFG/</code>, <code>pfs0:ART/</code>, and so on. The extra
+<code>OPL/</code> tier applies only when <code>hdd_partition</code> names a partition whose name does not start with
+<code>+</code> (for example <code>__common</code>).</p>
 
 <div class="callout info"><div class="h">ℹ Don't enlarge OPL partitions with a hex editor</div>
 Resizing an APA partition in place breaks LBA offsets for partitions that follow it on disk, which can corrupt your
@@ -97,17 +101,20 @@ with uLaunchELF, then copy your data back.
 <thead><tr><th>Location</th><th>Purpose</th></tr></thead>
 <tbody>
 <tr><td><code>hdd0:GAMENAME</code> (APA partition)</td><td>One HDLoader game partition per title</td></tr>
-<tr><td><code>pfs0:OPL/CFG/</code></td><td>Per-game config files</td></tr>
-<tr><td><code>pfs0:OPL/ART/</code></td><td>Cover art</td></tr>
-<tr><td><code>pfs0:OPL/VMC/</code></td><td>Virtual memory card images</td></tr>
-<tr><td><code>pfs0:OPL/THM/</code></td><td>Themes</td></tr>
-<tr><td><code>pfs0:OPL/CHT/</code></td><td>Cheat files</td></tr>
-<tr><td><code>pfs0:OPL/APPS/</code></td><td>Homebrew ELFs</td></tr>
-<tr><td><code>pfs0:OPL/LNG/</code></td><td>Language packs</td></tr>
+<tr><td><code>pfs0:CFG/</code></td><td>Per-game config files</td></tr>
+<tr><td><code>pfs0:ART/</code></td><td>Cover art</td></tr>
+<tr><td><code>pfs0:VMC/</code></td><td>Virtual memory card images</td></tr>
+<tr><td><code>pfs0:THM/</code></td><td>Themes</td></tr>
+<tr><td><code>pfs0:CHT/</code></td><td>Cheat files</td></tr>
+<tr><td><code>pfs0:APPS/</code></td><td>Homebrew ELFs</td></tr>
+<tr><td><code>pfs0:LNG/</code></td><td>Language packs</td></tr>
 </tbody>
 </table>
 <p>The <code>pfs0:</code> prefix above refers to the mounted OPL data partition — in practice that is
-<code>hdd0:+OPL</code> (or whatever partition name you configured in <code>conf_hdd.cfg</code>).</p>
+<code>hdd0:+OPL</code> (or whatever partition name you configured in <code>conf_hdd.cfg</code>). If you point
+<code>hdd_partition</code> at a partition whose name does not start with <code>+</code> (for example
+<code>__common</code>), OPL inserts an extra <code>OPL/</code> tier and the paths become
+<code>pfs0:OPL/CFG/</code>, <code>pfs0:OPL/ART/</code>, and so on.</p>
 
 <h3 id="apa-install-games">Installing games (HDL-Dump / NBD)</h3>
 <p>OPL does not install games itself — you install them from a PC using <b>HDL-Dump</b> over the network (via OPL's
@@ -220,12 +227,13 @@ In <code>conf_apps.cfg</code>, use <code>mass:</code> as the device prefix (the 
 <code>POPSTARTER.ELF</code>. Press <b>L3</b> on the HDD Games tab to switch to the VCD view.</p>
 <p>POPSTARTER's stock driver only reads FAT32, so booting a PS1 game from the exFAT HDD needs the
 <b>HDD (exFAT)</b> BDMA driver modules equipped. RiptOPL does this <b>automatically by default</b>: the
-<b>VCD BDMA Apply on Launch</b> toggle (in <b>General Settings</b>) ships <b>On</b>, and each time you launch
+<b>VCD BDMA Apply on Launch</b> toggle (in <b>Settings &rarr; VCD Settings</b>) ships <b>On</b>, and each time you launch
 a VCD it auto-equips that title's matching exFAT driver pair — copying the correct BDMAssault modules onto
 <code>mc?:/POPSTARTER/</code> for you — right before boot. You do not need to touch anything.</p>
 <div class="callout info"><div class="h">ℹ Manual equip (only after turning auto-equip Off)</div>
 The manual <b>BDMA Source</b> / <b>BDMA Mode</b> pickers are hidden while <b>VCD BDMA Apply on Launch</b> is On.
-If you turn that toggle <b>Off</b> to manage the equip yourself, set <b>BDMA Mode</b> to <b>HDD (exFAT)</b> and
+If you turn that toggle <b>Off</b> to manage the equip yourself, they appear on the same
+<b>Settings &rarr; VCD Settings</b> page — set <b>BDMA Mode</b> to <b>HDD (exFAT)</b> and
 <b>BDMA Source</b> to <b>Internal HDD</b> (the source identifies your drive by its <code>ata</code> driver and
 reads its <code>POPS/usbd.irx.ata</code> + <code>POPS/usbhdfsd.irx.ata</code>).
 </div>
@@ -239,7 +247,7 @@ including the BDMA Source setting.</p>
 <tr><td>Max capacity</td><td>2 TB (48-bit LBA)</td><td>2 TB (MBR) / unlimited (GPT)</td></tr>
 <tr><td>Install method</td><td>HDL-Dump via NBD server</td><td>Copy files from PC (no tools)</td></tr>
 <tr><td>PS2 game format</td><td>HDLoader partitions</td><td>ISO / ZSO in <code>DVD/</code> or <code>CD/</code></td></tr>
-<tr><td>OPL data location</td><td><code>pfs0:OPL/</code> inside the OPL partition</td><td>Standard folders at drive root</td></tr>
+<tr><td>OPL data location</td><td>Standard folders at the OPL partition root (<code>pfs0:</code>)</td><td>Standard folders at drive root</td></tr>
 <tr><td>PS1 VCD support</td><td><code>__.POPS*</code> APA partitions</td><td><code>POPS/</code> folder + BDMA equip</td></tr>
 <tr><td>Fragmentation risk</td><td>None (partition-based)</td><td>Yes — add files one at a time</td></tr>
 <tr><td>Tool ecosystem</td><td>HDL-Dump, pfs-shell, uLaunchELF</td><td>Any PC file manager</td></tr>
@@ -249,8 +257,9 @@ including the BDMA Source setting.</p>
 
 <h2 id="notes">Notes &amp; limitations</h2>
 <ul class="checklist">
-<li>APA/PFS HDD mode and the exFAT BDM HDD are <b>mutually exclusive</b> in RiptOPL — you can enable only one
-at a time. Enabling one greys the other out in Device Settings, so a given boot uses either APA/PFS or exFAT, never both.</li>
+<li>APA/PFS HDD mode and the exFAT BDM HDD now <b>coexist</b> in RiptOPL — both rows stay enabled in Device
+Settings and a single boot can serve both. The driver arbitrates per drive at mount time: APA is refused on a
+non-Sony (MBR/GPT/exFAT) disk as a corruption guard.</li>
 <li>The exFAT HDD mounts as <code>massN:</code> — it shares that namespace with USB/MX4SIO devices. If you have
 both a USB drive and the exFAT HDD connected, they each occupy a separate <code>massN</code> slot.</li>
 <li>Network boot (UDPBD / UDPFS) is mutually exclusive with SMB, but is independent of the local HDD — you can use

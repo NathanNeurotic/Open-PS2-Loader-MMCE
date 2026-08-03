@@ -55,9 +55,11 @@ are OPL's three <b>BDM mass-device transports</b>. They share the same filesyste
 Device Settings controls — all three mount into the <code>massN:</code> namespace and are handled by the
 Block Device Manager (BDM).</p>
 
-<div class="callout info"><div class="h">i USB is on by default</div>
-RiptOPL ships with <b>USB enabled</b> out of the box. iLink and MX4SIO are off by default; turn them on
-individually in <b>Device Settings</b> once you have the hardware connected.</div>
+<div class="callout info"><div class="h">i All three ship off — you opt in</div>
+On a fresh install RiptOPL ships with <b>USB, iLink and MX4SIO all disabled</b> and <b>BDM Start Mode</b> set to
+<b>Off</b> — every device on the Devices page starts off so you enable exactly the hardware your rig has. Turn
+on the transport you use, and set a start mode, in <b>Device Settings</b>. Until you do, a fresh install boots
+to the start menu with no game-list tabs at all.</div>
 
 <h2 id="hardware">The three transports</h2>
 
@@ -105,8 +107,10 @@ format tool. Choosing a non-default cluster size can cause compatibility issues.
 
 <h2 id="folder-layout">Folder layout</h2>
 <p>OPL expects the following directory structure at the root of the drive (or inside the optional
-<a href="#prefix">BDM Prefix</a> subfolder). OPL creates these folders automatically the first time it runs
-with the device enabled.</p>
+<a href="#prefix">BDM Prefix</a> subfolder). OPL creates most of these folders for you the first time it
+initialises the device <em>after you have enabled it in Device Settings</em> — not on first boot, and never
+for a device you have not turned on. <code>POPS/</code> is the exception: OPL never creates it, so make it
+yourself if you want PS1/VCD games.</p>
 
 <pre>
 DVD/        PS2 DVD5/DVD9 ISO and ZSO images (also supports &gt;4 GB on exFAT)
@@ -162,24 +166,26 @@ all games regardless of size. If your drive is FAT32, use USBExtreme for any gam
 </ul>
 
 <h2 id="device-settings">Enabling devices in Device Settings</h2>
-<p>Open <b>Device Settings</b> (from the main OPL menu). The relevant controls for this page are:</p>
+<p>Open <b>Device Settings</b> (from the main OPL menu) for the start mode and the per-transport toggles. The
+cache and prefix rows are <em>not</em> on that screen — they were moved to <b>General Settings</b> so Device
+Settings is strictly device selection:</p>
 
 <table data-sortable>
 <thead><tr><th>Setting</th><th>What it does</th><th>Default</th></tr></thead>
 <tbody>
-<tr><td><b>BDM Start Mode</b></td><td>Off / Manual / Auto — controls when OPL scans for mass devices</td><td>Manual</td></tr>
-<tr><td><b>USB</b></td><td>Enable/disable the USB mass storage driver</td><td>On</td></tr>
-<tr><td><b>iLink</b></td><td>Enable/disable the IEEE 1394 SBP-2 driver</td><td>Off</td></tr>
-<tr><td><b>MX4SIO</b></td><td>Enable/disable the MX4SIO SD driver</td><td>Off</td></tr>
-<tr><td><b>BDM Cache</b></td><td>Read-ahead cache size in sectors (0–32, default 16)</td><td>16</td></tr>
-<tr><td><b>BDM Prefix</b></td><td>Optional subfolder inside the drive root where OPL looks for its folders</td><td>(empty)</td></tr>
+<tr><td><b>BDM Start Mode</b></td><td>Off / Manual / Auto — controls when OPL scans for mass devices (Device Settings)</td><td>Off</td></tr>
+<tr><td><b>USB</b></td><td>Enable/disable the USB mass storage driver (Device Settings)</td><td>Off</td></tr>
+<tr><td><b>iLink</b></td><td>Enable/disable the IEEE 1394 SBP-2 driver (Device Settings)</td><td>Off</td></tr>
+<tr><td><b>MX4SIO</b></td><td>Enable/disable the MX4SIO SD driver (Device Settings)</td><td>Off</td></tr>
+<tr><td><b>BDM Cache</b></td><td>Read-ahead cache size in sectors (0–32) — <b>General Settings → Cache &amp; Storage</b></td><td>16</td></tr>
+<tr><td><b>BDM Prefix</b></td><td>Optional subfolder inside the drive root where OPL looks for its folders — <b>General Settings → Prefix Paths</b></td><td>(empty)</td></tr>
 </tbody>
 </table>
 
-<div class="callout info"><div class="h">i Start Mode: Manual vs Auto</div>
-<b>Manual</b> (the default) means OPL loads the BDM driver at boot but does not show the game list until
-you navigate to it — the device is scanned on demand. <b>Auto</b> scans immediately on boot. <b>Off</b>
-skips the driver entirely; use this if you have no mass devices attached and want the fastest possible boot.</div>
+<div class="callout info"><div class="h">i Start Mode: Off, Manual, Auto</div>
+<b>Off</b> is the shipped default — no mass-device tab is registered at all; leave it there if you have no
+mass devices attached and want the fastest possible boot. <b>Manual</b> registers the tab at boot but holds
+the scan until you navigate to it — the device is scanned on demand. <b>Auto</b> scans immediately on boot.</div>
 
 <h2 id="prefix">BDM Prefix</h2>
 <p>The <b>BDM Prefix</b> field lets you store your OPL folder tree inside a subfolder of the drive rather
@@ -194,7 +200,7 @@ the drive root, which is the most common setup.</p>
 <p>OPL can enumerate up to 8 BDM slots (<code>mass0:</code> through <code>mass7:</code>). Each connected
 device occupies one slot. If you have a USB drive in <code>mass0:</code> and an MX4SIO card in
 <code>mass1:</code>, both appear as separate game lists (with the slot number shown in the tab label). You
-do not need to configure them separately — one <b>BDM Mode</b> and one <b>BDM Prefix</b> applies to all
+do not need to configure them separately — one <b>BDM Start Mode</b> and one <b>BDM Prefix</b> applies to all
 slots.</p>
 
 <h2 id="troubleshooting">Common issues</h2>

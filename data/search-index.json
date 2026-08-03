@@ -2,7 +2,7 @@
  {
   "title": "Getting Started",
   "cat": "start",
-  "text": "End-to-end guide to launching your first PS2 game with RiptOPL: pick a storage device, understand the OPL folder layout auto-created on first boot, copy a game image, enable the device, and save settings.",
+  "text": "End-to-end guide to launching your first PS2 game with RiptOPL: pick a storage device, understand the OPL folder layout created when a device is enabled, copy a game image, enable the device, and save settings.",
   "url": "getting-started.html"
  },
  {
@@ -14,13 +14,13 @@
  {
   "title": "Pick a device",
   "cat": "start",
-  "text": "Overview of all eight supported storage backends (USB, MX4SIO, MMCE, iLink, SMB, APA HDD, exFAT HDD, SMB/UDP) with links to the per-device setup pages.",
+  "text": "Overview of all eight supported storage backends (USB, MX4SIO, MMCE, iLink, SMB — SMBv1 or SMB2 via the SMB Version setting, APA HDD, exFAT HDD, and network boot over UDPBD/UDPFS) with links to the per-device setup pages.",
   "url": "getting-started.html#pick-a-device"
  },
  {
   "title": "The OPL folder structure",
   "cat": "start",
-  "text": "RiptOPL auto-creates DVD, CD, ART, CFG, VMC, THM, LNG, CHT, and APPS folders on first boot; explains supported image formats (ISO, ZSO, USBExtreme) and the APA HDD exception.",
+  "text": "RiptOPL creates DVD, CD, ART, CFG, VMC, THM, LNG, CHT, and APPS folders when a device is enabled — not on first boot; explains supported image formats (ISO, ZSO, USBExtreme) and the APA HDD exception.",
   "url": "getting-started.html#folder-structure"
  },
  {
@@ -38,13 +38,13 @@
  {
   "title": "Install & First Boot",
   "cat": "start",
-  "text": "How to get RIPTOPL.ELF onto your PS2 via FMCB/FHDB or any ELF launcher, what happens on first boot, and how opinionated defaults differ from upstream OPL.",
+  "text": "How to get RIPTOPL.ELF onto your PS2 via FMCB/FHDB or any ELF launcher, what the installable package contains (including the PS2 Servers AIO shortcut), and what happens on first boot.",
   "url": "install.html"
  },
  {
   "title": "What is RIPTOPL.ELF?",
   "cat": "start",
-  "text": "RIPTOPL.ELF is a single self-contained PS2 executable including GSM, IGS, PADEMU, VMC, cheats, and parental controls in one build; DualSense support is the only optional extra.",
+  "text": "RIPTOPL.ELF is a single self-contained PS2 executable including GSM, PADEMU, VMC, cheats, and parental controls in one build. Several build flags stay off by default: EXTRA_FEATURES=0 leaves IGS (In-Game Screenshot) and RTL out of every published main ELF — those come from RIPTOPL-VARIANTS-*.zip; DualSense ships as a ready-made -ds5.ELF for each SDK flavour, and the experimental GSM 1080p loader ships as RIPTOPL-PS2DEVLATESTSDK-1080p.ELF (latest-SDK only).",
   "url": "install.html#what-is-riptopl-elf"
  },
  {
@@ -68,7 +68,7 @@
  {
   "title": "Opinionated defaults",
   "cat": "start",
-  "text": "RiptOPL boots with widescreen, cover art, notifications, PS2 logo, SFX, boot sound, and USB all on; device tabs in Manual start mode; video mode Auto; Coverflow as the default theme.",
+  "text": "RiptOPL boots with widescreen, cover art, notifications, PS2 logo, SFX, boot sound and BGM on; every device off and every start mode disabled (opt-in), GameID barcode off, video mode Auto, and Coverflow as the default theme.",
   "url": "install.html#opinionated-defaults"
  },
  {
@@ -116,7 +116,7 @@
  {
   "title": "USB / MX4SIO / iLink — Device Settings",
   "cat": "devices",
-  "text": "BDM Mode (Disabled/Manual/Auto), per-transport enable toggles (USB/iLink/MX4SIO), BDM Cache size (0–32, default 16), and BDM Prefix are all configured in Device Settings.",
+  "text": "Device Settings holds BDM Start Mode (Off/Manual/Auto) and the per-transport enable toggles (USB/iLink/MX4SIO, plus HDD (GPT/MBR)). BDM Cache size (0–32, default 16) and BDM Prefix live on General Settings.",
   "url": "usb.html#device-settings"
  },
  {
@@ -138,9 +138,9 @@
   "url": "mmce.html#folder-layout"
  },
  {
-  "title": "MMCE: Device Settings (Start Mode, Slot, Prefix Path)",
+  "title": "MMCE: Where the MMCE settings live",
   "cat": "devices",
-  "text": "MMCE Start Mode (Off/Manual/Auto), MMCE Slot (0/1/Auto), and MMCE Prefix Path — all found under the MMCE Settings section of Device Settings.",
+  "text": "MMCE Start Mode (Off/Manual/Auto, default Off) stays in Device Settings; MMCE Slot (0/1/Auto), IGR Bootcard Slot(s), Send GameID on Launch and the timing tuners moved to their own Settings → MMCE Settings page. MMCE Prefix Path sets a sub-path under the card root.",
   "url": "mmce.html#device-settings"
  },
  {
@@ -152,7 +152,7 @@
  {
   "title": "MMCE: Advanced Settings (Wait Cycles, Timeout Alarms)",
   "cat": "devices",
-  "text": "Low-level MMCE driver tuning: Wait cycles after /ACK low (0–5, default 0) and Use timeout alarms (OFF/ON, default OFF) to address instability or hard freezes on marginal hardware.",
+  "text": "Low-level MMCE driver tuning: Wait cycles after /ACK low (0–5, default 5) and Use timeout alarms (OFF/ON, default ON) — the shipped known-good pairing. The 0-cycles + alarms-OFF extreme is what causes instability and hard freezes on marginal hardware.",
   "url": "mmce.html#advanced-settings"
  },
  {
@@ -170,19 +170,19 @@
  {
   "title": "SMB (network share)",
   "cat": "devices",
-  "text": "Load PS2 and PS1 games from a shared folder on a PC, NAS, or Linux/Samba server over SMBv1. Covers share setup, Network Settings fields, the NIC interlock with Network Boot, and PS1 VCD over SMB.",
+  "text": "Load PS2 and PS1 games over SMB with the recommended PS2 Servers AIO launcher, Samba, or a compatible NAS. Device Settings carries an SMB Version row — SMBv1 (default) or SMB2 — and the choice must match your server. Covers share setup, Network Settings, and PS1 VCD over SMB.",
   "url": "smb.html"
  },
  {
   "title": "SMB — What you need",
   "cat": "devices",
-  "text": "Requirements for SMB loading: a PS2 network adapter, an SMBv1-capable server (Windows with SMBv1 re-enabled or Samba), and a wired LAN connection. Static IP is strongly recommended.",
+  "text": "Requirements for SMB loading: a PS2 network adapter, a wired LAN connection, and a server that matches the SMB Version row — the recommended PS2 Servers AIO launcher or any other SMBv1-capable server for SMBv1, or an SMB2-capable server for SMB2. PS2 Servers avoids enabling Windows SMB1.",
   "url": "smb.html#requirements"
  },
  {
-  "title": "SMB — Set up the share on your PC or NAS",
+  "title": "SMB — Set up the SMB server and share",
   "cat": "devices",
-  "text": "Create an OPL-layout folder (CD, DVD, POPS, ART, CFG, VMC, THM, CHT, APPS), share it with full read/write permissions, and place ISOs in the correct subfolder. Samba config example included.",
+  "text": "With PS2 Servers, choose SMBv1, select the games folder, start it, and copy the displayed settings into RiptOPL — leave SMB Version on SMBv1, because an SMBv1-only server lists no games under SMB2. Manual Samba/NAS setup and the standard OPL folder layout are also covered.",
   "url": "smb.html#share-setup"
  },
  {
@@ -194,7 +194,7 @@
  {
   "title": "SMB — Enable SMB in Device Settings",
   "cat": "devices",
-  "text": "Select SMB in the unified Network Protocol picker (Off/SMB/UDPFS/UDPBD) in Device Settings. SMB and the UDP boot protocols share the one NIC — only one can be active at a time.",
+  "text": "In Device Settings set Network Protocol to Manual or Auto, Protocol to SMB, and SMB Version to SMBv1 or SMB2; Access is locked to Files while Protocol is SMB. SMB and the UDP boot protocols share the one NIC — only one can be active at a time.",
   "url": "smb.html#enable-smb"
  },
  {
@@ -218,19 +218,19 @@
  {
   "title": "SMB — Common problems",
   "cat": "devices",
-  "text": "Troubleshooting table for CONN / LOGON / SHARE errors, empty game lists, slow loading, DHCP timeout, PS1 VCD launch failures, and Windows firewall/SMBv1 issues.",
+  "text": "Troubleshooting table for CONN / LOGON / SHARE errors, empty game lists (including an SMB Version vs. server dialect mismatch — an SMBv1-only server lists nothing under SMB2), slow loading, DHCP timeout, PS1 VCD launch failures, and Windows firewall/SMBv1 issues.",
   "url": "smb.html#troubleshooting-smb"
  },
  {
   "title": "SMB — Config file keys",
   "cat": "devices",
-  "text": "All SMB and network settings stored in network.cfg: ps2_ip_use_dhcp, ps2_ip_addr, smb_ip, smb_port, smb_share, smb_user, smb_pass, smb_share_use_nbns, smb_share_nb_addr, eth_linkmode, and more.",
+  "text": "The PS2’s network identity and the share address are stored in conf_network.cfg: ps2_ip_use_dhcp, ps2_ip_addr, smb_ip, smb_port, smb_share, smb_user, smb_pass, smb_share_use_nbns, smb_share_nb_addr, eth_linkmode, and more. Two more keys affect SMB but live in settings_riptopl.cfg instead: smb_dialect (the SMB Version row) and the network start mode.",
   "url": "smb.html#config-keys"
  },
  {
   "title": "Internal HDD (APA & exFAT)",
   "cat": "devices",
-  "text": "RiptOPL supports the internal PS2 ATA/IDE HDD two ways: APA/PFS (HDLoader format, installed via HDL-Dump over NBD) and exFAT via the Block Device Manager (BDMAssault), which mounts as a massN: slot labelled \"HDD (exFAT)\" just like a USB drive.",
+  "text": "RiptOPL supports the internal PS2 ATA/IDE HDD two ways: APA/PFS (HDLoader format, installed via HDL-Dump over NBD) and exFAT via the Block Device Manager (BDMAssault), which mounts as a massN: slot and lists as an \"HDD Games\" tab just like a USB drive. Both can be enabled at once — arbitration happens per drive at mount time.",
   "url": "hdd.html"
  },
  {
@@ -260,7 +260,7 @@
  {
   "title": "exFAT HDD via Block Device Manager (BDMA)",
   "cat": "devices",
-  "text": "Enable BDM HDD in Device Settings to mount the internal HDD as an exFAT mass-storage device in the massN: namespace. Supports MBR (up to 2 TB) or GPT (unlimited); format with Allocation unit size set to Default and add files one at a time to avoid fragmentation.",
+  "text": "Enable HDD (GPT/MBR) in Device Settings to mount the internal HDD as an exFAT mass-storage device in the massN: namespace, listed as an HDD Games tab. Supports MBR (up to 2 TB) or GPT (unlimited); format with Allocation unit size set to Default and add files one at a time to avoid fragmentation.",
   "url": "hdd.html#exfat-bdm"
  },
  {
@@ -272,7 +272,7 @@
  {
   "title": "PS1 games on exFAT HDD (BDMA equip)",
   "cat": "devices",
-  "text": "Put *.VCD files in the POPS/ folder on the exFAT HDD. To boot them, set General Settings → BDMA Mode → HDD (exFAT) and BDMA Source → Internal HDD, so RiptOPL identifies the drive by its ata driver and copies the BDMAssault modules POPSTARTER needs onto the memory card.",
+  "text": "Put *.VCD files in the POPS/ folder on the exFAT HDD. VCD BDMA Apply on Launch (Settings → VCD Settings) ships On, so RiptOPL auto-equips the HDD (exFAT) BDMAssault modules onto the memory card before each launch. Turn it Off to set BDMA Mode → HDD (exFAT) and BDMA Source → Internal HDD by hand.",
   "url": "hdd.html#exfat-ps1"
  },
  {
@@ -284,43 +284,43 @@
  {
   "title": "Network Boot (SMB / UDP)",
   "cat": "devices",
-  "text": "Stream your PS2 game library from a PC over the LAN. RiptOPL picks the network transport with a single selector — Device Settings → Network Protocol — offering just three choices: Off / SMB / UDPFS . ",
+  "text": "Stream your PS2 game library from a PC over the LAN. Device Settings carries four network rows — Network Protocol (Off / Manual / Auto), Protocol (SMB / UDPFS / UDPBD), SMB Version (SMBv1 / SMB2) and Access (Files / IMG) — and the linked PS2 Servers AIO launcher provides all three PC-side protocols.",
   "url": "network-boot.html"
  },
  {
-  "title": "The three Network Protocol choices",
+  "title": "The Network rows",
   "cat": "devices",
-  "text": "Set Settings → Device Settings → Network Protocol to one of three values. Because the PS2 has a single NIC, choosing one automatically excludes the others — no separate enable toggle, and no greying i",
+  "text": "Device Settings carries four network rows: Network Protocol is the start mode (Off / Manual / Auto, default Off); Protocol picks SMB, UDPFS or UDPBD; SMB Version picks SMBv1 (default) or SMB2; Access picks Files or IMG. Because the PS2 has a single NIC, choosing one protocol automatically excludes the others.",
   "url": "network-boot.html#protocols"
  },
  {
-  "title": "UDPFS Access — Files vs Image",
+  "title": "Access — Files vs IMG",
   "cat": "devices",
-  "text": "When UDPFS is selected, a second sub-setting UDPFS Access appears with two values — Files (default) and Image . They are the same UDPFS protocol in two shapes: Files is the udpfs_ioman filesystem ( ud",
+  "text": "The Access row is always present in Device Settings, but it is only free to change while Protocol = UDPFS — under SMB it is value-locked to Files and under UDPBD to IMG, greyed in both cases. Its two values are Files (default) and IMG. They are the same UDPFS protocol in two shapes: Files is the udpfs_ioman filesystem, IMG is the block-device disk image.",
   "url": "network-boot.html#udpfs-vs-udpfsbd"
  },
  {
   "title": "Requirements",
   "cat": "devices",
-  "text": "Static PS2 IP address (UDPFS only). The UDPFS IOP modules (both Files and Image) have no DHCP client — they read the IP set in Settings → Network Config and use it directly. If DHCP is currently on th",
+  "text": "UDPFS needs a static PS2 IP and a matching PC server. Open PS2-Servers.url for the maintained UDPFS / SMBv1 / UDPBD AIO launcher; server binaries are not embedded in RiptOPL.",
   "url": "network-boot.html#requirements"
  },
  {
   "title": "Selecting a network protocol",
   "cat": "devices",
-  "text": "Set a static IP on the PS2 (UDPFS only) For UDPFS (either access mode), go to Settings → Network Config and set a fixed IP address, subnet mask, and gateway; turn DHCP off . The UDPFS IOP modules read",
+  "text": "Choose SMB, UDPFS, or UDPBD in RiptOPL, then open PS2-Servers.url and start the matching server in the AIO launcher. Raw pcm720/udpfsd commands remain as an advanced UDPFS-only alternative.",
   "url": "network-boot.html#enable"
  },
  {
   "title": "Neutrino-only: no OPL core fallback (UDPFS)",
   "cat": "devices",
-  "text": "UDPFS (both Files and Image) has no embedded cdvdman backend, so it cannot use OPL's built-in EE core. Every UDPFS game launches via Neutrino, regardless of the per-game Loader Core setting. In the pe",
+  "text": "UDPFS (both Files and IMG) has no embedded cdvdman backend, so it cannot use OPL’s built-in EE core. Every UDPFS game launches via Neutrino, regardless of the per-game Loader Core setting.",
   "url": "network-boot.html#neutrino-only"
  },
  {
-  "title": "One NIC, one selector — no interlock to manage",
+  "title": "One NIC, one transport — how the four rows interlock",
   "cat": "devices",
-  "text": "The PS2 has a single Ethernet adapter (SMAP), and every network transport — SMB and UDPFS — loads a SMAP driver on it. Only one can own the adapter at a time, so RiptOPL exposes them as mutually exclu",
+  "text": "The PS2 has a single Ethernet adapter (SMAP), and every network transport — SMB, UDPFS and UDPBD — loads a SMAP driver on it. Only one can own the adapter at a time, so RiptOPL exposes them as mutually exclusive values of one Protocol row rather than independent toggles. The four rows still interlock live, but only downward.",
   "url": "network-boot.html#single-nic"
  },
  {
@@ -332,7 +332,7 @@
  {
   "title": "Game folder layout on the server",
   "cat": "devices",
-  "text": "For the Image mode (UDPFS Access = Image) and SMB, the PC server exports a FAT/exFAT volume the PS2 reads with the same folder conventions as a USB drive: mass0:/ (device root — folders sit here direc",
+  "text": "For the IMG mode (Access = IMG) and SMB, the PC server exports a FAT/exFAT volume the PS2 reads with the same folder conventions as a USB drive: mass0:/ (device root) with the OPL folders sitting directly inside it.",
   "url": "network-boot.html#folder-layout"
  },
  {
@@ -374,7 +374,7 @@
  {
   "title": "exFAT support — the BDMA equip",
   "cat": "ps1",
-  "text": "To boot PS1 games from an exFAT drive, set BDMA Mode and BDMA Source in General Settings so RiptOPL copies the correct BDMAssault modules to mc?:/POPSTARTER/.",
+  "text": "To boot PS1 games from an exFAT drive, RiptOPL copies the correct BDMAssault modules to mc?:/POPSTARTER/. VCD BDMA Apply on Launch (Settings → VCD Settings) ships On and equips them automatically before each launch; turn it Off to use the BDMA Mode and BDMA Source pickers yourself.",
   "url": "ps1-vcd.html#bdma"
  },
  {
@@ -422,7 +422,7 @@
  {
   "title": "Neutrino Device picker",
   "cat": "neutrino",
-  "text": "Pick the device TYPE that holds neutrino.elf: Auto / Memory Card / USB / MX4SIO / MMCE / HDD (exFAT) / HDD (APA). OPL probes <root>:/neutrino/neutrino.elf on the chosen device type; Auto probes the active game device first, then a legacy custom path, then mc0/mc1.",
+  "text": "Pick the device TYPE that holds neutrino.elf: Auto / Memory Card / USB / MX4SIO / MMCE / HDD (exFAT) / HDD (APA) / Game's Device. OPL probes <root>:/neutrino/neutrino.elf on the chosen device type; Auto probes the active game device first, then a legacy custom path, then mc0/mc1. Game's Device probes only the game's own device — a miss aborts the launch.",
   "url": "neutrino.html#neutrino-device"
  },
  {
@@ -434,13 +434,13 @@
  {
   "title": "Structured Neutrino Args sub-screen",
   "cat": "neutrino",
-  "text": "A companion dialog breaks Launch Args into named fields (-qb, -cwd, -cfg, -elf, -ata0, -ata0id, -ata1, Extra) and reassembles them in a valid canonical order, with --b and post-break ELF args placed last.",
+  "text": "A companion dialog breaks Launch Args into named fields (-qb, -dbc, -logo, -cwd, -cfg, -elf, -ata0, -ata0id, -ata1, Extra) and reassembles them in a valid canonical order, with --b and post-break ELF args placed last.",
   "url": "neutrino.html#args-subscreen"
  },
  {
   "title": "Neutrino Video (-gsm) and Mode 7 (-gc=7)",
   "cat": "neutrino",
-  "text": "A structured Neutrino Video picker (Off/240p/480p/1080i) maps to -gsm=fp1/fp2/1080ix1 and replaces OPL GSM under the Neutrino core. Mode 7 (Fix IOP Buffer Overrun) maps to -gc=7 and is Neutrino-only.",
+  "text": "A structured Neutrino Video picker (Off / 240p / 480p / 1080i x1 / x2 / x3 / Default) maps to -gsm=fp1/fp2/1080ix1/1080ix2/1080ix3 and replaces OPL GSM under the Neutrino core; Default follows the global Settings value. Mode 7 (Fix IOP Buffer Overrun) maps to -gc=7 and is Neutrino-only.",
   "url": "neutrino.html#neutrino-video"
  },
  {
@@ -450,9 +450,9 @@
   "url": "neutrino.html#core-aware-settings"
  },
  {
-  "title": "Network boot — the Network Protocol selector",
+  "title": "Network boot — UDPBD / UDPFS",
   "cat": "neutrino",
-  "text": "Off / SMB / UDPFS. UDPFS is the one modern network-boot protocol (UDPRDMA); a UDPFS Access sub-mode picks Files (loose ISOs) or Image (disk image). UDPBD is retired. All UDPFS games launch via Neutrino.",
+  "text": "UDPBD and UDPFS stream games from a PC over the LAN. UDPFS is the modern network-boot protocol (UDPRDMA); the Access row picks Files (loose ISOs, its own UDPFS Games tab) or IMG (disk image, sharing the BDM block tab with UDPBD). UDPBD (SUDPBDv2) is retained as a first-class choice, never migrated away. Both always launch via Neutrino — there is no OPL cdvdman backend for network block devices, so OPL forces the Neutrino core and warns if neutrino.elf is missing.",
   "url": "neutrino.html#network-boot"
  },
  {
@@ -542,19 +542,19 @@
  {
   "title": "Per-game Settings: Compatibility Settings",
   "cat": "features",
-  "text": "The Compatibility Settings screen holds the Loader Core picker, Neutrino Launch Args, Neutrino Video, the seven compatibility mode toggles, DMA mode, Game ID, and Alt-Startup.",
+  "text": "The Compatibility Settings screen holds the Loader Core picker, Neutrino Launch Args, Neutrino Video, Neutrino GSM Compatibility, Neutrino Filesystem, the seven compatibility mode toggles, DMA mode, Game ID, and Alt-Startup.",
   "url": "per-game-settings.html#compatibility-settings"
  },
  {
   "title": "Per-game Settings: Loader Core",
   "cat": "features",
-  "text": "The Loader Core picker chooses between OPL's built-in EE core and an external Neutrino ELF, stored per-game as $CoreLoader. SMB/UDP games are locked to Neutrino.",
+  "text": "The Loader Core picker chooses between OPL's built-in EE core and an external Neutrino ELF, stored per-game as $CoreLoader. UDPBD / UDPFS network-boot games are locked to Neutrino; SMB, .ul and .zso titles fall back to the OPL core instead.",
   "url": "per-game-settings.html#loader-core"
  },
  {
   "title": "Per-game Settings: Neutrino Launch Args & Video",
   "cat": "features",
-  "text": "When the Loader Core is Neutrino, the Neutrino Launch Args field ($NeutrinoArgs) and Neutrino Video picker ($NeutrinoVideo: Off/240p/480p/1080i) become active; both are greyed under the OPL core.",
+  "text": "When the Loader Core is Neutrino, the Neutrino Launch Args field ($NeutrinoArgs) and Neutrino Video picker ($NeutrinoVideo: Off / 240p / 480p / 1080i x1 / x2 / x3 / Default) become active, along with Neutrino GSM Compatibility and Neutrino Filesystem; all are greyed under the OPL core.",
   "url": "per-game-settings.html#neutrino-args-video"
  },
  {
@@ -566,7 +566,7 @@
  {
   "title": "Per-game Settings: VMC",
   "cat": "features",
-  "text": "Assign up to two Virtual Memory Card images to a game. VMC works under both the OPL core and Neutrino (passed as -mc0/-mc1 arguments). Config keys: $VMC and $VMC2.",
+  "text": "Assign up to two Virtual Memory Card images to a game. VMC works under both the OPL core and Neutrino (passed as -mc0/-mc1 arguments). Config keys: $VMC_0 (slot 1) and $VMC_1 (slot 2).",
   "url": "per-game-settings.html#vmc"
  },
  {
@@ -584,7 +584,7 @@
  {
   "title": "Per-game Settings: Config key reference",
   "cat": "features",
-  "text": "Per-game config keys include $Compatibility (bitmask), $CoreLoader, $NeutrinoArgs, $NeutrinoVideo, $VMC, $VMC2, $DNAS, and $AltStartup, all stored in CFG/<GAMEID>.cfg on the game device.",
+  "text": "Per-game config keys include $Compatibility (bitmask), $CoreLoader, $NeutrinoArgs, $NeutrinoVideo, $NeutrinoGsmComp, $NeutrinoBsdfs, $VMC_0, $VMC_1, $DNAS, and $AltStartup, all stored in CFG/<GAMEID>.cfg on the game device.",
   "url": "per-game-settings.html#config-keys"
  },
  {
@@ -643,11 +643,13 @@
  },
  {
   "title": "Cheats — A complete example .cht file",
+  "cat": "features",
   "text": "A full copy-paste PS2RD .cht example: an optional title line, a REQUIRED Master Code (9-type hook, address starts with 9), then named cheats (Infinite Health, Max Money) each with 16-hex-digit code lines. Save as CHT/SLUS_xxx.xx.cht with your game boot ID. Placeholder values.",
   "url": "cheats.html#example"
  },
  {
   "title": "Cheats — Which code types does the engine support?",
+  "cat": "features",
   "text": "RiptOPL runs the PS2RD code handler: types 0-7 (writes, increment, serial, copy, pointer, boolean), C/D/E (conditionals), and 9/F (Master Code hooks) are supported. Types 8, A and B are parsed but silently skipped. Verified against ee_core cheat_engine.S.",
   "url": "cheats.html#code-types"
  },
@@ -672,7 +674,7 @@
  {
   "title": "Cheats — Config keys reference",
   "cat": "features",
-  "text": "The four per-game config keys that control cheats: $CheatSource, $EnableCheat, $CheatMode, and $EnableImage, with their valid values.",
+  "text": "The four per-game config keys that control cheats: $CheatsSource, $EnableCheat, $CheatMode, and $EnableImage, with their valid values.",
   "url": "cheats.html#per-game-cfg"
  },
  {
@@ -754,6 +756,18 @@
   "url": "themes.html#complete-sample"
  },
  {
+  "title": "Per-device placement (devices=)",
+  "cat": "themes",
+  "text": "Place the MenuIcon, ItemsList and HintText differently per device page with devices=usb,hdd,mmce,...; a filtered element draws only on its pages and the unfiltered one automatically stands down there. Filtered ItemsLists are overrides that don't consume the games/apps/favs/VCD slots.",
+  "url": "themes.html#per-device-placement"
+ },
+ {
+  "title": "Using RiptOPL themes on regular OPL",
+  "cat": "themes",
+  "text": "Dual-compatibility rules: fork keys are invisible on regular OPL, devices= layouts draw overlapped (RiptOPL-only in practice), and the one hard rule -- always include one plain unfiltered ItemsList, or regular OPL crashes on the first scroll (latent upstream bug RiptOPL fixed).",
+  "url": "themes.html#regular-opl-compat"
+ },
+ {
   "title": "Settings Reference",
   "cat": "reference",
   "text": "Every settings menu and option in RiptOPL, grouped by screen: General Settings, Device Settings, Display Settings, Audio, Controller, OSD, Parental Lock, and Network.",
@@ -762,13 +776,13 @@
  {
   "title": "General Settings",
   "cat": "reference",
-  "text": "Debug Colors, PS2 Logo, IGR Path, global Neutrino Launch Args, Neutrino Device, POPSTARTER.ELF Path, BDMA Source/Mode, Write Operations, and Last Played auto-start.",
+  "text": "Debug Colors, PS2 Logo, IGR Path, Default Loader Core, global Neutrino Launch Args, Neutrino Device, Neutrino Video and GSM Compatibility, Write Operations, Last Played auto-start, folder browsing, menu vibration — plus the Prefix Paths and Cache & Storage splitters. The PS1/BDMA rows moved to VCD Settings.",
   "url": "settings.html#general-settings"
  },
  {
   "title": "Device Settings",
   "cat": "reference",
-  "text": "Consolidated hub for all storage devices: BDM/HDD/MMCE start modes, per-device enable toggles (USB/iLink/MX4SIO/HDD-exFAT), the unified Network Protocol picker (Off/SMB/UDPFS/UDPBD) with a UDPFS Access sub-mode, Favourites Start Mode, prefix paths, cache sizes, and all MMCE options.",
+  "text": "Strictly device selection: Default Menu, BDM/HDD (APA)/Applications/Favourites/MMCE start modes, per-device enable toggles (USB/iLink/MX4SIO/HDD GPT-MBR), and the four network rows — Network Protocol (Off/Manual/Auto), Protocol (SMB/UDPFS/UDPBD), SMB Version (SMBv1/SMB2) and Access (Files/IMG). Prefix paths and cache sizes are on General Settings; the MMCE tuning rows have their own MMCE Settings page.",
   "url": "settings.html#device-settings"
  },
  {
@@ -948,13 +962,13 @@
  {
   "title": "Releases — What the rolling release contains",
   "cat": "reference",
-  "text": "Each rolling build publishes the installable package zip (both toolchains + bundled Neutrino + POPSTARTER/POPS folders), bare ELFs, a source snapshot, SHA256SUMS.txt, and a language pack.",
+  "text": "Each rolling build publishes the installable package zip (two SDK-labelled loader folders, bundled Neutrino, POPSTARTER/POPS, and PS2-Servers.url), bare ELFs, ready-made -ds5 DualSense ELFs, VARIANTS and DEBUG zips, a source snapshot, a separate SHA256SUMS.txt asset, and languages.",
   "url": "releases.html#rolling-assets"
  },
  {
-  "title": "Releases — Two toolchains, one default",
+  "title": "Releases — Two toolchains, one recommended",
   "cat": "reference",
-  "text": "Three toolchains: the default ELF uses ps2dev/ps2dev:latest; a wOPL-container ELF ships as APP_RIPTOPL-WOPLSDK (stock MMCE drivers) and a pinned ps2max/dev ELF as APP_RIPTOPL-OLDSDK, both instant fallbacks if a toolchain regression breaks a game.",
+  "text": "Two toolchains: APP_RIPTOPL-PS2DEVLATESTSDK (ps2dev/ps2dev:latest, the recommended build) and APP_RIPTOPL-PS2DEVPINNEDSDK (the same ps2dev SDK pinned by digest, the safe fallback if the moving tag regresses). There is no unlabeled default folder.",
   "url": "releases.html#two-toolchains"
  },
  {
@@ -1002,7 +1016,7 @@
  {
   "title": "Troubleshooting: No display on boot (blank or black screen)",
   "cat": "reference",
-  "text": "Hold Triangle + Cross while OPL boots to reset a saved incompatible video mode (or GSM override) back to Auto; works for both blank-screen-on-boot and locked GSM mistakes.",
+  "text": "Hold Triangle + Cross while OPL boots to force a saved incompatible video mode (or GSM override) to 480p progressive; works for both blank-screen-on-boot and locked GSM mistakes.",
   "url": "troubleshooting.html#no-display"
  },
  {
@@ -1020,8 +1034,14 @@
  {
   "title": "Troubleshooting: Quick-reference button combos",
   "cat": "reference",
-  "text": "Summary table of boot-time button combos: START skips config load, Triangle + Cross resets video mode to Auto.",
+  "text": "Summary table of boot-time button combos: START skips config load, Triangle + Cross forces video mode to 480p progressive.",
   "url": "troubleshooting.html#quick-reference"
+ },
+ {
+  "title": "PS1/VCD list is empty (works elsewhere)",
+  "cat": "reference",
+  "text": "Triage ladder: device enables (APA vs exFAT auto-reconcile toast), PS2 ISOs prove the exFAT layer (byte-identical to wOPL), L3 + Default game view, VCDs scan from device-root /POPS not the games prefix, 160-char and POPSTARTER.VCD name rules, post-select failures are POPSTARTER-side.",
+  "url": "troubleshooting.html#vcd-list-empty"
  },
  {
   "title": "Credits & Sources",

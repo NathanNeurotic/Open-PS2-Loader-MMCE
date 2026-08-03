@@ -68,7 +68,7 @@ If <code>RIPTOPL.ELF</code> is already on your PS2 and booting, skip ahead to
 </ul>
 
 <details class="deep"><summary>Which release should I download?</summary>
-<p>The <b>rolling</b> pre-release is rebuilt from <code>master</code> on every push and always includes the bundled Neutrino core. It may occasionally be unstable. Tagged <b>v*</b> releases are manually cut, known-good snapshots. Either way, the full installable package zip (<code>RIPTOPL-&lt;sdk&gt;-&lt;rel&gt;-&lt;sha&gt;.zip</code>) contains the ELF, the bundled Neutrino archive, and a language pack — download the zip rather than a bare ELF if you intend to use Neutrino or per-game language overrides. See <a href="releases.html">Releases</a> for details.</p>
+<p>The <b>rolling</b> pre-release is rebuilt from <code>master</code> on every push and normally includes the bundled Neutrino core. It may occasionally be unstable. Tagged <b>v*</b> releases are manually cut, known-good snapshots. Either way, the full installable package zip (<code>RIPTOPL-&lt;rel&gt;-&lt;sha&gt;.zip</code>) contains the ELF, the <code>POPSTARTER/</code> and <code>POPS/</code> folders, and the already-extracted <code>neutrino/</code> folder — download the zip rather than a bare ELF if you intend to use Neutrino. The language pack is a separate <code>RIPTOPL-LANGS-*.zip</code> release asset. See <a href="releases.html">Releases</a> for details.</p>
 </details>
 
 <h2 id="pick-a-device">Pick a device</h2>
@@ -82,7 +82,7 @@ If <code>RIPTOPL.ELF</code> is already on your PS2 and booting, skip ahead to
 <tr><td><b>MX4SIO</b></td><td>MX4SIO adapter + SD card in the memory-card slot (FAT32 or exFAT)</td><td><a href="usb.html">USB / MX4SIO / iLink</a></td></tr>
 <tr><td><b>MMCE</b></td><td>SD2PSX, MemCard PRO2, or compatible MMCE device in the memory-card slot</td><td><a href="mmce.html">MMCE</a></td></tr>
 <tr><td><b>iLink</b></td><td>IEEE 1394 (FireWire) SBP2 storage device</td><td><a href="usb.html">USB / MX4SIO / iLink</a></td></tr>
-<tr><td><b>SMB</b></td><td>A network share on a PC or NAS (SMBv1); PS2 needs a network adapter</td><td><a href="smb.html">SMB</a></td></tr>
+<tr><td><b>SMB</b></td><td>A network share on a PC or NAS (SMBv1 or SMB2 — pick it with the <b>SMB Version</b> setting in Device Settings; SMBv1 is the default); PS2 needs a network adapter</td><td><a href="smb.html">SMB</a></td></tr>
 <tr><td><b>Internal HDD (APA)</b></td><td>Internal ATA HDD formatted with APA/PFS — classic PS2 HDD setup</td><td><a href="hdd.html">Internal HDD</a></td></tr>
 <tr><td><b>Internal HDD (exFAT)</b></td><td>Internal ATA HDD formatted exFAT — BDM path, same folder layout as USB</td><td><a href="hdd.html">Internal HDD</a></td></tr>
 <tr><td><b>Network boot (UDPBD / UDPFS)</b></td><td>PS2 network adapter + a PC running the server; requires Neutrino</td><td><a href="network-boot.html">Network Boot</a></td></tr>
@@ -128,7 +128,7 @@ An APA-formatted internal HDD stores games as HDLoader partitions, <b>not</b> as
 
 <div class="step">
 <h3>1. Prepare the drive</h3>
-<p>Format your USB drive as <b>FAT32</b> (for drives up to 32 GB) or <b>exFAT</b> (larger drives or games over 4 GB). Use the default allocation unit size when formatting exFAT. Create a <code>DVD</code> folder at the root of the drive (or let OPL create it on first boot), then copy your game ISO into it:</p>
+<p>Format your USB drive as <b>FAT32</b> (for drives up to 32 GB) or <b>exFAT</b> (larger drives or games over 4 GB). Use the default allocation unit size when formatting exFAT. Create a <code>DVD</code> folder at the root of the drive (or let RiptOPL create it when you turn USB on in step 3), then copy your game ISO into it:</p>
 <pre>
 USB root
 └── DVD/

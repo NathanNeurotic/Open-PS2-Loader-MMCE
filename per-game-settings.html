@@ -83,22 +83,27 @@ RiptOPL / OPL / wOPL builds that read from the same device; only the master sett
 <table data-sortable>
   <thead><tr><th>Value</th><th>Description</th></tr></thead>
   <tbody>
-    <tr><td><code>&lt;OPL&gt;</code></td><td>OPL's built-in EE core. The default for all games.</td></tr>
+    <tr><td><code>&lt;OPL&gt;</code></td><td>Pin this title to OPL's built-in EE core.</td></tr>
     <tr><td><code>Neutrino</code></td><td>Hand the game off to an external <code>neutrino.elf</code>. See <a href="neutrino.html">Neutrino Core</a>.</td></tr>
+    <tr><td><code>Default</code></td><td>Make no per-game choice — follow the global <b>Settings &rarr; General Settings &rarr; Default Loader Core</b> value. This is what a title shows while it has no saved <code>$CoreLoader</code> key, so it is the state every game starts in.</td></tr>
   </tbody>
 </table>
-<p>Config key: <code>$CoreLoader</code>. The screen adapts immediately when you change this picker — see
+<p>Config key: <code>$CoreLoader</code> — no key is written while the picker reads <b>Default</b>.
+The screen adapts immediately when you change this picker — see
 <a href="#core-aware-adaptation">Core-aware adaptation</a> below.</p>
 
-<div class="callout info"><div class="h">i UDPBD / UDPFS games lock to Neutrino</div>
-Network-boot games (UDPBD / UDPFS) have no OPL core backend. For those titles the Loader Core selector
-is locked to <b>Neutrino</b> and cannot be changed. If <code>neutrino.elf</code> is missing, OPL warns
+<div class="callout info"><div class="h">i UDPBD / UDPFS games always launch through Neutrino</div>
+Network-boot games (UDPBD / UDPFS) have no OPL core backend, so they launch through Neutrino whatever
+this picker says. On the block-device tabs (UDPBD and UDPFS <b>IMG</b>) the Loader Core selector is
+locked to <b>Neutrino</b> and cannot be changed; on the UDPFS <b>Files</b> tab the row stays editable,
+but the launch forces Neutrino anyway. If <code>neutrino.elf</code> is missing, OPL warns
 you and returns to the menu — there is no fallback.
 </div>
 
 <h3 id="neutrino-args-video">Neutrino Launch Args &amp; Neutrino Video (Neutrino core only)</h3>
-<p>These two fields appear on the Compatibility screen and are only active when the Loader Core is set to
-<b>Neutrino</b> (they are greyed under <code>&lt;OPL&gt;</code>).</p>
+<p>These fields appear on the Compatibility screen and are only active when the title's effective core is
+Neutrino — that is, Loader Core = <b>Neutrino</b>, or <b>Default</b> while the global Default Loader
+Core is Neutrino. They are greyed under <code>&lt;OPL&gt;</code>.</p>
 <ul class="checklist">
   <li><b>Neutrino Launch Args</b> — a button that opens the same <b>structured args sub-screen</b> as the
   global setting: named fields (Quick Boot, Working Dir, Config, Boot ELF, ATA0 / ATA0 ID / ATA1 image, plus
@@ -109,17 +114,30 @@ you and returns to the menu — there is no fallback.
   Settings → Neutrino Launch Args</b>; per-game args are appended after it.</li>
   <li><b>Neutrino Video</b> — structured picker for Neutrino's <code>-gsm</code> video-mode flag.
   Config key: <code>$NeutrinoVideo</code>.</li>
+  <li><b>Neutrino GSM Compatibility</b> — the <code>:c</code> field-flipping half of <code>-gsm</code>, for
+  games that shake or tear under a forced video mode. Values <em>Off / Type 1 (GSM/OPL) / Type 2 / Type 3 /
+  Default</em>. The row is greyed while the <b>Neutrino Video</b> picker reads Off, and the value is only
+  emitted when the effective video mode is not Off. Config key: <code>$NeutrinoGsmComp</code>.</li>
+  <li><b>Neutrino Filesystem</b> — overrides Neutrino's <code>-bsdfs</code> block-device filesystem.
+  Values <em>Auto / exfat / hdl / bd</em> (<em>Auto</em> uses the per-device default). Greyed for backends
+  that are not block-backed — MMCE, UDPFS, APA HDD and VCD entries. <code>hdl</code> and <code>bd</code>
+  are expert options. Config key: <code>$NeutrinoBsdfs</code>.</li>
 </ul>
 
 <table data-sortable>
   <thead><tr><th>Picker value</th><th>Neutrino flag emitted</th><th>Notes</th></tr></thead>
   <tbody>
-    <tr><td>Off</td><td><em>(nothing)</em></td><td>Default; no video override</td></tr>
+    <tr><td>Off</td><td><em>(nothing)</em></td><td>No video override. Saved as an explicit per-game value, so it beats a non-Off global default</td></tr>
     <tr><td>240p</td><td><code>-gsm=fp1</code></td><td>Force 240p / NTSC progressive</td></tr>
     <tr><td>480p</td><td><code>-gsm=fp2</code></td><td>Force 480p / NTSC progressive scan</td></tr>
-    <tr><td>1080i</td><td><code>-gsm=1080ix1</code></td><td>Force 1080i</td></tr>
+    <tr><td>1080i x1</td><td><code>-gsm=1080ix1</code></td><td>Force 1080i</td></tr>
+    <tr><td>1080i x2</td><td><code>-gsm=1080ix2</code></td><td>Force 1080i</td></tr>
+    <tr><td>1080i x3</td><td><code>-gsm=1080ix3</code></td><td>Force 1080i — the community "1080p impression" setting</td></tr>
+    <tr><td>Default</td><td><em>(nothing per-game)</em></td><td>Removes <code>$NeutrinoVideo</code> entirely, so the title follows the global <b>Settings → General Settings → Neutrino Video</b> value</td></tr>
   </tbody>
 </table>
+<p>See <a href="neutrino.html#neutrino-video">Neutrino Core &sect;5</a> for the same table with the global
+default explained.</p>
 
 <div class="callout info"><div class="h">i Manual -gsm wins</div>
 If you type a <code>-gsm=…</code> flag directly into the <b>Neutrino Launch Args</b> field, it takes
@@ -251,8 +269,9 @@ Compatibility Settings screen instead.</p>
 <b>OPL core feature</b> and is not available under Neutrino.</p>
 <p>If the game's Loader Core is set to Neutrino, opening PADEMU Settings displays the message
 <em>"This setting is not used with the Neutrino core."</em></p>
-<p>A DualSense / DualShock 5 build is available as a separate compile option
-(<code>make DUALSENSE=1</code>); see the <a href="releases.html">Releases</a> page.</p>
+<p>DualSense / DualShock 5 (USB) support is off in the default builds, but you do not have to build it
+yourself: each release flavour also ships a ready-made <code>-ds5.ELF</code> loader as its own named
+download. See the <a href="releases.html">Releases</a> page.</p>
 
 <h2 id="osd-language">OSD Language Settings</h2>
 <p>OPL can patch the OSD language, TV aspect ratio, and video output mode written into EEPROM during
@@ -280,14 +299,14 @@ will be silently ignored at launch.</p>
     <tr><td>PADEMU / Pad Macro panels</td><td><b>Active</b></td><td>Shows "not used with Neutrino core"</td></tr>
     <tr><td>OSD Language panel</td><td><b>Active</b></td><td>Shows "not used with Neutrino core"</td></tr>
     <tr><td>VMC panel</td><td><b>Active</b></td><td><b>Active</b> (via -mc0/-mc1)</td></tr>
-    <tr><td>Loader Core selector</td><td><b>Active</b></td><td><b>Active</b> (locked for UDPBD/VCD)</td></tr>
+    <tr><td>Loader Core selector</td><td><b>Active</b></td><td><b>Active</b> (locked for the UDP block devices, SMB and VCD)</td></tr>
   </tbody>
 </table>
 
 <div class="callout info"><div class="h">i PS1 / VCD games</div>
 PS1 titles shown via the <b>L3 VCD view</b> always launch through <b>POPSTARTER.ELF</b> — never
-OPL's core and never Neutrino. The Loader Core selector is pinned to <code>&lt;OPL&gt;</code> and locked
-for VCD entries, since the choice is inert. For PS1-specific settings (IGR hotkeys, multi-disc,
+OPL's core and never Neutrino. The Loader Core selector is pinned to <code>Default</code> and locked
+for VCD entries, since the choice is inert — no <code>$CoreLoader</code> key is written for them. For PS1-specific settings (IGR hotkeys, multi-disc,
 cheats), see the <a href="https://nathanneurotic.github.io/POPSLoader/">POPStarter docs</a>.
 </div>
 
@@ -317,8 +336,12 @@ If the settings turn out to work, follow up with <b>Save Changes</b>.</p>
 by the per-game settings screen are:</p>
 <pre>$Compatibility    compatibility mode bitmask (integer)
 $CoreLoader       0 = &lt;OPL&gt;, 1 = Neutrino
+                  (key ABSENT when the picker is "Default" -> follow the global Default Loader Core)
 $NeutrinoArgs     Neutrino launch arguments (set via the structured sub-screen)
-$NeutrinoVideo    0=Off, 1=240p, 2=480p, 3=1080i
+$NeutrinoVideo    0=Off, 1=240p, 2=480p, 3=1080i x1, 4=1080i x2, 5=1080i x3
+                  (key ABSENT when the picker is "Default" -> follow the global Neutrino Video)
+$NeutrinoGsmComp  0=Off, 1-3=comp type (key removed when the picker is "Default")
+$NeutrinoBsdfs    0=Auto, 1=exfat, 2=hdl, 3=bd (key removed on Auto)
 $VMC_0            VMC name for slot 1
 $VMC_1            VMC name for slot 2
 $DNAS             game hexadecimal ID (for compat DB lookup)
@@ -335,7 +358,9 @@ Neutrino, OPL converts this to a <code>-gc=</code> value by forwarding only mode
 
 <details class="deep"><summary>Where exactly is the .cfg file stored?</summary>
 <p>On each game device, in a folder named <code>CFG/</code> at the root of the OPL directory tree.
-For USB that is <code>mass:/CFG/</code>, for HDD APA it is <code>pfs0:OPL/CFG/</code>, for SMB it is
+For USB that is <code>mass:/CFG/</code>, for HDD APA it is <code>pfs0:CFG/</code> on the default
+<code>+OPL</code> data partition (<code>pfs0:OPL/CFG/</code> only when <code>hdd_partition</code> names a
+partition that does not start with <code>+</code>, e.g. <code>__common</code>), for SMB it is
 relative to the configured OPL share root, and so on. The filename is the game's startup ID with a
 <code>.cfg</code> extension (e.g. <code>SLUS_200.12.cfg</code>). Because all OPL-family builds read
 the same <code>CFG/</code> folder, per-game settings are shared between RiptOPL, wOPL, and stock OPL

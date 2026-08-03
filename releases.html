@@ -58,8 +58,14 @@ pipeline and carry the same asset set, so they can never silently diverge.</p>
 RiptOPL ships a single standard ELF that includes <b>GSM</b> video-mode handling,
 <b>DS3/DS4 pad emulation (PADEMU)</b>, <b>VMC</b> (Virtual Memory Cards),
 <b>PS2RD cheats</b>, and <b>parental controls</b>. There are no stripped-down per-feature variants
-to juggle. The one optional extra is <b>DualSense / DualShock 5 (USB)</b> support, which must be
-compiled in with <code>make DUALSENSE=1</code> and is not part of the standard release ELF.</div>
+to juggle. One optional extra is <b>DualSense / DualShock 5 (USB)</b> support: it is off in the
+standard ELF, but you do not have to build it yourself — the rolling release publishes a ready-made
+<code>RIPTOPL-&lt;version&gt;-PS2DEVLATESTSDK-ds5.ELF</code> (and the matching
+<code>-PS2DEVPINNEDSDK-ds5.ELF</code>). <code>make DUALSENSE=1</code> is only needed if you compile
+your own. A second, <b>experimental</b> extra — a forced-<b>1080p</b> GSM video mode — ships only as
+<code>RIPTOPL-PS2DEVLATESTSDK-1080p.ELF</code> (published without a version in the filename, unlike
+the rest; latest-SDK flavour only, gated behind a three-step in-GUI confirmation; the raster is
+hardware-unvalidated). Every other asset is 1080p-free.</div>
 
 <h2 id="channels">Release channels</h2>
 
@@ -137,29 +143,27 @@ The headline item is a full installable package zip; all other assets are publis
 </tbody>
 </table>
 
-<p><code>&lt;version&gt;</code> is the pinned build's <code>git describe</code> output, e.g.
-<code>v1.2.0-Beta-2559-bb25a00</code>. <code>&lt;sdk&gt;</code> is the pinned SDK tag (e.g.
-<code>v20250725-2</code>). <code>&lt;sha&gt;</code> is the first 16 hex characters of the default
-ELF's SHA256 — a uniqueness tag, not a security guarantee. The full checksums are in
-<code>SHA256SUMS.txt</code>.</p>
+<p><code>&lt;version&gt;</code> is the build's <code>git describe</code> output, e.g.
+<code>v1.2.0-Beta-2559-bb25a00</code> — one authoritative version, taken from the recommended
+<code>ps2dev:latest</code> build and applied to both flavours. <code>&lt;sha&gt;</code> is the first
+16 hex characters of the recommended ELF's SHA256 — a uniqueness tag, not a security guarantee. The
+full checksums are in <code>SHA256SUMS.txt</code>.</p>
 
-<h2 id="two-toolchains">Three toolchains, one default</h2>
+<h2 id="two-toolchains">Two toolchains, one recommended</h2>
 
-<p>Every build runs under three PS2 toolchains simultaneously:</p>
+<p>Every build runs under two PS2 toolchains simultaneously:</p>
 <ul class="checklist">
-  <li><b><code>ps2dev/ps2dev:latest</code></b> — the bleeding-edge toolchain. This is the <b>default ELF</b>
-  inside <code>APP_RIPTOPL/RIPTOPL.ELF</code>. It tracks PS2SDK closely and usually produces the
-  best binary.</li>
-  <li><b>wOPL's digest-pinned <code>ghcr.io/ps2homebrew</code> container</b> — the SDK wOPL itself
-  builds with, using the container's <b>stock MMCE drivers</b> (no coherent-mmce override). Its output
-  goes into <code>APP_RIPTOPL-WOPLSDK/RIPTOPL.ELF</code>. Use this to compare against a wOPL-toolchain
-  build or if the MMCE driver behaviour matters on your console.</li>
-  <li><b><code>ps2max/dev</code> (pinned)</b> — a specific, locked toolchain version. Its output goes
-  into <code>APP_RIPTOPL-OLDSDK/RIPTOPL.ELF</code>. Use this if the default ELF has a regression
-  on your console.</li>
+  <li><b><code>ps2dev/ps2dev:latest</code></b> — the current SDK, and the build RiptOPL is developed
+  and tested against. This is the <b>recommended ELF</b>, in
+  <code>APP_RIPTOPL-PS2DEVLATESTSDK/RIPTOPL.ELF</code>. Because it tracks a moving tag it can
+  occasionally regress on hardware (issue #102), which is what the pinned flavour is for.</li>
+  <li><b><code>ps2dev/ps2dev@sha256</code> (digest pin)</b> — the <em>same</em> ps2dev SDK, pinned to
+  a day it was known good. Its output goes into <code>APP_RIPTOPL-PS2DEVPINNEDSDK/RIPTOPL.ELF</code>.
+  Use it if the recommended build black-screens or the cursor is dead on your console.</li>
 </ul>
-<p>The bleeding-edge build is <em>best-effort</em>: if it fails, the rolling release still updates
-with the pinned build, and the release notes flag that the bleeding-edge binary is absent that run.
+<p>The recommended <code>ps2dev:latest</code> build must compile — if it fails, the publish fails
+loudly rather than shipping a partial release. The digest-pinned fallback is <em>best-effort</em>: if
+it fails, the release still updates without it and the notes say so.
 The <code>SHA256SUMS.txt</code> covers whichever ELFs were actually produced.</p>
 
 <h2 id="bundled-neutrino">Bundled Neutrino core</h2>
@@ -186,7 +190,8 @@ published:</p>
 <pre># Everything in the current rolling release
 gh release download rolling --repo NathanNeurotic/Open-PS2-Loader --clobber
 
-# Just the installable package zip
+# The zips only: the installable package plus the src / LANGS / VARIANTS / DEBUG extras
+# (the version string itself contains dashes, so this glob matches all of them)
 gh release download rolling --repo NathanNeurotic/Open-PS2-Loader \
   --pattern 'RIPTOPL-*-*-*.zip' --clobber</pre>
 
@@ -216,20 +221,18 @@ release packaging lives. The pushed ref picks the publish target:</p>
 release always reflects the freshest commit. A <code>master</code> push and a simultaneous
 <code>v*</code> tag release run in separate concurrency groups and do not cancel each other.</p>
 
-<details class="deep"><summary>Why are there three toolchain builds in the same release?</summary>
-<p>The PS2 toolchain (<code>ps2dev/ps2dev:latest</code>) advances continuously and occasionally
-introduces regressions. Shipping the bleeding-edge build alongside a pinned build lets you fall back
-instantly without waiting for a fix commit: if a game stops booting, copy
-<code>APP_RIPTOPL-OLDSDK/RIPTOPL.ELF</code> over <code>APP_RIPTOPL/RIPTOPL.ELF</code> on your
-memory card or USB drive and retry. The third build,
-<code>APP_RIPTOPL-WOPLSDK/RIPTOPL.ELF</code>, comes from wOPL's digest-pinned container with its
-stock MMCE drivers — a diagnostic reference for isolating toolchain- or MMCE-driver-specific
-behaviour. Report the regression upstream so it gets fixed for everyone.
+<details class="deep"><summary>Why are there two toolchain builds in the same release?</summary>
+<p>The PS2 toolchain (<code>ps2dev/ps2dev:latest</code>) is a moving tag: it advances continuously
+and occasionally introduces regressions (issue #102). The same commit is therefore also built against
+a digest pin of that SDK, so you can fall back instantly without waiting for a fix commit: if a game
+stops booting, use <code>APP_RIPTOPL-PS2DEVPINNEDSDK/RIPTOPL.ELF</code> instead of
+<code>APP_RIPTOPL-PS2DEVLATESTSDK/RIPTOPL.ELF</code> on your memory card or USB drive and retry.
+Report which flavour reproduced it so the regression gets fixed for everyone.
 </p></details>
 
 <details class="deep"><summary>When should I use the VARIANTS or DEBUG zips?</summary>
 <p><b>VARIANTS</b> cover the full cross-product of <code>EXTRA_FEATURES</code> (on/off) ×
-<code>PADEMU</code> (on/off) × <code>DUALSENSE</code> (on/off) in all three SDK flavours — useful
+<code>PADEMU</code> (on/off) × <code>DUALSENSE</code> (on/off) in both SDK flavours — useful
 if you want to isolate a compatibility difference introduced by one of those build flags.
 <b>DEBUG</b> builds
 (<code>iopcore</code>, <code>ingame</code>, <code>eesio</code>, <code>iopcore_ppctty</code>, <code>ingame_ppctty</code>,
@@ -241,23 +244,22 @@ they are significantly slower.</p></details>
 
 <div class="steps">
 <div class="step"><h3>Extract the package zip</h3>
-<p>Unzip <code>RIPTOPL-&lt;sdk&gt;-&lt;rel&gt;-&lt;sha&gt;.zip</code>. The contents are ready to
+<p>Unzip <code>RIPTOPL-&lt;rel&gt;-&lt;sha&gt;.zip</code>. The contents are ready to
 copy to your memory card or USB drive root:</p>
-<pre>APP_RIPTOPL/
-  RIPTOPL.ELF          ← use this (ps2dev:latest, default)
-APP_RIPTOPL-WOPLSDK/
-  RIPTOPL.ELF          ← wOPL-container toolchain, stock MMCE drivers
-APP_RIPTOPL-OLDSDK/
-  RIPTOPL.ELF          ← fallback if the default has a regression
+<pre>APP_RIPTOPL-PS2DEVLATESTSDK/
+  RIPTOPL.ELF          ← use this (ps2dev:latest, recommended)
+APP_RIPTOPL-PS2DEVPINNEDSDK/
+  RIPTOPL.ELF          ← digest-pinned fallback if the recommended build misbehaves
 POPSTARTER/            ← SMB network stack + bdma_config.txt
 POPS/                  ← POPSTARTER.ELF and BDMA variants
 neutrino/              ← official Neutrino core (already extracted, drag-and-drop)
-PC-SMB-Server/         ← host-side SMBv1 server (run on your PC, not the card)</pre>
+PS2-Servers.url        ← link to the UDPFS / SMBv1 / UDPBD all-in-one PC launcher</pre>
 </div>
 <div class="step"><h3>Install the ELF via your launch method</h3>
-<p>Copy <code>APP_RIPTOPL/RIPTOPL.ELF</code> to wherever your launch method (FMCB, FHDB, or
-equivalent) expects it. The folder name <code>APP_RIPTOPL</code> is the OPL convention for
-homebrew apps stored on your device.</p>
+<p>Copy <code>APP_RIPTOPL-PS2DEVLATESTSDK/RIPTOPL.ELF</code> to wherever your launch method (FMCB,
+FHDB, or equivalent) expects it. The shipped folders carry an SDK-flavour suffix so the two builds
+can sit side by side; the <code>APP_</code> prefix is the OPL convention for homebrew apps stored on
+your device.</p>
 </div>
 <div class="step"><h3>Set up Neutrino (optional)</h3>
 <p>The <code>neutrino/</code> folder is already extracted — just copy the whole folder
