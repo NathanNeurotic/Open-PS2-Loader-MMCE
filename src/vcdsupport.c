@@ -1498,4 +1498,3 @@ void vcdPrepareRetroGemBarcode(const char *vcdPath)
         displayRetroGemGameID(gameID, 2);
     }
 }
-

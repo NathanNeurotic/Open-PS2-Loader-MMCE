@@ -207,22 +207,22 @@ int gPadMacroSettings;
 #endif
 int gScrollSpeed;
 char gExitPath[256];
-char gNeutrinoArgs[256];     // extra command-line flags appended to every Neutrino launch
-char gNeutrinoPath[256];     // custom neutrino.elf path; "" -> auto-detect on mc0:/mc1:
-int gNeutrinoDevice;         // Neutrino ELF device (NEUTRINO_DEV_*); Auto scans mc0/mc1 + honors a legacy gNeutrinoPath
-int gDefaultCoreLoader;      // global default Loader Core (0=<OPL>, 1=Neutrino); per-game $CoreLoader overrides, absent key = follow this
-int gNeutrinoVideoDefault;   // global default Neutrino -gsm video mode (0=Off..5=1080i x3); per-game $NeutrinoVideo overrides, absent key = follow this (R3Z3N's 1080i x3 "1080p impression" trick, now global)
-int gNeutrinoGsmCompDefault; // global default -gsm ":c" field-flip half (0=off, 1-3=type)
-int gNeutrinoElfArg;         // default-on (settings key only, no UI): auto-emit -elf=cdrom0: on Neutrino launches (parity Delta-10)
-char gPopstarterPath[256];   // custom POPSTARTER.ELF path (used only when gPopstarterDevice == POPS_DEV_CUSTOM)
-int gPopstarterDevice;       // POPSTARTER.ELF device (POPS_DEV_*); Default = cwd then VCD device; legacy path -> Custom
+char gNeutrinoArgs[256];           // extra command-line flags appended to every Neutrino launch
+char gNeutrinoPath[256];           // custom neutrino.elf path; "" -> auto-detect on mc0:/mc1:
+int gNeutrinoDevice;               // Neutrino ELF device (NEUTRINO_DEV_*); Auto scans mc0/mc1 + honors a legacy gNeutrinoPath
+int gDefaultCoreLoader;            // global default Loader Core (0=<OPL>, 1=Neutrino); per-game $CoreLoader overrides, absent key = follow this
+int gNeutrinoVideoDefault;         // global default Neutrino -gsm video mode (0=Off..5=1080i x3); per-game $NeutrinoVideo overrides, absent key = follow this (R3Z3N's 1080i x3 "1080p impression" trick, now global)
+int gNeutrinoGsmCompDefault;       // global default -gsm ":c" field-flip half (0=off, 1-3=type)
+int gNeutrinoElfArg;               // default-on (settings key only, no UI): auto-emit -elf=cdrom0: on Neutrino launches (parity Delta-10)
+char gPopstarterPath[256];         // custom POPSTARTER.ELF path (used only when gPopstarterDevice == POPS_DEV_CUSTOM)
+int gPopstarterDevice;             // POPSTARTER.ELF device (POPS_DEV_*); Default = cwd then VCD device; legacy path -> Custom
 int gPopstarterRetroGemGameID = 1; // RetroGEM Game ID optical barcode for VCD launches (1=on, default)
 
-int gBdmaSource;             // BDMA SOURCE device family (VCD_BDMA_SRC_*) to read exFAT driver variants from
-int gBdmaMode;               // BDMA MODE last reflected from the mc?:/POPSTARTER/ marker (VCD_BDMA_*); not persisted
-int gBdmaApplyOnLaunch;      // auto-equip the launched VCD's matching exFAT driver before boot (1=on, default)
-int gVcdHideGameId;          // display-only: hide a leading PS1 game-ID prefix from the VCD list (1=on, default off)
-int gVcdFirstDiscOnly;       // #118: hide discs 2+ of a multi-disc PS1 set from the device VCD lists (1=on, default off)
+int gBdmaSource;        // BDMA SOURCE device family (VCD_BDMA_SRC_*) to read exFAT driver variants from
+int gBdmaMode;          // BDMA MODE last reflected from the mc?:/POPSTARTER/ marker (VCD_BDMA_*); not persisted
+int gBdmaApplyOnLaunch; // auto-equip the launched VCD's matching exFAT driver before boot (1=on, default)
+int gVcdHideGameId;     // display-only: hide a leading PS1 game-ID prefix from the VCD list (1=on, default off)
+int gVcdFirstDiscOnly;  // #118: hide discs 2+ of a multi-disc PS1 set from the device VCD lists (1=on, default off)
 int gEnableDebug;
 int gPS2Logo;
 int gDefaultDevice;

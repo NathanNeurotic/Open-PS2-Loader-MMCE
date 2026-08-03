@@ -186,4 +186,3 @@ int vcdWritePopstarterNetFiles(const vcd_popsnet_t *cfg, int writeSmb, int write
 void vcdPrepareRetroGemBarcode(const char *vcdPath);
 
 #endif
-

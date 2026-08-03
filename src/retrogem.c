@@ -19,7 +19,8 @@
 
 // Table of known PS1 disc PVD volume creation timestamps (16-byte ASCII) for discs that lack
 // SYSTEM.CNF or boot generic targets like PSX.EXE.
-typedef struct {
+typedef struct
+{
     const char timestamp[17]; // 16-char ASCII timestamp + NUL
     const char game_id[12];   // 11-char Game ID + NUL
 } ps1_generic_game_id_t;
@@ -27,7 +28,7 @@ typedef struct {
 static const ps1_generic_game_id_t ps1_generic_game_ids[] = {
     // Known PS1 generic volume creation timestamps
     {"1995121500000000", "SLUS_000.01"}, // Example entry template
-    {"", ""} // Sentinel
+    {"", ""}                             // Sentinel
 };
 
 // Check if a character is valid in a title ID (alpha, digit, '_', '.', '-')
@@ -48,9 +49,12 @@ static int retrogemCleanTitleID(const char *raw, char *out, size_t maxLen)
     out[0] = '\0';
 
     // Skip leading prefix (e.g. cdrom0:\ or cdrom:\ or XX. or SB.)
-    if (!strncmp(p, "cdrom0:\\", 8)) p += 8;
-    else if (!strncmp(p, "cdrom:\\", 7)) p += 7;
-    else if (!strncmp(p, "XX.", 3) || !strncmp(p, "SB.", 3)) p += 3;
+    if (!strncmp(p, "cdrom0:\\", 8))
+        p += 8;
+    else if (!strncmp(p, "cdrom:\\", 7))
+        p += 7;
+    else if (!strncmp(p, "XX.", 3) || !strncmp(p, "SB.", 3))
+        p += 3;
 
     // Skip leading slashes or spaces
     while (*p == '\\' || *p == '/' || *p == ' ')
@@ -161,9 +165,9 @@ static int retrogemParseIsoSector16(FILE *f, char *gameID, size_t maxLen)
                         if (!strncasecmp(nameBuf, "SYSTEM.CNF", 10)) {
                             // Located SYSTEM.CNF! Get its LBA & size
                             unsigned int sysLba = (unsigned int)dirBuf[off + 2] | ((unsigned int)dirBuf[off + 3] << 8) |
-                                                   ((unsigned int)dirBuf[off + 4] << 16) | ((unsigned int)dirBuf[off + 5] << 24);
+                                                  ((unsigned int)dirBuf[off + 4] << 16) | ((unsigned int)dirBuf[off + 5] << 24);
                             unsigned int sysSize = (unsigned int)dirBuf[off + 10] | ((unsigned int)dirBuf[off + 11] << 8) |
-                                                    ((unsigned int)dirBuf[off + 12] << 16) | ((unsigned int)dirBuf[off + 13] << 24);
+                                                   ((unsigned int)dirBuf[off + 12] << 16) | ((unsigned int)dirBuf[off + 13] << 24);
 
                             long sysOffset = (long)sysLba * sectorSize + modeOffset;
                             if (sysSize > 0 && sysSize < 4096 && fseek(f, sysOffset, SEEK_SET) == 0) {
@@ -173,7 +177,8 @@ static int retrogemParseIsoSector16(FILE *f, char *gameID, size_t maxLen)
                                         sysBuf[sysSize] = '\0';
                                         // Parse BOOT line in SYSTEM.CNF
                                         char *bootPtr = strstr(sysBuf, "BOOT");
-                                        if (!bootPtr) bootPtr = strstr(sysBuf, "boot");
+                                        if (!bootPtr)
+                                            bootPtr = strstr(sysBuf, "boot");
                                         if (bootPtr) {
                                             char *eq = strchr(bootPtr, '=');
                                             if (eq && retrogemCleanTitleID(eq + 1, gameID, maxLen)) {
@@ -330,8 +335,7 @@ void displayRetroGemGameID(const char *gameID, int frames)
                 // Clock pixel: Magenta (#FF00FF)
                 rmDrawRect(x, ystart, 1, height, GS_SETREG_RGBA(0xFF, 0x00, 0xFF, 0x80));
                 // Data bit pixel: Cyan (#00FFFF) for 1, Yellow (#FFFF00) for 0
-                u64 bit_color = ((data[i] >> j) & 1) ? GS_SETREG_RGBA(0x00, 0xFF, 0xFF, 0x80)
-                                                     : GS_SETREG_RGBA(0xFF, 0xFF, 0x00, 0x80);
+                u64 bit_color = ((data[i] >> j) & 1) ? GS_SETREG_RGBA(0x00, 0xFF, 0xFF, 0x80) : GS_SETREG_RGBA(0xFF, 0xFF, 0x00, 0x80);
                 rmDrawRect(x + 1, ystart, 1, height, bit_color);
             }
         }

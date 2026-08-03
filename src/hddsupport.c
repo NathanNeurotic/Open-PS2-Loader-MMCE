@@ -768,7 +768,6 @@ static void hddDoLaunchVcd(item_list_t *itemList, const char *name, const char *
     vcdPrepareRetroGemBarcode(vcdFullPath);
     deinit(UNMOUNT_EXCEPTION, itemList->mode);
     sysLaunchPopstarter(vcdElf, vcdSelector);
-
 }
 
 // Launch an HDD PS1/.VCD entry BY NAME -- the Favourites tab's view-independent entry point. The

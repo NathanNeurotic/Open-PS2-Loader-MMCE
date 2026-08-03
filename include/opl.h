@@ -281,16 +281,16 @@ extern int gDeinitTerminal;         // 1 while deinit() runs for exit/poweroff, 
                                     // POPSTARTER.ELF read comes off the ATA-backed massN: mount).
 // POPSTARTER.ELF Device picker: where PS1 VCD launches load POPS/POPSTARTER.ELF from. Default tries the
 // boot device (cwd) then the VCD's own device; the 6 TYPEs force a device; Custom uses gPopstarterPath.
-enum { POPS_DEV_DEFAULT = 0,   // cwd (gBootDir) /POPS/, then the VCD's own device (back-compat fallback)
-       POPS_DEV_MC,            // mc0: / mc1:
-       POPS_DEV_USB,           // BDM "usb"        -> the mounted massN:
-       POPS_DEV_MX4SIO,        // BDM "mx4sio"/sdc -> the mounted massN:
-       POPS_DEV_MMCE,          // mmce0: / mmce1:
-       POPS_DEV_EXFAT_HDD,     // BDM "ata" internal exFAT HDD -> the mounted massN:
-       POPS_DEV_APA_HDD,       // APA HDD: the mounted OPL data partition (pfs0:)
-       POPS_DEV_CUSTOM,        // free-text gPopstarterPath
-       POPS_DEV_GAME };        // the VCD's OWN device ONLY (<devPrefix>/POPS/POPSTARTER.ELF); no boot/cwd fallback (a miss toasts "not found"). Appended at the enum end to keep saved popstarter_device ints stable.
-extern int gPopstarterDevice;  // POPSTARTER.ELF device (POPS_DEV_*); legacy non-empty popstarter_path -> Custom
+enum { POPS_DEV_DEFAULT = 0,          // cwd (gBootDir) /POPS/, then the VCD's own device (back-compat fallback)
+       POPS_DEV_MC,                   // mc0: / mc1:
+       POPS_DEV_USB,                  // BDM "usb"        -> the mounted massN:
+       POPS_DEV_MX4SIO,               // BDM "mx4sio"/sdc -> the mounted massN:
+       POPS_DEV_MMCE,                 // mmce0: / mmce1:
+       POPS_DEV_EXFAT_HDD,            // BDM "ata" internal exFAT HDD -> the mounted massN:
+       POPS_DEV_APA_HDD,              // APA HDD: the mounted OPL data partition (pfs0:)
+       POPS_DEV_CUSTOM,               // free-text gPopstarterPath
+       POPS_DEV_GAME };               // the VCD's OWN device ONLY (<devPrefix>/POPS/POPSTARTER.ELF); no boot/cwd fallback (a miss toasts "not found"). Appended at the enum end to keep saved popstarter_device ints stable.
+extern int gPopstarterDevice;         // POPSTARTER.ELF device (POPS_DEV_*); legacy non-empty popstarter_path -> Custom
 extern int gPopstarterRetroGemGameID; // RetroGEM Game ID optical barcode for VCD launches (1=on, default on)
 
 extern int gBdmaSource;        // BDMA SOURCE device family (VCD_BDMA_SRC_*); persisted in conf

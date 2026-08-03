@@ -715,7 +715,6 @@ static void mmceLaunchVcd(item_list_t *itemList, const char *vcdName, config_set
     vcdPrepareRetroGemBarcode(vcdFullPath);
     deinit(UNMOUNT_EXCEPTION, itemList->mode); // keep the MMCE device mounted across the IOP reset
     sysLaunchPopstarter(vcdElf, vcdSelector);
-
 }
 
 void mmceLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
