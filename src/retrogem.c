@@ -103,7 +103,6 @@ static int retrogemCleanTitleID(const char *raw, char *out, size_t maxLen)
 // Tier 1 & 2 helper: ISO 9660 SYSTEM.CNF parsing and PVD Timestamp lookup
 static int retrogemParseIsoSector16(FILE *f, char *gameID, size_t maxLen)
 {
-    unsigned char sector[2352];
     unsigned char pvd[2048];
     long pvdOffset = -1;
     int sectorSize = 2048;
