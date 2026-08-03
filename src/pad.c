@@ -137,6 +137,13 @@ static u32 oldpaddata;
 // are SHOWN only when Settings -> Debug Colors is on.
 static pad_diag_t padDiag;
 
+// Per-poll read outcome, reset by readPads() and filled in by each readPad(): how many pads were
+// in a ready state, and how many produced a fresh sample. A poll where a ready pad produced no
+// fresh sample is a read MISS (per-pad accounting: another pad reading fine does not hide it).
+// Misses cluster under SIO2 load on real hardware; an emulator's pad never produces one.
+static int pollPadsReady;
+static int pollPadsRead;
+
 void padGetDiag(pad_diag_t *out)
 {
     if (out)
@@ -483,6 +490,7 @@ static int readPad(struct pad_data_t *pad)
     }
 
     if (isPadReadyState(pad->state)) {
+        pollPadsReady++;
         ret = padRead(pad->port, pad->slot, &pad->buttons); // port, slot, buttons
 
         if (ret != 0) {
@@ -544,6 +552,7 @@ static int readPad(struct pad_data_t *pad)
 #endif
 
     if (padsRead > 0) {
+        pollPadsRead++;
         newpdata = readLeftJoy(pad, newpdata);
         pad->paddata = newpdata;
 
@@ -817,8 +826,23 @@ int readPads()
     if (time_since_last > padDiag.pollMaxMs)
         padDiag.pollMaxMs = time_since_last;
 
+    pollPadsReady = 0;
+    pollPadsRead = 0;
     for (i = 0; i < pad_count; ++i)
         result |= readPad(&pad_data[i]);
+
+    // Debug-Colors diag: a read MISS is a poll where a ready pad produced no fresh sample --
+    // counted per-pad, so another pad (or a PADEMU ds34) reading fine does not hide it. These
+    // counters feed the HUD "PAD miss:" line; they had no writers between the PR #328 revert
+    // and this change, so the HUD showed miss:0 regardless of what the hardware did.
+    if (pollPadsRead < pollPadsReady) {
+        padDiag.readMisses++;
+        padDiag.missBurst++;
+        if (padDiag.missBurst > padDiag.missBurstMax)
+            padDiag.missBurstMax = padDiag.missBurst;
+    } else {
+        padDiag.missBurst = 0;
+    }
 
     // Stamp input activity AFTER the merge: any held button/stick re-arms the PAD_SELF_HEAL_IDLE_MS gate.
     if (paddata != 0)
