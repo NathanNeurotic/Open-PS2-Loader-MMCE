@@ -1077,3 +1077,8 @@ gui_strings:
   string: SMB port on the server -- 445 is the default. Leave at 0 (or 445) for a normal share; use 139 for older SMB1 servers.
 - label: POPS_LOADED_FROM
   string: Loaded from %s
+- label: POPSTARTER_RETROGEM_GAMEID
+  string: RetroGEM Game ID
+- label: HINT_POPSTARTER_RETROGEM_GAMEID
+  string: Render optical barcode for Pixel FX / RetroGEM / PS2Digital on PS1 VCD launch
+

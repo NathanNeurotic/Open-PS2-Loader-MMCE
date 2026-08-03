@@ -654,6 +654,11 @@ static void ethLaunchVcd(item_list_t *itemList, const char *vcdName, config_set_
         return;
     }
     vcdBuildSelector(ethPrefix, VCD_PREFIX_SMB, vcdName, vcdSelector, sizeof(vcdSelector));
+    size_t prefixLen = strlen(ethPrefix);
+    char separator = (prefixLen > 0 && ethPrefix[prefixLen - 1] == '\\') ? '\\' : '/';
+    char vcdFullPath[256];
+    snprintf(vcdFullPath, sizeof(vcdFullPath), "%sPOPS%c%s.VCD", ethPrefix, separator, vcdName);
+    vcdPrepareRetroGemBarcode(vcdFullPath);
     deinit(UNMOUNT_EXCEPTION, itemList->mode); // keep the SMB mount alive across the IOP reset
     sysLaunchPopstarter(vcdElf, vcdSelector);
 }

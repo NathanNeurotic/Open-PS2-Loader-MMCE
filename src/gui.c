@@ -789,6 +789,8 @@ void guiShowVcdConfig(void)
     diaSetInt(diaVcdConfig, CFG_POPSTARTER_DEVICE, gPopstarterDevice);
     diaSetString(diaVcdConfig, CFG_POPSTARTER_PATH, gPopstarterPath);
     diaSetShowDefaultWhenEmpty(diaVcdConfig, CFG_POPSTARTER_PATH, 1);
+    diaSetInt(diaVcdConfig, CFG_POPSTARTER_RETROGEM_GAMEID, gPopstarterRetroGemGameID);
+
     // POPSTARTER Path is the Custom-only escape hatch (guiVcdUpdater re-reveals it live).
     diaSetVisible(diaVcdConfig, CFG_LBL_POPSTARTER_PATH, gPopstarterDevice == POPS_DEV_CUSTOM);
     diaSetVisible(diaVcdConfig, CFG_POPSTARTER_PATH, gPopstarterDevice == POPS_DEV_CUSTOM);
@@ -810,6 +812,8 @@ reshow_vcd:
     }
     if (ret) {
         diaGetInt(diaVcdConfig, CFG_POPSTARTER_DEVICE, &gPopstarterDevice);
+        diaGetInt(diaVcdConfig, CFG_POPSTARTER_RETROGEM_GAMEID, &gPopstarterRetroGemGameID);
+
         {
             // The dialog field is char[32]; only adopt the typed value if it actually changed, so
             // opening+saving this page never truncates a longer path stored via the cfg.

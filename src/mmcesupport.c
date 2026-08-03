@@ -710,6 +710,9 @@ static void mmceLaunchVcd(item_list_t *itemList, const char *vcdName, config_set
     // reloads from the MC fits this drive. NEVER a launch gate -- the handoff below always proceeds
     // (POPSTARTER owns everything past the exec); a failed equip just toasts its diagnostic in passing.
     vcdEnsureBdmaForLaunch(VCD_BDMA_SRC_MMCE, VCD_BDMA_MMCE);
+    char vcdFullPath[256];
+    snprintf(vcdFullPath, sizeof(vcdFullPath), "%sPOPS/%s.VCD", mmcePrefix, vcdName);
+    vcdPrepareRetroGemBarcode(vcdFullPath);
     deinit(UNMOUNT_EXCEPTION, itemList->mode); // keep the MMCE device mounted across the IOP reset
     sysLaunchPopstarter(vcdElf, vcdSelector);
 }

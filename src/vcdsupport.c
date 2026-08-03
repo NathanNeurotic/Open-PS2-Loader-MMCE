@@ -27,6 +27,8 @@
 #include "include/bdma_embed.h"  // embedded BDMAssault variant pairs (gzipped; PROVENANCE.md)
 #include <zlib.h>                // inflate for the embedded pairs (already linked via libpng)
 #include "include/vcdsupport.h"
+#include "include/retrogem.h"
+
 
 int vcdExtractGameId(const char *name, char *idOut, int idSize)
 {
@@ -1483,4 +1485,16 @@ int vcdWritePopstarterNetFiles(const vcd_popsnet_t *cfg, int writeSmb, int write
     }
 
     return 0;
+}
+
+void vcdPrepareRetroGemBarcode(const char *vcdPath)
+{
+    char gameID[RETROGEM_GAMEID_MAX];
+
+    if (!gPopstarterRetroGemGameID || vcdPath == NULL || vcdPath[0] == '\0')
+        return;
+
+    if (retrogemGetVcdGameID(vcdPath, gameID, sizeof(gameID)) && gameID[0] != '\0') {
+        displayRetroGemGameID(gameID, 2);
+    }
 }
