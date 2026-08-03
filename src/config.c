@@ -297,10 +297,10 @@ void configInit(char *prefix)
     char path[256];
     int i;
 
-    if (prefix)
-        snprintf(legacyNetConfigPath, sizeof(legacyNetConfigPath), "%s/IPCONFIG.DAT", prefix);
-    else
+    if (!prefix)
         prefix = gBaseMCDir;
+
+    snprintf(legacyNetConfigPath, sizeof(legacyNetConfigPath), "%s/IPCONFIG.DAT", prefix);
 
     for (i = 0; i < CONFIG_INDEX_COUNT; i++) {
         snprintf(path, sizeof(path), "%s/%s", prefix, configFilenames[i]);
@@ -315,10 +315,10 @@ void configSetMove(char *prefix)
     char path[256];
     int i;
 
-    if (prefix)
-        snprintf(legacyNetConfigPath, sizeof(legacyNetConfigPath), "%s/IPCONFIG.DAT", prefix);
-    else
+    if (!prefix)
         prefix = gBaseMCDir;
+
+    snprintf(legacyNetConfigPath, sizeof(legacyNetConfigPath), "%s/IPCONFIG.DAT", prefix);
 
     for (i = 0; i < CONFIG_INDEX_COUNT; i++) {
         snprintf(path, sizeof(path), "%s/%s", prefix, configFilenames[i]);
