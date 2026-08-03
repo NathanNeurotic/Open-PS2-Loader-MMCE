@@ -367,9 +367,11 @@ Supported file systems:
 exFAT (since OPL v1.2.0 beta - rev1880) and FAT32, both use the MBR partition table. This section applies to MMCE and MX4SIO SD setups, USB storage, and iLink SBP2 storage.
 
 > [!NOTE]
-> MX4SIO game launch requires the matching PS2SDK `freesio2` module to load before
-> `mx4sio_bd` after OPL resets the game IOP. See [MX4SIO game-launch notes](docs/MX4SIO.md)
-> for the dependency, regression history, and hardware test checklist.
+> MX4SIO game launch requires a matching-generation `sio2man` module to load before
+> `mx4sio_bd` after OPL resets the game IOP (since the #340 fix, OPL embeds its own
+> in-tree `sio2man` build -- see `modules/sio2man/PROVENANCE.md`). See
+> [MX4SIO game-launch notes](docs/MX4SIO.md) for the dependency, regression history,
+> and hardware test checklist.
 
 Game files should be *ideally* defragmented either file by file or by whole drive.
 

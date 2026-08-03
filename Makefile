@@ -846,8 +846,8 @@ $(EE_ASM_DIR)filexio.c: $(PS2SDK)/iop/irx/fileXio.irx | $(EE_ASM_DIR)
 # starve freepad's vblank pad poll under USB/mc load on real hardware, which OPL feels as
 # dropped/queued menu input (#340). Same source + export surface, plus a priority-ceiling
 # bracket around the transaction lock. Details: modules/sio2man/PROVENANCE.md.
-modules/sio2man/sio2man.irx: modules/sio2man
-	$(MAKE) -C $<
+modules/sio2man/sio2man.irx: modules/sio2man/sio2man.c modules/sio2man/imports.lst modules/sio2man/exports.tab modules/sio2man/irx_imports.h modules/sio2man/Makefile
+	$(MAKE) -C modules/sio2man
 
 $(EE_ASM_DIR)sio2man.c: modules/sio2man/sio2man.irx | $(EE_ASM_DIR)
 	$(BIN2C) $< $@ $(*F)_irx

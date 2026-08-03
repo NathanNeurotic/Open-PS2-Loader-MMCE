@@ -86,7 +86,14 @@ static void sio2_prio_ceiling_acquire(void)
 
 static void sio2_prio_ceiling_release(void)
 {
-	if ( m_ceiling_thid > 0 )
+	/* Restore BEFORE SignalSema: the semaphore strictly serializes acquire/release pairs, so the
+	 * shared thid/prio pair stays coherent -- the ordering is load-bearing, do not swap it. The
+	 * few-instruction tail where the holder runs de-boosted while still holding the lock is a
+	 * strict subset of the stock module's exposure (stock runs the WHOLE transaction de-boosted).
+	 * The thid guard confines a legacy SDK-1.3 double-reset (a stock-identical exposure that can
+	 * pump the semaphore count) to stock's own lock breakage, instead of letting a stale release
+	 * de-boost the NEXT holder mid-transaction or leak a boosted priority. */
+	if ( m_ceiling_thid > 0 && m_ceiling_thid == GetThreadId() )
 	{
 		ChangeThreadPriority(m_ceiling_thid, m_ceiling_prio);
 		m_ceiling_thid = 0;

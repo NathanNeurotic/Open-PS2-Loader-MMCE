@@ -4,8 +4,9 @@
 
 The PS2SDK `sio2man` module, built from source in-tree with **one local patch**: a
 priority-ceiling bracket around the SIO2 transaction lock. The build replaces the SDK's prebuilt
-`$(PS2SDK)/iop/irx/freesio2.irx` as the `sio2man` blob embedded into OPL (menu side and the
-game-side IOP reboot both load this same embed).
+`$(PS2SDK)/iop/irx/freesio2.irx` as the `sio2man` blob embedded into OPL. The menu always loads
+it; game-side it reaches the rebooted IOP **only on MX4SIO launches** (`CORE_IRX_MX4SIO` places
+it ahead of `mx4sio_bd`) -- other launch paths never load OPL's sio2man into the game IOP.
 
 ## Source provenance
 
@@ -46,6 +47,9 @@ Threads already at or above 0x18 (freepad's transfer thread at 20) are left unto
 holder blocks awaiting the SIO2 interrupt it yields the CPU exactly as stock; only bus-phase
 code runs boosted -- the same scheduling the retired worker thread provided, with the new
 module's API surface (mmceman's sio2man hook and the post-PR#862 mx4sio driver keep working).
+The release restores only when called by the acquiring thread and runs before the `SignalSema`
+(order is load-bearing); both choices confine a legacy SDK-1.3 double-reset -- a stock-identical
+semaphore-pumping exposure -- to the lock breakage stock already has, with no priority leak.
 
 ## Revert / resync path
 

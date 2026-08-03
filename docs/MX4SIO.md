@@ -34,8 +34,11 @@ The minimal dependency fix is:
    the module table copied to kernel RAM.
 3. In the MX4SIO game-core path, load `OPL_MODULE_ID_SIO2MAN` first and load
    `OPL_MODULE_ID_MX4SIOBD` only when the first load returns a positive module ID.
-4. Build `freesio2.irx` and `mx4sio_bd{,_mini}.irx` from the same PS2SDK so their
-   interface generations cannot drift apart.
+4. Keep the embedded `sio2man` and `mx4sio_bd{,_mini}.irx` on the same PS2SDK interface
+   generation so they cannot drift apart. (Since the #340 fix, the embedded `sio2man` is no
+   longer the SDK's prebuilt `freesio2.irx`: it is built in-tree from pinned ps2sdk source with
+   a priority-ceiling patch -- same export surface and interface generation; see
+   `modules/sio2man/PROVENANCE.md`.)
 
 The positive-result guard is intentional. `LoadOPLModule()` returns the loaded IOP module
 ID on success; zero does not prove that a module was loaded. Starting `mx4sio_bd` after a
