@@ -119,7 +119,7 @@ PNG_ASSETS = load0 load1 load2 load3 load4 load5 load6 load7 usb usb_bd ilk_bd \
 	Index_0 Index_1 Index_2 Index_3 Index_4 fav fav_mark R3 L3 PS1 PS2 case_overlay
 	# unused icons - up down l1 l2 r1 r2
 
-GFX_OBJS = $(PNG_ASSETS:%=%_png.o) poeveticanew.o
+GFX_OBJS = $(PNG_ASSETS:%=%_png.o) poeveticanew.o icon_sys.o icon_icn.o
 
 # NOTE: audio/bgm.ogg is intentionally NOT compiled into the ELF (saves ~324 KB).
 # It is kept in the repo only as a reference/default track. BGM is loaded at
@@ -850,6 +850,12 @@ $(EE_ASM_DIR)mcserv.c: $(PS2SDK)/iop/irx/mcserv.irx | $(EE_ASM_DIR)
 
 $(EE_ASM_DIR)poeveticanew.c: thirdparty/PoeVeticaNew.ttf | $(EE_ASM_DIR)
 	$(BIN2C) $< $@ $(*F)_raw
+
+$(EE_ASM_DIR)icon_sys.c: gfx/icon.sys | $(EE_ASM_DIR)
+	$(BIN2C) $< $@ $(*F)
+
+$(EE_ASM_DIR)icon_icn.c: gfx/opl.icn | $(EE_ASM_DIR)
+	$(BIN2C) $< $@ $(*F)
 
 $(EE_ASM_DIR)icon_sys_A.c: misc/icon_A.sys | $(EE_ASM_DIR)
 	$(BIN2C) $< $@ $(*F)
