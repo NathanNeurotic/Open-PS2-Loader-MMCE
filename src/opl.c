@@ -1499,6 +1499,16 @@ static void resolveBootDirToMass(void)
         return;
     }
 
+    // CD-ROM / ISO boot (PS3 PS2-Classic ISO or PS2 disc boot): cdrom0: is read-only hardware.
+    // Re-home the config to the Memory Card (mc?:OPL) so saves land on Memory Card Slot 1/2 (#353).
+    if (!strncmp(gBootDir, "cdrom", 5)) {
+        LOG("BOOT read-only cdrom boot dir %s -> redirecting config home to MC\n", gBootDir);
+        gBootDir[0] = '\0';
+        configEnd();
+        configInit(NULL);
+        return;
+    }
+
     // MMCE boot: the mmceman driver is likewise not loaded at boot time (sysReset loads none of the
     // device stacks), so mmceN: is unreadable exactly when settings must load. Load it (idempotent)
     // and give the card a moment to register its filesystem. mmceN: IS the readable namespace, so no

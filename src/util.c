@@ -21,6 +21,11 @@
 extern int probed_fd;
 extern u32 probed_lba;
 
+extern unsigned char icon_sys[];
+extern unsigned int size_icon_sys;
+extern unsigned char icon_icn[];
+extern unsigned int size_icon_icn;
+
 static int mcID = -1;
 
 void guiWarning(const char *text, int count);
@@ -94,13 +99,12 @@ static int checkMC()
     return mcID;
 }
 
-// Ensure mc?:OPL/ exists so config/notification writes land. Previously this also wrote a browser
-// save icon (opl.icn + icon.sys) for the folder, but the 3D icon (~21 KB) was embedded in the ELF
-// purely for that cosmetic PS2-browser icon; dropped to reclaim the space (test note #11). The folder
-// still gets created here (and the config write's O_CREAT would create it anyway).
+// Ensure mc?:OPL/ exists and contains browser save icon (opl.icn + icon.sys) so PS2/PS3
+// Memory Card Manager displays the save folder with a valid icon instead of 'Corrupted Data' (#353).
 void checkMCFolder(void)
 {
     char path[32];
+    int fd;
 
     if (checkMC() < 0) {
         return;
@@ -108,6 +112,30 @@ void checkMCFolder(void)
 
     snprintf(path, sizeof(path), "mc%d:OPL/", mcID & 1);
     mkdir(path, 0777);
+
+    snprintf(path, sizeof(path), "mc%d:OPL/opl.icn", mcID & 1);
+    fd = open(path, O_RDONLY);
+    if (fd < 0) {
+        fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+        if (fd >= 0) {
+            write(fd, icon_icn, size_icon_icn);
+            close(fd);
+        }
+    } else {
+        close(fd);
+    }
+
+    snprintf(path, sizeof(path), "mc%d:OPL/icon.sys", mcID & 1);
+    fd = open(path, O_RDONLY);
+    if (fd < 0) {
+        fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+        if (fd >= 0) {
+            write(fd, icon_sys, size_icon_sys);
+            close(fd);
+        }
+    } else {
+        close(fd);
+    }
 }
 
 static int checkFile(char *path, int mode)
