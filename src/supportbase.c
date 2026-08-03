@@ -311,8 +311,12 @@ static int scanForISO(char *path, char type, struct game_list_t **glist, struct 
     int cacheLoaded = loadISOGameListCache(path, &cache) == 0;
 
     if ((dir = opendir(path)) != NULL) {
-        size_t base_path_len = strlen(path);
-        snprintf(fullpath, sizeof(fullpath), "%s", path);
+        int pathLen = snprintf(fullpath, sizeof(fullpath), "%s", path);
+        if (pathLen < 0 || pathLen >= (int)sizeof(fullpath) - 1) {
+            closedir(dir);
+            return 0;
+        }
+        size_t base_path_len = (size_t)pathLen;
         fullpath[base_path_len] = '/';
 
         while ((dirent = readdir(dir)) != NULL) {
