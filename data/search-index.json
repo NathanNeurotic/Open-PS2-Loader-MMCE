@@ -26,7 +26,7 @@
  {
   "title": "Walk-through: USB to first launch",
   "cat": "start",
-  "text": "Five-step walkthrough using USB: format the drive, place the ISO in DVD/, boot RiptOPL, enable USB in Device Settings, launch the game, and save settings_riptopl.cfg.",
+  "text": "Five-step walkthrough using USB: format the drive, place the ISO in DVD/, boot RiptOPL, enable USB under Game Sources, launch the game, and save settings_riptopl.cfg.",
   "url": "getting-started.html#walk-through"
  },
  {
@@ -62,7 +62,7 @@
  {
   "title": "First boot walkthrough",
   "cat": "start",
-  "text": "Launch the ELF, enable a device in Device Settings, save settings (which auto-creates the OPL folder tree), and launch your first game.",
+  "text": "Launch the ELF, enable a device under Game Sources, save settings (which auto-creates the OPL folder tree), and launch your first game.",
   "url": "install.html#first-boot"
  },
  {
