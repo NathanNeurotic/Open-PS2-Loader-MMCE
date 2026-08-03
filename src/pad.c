@@ -138,11 +138,14 @@ static u32 oldpaddata;
 static pad_diag_t padDiag;
 
 // Per-poll read outcome, reset by readPads() and filled in by each readPad(): how many pads were
-// in a ready state, and how many produced a fresh sample. A poll with ready pads and zero fresh
-// samples is a read MISS -- the event the repeat loop must tolerate (#340). Misses cluster under
-// SIO2 load on real hardware; an emulator's pad never produces one.
+// in a ready state, how many produced a fresh sample, and the held bits carried by pads that
+// were ready but produced NO sample -- a per-pad read MISS, the event the repeat loop must
+// tolerate (#340). Per-pad, not per-poll: with two pads (or a PADEMU ds34 alongside a native
+// pad) another pad's successful read must not mask this pad's miss. Misses cluster under SIO2
+// load on real hardware; an emulator's pad never produces one.
 static int pollPadsReady;
 static int pollPadsRead;
+static u32 pollMissedHeld;
 
 void padGetDiag(pad_diag_t *out)
 {
@@ -565,6 +568,17 @@ static int readPad(struct pad_data_t *pad)
         // no successful read: baseline behavior (do not carry state)
     }
 
+    if (pad->state == PAD_STATE_DISCONN && padsRead == 0) {
+        // Nothing is supplying this port any more (a ds34 pad that stopped reporting; native
+        // unplugs were already zeroed on the DISCONN transition above). Without this, the last
+        // sample would sit in edgedata forever and hold the repeat pause / activity stamp open.
+        pad->paddata = 0;
+    } else if (isPadReadyState(pad->state) && padsRead == 0) {
+        // This pad MISSED: ready state, no fresh sample. Remember its carried held bits for the
+        // repeat loop and the activity stamp.
+        pollMissedHeld |= pad->paddata;
+    }
+
     edgedata |= pad->paddata;
 
     return rcode;
@@ -828,29 +842,32 @@ int readPads()
 
     pollPadsReady = 0;
     pollPadsRead = 0;
+    pollMissedHeld = 0;
     for (i = 0; i < pad_count; ++i)
         result |= readPad(&pad_data[i]);
 
-    // A read MISS: at least one pad is connected but none produced a fresh sample this poll.
-    // paddata is missing the held bits for the frame while edgedata still carries the last valid
-    // sample (readPad ORs it in unconditionally). The counters feed the Debug-Colors HUD line;
-    // they had no writers between the PR #328 revert and this fix, so the HUD showed miss:0
-    // regardless of what the hardware was doing.
-    int readMissPoll = (pollPadsReady > 0 && pollPadsRead == 0);
-    if (readMissPoll) {
+    // A read MISS poll: at least one ready pad produced no fresh sample (per-pad accounting --
+    // another pad reading fine does not hide it). During a miss the missing pad's held bits are
+    // absent from paddata while pollMissedHeld/edgedata carry its last valid sample. The counters
+    // feed the Debug-Colors HUD line; they had no writers between the PR #328 revert and this
+    // fix, so the HUD showed miss:0 regardless of what the hardware was doing.
+    if (pollPadsRead < pollPadsReady) {
         padDiag.readMisses++;
         padDiag.missBurst++;
         if (padDiag.missBurst > padDiag.missBurstMax)
             padDiag.missBurstMax = padDiag.missBurst;
-    } else if (pollPadsRead > 0) {
+    } else {
+        // Every ready pad read (or no pads are connected at all): no miss run in progress.
         padDiag.missBurst = 0;
     }
 
     // Stamp input activity AFTER the merge: any held button/stick re-arms the PAD_SELF_HEAL_IDLE_MS gate.
-    // A miss poll with a carried held sample counts as activity too -- the user is almost certainly
+    // A missing pad's carried held sample counts as activity too -- the user is almost certainly
     // still holding, and the misses themselves cluster exactly when an inline initializePad (250-600 ms
-    // GUI blackout) would hurt the most (#271/#272).
-    if (paddata != 0 || (readMissPoll && edgedata != 0))
+    // GUI blackout) would hurt the most (#271/#272). Known residual: a pad wedged forever in a
+    // ready state with a held last sample keeps the self-heal deferred for the session -- accepted,
+    // since an EE-side re-init cannot fix a starved IOP-side driver anyway.
+    if (paddata != 0 || pollMissedHeld != 0)
         lastInputActivityMs = curtime;
 
     // Rumble duration is millisecond-based because some paths poll twice in one frame.
@@ -883,13 +900,13 @@ int readPads()
     // read at all, so that reset turned every transient SIO2 miss into a 300-1500 ms repeat stall
     // while holding a direction on real hardware (#272/#340: the "hangs on the 3rd item" pattern;
     // the pause was HW-validated at Beta-3442 and lost in the PR #328 revert). PAUSE the countdown
-    // instead when the miss poll's edgedata still carries the held key: a key genuinely released
-    // during a blind window resets on the first good read, when edgedata drops it. On an emulator
+    // instead while a MISSING pad's carried sample still holds the key: a key genuinely released
+    // during a blind window resets on the first good read, when the carry drops it. On an emulator
     // (no misses) this loop is byte-for-byte the baseline behavior.
     for (i = 0; i < 16; ++i) {
         if (getKeyPressed(i + 1))
             delaycnt[i] -= (int)time_since_last;
-        else if (!(readMissPoll && (edgedata & keyToPad[i + 1])))
+        else if (!(pollMissedHeld & keyToPad[i + 1]))
             delaycnt[i] = getKeyDelay(i + 1, 0);
     }
 
