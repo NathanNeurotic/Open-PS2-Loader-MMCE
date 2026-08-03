@@ -409,8 +409,8 @@ are supported using the folder structure above.
 
 ## HDD
 	
-Both PS2 HDD types are **off by default** in RiptOPL — enable the one you use under **Device
-Settings**. For PS2, 48-bit LBA internal HDDs are supported. The HDD can be formatted as:
+Both PS2 HDD types are **off by default** in RiptOPL — enable the one you use under **Game
+Sources**. For PS2, 48-bit LBA internal HDDs are supported. The HDD can be formatted as:
 
 - APA partitioning with PFS filesystem (up to 2TB)
 	- OPL will create the `+OPL` partition on the HDD.  To avoid this, create `hdd0:__common/OPL/conf_hdd.cfg` containing the entry `hdd_partition=__common` (or whichever partition you prefer) — the same file and key described above.
@@ -455,8 +455,7 @@ OPL=mass:APPS/RIPTOPL.ELF
 
 With this method, ELFs do not need to be in `APPS`, but keeping them there can make your setup easier to manage.
 
-The `conf_apps.cfg` file must be in the OPL folder on your Memory Card,\
-or at the root of the storage device.
+The `conf_apps.cfg` file can be placed in the `OPL/` folder on your Memory Card or storage device (e.g., `mc0:OPL/conf_apps.cfg`, `mass0:OPL/conf_apps.cfg`), or at the root of the storage device.
 
 ### title.cfg method
 
