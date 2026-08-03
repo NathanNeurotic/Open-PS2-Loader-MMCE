@@ -1624,11 +1624,6 @@ struct UIItem diaControllerConfig[] = {
     {UI_ENUM, CFG_YSENSITIVITY, 1, 1, -1, 0, 0, {.intvalue = {0, 0}}},
     {UI_BREAK},
 
-    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {"Left Stick Navigation", -1}}},
-    {UI_SPACER},
-    {UI_BOOL, UICFG_ENABLE_ANALOG_NAV, 1, 1, -1, 0, 0, {.intvalue = {0, 0}}},
-    {UI_BREAK},
-
     // Menu Rumble moved here from the old General Settings (diaConfig) by the layout restructure.
     {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {NULL, _STR_RUMBLE}}},
     {UI_SPACER},

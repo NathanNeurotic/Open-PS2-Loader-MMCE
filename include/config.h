@@ -92,7 +92,6 @@ enum CONFIG_INDEX {
 #define CONFIG_OPL_ENABLE_COVERART            "enable_coverart"
 #define CONFIG_OPL_ENABLE_BGART               "enable_bgart"
 #define CONFIG_OPL_ENABLE_ART_TAR             "enable_art_tar"
-#define CONFIG_OPL_ENABLE_ANALOG_NAV          "enable_analog_nav"
 #define CONFIG_OPL_ART_DELAY                  "art_delay"
 #define CONFIG_OPL_WIDESCREEN                 "wide_screen"
 #define CONFIG_OPL_DEFAULT_GAME_VIEW          "default_game_view"
