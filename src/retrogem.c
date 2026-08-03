@@ -293,6 +293,7 @@ void displayRetroGemGameID(const char *gameID, int frames)
     u8 data[64];
     int gidlen, dpos, data_len, xstart, ystart, height;
     int i, j, frame;
+    int screenWidth, screenHeight;
 
     if (gameID == NULL || gameID[0] == '\0')
         return;
@@ -321,12 +322,13 @@ void displayRetroGemGameID(const char *gameID, int frames)
     data_len = dpos;
     data[2] = retrogemCalculateCRC(&data[3], data_len - 3);
 
+    rmGetScreenExtents(&screenWidth, &screenHeight);
     xstart = (screenWidth / 2) - (data_len * 8);
     ystart = screenHeight - (((screenHeight / 8) * 2) + 20);
     height = 2;
 
     for (frame = 0; frame < frames; frame++) {
-        guiStartFrame();
+        rmStartFrame();
         rmDrawRect(0, 0, screenWidth, screenHeight, GS_SETREG_RGBA(0x00, 0x00, 0x00, 0x80));
 
         for (i = 0; i < data_len; i++) {
@@ -339,11 +341,11 @@ void displayRetroGemGameID(const char *gameID, int frames)
                 rmDrawRect(x + 1, ystart, 1, height, bit_color);
             }
         }
-        guiEndFrame();
+        rmEndFrame();
     }
 
     // 1 clean black frame to ensure graphics buffer is clear before handoff
-    guiStartFrame();
+    rmStartFrame();
     rmDrawRect(0, 0, screenWidth, screenHeight, GS_SETREG_RGBA(0x00, 0x00, 0x00, 0x80));
-    guiEndFrame();
+    rmEndFrame();
 }
