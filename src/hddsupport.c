@@ -63,10 +63,10 @@ static void hddInitModules(void)
 
     // update Themes
     char path[256];
-    sprintf(path, "%sTHM", gHDDPrefix);
+    snprintf(path, sizeof(path), "%sTHM", gHDDPrefix);
     thmAddElements(path, "/", 1);
 
-    sprintf(path, "%sLNG", gHDDPrefix);
+    snprintf(path, sizeof(path), "%sLNG", gHDDPrefix);
     lngAddLanguages(path, "/", hddGameList.mode);
 
     sbCreateFolders(gHDDPrefix, 0);

@@ -622,7 +622,7 @@ static int bdmNeedsUpdate(item_list_t *itemList)
     if (vcdViewActive(itemList->mode))
         return 0;
 
-    sprintf(path, "%sCD", pDeviceData->bdmPrefix);
+    snprintf(path, sizeof(path), "%sCD", pDeviceData->bdmPrefix);
     if (stat(path, &st) != 0)
         st.st_mtime = 0;
     if (pDeviceData->bdmModifiedCDPrev != st.st_mtime) {
@@ -630,7 +630,7 @@ static int bdmNeedsUpdate(item_list_t *itemList)
         result = 1;
     }
 
-    sprintf(path, "%sDVD", pDeviceData->bdmPrefix);
+    snprintf(path, sizeof(path), "%sDVD", pDeviceData->bdmPrefix);
     if (stat(path, &st) != 0)
         st.st_mtime = 0;
     if (pDeviceData->bdmModifiedDVDPrev != st.st_mtime) {

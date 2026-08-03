@@ -55,7 +55,10 @@ static unsigned char *NTLM_Password_Hash(const char *password, unsigned char *ci
     memset(passwd_buf, 0, sizeof(passwd_buf));
 
     /* turn the password to unicode */
-    for (i = 0, j = 0; i < strlen(password); i++, j += 2)
+    size_t pass_len = strlen(password);
+    if (pass_len > 255)
+        pass_len = 255;
+    for (i = 0, j = 0; i < pass_len; i++, j += 2)
         passwd_buf[j] = password[i];
 
     /* get the message digest */

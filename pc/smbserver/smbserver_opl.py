@@ -104,13 +104,15 @@ def send_msg(sock, smb_msg):
 
 
 def _recv_exact(sock, n):
-    buf = b""
-    while len(buf) < n:
-        chunk = sock.recv(n - len(buf))
-        if not chunk:
+    buf = bytearray(n)
+    view = memoryview(buf)
+    pos = 0
+    while pos < n:
+        read_bytes = sock.recv_into(view[pos:], n - pos)
+        if not read_bytes:
             return None
-        buf += chunk
-    return buf
+        pos += read_bytes
+    return bytes(buf)
 
 
 def recv_msg(sock):

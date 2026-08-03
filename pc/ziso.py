@@ -136,11 +136,8 @@ def decompress_zso(fname_in, fname_out):
         print("ziso file format error")
         return -1
 
-    total_block = total_bytes // block_size
-    index_buf = []
-
-    for _ in range(total_block + 1):
-        index_buf.append(unpack('I', fin.read(4))[0])
+    index_data = fin.read(4 * (total_block + 1))
+    index_buf = list(unpack(f'<{total_block + 1}I', index_data))
 
     show_zso_info(fname_in, fname_out, total_bytes,
                   block_size, total_block, ver, align)

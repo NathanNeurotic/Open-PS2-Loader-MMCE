@@ -1045,9 +1045,6 @@ void mmceLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
     // where the per-game folder genuinely matters: AndrewBento's logo-off report). The cross-device
     // paths (bdm/hdd/eth) send it too, with the same wait.
 
-    // mcReset();
-    // mcInit(MC_TYPE_XMC);
-
     if (gAutoLaunchBDMGame == NULL) {
         deinit(NO_EXCEPTION, MMCE_MODE); // CAREFUL: deinit will call mmceCleanUp, so mmceGames/game will be freed
     }
