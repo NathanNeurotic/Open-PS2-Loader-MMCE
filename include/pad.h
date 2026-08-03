@@ -33,8 +33,8 @@ void unloadPads();
 // Colors is on (gui.c / dia.c). Field semantics live with the writers in pad.c.
 typedef struct
 {
-    unsigned int readMisses;   // total failed ready-state pad reads
-    unsigned int missBurst;    // current consecutive-miss run, max across pads (polls)
+    unsigned int readMisses;   // polls where at least one ready-state pad produced no fresh sample
+    unsigned int missBurst;    // current consecutive run of such polls (0 when all ready pads read)
     unsigned int missBurstMax; // session peak of the above
     unsigned int pollMaxMs;    // worst readPads() period this session
     unsigned int stateFlaps;   // DISCONN -> ready reconnect edges seen
