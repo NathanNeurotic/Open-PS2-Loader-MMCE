@@ -351,6 +351,8 @@ clean:	download_lwNBD
 	$(MAKE) -C modules/isofs clean
 	echo " -bdmevent"
 	$(MAKE) -C modules/bdmevent clean
+	echo " -sio2man"
+	$(MAKE) -C modules/sio2man clean
 	echo " -SMSUTILS"
 	$(MAKE) -C modules/network/SMSUTILS clean
 	echo " -SMSTCPIP"
@@ -642,8 +644,11 @@ $(EE_ASM_DIR)bdmfs_fatfs.c: $(PS2SDK)/iop/irx/bdmfs_fatfs.irx | $(EE_ASM_DIR)
 $(EE_ASM_DIR)iLinkman.c: $(PS2SDK)/iop/irx/iLinkman.irx | $(EE_ASM_DIR)
 	$(BIN2C) $< $@ $(*F)_irx
 
-# Keep mx4sio_bd and freesio2 (embedded below as sio2man) from the same PS2SDK.
-# The current MX4SIO driver requires PS2SDK's sio2man after the game-side IOP reset.
+# Keep mx4sio_bd and the embedded sio2man on the same PS2SDK generation.
+# The current MX4SIO driver requires PS2SDK's sio2man after the game-side IOP reset. The
+# embedded sio2man is built in-tree from pinned SDK source (modules/sio2man -- same API,
+# plus the #340 priority-ceiling patch; see its PROVENANCE.md), so it tracks the SDK the
+# container ships rather than drifting from it.
 ifeq ($(DEBUG),1)
 # block device drivers with printf's
 USBBD_IRX = usbmass_bd.irx
@@ -836,7 +841,15 @@ $(EE_ASM_DIR)iomanx.c: $(PS2SDK)/iop/irx/iomanX.irx | $(EE_ASM_DIR)
 $(EE_ASM_DIR)filexio.c: $(PS2SDK)/iop/irx/fileXio.irx | $(EE_ASM_DIR)
 	$(BIN2C) $< $@ $(*F)_irx
 
-$(EE_ASM_DIR)sio2man.c: $(PS2SDK)/iop/irx/freesio2.irx | $(EE_ASM_DIR)
+# sio2man is built in-tree from pinned ps2sdk source instead of embedding the SDK's prebuilt
+# freesio2.irx: the stock post-PR#709 threadless sio2man lets a low-priority transaction holder
+# starve freepad's vblank pad poll under USB/mc load on real hardware, which OPL feels as
+# dropped/queued menu input (#340). Same source + export surface, plus a priority-ceiling
+# bracket around the transaction lock. Details: modules/sio2man/PROVENANCE.md.
+modules/sio2man/sio2man.irx: modules/sio2man
+	$(MAKE) -C $<
+
+$(EE_ASM_DIR)sio2man.c: modules/sio2man/sio2man.irx | $(EE_ASM_DIR)
 	$(BIN2C) $< $@ $(*F)_irx
 
 $(EE_ASM_DIR)padman.c: $(PS2SDK)/iop/irx/freepad.irx | $(EE_ASM_DIR)

@@ -31,4 +31,6 @@ jobs:
           # update into a conflict, and its 52 files would otherwise fail this check outright.
           # Only the vendored subtree is excluded -- our own code in that module directory
           # (smb2man.c, posix.c, iopheap.c, udivdi3.c, the shims) is still checked.
-          exclude: './modules/network/smb2man/libsmb2'
+          # modules/sio2man is ps2sdk source kept in upstream style so the local patch stays a
+          # small reviewable diff against ps2dev/ps2sdk (see its PROVENANCE.md).
+          exclude: './modules/network/smb2man/libsmb2 ./modules/sio2man'
