@@ -94,27 +94,24 @@ The headline item is a full installable package zip; all other assets are publis
 <thead><tr><th>Asset</th><th>What it is</th></tr></thead>
 <tbody>
 <tr>
-  <td><code>RIPTOPL-&lt;sdk&gt;-&lt;rel&gt;-&lt;sha&gt;.zip</code></td>
-  <td><b>The installable package.</b> Contains <code>APP_RIPTOPL/RIPTOPL.ELF</code> (built with
-  <code>ps2dev/ps2dev:latest</code>, the default), <code>APP_RIPTOPL-WOPLSDK/RIPTOPL.ELF</code>
-  (wOPL's digest-pinned container with stock MMCE drivers) and
-  <code>APP_RIPTOPL-OLDSDK/RIPTOPL.ELF</code> (the pinned/stable toolchain, as a fallback), the
-  <code>POPSTARTER/</code> and <code>POPS/</code> folders for PS1 support, an already-extracted
-  <code>neutrino/</code> folder (drag-and-drop — with <code>config/bsd-udpfsbd.toml</code> injected so
-  UDPFS works), and a host-side <code>PC-SMB-Server/</code> folder (a pure-Python SMBv1 server you run
-  on your PC for Windows 11). Extract it and use <code>APP_RIPTOPL/RIPTOPL.ELF</code>.</td>
+  <td><code>RIPTOPL-&lt;rel&gt;-&lt;sha&gt;.zip</code></td>
+  <td><b>The installable package.</b> Contains labeled SDK loader folders:
+  <code>APP_RIPTOPL-PS2DEVLATESTSDK/RIPTOPL.ELF</code> (#1, built with the current <code>ps2dev/ps2dev:latest</code> SDK),
+  and <code>APP_RIPTOPL-PS2DEVPINNEDSDK/RIPTOPL.ELF</code> (#2, built on a digest-pinned ps2dev SDK as the safe fallback),
+  the <code>POPSTARTER/</code> and <code>POPS/</code> folders for PS1 support, the bundled <code>neutrino/</code> folder, and a <code>PS2-Servers.url</code> shortcut.
+  Extract it and use <code>APP_RIPTOPL-PS2DEVLATESTSDK/RIPTOPL.ELF</code>.</td>
 </tr>
 <tr>
-  <td><code>RIPTOPL-&lt;version&gt;.ELF</code></td>
-  <td>Bare loader ELF, <code>ps2dev/ps2dev:latest</code> toolchain (primary).</td>
+  <td><code>RIPTOPL-&lt;version&gt;-PS2DEVLATESTSDK.ELF</code></td>
+  <td>Bare loader ELF, <code>ps2dev/ps2dev:latest</code> toolchain (#1 recommended).</td>
 </tr>
 <tr>
-  <td><code>RIPTOPL-&lt;version&gt;-woplsdk.ELF</code></td>
-  <td>Bare loader ELF, wOPL's digest-pinned <code>ghcr.io/ps2homebrew</code> container with stock MMCE drivers.</td>
+  <td><code>RIPTOPL-&lt;version&gt;-PS2DEVPINNEDSDK.ELF</code></td>
+  <td>Bare loader ELF, digest-pinned <code>ps2dev/ps2dev</code> toolchain (#2 safe fallback).</td>
 </tr>
 <tr>
-  <td><code>RIPTOPL-&lt;version&gt;-oldsdk.ELF</code></td>
-  <td>Bare loader ELF, <code>ps2max/dev</code> pinned toolchain (fallback).</td>
+  <td><code>RIPTOPL-&lt;version&gt;-&lt;SDK&gt;-ds5.ELF</code></td>
+  <td>DualSense (DS5 USB) pad support loader ELFs for each SDK toolchain flavour (<code>DUALSENSE=1</code>).</td>
 </tr>
 <tr>
   <td><code>RIPTOPL-&lt;version&gt;-src.zip</code></td>
@@ -130,12 +127,12 @@ The headline item is a full installable package zip; all other assets are publis
 </tr>
 <tr>
   <td><code>RIPTOPL-VARIANTS-*.zip</code></td>
-  <td>Alternate build configs: the full <code>EXTRA_FEATURES × PADEMU × DUALSENSE</code> matrix, in all three SDK flavours. For testing or diagnostics.</td>
+  <td>Alternate build configs and variants for testing or diagnostics.</td>
 </tr>
 <tr>
   <td><code>RIPTOPL-DEBUG-*.zip</code></td>
   <td>Debug builds (<code>iopcore</code>, <code>ingame</code>, <code>eesio</code>, <code>iopcore_ppctty</code>, <code>ingame_ppctty</code>,
-  <code>DTL_T10000</code> variants), all three SDK flavours. For diagnostics only.</td>
+  <code>DTL_T10000</code> variants). For diagnostics only.</td>
 </tr>
 </tbody>
 </table>
