@@ -216,6 +216,8 @@ int gNeutrinoGsmCompDefault; // global default -gsm ":c" field-flip half (0=off,
 int gNeutrinoElfArg;         // default-on (settings key only, no UI): auto-emit -elf=cdrom0: on Neutrino launches (parity Delta-10)
 char gPopstarterPath[256];   // custom POPSTARTER.ELF path (used only when gPopstarterDevice == POPS_DEV_CUSTOM)
 int gPopstarterDevice;       // POPSTARTER.ELF device (POPS_DEV_*); Default = cwd then VCD device; legacy path -> Custom
+int gPopstarterRetroGemGameID = 1; // RetroGEM Game ID optical barcode for VCD launches (1=on, default)
+
 int gBdmaSource;             // BDMA SOURCE device family (VCD_BDMA_SRC_*) to read exFAT driver variants from
 int gBdmaMode;               // BDMA MODE last reflected from the mc?:/POPSTARTER/ marker (VCD_BDMA_*); not persisted
 int gBdmaApplyOnLaunch;      // auto-equip the launched VCD's matching exFAT driver before boot (1=on, default)
@@ -1884,6 +1886,9 @@ static void _loadConfig()
             // popstarter_path migrates to Custom (honour the old override); otherwise Default (cwd).
             if (!configGetInt(configOPL, CONFIG_OPL_POPSTARTER_DEVICE, &gPopstarterDevice))
                 gPopstarterDevice = (gPopstarterPath[0] != '\0') ? POPS_DEV_CUSTOM : POPS_DEV_DEFAULT;
+            if (!configGetInt(configOPL, CONFIG_OPL_POPSTARTER_RETROGEM_GAMEID, &gPopstarterRetroGemGameID))
+                gPopstarterRetroGemGameID = 1;
+
             configGetInt(configOPL, CONFIG_OPL_BDMA_SOURCE, &gBdmaSource);
             configGetInt(configOPL, CONFIG_OPL_BDMA_APPLY, &gBdmaApplyOnLaunch);
             configGetInt(configOPL, CONFIG_OPL_VCD_HIDE_GAMEID, &gVcdHideGameId);
@@ -2201,6 +2206,8 @@ static void _saveConfig()
         configSetInt(configOPL, CONFIG_OPL_NEUTRINO_ELF_ARG, gNeutrinoElfArg);
         configSetStr(configOPL, CONFIG_OPL_POPSTARTER_PATH, gPopstarterPath);
         configSetInt(configOPL, CONFIG_OPL_POPSTARTER_DEVICE, gPopstarterDevice);
+        configSetInt(configOPL, CONFIG_OPL_POPSTARTER_RETROGEM_GAMEID, gPopstarterRetroGemGameID);
+
         configSetInt(configOPL, CONFIG_OPL_BDMA_SOURCE, gBdmaSource);
         configSetInt(configOPL, CONFIG_OPL_BDMA_APPLY, gBdmaApplyOnLaunch);
         configSetInt(configOPL, CONFIG_OPL_VCD_HIDE_GAMEID, gVcdHideGameId);
@@ -3016,6 +3023,8 @@ static void setDefaults(void)
     gNeutrinoElfArg = 1;         // auto-emit the game ELF for Neutrino compatibility lookup by default
     gPopstarterPath[0] = '\0';
     gPopstarterDevice = POPS_DEV_DEFAULT;
+    gPopstarterRetroGemGameID = 1;
+
     gBdmaSource = VCD_BDMA_SRC_USB;
     gBdmaMode = VCD_BDMA_FAT32;
     gBdmaApplyOnLaunch = 1; // auto-equip on launch by default (the MX4SIO->OSDSYS fix)

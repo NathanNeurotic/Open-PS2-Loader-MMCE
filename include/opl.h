@@ -291,6 +291,8 @@ enum { POPS_DEV_DEFAULT = 0,   // cwd (gBootDir) /POPS/, then the VCD's own devi
        POPS_DEV_CUSTOM,        // free-text gPopstarterPath
        POPS_DEV_GAME };        // the VCD's OWN device ONLY (<devPrefix>/POPS/POPSTARTER.ELF); no boot/cwd fallback (a miss toasts "not found"). Appended at the enum end to keep saved popstarter_device ints stable.
 extern int gPopstarterDevice;  // POPSTARTER.ELF device (POPS_DEV_*); legacy non-empty popstarter_path -> Custom
+extern int gPopstarterRetroGemGameID; // RetroGEM Game ID optical barcode for VCD launches (1=on, default on)
+
 extern int gBdmaSource;        // BDMA SOURCE device family (VCD_BDMA_SRC_*); persisted in conf
 extern int gBdmaMode;          // BDMA MODE mirrored from the mc?:/POPSTARTER/ marker (VCD_BDMA_*)
 extern int gBdmaApplyOnLaunch; // auto-equip the launched VCD's matching exFAT driver before boot (1=on)

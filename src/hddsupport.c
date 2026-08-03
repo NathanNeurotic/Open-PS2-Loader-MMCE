@@ -763,8 +763,12 @@ static void hddDoLaunchVcd(item_list_t *itemList, const char *name, const char *
     }
     // Success: leave IO blocked (deinit re-blocks anyway) and pfs0: on the POPSTARTER partition for the
     // argv-preserving load below. POPSTARTER takes over and performs its own IOP reset.
+    char vcdFullPath[256];
+    snprintf(vcdFullPath, sizeof(vcdFullPath), "%s/%s.VCD", part, name);
+    vcdPrepareRetroGemBarcode(vcdFullPath);
     deinit(UNMOUNT_EXCEPTION, itemList->mode);
     sysLaunchPopstarter(vcdElf, vcdSelector);
+
 }
 
 // Launch an HDD PS1/.VCD entry BY NAME -- the Favourites tab's view-independent entry point. The

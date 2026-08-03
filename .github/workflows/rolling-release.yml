@@ -592,6 +592,8 @@ jobs:
             printf -- '- Category settings layout\n'
             printf -- '- Per-game VMC shared with Neutrino on writable BDM (honours OPL VMC groups)\n'
             printf -- '- Visual GameID barcode for Pixel FX / RetroGEM / PS2Digital (Display page, OFF by default)\n'
+            printf -- '- RetroGEM Game ID optical barcode for POPStarter / PS1 VCD launches (POPStarter Settings page, ON by default)\n'
+
             printf -- '- Neutrino args: prefix a flag with $ to disable it without deleting; "Test launch" boots without saving\n'
             printf -- '- DualSense / DS5 USB controller support\n'
             printf -- '- PS2-Servers.url: opens the maintained UDPFS / SMBv1 / UDPBD all-in-one PC launcher\n'

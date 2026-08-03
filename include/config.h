@@ -112,6 +112,8 @@ enum CONFIG_INDEX {
 #define CONFIG_OPL_NEUTRINO_ELF_ARG     "neutrino_elf_arg"  // default-on (no UI row): auto-emit -elf=cdrom0:\<startup>;1 (parity Delta-10)
 #define CONFIG_OPL_POPSTARTER_PATH      "popstarter_path"   // free-text custom path (used only when device=Custom)
 #define CONFIG_OPL_POPSTARTER_DEVICE    "popstarter_device" // device TYPE holding POPS/POPSTARTER.ELF (POPS_DEV_*)
+#define CONFIG_OPL_POPSTARTER_RETROGEM_GAMEID "popstarter_retrogem_gameid" // RetroGEM Game ID optical barcode for VCD launches
+
 #define CONFIG_OPL_BDMA_SOURCE          "bdma_source"
 #define CONFIG_OPL_BDMA_APPLY           "bdma_apply_launch"
 #define CONFIG_OPL_VCD_HIDE_GAMEID      "vcd_hide_gameid"     // display-only: hide a leading PS1 game-ID prefix from the VCD list

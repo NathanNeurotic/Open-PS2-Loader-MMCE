@@ -182,4 +182,8 @@ int vcdPopsNetChanged(const vcd_popsnet_t *orig, const vcd_popsnet_t *cur);
 // the file must exist either way. Returns 0, or the first vcdSafeWriteFile error (-2/-3).
 int vcdWritePopstarterNetFiles(const vcd_popsnet_t *cfg, int writeSmb, int writeIp);
 
+// Render the RetroGEM Game ID optical barcode immediately prior to a POPStarter VCD launch.
+void vcdPrepareRetroGemBarcode(const char *vcdPath);
+
 #endif
+

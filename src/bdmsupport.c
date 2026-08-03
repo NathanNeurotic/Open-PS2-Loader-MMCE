@@ -821,8 +821,13 @@ static void bdmLaunchVcd(item_list_t *itemList, const char *vcdName, config_set_
             break;
     }
 
+    char vcdFullPath[256];
+    snprintf(vcdFullPath, sizeof(vcdFullPath), "%sPOPS/%s.VCD", vcdPrefix, vcdName);
+    vcdPrepareRetroGemBarcode(vcdFullPath);
+
     deinit(UNMOUNT_EXCEPTION, itemList->mode); // keep the VCD device mounted across the IOP reset
     sysLaunchPopstarter(vcdElf, vcdSelector);
+
 }
 
 // Δ9 (NHDDL parity): Neutrino's bd backend packs the ISO and BOTH -mc VMCs into ONE shared
