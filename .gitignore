@@ -34,6 +34,8 @@ DETAILED_CHANGELOG
 !.clang-format
 !.clang-format-ignore
 !modules/debug/*.irx
+# TEST-ONLY (#340): the vendored 2023-era sio2man diagnostic blob
+!modules/sio2man-2023/*.irx
 
 #
 # Generated source files

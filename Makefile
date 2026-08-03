@@ -836,7 +836,12 @@ $(EE_ASM_DIR)iomanx.c: $(PS2SDK)/iop/irx/iomanX.irx | $(EE_ASM_DIR)
 $(EE_ASM_DIR)filexio.c: $(PS2SDK)/iop/irx/fileXio.irx | $(EE_ASM_DIR)
 	$(BIN2C) $< $@ $(*F)_irx
 
-$(EE_ASM_DIR)sio2man.c: $(PS2SDK)/iop/irx/freesio2.irx | $(EE_ASM_DIR)
+# TEST-ONLY BUILD (#340 diagnosis, DO NOT MERGE): embed the pre-rewrite 2023 sio2man (threaded,
+# prio-24 worker) extracted from uOPL's pinned CI container instead of the SDK's current
+# threadless freesio2.irx. Confirms/refutes the threadless-sio2man trigger on real hardware.
+# EXPECTED side effects: MMCE and MX4SIO menu features may break (they need the new sio2man API).
+# See modules/sio2man-2023/PROVENANCE-TEST.md.
+$(EE_ASM_DIR)sio2man.c: modules/sio2man-2023/freesio2-2023.irx | $(EE_ASM_DIR)
 	$(BIN2C) $< $@ $(*F)_irx
 
 $(EE_ASM_DIR)padman.c: $(PS2SDK)/iop/irx/freepad.irx | $(EE_ASM_DIR)
