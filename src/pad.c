@@ -143,11 +143,19 @@ enum {
 #define PADINIT_READY_MS           500
 #define PADINIT_REQ_MS             1000
 #define PADINIT_TOTAL_MS           2000
-// Consecutive failed self-heals double the retry spacing: 60, 120, 240, 480, 960 good reads
-// (~1 s .. ~16 s). The HW photos showed init:9 in one idle session -- a chronically-flapping
-// freepad was being hammered with mode requests every ~1 s, each attempt itself adding SIO2
-// traffic to the very bus whose errors triggered it.
+// Consecutive failed self-heals double the retry spacing (60, 120, ... good reads) until the
+// give-up threshold below ends the healing for the session. The HW photos showed init:9 in one
+// idle session -- a chronically-flapping freepad was being hammered with mode requests every
+// ~1 s, each attempt itself adding SIO2 traffic to the very bus whose errors triggered it.
 #define PAD_HEAL_BACKOFF_MAX_SHIFT 4
+// After this many consecutive failed self-heals, STOP healing for the session; a reconnect edge
+// (a real replug) re-arms. The v2 HW test (#358) proved why no gentler policy works: while a
+// mode-change request is in flight freepad's vblank task stops serving READ_DATA, so on a pad
+// that never completes one (three runs, all at the 2002 ms total cap) every heal attempt is a
+// ~2 s input outage no EE-side reading can bridge (miss:47 brst:28 measured WITH reads live
+// during the machine). The d-pad works fine in digital mode -- on such a pad, giving up the
+// analog re-arm buys uninterrupted input, which is the better trade everywhere.
+#define PAD_HEAL_GIVE_UP           2
 
 /// current time in miliseconds (last update time)
 static u32 curtime = 0;
@@ -786,6 +794,10 @@ static int readPad(struct pad_data_t *pad)
                 // disabled once its fully-published mode table proves DualShock mode absent.
                 if (pad->analogRetryDelay > 0) {
                     pad->analogRetryDelay--;
+                } else if (pad->healFailures >= PAD_HEAL_GIVE_UP) {
+                    // Given up for this session (see PAD_HEAL_GIVE_UP): this pad has proven it
+                    // cannot complete a mode change, and every further attempt would be a ~2 s
+                    // read outage. The reconnect edge resets healFailures, so a replug re-arms.
                 } else if (newpdata != 0 || (u32)(curtime - lastInputActivityMs) < PAD_SELF_HEAL_IDLE_MS) {
                     // User is actively providing input: DEFER the heal (see PAD_SELF_HEAL_IDLE_MS).
                     // The heal no longer blocks the GUI (async machine, #340), but its mode traffic
