@@ -274,6 +274,97 @@ void sfxGetPlayDiag(unsigned int *lastMs, unsigned int *maxMs)
         *maxMs = sfxMaxPlayMs;
 }
 
+// ---- SFX dispatch thread (#340) -------------------------------------------------------------------
+// audsrv_ch_play_adpcm is a synchronous SIF RPC, and the HW photos measured a single cursor-tick
+// RPC blocking the GUI thread for 352 ms under IOP contention (SFX:0/352ms on the Debug HUD).
+// Sounds are queued to a small dedicated thread instead, so the GUI never waits on the IOP for a
+// sound effect; the RPC wall time is still measured (on the dispatch thread) into the same HUD
+// fields, now reporting IOP congestion without implicating the menu. Single producer (GUI thread)
+// / single consumer ring; when the ring is full the sound is DROPPED -- a skipped tick beats a
+// stalled menu. Concurrent audsrv RPCs from another thread are nothing new here: bgmIoThread has
+// always streamed audsrv from its own thread alongside GUI-thread sfx.
+#define SFX_QUEUE_LEN 8
+static struct
+{
+    int channel;
+    int id;
+} sfxQueue[SFX_QUEUE_LEN];
+static volatile int sfxQHead = 0; // advanced by the producer only
+static volatile int sfxQTail = 0; // advanced by the consumer only
+static int sfxDispatchSema = -1;
+static int sfxDispatchTid = -1;
+static u8 sfxDispatchStack[8 * 1024] __attribute__((aligned(16)));
+extern void *_gp;
+
+static void sfxDispatchThread(void *arg)
+{
+    (void)arg;
+
+    while (1) {
+        WaitSema(sfxDispatchSema);
+        while (sfxQTail != sfxQHead) {
+            int channel = sfxQueue[sfxQTail].channel;
+            int id = sfxQueue[sfxQTail].id;
+            sfxQTail = (sfxQTail + 1) % SFX_QUEUE_LEN;
+
+            if (!audio_initialized) // shutdown raced a queued sound: skip the RPC
+                continue;
+
+            u32 start = cpu_ticks();
+            audsrv_ch_play_adpcm(channel, &sfx[id]);
+            unsigned int costMs = (unsigned int)((cpu_ticks() - start) / SFX_CLOCKS_PER_MS);
+            sfxLastPlayMs = costMs;
+            if (costMs > sfxMaxPlayMs)
+                sfxMaxPlayMs = costMs;
+        }
+    }
+}
+
+// Lazily created on the first play (GUI thread only). Returns nonzero when the dispatch path is
+// usable; on thread-creation failure the caller falls back to the old synchronous RPC.
+static int sfxDispatchEnsure(void)
+{
+    if (sfxDispatchTid >= 0)
+        return 1;
+
+    ee_sema_t sema;
+    sema.init_count = 0;
+    sema.max_count = SFX_QUEUE_LEN;
+    sema.option = 0;
+    sfxDispatchSema = CreateSema(&sema);
+    if (sfxDispatchSema < 0)
+        return 0;
+
+    ee_thread_t thread;
+    thread.func = &sfxDispatchThread;
+    thread.stack = sfxDispatchStack;
+    thread.stack_size = sizeof(sfxDispatchStack);
+    thread.gp_reg = &_gp;
+    thread.initial_priority = 45; // below the GUI thread (31) and IO worker (30): sound yields to input
+    thread.attr = 0;
+    thread.option = 0;
+    sfxDispatchTid = CreateThread(&thread);
+    if (sfxDispatchTid < 0) {
+        DeleteSema(sfxDispatchSema);
+        sfxDispatchSema = -1;
+        return 0;
+    }
+    StartThread(sfxDispatchTid, NULL);
+    return 1;
+}
+
+static void sfxEnqueue(int channel, int id)
+{
+    int next = (sfxQHead + 1) % SFX_QUEUE_LEN;
+
+    if (next == sfxQTail)
+        return; // ring full under IOP congestion: drop the sound, never the frame
+    sfxQueue[sfxQHead].channel = channel;
+    sfxQueue[sfxQHead].id = id;
+    sfxQHead = next;
+    SignalSema(sfxDispatchSema);
+}
+
 void sfxPlay(int id)
 {
     int channel;
@@ -330,18 +421,23 @@ void sfxPlay(int id)
 
             cursorChannelIndex = (cursorChannelIndex + 1) % CURSOR_SFX_CHANNEL_COUNT;
             channel = sfxGetCursorChannel(chosenSlot);
-
-            // Volumes are configured once by audioSetVolume(). Replaying a
-            // rotation channel replaces its old sample in one SIF RPC.
-            audsrv_ch_play_adpcm(channel, &sfx[id]);
         } else {
-            audsrv_ch_play_adpcm(id, &sfx[id]);
+            channel = id;
         }
 
-        unsigned int costMs = (unsigned int)((cpu_ticks() - sfxStartTicks) / SFX_CLOCKS_PER_MS);
-        sfxLastPlayMs = costMs;
-        if (costMs > sfxMaxPlayMs)
-            sfxMaxPlayMs = costMs;
+        // Volumes are configured once by audioSetVolume(). Replaying a rotation channel replaces
+        // its old sample in one SIF RPC -- issued from the dispatch thread so the GUI never waits
+        // on the IOP for a sound (#340; HW measured a 352 ms worst case inline). Synchronous
+        // fallback only if the dispatch thread could not be created.
+        if (sfxDispatchEnsure()) {
+            sfxEnqueue(channel, id);
+        } else {
+            audsrv_ch_play_adpcm(channel, &sfx[id]);
+            unsigned int costMs = (unsigned int)((cpu_ticks() - sfxStartTicks) / SFX_CLOCKS_PER_MS);
+            sfxLastPlayMs = costMs;
+            if (costMs > sfxMaxPlayMs)
+                sfxMaxPlayMs = costMs;
+        }
     }
 }
 

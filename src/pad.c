@@ -82,6 +82,16 @@ struct pad_data_t
     unsigned char rumbleLevel; // big-engine level for the pulse in flight (0 = none armed)
     unsigned char rumbleSmall; // 1 = drive the small engine too (bumps); taps are big-ERM-only
     int rumbleMsLeft;          // ms remaining; ticked down in readPads() (see the ms-vs-frames note there)
+
+    // Asynchronous runtime re-init (#340): nonzero initStage = the per-frame init state machine is
+    // in flight for this pad (the pad is not read meanwhile). Replaces the old inline blocking
+    // initializePad at runtime, whose 250-600+ ms GUI blackouts the HW photos measured firing 5-9
+    // times per session (init:N in the Debug HUD) -- those blackouts WERE the felt menu hangs.
+    unsigned char initStage;
+    unsigned char initIsHeal;   // trigger was the analog self-heal (heal runs consume backoff steps)
+    unsigned char healFailures; // consecutive RETRY-completed heals; shifts the self-heal backoff
+    u32 stageStartMs;           // curtime when the current stage began (per-stage ms budgets)
+    u32 initStartMs;            // curtime at trigger: total wall cap + HUD reinit cost fields
 };
 
 // Pad commands are asynchronous. Keep every wait bounded so a transient SIO2/pad error cannot hang the
@@ -111,6 +121,33 @@ struct pad_data_t
 #define PAD_INIT_RETRY       -1
 #define PAD_INIT_UNSUPPORTED 0
 #define PAD_INIT_OK          1
+
+// Async runtime re-init state machine (#340). One padGetState/padGetReqState sample per rendered
+// frame instead of the old DelayThread polling loops -- the GUI-thread cost per frame is at most
+// one bounded libpad call instead of the full blocking sequence. Budgets are MILLISECONDS of
+// curtime (wall-clock), NOT frames: frame-count budgets would inflate 3-10x exactly when frames
+// stretch under load. READY generously covers the old 25 ms bound; REQ covers freepad's
+// >=83-100 ms request latency (PR #151) with headroom; TOTAL hard-caps a wedged freepad so a
+// port can never sit unread longer than ~2 s no matter what the stages do.
+enum {
+    PADINIT_IDLE = 0,
+    PADINIT_WAIT_READY0, // settle before the mode-table query
+    PADINIT_CHECK_MODES, // mode table checks + padSetMainMode issue (synchronous, one frame)
+    PADINIT_WAIT_MODE_REQ,
+    PADINIT_WAIT_READY1, // settle, then press-mode info + enter issue
+    PADINIT_WAIT_PRESS_REQ,
+    PADINIT_WAIT_READY2, // settle, then actuator info + align issue
+    PADINIT_WAIT_ACT_REQ,
+    PADINIT_WAIT_READY3, // final settle
+};
+#define PADINIT_READY_MS 500
+#define PADINIT_REQ_MS   1000
+#define PADINIT_TOTAL_MS 2000
+// Consecutive failed self-heals double the retry spacing: 60, 120, 240, 480, 960 good reads
+// (~1 s .. ~16 s). The HW photos showed init:9 in one idle session -- a chronically-flapping
+// freepad was being hammered with mode requests every ~1 s, each attempt itself adding SIO2
+// traffic to the very bus whose errors triggered it.
+#define PAD_HEAL_BACKOFF_MAX_SHIFT 4
 
 /// current time in miliseconds (last update time)
 static u32 curtime = 0;
@@ -145,6 +182,7 @@ static pad_diag_t padDiag;
 // load on real hardware; an emulator's pad never produces one.
 static int pollPadsReady;
 static int pollPadsRead;
+static int pollPadsInit; // pads whose async re-init machine ran this poll (neither ready nor read)
 static u32 pollMissedHeld;
 
 void padGetDiag(pad_diag_t *out)
@@ -397,6 +435,233 @@ static void updatePadState(struct pad_data_t *pad, int state)
         pad->state = state;
 }
 
+// ---- Async runtime re-init (#340) -----------------------------------------------------------------
+// The same sequence as initializePadInner, unrolled into a per-frame state machine: every wait that
+// used to be a DelayThread polling loop on the GUI thread becomes one status sample per rendered
+// frame. Boot-time init (startPads) keeps the blocking version -- there is no GUI to stall yet and
+// the blocking sequence is HW-proven. Keep the two in step when touching either.
+
+static void padInitBegin(struct pad_data_t *pad, int isHeal)
+{
+    if (pad->initStage != PADINIT_IDLE)
+        return;
+
+    LOG("PAD async init start %d,%d heal=%d\n", pad->port, pad->slot, isHeal);
+    // Menu rumble state belongs to the current connection.
+    pad->rumbleOn = 0;
+    pad->rumbleMsLeft = 0;
+    pad->initIsHeal = isHeal ? 1 : 0;
+    pad->stageStartMs = curtime;
+    pad->initStartMs = curtime;
+    pad->initStage = PADINIT_WAIT_READY0;
+}
+
+static void padInitFinish(struct pad_data_t *pad, int rc)
+{
+    // The HUD reinit fields now report WALL time of the async run -- informative for correlating
+    // with felt hitches, while the GUI-thread cost is ~zero by construction.
+    unsigned int costMs = (unsigned int)(curtime - pad->initStartMs);
+
+    padDiag.reinitRuns++;
+    padDiag.reinitLastMs = costMs;
+    if (costMs > padDiag.reinitMaxMs)
+        padDiag.reinitMaxMs = costMs;
+    pad->initStage = PADINIT_IDLE;
+
+    // Only failed HEAL runs consume backoff steps: a reconnect-edge run failing (plug settle,
+    // empty mode table) says nothing about the self-heal's prospects. Any successful run resets.
+    if (rc == PAD_INIT_RETRY) {
+        if (pad->initIsHeal && pad->healFailures < PAD_HEAL_BACKOFF_MAX_SHIFT)
+            pad->healFailures++;
+    } else {
+        pad->healFailures = 0;
+    }
+    pad->analogRetryDelay = PAD_ANALOG_RETRY_DELAY << pad->healFailures;
+
+    LOG("PAD async init done %d,%d rc=%d wall=%ums nextRetry=%d\n",
+        pad->port, pad->slot, rc, costMs, pad->analogRetryDelay);
+}
+
+// Advance to `stage`, restarting its ms budget.
+static void padInitStage(struct pad_data_t *pad, int stage)
+{
+    pad->initStage = (unsigned char)stage;
+    pad->stageStartMs = curtime;
+}
+
+// A real unplug observed MID-machine: the machine's own updatePadState calls consume the
+// DISCONN transition the normal readPad branch would have handled, so do the full unplug
+// housekeeping here (drop the held sample at once, forget the analog verdict).
+static int padInitCheckDisconn(struct pad_data_t *pad, int state)
+{
+    if (state != PAD_STATE_DISCONN)
+        return 0;
+
+    LOG("PAD pad %d,%d unplugged mid-init\n", pad->port, pad->slot);
+    padInitFinish(pad, PAD_INIT_RETRY);
+    pad->analogCapable = -1;
+    pad->analogRetryDelay = 0;
+    pad->paddata = 0;
+    return 1;
+}
+
+static void padInitTick(struct pad_data_t *pad)
+{
+    int tmp, modes, i, state;
+
+    // Hard wall cap: whatever a wedged freepad does to the individual stages, a port is never
+    // held unread longer than this.
+    if ((u32)(curtime - pad->initStartMs) > PADINIT_TOTAL_MS) {
+        padInitFinish(pad, PAD_INIT_RETRY);
+        return;
+    }
+
+    switch (pad->initStage) {
+        case PADINIT_WAIT_READY0:
+            state = padGetState(pad->port, pad->slot);
+            updatePadState(pad, state);
+            if (padInitCheckDisconn(pad, state))
+                break;
+            if (isPadReadyState(state))
+                padInitStage(pad, PADINIT_CHECK_MODES);
+            else if ((u32)(curtime - pad->stageStartMs) > PADINIT_READY_MS)
+                padInitFinish(pad, PAD_INIT_RETRY);
+            break;
+
+        case PADINIT_CHECK_MODES: {
+            // Mode-table reads are synchronous shared-memory queries; padSetMainMode issues one
+            // request. All cheap -- the whole stage is a single frame.
+            modes = padInfoMode(pad->port, pad->slot, PAD_MODETABLE, -1);
+            if (modes <= 0) {
+                // A not-yet-ready DualShock also reports an empty mode table: stay retryable.
+                LOG("PAD mode table is not ready (or controller is digital-only)\n");
+                padInitFinish(pad, PAD_INIT_RETRY);
+                break;
+            }
+            // freepad only writes a table entry from a validated controller response, so a 0 entry
+            // PROVES the table is half-built (contention) -- that must stay RETRYABLE. Only a
+            // fully-published table lacking DualShock may latch digital-only (see initializePadInner).
+            int sawInvalid = 0;
+            int hasDualshock = 0;
+            for (i = 0; i < modes; i++) {
+                tmp = padInfoMode(pad->port, pad->slot, PAD_MODETABLE, i);
+                if (tmp == PAD_TYPE_DUALSHOCK)
+                    hasDualshock = 1;
+                else if (tmp == 0)
+                    sawInvalid = 1;
+            }
+            if (!hasDualshock) {
+                if (sawInvalid) {
+                    padInitFinish(pad, PAD_INIT_RETRY);
+                    break;
+                }
+                LOG("PAD This is no Dual Shock controller\n");
+                pad->analogCapable = 0;
+                padDiag.analogCapable = 0;
+                padInitFinish(pad, PAD_INIT_UNSUPPORTED);
+                break;
+            }
+            pad->analogCapable = 1;
+            padDiag.analogCapable = 1;
+
+            if (padInfoMode(pad->port, pad->slot, PAD_MODECUREXID, 0) == 0) {
+                padInitFinish(pad, PAD_INIT_RETRY);
+                break;
+            }
+
+            tmp = padSetMainMode(pad->port, pad->slot, PAD_MMODE_DUALSHOCK, PAD_MMODE_LOCK);
+            if (tmp != 1) {
+                LOG("PAD padSetMainMode not accepted\n");
+                padInitFinish(pad, PAD_INIT_RETRY);
+                break;
+            }
+            padInitStage(pad, PADINIT_WAIT_MODE_REQ);
+            break;
+        }
+
+        case PADINIT_WAIT_MODE_REQ:
+            tmp = padGetReqState(pad->port, pad->slot);
+            if (tmp == PAD_RSTAT_COMPLETE)
+                padInitStage(pad, PADINIT_WAIT_READY1);
+            else if (tmp != PAD_RSTAT_BUSY || (u32)(curtime - pad->stageStartMs) > PADINIT_REQ_MS)
+                padInitFinish(pad, PAD_INIT_RETRY);
+            break;
+
+        case PADINIT_WAIT_READY1:
+            state = padGetState(pad->port, pad->slot);
+            updatePadState(pad, state);
+            if (padInitCheckDisconn(pad, state))
+                break;
+            if (isPadReadyState(state)) {
+                LOG("PAD infoPressMode: %d\n", padInfoPressMode(pad->port, pad->slot));
+                tmp = padEnterPressMode(pad->port, pad->slot);
+                LOG("PAD enterPressMode: %d\n", tmp);
+                padInitStage(pad, (tmp == 1) ? PADINIT_WAIT_PRESS_REQ : PADINIT_WAIT_READY2);
+            } else if ((u32)(curtime - pad->stageStartMs) > PADINIT_READY_MS)
+                padInitFinish(pad, PAD_INIT_RETRY);
+            break;
+
+        case PADINIT_WAIT_PRESS_REQ:
+            // Pressure mode is best-effort in the blocking sequence too: failure only logs.
+            tmp = padGetReqState(pad->port, pad->slot);
+            if (tmp != PAD_RSTAT_BUSY || (u32)(curtime - pad->stageStartMs) > PADINIT_REQ_MS) {
+                if (tmp != PAD_RSTAT_COMPLETE)
+                    LOG("PAD enterPressMode request failed\n");
+                padInitStage(pad, PADINIT_WAIT_READY2);
+            }
+            break;
+
+        case PADINIT_WAIT_READY2:
+            state = padGetState(pad->port, pad->slot);
+            updatePadState(pad, state);
+            if (padInitCheckDisconn(pad, state))
+                break;
+            if (isPadReadyState(state)) {
+                pad->actuators = padInfoAct(pad->port, pad->slot, -1, 0);
+                if (pad->actuators != 0) {
+                    pad->actAlign[0] = 0; // Enable small engine
+                    pad->actAlign[1] = 1; // Enable big engine
+                    pad->actAlign[2] = 0xff;
+                    pad->actAlign[3] = 0xff;
+                    pad->actAlign[4] = 0xff;
+                    pad->actAlign[5] = 0xff;
+                    tmp = padSetActAlign(pad->port, pad->slot, pad->actAlign);
+                    LOG("PAD padSetActAlign: %d\n", tmp);
+                    padInitStage(pad, (tmp == 1) ? PADINIT_WAIT_ACT_REQ : PADINIT_WAIT_READY3);
+                } else {
+                    LOG("PAD Did not find any actuators.\n");
+                    padInitStage(pad, PADINIT_WAIT_READY3);
+                }
+            } else if ((u32)(curtime - pad->stageStartMs) > PADINIT_READY_MS) {
+                // Analog mode is restored; pressure/rumble setup can wait for the next reconnect.
+                padInitFinish(pad, PAD_INIT_OK);
+            }
+            break;
+
+        case PADINIT_WAIT_ACT_REQ:
+            tmp = padGetReqState(pad->port, pad->slot);
+            if (tmp != PAD_RSTAT_BUSY || (u32)(curtime - pad->stageStartMs) > PADINIT_REQ_MS) {
+                if (tmp != PAD_RSTAT_COMPLETE)
+                    LOG("PAD padSetActAlign request failed\n");
+                padInitStage(pad, PADINIT_WAIT_READY3);
+            }
+            break;
+
+        case PADINIT_WAIT_READY3:
+            state = padGetState(pad->port, pad->slot);
+            updatePadState(pad, state);
+            if (padInitCheckDisconn(pad, state))
+                break;
+            if (isPadReadyState(state) || (u32)(curtime - pad->stageStartMs) > PADINIT_READY_MS)
+                padInitFinish(pad, PAD_INIT_OK);
+            break;
+
+        default:
+            pad->initStage = PADINIT_IDLE;
+            break;
+    }
+}
+
 static u32 readLeftJoy(struct pad_data_t *pad, u32 pdata)
 {
     u32 padData = pdata;
@@ -464,6 +729,22 @@ static int readPad(struct pad_data_t *pad)
     int padsRead = 0;
     u32 newpdata = 0;
 
+    if (pad->initStage != PADINIT_IDLE) {
+        // A re-init is in flight: advance it one step and skip reading this pad, matching the old
+        // blocking sequence's no-reads-during-init semantics without the GUI blackout. Carry the
+        // held sample for the repeat pause / activity stamp (as the blackout implicitly did by not
+        // running the repeat loop at all), but do NOT count these polls as read misses. PADEMU
+        // ds34 legs are skipped too while the machine runs -- bounded by PADINIT_TOTAL_MS (~2 s
+        // worst case against a fully wedged freepad; typical runs are a few hundred ms).
+        padInitTick(pad);
+        if (pad->initStage != PADINIT_IDLE) {
+            pollPadsInit++;
+            pollMissedHeld |= pad->paddata;
+            edgedata |= pad->paddata;
+            return 0;
+        }
+    }
+
     oldState = pad->state;
     newState = padGetState(pad->port, pad->slot);
     updatePadState(pad, newState);
@@ -473,14 +754,14 @@ static int readPad(struct pad_data_t *pad)
         LOG("PAD pad %d,%d connected\n", pad->port, pad->slot);
         pad->analogCapable = -1;
         pad->analogRetryDelay = 0;
+        pad->healFailures = 0; // a fresh physical connection deserves a fresh self-heal backoff
         padDiag.stateFlaps++;
-        // Idle-gated (#271): this init is the same 250-600 ms inline blackout as the self-heal
-        // below, and a reconnect edge can be DRIVEN by the very read errors that cluster under
-        // load (sustained misses drop freepad to DISCONN, the recovery reconnects). Defer while
-        // input is active: a digital-mode pad still reads every d-pad press, and the self-heal
-        // branch below picks the init up on the first poll after a second of quiet.
+        // Idle-gated (#271): the init no longer blocks the GUI (async state machine, #340), but it
+        // still adds SIO2 mode traffic to the very bus whose errors drive reconnect flaps, so keep
+        // deferring while input is active: a digital-mode pad still reads every d-pad press, and
+        // the self-heal branch below picks the init up on the first poll after a second of quiet.
         if ((u32)(curtime - lastInputActivityMs) >= PAD_SELF_HEAL_IDLE_MS)
-            initializePad(pad);
+            padInitBegin(pad, 0);
         else
             padDiag.reinitDefers++;
     } else if (oldState != PAD_STATE_DISCONN && pad->state == PAD_STATE_DISCONN) {
@@ -511,15 +792,17 @@ static int readPad(struct pad_data_t *pad)
                 if (pad->analogRetryDelay > 0) {
                     pad->analogRetryDelay--;
                 } else if (newpdata != 0 || (u32)(curtime - lastInputActivityMs) < PAD_SELF_HEAL_IDLE_MS) {
-                    // User is actively providing input: DEFER the heal (see PAD_SELF_HEAL_IDLE_MS)
-                    // -- initializePad here would block this thread 250-600 ms and eat the taps in
-                    // flight. newpdata (THIS poll's sample) closes the one-poll staleness hole
-                    // where the first press after a quiet spell lands while the activity stamp is
-                    // still one poll old. Leaving the retry budget at 0 makes the heal fire on
-                    // the first poll after a second of quiet.
+                    // User is actively providing input: DEFER the heal (see PAD_SELF_HEAL_IDLE_MS).
+                    // The heal no longer blocks the GUI (async machine, #340), but its mode traffic
+                    // rides the same contended bus. newpdata (THIS poll's sample) closes the
+                    // one-poll staleness hole where the first press after a quiet spell lands while
+                    // the activity stamp is still one poll old. Leaving the retry budget at 0 makes
+                    // the heal fire on the first poll after a second of quiet.
                 } else {
-                    initializePad(pad);
-                    pad->analogRetryDelay = PAD_ANALOG_RETRY_DELAY;
+                    // Retry spacing is re-armed by padInitFinish with exponential backoff -- the HW
+                    // photos showed heal STORMS (init:9 per idle session) against a chronically
+                    // flapping freepad, each attempt adding SIO2 load to the bus that caused it.
+                    padInitBegin(pad, 1);
                 }
             }
         }
@@ -638,6 +921,14 @@ static int rumbleLive = 0;
 void padRumbleActivate(void)
 {
     rumbleLive = 1;
+
+    // The intro loop never polls pads, so the first main-loop poll's delta spanned the whole
+    // boot and polluted the Debug HUD's worst-poll tracker (the HW photos read poll:8-13 SECONDS,
+    // hiding every real in-session stall). Reseed the poll clock and restart the tracker at the
+    // moment per-frame polling actually begins.
+    padTicksSeeded = 0;
+    tickrem = 0;
+    padDiag.pollMaxMs = 0;
 }
 
 // Previous rumble-arm timestamp in RAW ticks (see padRumbleArm) -- raw, not ms, so the
@@ -842,6 +1133,7 @@ int readPads()
 
     pollPadsReady = 0;
     pollPadsRead = 0;
+    pollPadsInit = 0;
     pollMissedHeld = 0;
     for (i = 0; i < pad_count; ++i)
         result |= readPad(&pad_data[i]);
@@ -856,8 +1148,10 @@ int readPads()
         padDiag.missBurst++;
         if (padDiag.missBurst > padDiag.missBurstMax)
             padDiag.missBurstMax = padDiag.missBurst;
-    } else {
-        // Every ready pad read (or no pads are connected at all): no miss run in progress.
+    } else if (pollPadsInit == 0) {
+        // Every ready pad read (or no pads connected): no miss run in progress. Polls consumed by
+        // an init machine leave the burst UNTOUCHED -- init often fires straight out of a miss
+        // burst, and resetting here would truncate exactly the runs being measured.
         padDiag.missBurst = 0;
     }
 
@@ -1028,8 +1322,11 @@ void unloadPads()
     // deinitEx() entry; this covers the callers that unload pads without going through it.
     padRumbleStopAll();
 
-    for (i = 0; i < pad_count; ++i)
+    for (i = 0; i < pad_count; ++i) {
+        // Abort any in-flight async re-init before its port closes.
+        pad_data[i].initStage = PADINIT_IDLE;
         unloadPad(&pad_data[i]);
+    }
 
     padEnd();
 }
