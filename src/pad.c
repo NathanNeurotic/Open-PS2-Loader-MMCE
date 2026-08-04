@@ -84,9 +84,9 @@ struct pad_data_t
     int rumbleMsLeft;          // ms remaining; ticked down in readPads() (see the ms-vs-frames note there)
 
     // Asynchronous runtime re-init (#340): nonzero initStage = the per-frame init state machine is
-    // in flight for this pad (the pad is not read meanwhile). Replaces the old inline blocking
-    // initializePad at runtime, whose 250-600+ ms GUI blackouts the HW photos measured firing 5-9
-    // times per session (init:N in the Debug HUD) -- those blackouts WERE the felt menu hangs.
+    // in flight for this pad; the pad keeps being read normally meanwhile. Replaces the old inline
+    // blocking initializePad at runtime, whose 250-600+ ms GUI blackouts the HW photos measured
+    // firing 5-9 times per session (init:N in the Debug HUD) -- those blackouts WERE the felt hangs.
     unsigned char initStage;
     unsigned char initIsHeal;   // trigger was the analog self-heal (heal runs consume backoff steps)
     unsigned char healFailures; // consecutive RETRY-completed heals; shifts the self-heal backoff
@@ -182,7 +182,6 @@ static pad_diag_t padDiag;
 // load on real hardware; an emulator's pad never produces one.
 static int pollPadsReady;
 static int pollPadsRead;
-static int pollPadsInit; // pads whose async re-init machine ran this poll (neither ready nor read)
 static u32 pollMissedHeld;
 
 void padGetDiag(pad_diag_t *out)
@@ -730,19 +729,15 @@ static int readPad(struct pad_data_t *pad)
     u32 newpdata = 0;
 
     if (pad->initStage != PADINIT_IDLE) {
-        // A re-init is in flight: advance it one step and skip reading this pad, matching the old
-        // blocking sequence's no-reads-during-init semantics without the GUI blackout. Carry the
-        // held sample for the repeat pause / activity stamp (as the blackout implicitly did by not
-        // running the repeat loop at all), but do NOT count these polls as read misses. PADEMU
-        // ds34 legs are skipped too while the machine runs -- bounded by PADINIT_TOTAL_MS (~2 s
-        // worst case against a fully wedged freepad; typical runs are a few hundred ms).
+        // A re-init is in flight: advance it one step, then fall through and read the pad
+        // NORMALLY. The old blocking sequence went unread during init only because its thread
+        // was busy polling -- the protocol has no such rule: freepad keeps serving reads across
+        // a mode change, and any miss/digital frames it returns are exactly what the per-pad
+        // miss machinery absorbs. HW proof this matters (first composite test, 2026-08-04):
+        // on a freepad that never completes the sequence every heal run burned to the 2002 ms
+        // total cap, and with reads suspended each run was a 2 s hold-scroll freeze -- the last
+        // remaining #340 hang -- while taps between runs stayed tight.
         padInitTick(pad);
-        if (pad->initStage != PADINIT_IDLE) {
-            pollPadsInit++;
-            pollMissedHeld |= pad->paddata;
-            edgedata |= pad->paddata;
-            return 0;
-        }
     }
 
     oldState = pad->state;
@@ -1133,7 +1128,6 @@ int readPads()
 
     pollPadsReady = 0;
     pollPadsRead = 0;
-    pollPadsInit = 0;
     pollMissedHeld = 0;
     for (i = 0; i < pad_count; ++i)
         result |= readPad(&pad_data[i]);
@@ -1148,10 +1142,8 @@ int readPads()
         padDiag.missBurst++;
         if (padDiag.missBurst > padDiag.missBurstMax)
             padDiag.missBurstMax = padDiag.missBurst;
-    } else if (pollPadsInit == 0) {
-        // Every ready pad read (or no pads connected): no miss run in progress. Polls consumed by
-        // an init machine leave the burst UNTOUCHED -- init often fires straight out of a miss
-        // burst, and resetting here would truncate exactly the runs being measured.
+    } else {
+        // Every ready pad read (or no pads connected): no miss run in progress.
         padDiag.missBurst = 0;
     }
 
