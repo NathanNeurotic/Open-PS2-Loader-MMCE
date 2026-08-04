@@ -140,9 +140,9 @@ enum {
     PADINIT_WAIT_ACT_REQ,
     PADINIT_WAIT_READY3, // final settle
 };
-#define PADINIT_READY_MS 500
-#define PADINIT_REQ_MS   1000
-#define PADINIT_TOTAL_MS 2000
+#define PADINIT_READY_MS           500
+#define PADINIT_REQ_MS             1000
+#define PADINIT_TOTAL_MS           2000
 // Consecutive failed self-heals double the retry spacing: 60, 120, 240, 480, 960 good reads
 // (~1 s .. ~16 s). The HW photos showed init:9 in one idle session -- a chronically-flapping
 // freepad was being hammered with mode requests every ~1 s, each attempt itself adding SIO2
