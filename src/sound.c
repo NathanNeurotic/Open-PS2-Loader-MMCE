@@ -5,6 +5,7 @@
  */
 
 #include <audsrv.h>
+#include <delaythread.h>
 #include <timer.h>
 #include <vorbis/vorbisfile.h>
 
@@ -69,6 +70,10 @@ static struct sfxEffect sfx_files[SFX_COUNT] = {
 
 static struct audsrv_adpcm_t sfx[SFX_COUNT];
 static int audio_initialized = 0;
+
+// SFX dispatch thread (#340) -- definitions live below sfxPlay; sfxInit needs the quiesce early.
+static void sfxDispatchQuiesce(void);
+static volatile int sfxDispatchPaused;
 
 #define CURSOR_SFX_CHANNEL_BASE  SFX_COUNT
 #define CURSOR_SFX_CHANNEL_COUNT 6
@@ -204,6 +209,10 @@ int sfxInit(int bootSnd)
         return -1;
     }
 
+    // This function rewrites sfx[] and resets the IOP ADPCM bank (theme reload path): park the
+    // dispatch thread first so no queued entry can hand audsrv a half-reloaded sample (#340).
+    sfxDispatchQuiesce();
+
     audsrv_adpcm_init();
     cursorChannelIndex = 0;
     sfxInitDefaults();
@@ -245,6 +254,8 @@ int sfxInit(int bootSnd)
         }
     }
 
+    sfxDispatchPaused = 0; // sfx[] rewrite complete: re-arm the dispatch path
+
     return loaded;
 }
 
@@ -277,20 +288,31 @@ void sfxGetPlayDiag(unsigned int *lastMs, unsigned int *maxMs)
 // ---- SFX dispatch thread (#340) -------------------------------------------------------------------
 // audsrv_ch_play_adpcm is a synchronous SIF RPC, and the HW photos measured a single cursor-tick
 // RPC blocking the GUI thread for 352 ms under IOP contention (SFX:0/352ms on the Debug HUD).
-// Sounds are queued to a small dedicated thread instead, so the GUI never waits on the IOP for a
-// sound effect; the RPC wall time is still measured (on the dispatch thread) into the same HUD
-// fields, now reporting IOP congestion without implicating the menu. Single producer (GUI thread)
-// / single consumer ring; when the ring is full the sound is DROPPED -- a skipped tick beats a
-// stalled menu. Concurrent audsrv RPCs from another thread are nothing new here: bgmIoThread has
-// always streamed audsrv from its own thread alongside GUI-thread sfx.
+// Sounds are queued to a small dedicated thread instead, so no caller ever waits on the IOP for
+// a sound effect; the RPC wall time is still measured (on the dispatch thread) into the same HUD
+// fields, now reporting IOP congestion without stalling anyone.
+//
+// TWO producers exist: the GUI thread (prio 31) and the ioman worker (prio 30 -- the BD
+// connect/disconnect sounds fire from the deferred menu update), and the worker PREEMPTS the
+// GUI, so the enqueue's slot claim is bracketed with DIntr/EIntr (EE thread preemption requires
+// an interrupt, making that a complete guard). The thread and semaphore are created ONCE from
+// audioInit, which happens-before any producer (both producers gate on audio_initialized).
+// A full ring DROPS the sound -- a skipped tick beats a stalled menu. Concurrent audsrv RPCs
+// from a second thread are nothing new: bgmIoThread has always streamed alongside sfx.
 #define SFX_QUEUE_LEN 8
+// Entries older than this play no more: after an IOP stall clears, replaying the backlog of
+// stacked cursor ticks would chirp all rotation channels back-to-back.
+#define SFX_STALE_TICKS (100 * SFX_CLOCKS_PER_MS)
 static struct
 {
     int channel;
     int id;
+    u32 ticks;
 } sfxQueue[SFX_QUEUE_LEN];
-static volatile int sfxQHead = 0; // advanced by the producer only
-static volatile int sfxQTail = 0; // advanced by the consumer only
+static volatile int sfxQHead = 0;          // advanced by producers (GUI + ioman worker), DIntr-guarded
+static volatile int sfxQTail = 0;          // advanced by the consumer only
+static volatile int sfxDispatchPaused = 0; // quiesce flag: queued entries drain UNPLAYED
+static volatile int sfxDispatchBusy = 0;   // consumer is inside the audsrv RPC
 static int sfxDispatchSema = -1;
 static int sfxDispatchTid = -1;
 static u8 sfxDispatchStack[8 * 1024] __attribute__((aligned(16)));
@@ -305,10 +327,17 @@ static void sfxDispatchThread(void *arg)
         while (sfxQTail != sfxQHead) {
             int channel = sfxQueue[sfxQTail].channel;
             int id = sfxQueue[sfxQTail].id;
+            u32 ticks = sfxQueue[sfxQTail].ticks;
             sfxQTail = (sfxQTail + 1) % SFX_QUEUE_LEN;
 
-            if (!audio_initialized) // shutdown raced a queued sound: skip the RPC
+            // busy goes up BEFORE the gates: the quiescers set paused and then wait for
+            // (empty && !busy), so an entry that passed the gates is always covered by busy.
+            sfxDispatchBusy = 1;
+            if (sfxDispatchPaused || !audio_initialized ||
+                (id == SFX_CURSOR && (u32)(cpu_ticks() - ticks) > SFX_STALE_TICKS)) {
+                sfxDispatchBusy = 0;
                 continue;
+            }
 
             u32 start = cpu_ticks();
             audsrv_ch_play_adpcm(channel, &sfx[id]);
@@ -316,24 +345,27 @@ static void sfxDispatchThread(void *arg)
             sfxLastPlayMs = costMs;
             if (costMs > sfxMaxPlayMs)
                 sfxMaxPlayMs = costMs;
+            sfxDispatchBusy = 0;
         }
     }
 }
 
-// Lazily created on the first play (GUI thread only). Returns nonzero when the dispatch path is
-// usable; on thread-creation failure the caller falls back to the old synchronous RPC.
-static int sfxDispatchEnsure(void)
+// Called from audioInit BEFORE audio_initialized flips on -- creation happens-before any
+// producer, so the lazy double-create race cannot exist. On failure sfxPlay falls back to the
+// old synchronous RPC.
+static void sfxDispatchStart(void)
 {
     if (sfxDispatchTid >= 0)
-        return 1;
+        return;
 
     ee_sema_t sema;
     sema.init_count = 0;
     sema.max_count = SFX_QUEUE_LEN;
+    sema.attr = 0;
     sema.option = 0;
     sfxDispatchSema = CreateSema(&sema);
     if (sfxDispatchSema < 0)
-        return 0;
+        return;
 
     ee_thread_t thread;
     thread.func = &sfxDispatchThread;
@@ -347,21 +379,45 @@ static int sfxDispatchEnsure(void)
     if (sfxDispatchTid < 0) {
         DeleteSema(sfxDispatchSema);
         sfxDispatchSema = -1;
-        return 0;
+        return;
     }
     StartThread(sfxDispatchTid, NULL);
-    return 1;
+}
+
+// Park the consumer: no RPC is in flight when this returns. Required before sfx[] is rewritten
+// (sfxInit theme reload -- a queued entry playing a half-reloaded sample would hand audsrv a torn
+// descriptor) and before audsrv_quit (audioEnd -- an RPC crossing the quit, or the NBD path's
+// IOP reset, wedges the thread forever). Bounded; the prio-45 thread drains during the yields.
+// The caller re-arms with sfxDispatchPaused = 0 once its rewrite is complete.
+static void sfxDispatchQuiesce(void)
+{
+    int spins;
+
+    if (sfxDispatchTid < 0)
+        return;
+    sfxDispatchPaused = 1;
+    SignalSema(sfxDispatchSema); // wake it so queued entries drain (unplayed)
+    for (spins = 0; spins < 500 && (sfxQTail != sfxQHead || sfxDispatchBusy); spins++)
+        DelayThread(1000);
 }
 
 static void sfxEnqueue(int channel, int id)
 {
-    int next = (sfxQHead + 1) % SFX_QUEUE_LEN;
+    if (sfxDispatchPaused)
+        return;
 
-    if (next == sfxQTail)
+    // Two producers on different priorities: claim the slot atomically.
+    DIntr();
+    int next = (sfxQHead + 1) % SFX_QUEUE_LEN;
+    if (next == sfxQTail) {
+        EIntr();
         return; // ring full under IOP congestion: drop the sound, never the frame
+    }
     sfxQueue[sfxQHead].channel = channel;
     sfxQueue[sfxQHead].id = id;
+    sfxQueue[sfxQHead].ticks = cpu_ticks();
     sfxQHead = next;
+    EIntr();
     SignalSema(sfxDispatchSema);
 }
 
@@ -426,10 +482,10 @@ void sfxPlay(int id)
         }
 
         // Volumes are configured once by audioSetVolume(). Replaying a rotation channel replaces
-        // its old sample in one SIF RPC -- issued from the dispatch thread so the GUI never waits
-        // on the IOP for a sound (#340; HW measured a 352 ms worst case inline). Synchronous
-        // fallback only if the dispatch thread could not be created.
-        if (sfxDispatchEnsure()) {
+        // its old sample in one SIF RPC -- issued from the dispatch thread so the caller never
+        // waits on the IOP for a sound (#340; HW measured a 352 ms worst case inline). Synchronous
+        // fallback only if the dispatch thread could not be created at audioInit.
+        if (sfxDispatchTid >= 0) {
             sfxEnqueue(channel, id);
         } else {
             audsrv_ch_play_adpcm(channel, &sfx[id]);
@@ -772,6 +828,10 @@ void audioInit(void)
             LOG("AUDIO: Audsrv returned error string: %s\n", audsrv_get_error_string());
             return;
         }
+        // Create-before-enable: every sfx producer gates on audio_initialized, so the dispatch
+        // thread exists before any producer can run (#340).
+        sfxDispatchStart();
+        sfxDispatchPaused = 0;
         audio_initialized = 1;
     }
 }
@@ -789,6 +849,10 @@ void audioEnd(void)
      * but bgmDeinit() was never called, leaking the semaphores and thread handles. */
     if (isBgmPlaying() || bgmIoThreadRunning || bgmThreadRunning)
         bgmStop();
+
+    // No sfx RPC may cross audsrv_quit (or the NBD path's later IOP reset -- an RPC in flight
+    // across either wedges the dispatch thread forever). Stays paused; audioInit re-arms.
+    sfxDispatchQuiesce();
 
     audsrv_quit();
     audio_initialized = 0;
