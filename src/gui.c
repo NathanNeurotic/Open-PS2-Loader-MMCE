@@ -2763,6 +2763,23 @@ static void guiShow()
         screenHandler->renderScreen();
 }
 
+// A message box or modal wait raised mid-transition must land on the DESTINATION screen:
+// letting the fade keep running behind it renders the OLD screen for the first half -- reported
+// as "error messages always have the previous frame as their background". Snapping makes the same
+// assignments guiShow() makes when the fade completes naturally (transIndex == transition_frames).
+// One deliberate timing shift: the padFreezeEdgeBaseline input freeze, gated on
+// screenHandlerTarget != NULL, releases up to ~13 frames earlier than the fade would have. Benign
+// -- the box consumes its own edge-triggered dismiss (getKeyOn) and the transition-triggering
+// button is long released by the time a box is dismissed.
+static void guiSnapTransition(void)
+{
+    if (screenHandlerTarget) {
+        screenHandler = screenHandlerTarget;
+        screenHandlerTarget = NULL;
+        transIndex = 0;
+    }
+}
+
 void guiIntroLoop(void)
 {
     int greetingAlpha = 0x80;
@@ -2906,6 +2923,14 @@ int guiMsgBox(const char *text, int addAccept, struct UIItem *ui)
 {
     int terminate = 0;
 
+    // Background contract (the "error box shows the previous frame" report): a box raised while a
+    // screen transition is in flight must land on the DESTINATION screen -- letting the fade keep
+    // running renders the OLD screen behind the box for the first half. Snap it. (The dialog-flow
+    // background case, rendering the settings dialog rather than the main screen behind the box, is
+    // intentionally NOT handled here: the deferred error hook fires after the dialog's stack-local
+    // enum arrays have died, and rendering it then would deref freed stack -- the #154 landmine.)
+    guiSnapTransition();
+
     sfxPlay(SFX_MESSAGE);
 
     while (!terminate) {
@@ -3039,6 +3064,10 @@ void guiGameHandleDeferedIO(int *ptr, struct UIItem *ui, int type, void *data)
 
 void guiRenderTextScreen(const char *message)
 {
+    // Same transition contract as guiMsgBox: land any in-flight fade so the wait screen does not
+    // sit on the old screen mid-transition.
+    guiSnapTransition();
+
     guiStartFrame();
 
     guiShow();
