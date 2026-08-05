@@ -88,10 +88,12 @@ struct pad_data_t
     // blocking initializePad at runtime, whose 250-600+ ms GUI blackouts the HW photos measured
     // firing 5-9 times per session (init:N in the Debug HUD) -- those blackouts WERE the felt hangs.
     unsigned char initStage;
-    unsigned char initIsHeal;   // trigger was the analog self-heal (heal runs consume backoff steps)
-    unsigned char healFailures; // consecutive RETRY-completed heals; shifts the self-heal backoff
-    u32 stageStartMs;           // curtime when the current stage began (per-stage ms budgets)
-    u32 initStartMs;            // curtime at trigger: total wall cap + HUD reinit cost fields
+    unsigned char initIsHeal;    // trigger was the analog self-heal (vs a genuine replug)
+    unsigned char healFailures;  // consecutive RETRY-completed runs; backoff shift + give-up counter
+    unsigned char unplugHandled; // the long-dwell unplug housekeeping ran for the current DISCONN
+    u32 stageStartMs;            // curtime when the current stage began (per-stage ms budgets)
+    u32 initStartMs;             // curtime at trigger: total wall cap + HUD reinit cost fields
+    u32 disconnStartMs;          // curtime when the current DISCONN began (flap-vs-replug dwell)
 };
 
 // Pad commands are asynchronous. Keep every wait bounded so a transient SIO2/pad error cannot hang the
@@ -156,6 +158,14 @@ enum {
 // during the machine). The d-pad works fine in digital mode -- on such a pad, giving up the
 // analog re-arm buys uninterrupted input, which is the better trade everywhere.
 #define PAD_HEAL_GIVE_UP           2
+// Flap-vs-replug discriminator (#340 v4). freepad drops to DISCONN under sustained read errors
+// and reconnects within 1-2 polls (~16-33 ms); a human unplug+replug dwells hundreds of ms at
+// minimum. A DISCONN shorter than this is a FLAP: the held sample is kept (no forged release ->
+// no phantom step/confirm, no repeat reset) and NO re-init fires (v3's give-up was dead code on
+// a flappy pad: every flap reset healFailures and ran an un-counted reconnect init -- up to ~6 s
+// of mode-window read outage per flap). Only a longer dwell is treated as a real unplug, with
+// the clean-slate housekeeping and a fresh init + give-up reset on reconnection.
+#define PAD_FLAP_DWELL_MS          300
 
 /// current time in miliseconds (last update time)
 static u32 curtime = 0;
@@ -438,8 +448,16 @@ static int initializePad(struct pad_data_t *pad)
 
 static void updatePadState(struct pad_data_t *pad, int state)
 { // To simplify processing, monitor only Disconnected, FindCTP1 & Stable states.
-    if ((state == PAD_STATE_DISCONN) || (state == PAD_STATE_STABLE) || (state == PAD_STATE_FINDCTP1))
+    if ((state == PAD_STATE_DISCONN) || (state == PAD_STATE_STABLE) || (state == PAD_STATE_FINDCTP1)) {
+        // Single choke point for the ready->DISCONN edge (both the normal read path and the init
+        // machine sample state through here): stamp the dwell clock for the flap-vs-replug
+        // discriminator and re-arm the one-shot unplug housekeeping.
+        if (state == PAD_STATE_DISCONN && pad->state != PAD_STATE_DISCONN) {
+            pad->disconnStartMs = curtime;
+            pad->unplugHandled = 0;
+        }
         pad->state = state;
+    }
 }
 
 // ---- Async runtime re-init (#340) -----------------------------------------------------------------
@@ -475,10 +493,11 @@ static void padInitFinish(struct pad_data_t *pad, int rc)
         padDiag.reinitMaxMs = costMs;
     pad->initStage = PADINIT_IDLE;
 
-    // Only failed HEAL runs consume backoff steps: a reconnect-edge run failing (plug settle,
-    // empty mode table) says nothing about the self-heal's prospects. Any successful run resets.
+    // EVERY failed run consumes a give-up step (v4): the v3 audit showed a flappy pad cycling
+    // reconnect-edge runs that were never counted, keeping the give-up unreachable. A genuine
+    // replug resets the budget at its reconnect edge; any successful run resets it here.
     if (rc == PAD_INIT_RETRY) {
-        if (pad->initIsHeal && pad->healFailures < PAD_HEAL_BACKOFF_MAX_SHIFT)
+        if (pad->healFailures < PAD_HEAL_BACKOFF_MAX_SHIFT)
             pad->healFailures++;
     } else {
         pad->healFailures = 0;
@@ -496,12 +515,15 @@ static void padInitStage(struct pad_data_t *pad, int stage)
     pad->stageStartMs = curtime;
 }
 
-// A real unplug observed MID-machine: the machine's own updatePadState calls consume the
-// DISCONN transition the normal readPad branch would have handled, so do the full unplug
-// housekeeping here (drop the held sample at once, forget the analog verdict).
+// DISCONN observed MID-machine. A short dwell is a flap: keep waiting -- the stage budgets and
+// the total cap already bound the run, and aborting on a 1-2 poll flap would churn init runs.
+// Only a dwell that proves a real unplug finishes the run and does the clean-slate housekeeping
+// (the machine's own updatePadState consumed the transition the normal readPad branch handles).
 static int padInitCheckDisconn(struct pad_data_t *pad, int state)
 {
     if (state != PAD_STATE_DISCONN)
+        return 0;
+    if ((u32)(curtime - pad->disconnStartMs) < PAD_FLAP_DWELL_MS)
         return 0;
 
     LOG("PAD pad %d,%d unplugged mid-init\n", pad->port, pad->slot);
@@ -509,6 +531,7 @@ static int padInitCheckDisconn(struct pad_data_t *pad, int state)
     pad->analogCapable = -1;
     pad->analogRetryDelay = 0;
     pad->paddata = 0;
+    pad->unplugHandled = 1;
     return 1;
 }
 
@@ -536,6 +559,16 @@ static void padInitTick(struct pad_data_t *pad)
             break;
 
         case PADINIT_CHECK_MODES: {
+            // Last exit before a mode request is issued: the machine was started while idle, but
+            // WAIT_READY0 can take up to 500 ms -- if the user resumed pressing in that window,
+            // abort WITHOUT consuming a give-up step (no request is in flight yet; the trigger
+            // re-fires after the next quiet second). Once padSetMainMode is issued freepad parks
+            // READ_DATA until it resolves, so past this point the run must ride out.
+            if ((u32)(curtime - lastInputActivityMs) < PAD_SELF_HEAL_IDLE_MS) {
+                pad->initStage = PADINIT_IDLE;
+                padDiag.reinitDefers++;
+                break;
+            }
             // Mode-table reads are synchronous shared-memory queries; padSetMainMode issues one
             // request. All cheap -- the whole stage is a single frame.
             modes = padInfoMode(pad->port, pad->slot, PAD_MODETABLE, -1);
@@ -753,27 +786,33 @@ static int readPad(struct pad_data_t *pad)
     updatePadState(pad, newState);
 
     if (oldState == PAD_STATE_DISCONN && isPadReadyState(pad->state)) {
-        // Pad just connected.
-        LOG("PAD pad %d,%d connected\n", pad->port, pad->slot);
-        pad->analogCapable = -1;
-        pad->analogRetryDelay = 0;
-        pad->healFailures = 0; // a fresh physical connection deserves a fresh self-heal backoff
         padDiag.stateFlaps++;
-        // Idle-gated (#271): the init no longer blocks the GUI (async state machine, #340), but it
-        // still adds SIO2 mode traffic to the very bus whose errors drive reconnect flaps, so keep
-        // deferring while input is active: a digital-mode pad still reads every d-pad press, and
-        // the self-heal branch below picks the init up on the first poll after a second of quiet.
-        if ((u32)(curtime - lastInputActivityMs) >= PAD_SELF_HEAL_IDLE_MS)
-            padInitBegin(pad, 0);
-        else
-            padDiag.reinitDefers++;
+        if ((u32)(curtime - pad->disconnStartMs) >= PAD_FLAP_DWELL_MS || pad->unplugHandled) {
+            // A GENUINE replug (long DISCONN dwell): clean slate, fresh give-up budget, and a
+            // full init. Idle-gated (#271): the init no longer blocks the GUI (async machine,
+            // #340), but its mode traffic rides the very bus whose errors drive flaps, so keep
+            // deferring while input is active -- a digital-mode pad still reads every press.
+            LOG("PAD pad %d,%d connected\n", pad->port, pad->slot);
+            pad->analogCapable = -1;
+            pad->analogRetryDelay = 0;
+            pad->healFailures = 0;
+            if ((u32)(curtime - lastInputActivityMs) >= PAD_SELF_HEAL_IDLE_MS)
+                padInitBegin(pad, 0);
+            else
+                padDiag.reinitDefers++;
+        } else {
+            // A FLAP: freepad dropped to DISCONN under read errors and recovered within the
+            // dwell. The held sample was never dropped (see the DISCONN accounting below), so
+            // no edge is forged and no repeat state was lost -- and critically, NO re-init
+            // fires and the give-up budget is NOT reset: v3's give-up was unreachable on a
+            // flappy pad precisely because every flap re-armed it and ran an un-counted init.
+            LOG("PAD pad %d,%d flap recovered\n", pad->port, pad->slot);
+        }
     } else if (oldState != PAD_STATE_DISCONN && pad->state == PAD_STATE_DISCONN) {
-        // The pad may transit from any state to disconnected. A real unplug is not a transient
-        // miss: drop the held sample at once so a re-plug starts from a clean slate.
+        // Entered DISCONN. Do NOT drop the held sample yet: a flap lasts 1-2 polls and dropping
+        // it forged a release+re-press on recovery (phantom step / double-confirm -- the SKIP
+        // half of #340). The unplug housekeeping runs below once the dwell proves a real unplug.
         LOG("PAD pad %d,%d disconnected\n", pad->port, pad->slot);
-        pad->analogCapable = -1;
-        pad->analogRetryDelay = 0;
-        pad->paddata = 0;
     }
 
     if (isPadReadyState(pad->state)) {
@@ -859,10 +898,20 @@ static int readPad(struct pad_data_t *pad)
     }
 
     if (pad->state == PAD_STATE_DISCONN && padsRead == 0) {
-        // Nothing is supplying this port any more (a ds34 pad that stopped reporting; native
-        // unplugs were already zeroed on the DISCONN transition above). Without this, the last
-        // sample would sit in edgedata forever and hold the repeat pause / activity stamp open.
-        pad->paddata = 0;
+        if ((u32)(curtime - pad->disconnStartMs) < PAD_FLAP_DWELL_MS) {
+            // Inside the flap dwell: treat the DISCONN poll exactly like a read miss -- carry
+            // the held sample so the repeat countdown pauses and no release edge is forged.
+            pollMissedHeld |= pad->paddata;
+        } else if (!pad->unplugHandled) {
+            // Dwell exceeded: this is a real unplug (or a ds34 pad that stopped reporting).
+            // One-shot clean-slate housekeeping; without it the last sample would sit in
+            // edgedata forever and hold the repeat pause / activity stamp open.
+            LOG("PAD pad %d,%d unplug confirmed (dwell)\n", pad->port, pad->slot);
+            pad->paddata = 0;
+            pad->analogCapable = -1;
+            pad->analogRetryDelay = 0;
+            pad->unplugHandled = 1;
+        }
     } else if (isPadReadyState(pad->state) && padsRead == 0) {
         // This pad MISSED: ready state, no fresh sample. Remember its carried held bits for the
         // repeat loop and the activity stamp.
