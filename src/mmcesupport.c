@@ -370,15 +370,27 @@ void mmceSetPrefix(void)
 
 void mmceLoadModules(void)
 {
-    // mmceman is a singleton -- loading the IRX buffer twice creates a 2nd instance. Guard so this is
-    // idempotent: mmceInit calls it, and the BDMA equip now also calls it (to wake an MMCE source when
-    // MMCE games are off / Manual-not-started). Set the flag first so a partial load can't double-load.
+    // TEST-ONLY BUILD (#340 diagnosis, DO NOT MERGE): never load mmceman into the menu IOP,
+    // regardless of config. mmceman's hook permanently replaces sio2man's sio2_transfer export
+    // and relinks freepad's import table; every MMCE command takes sio2man's exclusive lock and
+    // swaps the global SIO2 interrupt handler, and with no MMCE hardware each probe burns its
+    // full 200 ms timeout while freepad's vblank pad reads block (~12-13 missed polls -- the
+    // exact burst signature measured on HW). Official OPL / sOPL / uOPL ship no mmceman and are
+    // smooth on the same console; this build tests whether removing ONLY this module makes
+    // RiptOPL match them, on the tester's UNCHANGED config (his July-era settings_riptopl.cfg
+    // almost certainly still carries mmce_gameid=1 from the default-ON era). MMCE features are
+    // expectedly dead in this build -- USB-only test rig.
+    LOG("MMCESUPPORT LoadModules SUPPRESSED (#340 diagnostic build)\n");
+    mmceModLoaded = 1; // keep callers' idempotence expectations; nothing is actually loaded
+
+    /* -- original body --
     if (mmceModLoaded)
         return;
     mmceModLoaded = 1;
     LOG("MMCESUPPORT LoadModules\n");
     LOG("[MMCEMAN]:\n");
     sysLoadModuleBuffer(&mmceman_irx, size_mmceman_irx, 0, NULL);
+    */
 }
 
 // Δ4 (NHDDL parity): arm the GameID transport OUTSIDE the launch path. NHDDL loads mmceman once at
