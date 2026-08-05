@@ -106,7 +106,8 @@ void udpfsInit(item_list_t *itemList)
     udpfsModifiedDVDPrev = 0;
     udpfsGameCount = 0;
     udpfsGames = NULL;
-    udpfsGameList.delay = MENU_MIN_INACTIVE_FRAMES; // NAV-PARITY (#340): official uses this fixed 8-frame settle, not the fork Art Delay setting
+    // NAV-PARITY TEST BUILD (#340): official's fixed 8-frame art settle, not the fork Art Delay setting.
+    udpfsGameList.delay = MENU_MIN_INACTIVE_FRAMES;
     ioPutRequest(IO_CUSTOM_SIMPLEACTION, &udpfsLoadModules);
     udpfsGameList.enabled = 1;
 }

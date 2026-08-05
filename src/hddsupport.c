@@ -404,7 +404,8 @@ void hddInit(item_list_t *itemList)
 {
     LOG("HDDSUPPORT Init\n");
     hddForceUpdate = 0; // Use cache at initial startup.
-    hddGameList.delay = MENU_MIN_INACTIVE_FRAMES; // NAV-PARITY (#340): official uses this fixed 8-frame settle, not the fork Art Delay setting
+    // NAV-PARITY TEST BUILD (#340): official's fixed 8-frame art settle, not the fork Art Delay setting.
+    hddGameList.delay = MENU_MIN_INACTIVE_FRAMES;
     ioPutRequest(IO_CUSTOM_SIMPLEACTION, &hddInitModules);
     hddGameList.enabled = 1;
 }

@@ -1213,7 +1213,8 @@ void guiShowArtworkConfig(void)
             item_list_t *lists[] = {appGetObject(1), hddGetObject(1), ethGetObject(1), mmceGetObject(1), udpfsGetObject(1), favGetObject(1)};
             for (int i = 0; i < 6; i++) {
                 if (lists[i] != NULL)
-                    lists[i]->delay = MENU_MIN_INACTIVE_FRAMES; // NAV-PARITY (#340): official uses this fixed 8-frame settle, not the fork Art Delay setting
+                    // NAV-PARITY TEST BUILD (#340): official's fixed 8-frame art settle, not the fork Art Delay setting.
+                    lists[i]->delay = MENU_MIN_INACTIVE_FRAMES;
             }
         }
 

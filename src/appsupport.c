@@ -410,7 +410,8 @@ void appInit(item_list_t *itemList)
 {
     LOG("APPSUPPORT Init\n");
     appForceUpdate = 1;
-    appItemList.delay = MENU_MIN_INACTIVE_FRAMES; // NAV-PARITY (#340): official uses this fixed 8-frame settle, not the fork Art Delay setting
+    // NAV-PARITY TEST BUILD (#340): official's fixed 8-frame art settle, not the fork Art Delay setting.
+    appItemList.delay = MENU_MIN_INACTIVE_FRAMES;
     if (configApps != NULL)
         configFree(configApps);
     configApps = oplGetLegacyAppsConfig();

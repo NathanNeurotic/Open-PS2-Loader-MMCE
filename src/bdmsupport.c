@@ -452,7 +452,8 @@ static void bdmInit(item_list_t *itemList)
     pDeviceData->bdmDeviceType = BDM_TYPE_UNKNOWN;
     pDeviceData->bdmHddIsLBA48 = -1;
     pDeviceData->ataHighestUDMAMode = -1;
-    itemList->delay = MENU_MIN_INACTIVE_FRAMES; // NAV-PARITY (#340): official uses this fixed 8-frame settle, not the fork Art Delay setting
+    // NAV-PARITY TEST BUILD (#340): official's fixed 8-frame art settle, not the fork Art Delay setting.
+    itemList->delay = MENU_MIN_INACTIVE_FRAMES;
     bdmLoadModules();
     itemList->enabled = 1;
 }
