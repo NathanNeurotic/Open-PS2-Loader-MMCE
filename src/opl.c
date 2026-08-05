@@ -1959,6 +1959,26 @@ static void _loadConfig()
                         (gNetworkProtocol == NET_PROTO_UDPFS || gNetworkProtocol == NET_PROTO_UDPFSBD ||
                          gNetworkProtocol == NET_PROTO_UDPBD));
 
+    // MAXIMAL-QUIET TEST BUILD (#340, DO NOT MERGE) -- force every fork-only menu-time subsystem
+    // OFF regardless of the saved config, so the running environment matches official OPL's as
+    // closely as our binary can. Each of these is work official's menu does NOT do while the user
+    // navigates, and each is a candidate for manufacturing the pad-read misses:
+    //   art/BG art  -> the whole fork texcache IO pipeline (1139 lines vs official's 175): per-
+    //                  selection cover + background reads on the USB/IOP path
+    //   SFX/BootSND -> per-cursor-move audsrv SIF RPC (official defaults these OFF; the tester's
+    //                  official comparison therefore ran silent)
+    //   BGM         -> continuous ogg streaming off the USB device
+    //   rumble      -> per-frame padSetActDirect RPCs while a pulse is armed
+    //   autoRefresh -> background device rescans
+    // mmceman's menu-time load is suppressed separately in mmcesupport.c.
+    gEnableArt = 0;
+    gEnableBGArt = 0;
+    gEnableSFX = 0;
+    gEnableBootSND = 0;
+    gEnableBGM = 0;
+    gEnableRumble = 0;
+    gAutoRefresh = 0;
+
     applyConfig(themeID, langID, 0);
 
     lscret = result;

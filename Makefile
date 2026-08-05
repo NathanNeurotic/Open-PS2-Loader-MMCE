@@ -34,7 +34,11 @@ RTL ?= $(EXTRA_FEATURES)
 IGS ?= $(EXTRA_FEATURES)
 
 #Enables/disables pad emulator
-PADEMU ?= 1
+# MAXIMAL-QUIET TEST BUILD (#340, DO NOT MERGE): PADEMU compiled OUT. Its per-poll
+# ds34usb/ds34bt status+data+rumble calls run for every pad every frame in the menu; official
+# builds it too, so this is not a fork discriminator -- but this build removes EVERY optional
+# per-frame consumer at once, and PADEMU is one of them. DS3/DS4/DS5 pads will not work here.
+PADEMU ?= 0
 
 #Enables/disables PS5 DualSense (USB) support in the pad emulator. HW-VALIDATED on a real DS5
 #(maintainer, 2026-07-06) but kept OFF in the default build by deliberate choice -- the rolling

@@ -370,15 +370,12 @@ void mmceSetPrefix(void)
 
 void mmceLoadModules(void)
 {
-    // mmceman is a singleton -- loading the IRX buffer twice creates a 2nd instance. Guard so this is
-    // idempotent: mmceInit calls it, and the BDMA equip now also calls it (to wake an MMCE source when
-    // MMCE games are off / Manual-not-started). Set the flag first so a partial load can't double-load.
-    if (mmceModLoaded)
-        return;
+    // MAXIMAL-QUIET TEST BUILD (#340, DO NOT MERGE): never load mmceman into the menu IOP,
+    // config ignored. Its hook replaces sio2man's sio2_transfer export and relinks freepad's
+    // import table; with no MMCE hardware each probe burns a 200 ms timeout while freepad's
+    // vblank pad reads block. Official OPL, sOPL and uOPL ship no mmceman at all.
+    LOG("MMCESUPPORT LoadModules SUPPRESSED (#340 maximal-quiet build)\n");
     mmceModLoaded = 1;
-    LOG("MMCESUPPORT LoadModules\n");
-    LOG("[MMCEMAN]:\n");
-    sysLoadModuleBuffer(&mmceman_irx, size_mmceman_irx, 0, NULL);
 }
 
 // Δ4 (NHDDL parity): arm the GameID transport OUTSIDE the launch path. NHDDL loads mmceman once at
