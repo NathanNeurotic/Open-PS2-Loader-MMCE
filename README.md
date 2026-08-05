@@ -1,3 +1,5 @@
+<img width="1254" height="1254" alt="image" src="https://github.com/user-attachments/assets/99d01aa1-6546-435d-9851-7006ab2274e7" />
+
 ![logo](https://github.com/user-attachments/assets/bdf46f3c-a749-4128-a4c3-e0f968a31897)
 ```HAS THIS EVER HAPPENED TO YOU?```
 ```You download another OPL fork. It has a new theme. A new menu. Maybe even a file browser, because apparently launching games was too direct and somebody needed a side quest.```
