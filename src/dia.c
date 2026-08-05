@@ -1043,16 +1043,10 @@ static void diaRestoreScrollSpeed(void)
 */
 static int diaScrollDelay(void)
 {
-    int delay = 500 - gScrollSpeed * 200; // mirrors guiUpdateScrollSpeed()
-
-    // gScrollSpeed is sanitised to 0..2 by guiUpdateScrollSpeed, but this runs on paths that may
-    // not have gone through it yet; clamp rather than trust it.
-    if (delay < DIA_SCROLL_MIN_MS)
-        delay = DIA_SCROLL_MIN_MS;
-    if (delay > 500)
-        delay = 500;
-
-    return delay;
+    // NAV-PARITY TEST BUILD (#340): official's dialogs use a FIXED 300 ms repeat delay
+    // (DIA_SCROLL_SPEED) and ignore Scroll Speed entirely. The fork's scroll-speed mapping is
+    // one of the navigation behaviours under test.
+    return 300;
 }
 
 static struct UIItem *diaFindByID(struct UIItem *ui, int id)
@@ -1097,10 +1091,8 @@ int diaExecuteDialog(struct UIItem *ui, int uiId, short inMenu, int (*updater)(i
     while (1) {
         rmStartFrame();
         diaRenderUI(ui, inMenu, cur, haveFocus);
-        // Settings dialogs render directly, never reaching guiDrawOverlays -- so the Debug-
-        // Colors instrumentation line (#271/#272) must be drawn here too, in exactly the
-        // dialogs where the settings-scroll reports live. No-op unless Debug Colors is on.
-        guiDrawDebugLine();
+        // NAV-PARITY TEST BUILD (#340): no HUD in the dialog loop -- official's is
+        // rmStartFrame / diaRenderUI / rmEndFrame / readPads and nothing else.
         rmEndFrame();
 
         readPads();

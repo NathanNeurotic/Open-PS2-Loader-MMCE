@@ -1067,9 +1067,11 @@ GSTEXTURE *cacheGetTexture(image_cache_t *cache, item_list_t *list, int *cacheId
         }
     }
 
-    if (effectiveMode == MMCE_MODE &&
-        (cacheIsNavigationActive() ||
-         guiInactiveFrames < cacheGetArtIdleFrames(cache, (list != NULL) ? list->delay : gArtDelay))) {
+    // NAV-PARITY TEST BUILD (#340): official gates EVERY art request behind the list's idle
+    // settle (`guiInactiveFrames < list->delay`), for every device -- not MMCE-only, and with no
+    // cacheIsNavigationActive() pad reads from the render path. So while the user is scrolling,
+    // NO art request is enqueued at all; they go out once the selection settles.
+    if (guiInactiveFrames < ((list != NULL) ? list->delay : MENU_MIN_INACTIVE_FRAMES)) {
         cacheUnlock();
         return NULL;
     }

@@ -209,8 +209,7 @@ static void _menuLoadConfig()
     }
     SignalSema(menuSemaId);
 
-    if (blockingLoad)
-        (void)cacheCancelPendingImageLoadsTimed(MENU_MIN_INACTIVE_FRAMES);
+    // NAV-PARITY TEST BUILD (#340): no art-queue drain before a per-item config read.
 
     if (list != NULL)
         loadedConfig = list->itemGetConfig(list, configId);
@@ -302,16 +301,15 @@ static void _menuRequestConfig()
             itemConfig = NULL;
         }
         item_list_t *list = selected_item->item->userdata;
-        int configIdleFrames = list->mode == APP_MODE ? MENU_APP_CONFIG_IDLE_FRAMES : list->delay;
+        // NAV-PARITY TEST BUILD (#340): official gates the per-item CFG load on list->delay alone
+        // (no APP_MODE 1-frame fast path) and has no "retry a NULL load" re-queue branch.
+        int configIdleFrames = list->delay;
 
         if (itemConfigId == -1 || guiInactiveFrames >= configIdleFrames) {
             itemConfigId = selected_item->item->current->item.id;
             shouldQueueLoad = 1;
             visibleLoad = actionStatus != 0;
         }
-    } else if (itemConfig == NULL && actionStatus != 0) {
-        shouldQueueLoad = 1;
-        visibleLoad = 1;
     } else
         actionStatus = 0;
 
@@ -1275,9 +1273,9 @@ static void menuRenderElements(theme_elems_t *elems, int allowItemConfig, config
 {
     // selected_item can't be NULL here as we only allow to switch to "Main" rendering when there is at least one device activated
     theme_element_t *elem = elems->first;
-    item_list_t *list = selected_item != NULL && selected_item->item != NULL ? selected_item->item->userdata : NULL;
-
-    if (allowItemConfig && elems->needsItemConfig && menuCanRequestItemConfig(list))
+    // NAV-PARITY TEST BUILD (#340): official calls _menuRequestConfig() unconditionally from the
+    // render path -- no needsItemConfig theme flag, no menuCanRequestItemConfig settle gate.
+    if (allowItemConfig)
         _menuRequestConfig();
 
     WaitSema(menuSemaId);

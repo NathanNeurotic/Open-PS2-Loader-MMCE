@@ -1213,7 +1213,7 @@ void guiShowArtworkConfig(void)
             item_list_t *lists[] = {appGetObject(1), hddGetObject(1), ethGetObject(1), mmceGetObject(1), udpfsGetObject(1), favGetObject(1)};
             for (int i = 0; i < 6; i++) {
                 if (lists[i] != NULL)
-                    lists[i]->delay = gArtDelay;
+                    lists[i]->delay = MENU_MIN_INACTIVE_FRAMES; // NAV-PARITY (#340): official uses this fixed 8-frame settle, not the fork Art Delay setting
             }
         }
 
@@ -2705,25 +2705,21 @@ static void guiDrawOverlays()
     // if (gEnableDebug)
     //     fntRenderString(gTheme->fonts[0], 0, screenHeight - 24, ALIGN_NONE, 0, 0, blurttext, GS_SETREG_RGBA(255, 255, 0, 128));
 
-    // Debug-Colors instrumentation (#271/#272/#296). Steps aside during coverflow slides:
-    // binding the font atlas every frame can evict cover textures from the near-saturated VRAM
-    // arena mid-animation (the historic #120 HUD note).
-    if (!thmCoverflowIsAnimating())
-        guiDrawDebugLine();
+    // NAV-PARITY TEST BUILD (#340): the per-frame Debug-Colors HUD is gone -- official draws no
+    // such line, and it costs a font-atlas bind plus ~120 glyphs every menu frame when enabled.
 }
 
 static void guiReadPads()
 {
-    // A transition polls without dispatching input. Freeze against the triggering sample so that
-    // button cannot replay on the destination, while a different button held through the fade can.
-    padFreezeEdgeBaseline(screenHandlerTarget != NULL);
-
+    // NAV-PARITY TEST BUILD (#340): official's guiReadPads is a PURE pad poll. The fork added the
+    // transition edge-freeze, an INT_MAX clamp, and cachePumpPendingArt -- the last of which takes
+    // the art worker's semaphore and walks the request list ON THE GUI THREAD INSIDE THE INPUT
+    // POLL every frame, so a pad read can block behind the art thread. Art still loads: the queue
+    // is pumped from cacheGetTexture and the worker is woken at enqueue time.
     if (readPads())
         guiInactiveFrames = 0;
-    else if (guiInactiveFrames < INT_MAX)
+    else
         guiInactiveFrames++;
-
-    cachePumpPendingArt();
 }
 
 // renders the screen and handles inputs. Also handles screen transitions between numerous
@@ -2966,27 +2962,18 @@ void guiHandleDeferedIO(int *ptr, const char *message, int type, void *data, int
     // drain returns as soon as the art queue is empty (cacheWaitForAllRequestsTimed
     // early-exits when nothing is queued/active), so this adds no delay in the
     // common case; the timeout only bounds a genuinely stuck read.
-    int abortOk = cacheAbortMmceImageLoadsTimed(500);
-    int cancelOk = cacheCancelPendingImageLoadsTimed(500);
-    if (!abortOk || !cancelOk) {
-        // A cover-art read did not drain within the timeout -- most likely a slow
-        // (not dead) storage device. We still issue the deferred IO below: bailing
-        // here would silently drop a valid config save on a merely-slow card, and
-        // could not unwedge a genuinely stuck IOP RPC channel anyway. Logged so a
-        // true hardware hang is diagnosable rather than a silent freeze on the
-        // unbounded wait below (Codex audit, Medium 1).
-        LOG("guiHandleDeferedIO: art drain timed out; deferred IO may stall on stuck storage\n");
-    }
+    // NAV-PARITY TEST BUILD (#340): the two timed art drains (up to ~500 ms each, on the GUI
+    // thread, BEFORE the IO is even queued) are removed -- official issues the request straight
+    // away. Reintroduces the #45 shape (a config write can queue behind in-flight art reads), but
+    // the bounded wait below still prevents a hard freeze.
 
     if (ioPutRequest(type, data) != IO_OK) {
         *ptr = 0;
         return;
     }
 
-    // Belt-and-suspenders: lower our (GUI thread) priority while busy-waiting so
-    // any art work that slips in afterwards can still reach a yield point and
-    // release the channel. Restored before returning; the handshake is unchanged.
-    int savedPriority = cacheLowerCallerPriority();
+    // NAV-PARITY TEST BUILD (#340): no GUI-thread priority drop here -- official never reorders
+    // the GUI against the art worker.
 
     // Bound the wait when the caller asks (timeoutMs > 0). A deferred IO that never completes -- a
     // failing HDD/card that wedges the single IOP fileXio channel mid-write -- would otherwise spin
@@ -3010,8 +2997,6 @@ void guiHandleDeferedIO(int *ptr, const char *message, int type, void *data, int
         }
         guiRenderTextScreen(message);
     }
-
-    cacheRestoreCallerPriority(savedPriority);
 }
 
 void guiGameHandleDeferedIO(int *ptr, struct UIItem *ui, int type, void *data)

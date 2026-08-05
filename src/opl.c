@@ -1121,21 +1121,13 @@ static void menuUpdateHook()
     // if timer exceeds some threshold, schedule updates of the available input sources
     frameCounter++;
 
-    // Keep background refresh work out of the shared IO queue while the user is actively navigating.
-    if (guiInactiveFrames < MENU_MIN_INACTIVE_FRAMES)
-        return;
-
-    // Let the current queue drain before adding background refresh work.
-    if (ioHasPendingRequests())
-        return;
-
-    if (cacheHasPendingArt())
-        return;
-
-    // Steady-state probes additionally require REAL idleness (see the define): a tap gap passes the
-    // short gate above, and a probe fired into it contends with the pads on SIO2 and eats the next
-    // tap (#271). Event-driven work (the genChanged hotplug bypass below) keeps the short gate.
-    int longIdle = (guiInactiveFrames >= MENU_BG_RESCAN_MIN_INACTIVE_FRAMES);
+    // NAV-PARITY TEST BUILD (#340): official's menuUpdateHook has NO gates at all -- it runs its
+    // rescan loop every frame and lets updateDelay do the throttling. The fork's three early
+    // returns (short idle gate / IO-queue drain / art pending) and the 60-frame longIdle
+    // requirement are removed here so background device work happens on official's schedule.
+    // NOTE: these gates were added BECAUSE probes fired into tap gaps were eating taps (#271), so
+    // this particular revert could plausibly make the symptom WORSE -- that is itself a result.
+    int longIdle = 1;
 
     // schedule updates of all the list handlers
     // Periodic background rescans. Both steady-state rescans enqueue standard requests and are

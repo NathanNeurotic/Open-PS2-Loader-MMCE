@@ -316,32 +316,10 @@ void sfxPlay(int id)
     }
 
     if (gEnableSFX) {
-        u32 sfxStartTicks = cpu_ticks();
-        if (id == SFX_CURSOR) {
-            static u32 lastCursorTicks = 0;
-            if (lastCursorTicks != 0) {
-                u32 interval = (sfxStartTicks - lastCursorTicks) / SFX_CLOCKS_PER_MS;
-                if (interval < 45)
-                    return;
-            }
-            lastCursorTicks = sfxStartTicks;
-
-            int chosenSlot = cursorChannelIndex;
-
-            cursorChannelIndex = (cursorChannelIndex + 1) % CURSOR_SFX_CHANNEL_COUNT;
-            channel = sfxGetCursorChannel(chosenSlot);
-
-            // Volumes are configured once by audioSetVolume(). Replaying a
-            // rotation channel replaces its old sample in one SIF RPC.
-            audsrv_ch_play_adpcm(channel, &sfx[id]);
-        } else {
-            audsrv_ch_play_adpcm(id, &sfx[id]);
-        }
-
-        unsigned int costMs = (unsigned int)((cpu_ticks() - sfxStartTicks) / SFX_CLOCKS_PER_MS);
-        sfxLastPlayMs = costMs;
-        if (costMs > sfxMaxPlayMs)
-            sfxMaxPlayMs = costMs;
+        // NAV-PARITY TEST BUILD (#340): official's sfxPlay is exactly this one call -- no cursor
+        // channel rotation, no 45 ms cursor rate limit, no per-call tick diagnostics.
+        (void)channel;
+        audsrv_ch_play_adpcm(id, &sfx[id]);
     }
 }
 

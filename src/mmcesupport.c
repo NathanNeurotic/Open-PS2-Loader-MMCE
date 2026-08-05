@@ -413,7 +413,7 @@ void mmceInit(item_list_t *itemList)
     mmceFoldersCreatedFor[0] = '\0';
     mmceFolderRetries = 0;
 
-    mmceGameList.delay = gArtDelay;
+    mmceGameList.delay = MENU_MIN_INACTIVE_FRAMES; // NAV-PARITY (#340): official uses this fixed 8-frame settle, not the fork Art Delay setting
     mmceGameList.updateDelay = MMCE_MODE_UPDATE_DELAY;
 
     mmceLoadModules();
