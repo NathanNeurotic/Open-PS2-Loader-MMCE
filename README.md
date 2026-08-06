@@ -235,12 +235,13 @@ and ideas from [rickgaiser's OPL](https://github.com/rickgaiser/Open-PS2-Loader)
 
 With special and sincere thanks to:
 
-- **KrahJohlito** — the creator of **uOPL (Unofficial Open PS2 Loader)** and its continuation
-  **[wOPL](https://github.com/KrahJohlito/wOPL)**, where much of this fork's modern
-  functionality originated. The Neutrino external-core loader and the Coverflow and
-  Favourites interfaces are all reimplementations of features he designed and pioneered
-  there. We learned an enormous amount reading that code, and this fork is as much a
-  tribute to it as anything else. Thank you.
+- **KrahJohlito** — the legend, and the single biggest influence on this fork. Creator of
+  **uOPL (Unofficial Open PS2 Loader)** and its continuation
+  **[wOPL](https://github.com/KrahJohlito/wOPL)**, where the modern OPL experience was
+  invented. The Neutrino external-core loader, the Coverflow interface, and the Favourites
+  tab — the features that define RiptOPL — were designed and pioneered by him, and everything
+  this fork does with them is a reimplementation of his work. We learned more reading his
+  code than anywhere else, and RiptOPL is, above all, a tribute to it. Thank you.
 - **Wolf3s** — for contributions across the wOPL effort and the wider OPL scene, and for
   maintaining an independent **[uOPL](https://github.com/Wolf3s/uOPL)** fork that keeps
   unique features and unmerged work alive. Thank you.
