@@ -11,6 +11,7 @@
 #include <delaythread.h> // DelayThread for the bounded disc re-detect polls in sysLaunchDisc
 #include "include/opl.h"
 #include "include/gui.h"
+#include "include/lang.h" // _l(_STR_...) -- Neutrino preflight abort toasts
 #include "include/ethsupport.h"
 #include "include/hddsupport.h"
 #include "include/util.h"
@@ -937,6 +938,465 @@ void sysPrintEECoreConfig(struct EECoreConfig_t *config)
     LOG("Compat Mask = 0x%02x\n", config->_CompatMask);
 }
 #endif
+
+// --- Neutrino external-core launch (per-game $CoreLoader) --------------------
+// Maps an OPL block-device driver token to Neutrino's -bsd backend name. Uses
+// exact strcmp per token (NOT a strncmp prefix test): a prefix test matches
+// "sdc" against "sd" first and mis-maps MX4SIO to ilink. Mirrors our hardened
+// bdmDriverIs* matchers. Returns "unsupported" for anything
+// Neutrino cannot back (e.g. eth/smb), which the caller treats as a hard stop.
+static const char *getDeviceName(const char *driver)
+{
+    if (driver == NULL)
+        return "unsupported";
+    if (!strcmp(driver, "usb"))
+        return "usb";
+    if (!strcmp(driver, "ilink") || !strcmp(driver, "sd"))
+        return "ilink";
+    if (!strcmp(driver, "mx4sio") || !strcmp(driver, "sdc"))
+        return "mx4sio";
+    if (!strcmp(driver, "ata"))
+        return "ata";
+    if (!strcmp(driver, "apa"))
+        return "apa";
+    if (!strcmp(driver, "mmce"))
+        return "mmce";
+    // NOTE(rebuild): the "udp"/"udpfs" network transport tokens return with checklist
+    // items 5/6/7 -- no network block device can be mounted until then, so falling
+    // through to "unsupported" (which aborts the launch with a toast) is exact.
+    return "unsupported";
+}
+
+// Re-encodes the OPL compatmask into Neutrino's -gc concatenated-digit format.
+// Forwards OPL bits 1,2,3,5 plus Mode 7 (COMPAT_MODE_7) -- a Neutrino-only flag with
+// no OPL ee-core effect (greyed under the OPL core) that emits -gc=7 "fix game buffer
+// overrun". result[] is sized off COMPAT_MODE_COUNT
+// and every append is bounds-guarded so widening the set later cannot overflow.
+// NOTE: Neutrino's -gc numbering is Neutrino's own, not OPL's bitmask semantics;
+// the OPL<->Neutrino correspondence must be hardware-verified before widening.
+static int convertCompatmaskToModes(int compatmask)
+{
+    char result[COMPAT_MODE_COUNT + 2];
+    int pos = 0;
+
+    if ((compatmask & COMPAT_MODE_1) && pos < (int)sizeof(result) - 1)
+        result[pos++] = '1';
+    if ((compatmask & COMPAT_MODE_2) && pos < (int)sizeof(result) - 1)
+        result[pos++] = '2';
+    if ((compatmask & COMPAT_MODE_3) && pos < (int)sizeof(result) - 1)
+        result[pos++] = '3';
+    if ((compatmask & COMPAT_MODE_5) && pos < (int)sizeof(result) - 1)
+        result[pos++] = '5';
+    if ((compatmask & COMPAT_MODE_7) && pos < (int)sizeof(result) - 1)
+        result[pos++] = '7'; // Neutrino "IOP: fix game buffer overrun"; greyed under the OPL core
+
+    result[pos] = '\0';
+    return atoi(result);
+}
+
+// Split a whitespace-separated argument string into individual argv entries appended
+// after the auto-built ones. `buf` receives a bounded mutable copy of `src`, and the
+// tokens point into it, so `buf` must stay live until the argv is consumed. Returns
+// the updated argc; never exceeds argvMax.
+static int appendArgTokens(char **argv, int argc, int argvMax, char *buf, int bufSize, const char *src)
+{
+    if (src == NULL || src[0] == '\0')
+        return argc;
+
+    snprintf(buf, bufSize, "%s", src);
+
+    char *tok = strtok(buf, " \t");
+    while (tok != NULL && argc < argvMax) {
+        // A leading '$' marks a user-disabled flag (NHDDL convention): keep it in the
+        // args field for easy re-enabling, but don't forward it to Neutrino. Neutrino
+        // flags are all '-'-prefixed, so '$' never collides with a real argument.
+        if (tok[0] != '$')
+            argv[argc++] = tok;
+        tok = strtok(NULL, " \t");
+    }
+    return argc;
+}
+
+// Does `s` look like a retail boot-file name (AAAA_NNN.NN, e.g. SLUS_123.45)? Gates the opt-in
+// -elf=cdrom0: emission below to startups neutrino can actually resolve a GameID from.
+static int sysStartupShapeOk(const char *s)
+{
+    int i;
+    if (s == NULL || strlen(s) != 11 || s[4] != '_' || s[8] != '.')
+        return 0;
+    for (i = 0; i < 4; i++)
+        if (!((s[i] >= 'A' && s[i] <= 'Z') || (s[i] >= '0' && s[i] <= '9')))
+            return 0;
+    for (i = 5; i <= 10; i++) {
+        if (i == 8)
+            continue;
+        if (s[i] < '0' || s[i] > '9')
+            return 0;
+    }
+    return 1;
+}
+
+// True if `args` contains `flag` as an ACTIVE token -- i.e. NOT $-disabled (the leading-$ convention
+// that appendArgTokens strips at dispatch). Lets an auto-emitted flag stay suppressed only by a flag
+// the user is actually forwarding, not by one they turned off with `$`.
+// Does `args` contain an ACTIVE (non-$-disabled) occurrence of `flag` as its OWN token? `flag` is
+// either an exact switch ("-dbc") or a key prefix ending in '=' ("-gsm="). A raw strstr is not
+// enough: "-dbc" also occurs inside path-valued tokens like -elf=my-dbc-game.elf (PR #96 review),
+// which must NOT count -- so a hit needs a token boundary on BOTH sides (start-of-string or
+// whitespace before; end-of-string or whitespace after, unless the flag itself is a key prefix
+// whose value legitimately continues). This also fixes the same latent false positive for -gsm=.
+static int neutrinoArgHasActiveFlag(const char *args, const char *flag)
+{
+    if (args == NULL)
+        return 0;
+    size_t flen = strlen(flag);
+    int keyPrefix = (flen > 0 && flag[flen - 1] == '=');
+    const char *p = args;
+    while ((p = strstr(p, flag)) != NULL) {
+        int disabled = (p > args && *(p - 1) == '$');
+        const char *tokStart = disabled ? p - 1 : p;
+        int startOk = (tokStart == args) || (tokStart[-1] == ' ') || (tokStart[-1] == '\t');
+        char after = p[flen];
+        int endOk = keyPrefix || after == '\0' || after == ' ' || after == '\t';
+        if (startOk && endOk && !disabled)
+            return 1; // a whole-token, non-$-disabled occurrence -> the user is forwarding this flag
+        p += flen;
+    }
+    return 0;
+}
+
+// Hand the game off to an external Neutrino ELF instead of OPL's embedded core.
+// Hardened vs the wOPL original: NULL-guarded; an "unsupported" device aborts
+// (never launches -bsd=unsupported); DISTINCT argv buffers (wOPL reused ONE
+// buffer for both -bsd=ata and -bsdfs=hdl, clobbering -bsd=ata on HDD); argv[32]
+// with per-append bounds guards (wOPL's argv[6] was exactly full). User-supplied
+// flags (global gNeutrinoArgs + the per-game extraArgs) are tokenized and appended last.
+// Rewrite the "ip=A.B.C.D" token inside <neutrino dir>/config/bsd-<device>.toml to the PS2's configured
+// static IP. Neutrino's ministack takes its IP from that toml -- hardcoded 192.168.1.10 in the stock and
+// bundled files -- NOT from anything OPL used while browsing, so any mismatch means the UDPFS server's
+// discovery reply never routes back and the game black-screens after a perfectly healthy list. Δ6: now
+// runs PRE-deinit via sysNeutrinoPreflight (every mount is up, the GUI is alive), so a hard failure can
+// abort to the menu with a toast instead of dying invisibly post-teardown. Anchored to the stock `"ip=`
+// quoting so a comment mentioning ip= can never be clobbered.
+// Returns 0 = OK to launch (synced / already-in-sync / benign leave-alone), <0 = abort the launch:
+// the toml is MISSING (neutrino cannot load its bsd config at all) or was mangled-then-restored (the
+// old ip survives, so the boot would black-screen on any other subnet).
+static int sysSyncNeutrinoUdpfsToml(const char *neutrinoPath, const char *deviceName)
+{
+    static char toml[4096]; // Δ6: raised from 2048 -- an annotated toml no longer gets skipped
+    static char updated[4096 + 20];
+    char tomlPath[288];
+    char newIp[20];
+    int fd, len;
+
+    const char *slash = strrchr(neutrinoPath, '/');
+    if (slash == NULL)
+        return 0; // custom flat path -- no dir to anchor on; old hand-edit contract
+    snprintf(tomlPath, sizeof(tomlPath), "%.*sconfig/bsd-%s.toml", (int)(slash - neutrinoPath) + 1, neutrinoPath, deviceName);
+
+    fd = open(tomlPath, O_RDONLY);
+    if (fd < 0) {
+        LOG("[NEUTRINO] no %s -- neutrino cannot boot this transport without it\n", tomlPath);
+        return -1; // missing bsd toml = guaranteed post-teardown failure -> abort while GUI is alive
+    }
+    len = read(fd, toml, sizeof(toml) - 1);
+    close(fd);
+    if (len <= 0)
+        return -1; // unreadable/empty bsd toml -> same guaranteed failure
+    if (len >= (int)sizeof(toml) - 1) {
+        LOG("[NEUTRINO] %s larger than %d -- ip= left as-is\n", tomlPath, (int)sizeof(toml));
+        return 0; // exotic hand-built toml: proceed on the old hand-edit contract
+    }
+    toml[len] = '\0';
+
+    char *tok = strstr(toml, "\"ip=");
+    if (tok == NULL) {
+        LOG("[NEUTRINO] %s has no \"ip= token -- left as-is\n", tomlPath);
+        return 0; // hand-restructured toml: the user owns the ip; proceed
+    }
+    char *valStart = tok + 4;
+    char *valEnd = valStart;
+    while (*valEnd == '.' || (*valEnd >= '0' && *valEnd <= '9'))
+        valEnd++;
+
+    snprintf(newIp, sizeof(newIp), "%d.%d.%d.%d", ps2_ip[0], ps2_ip[1], ps2_ip[2], ps2_ip[3]);
+    if ((int)strlen(newIp) == (int)(valEnd - valStart) && !strncmp(valStart, newIp, strlen(newIp)))
+        return 0; // already in sync -- don't touch the file
+
+    snprintf(updated, sizeof(updated), "%.*s%s%s", (int)(valStart - toml), toml, newIp, valEnd);
+
+    fd = open(tomlPath, O_WRONLY | O_TRUNC);
+    if (fd < 0) {
+        LOG("[NEUTRINO] cannot rewrite %s (%d) -- ip= left as-is\n", tomlPath, fd);
+        return 0; // write-protected media: proceed on the old hand-edit contract
+    }
+    int expected = (int)strlen(updated);
+    int written = write(fd, updated, expected);
+    close(fd);
+    if (written != expected) {
+        // O_TRUNC already emptied the file; a short write would leave a mangled toml behind. Best
+        // recovery without atomic-rename support across every PS2 filesystem: put the ORIGINAL
+        // content back so the user is no worse off than before the sync (old hand-edit contract).
+        LOG("[NEUTRINO] short write to %s (%d/%d) -- restoring original toml\n", tomlPath, written, expected);
+        fd = open(tomlPath, O_WRONLY | O_TRUNC);
+        if (fd >= 0) {
+            write(fd, toml, len);
+            close(fd);
+        }
+        return -1; // the OLD ip survives -> the boot would black-screen; abort while GUI is alive
+    }
+    LOG("[NEUTRINO] synced %s ip= -> %s\n", tomlPath, newIp);
+    return 0;
+}
+
+// Δ6 (NHDDL parity): everything that can FAIL a Neutrino launch and is checkable pre-teardown runs
+// HERE, called by every device leg BEFORE deinitEx -- the GUI is alive for a toast and nothing has
+// been torn down, so a failure is "stay in the menu", not a post-teardown black screen. Returns
+// 0 = proceed; <0 = abort (a toast was shown).
+int sysNeutrinoPreflight(const char *driver, const char *neutrinoPath)
+{
+    if (driver == NULL || neutrinoPath == NULL)
+        return -1;
+
+    const char *deviceName = getDeviceName(driver);
+    if (!strcmp(deviceName, "unsupported")) {
+        LOG("[NEUTRINO] preflight: unsupported device '%s'\n", driver);
+        guiWarning(_l(_STR_NEUTRINO_DEV_UNSUPPORTED), 6);
+        return -1;
+    }
+
+    // Network transports: sync the bsd toml ip= NOW, while the toml's device is mounted and a
+    // failure can still be reported (see sysSyncNeutrinoUdpfsToml for the abort conditions).
+    if (!strcmp(deviceName, "udpfs") || !strcmp(deviceName, "udpfsbd") || !strcmp(deviceName, "udpbd")) {
+        if (sysSyncNeutrinoUdpfsToml(neutrinoPath, deviceName) < 0) {
+            guiWarning(_l(_STR_NEUTRINO_TOML_SYNC_FAILED), 6);
+            return -1;
+        }
+    }
+    return 0;
+}
+
+void sysLaunchNeutrino(const char *driver, const char *path, const char *startup, int compatmask, int EnablePS2Logo, const char *neutrinoPath, const char *extraArgs, int neutrinoVideo, int neutrinoGsmComp, int neutrinoBsdfs, const neutrino_vmc_args_t *vmcArgs)
+{
+    if (neutrinoPath == NULL || driver == NULL || path == NULL) {
+        LOG("[NEUTRINO] null arg, abort\n");
+        return;
+    }
+
+    const char *deviceName = getDeviceName(driver);
+    if (!strcmp(deviceName, "unsupported")) {
+        LOG("[NEUTRINO] unsupported device '%s', abort\n", driver);
+        return;
+    }
+
+    // HW-confirmed (issue #56, AndrewBento, PSXMemCard Gen2): Neutrino's -logo on the mmce backend
+    // black-screens GAME-DEPENDENTLY ("depends a bit on luck which game") -- and the identical
+    // failure reproduces on NHDDL, so it is a Neutrino/mmce interaction, not this launcher. Every
+    // affected game boots with the logo off, so the GLOBAL PS2-Logo toggle is suppressed for
+    // mmce-hosted games until that is fixed upstream. Deliberate escape hatch: a user-supplied
+    // "-logo" in the global/per-game Neutrino args still passes through the tokenizer untouched.
+    if (EnablePS2Logo && !strcmp(driver, "mmce")) {
+        LOG("[NEUTRINO] -logo suppressed on mmce (issue #56: game-dependent black screens, repro'd on NHDDL)\n");
+        EnablePS2Logo = 0;
+    }
+
+    char bsd[16];
+    char bsdfs[16];
+    char filePath[288];        // "-dvd=hdl:" (9) + up to a 255-char path + NUL — avoid truncation (B2)
+    char cwdArg[288];          // "-cwd=" + the neutrino.elf install dir (auto; Neutrino finds its config/modules there)
+    char compatModes[32] = ""; // stays empty when no compat modes are forwarded (B1)
+    char globalArgsBuf[256];   // mutable copy of gNeutrinoArgs for tokenizing (tokens point in)
+    char extraArgsBuf[256];    // mutable copy of the per-game extraArgs for tokenizing
+    char *argv[16];            // target argv[0] + auto args + tokenized user flags (kernel-budgeted)
+    int argc = 0;
+    // 14, NOT sizeof(argv): the kernel args area holds at most 15 strings per ExecPS2 hop (ps2sdk
+    // exit.c SetArg, SETARG_MAX_ARGS 15 -- and ExecPS2 forwards the UNCLAMPED count, so overflowing
+    // makes the kernel read string bytes as argv pointers). Hop 1 prepends the elfldr child's load
+    // path, spending one slot, so the target argv must stay <= 14 entries.
+    const int argvMax = 14;
+
+    // Target argv[0] = neutrino.elf's own path (NHDDL convention). sysLoadELFKeepIOP forwards
+    // argv verbatim -- argv[0] included -- so this must be supplied explicitly here (POPSTARTER
+    // launches use the same loader with a selector as argv[0] instead).
+    if (argc < argvMax)
+        argv[argc++] = (char *)neutrinoPath;
+
+    if (!strcmp(deviceName, "apa")) {
+        snprintf(bsd, sizeof(bsd), "-bsd=ata");
+        if (argc < argvMax)
+            argv[argc++] = bsd;
+        snprintf(bsdfs, sizeof(bsdfs), "-bsdfs=hdl");
+        if (argc < argvMax)
+            argv[argc++] = bsdfs;
+        snprintf(filePath, sizeof(filePath), "-dvd=hdl:%s", path);
+        if (argc < argvMax)
+            argv[argc++] = filePath;
+    } else {
+        snprintf(bsd, sizeof(bsd), "-bsd=%s", deviceName);
+        if (argc < argvMax)
+            argv[argc++] = bsd;
+        // Per-game -bsdfs override (parity-audit #11), Auto(0) = today's bytes exactly (no -bsdfs,
+        // bare -dvd). Valid driver values are ONLY exfat/hdl/bd; the -dvd prefix changes in lockstep
+        // (verified vs rickgaiser/neutrino main.c usage: "-bsdfs=hdl -dvd=hdl:..." and
+        // "-bsdfs=bd -dvd=bdfs:..."; exfat is the default fs and takes the bare path unchanged --
+        // any ':'-bearing -dvd value is file-mode, opened through the selected fs). NEVER emitted
+        // for mmce/udpfs: they are fileid backends with no filesystem layer (Neutrino forces
+        // sBSDFS="no" there regardless -- this guard just keeps the argv clean). A user-typed
+        // -bsdfs= wins (skip the structured emit); a user-typed -dvd= also wins on its own because
+        // user tokens are appended after these and Neutrino's arg parse is last-wins.
+        static const char *const bsdfsTokens[] = {"", "exfat", "hdl", "bd"};
+        static const char *const bsdfsDvdPrefix[] = {"", "", "hdl:", "bdfs:"};
+        int fsOverride = 0;
+        if (neutrinoBsdfs >= 1 && neutrinoBsdfs <= 3 &&
+            strcmp(deviceName, "mmce") != 0 && strcmp(deviceName, "udpfs") != 0 &&
+            !neutrinoArgHasActiveFlag(gNeutrinoArgs, "-bsdfs=") && !neutrinoArgHasActiveFlag(extraArgs, "-bsdfs="))
+            fsOverride = neutrinoBsdfs;
+        if (fsOverride) {
+            snprintf(bsdfs, sizeof(bsdfs), "-bsdfs=%s", bsdfsTokens[fsOverride]);
+            if (argc < argvMax)
+                argv[argc++] = bsdfs;
+        }
+        snprintf(filePath, sizeof(filePath), "-dvd=%s%s", bsdfsDvdPrefix[fsOverride], path);
+        if (argc < argvMax)
+            argv[argc++] = filePath;
+    }
+
+    // Everything up to and including -dvd is the boot-critical core: the pool-fit drop loop below
+    // must never shed these. A fixed floor of 3 silently stopped covering -dvd once the optional
+    // -bsdfs slots in front of it (argv[3]) -- record the real core count instead.
+    const int coreArgc = argc;
+
+    // Only forward -gc when at least one compat mode is set: Neutrino treats
+    // -gc=0 as an explicit mode (IOP fast reads), NOT a no-op, so passing it for
+    // a game with no OPL modes selected would force unwanted behavior (B1).
+    int gcModes = convertCompatmaskToModes(compatmask);
+    if (gcModes > 0) {
+        snprintf(compatModes, sizeof(compatModes), "-gc=%d", gcModes);
+        if (argc < argvMax)
+            argv[argc++] = compatModes;
+    }
+
+    // Global toggles auto-emit -dbc/-logo; the per-game/global args screens now carry them as
+    // structured bools too (forwarded via the tokenizer below), so suppress the auto-emit when the
+    // user's args already hold an active (non-$-disabled) copy -- one flag, emitted once.
+    if (gEnableDebug && argc < argvMax &&
+        !neutrinoArgHasActiveFlag(gNeutrinoArgs, "-dbc") && !neutrinoArgHasActiveFlag(extraArgs, "-dbc"))
+        argv[argc++] = "-dbc";
+
+    if (EnablePS2Logo && argc < argvMax &&
+        !neutrinoArgHasActiveFlag(gNeutrinoArgs, "-logo") && !neutrinoArgHasActiveFlag(extraArgs, "-logo"))
+        argv[argc++] = "-logo";
+
+    // Per-game Neutrino video mode (-gsm): 1=fp1 (240p), 2=fp2 (480p), 3=1080ix1 (1080i); 0/out-of-range
+    // = no -gsm. Neutrino is LAST-wins on -gsm and ABORTS the boot on a malformed value, so emit exactly
+    // ONE: skip the structured token when the user already typed a -gsm into the global or per-game args,
+    // letting that explicit value win (precedence confirmed vs rickgaiser/neutrino ee/loader/src/main.c).
+    int userHasGsm = neutrinoArgHasActiveFlag(gNeutrinoArgs, "-gsm=") ||
+                     neutrinoArgHasActiveFlag(extraArgs, "-gsm=");
+    if (neutrinoVideo >= 1 && neutrinoVideo <= 5 && !userHasGsm && argc < argvMax) {
+        // -gsm=v:c grammar (neutrino main.c parse_gsm_flags): v in {fp1, fp2, 1080ix1, 1080ix2,
+        // 1080ix3}, optional :c in {1,2,3} = field-flipping compatibility type. NEVER emit a bare
+        // ":c" -- an unrecognized -gsm value aborts the whole neutrino boot -- so the comp half is
+        // ignored unless a video mode is set (the GUI hint says as much).
+        static const char *const gsmVideoTokens[] = {"", "fp1", "fp2", "1080ix1", "1080ix2", "1080ix3"};
+        static char gsmArg[24]; // outlives argv[] until the ExecPS2 handoff below
+        if (neutrinoGsmComp >= 1 && neutrinoGsmComp <= 3)
+            snprintf(gsmArg, sizeof(gsmArg), "-gsm=%s:%d", gsmVideoTokens[neutrinoVideo], neutrinoGsmComp);
+        else
+            snprintf(gsmArg, sizeof(gsmArg), "-gsm=%s", gsmVideoTokens[neutrinoVideo]);
+        argv[argc++] = gsmArg;
+    }
+
+    // Parity Delta-10, enabled by default via settings_riptopl.cfg "neutrino_elf_arg"=1
+    // (deliberately no UI row): hand neutrino the boot ELF path directly so its per-GameID
+    // config/<GameID>.toml compat lookup can resolve pre-reset. Shape-guarded to AAAA_NNN.NN
+    // startups and skipped when the user already forwards an -elf= (structured field or free
+    // text) -- neutrino must see exactly one.
+    static char elfArg[40]; // outlives argv[] until the ExecPS2 handoff
+    if (gNeutrinoElfArg && sysStartupShapeOk(startup) && argc < argvMax &&
+        !neutrinoArgHasActiveFlag(gNeutrinoArgs, "-elf=") && !neutrinoArgHasActiveFlag(extraArgs, "-elf=")) {
+        snprintf(elfArg, sizeof(elfArg), "-elf=cdrom0:\\%s;1", startup);
+        argv[argc++] = elfArg;
+        LOG("[NEUTRINO] neutrino_elf_arg=1: emitting %s\n", elfArg);
+    }
+
+    // VMC slots (#47): emit each configured "-mcN=...bin" as its OWN argv entry. These come from
+    // sbBuildVmcNeutrinoArgs (caller storage, alive across the launch) and must NOT pass through the
+    // whitespace tokenizer below -- a VMC name with a space would otherwise be split into two args
+    // and Neutrino would receive a truncated, unopenable card path (silent no-mount).
+    if (vmcArgs != NULL) {
+        int slot;
+        for (slot = 0; slot < NEUTRINO_VMC_SLOTS; slot++) {
+            if (vmcArgs->arg[slot][0] != '\0' && argc < argvMax)
+                argv[argc++] = (char *)vmcArgs->arg[slot];
+        }
+    }
+
+    // Auto -cwd: point Neutrino at the directory holding neutrino.elf so it loads its config / extra
+    // modules relative to its install location, UNLESS the user already supplied one (precedence like
+    // -gsm above). Without it Neutrino launches with no working dir, so a setup that keeps config next
+    // to the ELF would not be found. mc:NEUTRINO/neutrino.elf paths also contain a '/', so this works
+    // for memory-card installs too.
+    int userHasCwd = neutrinoArgHasActiveFlag(gNeutrinoArgs, "-cwd=") ||
+                     neutrinoArgHasActiveFlag(extraArgs, "-cwd=");
+    if (!userHasCwd) {
+        const char *slash = strrchr(neutrinoPath, '/');
+        if (slash != NULL) {
+            int dirLen = (int)(slash - neutrinoPath) + 1; // keep the trailing '/'
+            snprintf(cwdArg, sizeof(cwdArg), "-cwd=%.*s", dirLen, neutrinoPath);
+            if (argc < argvMax)
+                argv[argc++] = cwdArg;
+        }
+    }
+
+    // Δ6: the bsd toml ip= sync (network transports) now runs PRE-deinit inside sysNeutrinoPreflight
+    // -- called by every device leg before deinitEx -- so a failure aborts to a live menu with a
+    // toast instead of dying invisibly here, post-teardown. Nothing to do at this point.
+
+    // Append user-supplied Neutrino flags: global defaults first, then the per-game
+    // string (so a game can extend the global set). Both are tokenized on whitespace.
+    argc = appendArgTokens(argv, argc, argvMax, globalArgsBuf, sizeof(globalArgsBuf), gNeutrinoArgs);
+    argc = appendArgTokens(argv, argc, argvMax, extraArgsBuf, sizeof(extraArgsBuf), extraArgs);
+
+    // ExecPS2 argv BYTE budget (verified vs ps2sdk exit.c SetArg + the crt0 args struct): each hop
+    // carries its strings in ONE 256-byte pool, every NUL included. Hop 1 packs the child's load
+    // path PLUS this argv -- neutrinoPath is counted TWICE (loadpath and target argv[0]). SetArg's
+    // copy is UNbounded, so exceeding the pool corrupts rather than truncates. Fit by dropping tail
+    // args (user extras sit last; each drop LOGged); the boot-critical core (argv[0]/-bsd/
+    // [-bsdfs]/-dvd, counted as coreArgc above) must survive or nothing can boot anyway -- past
+    // that, refuse and let the LOG name the overage.
+    {
+        int pool = (int)strlen(neutrinoPath) + 1; // hop-1 child argv[0] = the load path
+        int i;
+        for (i = 0; i < argc; i++)
+            pool += (int)strlen(argv[i]) + 1;
+        while (pool > 256 && argc > coreArgc) {
+            argc--;
+            pool -= (int)strlen(argv[argc]) + 1;
+            LOG("[NEUTRINO] argv pool over 256 bytes -- dropping tail arg: %s\n", argv[argc]);
+        }
+        if (pool > 256) {
+            LOG("[NEUTRINO] argv pool %d bytes even at the core-args floor (256 max) -- refusing handoff\n", pool);
+            return;
+        }
+    }
+
+    // Log the FULL argv (not just bsd/dvd/compat) so the VMC -mc args are verifiable on hardware (#47).
+    LOG("[NEUTRINO] elf=%s argc=%d\n", neutrinoPath, argc);
+    {
+        int i;
+        for (i = 0; i < argc; i++)
+            LOG("[NEUTRINO]   argv[%d]=%s\n", i, argv[i]);
+    }
+
+    // Hand off WITHOUT the elf-loader IOP reset (NHDDL parity, vendored elfldr/): Neutrino reads
+    // its config/modules (-cwd) and opens the game ISO through OUR still-mounted devices, and only
+    // then does its own IOP reset -- the old resetting handoff left it a bare SIO2MAN/MCMAN/MCSERV
+    // IOP, so any USB/BDM-hosted neutrino.elf setup black-screened to OSDSYS. The callers keep both
+    // the game device and the neutrino.elf device mounted (deinitEx).
+    if (sysLoadELFKeepIOP(neutrinoPath, "", argc, argv) < 0)
+        LOG("[NEUTRINO] keep-IOP handoff failed for %s\n", neutrinoPath);
+}
 
 void sysLaunchLoaderElf(const char *filename, const char *mode_str, int size_cdvdman_irx, void **cdvdman_irx, int size_mcemu_irx, void **mcemu_irx, int EnablePS2Logo, unsigned int compatflags)
 {

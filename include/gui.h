@@ -144,6 +144,8 @@ void guiShowColorsConfig(void);
 int guiDrawBGSettings(void);
 int guiDeviceTypeToIoMode(int deviceType);
 int guiIoModeToDeviceType(int ioMode);
+void guiShowNeutrinoDefaults(void);
+void guiShowNeutrinoArgsConfig(char *argsBuf, int bufSize);
 void guiShowAudioConfig();
 void guiShowControllerConfig();
 void guiShowNetConfig();

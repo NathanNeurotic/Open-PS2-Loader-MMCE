@@ -79,6 +79,8 @@ void menuDeferredUpdate(void *data);
 void moduleUpdateMenu(int mode, int themeChanged, int langChanged);
 void handleLwnbdSrv();
 void deinit(int exception, int modeSelected);
+// Neutrino keep-IOP handoff: deinit that spares a SECOND mode's mounts (the neutrino.elf device).
+void deinitEx(int exception, int modeSelected, int modeSelected2);
 
 // Shutdown minimal services initiated for auto loading.
 void miniDeinit(config_set_t *configSet);
@@ -125,6 +127,22 @@ extern int hddCacheSize;
 extern int smbCacheSize;
 
 extern int gEnableUSB;
+// Neutrino Device picker: a driver-accurate device TYPE that holds <root>:/neutrino/neutrino.elf.
+enum { NEUTRINO_DEV_AUTO = 0, // game device, then mc0/mc1 (legacy behaviour)
+       NEUTRINO_DEV_MC,       // mc0: / mc1:
+       NEUTRINO_DEV_USB,      // BDM "usb"        -> the mounted massN:
+       NEUTRINO_DEV_MX4SIO,   // BDM "mx4sio"/sdc -> the mounted massN:
+       NEUTRINO_DEV_MMCE,     // mmce0: / mmce1: (checklist item 1)
+       NEUTRINO_DEV_EXFAT_HDD, // BDM "ata" internal exFAT HDD -> the mounted massN:
+       NEUTRINO_DEV_APA_HDD,  // APA HDD: the mounted OPL data partition (pfs0:)
+       NEUTRINO_DEV_GAME };   // the active game's OWN device ONLY; appended last to keep saved ints stable
+extern int gNeutrinoDevice;
+extern int gDefaultCoreLoader;
+extern int gNeutrinoVideoDefault;
+extern int gNeutrinoGsmCompDefault;
+extern int gNeutrinoElfArg;
+extern char gNeutrinoArgs[256];
+extern char gNeutrinoPath[256];
 extern int gEnableBGArt;
 extern unsigned char gDefaultPlasBlendColor[3];
 extern int gEnableILK;

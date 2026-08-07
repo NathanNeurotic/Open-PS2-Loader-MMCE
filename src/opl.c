@@ -149,6 +149,13 @@ int bdmCacheSize;
 int hddCacheSize;
 int smbCacheSize;
 int gEnableUSB;
+char gNeutrinoArgs[256];           // extra command-line flags appended to every Neutrino launch
+char gNeutrinoPath[256];           // custom neutrino.elf path; "" -> auto-detect on mc0:/mc1:
+int gNeutrinoDevice;               // Neutrino ELF device (NEUTRINO_DEV_*); Auto scans mc0/mc1 + honors a legacy gNeutrinoPath
+int gDefaultCoreLoader;            // global default Loader Core (0=<OPL>, 1=Neutrino); per-game $CoreLoader overrides, absent key = follow this
+int gNeutrinoVideoDefault;         // global default Neutrino -gsm video mode (0=Off..5=1080i x3); per-game $NeutrinoVideo overrides
+int gNeutrinoGsmCompDefault;       // global default -gsm ":c" field-flip half (0=off, 1-3=type)
+int gNeutrinoElfArg;               // default-on (settings key only, no UI): auto-emit -elf=cdrom0: on Neutrino launches
 int gEnableILK;
 int gEnableBGArt;
 unsigned char gDefaultPlasBlendColor[3]; // plasma gradient low end; black = historical look
@@ -1033,6 +1040,27 @@ static void _loadConfig()
             configGetInt(configOPL, CONFIG_OPL_APP_MODE, &gAPPStartMode);
             configGetInt(configOPL, CONFIG_OPL_ENABLE_USB, &gEnableUSB);
             configGetInt(configOPL, CONFIG_OPL_FAV_MODE, &gFAVStartMode);
+            configGetStrCopy(configOPL, CONFIG_OPL_NEUTRINO_ARGS, gNeutrinoArgs, sizeof(gNeutrinoArgs));
+            configGetStrCopy(configOPL, CONFIG_OPL_NEUTRINO_PATH, gNeutrinoPath, sizeof(gNeutrinoPath));
+            configGetInt(configOPL, CONFIG_OPL_NEUTRINO_ELF_ARG, &gNeutrinoElfArg);
+            configGetInt(configOPL, CONFIG_OPL_DEFAULT_CORE, &gDefaultCoreLoader);
+            configGetInt(configOPL, CONFIG_OPL_NEUTRINO_VIDEO, &gNeutrinoVideoDefault);
+            if (gNeutrinoVideoDefault < 0 || gNeutrinoVideoDefault > 5)
+                gNeutrinoVideoDefault = 0; // sanitize (indexes system.c gsmVideoTokens at the launch legs)
+            configGetInt(configOPL, CONFIG_OPL_NEUTRINO_GSMCOMP, &gNeutrinoGsmCompDefault);
+            if (gNeutrinoGsmCompDefault < 0 || gNeutrinoGsmCompDefault > 3)
+                gNeutrinoGsmCompDefault = 0;
+            // Neutrino Device: prefer the new device-TYPE key; if absent (config predates the
+            // picker change), migrate the legacy device-INDEX value.
+            if (!configGetInt(configOPL, CONFIG_OPL_NEUTRINO_DEVTYPE, &gNeutrinoDevice)) {
+                int legacyDev = 0;
+                if (configGetInt(configOPL, CONFIG_OPL_NEUTRINO_DEVICE, &legacyDev)) {
+                    if (legacyDev == 1 || legacyDev == 2)
+                        gNeutrinoDevice = NEUTRINO_DEV_MC;
+                    else
+                        gNeutrinoDevice = NEUTRINO_DEV_AUTO;
+                }
+            }
             configGetInt(configOPL, CONFIG_OPL_ENABLE_BGART, &gEnableBGArt);
             configGetColor(configOPL, CONFIG_OPL_PLAS_BLEND_COLOR, gDefaultPlasBlendColor);
             configGetInt(configOPL, CONFIG_OPL_COVERFLOW_COUNT, &gCoverflowCount);
@@ -1224,6 +1252,13 @@ static void _saveConfig()
         configSetInt(configOPL, CONFIG_OPL_SMB_CACHE, smbCacheSize);
         configSetInt(configOPL, CONFIG_OPL_ENABLE_USB, gEnableUSB);
         configSetInt(configOPL, CONFIG_OPL_FAV_MODE, gFAVStartMode);
+        configSetStr(configOPL, CONFIG_OPL_NEUTRINO_ARGS, gNeutrinoArgs);
+        configSetStr(configOPL, CONFIG_OPL_NEUTRINO_PATH, gNeutrinoPath);
+        configSetInt(configOPL, CONFIG_OPL_DEFAULT_CORE, gDefaultCoreLoader);
+        configSetInt(configOPL, CONFIG_OPL_NEUTRINO_VIDEO, gNeutrinoVideoDefault);
+        configSetInt(configOPL, CONFIG_OPL_NEUTRINO_GSMCOMP, gNeutrinoGsmCompDefault);
+        configSetInt(configOPL, CONFIG_OPL_NEUTRINO_DEVTYPE, gNeutrinoDevice);
+        configSetInt(configOPL, CONFIG_OPL_NEUTRINO_ELF_ARG, gNeutrinoElfArg);
         configSetInt(configOPL, CONFIG_OPL_ENABLE_BGART, gEnableBGArt);
         configSetColor(configOPL, CONFIG_OPL_PLAS_BLEND_COLOR, gDefaultPlasBlendColor);
         configSetInt(configOPL, CONFIG_OPL_COVERFLOW_COUNT, gCoverflowCount);
@@ -1753,6 +1788,38 @@ static void moduleCleanup(opl_io_module_t *mod, int exception, int modeSelected)
     clearMenuGameList(mod);
 }
 
+// deinitEx: deinit for the Neutrino keep-IOP handoff -- spares TWO modes' mounts (the game
+// device AND the device holding neutrino.elf), since Neutrino reads its -cwd config/modules
+// and the ISO through OPL's live mounts before performing its own IOP reset.
+void deinitEx(int exception, int modeSelected, int modeSelected2)
+{
+    // block all io ops, wait for the ones still running to finish
+    ioBlockOps(1);
+    guiExecDeferredOps();
+
+#ifdef PADEMU
+    ds34usb_reset();
+    ds34bt_reset();
+#endif
+    unloadPads();
+
+    for (int i = 0; i < MODE_COUNT; i++) {
+        if (list_support[i].support != NULL) {
+            int spared = (modeSelected2 >= 0 && list_support[i].support->mode == modeSelected2);
+            moduleCleanup(&list_support[i], exception, spared ? modeSelected2 : modeSelected);
+        }
+    }
+
+    audioEnd();
+    ioEnd();
+    guiEnd();
+    menuEnd();
+    lngEnd();
+    thmEnd();
+    rmEnd();
+    configEnd();
+}
+
 void deinit(int exception, int modeSelected)
 {
     // block all io ops, wait for the ones still running to finish
@@ -1876,6 +1943,13 @@ static void setDefaults(void)
 
     gEnableUSB = 0; // USB block device is opt-in, like the other BDM transports
     gFAVStartMode = START_MODE_DISABLED;
+    gNeutrinoArgs[0] = '\0';
+    gNeutrinoPath[0] = '\0';
+    gNeutrinoDevice = NEUTRINO_DEV_AUTO;
+    gDefaultCoreLoader = 0;    // <OPL> (native) -- preserves behaviour until the user opts into Neutrino globally
+    gNeutrinoVideoDefault = 0; // no global -gsm until the user opts in
+    gNeutrinoGsmCompDefault = 0;
+    gNeutrinoElfArg = 1; // auto-emit the game ELF for Neutrino compatibility lookup by default
     gEnableBGArt = 1; // inert while gEnableArt stays at the official OFF default
     gDefaultPlasBlendColor[0] = 0x00;
     gDefaultPlasBlendColor[1] = 0x00;

@@ -1,6 +1,8 @@
 #ifndef __SUPPORT_BASE_H
 #define __SUPPORT_BASE_H
 
+#include "include/system.h" // neutrino_vmc_args_t
+
 #define UL_GAME_NAME_MAX       32
 #define ISO_GAME_NAME_MAX      160
 #define ISO_GAME_EXTENSION_MAX 4
@@ -56,5 +58,35 @@ int sbProbeISO9660(const char *path, base_game_info_t *game, u32 layer1_offset);
 int sbProbeISO9660_64(const char *path, base_game_info_t *game, u32 layer1_offset);
 
 int sbLoadCheats(const char *path, const char *file);
+
+
+int sbFileExists(const char *path);
+
+// First existing Neutrino core ELF, or NULL. In AUTO mode (gNeutrinoDevice==0): custom gNeutrinoPath
+// -> the active game's device (activePrefix) -> mc0/mc1 install spots. An explicit Device picker
+// ignores activePrefix. Pass NULL when no game device applies.
+const char *sbResolveNeutrinoPath(const char *activePrefix);
+
+// Structured view of the USER-settable Neutrino launch flags (the catch-all "Launch Args" box).
+typedef struct
+{
+    int qb;          // -qb (quick-boot)
+    int dbc;         // -dbc (debug colors)
+    int logo;        // -logo (PS2 logo)
+    char cwd[64];    // -cwd=
+    char cfg[64];    // -cfg=
+    char elf[64];    // -elf=
+    char ata0[64];   // -ata0=
+    char ata0id[64]; // -ata0id=
+    char ata1[64];   // -ata1=
+    char extra[64];  // unrecognised/free tokens, space-joined; "--b ..." preserved at the tail
+} neutrino_args_t;
+// Parse an args string into the struct; assemble it back in a Neutrino-accepted order (--b last).
+void neutrinoArgsParse(const char *in, neutrino_args_t *na);
+void neutrinoArgsAssemble(const neutrino_args_t *na, char *out, int outSize);
+
+// Fully-formed Neutrino -mcN VMC args for both slots, resolved from the per-game config
+// BEFORE deinit frees it. vmcPrefix = the device prefix VMC/ lives under.
+void sbBuildVmcNeutrinoArgs(config_set_t *configSet, const char *vmcPrefix, neutrino_vmc_args_t *vmcArgs);
 
 #endif

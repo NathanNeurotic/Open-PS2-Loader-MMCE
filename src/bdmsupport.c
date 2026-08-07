@@ -106,6 +106,70 @@ static void bdmLoadBlockDeviceModules(void)
     SignalSema(bdmLoadModuleLock);
 }
 
+// BDM device identity helpers (Neutrino device-TYPE picker; trimmed to the identity
+// surface only -- the fork's wider slot-search/equip machinery arrives with items 14/16).
+static int bdmDetermineDeviceType(const char *driverName)
+{
+    if (!strcmp(driverName, "usb"))
+        return BDM_TYPE_USB;
+    if (!strcmp(driverName, "sd") && strlen(driverName) == 2)
+        return BDM_TYPE_ILINK;
+    if (!strcmp(driverName, "sdc") && strlen(driverName) == 3)
+        return BDM_TYPE_SDC;
+    if (!strcmp(driverName, "ata") && strlen(driverName) == 3)
+        return BDM_TYPE_ATA;
+    return -1;
+}
+
+static int bdmReadDeviceIdentity(const char *path, char *driverName, int driverNameLength, int *deviceIndex)
+{
+    int dir, result;
+
+    if (driverNameLength > 0)
+        memset(driverName, 0, driverNameLength);
+    *deviceIndex = -1;
+
+    dir = fileXioDopen(path);
+    if (dir < 0)
+        return dir;
+
+    result = fileXioIoctl2(dir, USBMASS_IOCTL_GET_DRIVERNAME, NULL, 0, driverName, driverNameLength - 1);
+    if (result >= 0)
+        result = fileXioIoctl2(dir, USBMASS_IOCTL_GET_DEVICE_NUMBER, NULL, 0, deviceIndex, sizeof(*deviceIndex));
+
+    fileXioDclose(dir);
+    return result;
+}
+
+// Find the first mounted BDM device whose driver matches bdmType (BDM_TYPE_*) and write its
+// massN: FILESYSTEM root WITH a trailing slash (e.g. "mass0:/") to root. Returns 1 if such a
+// device is mounted, 0 otherwise. The root is ALWAYS the legacy mass<slot>: mount, never a
+// typed root -- consumers (Neutrino picker, future POPSTARTER equip) must stay on massN:.
+int bdmGetDeviceRootByType(int bdmType, char *root, int rootLen)
+{
+    if (root == NULL || rootLen <= 0)
+        return 0;
+
+    for (int i = 0; i < MAX_BDM_DEVICES; i++) {
+        char path[16], driver[32];
+        int devIndex = -1;
+
+        snprintf(path, sizeof(path), "mass%d:/", i);
+        // Identify the device by its DRIVER NAME only; GET_DEVICE_NUMBER can fail on a
+        // perfectly usable device and the device pages already tolerate that.
+        bdmReadDeviceIdentity(path, driver, sizeof(driver), &devIndex);
+        if (driver[0] == '\0')
+            continue;
+        if (bdmDetermineDeviceType(driver) != bdmType)
+            continue;
+
+        snprintf(root, rootLen, "mass%d:/", i);
+        return 1;
+    }
+    return 0;
+}
+
+
 void bdmLoadModules(void)
 {
     LOG("BDMSUPPORT LoadModules\n");
@@ -315,6 +379,123 @@ static void bdmRenameGame(item_list_t *itemList, int id, char *newName)
     pDeviceData->bdmULSizePrev = -2;
     pDeviceData->ForceRefresh = 1;
 }
+// Neutrino frag budget: neutrino only discovers a blown fragment budget after its own IOP
+// reset (debug printf + exit = black screen). Count it now. i_bdm's GET_FRAGLIST with a NULL
+// buffer returns the fragment COUNT for the open file.
+#define NEUTRINO_BDM_MAX_FRAGS 64
+
+static int bdmNeutrinoFragBudgetOk(const char *isoPath, const neutrino_vmc_args_t *vmcArgs)
+{
+    const char *paths[1 + NEUTRINO_VMC_SLOTS];
+    int nPaths = 0, total = 0, i;
+
+    paths[nPaths++] = isoPath;
+    for (i = 0; i < NEUTRINO_VMC_SLOTS; i++) {
+        const char *eq = vmcArgs->arg[i][0] ? strchr(vmcArgs->arg[i], '=') : NULL;
+        if (eq != NULL && eq[1] != '\0')
+            paths[nPaths++] = eq + 1; // "-mcN=<path>"; the builder already verified the file exists
+    }
+
+    for (i = 0; i < nPaths; i++) {
+        int fd = open(paths[i], O_RDONLY);
+        if (fd < 0) { // advisory check only: never veto the launch on a probe failure
+            LOG("[NEUTRINO] frag pre-count: open(%s) failed, file skipped\n", paths[i]);
+            continue;
+        }
+        int frags = fileXioIoctl2(ps2sdk_get_iop_fd(fd), USBMASS_IOCTL_GET_FRAGLIST, NULL, 0, NULL, 0);
+        close(fd);
+        if (frags < 0) {
+            LOG("[NEUTRINO] frag pre-count: ioctl(%s) = %d, file skipped\n", paths[i], frags);
+            continue;
+        }
+        total += frags;
+    }
+
+    if (total > NEUTRINO_BDM_MAX_FRAGS) {
+        guiWarning(_l(_STR_NEUTRINO_TOO_FRAGMENTED), 6);
+        return 0;
+    }
+    return 1;
+}
+
+// Neutrino core launch leg: everything the native path below prepares (VMC/mcemu patching,
+// cdvdman patch, fraglists, layer-1 probing, cheats, ATA DMA setup) exists for the EMBEDDED
+// cdvdman core; Neutrino re-derives all of it from -bsd/-dvd after its own IOP reset.
+// Returns 1 = handled (handed off, or aborted with the user informed -- caller returns);
+// 0 = proceed with the native launch.
+// NOTE(rebuild): the UDP forced-core branch returns with items 5/6 (no udp driver can be
+// mounted yet); the MMCE cross-device GameID send returns with item 3.
+static int bdmTryNeutrinoLaunch(item_list_t *itemList, base_game_info_t *game, bdm_device_data_t *pDeviceData, config_set_t *configSet)
+{
+    int coreLoader = gDefaultCoreLoader; // no per-game $CoreLoader key -> follow the global default core
+    configGetInt(configSet, CONFIG_ITEM_CORE_LOADER, &coreLoader);
+    if (!coreLoader)
+        return 0;
+
+    if (game->format == GAME_FORMAT_USBLD || !strcasecmp(game->extension, ".zso")) {
+        // Neutrino cannot run UL or ZSO images.
+        guiWarning(_l(_STR_NEUTRINO_BAD_FORMAT), 6);
+        return 0;
+    }
+
+    const char *neutrinoPath = sbResolveNeutrinoPath(pDeviceData->bdmPrefix); // AUTO probes this device for a co-located install
+    if (neutrinoPath == NULL) {
+        guiWarning(_l(_STR_NEUTRINO_NOT_FOUND), 6);
+        return 0;
+    }
+
+    // Everything Neutrino actually needs from the config/device, copied to THIS stack frame
+    // (deinit below frees configSet's owner + pDeviceData). Absent per-game keys = follow the
+    // global defaults.
+    int compatmask = 0, neutrinoVideo = gNeutrinoVideoDefault, neutrinoGsmComp = gNeutrinoGsmCompDefault, neutrinoBsdfs = 0;
+    char neutrinoExtraArgs[256] = "";
+    neutrino_vmc_args_t neutrinoVmc = {0};
+    char partname[256], bdmCurrentDriver[32];
+    configGetInt(configSet, CONFIG_ITEM_COMPAT, &compatmask);
+    configGetStrCopy(configSet, CONFIG_ITEM_NEUTRINO_ARGS, neutrinoExtraArgs, sizeof(neutrinoExtraArgs));
+    configGetInt(configSet, CONFIG_ITEM_NEUTRINO_VIDEO, &neutrinoVideo);
+    configGetInt(configSet, CONFIG_ITEM_NEUTRINO_GSMCOMP, &neutrinoGsmComp);
+    configGetInt(configSet, CONFIG_ITEM_NEUTRINO_BSDFS, &neutrinoBsdfs);
+    sbBuildVmcNeutrinoArgs(configSet, pDeviceData->bdmPrefix, &neutrinoVmc);
+    sbCreatePath(game, partname, pDeviceData->bdmPrefix, "/", 0); // -dvd target
+    snprintf(bdmCurrentDriver, sizeof(bdmCurrentDriver), "%s", pDeviceData->bdmDriver);
+
+    if (!bdmNeutrinoFragBudgetOk(partname, &neutrinoVmc))
+        return 0; // stay native: the embedded core handles fragmentation via fraglists
+
+    if (gRememberLastPlayed) {
+        configSetStr(configGetByType(CONFIG_LAST), "last_played", game->startup);
+        saveConfig(CONFIG_LAST, 0);
+    }
+
+    // Preflight (driver token validation) -- abort stays in a live menu.
+    if (sysNeutrinoPreflight(bdmCurrentDriver, neutrinoPath) < 0)
+        return 0;
+
+    // game->startup lives inside bdmGames / gAutoLaunchBDMGame, both freed below. Copy it
+    // before the teardown so sysLaunchNeutrino's -elf build reads valid stack memory.
+    char bdmStartup[GAME_STARTUP_MAX + 1];
+    snprintf(bdmStartup, sizeof(bdmStartup), "%s", game->startup);
+
+    if (gAutoLaunchBDMGame == NULL) {
+        // Keep-IOP handoff: keep BOTH the game device and the neutrino.elf device mounted
+        // (Neutrino reads its -cwd config/modules and the ISO through our mounts pre-reset).
+        int neutrinoDevMode = oplPath2Mode(neutrinoPath);
+        deinitEx(UNMOUNT_EXCEPTION, itemList->mode, neutrinoDevMode); // CAREFUL: itemCleanUp frees bdmGames/game
+    } else {
+        miniDeinit(configSet);
+        free(gAutoLaunchBDMGame);
+        gAutoLaunchBDMGame = NULL;
+        free(gAutoLaunchDeviceData);
+        gAutoLaunchDeviceData = NULL;
+    }
+
+    // gPS2Logo passes the user's preference straight through: Neutrino performs its own logo
+    // read/validation for -logo.
+    sysLaunchNeutrino(bdmCurrentDriver, partname, bdmStartup, compatmask, gPS2Logo, neutrinoPath, neutrinoExtraArgs, neutrinoVideo, neutrinoGsmComp, neutrinoBsdfs, &neutrinoVmc);
+    return 1;
+}
+
 
 void bdmLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
 {
@@ -338,6 +519,11 @@ void bdmLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
         pDeviceData = gAutoLaunchDeviceData;
         game = gAutoLaunchBDMGame;
     }
+
+    // Neutrino core gets its own lean path FIRST -- everything below is native-core prep it
+    // neither needs nor should be able to die on (see bdmTryNeutrinoLaunch).
+    if (bdmTryNeutrinoLaunch(itemList, game, pDeviceData, configSet))
+        return;
 
     char vmc_name[32], vmc_path[256], have_error = 0;
     int vmc_id, size_mcemu_irx = 0;
