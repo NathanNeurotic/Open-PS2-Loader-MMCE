@@ -511,8 +511,7 @@ void guiShowConfig()
     diaSetString(diaConfig, CFG_EXITTO, gExitPath);
 
     diaSetInt(diaConfig, CFG_LASTPLAYED, gRememberLastPlayed);
-    // NOTE(rebuild): folder browsing returns with checklist item 34 -- hide its row until then.
-    diaSetVisible(diaConfig, CFG_FOLDERNAV, 0);
+    diaSetInt(diaConfig, CFG_FOLDERNAV, gEnableFolderNav);
     diaSetInt(diaConfig, CFG_AUTOSTARTLAST, gAutoStartLastPlayed);
     diaSetVisible(diaConfig, CFG_AUTOSTARTLAST, gRememberLastPlayed);
     diaSetVisible(diaConfig, CFG_LBL_AUTOSTARTLAST, gRememberLastPlayed);
@@ -521,6 +520,7 @@ void guiShowConfig()
     if (ret) {
         diaGetString(diaConfig, CFG_EXITTO, gExitPath, sizeof(gExitPath));
         diaGetInt(diaConfig, CFG_LASTPLAYED, &gRememberLastPlayed);
+        diaGetInt(diaConfig, CFG_FOLDERNAV, &gEnableFolderNav);
         diaGetInt(diaConfig, CFG_AUTOSTARTLAST, &gAutoStartLastPlayed);
 
         DisableCron = 1; // Disable Auto Start Last Played counter (we don't want to call it right after enable it on GUI)
