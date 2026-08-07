@@ -20,6 +20,12 @@ enum CONFIG_INDEX {
 #define CONFIG_GAME    (1 << CONFIG_INDEX_GAME)
 #define CONFIG_ALL     0xFF
 
+// RiptOPL master settings file. Namespaced so it never collides with a stock OPL install's
+// conf_opl.cfg on the same card. configRead() falls back to the legacy fork name so existing
+// RiptOPL installs keep their settings -- the next save writes the new name (auto-migration).
+#define CONFIG_OPL_FILENAME        "settings_riptopl.cfg"
+#define CONFIG_OPL_FILENAME_LEGACY "conf_riptopl.cfg"
+
 #define CONFIG_SOURCE_DEFAULT 0
 #define CONFIG_SOURCE_USER    1
 #define CONFIG_SOURCE_DLOAD   2 // Downloaded from the network
@@ -97,6 +103,7 @@ enum CONFIG_INDEX {
 #define CONFIG_OPL_BDM_CACHE            "bdm_cache"
 #define CONFIG_OPL_HDD_CACHE            "hdd_cache"
 #define CONFIG_OPL_SMB_CACHE            "smb_cache"
+#define CONFIG_OPL_ENABLE_USB           "enable_usb"
 #define CONFIG_OPL_ENABLE_ILINK         "enable_ilink"
 #define CONFIG_OPL_ENABLE_MX4SIO        "enable_mx4sio"
 #define CONFIG_OPL_ENABLE_BDMHDD        "enable_bdm_hdd"

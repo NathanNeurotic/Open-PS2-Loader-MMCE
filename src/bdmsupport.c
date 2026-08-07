@@ -118,11 +118,14 @@ void bdmLoadModules(void)
     LOG("[BDMFS_FATFS]:\n");
     sysLoadModuleBuffer(&bdmfs_fatfs_irx, size_bdmfs_fatfs_irx, 0, NULL);
 
-    // Load USB Block Device drivers
+    // Load USB Block Device drivers. usbd stays unconditional (USB pads need the host
+    // stack); only the mass-storage block device honours the opt-in toggle.
     LOG("[USBD]:\n");
     sysLoadModuleBuffer(&usbd_irx, size_usbd_irx, 0, NULL);
-    LOG("[USBMASS_BD]:\n");
-    sysLoadModuleBuffer(&usbmass_bd_irx, size_usbmass_bd_irx, 0, NULL);
+    if (gEnableUSB) {
+        LOG("[USBMASS_BD]:\n");
+        sysLoadModuleBuffer(&usbmass_bd_irx, size_usbmass_bd_irx, 0, NULL);
+    }
 
     // Load Optional Block Device drivers
     ioPutRequest(IO_CUSTOM_SIMPLEACTION, &bdmLoadBlockDeviceModules);
@@ -178,7 +181,7 @@ static int bdmNeedsUpdate(item_list_t *itemList)
         int deviceEnabled = 0;
         switch (pDeviceData->bdmDeviceType) {
             case BDM_TYPE_USB:
-                deviceEnabled = (gBDMStartMode != START_MODE_DISABLED);
+                deviceEnabled = gEnableUSB;
                 break;
             case BDM_TYPE_ILINK:
                 deviceEnabled = gEnableILK;

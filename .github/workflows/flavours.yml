@@ -57,5 +57,6 @@ jobs:
         with:
           name: OPL-${{ matrix.flavour }}
           path: |
+            RIPTOPL-*.ELF
             OPNPS2LD-*.ELF
           if-no-files-found: error

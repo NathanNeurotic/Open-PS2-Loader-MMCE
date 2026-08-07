@@ -5,6 +5,7 @@
 */
 
 #include "include/opl.h"
+#include "include/diag.h"
 #include "include/menusys.h"
 #include "include/iosupport.h"
 #include "include/renderman.h"
@@ -161,7 +162,8 @@ static void _menuSaveConfig()
     SignalSema(menuSemaId);
 
     if (!result)
-        setErrorMessage(_STR_ERROR_SAVING_SETTINGS);
+        // gLastSaveErrno was latched inside configWrite at the real failure site.
+        setErrorMessagePathCode(_STR_ERROR_SAVING_SETTINGS_TO, itemConfig ? itemConfig->filename : "", gLastSaveErrno);
 }
 
 static void _menuRequestConfig()
