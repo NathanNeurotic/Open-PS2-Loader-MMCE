@@ -32,7 +32,7 @@
 #include "include/appsupport.h"
 #include "include/favsupport.h"
 #include "include/folderbrowse.h" // folderDepth -- favourites suppression inside subfolders
-#include "include/vcdsupport.h" // vcdViewActive stub -- isVcd stays 0 until item 12 lands
+#include "include/vcdsupport.h"   // vcdViewActive stub -- isVcd stays 0 until item 12 lands
 
 #include "include/cheatman.h"
 #include "include/sound.h"
@@ -169,9 +169,9 @@ int gVcdFirstDiscOnly;             // hide discs 2+ of multi-disc PS1 sets
 char gBootDir[256];                // boot directory (cwd) OPL launched from; "" if undeterminable
 int gEnableILK;
 int gEnableBGArt;
-int gEnableArtTar;    // .tar art packs (item 45); no UI until gate D
-int gArtDelay;        // inactivity frames before art loads; safe default until gate D tunes it
-int gEnableFolderNav; // folder browsing in game lists (item 34)
+int gEnableArtTar;                       // .tar art packs (item 45); no UI until gate D
+int gArtDelay;                           // inactivity frames before art loads; safe default until gate D tunes it
+int gEnableFolderNav;                    // folder browsing in game lists (item 34)
 unsigned char gDefaultPlasBlendColor[3]; // plasma gradient low end; black = historical look
 volatile int gLastSaveErrno = 0;
 int gEnableMX4SIO;

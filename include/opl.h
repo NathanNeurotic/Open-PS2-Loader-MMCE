@@ -170,8 +170,8 @@ extern int gVcdHideGameId;     // display-only: hide a leading PS1 game-ID prefi
 extern int gVcdFirstDiscOnly;  // hide discs 2+ of multi-disc PS1 sets
 extern char gBootDir[256];     // boot directory (cwd) OPL launched from; "" if undeterminable
 extern int gEnableBGArt;
-extern int gEnableArtTar; // .tar art packs (item 45); OFF until the Artwork UI returns
-extern int gArtDelay;     // frames of inactivity before art loads (item 45); safe official-like default until gate D
+extern int gEnableArtTar;    // .tar art packs (item 45); OFF until the Artwork UI returns
+extern int gArtDelay;        // frames of inactivity before art loads (item 45); safe official-like default until gate D
 extern int gEnableFolderNav; // folder browsing in game lists (item 34)
 extern unsigned char gDefaultPlasBlendColor[3];
 extern int gEnableILK;
