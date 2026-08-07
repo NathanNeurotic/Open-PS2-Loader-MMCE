@@ -156,6 +156,16 @@ int gDefaultCoreLoader;      // global default Loader Core (0=<OPL>, 1=Neutrino)
 int gNeutrinoVideoDefault;   // global default Neutrino -gsm video mode (0=Off..5=1080i x3); per-game $NeutrinoVideo overrides
 int gNeutrinoGsmCompDefault; // global default -gsm ":c" field-flip half (0=off, 1-3=type)
 int gNeutrinoElfArg;         // default-on (settings key only, no UI): auto-emit -elf=cdrom0: on Neutrino launches
+int gDefaultGameView;
+char gPopstarterPath[256];         // custom POPSTARTER.ELF path (used only when gPopstarterDevice == POPS_DEV_CUSTOM)
+int gPopstarterDevice;             // POPSTARTER.ELF device (POPS_DEV_*); legacy path -> Custom
+int gPopstarterRetroGemGameID = 1; // RetroGEM Game ID optical barcode for VCD launches (1=on, default)
+int gBdmaSource;                   // BDMA SOURCE device family (VCD_BDMA_SRC_*)
+int gBdmaMode;                     // BDMA MODE mirrored from the mc?:/POPSTARTER/ marker
+int gBdmaApplyOnLaunch;            // auto-equip the launched VCD's matching exFAT driver before boot
+int gVcdHideGameId;                // display-only: hide a leading PS1 game-ID prefix from VCD lists
+int gVcdFirstDiscOnly;             // hide discs 2+ of multi-disc PS1 sets
+char gBootDir[256];                // boot directory (cwd) OPL launched from; "" if undeterminable
 int gEnableILK;
 int gEnableBGArt;
 unsigned char gDefaultPlasBlendColor[3]; // plasma gradient low end; black = historical look
@@ -1040,6 +1050,20 @@ static void _loadConfig()
             configGetInt(configOPL, CONFIG_OPL_APP_MODE, &gAPPStartMode);
             configGetInt(configOPL, CONFIG_OPL_ENABLE_USB, &gEnableUSB);
             configGetInt(configOPL, CONFIG_OPL_FAV_MODE, &gFAVStartMode);
+            configGetInt(configOPL, CONFIG_OPL_DEFAULT_GAME_VIEW, &gDefaultGameView);
+            if (gDefaultGameView < GAME_VIEW_BOTH || gDefaultGameView > GAME_VIEW_VCD)
+                gDefaultGameView = GAME_VIEW_BOTH;
+            configGetStrCopy(configOPL, CONFIG_OPL_POPSTARTER_PATH, gPopstarterPath, sizeof(gPopstarterPath));
+            // POPSTARTER device TYPE (POPS_DEV_*). Absent in legacy configs: a non-empty custom
+            // popstarter_path migrates to Custom (honour the old override); otherwise Default (cwd).
+            if (!configGetInt(configOPL, CONFIG_OPL_POPSTARTER_DEVICE, &gPopstarterDevice))
+                gPopstarterDevice = (gPopstarterPath[0] != '\0') ? POPS_DEV_CUSTOM : POPS_DEV_DEFAULT;
+            if (!configGetInt(configOPL, CONFIG_OPL_POPSTARTER_RETROGEM_GAMEID, &gPopstarterRetroGemGameID))
+                gPopstarterRetroGemGameID = 1;
+            configGetInt(configOPL, CONFIG_OPL_BDMA_SOURCE, &gBdmaSource);
+            configGetInt(configOPL, CONFIG_OPL_BDMA_APPLY, &gBdmaApplyOnLaunch);
+            configGetInt(configOPL, CONFIG_OPL_VCD_HIDE_GAMEID, &gVcdHideGameId);
+            configGetInt(configOPL, CONFIG_OPL_VCD_FIRST_DISC_ONLY, &gVcdFirstDiscOnly);
             configGetStrCopy(configOPL, CONFIG_OPL_NEUTRINO_ARGS, gNeutrinoArgs, sizeof(gNeutrinoArgs));
             configGetStrCopy(configOPL, CONFIG_OPL_NEUTRINO_PATH, gNeutrinoPath, sizeof(gNeutrinoPath));
             configGetInt(configOPL, CONFIG_OPL_NEUTRINO_ELF_ARG, &gNeutrinoElfArg);
@@ -1252,6 +1276,14 @@ static void _saveConfig()
         configSetInt(configOPL, CONFIG_OPL_SMB_CACHE, smbCacheSize);
         configSetInt(configOPL, CONFIG_OPL_ENABLE_USB, gEnableUSB);
         configSetInt(configOPL, CONFIG_OPL_FAV_MODE, gFAVStartMode);
+        configSetInt(configOPL, CONFIG_OPL_DEFAULT_GAME_VIEW, gDefaultGameView);
+        configSetStr(configOPL, CONFIG_OPL_POPSTARTER_PATH, gPopstarterPath);
+        configSetInt(configOPL, CONFIG_OPL_POPSTARTER_DEVICE, gPopstarterDevice);
+        configSetInt(configOPL, CONFIG_OPL_POPSTARTER_RETROGEM_GAMEID, gPopstarterRetroGemGameID);
+        configSetInt(configOPL, CONFIG_OPL_BDMA_SOURCE, gBdmaSource);
+        configSetInt(configOPL, CONFIG_OPL_BDMA_APPLY, gBdmaApplyOnLaunch);
+        configSetInt(configOPL, CONFIG_OPL_VCD_HIDE_GAMEID, gVcdHideGameId);
+        configSetInt(configOPL, CONFIG_OPL_VCD_FIRST_DISC_ONLY, gVcdFirstDiscOnly);
         configSetStr(configOPL, CONFIG_OPL_NEUTRINO_ARGS, gNeutrinoArgs);
         configSetStr(configOPL, CONFIG_OPL_NEUTRINO_PATH, gNeutrinoPath);
         configSetInt(configOPL, CONFIG_OPL_DEFAULT_CORE, gDefaultCoreLoader);
@@ -1950,7 +1982,17 @@ static void setDefaults(void)
     gNeutrinoVideoDefault = 0; // no global -gsm until the user opts in
     gNeutrinoGsmCompDefault = 0;
     gNeutrinoElfArg = 1; // auto-emit the game ELF for Neutrino compatibility lookup by default
-    gEnableBGArt = 1;    // inert while gEnableArt stays at the official OFF default
+    gDefaultGameView = GAME_VIEW_BOTH;
+    gPopstarterDevice = POPS_DEV_DEFAULT;
+    gPopstarterPath[0] = '\0';
+    gPopstarterRetroGemGameID = 1;
+    gBdmaSource = VCD_BDMA_SRC_USB;
+    gBdmaMode = VCD_BDMA_FAT32;
+    gBdmaApplyOnLaunch = 1; // auto-equip on launch by default
+    gVcdHideGameId = 1;     // hide the PS1 game-ID prefix by default (display-only)
+    gVcdFirstDiscOnly = 1;  // hide discs 2+ of multi-disc PS1 sets by default (POPSLoader parity)
+    gBootDir[0] = '\0';
+    gEnableBGArt = 1; // inert while gEnableArt stays at the official OFF default
     gDefaultPlasBlendColor[0] = 0x00;
     gDefaultPlasBlendColor[1] = 0x00;
     gDefaultPlasBlendColor[2] = 0x00;

@@ -75,7 +75,7 @@ endif
 
 FRONTEND_OBJS = pad.o xparam.o fntsys.o renderman.o menusys.o OSDHistory.o system.o elfldr_noreset.o elfldr.o lang.o lang_internal.o config.o hdd.o dialogs.o favsupport.o \
 		dia.o ioman.o texcache.o themes.o supportbase.o bdmsupport.o ethsupport.o hddsupport.o zso.o lz4.o \
-		appsupport.o gui.o guigame.o vmc_groups.o textures.o opl.o atlas.o nbns.o httpclient.o gsm.o cheatman.o sound.o ps2cnf.o
+		appsupport.o vcdsupport.o retrogem.o gui.o guigame.o vmc_groups.o textures.o opl.o atlas.o nbns.o httpclient.o gsm.o cheatman.o sound.o ps2cnf.o
 
 IOP_OBJS =	iomanx.o filexio.o ps2fs.o usbd.o bdmevent.o \
 		bdm.o bdmfs_fatfs.o usbmass_bd.o iLinkman.o IEEE1394_bd.o mx4sio_bd.o \
@@ -109,7 +109,7 @@ GFX_OBJS = $(PNG_ASSETS:%=%_png.o) poeveticanew.o icon_sys.o icon_icn.o
 
 AUDIO_OBJS =	boot.o cancel.o confirm.o cursor.o message.o transition.o bd_connect.o bd_disconnect.o
 
-MISC_OBJS =	icon_sys_A.o icon_sys_J.o icon_sys_C.o conf_theme_OPL.o theme_coverflow.o
+MISC_OBJS =	icon_sys_A.o icon_sys_J.o icon_sys_C.o conf_theme_OPL.o theme_coverflow.o bdma_usbd_usb.o bdma_usbhdfsd_usbexfat.o bdma_usbhdfsd_mx4sio.o bdma_usbd_mmce.o bdma_usbhdfsd_mmce.o bdma_usbd_ata.o bdma_usbhdfsd_ata.o
 
 TRANSLATIONS = Albanian Arabic Bulgarian Cebuano Croatian Czech Danish Dutch Filipino French \
 	German Greek Hungarian Indonesian Italian Japanese Korean Laotian Persian Polish Portuguese \
@@ -745,6 +745,32 @@ $(EE_ASM_DIR)icon_sys_C.c: misc/icon_C.sys | $(EE_ASM_DIR)
 
 $(EE_ASM_DIR)conf_theme_OPL.c: misc/conf_theme_OPL.cfg | $(EE_ASM_DIR)
 	$(BIN2C) $< $@ $(*F)_cfg
+
+# Embedded BDMAssault variant pairs (modules/bdmassault, see PROVENANCE.md): gzipped (-n for
+# reproducible bytes; zlib is already linked via libpng) and pasted by vcdEquipBdma's final-fallback
+# leg when no user-supplied copy exists on any seek-path device. bdma_usbd_usb serves BOTH the
+# usbexfat and mx4sio modes (byte-identical upstream blobs, deduped).
+$(EE_ASM_DIR)bdma_usbd_usb.c: modules/bdmassault/usbd.irx.usbexfat | $(EE_ASM_DIR)
+	gzip -9 -n -c $< > $(EE_ASM_DIR)bdma_usbd_usb.gz
+	$(BIN2C) $(EE_ASM_DIR)bdma_usbd_usb.gz $@ bdma_usbd_usb_gz
+$(EE_ASM_DIR)bdma_usbhdfsd_usbexfat.c: modules/bdmassault/usbhdfsd.irx.usbexfat | $(EE_ASM_DIR)
+	gzip -9 -n -c $< > $(EE_ASM_DIR)bdma_usbhdfsd_usbexfat.gz
+	$(BIN2C) $(EE_ASM_DIR)bdma_usbhdfsd_usbexfat.gz $@ bdma_usbhdfsd_usbexfat_gz
+$(EE_ASM_DIR)bdma_usbhdfsd_mx4sio.c: modules/bdmassault/usbhdfsd.irx.mx4sio | $(EE_ASM_DIR)
+	gzip -9 -n -c $< > $(EE_ASM_DIR)bdma_usbhdfsd_mx4sio.gz
+	$(BIN2C) $(EE_ASM_DIR)bdma_usbhdfsd_mx4sio.gz $@ bdma_usbhdfsd_mx4sio_gz
+$(EE_ASM_DIR)bdma_usbd_mmce.c: modules/bdmassault/usbd.irx.mmce | $(EE_ASM_DIR)
+	gzip -9 -n -c $< > $(EE_ASM_DIR)bdma_usbd_mmce.gz
+	$(BIN2C) $(EE_ASM_DIR)bdma_usbd_mmce.gz $@ bdma_usbd_mmce_gz
+$(EE_ASM_DIR)bdma_usbhdfsd_mmce.c: modules/bdmassault/usbhdfsd.irx.mmce | $(EE_ASM_DIR)
+	gzip -9 -n -c $< > $(EE_ASM_DIR)bdma_usbhdfsd_mmce.gz
+	$(BIN2C) $(EE_ASM_DIR)bdma_usbhdfsd_mmce.gz $@ bdma_usbhdfsd_mmce_gz
+$(EE_ASM_DIR)bdma_usbd_ata.c: modules/bdmassault/usbd.irx.ata | $(EE_ASM_DIR)
+	gzip -9 -n -c $< > $(EE_ASM_DIR)bdma_usbd_ata.gz
+	$(BIN2C) $(EE_ASM_DIR)bdma_usbd_ata.gz $@ bdma_usbd_ata_gz
+$(EE_ASM_DIR)bdma_usbhdfsd_ata.c: modules/bdmassault/usbhdfsd.irx.ata | $(EE_ASM_DIR)
+	gzip -9 -n -c $< > $(EE_ASM_DIR)bdma_usbhdfsd_ata.gz
+	$(BIN2C) $(EE_ASM_DIR)bdma_usbhdfsd_ata.gz $@ bdma_usbhdfsd_ata_gz
 
 $(EE_ASM_DIR)theme_coverflow.c: misc/theme_coverflow.cfg | $(EE_ASM_DIR)
 	$(BIN2C) $< $@ $(*F)_cfg

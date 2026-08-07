@@ -1398,6 +1398,29 @@ void sysLaunchNeutrino(const char *driver, const char *path, const char *startup
         LOG("[NEUTRINO] keep-IOP handoff failed for %s\n", neutrinoPath);
 }
 
+// Hand off to an external POPSTARTER.ELF to boot a PS1 VCD. The caller resolves the per-device
+// POPSTARTER.ELF path + builds the argv[0] selector ("<POPS>/<XX.|SB.><name>.ELF", which
+// POPSTARTER itself re-derives the matching .VCD from), copies both to stack buffers, and
+// deinit()s the owning device with UNMOUNT_EXCEPTION BEFORE calling this -- the same contract as
+// sysLaunchNeutrino (so the VCD-holding device stays mounted across the IOP reset).
+void sysLaunchPopstarter(const char *popstarterElf, const char *selector)
+{
+    if (popstarterElf == NULL || selector == NULL) {
+        LOG("[POPS] null arg, abort\n");
+        return;
+    }
+
+    char *argv[1];
+    argv[0] = (char *)selector;
+    LOG("[POPS] elf=%s argv0=%s\n", popstarterElf, selector);
+
+    // Every POPSTARTER route depends on the selector remaining target argv[0]. The stock SDK
+    // partition loader replaces it with the ELF load path; use the argv-preserving loader
+    // uniformly. POPSTARTER performs its own IOP reset and device discovery from the selector.
+    if (sysLoadELFKeepIOP(popstarterElf, "", 1, argv) < 0)
+        LOG("[POPS] keep-IOP handoff failed for %s\n", popstarterElf);
+}
+
 void sysLaunchLoaderElf(const char *filename, const char *mode_str, int size_cdvdman_irx, void **cdvdman_irx, int size_mcemu_irx, void **mcemu_irx, int EnablePS2Logo, unsigned int compatflags)
 {
     unsigned int modules, ModuleStorageSize;

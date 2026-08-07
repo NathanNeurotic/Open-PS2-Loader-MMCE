@@ -143,6 +143,32 @@ extern int gNeutrinoGsmCompDefault;
 extern int gNeutrinoElfArg;
 extern char gNeutrinoArgs[256];
 extern char gNeutrinoPath[256];
+// Default game-list view for VCD-capable device pages.
+enum {
+    GAME_VIEW_BOTH = 0, // both lists reachable via the per-device L3 toggle (default)
+    GAME_VIEW_ISO,      // lock every VCD-capable page to its ISO/disc list
+    GAME_VIEW_VCD       // lock every VCD-capable page to its VCD (PS1) list
+};
+extern int gDefaultGameView;
+// POPSTARTER.ELF Device picker: where PS1 VCD launches load POPS/POPSTARTER.ELF from.
+enum { POPS_DEV_DEFAULT = 0, // cwd (gBootDir) /POPS/, then the VCD's own device (back-compat fallback)
+       POPS_DEV_MC,          // mc0: / mc1:
+       POPS_DEV_USB,         // BDM "usb"        -> the mounted massN:
+       POPS_DEV_MX4SIO,      // BDM "mx4sio"/sdc -> the mounted massN:
+       POPS_DEV_MMCE,        // mmce0: / mmce1: (checklist item 1)
+       POPS_DEV_EXFAT_HDD,   // BDM "ata" internal exFAT HDD -> the mounted massN:
+       POPS_DEV_APA_HDD,     // APA HDD: the mounted OPL data partition (pfs0:)
+       POPS_DEV_CUSTOM,      // free-text gPopstarterPath
+       POPS_DEV_GAME };      // the VCD's OWN device ONLY; appended last to keep saved ints stable
+extern int gPopstarterDevice;
+extern int gPopstarterRetroGemGameID;
+extern char gPopstarterPath[256];
+extern int gBdmaSource;        // BDMA SOURCE device family (VCD_BDMA_SRC_*); persisted in conf
+extern int gBdmaMode;          // BDMA MODE mirrored from the mc?:/POPSTARTER/ marker (VCD_BDMA_*)
+extern int gBdmaApplyOnLaunch; // auto-equip the launched VCD's matching exFAT driver before boot
+extern int gVcdHideGameId;     // display-only: hide a leading PS1 game-ID prefix from VCD lists
+extern int gVcdFirstDiscOnly;  // hide discs 2+ of multi-disc PS1 sets
+extern char gBootDir[256];     // boot directory (cwd) OPL launched from; "" if undeterminable
 extern int gEnableBGArt;
 extern unsigned char gDefaultPlasBlendColor[3];
 extern int gEnableILK;

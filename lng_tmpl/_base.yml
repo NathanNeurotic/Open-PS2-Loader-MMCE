@@ -946,3 +946,9 @@ gui_strings:
   string: Neutrino ELF not found, launching with <OPL> core
 - label: NEUTRINO_TOO_FRAGMENTED
   string: Too fragmented for Neutrino (%d fragments, limit %d incl. VMCs) -- trying the OPL core instead.
+- label: BDMA_ERR_SRC
+  string: BDMA module files not found on the source device.
+- label: BDMA_ERR_SPACE
+  string: Not enough memory card space for the BDMA modules.
+- label: BDMA_ERR_IO
+  string: Error writing the BDMA modules to the memory card.
