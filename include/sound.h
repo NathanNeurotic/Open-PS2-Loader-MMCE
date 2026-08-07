@@ -21,6 +21,8 @@ void audioSetVolume(void);
 int sfxInit(int bootSnd);
 int sfxGetSoundDuration(int id);
 void sfxPlay(int id);
+// Per-press audsrv RPC wall time (last / max, ms) -- measured on the dispatch thread.
+void sfxGetPlayDiag(unsigned int *lastMs, unsigned int *maxMs);
 
 void bgmStart(void);
 void bgmStop(void);
