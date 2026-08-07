@@ -131,7 +131,7 @@ int diaShowKeyb(char *text, int maxLen, int hide_text, const char *title)
             if (cmdicons[i]) {
                 int w = (cmdicons[i]->Width * 20) / cmdicons[i]->Height;
                 int h = 20;
-                rmDrawPixmap(cmdicons[i], 436, 170 + 3 * UI_SPACING_H * i, ALIGN_NONE, w, h, SCALING_RATIO, gDefaultCol);
+                rmDrawPixmap(cmdicons[i], 436, 170 + 3 * UI_SPACING_H * i, ALIGN_NONE, w, h, SCALING_RATIO, gDefaultCol, 0);
             }
 
             x = 477;

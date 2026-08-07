@@ -125,6 +125,8 @@ extern int hddCacheSize;
 extern int smbCacheSize;
 
 extern int gEnableUSB;
+extern int gEnableBGArt;
+extern unsigned char gDefaultPlasBlendColor[3];
 extern int gEnableILK;
 extern int gEnableMX4SIO;
 extern int gEnableBdmHDD;

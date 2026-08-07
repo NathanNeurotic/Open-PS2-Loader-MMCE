@@ -92,6 +92,7 @@ static void clearIOModuleT(opl_io_module_t *mod)
     mod->menuItem.current = NULL;
     mod->menuItem.submenu = NULL;
     mod->menuItem.pagestart = NULL;
+    mod->menuItem.last = NULL; // coverflow wrap tail (device re-init must not leave it dangling)
     mod->menuItem.remindLast = 0;
     mod->menuItem.refresh = NULL;
     mod->menuItem.text = NULL;
@@ -138,6 +139,8 @@ int hddCacheSize;
 int smbCacheSize;
 int gEnableUSB;
 int gEnableILK;
+int gEnableBGArt;
+unsigned char gDefaultPlasBlendColor[3]; // plasma gradient low end; black = historical look
 volatile int gLastSaveErrno = 0;
 int gEnableMX4SIO;
 int gEnableBdmHDD;
@@ -354,6 +357,7 @@ static void initMenuForListSupport(opl_io_module_t *mod)
     mod->menuItem.submenu = NULL;
     mod->menuItem.current = NULL;
     mod->menuItem.pagestart = NULL;
+    mod->menuItem.last = NULL; // coverflow wrap tail
     mod->menuItem.remindLast = 0;
 
     mod->menuItem.refresh = &itemExecRefresh;
@@ -382,6 +386,7 @@ static void clearMenuGameList(opl_io_module_t *mdl)
         mdl->menuItem.submenu = NULL;
         mdl->menuItem.current = NULL;
         mdl->menuItem.pagestart = NULL;
+        mdl->menuItem.last = NULL; // coverflow wrap tail (list clear/refresh must reset it)
         mdl->menuItem.remindLast = 0;
 
         // unlock
@@ -965,6 +970,25 @@ static void _loadConfig()
             configGetInt(configOPL, CONFIG_OPL_ETH_MODE, &gETHStartMode);
             configGetInt(configOPL, CONFIG_OPL_APP_MODE, &gAPPStartMode);
             configGetInt(configOPL, CONFIG_OPL_ENABLE_USB, &gEnableUSB);
+            configGetInt(configOPL, CONFIG_OPL_ENABLE_BGART, &gEnableBGArt);
+            configGetColor(configOPL, CONFIG_OPL_PLAS_BLEND_COLOR, gDefaultPlasBlendColor);
+            configGetInt(configOPL, CONFIG_OPL_COVERFLOW_COUNT, &gCoverflowCount);
+            configGetInt(configOPL, CONFIG_OPL_COVERFLOW_SCALE, &gCoverflowCenterScale);
+            configGetInt(configOPL, CONFIG_OPL_COVERFLOW_ANIM, &gCoverflowAnimSpeed);
+            configGetInt(configOPL, CONFIG_OPL_COVERFLOW_DIM, &gCoverflowDimCovers);
+            // clamp count to {3,5} on load -- defends a hand-edited conf.cfg
+            gCoverflowCount = (gCoverflowCount == 5) ? 5 : 3;
+            // clamp the remaining coverflow values too -- a hand-edited conf.cfg
+            // otherwise feeds unbounded ints into signed render math
+            if (gCoverflowCenterScale < 0)
+                gCoverflowCenterScale = 0;
+            else if (gCoverflowCenterScale > 1000)
+                gCoverflowCenterScale = 1000;
+            if (gCoverflowAnimSpeed < 0)
+                gCoverflowAnimSpeed = 0;
+            else if (gCoverflowAnimSpeed > 5000)
+                gCoverflowAnimSpeed = 5000;
+            gCoverflowDimCovers = gCoverflowDimCovers ? 1 : 0;
             configGetInt(configOPL, CONFIG_OPL_ENABLE_ILINK, &gEnableILK);
             configGetInt(configOPL, CONFIG_OPL_ENABLE_MX4SIO, &gEnableMX4SIO);
             configGetInt(configOPL, CONFIG_OPL_ENABLE_BDMHDD, &gEnableBdmHDD);
@@ -1136,6 +1160,12 @@ static void _saveConfig()
         configSetInt(configOPL, CONFIG_OPL_HDD_CACHE, hddCacheSize);
         configSetInt(configOPL, CONFIG_OPL_SMB_CACHE, smbCacheSize);
         configSetInt(configOPL, CONFIG_OPL_ENABLE_USB, gEnableUSB);
+        configSetInt(configOPL, CONFIG_OPL_ENABLE_BGART, gEnableBGArt);
+        configSetColor(configOPL, CONFIG_OPL_PLAS_BLEND_COLOR, gDefaultPlasBlendColor);
+        configSetInt(configOPL, CONFIG_OPL_COVERFLOW_COUNT, gCoverflowCount);
+        configSetInt(configOPL, CONFIG_OPL_COVERFLOW_SCALE, gCoverflowCenterScale);
+        configSetInt(configOPL, CONFIG_OPL_COVERFLOW_ANIM, gCoverflowAnimSpeed);
+        configSetInt(configOPL, CONFIG_OPL_COVERFLOW_DIM, gCoverflowDimCovers);
         configSetInt(configOPL, CONFIG_OPL_ENABLE_ILINK, gEnableILK);
         configSetInt(configOPL, CONFIG_OPL_ENABLE_MX4SIO, gEnableMX4SIO);
         configSetInt(configOPL, CONFIG_OPL_ENABLE_BDMHDD, gEnableBdmHDD);
@@ -1780,7 +1810,11 @@ static void setDefaults(void)
     gETHStartMode = START_MODE_DISABLED;
     gAPPStartMode = START_MODE_DISABLED;
 
-    gEnableUSB = 0; // USB block device is opt-in, like the other BDM transports
+    gEnableUSB = 0;   // USB block device is opt-in, like the other BDM transports
+    gEnableBGArt = 1; // inert while gEnableArt stays at the official OFF default
+    gDefaultPlasBlendColor[0] = 0x00;
+    gDefaultPlasBlendColor[1] = 0x00;
+    gDefaultPlasBlendColor[2] = 0x00;
     gEnableILK = 0;
     gEnableMX4SIO = 0;
     gEnableBdmHDD = 0;

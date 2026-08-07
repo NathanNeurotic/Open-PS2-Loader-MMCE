@@ -97,6 +97,12 @@ void rmUnloadTexture(GSTEXTURE *txt)
     gsKit_TexManager_free(gsGlobal, txt);
 }
 
+void rmPrimeTexture(GSTEXTURE *txt)
+{
+    if (txt != NULL && txt->Mem != NULL)
+        gsKit_TexManager_bind(gsGlobal, txt);
+}
+
 void rmStartFrame(void)
 {
     if (hires == 0)
@@ -220,7 +226,31 @@ int rmSetMode(int force)
         gsGlobal->OffsetY = ((4096 - gsGlobal->Height) / 2) * 16;
 
         if (hires) {
+            // PrimAlphaEnable MUST be OFF across this call, and the bracket below is a real fix, not
+            // hygiene (FifthFox's 1080i "scrolling leaves artifacts that persist", HW).
+            //
+            // gsKit_hires_init_screen -> _gsKit_create_passes bakes a gsKit_clear into each pass's
+            // PERSISTENT queue -- that baked clear is the ONLY thing that ever erases a hires frame
+            // (rmStartFrame deliberately skips clearing when hires; see there). But gsKit_clear's
+            // sprite samples the PRIM ABE bit from gsGlobal->PrimAlphaEnable AT CREATION TIME
+            // (gsPrimitive.c gsKit_prim_list_sprite_flat), and the colour gsKit bakes is
+            // GS_SETREG_RGBAQ(0,0,0,0x00,0) -- ALPHA ZERO. With PrimAlphaEnable ON (set above) and our
+            // source-over blend (gDefaultAlpha: (Cs-Cd)*As+Cd), As=0 reduces to Cd: the "clear" wrote
+            // the old destination pixel back. A no-op, baked in, replayed every pass, forever.
+            //
+            // That is why a band whose pass misses its 1/180s deadline shows STALE pixels instead of
+            // black, and why they persist across screens: nothing under the UI ever repaints. The
+            // non-hires path never had this bug for exactly one reason: rmStartFrame's per-frame
+            // clear passes gColBlack, whose alpha is 0x80 (opaque) -- same function, different alpha.
+            //
+            // With ABE=0 baked in, the clear writes opaque black regardless of the runtime blend
+            // state. Restoring PrimAlphaEnable right after is safe: it is only ever sampled when a
+            // primitive is CREATED, and no OPL primitive is created inside init_screen. The only
+            // other _gsKit_create_passes caller is gsKit_hires_set_bg, which OPL never calls (and
+            // must not casually: a bg texture replaces the baked clear entirely).
+            gsGlobal->PrimAlphaEnable = GS_SETTING_OFF;
             gsKit_hires_init_screen(gsGlobal, rm_mode_table[vmode].passes);
+            gsGlobal->PrimAlphaEnable = GS_SETTING_ON;
         } else {
             gsKit_init_screen(gsGlobal);
             gsKit_mode_switch(gsGlobal, GS_ONESHOT);
@@ -234,7 +264,25 @@ int rmSetMode(int force)
             gsKit_hires_sync(gsGlobal);
             gsKit_hires_flip(gsGlobal);
         } else {
+            // gsKit_init_screen() clears only the active DRAW buffer; with double
+            // buffering the DISPLAYED buffer keeps whatever leftover VRAM was there
+            // (the boot / mode-change "garbage"), and it is never cleared here:
+            // gsKit_sync_flip() skips its buffer toggle while FirstFrame is set
+            // (see gsKit gsCore.c), so a plain clear+flip just clears the same
+            // buffer twice. Clear BOTH double buffers explicitly -- clear the
+            // active one, switch the draw target to the other the way
+            // gsKit_setactive() derives it from ActiveBuffer, clear that one too,
+            // then restore the original active buffer so the following flip and all
+            // later rendering behave exactly as before. We are in GS_ONESHOT mode
+            // here, so each gsKit_clear() is drawn immediately.
             gsKit_clear(gsGlobal, gColBlack);
+            if (gsGlobal->DoubleBuffering == GS_SETTING_ON) {
+                gsGlobal->ActiveBuffer ^= 1;
+                gsKit_setactive(gsGlobal);
+                gsKit_clear(gsGlobal, gColBlack);
+                gsGlobal->ActiveBuffer ^= 1;
+                gsKit_setactive(gsGlobal);
+            }
             gsKit_sync_flip(gsGlobal);
         }
 
@@ -339,18 +387,73 @@ void rmDrawQuad(rm_quad_t *q)
     order++;
 }
 
-void rmDrawPixmap(GSTEXTURE *txt, int x, int y, short aligned, int w, int h, short scaled, u64 color)
+// Vertical offset (px) applied to the coverflow reflection; set per-element by drawCoverFlow
+// from the theme's reflection_offset. 0 = flush under the cover, negative = up, positive = down.
+static int gReflectionYOff = 0;
+
+void rmSetReflectionYOffset(int yoff)
+{
+    gReflectionYOff = yoff;
+}
+
+// Coverflow mirror: a vertically-flipped, alpha-faded reflection below the cover.
+// bottomY = the cover's VISIBLE bottom in screen space; botV = the texture-v of that
+// visible bottom. For an overlay (case art) these track the FRAME, not the padded
+// element, so the case's transparent bottom padding is never mirrored into a gap and
+// the mirror sits flush under the cover regardless of widescreen/PAR. reflection_offset
+// (gReflectionYOff) is left as an optional fine-tune knob on top. Dormant unless a
+// caller passes reflection != 0 (only drawCoverFlow does).
+//
+// gsKit sprites are single-color, so the alpha gradient is built from N stacked strips
+// whose alpha falls off linearly to 0 with distance from the cover -- a real reflection
+// fade instead of a flat, "pasted-on second box".
+static void rmDrawReflection(GSTEXTURE *txt, rm_quad_t *q, float bottomY, float botV)
+{
+    int reflH = (bottomY - q->ul.y) / 4;
+    if (reflH <= 0)
+        return;
+    float ry = bottomY + gReflectionYOff;
+
+    gsGlobal->PrimAlphaEnable = GS_SETTING_ON;
+    gsKit_TexManager_bind(gsGlobal, txt);
+
+    const int strips = 12;
+    const int topAlpha = 0x23; // gsKit modulate alpha right under the cover (reduced again, ~27% below original); fades to 0
+    int s;
+    for (s = 0; s < strips; s++) {
+        int a = topAlpha * (strips - 1 - s) / (strips - 1);
+        if (a <= 0)
+            break;
+        // Strip s spans [s, s+1]/strips of the reflection height; v runs botV (waterline)
+        // -> ul.v (cover top) so the cover is mirrored vertically as it fades out.
+        float y0 = ry + (float)reflH * s / strips;
+        float y1 = ry + (float)reflH * (s + 1) / strips;
+        float v0 = botV + (q->ul.v - botV) * s / strips;
+        float v1 = botV + (q->ul.v - botV) * (s + 1) / strips;
+        gsKit_prim_sprite_texture(gsGlobal, txt,
+                                  q->ul.x + fRenderXOff, y0 + fRenderYOff,
+                                  q->ul.u, v0,
+                                  q->br.x + fRenderXOff, y1 + fRenderYOff,
+                                  q->br.u, v1, order, GS_SETREG_RGBA(0x80, 0x80, 0x80, a));
+        order++;
+    }
+}
+
+void rmDrawPixmap(GSTEXTURE *txt, int x, int y, short aligned, int w, int h, short scaled, u64 color, int reflection)
 {
     rm_quad_t quad;
     rmSetupQuad(txt, x, y, aligned, w, h, scaled, color, &quad);
     rmDrawQuad(&quad);
+    if (reflection)
+        rmDrawReflection(txt, &quad, quad.br.y, quad.br.v); // plain pixmap: the whole texture is the cover
 }
 
 void rmDrawOverlayPixmap(GSTEXTURE *overlay, int x, int y, short aligned, int w, int h, short scaled, u64 color,
-                         GSTEXTURE *inlay, int ulx, int uly, int urx, int ury, int blx, int bly, int brx, int bry)
+                         GSTEXTURE *inlay, int ulx, int uly, int urx, int ury, int blx, int bly, int brx, int bry, int reflection)
 {
     rm_quad_t quad;
     rmSetupQuad(overlay, x, y, aligned, w, h, scaled, color, &quad);
+    int origBly = bly, origBry = bry; // unscaled inlay lower corners (element/texture space) for the reflection
     ulx = X_SCALE(ulx * iAspectWidth) >> 2;
     urx = X_SCALE(urx * iAspectWidth) >> 2;
     blx = X_SCALE(blx * iAspectWidth) >> 2;
@@ -374,10 +477,39 @@ void rmDrawOverlayPixmap(GSTEXTURE *overlay, int x, int y, short aligned, int w,
                             quad.ul.x + blx + fRenderXOff, quad.ul.y + bly + fRenderYOff,
                             0.0f, inlay->Height,
                             quad.ul.x + brx + fRenderXOff, quad.ul.y + bry + fRenderYOff,
-                            inlay->Width, inlay->Height, order, gDefaultCol);
+                            inlay->Width, inlay->Height, order, color);
     order++;
 
     rmDrawQuad(&quad);
+    if (reflection) {
+        // Anchor the mirror to the cover's VISIBLE bottom (the inlay's lower corner), not
+        // the padded element bottom, and sample only the frame's texture rows -- so the
+        // case art's transparent bottom padding can't open a gap above the reflection.
+        int coverBottomOff = (bly > bry) ? bly : bry;              // scaled, screen space
+        int frameBottom = (origBly > origBry) ? origBly : origBry; // unscaled, element space
+        float botV = (h > 0) ? (float)frameBottom * overlay->Height / h : overlay->Height;
+        float waterline = quad.ul.y + coverBottomOff;
+        // Mirror the INLAY (the actual game cover art) too -- previously only the case FRAME was
+        // reflected, so the cover box mirrored but the artwork inside it had no reflection at all
+        // (the disc/frame appeared to mirror, the cover did not). Reuse the same rmDrawReflection the
+        // plain-cover path uses; the inlay occupies the cover WINDOW inside the frame, so span its x
+        // from the inlay's own (scaled) left/right corners and its u/v over the whole inlay texture.
+        // Share the frame's waterline + height so the art and frame reflections track together, and
+        // draw the inlay mirror FIRST so the frame mirror lands on top (matching the upright
+        // inlay-then-frame draw order above). Non-coverflow callers pass reflection=0, so unaffected.
+        rm_quad_t iquad = quad;
+        iquad.ul.x = quad.ul.x + ((ulx < blx) ? ulx : blx);
+        iquad.br.x = quad.ul.x + ((urx > brx) ? urx : brx);
+        // Base the mirror height on the inlay WINDOW's top (uly/ury, already Y_SCALEd into the same
+        // screen space as quad.ul.y), not the frame's top -- otherwise reflH spans the padded frame
+        // height and the mirrored art renders vertically stretched, overflowing the frame's mirror.
+        iquad.ul.y = quad.ul.y + ((uly < ury) ? uly : ury);
+        iquad.ul.u = 0.0f;
+        iquad.br.u = inlay->Width;
+        iquad.ul.v = 0.0f;
+        rmDrawReflection(inlay, &iquad, waterline, inlay->Height);
+        rmDrawReflection(overlay, &quad, waterline, botV);
+    }
 }
 
 void rmDrawRect(int x, int y, int w, int h, u64 color)

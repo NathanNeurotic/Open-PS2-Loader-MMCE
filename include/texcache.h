@@ -57,4 +57,22 @@ void cacheDestroyCache(image_cache_t *cache);
 
 GSTEXTURE *cacheGetTexture(image_cache_t *cache, item_list_t *list, int *cacheId, int *UID, char *value);
 
+// STUB (rebuild): drain/abort hooks for the fork's THREADED art cache. This rebuild runs the
+// official SYNCHRONOUS cache -- nothing is ever pending or in-flight -- so "drained" is always
+// exactly true. If a threaded cache ever returns (checklist item 45 territory), these must
+// become the real implementations again.
+static inline int cacheAbortMmceImageLoadsTimed(int waitTicks)
+{
+    (void)waitTicks;
+    return 1;
+}
+static inline int cacheCancelPendingImageLoadsTimed(int waitTicks)
+{
+    (void)waitTicks;
+    return 1;
+}
+static inline void cacheCancelPendingImageLoads(void)
+{
+}
+
 #endif

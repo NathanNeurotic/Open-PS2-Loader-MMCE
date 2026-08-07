@@ -12,12 +12,21 @@ enum IO_MODES {
     BDM_MODE2,
     BDM_MODE3,
     BDM_MODE4,
+    BDM_MODE5,
+    BDM_MODE6,
+    BDM_MODE7,
     ETH_MODE,
     HDD_MODE,
     APP_MODE,
+    MMCE_MODE,  // reserved: MMCE support returns with checklist item 1
+    FAV_MODE,   // reserved: Favourites returns with checklist item 33
+    UDPFS_MODE, // reserved (item 6); appended last so existing mode values don't shift
 
     MODE_COUNT
 };
+
+#define BDM_MODE_LAST  BDM_MODE7
+#define BDM_MODE_COUNT (BDM_MODE_LAST - BDM_MODE + 1)
 
 enum START_MODE {
     START_MODE_DISABLED = 0,

@@ -15,7 +15,10 @@
  */
 
 /// DTV 576 Progressive Scan (720x576). Not available in ROM v1.70 and earlier.
-#define GS_MODE_DTV_576P 0x53
+#define GS_MODE_DTV_576P  0x53
+/// DTV 1080 Progressive Scan (1920x1080). GSM-synthetic mode (no ROM SetGsCrt support): the ee_core
+/// DTV_1080P handler builds the raster itself. Experimental, gated behind a triple-confirm in the GUI.
+#define GS_MODE_DTV_1080P 0x54
 
 #define DIM_UNDEF -1
 
@@ -88,13 +91,19 @@ void rmInvalidateTexture(GSTEXTURE *txt);
 /** Unload texture from texture manager, performance optimization */
 void rmUnloadTexture(GSTEXTURE *txt);
 
+/** Uploads a texture to VRAM without drawing it. */
+void rmPrimeTexture(GSTEXTURE *txt);
+
 void rmDrawQuad(rm_quad_t *q);
 
 /** Queues a specified pixmap (tinted with colour) to be rendered on specified position */
-void rmDrawPixmap(GSTEXTURE *txt, int x, int y, short aligned, int w, int h, short scaled, u64 color);
+void rmDrawPixmap(GSTEXTURE *txt, int x, int y, short aligned, int w, int h, short scaled, u64 color, int reflection);
 
 void rmDrawOverlayPixmap(GSTEXTURE *overlay, int x, int y, short aligned, int w, int h, short scaled, u64 color,
-                         GSTEXTURE *inlay, int ulx, int uly, int urx, int ury, int blx, int bly, int brx, int bry);
+                         GSTEXTURE *inlay, int ulx, int uly, int urx, int ury, int blx, int bly, int brx, int bry, int reflection);
+
+/** Vertical pixel offset applied to the coverflow reflection (0 = flush under the cover, - = up, + = down). */
+void rmSetReflectionYOffset(int yoff);
 
 /** Queues a opaque rectangle to be rendered */
 void rmDrawRect(int x, int y, int w, int h, u64 color);
