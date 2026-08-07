@@ -694,3 +694,5 @@ gui_strings:
   string: Cheat Selection
 - label: HDD_HINT
   string: Only one HDD allowed, enabling locks APA or GPT.
+- label: ERROR_SAVING_SETTINGS_TO
+  string: Could not write settings to %s (error %d)

@@ -8,6 +8,8 @@
 #include "include/util.h"
 #include "include/ioman.h"
 #include "include/sound.h"
+#include "include/diag.h"
+#include <errno.h>
 #include <string.h>
 
 // FIXME: We should not need this function.
@@ -20,7 +22,7 @@ static u32 currentUID = 0;
 static config_set_t configFiles[CONFIG_INDEX_COUNT];
 static char legacyNetConfigPath[256] = "mc?:SYS-CONF/IPCONFIG.DAT";
 static const char *configFilenames[CONFIG_INDEX_COUNT] = {
-    "conf_opl.cfg",
+    CONFIG_OPL_FILENAME,
     "conf_last.cfg",
     "conf_apps.cfg",
     "conf_network.cfg",
@@ -522,10 +524,32 @@ int configReadBuffer(config_set_t *configSet, const void *buffer, int size)
     return ret;
 }
 
+// The master config was once named conf_riptopl.cfg. Given the built
+// "<dir>/settings_riptopl.cfg" path, produce its legacy "<dir>/conf_riptopl.cfg" sibling so an
+// existing install's settings still load (read-fallback); the next save writes the new name.
+static void configBuildLegacyOplPath(const char *path, char *out, int outSize)
+{
+    const char *slash = strrchr(path, '/');
+    if (slash != NULL)
+        snprintf(out, outSize, "%.*s%s", (int)(slash - path) + 1, path, CONFIG_OPL_FILENAME_LEGACY);
+    else
+        snprintf(out, outSize, "%s", CONFIG_OPL_FILENAME_LEGACY);
+}
+
 int configRead(config_set_t *configSet)
 {
     int ret;
     file_buffer_t *fileBuffer = openFileBuffer(configSet->filename, O_RDONLY, 0, 4096);
+    if (!fileBuffer) {
+        // Only the OPL master config gets the legacy-name read fallback.
+        const char *name = strrchr(configSet->filename, '/');
+        name = (name != NULL) ? name + 1 : configSet->filename;
+        if (strcmp(name, CONFIG_OPL_FILENAME) == 0) {
+            char legacyPath[256];
+            configBuildLegacyOplPath(configSet->filename, legacyPath, sizeof(legacyPath));
+            fileBuffer = openFileBuffer(legacyPath, O_RDONLY, 0, 4096);
+        }
+    }
     if (!fileBuffer) {
         LOG("CONFIG No file %s.\n", configSet->filename);
         configSet->modified = 0;
@@ -562,6 +586,7 @@ int configWrite(config_set_t *configSet)
             bgmUnMute();
             return 1;
         }
+        gLastSaveErrno = errno; // latched at the real failure site for the user-facing error
         return 0;
     }
     return 1;
