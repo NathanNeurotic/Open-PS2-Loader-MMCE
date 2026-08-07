@@ -920,8 +920,11 @@ static void _loadConfig()
             if (!(getKeyPressed(KEY_TRIANGLE) && getKeyPressed(KEY_CROSS))) {
                 configGetInt(configOPL, CONFIG_OPL_VMODE, &gVMode);
             } else {
-                LOG("--- Triangle + Cross held at boot - setting Video Mode to Auto ---\n");
-                gVMode = 0;
+                // Recovery combo: force 480p PROGRESSIVE (EDTV 640x448p@60, vmode index 3), not
+                // Auto -- Auto resolves to region-default interlaced 480i/576i, which is exactly
+                // what some modern displays/upscalers fail to sync, leaving the user still blind.
+                LOG("--- Triangle + Cross held at boot - forcing Video Mode to 480p (recovery) ---\n");
+                gVMode = 3;
                 configSetInt(configOPL, CONFIG_OPL_VMODE, gVMode);
             }
 

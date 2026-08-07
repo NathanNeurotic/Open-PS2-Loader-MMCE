@@ -1,0 +1,32 @@
+Vendored from: ps2dev/ps2sdk, iop/dev9/atad (built with the iop/dev9/ata_bd flag set:
+ATA_USE_DEV9=1 ATA_GAMESTAR_WORKAROUND=1 ATA_ENABLE_BDM=1)
+Pin: 426de26cc7fe6d3d0e33d5704fa6815061ee9b27 (2026-07-20)
+License: AFL 2.0 (headers retained in the sources)
+
+WHY VENDORED (2026-07-21, maintainer HW report "40x: HardDisk Drive not detected" persisting
+through the #249 retry loop): the stock driver latches ata_devinfo_init=1 BEFORE probing, and
+_start() probes at module load -- a drive still spinning up at that instant stays "dead" for the
+whole session, and every later sceAtaInit (OPL's EE retry, xhdd's re-probe devctl) is a no-op
+returning the corpse. No EE-side code can heal a latched IOP driver; the fix must live here.
+
+LOCAL CHANGES vs the pin (all marked /* FORK */ in src/ps2atad.c):
+1. sceAtaInit latches init-done only on SUCCESS -> failed probes are retryable.
+2. ata_init_devices returns ATA_RES_ERR_NODEV when device 0 answered the probe but failed
+   IDENTIFY (the spin-up race) -- previously it returned 0 and latched a dead devinfo.
+3. g_ata_bd_connected[] guard: bdm_connect_bd at most once per unit across re-probes.
+4. The g_ata_bd[i].path assignment is DROPPED: the field was appended to struct block_device on
+   2026-02-26 and is absent from the PS2MAXSDK container's bdm.h; it is additive (all prior
+   offsets identical -> ABI-safe to omit), bdmfs_fatfs always registers "mass" separately, and
+   the fork forces massN: paths anyway (repo doctrine).
+5. Makefile is fork-authored (exports.o-first ordering; see the comment in it).
+
+Also picked up from the pin (missing from BOTH pinned build containers): upstream ab3c5a883
+("fix device probing", per-device SoftReset+select loop) and 221f6e27a (DVRP device-selection
+workaround).
+
+RE-VENDOR: re-fetch src/ps2atad.c, src/imports.lst, src/irx_imports.h, src/exports.tab from the
+new pin, re-apply changes 1-4, update this file's pin line, `rm -rf obj/` before rebuilding.
+NOT vendored: include/atad.h (the installed SDK's copy is used so xhdd and this module compile
+against the same header per container; stable since 2024-12).
+HDPro: hdpro_atad.irx remains the SDK prebuilt (its own latch unfixed; vendor separately only if
+an HDPro rig ever reports this symptom).

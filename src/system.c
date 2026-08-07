@@ -8,6 +8,7 @@
 #include <iopcontrol_special.h>
 #endif
 
+#include <delaythread.h> // DelayThread for the bounded disc re-detect polls in sysLaunchDisc
 #include "include/opl.h"
 #include "include/gui.h"
 #include "include/ethsupport.h"
@@ -380,6 +381,150 @@ void sysExecExit(void)
     // Deinitialize without shutting down active devices.
     deinit(NO_EXCEPTION, IO_MODE_SELECTED_ALL);
     exit(0);
+}
+
+// Parse SYSTEM.CNF text for "BOOT2 = <path>" and copy the path into out. Returns 0 on success.
+// Retail discs are tiny uppercase "KEY = value" files, but stay defensive: match the key
+// case-insensitively, require the '=' on the SAME line right after the key (a naive strchr
+// could walk across a newline on a malformed file and grab the wrong line's value), and keep
+// scanning past substring hits so a "BOOT2" inside another value can't shadow the real key.
+static int sysParseBoot2(const char *cnf, char *out, int outSize)
+{
+    const char *p = cnf;
+
+    if (outSize <= 0)
+        return -1;
+
+    while (*p != '\0') {
+        if (strncasecmp(p, "BOOT2", 5) == 0) {
+            const char *eq = p + 5;
+            while (*eq == ' ' || *eq == '\t')
+                eq++;
+            if (*eq == '=') {
+                int i = 0;
+                eq++;
+                while (*eq == ' ' || *eq == '\t')
+                    eq++;
+                while (*eq != '\0' && *eq != '\r' && *eq != '\n' && *eq != ' ' && *eq != '\t' && i < outSize - 1)
+                    out[i++] = *eq++;
+                out[i] = '\0';
+                return (i > 0) ? 0 : -1;
+            }
+            p += 5;
+        } else {
+            p++;
+        }
+    }
+    return -1;
+}
+
+// Boot the physical PS2 disc in the drive, always through rom0:PS2LOGO (which performs the disc
+// region/auth check). PS2 discs only. Returns a negative code (and stays in OPL) on failure; on
+// success it tears OPL down and never returns.
+//
+// The boot path comes from the disc's OWN SYSTEM.CNF "BOOT2" line -- full PS2BBL/OSDSYS parity.
+// A sceCdReadKey(0x004B)-derived name that returns plausible-but-wrong bytes produces a
+// nonexistent cdrom0: path, so PS2LOGO shows the logo (the DISC authenticates fine) and falls
+// through to OSDSYS. The derivation is kept as the FALLBACK when SYSTEM.CNF is unreadable, and
+// as a logged cross-check otherwise.
+int sysLaunchDisc(void)
+{
+    u8 key[16];
+    char boot[16], path[64], cnf[1024];
+    char *args[1];
+    u32 k32;
+    int type, fd, len;
+
+    if (sceCdStatus() == SCECdErOPENS) // tray open
+        return -1;
+
+    while (sceCdGetDiskType() == SCECdDETCT) // wait for the drive to identify the disc
+        ;
+
+    type = sceCdGetDiskType();
+    // An idle drive spins the disc DOWN and then reports NODISC even with a game disc loaded.
+    // The software equivalent of a tray open/close is a TRAY-CLOSE REQUEST on the already-closed
+    // tray, which re-runs the detect cycle. A genuinely empty drive still ends at the -2 bail
+    // below, just ~4 s later.
+    if (type == SCECdNODISC) {
+        int spin;
+        u32 traychk = 0;
+        int tr = sceCdTrayReq(SCECdTrayClose, &traychk);
+        (void)tr; // only read by LOG (a no-op in release builds)
+        LOG("[DISC] drive reports NODISC -- tray-close re-detect: req=%d traychk=%lu\n", tr, (unsigned long)traychk);
+        sceCdSync(0);
+        for (spin = 0; spin < 20; spin++) { // ~4 s budget for a cold spin-up + re-detect
+            // Let it finish identifying after the spin-up, but bounded + yielding: a dirty laser or
+            // damaged disc can stick in DETCT, and a bare spin would hang Launch Disc and peg the CPU.
+            int detecting = 0;
+            while (sceCdGetDiskType() == SCECdDETCT && detecting++ < 50)
+                DelayThread(20 * 1000); // ~1 s cap, yields to other threads
+            type = sceCdGetDiskType();
+            if (type != SCECdNODISC)
+                break;
+            DelayThread(200 * 1000); // 200 ms between polls
+        }
+        LOG("[DISC] after tray-close re-detect: type=%d (%d re-polls)\n", type, spin);
+    }
+
+    if (type != SCECdPS2DVD && type != SCECdPS2CD) // no disc / not a PS2 game disc
+        return -2;
+
+    sceCdDiskReady(0);
+
+    // Primary: the disc's SYSTEM.CNF BOOT2 line (what OSDSYS itself boots).
+    path[0] = '\0';
+    fd = open("cdrom0:\\SYSTEM.CNF;1", O_RDONLY);
+    if (fd >= 0) {
+        len = read(fd, cnf, sizeof(cnf) - 1);
+        close(fd);
+        if (len > 0) {
+            cnf[len] = '\0';
+            if (sysParseBoot2(cnf, path, sizeof(path)) != 0)
+                path[0] = '\0';
+        }
+    }
+
+    // Fallback + cross-check: derive the boot name from the disc key (PS2BBL PS2GetBootFile,
+    // non-China path). Best-effort: if BOOT2 was parsed, a key failure no longer matters.
+    boot[0] = '\0';
+    if (sceCdReadKey(0, 0, 0x004B, key) != 0 && sceCdGetError() == 0) {
+        boot[11] = '\0';
+        k32 = (key[4] >> 3) | (key[14] >> 3 << 5) | ((key[0] & 0x7F) << 10);
+        boot[10] = '0' + (k32 % 10);
+        boot[9] = '0' + (k32 / 10 % 10);
+        boot[8] = '.';
+        boot[7] = '0' + (k32 / 10 / 10 % 10);
+        boot[6] = '0' + (k32 / 10 / 10 / 10 % 10);
+        boot[5] = '0' + (k32 / 10 / 10 / 10 / 10 % 10);
+        boot[4] = '_';
+        boot[3] = (key[0] >> 7) | ((key[1] & 0x3F) << 1);
+        boot[2] = (key[1] >> 6) | ((key[2] & 0x1F) << 2);
+        boot[1] = (key[2] >> 5) | ((key[3] & 0xF) << 3);
+        boot[0] = ((key[4] & 0x7) << 4) | (key[3] >> 4);
+        if (boot[0] < 'A' || boot[0] > 'Z') // sanity: a real boot name starts with a letter
+            boot[0] = '\0';
+    }
+
+    if (path[0] == '\0') {
+        if (boot[0] == '\0') // neither source produced a boot path
+            return -3;
+        snprintf(path, sizeof(path), "cdrom0:\\%s;1", boot);
+        LOG("[DISC] SYSTEM.CNF unavailable; using key-derived name\n");
+    } else if (boot[0] != '\0' && strstr(path, boot) == NULL) {
+        // BOOT2 wins (it is what the browser boots); the mismatch is diagnostic.
+        LOG("[DISC] key-derived name %s does not match BOOT2 %s -- booting BOOT2\n", boot, path);
+    }
+
+    LOG("[DISC] booting %s\n", path);
+
+    // NOTE(rebuild): the MMCE GameID send that belongs here returns with checklist item 3.
+
+    deinit(NO_EXCEPTION, IO_MODE_SELECTED_ALL); // tear OPL down (mirrors sysExecExit)
+
+    args[0] = path;
+    LoadExecPS2("rom0:PS2LOGO", 1, args); // logo performs the disc region/auth check
+    return 0;                             // unreachable on success
 }
 
 // Module bits

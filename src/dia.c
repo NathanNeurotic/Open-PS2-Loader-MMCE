@@ -24,8 +24,13 @@
 #define UI_SPACER_MINIMAL 30
 // length of breaking line in pixels
 #define UI_BREAK_LEN      600
-// scroll speed (delay in ms!) when in dialogs
-#define DIA_SCROLL_SPEED  300
+// Floor for the dialog repeat delay, in ms. Dialogs are deliberately calmer than the game list --
+// overshooting a settings row is more annoying than overshooting a game -- but that intent used to
+// be expressed as a HARDCODED 300 ms, which is exactly the "medium" main-menu value. The result was
+// that Settings ignored the user's Scroll Speed entirely: picking "fast" (100 ms) still gave 300 ms
+// in every dialog (3x slower than asked), and picking "slow" (500 ms) gave no extra slowness at all.
+// See diaScrollDelay(); medium is unchanged, so most users see no difference.
+#define DIA_SCROLL_MIN_MS 200
 // scroll speed (delay in ms!) when setting int value
 #define DIA_INT_SET_SPEED 100
 
@@ -79,6 +84,10 @@ int diaShowKeyb(char *text, int maxLen, int hide_text, const char *title)
         if ((mask_buffer = malloc(maxLen)) != NULL) {
             memset(mask_buffer, '*', len);
             mask_buffer[len] = '\0';
+        } else {
+            // Allocation failed: fall back to showing the text rather than
+            // rendering through a NULL mask buffer.
+            hide_text = 0;
         }
     } else {
         mask_buffer = NULL;
@@ -88,6 +97,8 @@ int diaShowKeyb(char *text, int maxLen, int hide_text, const char *title)
         readPads();
 
         rmStartFrame();
+        // NOTE(rebuild): the optional settings-background texture (guiDrawBGSettings)
+        // returns with the theme-engine work in checklist items 31/37.
         guiDrawBGPlasma();
         rmDrawRect(0, 0, screenWidth, screenHeight, gColDarker);
 
@@ -282,6 +293,8 @@ static int diaShowColSel(unsigned char *r, unsigned char *g, unsigned char *b)
         readPads();
 
         rmStartFrame();
+        // NOTE(rebuild): the optional settings-background texture (guiDrawBGSettings)
+        // returns with the theme-engine work in checklist items 31/37.
         guiDrawBGPlasma();
         rmDrawRect(0, 0, screenWidth, screenHeight, gColDarker);
 
@@ -323,6 +336,29 @@ static int diaShowColSel(unsigned char *r, unsigned char *g, unsigned char *b)
 
         rmEndFrame();
 
+        /*
+          Confirm/cancel are tested FIRST, and outside the direction chain.
+
+          The direction arms below use getKey() under setButtonDelay(..., 1), so while a direction
+          is physically held getKey() reports true on EVERY frame. With confirm/cancel chained onto
+          the same else-if ladder they were unreachable for the entire duration of a hold: press X
+          while still leaning on the D-pad and nothing happened. getKeyOn() is edge-triggered, so
+          hoisting it cannot steal a repeat from the directions.
+        */
+        if (getKeyOn(gSelectButton)) {
+            sfxPlay(SFX_CONFIRM);
+            *r = col[0];
+            *g = col[1];
+            *b = col[2];
+            ret = 1;
+            break;
+        }
+        if (getKeyOn(gSelectButton == KEY_CIRCLE ? KEY_CROSS : KEY_CIRCLE)) {
+            sfxPlay(SFX_CANCEL);
+            ret = 0;
+            break;
+        }
+
         if (getKey(KEY_LEFT)) {
             if (col[selc] > 0) {
                 col[selc]--;
@@ -343,17 +379,6 @@ static int diaShowColSel(unsigned char *r, unsigned char *g, unsigned char *b)
                 selc++;
                 sfxPlay(SFX_CURSOR);
             }
-        } else if (getKeyOn(gSelectButton)) {
-            sfxPlay(SFX_CONFIRM);
-            *r = col[0];
-            *g = col[1];
-            *b = col[2];
-            ret = 1;
-            break;
-        } else if (getKeyOn(gSelectButton == KEY_CIRCLE ? KEY_CROSS : KEY_CIRCLE)) {
-            sfxPlay(SFX_CANCEL);
-            ret = 0;
-            break;
         }
     }
 
@@ -394,19 +419,92 @@ static int diaShouldBreakLineAfter(struct UIItem *ui)
 
 static void diaDrawHint(int text_id)
 {
-    int x, y;
     char *text = _l(text_id);
 
-    x = screenWidth - rmUnScaleX(fntCalcDimensions(gTheme->fonts[0], text)) - 10;
-    y = gTheme->usedHeight - 62;
+    // Size the box to the hint, but never wider than (almost) the full screen, and clamp the left
+    // edge so the start is always on-screen (a long hint used to start off the left edge -- #48).
+    int boxW = rmUnScaleX(fntCalcDimensions(gTheme->fonts[0], text)) + 10;
+    if (boxW > screenWidth - 20)
+        boxW = screenWidth - 20;
+    int x = screenWidth - boxW - 10;
+    if (x < 10)
+        x = 10;
+    int innerW = boxW - 10;
+
+    // fntRenderString does NOT word-wrap: it lays the string on ONE line and clips at the box edge
+    // (only an explicit '\n' starts a new line). So pre-wrap here -- greedily pack words up to innerW,
+    // inserting '\n' between lines. Without this a long hint (e.g. the Neutrino args hint) rendered as
+    // a single clipped, unreadable line that ran off the box -- the remaining #48 hint complaint.
+    char wrapped[384];
+    int wlen = 0, lineW = 0, lines = 1;
+    int spaceW = rmUnScaleX(fntCalcDimensions(gTheme->fonts[0], " "));
+    const char *p = text;
+    while (*p) {
+        while (*p == ' ') // skip runs of spaces; we re-insert our own single separators
+            p++;
+        if (!*p)
+            break;
+        char word[96];
+        int k = 0;
+        while (*p && *p != ' ' && k < (int)sizeof(word) - 1)
+            word[k++] = *p++;
+        word[k] = '\0';
+        int wordW = rmUnScaleX(fntCalcDimensions(gTheme->fonts[0], word));
+
+        if (lineW > 0 && (lineW + spaceW + wordW) > innerW) { // word doesn't fit -> new line
+            if (wlen < (int)sizeof(wrapped) - 1)
+                wrapped[wlen++] = '\n';
+            lines++;
+            lineW = 0;
+        } else if (lineW > 0) { // same line -> re-insert the separating space
+            if (wlen < (int)sizeof(wrapped) - 1)
+                wrapped[wlen++] = ' ';
+            lineW += spaceW;
+        }
+        for (int i = 0; i < k && wlen < (int)sizeof(wrapped) - 1; i++)
+            wrapped[wlen++] = word[i];
+        lineW += wordW;
+    }
+    wrapped[wlen] = '\0';
+
+    int boxH = lines * MENU_ITEM_HEIGHT + 10;
+    int y = gTheme->usedHeight - 32 - boxH;
 
     // render hint on the lower side of the screen.
-    rmDrawRect(x, y, screenWidth - x, MENU_ITEM_HEIGHT + 10, gColDarker);
-    fntRenderString(gTheme->fonts[0], x + 5, y + 5, ALIGN_NONE, 0, 0, text, gTheme->textColor);
+    rmDrawRect(x, y, boxW, boxH, gColDarker);
+    fntRenderString(gTheme->fonts[0], x + 5, y + 5, ALIGN_NONE, innerW, boxH - 5, wrapped, gTheme->textColor);
 }
 
 /// renders an ui item (either selected or not)
 /// sets width and height of the render into the parameters
+// The height diaRenderItem WOULD set for this item, computed without drawing. Kept byte-for-byte in
+// step with diaRenderItem's *h logic below: the default is UI_SPACING_H, UI_SPACER is 0, UI_COLOUR is
+// 17, an invisible controllable item is 0 (diaRenderItem early-returns leaving the caller's h=0), and
+// any non-zero fixedHeight overrides upward (negative = percent of screenHeight). *h never depends on
+// x/y or the text, so this is exact -- used to advance layout past a row the viewport clip skips (#195
+// scroll-bleed fix) so the on-screen rows below it keep their true positions.
+static int diaItemHeight(struct UIItem *item)
+{
+    int h;
+
+    if (!item->visible && item->type >= UI_LABEL)
+        return 0;
+
+    if (item->type == UI_SPACER)
+        h = 0;
+    else if (item->type == UI_COLOUR)
+        h = 17;
+    else
+        h = UI_SPACING_H;
+
+    if (item->fixedHeight != 0) {
+        int newSize = (item->fixedHeight < 0) ? item->fixedHeight * screenHeight / -100 : item->fixedHeight;
+        if (h < newSize)
+            h = newSize;
+    }
+    return h;
+}
+
 static void diaRenderItem(int x, int y, struct UIItem *item, int selected, int haveFocus, int *w, int *h)
 {
     // Don't draw controllable items that are not visible.
@@ -428,6 +526,9 @@ static void diaRenderItem(int x, int y, struct UIItem *item, int selected, int h
         case UI_TERMINATOR:
             return;
 
+        case UI_HEADER:
+            // header: same layout as a label, just rendered in the accent (selected-text) colour
+            txtcol = gTheme->selTextColor;
         case UI_BUTTON:
         case UI_LABEL: {
             // width is text length in pixels...
@@ -486,6 +587,10 @@ static void diaRenderItem(int x, int y, struct UIItem *item, int selected, int h
         case UI_STRING: {
             if (strlen(item->stringvalue.text))
                 *w = fntRenderString(gTheme->fonts[0], x, y, ALIGN_NONE, 0, 0, item->stringvalue.text, txtcol) - x;
+            else if (item->showDefaultWhenEmpty)
+                // Field has a built-in fallback when blank -- show a dim "Default" so it reads as
+                // intentional, not unset. The stored value stays empty, so the fallback still fires.
+                *w = fntRenderString(gTheme->fonts[0], x, y, ALIGN_NONE, 0, 0, _l(_STR_DEFAULT), GS_SETREG_RGBA(0x60, 0x60, 0x60, 0x80)) - x;
             else
                 *w = fntRenderString(gTheme->fonts[0], x, y, ALIGN_NONE, 0, 0, _l(_STR_NOT_SET), txtcol) - x;
             break;
@@ -515,7 +620,15 @@ static void diaRenderItem(int x, int y, struct UIItem *item, int selected, int h
         }
 
         case UI_ENUM: {
-            const char *tv = item->intvalue.enumvalues[item->intvalue.current];
+            // Guard against a corrupt/out-of-range stored index (e.g. a hand-edited cfg): count the
+            // NULL-terminated options, then index with a clamped copy so we never read past the array.
+            int ecount = 0;
+            while (item->intvalue.enumvalues[ecount] != NULL)
+                ecount++;
+            int eidx = item->intvalue.current;
+            if (eidx < 0 || eidx >= ecount)
+                eidx = 0;
+            const char *tv = (ecount > 0) ? item->intvalue.enumvalues[eidx] : NULL;
 
             if (!tv)
                 tv = _l(_STR_NO_ITEMS);
@@ -563,17 +676,29 @@ static void diaRenderItem(int x, int y, struct UIItem *item, int selected, int h
     }
 }
 
+// Vertical scroll offset for config dialogs taller than the screen. Reset to 0 when a dialog
+// opens (diaExecuteDialog); diaRenderUI shifts rendering up by it and re-clamps it each frame
+// so the focused item is always brought on-screen (cursor-follow). Stays 0 when content fits.
+// Defined further down; the cursor-follow scroll below needs it to detect "focus on the first control".
+static struct UIItem *diaGetFirstControl(struct UIItem *ui);
+
+static int diaScrollOffset = 0;
+
 /// renders whole ui screen (for given dialog setup)
 void diaRenderUI(struct UIItem *ui, short inMenu, struct UIItem *cur, int haveFocus)
 {
+    // NOTE(rebuild): the optional settings-background texture (guiDrawBGSettings)
+    // returns with the theme-engine work in checklist items 31/37.
     guiDrawBGPlasma();
 
     int x0 = 20;
     int y0 = 20;
 
-    // render all items
+    // render all items (shifted up by the scroll offset for tall dialogs)
     struct UIItem *rc = ui;
-    int x = x0, y = y0, hmax = 0;
+    int x = x0, y = y0 - diaScrollOffset, hmax = 0;
+    int curTop = y0, curBot = y0; // rendered extent of the focused row, for cursor-follow scroll
+    int contentBottom = y0;       // lowest rendered pixel (screen-space), for the maxScroll upper clamp
 
     while (rc->type != UI_TERMINATOR) {
         int w = 0, h = 0;
@@ -587,12 +712,41 @@ void diaRenderUI(struct UIItem *ui, short inMenu, struct UIItem *cur, int haveFo
             hmax = 0;
         }
 
-        diaRenderItem(x, y, rc, rc == cur, haveFocus, &w, &h);
+        // Viewport clip for scrolled dialogs (FifthFox HW: "scrolled text moves out of the background
+        // image ... clearing the entire screen removes the stray text"). diaScrollOffset shifts rows
+        // above y0 (and below the hint bar); nothing else stops them drawing there, and since the
+        // dialog re-paints its background rather than full-clearing, a row that scrolled outside the
+        // background stays behind as stray text. So SKIP entirely any row fully outside the item
+        // viewport -- there is then nothing to leave behind. It is an APP-LAYER skip on purpose: a GS
+        // scissor cannot survive the 720p/1080i multi-pass render (its per-pass band scissor gets
+        // overwritten), so this works in every video mode where a scissor would not.
+        //
+        // A skipped row is not drawn, but the layout must advance by its EXACT height (diaItemHeight,
+        // which mirrors diaRenderItem's *h logic) so the on-screen rows below it keep their true
+        // positions and contentBottom/cursor-follow stay correct. Width is irrelevant for an unshown
+        // row -- x resets on the next line break -- so w=0. The FOCUSED row is never skipped (the
+        // cursor-follow clamp keeps it inside the viewport by construction), so cursor tracking is exact.
+        int rowH = diaItemHeight(rc);
+        int viewBottom = gTheme->usedHeight - 40; // the same bound the scroll clamp below uses
+        if (rc != cur && (y + rowH <= y0 || y >= viewBottom)) {
+            w = 0;
+            h = rowH;
+        } else {
+            diaRenderItem(x, y, rc, rc == cur, haveFocus, &w, &h);
+        }
+
+        if (rc == cur) {
+            curTop = y;
+            curBot = y + h;
+        }
 
         if (w > 0)
             x += w + UI_SPACING_V;
 
         hmax = (h > hmax) ? h : hmax;
+
+        if (y + h > contentBottom)
+            contentBottom = y + h; // track content bottom (screen-space) for the maxScroll clamp
 
         if (diaShouldBreakLineAfter(rc)) {
             x = x0;
@@ -604,6 +758,36 @@ void diaRenderUI(struct UIItem *ui, short inMenu, struct UIItem *cur, int haveFo
         }
 
         rc++;
+    }
+
+    // Cursor-follow scroll: re-clamp the offset so the focused row stays on-screen, above the
+    // bottom hint bar. Self-correcting each frame; remains 0 for dialogs that fit (no scroll).
+    if (cur != NULL) {
+        int visibleBottom = gTheme->usedHeight - 40;
+        // Upper bound: never scroll past the content's bottom. contentBottom is screen-space, so undo
+        // the current offset to get the content-space extent. Without this, when the cursor lands on
+        // the trailing OK row the offset could over-shoot and stay stuck shifted up (#48).
+        int maxScroll = (contentBottom + diaScrollOffset) - visibleBottom;
+        if (maxScroll < 0)
+            maxScroll = 0;
+        // Only scroll when a real viewport exists; guards degenerate small-usedHeight themes
+        // where visibleBottom <= y0 would let the two edge corrections fight (jitter).
+        if (cur == diaGetFirstControl(ui)) {
+            // Focus is on the FIRST navigable control: nothing selectable sits above it, only the
+            // non-focusable header/title rows. Snap to the very top so the page title is visible,
+            // instead of merely pulling the first control up to y0 and leaving the title clipped
+            // off the top of the viewport (#48: page stays stuck shifted down at the first element).
+            diaScrollOffset = 0;
+        } else if (visibleBottom > y0) {
+            if (curTop < y0)
+                diaScrollOffset -= (y0 - curTop);
+            else if (curBot > visibleBottom)
+                diaScrollOffset += (curBot - visibleBottom);
+        }
+        if (diaScrollOffset > maxScroll)
+            diaScrollOffset = maxScroll;
+        if (diaScrollOffset < 0)
+            diaScrollOffset = 0;
     }
 
     if ((cur != NULL) && (!haveFocus) && (cur->hintId != -1)) {
@@ -626,11 +810,13 @@ static void diaResetValue(struct UIItem *item)
     switch (item->type) {
         case UI_INT:
         case UI_BOOL:
+        case UI_ENUM:
             item->intvalue.current = item->intvalue.def;
             return;
         case UI_STRING:
         case UI_PASSWORD:
             strncpy(item->stringvalue.text, item->stringvalue.def, sizeof(item->stringvalue.text));
+            item->stringvalue.text[sizeof(item->stringvalue.text) - 1] = '\0';
             return;
         default:
             return;
@@ -684,25 +870,29 @@ static int diaHandleInput(struct UIItem *item, int *modified)
     } else if ((item->type == UI_STRING) || (item->type == UI_PASSWORD)) {
         char tmp[32];
         strncpy(tmp, item->stringvalue.text, sizeof(tmp));
+        tmp[sizeof(tmp) - 1] = '\0';
 
         if (item->stringvalue.handler) {
-            if (item->stringvalue.handler(tmp, sizeof(tmp)))
+            if (item->stringvalue.handler(tmp, sizeof(tmp))) {
                 strncpy(item->stringvalue.text, tmp, sizeof(item->stringvalue.text));
+                item->stringvalue.text[sizeof(item->stringvalue.text) - 1] = '\0';
+            }
         } else {
-            if (diaShowKeyb(tmp, sizeof(tmp), item->type == UI_PASSWORD, NULL))
+            if (diaShowKeyb(tmp, sizeof(tmp), item->type == UI_PASSWORD, NULL)) {
                 strncpy(item->stringvalue.text, tmp, sizeof(item->stringvalue.text));
+                item->stringvalue.text[sizeof(item->stringvalue.text) - 1] = '\0';
+            }
         }
 
         return 0;
     } else if (item->type == UI_ENUM) {
-        int cur = item->intvalue.current;
-
-        if (item->intvalue.enumvalues[cur] == NULL) {
-            if (cur > 0)
-                item->intvalue.current--;
-            else
-                return 0;
-        }
+        // Snap a corrupt/out-of-range current index back into range before indexing the
+        // NULL-terminated enumvalues[] (count first so we never read past the terminator).
+        int ecount = 0;
+        while (item->intvalue.enumvalues[ecount] != NULL)
+            ecount++;
+        if (item->intvalue.current < 0 || item->intvalue.current >= ecount)
+            item->intvalue.current = 0;
 
         if (getKey(KEY_UP) && (item->intvalue.current > 0)) {
             item->intvalue.current--;
@@ -842,6 +1032,32 @@ static void diaRestoreScrollSpeed(void)
     padRestoreSettings(diaPadSettings);
 }
 
+/*
+  Dialog repeat delay, derived from the user's Scroll Speed instead of ignoring it.
+
+  guiUpdateScrollSpeed() maps gScrollSpeed 0/1/2 -> 500/300/100 ms for the main menu. Dialogs take
+  that same value but never go below DIA_SCROLL_MIN_MS, keeping them calmer than the game list
+  without overriding the preference outright:
+
+    slow   (500) -> 500   (was 300: "slow" now actually is slower)
+    medium (300) -> 300   (unchanged -- the shipped default is unaffected)
+    fast   (100) -> 200   (was 300: "fast" is now genuinely faster, with a floor so a settings
+                           list cannot become as twitchy as the game list)
+*/
+static int diaScrollDelay(void)
+{
+    int delay = 500 - gScrollSpeed * 200; // mirrors guiUpdateScrollSpeed()
+
+    // gScrollSpeed is sanitised to 0..2 by guiUpdateScrollSpeed, but this runs on paths that may
+    // not have gone through it yet; clamp rather than trust it.
+    if (delay < DIA_SCROLL_MIN_MS)
+        delay = DIA_SCROLL_MIN_MS;
+    if (delay > 500)
+        delay = 500;
+
+    return delay;
+}
+
 static struct UIItem *diaFindByID(struct UIItem *ui, int id)
 {
     while (ui->type != UI_TERMINATOR) {
@@ -866,7 +1082,7 @@ int diaExecuteDialog(struct UIItem *ui, int uiId, short inMenu, int (*updater)(i
         cur = diaGetFirstControl(ui);
 
     // what? no controllable item? Exit!
-    if (cur == ui)
+    if (!diaIsControllable(cur))
         return -1;
 
     int haveFocus = 0, modified;
@@ -874,14 +1090,17 @@ int diaExecuteDialog(struct UIItem *ui, int uiId, short inMenu, int (*updater)(i
     diaStoreScrollSpeed();
 
     // slower controls for dialogs
-    setButtonDelay(KEY_UP, DIA_SCROLL_SPEED);
-    setButtonDelay(KEY_DOWN, DIA_SCROLL_SPEED);
+    setButtonDelay(KEY_UP, diaScrollDelay());
+    setButtonDelay(KEY_DOWN, diaScrollDelay());
+
+    diaScrollOffset = 0; // start each dialog scrolled to the top
 
     // okay, we have the first selectable item
     // we can proceed with rendering etc. etc.
     while (1) {
         rmStartFrame();
         diaRenderUI(ui, inMenu, cur, haveFocus);
+        // NOTE(rebuild): the Debug-Colors HUD line returns with checklist item 46.
         rmEndFrame();
 
         readPads();
@@ -891,8 +1110,8 @@ int diaExecuteDialog(struct UIItem *ui, int uiId, short inMenu, int (*updater)(i
             haveFocus = diaHandleInput(cur, &modified);
 
             if (!haveFocus) {
-                setButtonDelay(KEY_UP, DIA_SCROLL_SPEED);
-                setButtonDelay(KEY_DOWN, DIA_SCROLL_SPEED);
+                setButtonDelay(KEY_UP, diaScrollDelay());
+                setButtonDelay(KEY_DOWN, diaScrollDelay());
             }
         } else {
             modified = 0;
@@ -954,8 +1173,14 @@ int diaExecuteDialog(struct UIItem *ui, int uiId, short inMenu, int (*updater)(i
 
         if (updater) {
             int updResult = updater(modified);
-            if (updResult)
+            if (updResult) {
+                // The other three exits (above) restore; this one did not, leaking the dialog's
+                // 300 ms KEY_UP/KEY_DOWN delay into whatever screen follows. Inert today -- every
+                // settings updater returns 0, and each dialog re-applies the delay on entry -- but
+                // it is a real asymmetry, and the next updater that returns non-zero inherits it.
+                diaRestoreScrollSpeed();
                 return updResult;
+            }
         }
     }
 }
@@ -968,6 +1193,16 @@ void diaSetEnabled(struct UIItem *ui, int id, int enabled)
         return;
 
     item->enabled = enabled;
+}
+
+void diaSetShowDefaultWhenEmpty(struct UIItem *ui, int id, int show)
+{
+    struct UIItem *item = diaFindByID(ui, id);
+
+    if (!item)
+        return;
+
+    item->showDefaultWhenEmpty = show;
 }
 
 void diaSetVisible(struct UIItem *ui, int id, int visible)
@@ -1030,6 +1265,8 @@ int diaGetString(struct UIItem *ui, int id, char *value, int length)
 
     if ((item->type == UI_STRING) || (item->type == UI_PASSWORD)) {
         strncpy(value, item->stringvalue.text, length);
+        if (length > 0)
+            value[length - 1] = '\0';
         return 1;
     }
 
@@ -1111,7 +1348,7 @@ int diaSetLabel(struct UIItem *ui, int id, const char *text)
     if (!item)
         return 0;
 
-    if ((item->type == UI_LABEL) || (item->type == UI_BUTTON)) {
+    if ((item->type == UI_LABEL) || (item->type == UI_BUTTON) || (item->type == UI_HEADER)) {
         item->label.text = text;
         return 1;
     }
@@ -1119,6 +1356,11 @@ int diaSetLabel(struct UIItem *ui, int id, const char *text)
     return 0;
 }
 
+// LIFETIME CONTRACT: this stores enumvals' RAW POINTER -- no copy. The array must outlive every
+// render of the dialog (dialog structs are also reused across openings). A block-scoped array is
+// a dangling pointer the moment its brace closes (issue #154: the DMA row rendered the Neutrino
+// video-mode list). Use static arrays for pure literals; _l()-localized arrays must stay
+// function-scope in the function that executes the dialog (static would freeze the first language).
 int diaSetEnum(struct UIItem *ui, int id, const char **enumvals)
 {
     struct UIItem *item = diaFindByID(ui, id);

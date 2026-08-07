@@ -13,6 +13,7 @@ void sysInitDev9(void);
 void sysShutdownDev9(void);
 void sysReset(int modload_mask);
 void sysExecExit(void);
+int sysLaunchDisc(void); // boot the physical PS2 disc in the drive; <0 (stays in OPL) on failure
 void sysPowerOff(void);
 #ifdef __DECI2_DEBUG
 int sysInitDECI2(void);

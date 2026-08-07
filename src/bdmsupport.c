@@ -520,6 +520,9 @@ void bdmLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
     char bdmCurrentDriver[32];
     snprintf(bdmCurrentDriver, sizeof(bdmCurrentDriver), "%s", pDeviceData->bdmDriver);
     settings->bdDeviceId = pDeviceData->massDeviceIndex;
+    // Match the IOP-side block device by its exported driver token, not just the device index,
+    // so the in-game reader can never attach to the wrong transport when several are active.
+    snprintf(settings->bdDeviceDriver, sizeof(settings->bdDeviceDriver), "%s", bdmCurrentDriver);
 
     if (!strcmp(bdmCurrentDriver, "ata") && strlen(bdmCurrentDriver) == 3) {
         // Get DMA settings for ATA mode.

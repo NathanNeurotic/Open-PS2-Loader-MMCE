@@ -15,6 +15,10 @@ typedef enum {
     UI_SPACER,
     // A string label
     UI_LABEL,
+    // Same as a label but drawn in the accent (selected-text) colour to look like a header.
+    // Placed between UI_LABEL and UI_OK on purpose: that keeps it non-controllable
+    // (diaIsControllable: type >= UI_OK) and visibility-guarded (the type >= UI_LABEL checks).
+    UI_HEADER,
     // Ok button
     UI_OK, // Just a shortcut for BUTTON with OK label and id 1!
     // Universal button (display's label, returns id on X)
@@ -78,6 +82,11 @@ struct UIItem
             unsigned char b;
         } colourvalue;
     };
+
+    // Placed AFTER the union: dialogs.c's UI widgets use positional initializers that stop at the
+    // union, so a field here stays default-0 (no initializer breakage) and is set at runtime via
+    // diaSetShowDefaultWhenEmpty(). UI_STRING: render a dim "Default" when blank (fallback fields).
+    unsigned char showDefaultWhenEmpty;
 };
 
 /// Dialog display
@@ -85,6 +94,7 @@ int diaExecuteDialog(struct UIItem *ui, int uiId, short inMenu, int (*updater)(i
 void diaRenderUI(struct UIItem *ui, short inMenu, struct UIItem *cur, int haveFocus);
 int diaShowKeyb(char *text, int maxLen, int hide_text, const char *title);
 void diaSetEnabled(struct UIItem *ui, int id, int enabled);
+void diaSetShowDefaultWhenEmpty(struct UIItem *ui, int id, int show);
 void diaSetVisible(struct UIItem *ui, int id, int visible);
 void diaSetItemType(struct UIItem *ui, int id, UIItemType type);
 int diaGetInt(struct UIItem *ui, int id, int *value);

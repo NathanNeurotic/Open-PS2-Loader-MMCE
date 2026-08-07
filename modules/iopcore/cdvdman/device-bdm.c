@@ -28,6 +28,37 @@ extern struct irx_export_table _exp_bdm;
 extern struct irx_export_table _exp_atad;
 #endif
 
+#ifdef USE_BDM_ATA
+static int bdm_is_ata_driver_name(const char *name)
+{
+    return (name != NULL) &&
+           (name[0] == 'a') &&
+           (name[1] == 't') &&
+           (name[2] == 'a') &&
+           (name[3] == '\0');
+}
+#endif
+
+static int bdm_matches_launch_device(const struct block_device *bd)
+{
+    if (bd == NULL)
+        return 0;
+
+    if (cdvdman_settings.bdDeviceDriver[0] == '\0')
+        return bd->devNr == cdvdman_settings.bdDeviceId;
+
+#ifdef USE_BDM_ATA
+    /* The ATA-specific BDM cdvdman only ever exposes a single synthetic "ata"
+       block device from atad.c, so binding by driver token is sufficient. */
+    if (bdm_is_ata_driver_name(bd->name))
+        return bdm_is_ata_driver_name(cdvdman_settings.bdDeviceDriver);
+#endif
+
+    return (bd->devNr == cdvdman_settings.bdDeviceId) &&
+           (bd->name != NULL) &&
+           (strncmp(bd->name, cdvdman_settings.bdDeviceDriver, sizeof(cdvdman_settings.bdDeviceDriver)) == 0);
+}
+
 //
 // BDM exported functions
 //
@@ -36,7 +67,7 @@ void bdm_connect_bd(struct block_device *bd)
 {
     DPRINTF("connecting device %s%dp%d\n", bd->name, bd->devNr, bd->parNr);
 
-    if (g_bd == NULL && bd->devNr == cdvdman_settings.bdDeviceId) {
+    if (g_bd == NULL && bdm_matches_launch_device(bd)) {
         DPRINTF("attaching to %s%dp%d\n", bd->name, bd->devNr, bd->parNr);
         g_bd = bd;
         g_bd_sectors_per_sector = (2048 / bd->sectorSize);
@@ -49,7 +80,7 @@ void bdm_disconnect_bd(struct block_device *bd)
 {
     DPRINTF("disconnecting device %s%dp%d\n", bd->name, bd->devNr, bd->parNr);
 
-    if (bd->devNr == cdvdman_settings.bdDeviceId) {
+    if (bdm_matches_launch_device(bd)) {
         DPRINTF("detatching from %s%dp%d\n", bd->name, bd->devNr, bd->parNr);
 
         // Lock usage of block device

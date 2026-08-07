@@ -696,3 +696,11 @@ gui_strings:
   string: Only one HDD allowed, enabling locks APA or GPT.
 - label: ERROR_SAVING_SETTINGS_TO
   string: Could not write settings to %s (error %d)
+- label: LAUNCH_PS2_DISC
+  string: Launch PS2 Disc
+- label: DISC_LAUNCH_ERR
+  string: No PS2 disc in the drive.
+- label: FINANCIAL_SUPPORT
+  string: Financial Support
+- label: DEFAULT
+  string: Default
