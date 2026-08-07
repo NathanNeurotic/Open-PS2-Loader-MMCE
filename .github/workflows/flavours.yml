@@ -1,0 +1,61 @@
+name: build-flavours
+
+# RiptOPL rebuild-branch companion: build this branch's UNMODIFIED official OPL source in all
+# three RiptOPL CI toolchains, so every rebuild step ships the same three flavours as master:
+#   OFFICIALSDK     -- ghcr.io/ps2homebrew/ps2homebrew:main (official OPL's own CI container)
+#   PS2DEVLATESTSDK -- ps2dev/ps2dev:latest
+#   PS2DEVPINNEDSDK -- ps2dev/ps2dev pinned by digest (2026-07-28 snapshot, same pin as master CI)
+# This file is the ONLY RiptOPL addition on the rebuild base branch; the source tree stays
+# byte-identical to upstream. Each ELF self-identifies via LOCALVERSION ("-<FLAVOUR>" suffix).
+
+on:
+  push:
+    branches:
+      - 'rebuild/**'
+  workflow_dispatch:
+
+jobs:
+  build-flavour:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - flavour: OFFICIALSDK
+            image: ghcr.io/ps2homebrew/ps2homebrew:main
+          - flavour: PS2DEVLATESTSDK
+            image: ps2dev/ps2dev:latest
+          - flavour: PS2DEVPINNEDSDK
+            image: ps2dev/ps2dev@sha256:c64ae69c9817865ed98ff054e4ae5360b9e280ed952c97946bca95d9d35be995
+    runs-on: ubuntu-latest
+    container: ${{ matrix.image }}
+    steps:
+      # git must exist BEFORE checkout (ps2dev images are minimal Alpine): without it,
+      # actions/checkout falls back to an API tarball, git describe fails, and the version
+      # string collapses to "-dirty". Guarded installs no-op where tools already exist
+      # (the ps2homebrew image ships official OPL's full build deps).
+      - name: Install host dependencies (either package manager)
+        run: |
+          if command -v apk >/dev/null 2>&1; then
+            apk add --no-cache bash make git zip unzip tar gzip xz python3 py3-pip py3-yaml gmp mpfr4 mpc1 gawk coreutils findutils grep sed diffutils || true
+          elif command -v apt-get >/dev/null 2>&1; then
+            apt-get update -qq && apt-get install -y -qq bash make git zip unzip python3 python3-yaml gawk || true
+          fi
+
+      - name: git checkout
+        uses: actions/checkout@v4
+
+      - run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git fetch --prune --unshallow || true
+
+      - name: Compile -> make clean release (${{ matrix.flavour }})
+        run: make --trace clean && make --trace LOCALVERSION=${{ matrix.flavour }} release
+
+      - name: Upload ELF (${{ matrix.flavour }})
+        if: ${{ success() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: OPL-${{ matrix.flavour }}
+          path: |
+            OPNPS2LD-*.ELF
+          if-no-files-found: error
