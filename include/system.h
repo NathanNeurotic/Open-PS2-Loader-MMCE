@@ -18,6 +18,8 @@ int sysLaunchDisc(void); // boot the physical PS2 disc in the drive; <0 (stays i
 #define NEUTRINO_PATH     "mc0:NEUTRINO/neutrino.elf"
 #define NEUTRINO_ALT_PATH "mc1:NEUTRINO/neutrino.elf"
 
+#define POPS_FOLDER "POPS" // per-device PS1/POPSTARTER folder: <dev>/POPS/POPSTARTER.ELF + *.VCD
+
 #define NEUTRINO_VMC_SLOTS 2
 
 // Fully-formed Neutrino "-mcN=<prefix>VMC/<name>.bin" args, one per VMC slot, resolved by the
@@ -37,6 +39,10 @@ void sysLaunchNeutrino(const char *driver, const char *path, const char *startup
 // can still toast. Call BEFORE deinit in every Neutrino leg. Returns 0 = proceed; <0 = abort
 // the launch (a toast has already been shown).
 int sysNeutrinoPreflight(const char *driver, const char *neutrinoPath);
+
+// Launch an external POPSTARTER.ELF for a PS1 VCD. selector = the target's argv[0]
+// "<POPS>/<prefix><name>.ELF" token. Caller deinit()s with UNMOUNT_EXCEPTION first.
+void sysLaunchPopstarter(const char *popstarterElf, const char *selector);
 
 // ELF handoff that KEEPS the IOP (drivers + mounts) alive -- NHDDL parity: the vendored elfldr/
 // child loader SifLoadElf()s the target through OPL's live mounts and never SifIopReset()s (the

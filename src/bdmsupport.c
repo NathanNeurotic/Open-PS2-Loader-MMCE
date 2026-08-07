@@ -137,6 +137,7 @@ static int bdmReadDeviceIdentity(const char *path, char *driverName, int driverN
     if (result >= 0)
         result = fileXioIoctl2(dir, USBMASS_IOCTL_GET_DEVICE_NUMBER, NULL, 0, deviceIndex, sizeof(*deviceIndex));
 
+
     fileXioDclose(dir);
     return result;
 }
@@ -146,6 +147,116 @@ int bdmSupportIsUDPBD(item_list_t *support)
 {
     (void)support;
     return 0;
+}
+
+// Force-load the BDM transport for a BDMA source type if it is not already up (equip-time
+// force-load; the games tab stays hidden because page visibility gates on gEnable* independently).
+// Adapted to this tree's load latches; returns 1 when the transport modules are loaded.
+static int iUSBMassModLoaded = 0; // usbmass_bd load latch for the equip's force-load path
+
+static int bdmEnsureTransportLoaded(int bdmType)
+{
+    switch (bdmType) {
+        case BDM_TYPE_USB:
+            if (gEnableUSB)
+                iUSBMassModLoaded = 1; // bdmLoadModules already loaded it at BDM start
+            if (!iUSBMassModLoaded) {
+                LOG("[USBMASS_BD]:\n");
+                if (sysLoadModuleBuffer(&usbmass_bd_irx, size_usbmass_bd_irx, 0, NULL) >= 0)
+                    iUSBMassModLoaded = 1;
+            }
+            return iUSBMassModLoaded;
+        case BDM_TYPE_SDC:
+            if (!mx4sioModLoaded) {
+                LOG("[MX4SIO_BD]:\n");
+                sysLoadModuleBuffer(&mx4sio_bd_irx, size_mx4sio_bd_irx, 0, NULL);
+                mx4sioModLoaded = 1;
+            }
+            return mx4sioModLoaded;
+        case BDM_TYPE_ILINK:
+            if (!iLinkModLoaded) {
+                LOG("[ILINKMAN]:\n");
+                sysLoadModuleBuffer(&iLinkman_irx, size_iLinkman_irx, 0, NULL);
+                LOG("[IEEE1394_BD]:\n");
+                sysLoadModuleBuffer(&IEEE1394_bd_irx, size_IEEE1394_bd_irx, 0, NULL);
+                iLinkModLoaded = 1;
+            }
+            return iLinkModLoaded;
+        case BDM_TYPE_ATA:
+            if (!hddModLoaded) {
+                hddLoadModules();
+                hddModLoaded = 1;
+            }
+            return hddModLoaded;
+        default:
+            return 0;
+    }
+}
+
+// Ensure the BDM transport for a BDMA source type is loaded AND a device of that type is mounted,
+// so the equip can read modules from a source device even when that family is NOT enabled for
+// games. Idempotent + instant when the transport is already up. Returns 1 if a device of the
+// type is present afterwards, 0 otherwise.
+int bdmEnsureSourceModules(int bdmType, u32 timeoutMs)
+{
+    int wasLoaded;
+    char root[BDM_DEVICE_ROOT_MAX + 2];
+    // u64, NOT u32: GetTimerSystemTime() returns a u64 bus-clock count that passes 2^32 after
+    // ~29 s of uptime; truncating the start makes the elapsed math explode.
+    u64 start;
+
+    WaitSema(bdmLoadModuleLock);
+    switch (bdmType) {
+        case BDM_TYPE_USB:
+            wasLoaded = iUSBMassModLoaded || gEnableUSB;
+            break;
+        case BDM_TYPE_SDC:
+            wasLoaded = mx4sioModLoaded;
+            break;
+        case BDM_TYPE_ILINK:
+            wasLoaded = iLinkModLoaded;
+            break;
+        case BDM_TYPE_ATA:
+            wasLoaded = hddModLoaded;
+            break;
+        default:
+            SignalSema(bdmLoadModuleLock);
+            return 0;
+    }
+    bdmEnsureTransportLoaded(bdmType);
+    SignalSema(bdmLoadModuleLock);
+
+    start = GetTimerSystemTime();
+    while (!bdmGetDeviceRootByType(bdmType, root, sizeof(root))) {
+        if (wasLoaded)
+            return 0;
+        if ((GetTimerSystemTime() - start) / (kBUSCLK / 1000) > timeoutMs)
+            return 0;
+        DelayThread(100 * 1000);
+    }
+    return 1;
+}
+
+// List EVERY mounted slot whose driver matches bdmType into slots (mass<i>:/ roots); returns the
+// count. The BDMA equip searches every same-type slot, not just the first.
+int bdmGetDeviceSlotsByType(int bdmType, int *slots, int maxSlots)
+{
+    int n = 0;
+
+    if (slots == NULL || maxSlots <= 0)
+        return 0;
+
+    for (int i = 0; i < MAX_BDM_DEVICES && n < maxSlots; i++) {
+        char path[16], driver[32];
+        int devIndex = -1;
+
+        snprintf(path, sizeof(path), "mass%d:/", i);
+        bdmReadDeviceIdentity(path, driver, sizeof(driver), &devIndex);
+        if (driver[0] != '\0' && bdmDetermineDeviceType(driver) == bdmType)
+            slots[n++] = i;
+    }
+
+    return n;
 }
 
 
