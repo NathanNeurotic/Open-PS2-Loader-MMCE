@@ -268,7 +268,7 @@ void sfxGetPlayDiag(unsigned int *lastMs, unsigned int *maxMs)
 // audioInit, which happens-before any producer (both producers gate on audio_initialized).
 // A full ring DROPS the sound -- a skipped tick beats a stalled menu. Concurrent audsrv RPCs
 // from a second thread are nothing new: bgmThread has always streamed alongside sfx.
-#define SFX_QUEUE_LEN 8
+#define SFX_QUEUE_LEN   8
 // Entries older than this play no more: after an IOP stall clears, replaying the backlog of
 // stacked cursor ticks would chirp back-to-back.
 #define SFX_STALE_TICKS (100 * SFX_CLOCKS_PER_MS)
@@ -278,8 +278,8 @@ static struct
     int id;
     u32 ticks;
 } sfxQueue[SFX_QUEUE_LEN];
-static volatile int sfxQHead = 0; // advanced by producers (GUI + ioman worker), DIntr-guarded
-static volatile int sfxQTail = 0; // advanced by the consumer only
+static volatile int sfxQHead = 0;        // advanced by producers (GUI + ioman worker), DIntr-guarded
+static volatile int sfxQTail = 0;        // advanced by the consumer only
 static volatile int sfxDispatchBusy = 0; // consumer is inside the audsrv RPC
 static int sfxDispatchSema = -1;
 static int sfxDispatchTid = -1;

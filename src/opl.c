@@ -1784,7 +1784,7 @@ static void setDefaults(void)
     gAutosort = 1;
     gAutoRefresh = 0;
     gEnableDebug = 0;
-    gPS2Logo = 1;   // opinionated defaults: the fork ships ready-to-use
+    gPS2Logo = 1; // opinionated defaults: the fork ships ready-to-use
     gHDDGameListCache = 0;
     gEnableWrite = 1;
     gRememberLastPlayed = 0;
