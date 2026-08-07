@@ -932,3 +932,17 @@ gui_strings:
   string: Controller
 - label: MENU_AUDIO
   string: Audio
+- label: NEUTRINO_DEV_UNSUPPORTED
+  string: Neutrino cannot launch from this device -- launch aborted.
+- label: NEUTRINO_TOML_SYNC_FAILED
+  string: Neutrino network config (bsd toml) missing or unwritable -- launch aborted, check the neutrino folder.
+- label: NEUTRINO_VMC_MISSING
+  string: Per-game VMC file not found -- launching without it (game uses its real card).
+- label: GAMES_DEVICE
+  string: Game's Device
+- label: NEUTRINO_BAD_FORMAT
+  string: Neutrino does not support this file format, launching with <OPL> core
+- label: NEUTRINO_NOT_FOUND
+  string: Neutrino ELF not found, launching with <OPL> core
+- label: NEUTRINO_TOO_FRAGMENTED
+  string: Too fragmented for Neutrino (%d fragments, limit %d incl. VMCs) -- trying the OPL core instead.

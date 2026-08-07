@@ -866,6 +866,130 @@ void guiShowParentalLockConfig(void)
         menuSetParentalLockCheckState(1);
     }
 }
+// Neutrino Defaults live-updater: the ":c" comp half is only ever emitted alongside a video mode
+// (-gsm=v:c grammar) -- grey it while the global Neutrino Video default is Off (same rule as the
+// per-game rows).
+static int guiNeutrinoDefaultsUpdater(int modified)
+{
+    int neutrinoVideoDef;
+
+    if (modified) {
+        diaGetInt(diaNeutrinoDefaults, CFG_NEUTRINO_VIDEO, &neutrinoVideoDef);
+        diaSetEnabled(diaNeutrinoDefaults, CFG_NEUTRINO_GSMCOMP, neutrinoVideoDef != 0);
+    }
+    return 0;
+}
+
+// Game Launching -> Neutrino Defaults: the global Neutrino device/video/gsm-comp defaults + the
+// structured Advanced Arguments editor.
+void guiShowNeutrinoDefaults(void)
+{
+    // Neutrino lives at <root>:/neutrino/neutrino.elf on ANY device -- offer the common roots.
+    // MUST stay in sync with the roots[] table in sbResolveNeutrinoPath() (supportbase.c).
+    const char *neutrinoDevStrs[] = {_l(_STR_AUTO), "Memory Card", "USB", "MX4SIO", "MMCE", "HDD (exFAT)", "HDD (APA)", _l(_STR_GAMES_DEVICE), NULL}; // device TYPE holding /neutrino/neutrino.elf (NEUTRINO_DEV_*); "Game's Device" (NEUTRINO_DEV_GAME) appended last to match the enum tail
+    diaSetEnum(diaNeutrinoDefaults, CFG_NEUTRINO_DEVICE, neutrinoDevStrs);
+    diaSetInt(diaNeutrinoDefaults, CFG_NEUTRINO_DEVICE, gNeutrinoDevice);
+    // Global default Neutrino Video (-gsm) + comp half: same indices as the per-game picker
+    // (system.c gsmVideoTokens). static: literals only, and diaSetEnum stores the raw pointer.
+    static const char *neutrinoVideoDefStrs[] = {"Off", "240p", "480p", "1080i x1", "1080i x2", "1080i x3", NULL};
+    static const char *neutrinoGsmCompDefStrs[] = {"Off", "Type 1 (GSM/OPL)", "Type 2", "Type 3", NULL};
+    diaSetEnum(diaNeutrinoDefaults, CFG_NEUTRINO_VIDEO, neutrinoVideoDefStrs);
+    diaSetInt(diaNeutrinoDefaults, CFG_NEUTRINO_VIDEO, gNeutrinoVideoDefault);
+    diaSetEnum(diaNeutrinoDefaults, CFG_NEUTRINO_GSMCOMP, neutrinoGsmCompDefStrs);
+    diaSetInt(diaNeutrinoDefaults, CFG_NEUTRINO_GSMCOMP, gNeutrinoGsmCompDefault);
+    diaSetEnabled(diaNeutrinoDefaults, CFG_NEUTRINO_GSMCOMP, gNeutrinoVideoDefault != 0);
+
+    int ret;
+reshow_neutrino:
+    ret = diaExecuteDialog(diaNeutrinoDefaults, -1, 1, &guiNeutrinoDefaultsUpdater);
+    if (ret == CFG_NEUTRINO_ARGS) {
+        // the "Advanced Arguments" button -> open the structured args sub-screen, then re-enter
+        guiShowNeutrinoArgsConfig(gNeutrinoArgs, sizeof(gNeutrinoArgs));
+        goto reshow_neutrino;
+    }
+    if (ret) {
+        diaGetInt(diaNeutrinoDefaults, CFG_NEUTRINO_DEVICE, &gNeutrinoDevice);
+        diaGetInt(diaNeutrinoDefaults, CFG_NEUTRINO_VIDEO, &gNeutrinoVideoDefault);
+        diaGetInt(diaNeutrinoDefaults, CFG_NEUTRINO_GSMCOMP, &gNeutrinoGsmCompDefault);
+
+        applyConfig(-1, -1, 0);
+    }
+}
+
+// Neutrino Launch Args sub-screen: edit the user-settable Neutrino flags as structured fields and
+// reassemble them in a Neutrino-accepted order (--b last). Used for both the global args (here) and
+// the per-game args. argsBuf in/out is the stored "Launch Args" string.
+void guiShowNeutrinoArgsConfig(char *argsBuf, int bufSize)
+{
+    neutrino_args_t na;
+    neutrinoArgsParse(argsBuf, &na);
+
+    diaSetInt(diaNeutrinoArgs, NARGS_QB, na.qb ? 1 : 0);
+    diaSetInt(diaNeutrinoArgs, NARGS_DBC, na.dbc ? 1 : 0);
+    diaSetInt(diaNeutrinoArgs, NARGS_LOGO, na.logo ? 1 : 0);
+    diaSetString(diaNeutrinoArgs, NARGS_CWD, na.cwd);
+    diaSetString(diaNeutrinoArgs, NARGS_CFG, na.cfg);
+    diaSetString(diaNeutrinoArgs, NARGS_ELF, na.elf);
+    diaSetString(diaNeutrinoArgs, NARGS_ATA0, na.ata0);
+    diaSetString(diaNeutrinoArgs, NARGS_ATA0ID, na.ata0id);
+    diaSetString(diaNeutrinoArgs, NARGS_ATA1, na.ata1);
+    diaSetString(diaNeutrinoArgs, NARGS_EXTRA, na.extra);
+
+    // Baseline = the fields AS POPULATED (the UI caps each string at 31 chars). Comparing the
+    // post-dialog fields against this tells us which fields the user actually edited, so untouched
+    // fields can keep their FULL parsed value instead of the truncated UI copy.
+    neutrino_args_t pop;
+    diaGetInt(diaNeutrinoArgs, NARGS_QB, &pop.qb);
+    diaGetInt(diaNeutrinoArgs, NARGS_DBC, &pop.dbc);
+    diaGetInt(diaNeutrinoArgs, NARGS_LOGO, &pop.logo);
+    diaGetString(diaNeutrinoArgs, NARGS_CWD, pop.cwd, sizeof(pop.cwd));
+    diaGetString(diaNeutrinoArgs, NARGS_CFG, pop.cfg, sizeof(pop.cfg));
+    diaGetString(diaNeutrinoArgs, NARGS_ELF, pop.elf, sizeof(pop.elf));
+    diaGetString(diaNeutrinoArgs, NARGS_ATA0, pop.ata0, sizeof(pop.ata0));
+    diaGetString(diaNeutrinoArgs, NARGS_ATA0ID, pop.ata0id, sizeof(pop.ata0id));
+    diaGetString(diaNeutrinoArgs, NARGS_ATA1, pop.ata1, sizeof(pop.ata1));
+    diaGetString(diaNeutrinoArgs, NARGS_EXTRA, pop.extra, sizeof(pop.extra));
+
+    if (diaExecuteDialog(diaNeutrinoArgs, -1, 1, NULL)) {
+        neutrino_args_t out;
+        char after[256];
+        diaGetInt(diaNeutrinoArgs, NARGS_QB, &out.qb);
+        diaGetInt(diaNeutrinoArgs, NARGS_DBC, &out.dbc);
+        diaGetInt(diaNeutrinoArgs, NARGS_LOGO, &out.logo);
+        diaGetString(diaNeutrinoArgs, NARGS_CWD, out.cwd, sizeof(out.cwd));
+        diaGetString(diaNeutrinoArgs, NARGS_CFG, out.cfg, sizeof(out.cfg));
+        diaGetString(diaNeutrinoArgs, NARGS_ELF, out.elf, sizeof(out.elf));
+        diaGetString(diaNeutrinoArgs, NARGS_ATA0, out.ata0, sizeof(out.ata0));
+        diaGetString(diaNeutrinoArgs, NARGS_ATA0ID, out.ata0id, sizeof(out.ata0id));
+        diaGetString(diaNeutrinoArgs, NARGS_ATA1, out.ata1, sizeof(out.ata1));
+        diaGetString(diaNeutrinoArgs, NARGS_EXTRA, out.extra, sizeof(out.extra));
+        // Per-field merge: adopt only the fields the user actually changed; untouched fields keep
+        // their FULL parsed value (na) so editing one field never truncates the others to 31 chars.
+        if (out.qb != pop.qb)
+            na.qb = out.qb;
+        if (out.dbc != pop.dbc)
+            na.dbc = out.dbc;
+        if (out.logo != pop.logo)
+            na.logo = out.logo;
+        if (strcmp(out.cwd, pop.cwd) != 0)
+            snprintf(na.cwd, sizeof(na.cwd), "%s", out.cwd);
+        if (strcmp(out.cfg, pop.cfg) != 0)
+            snprintf(na.cfg, sizeof(na.cfg), "%s", out.cfg);
+        if (strcmp(out.elf, pop.elf) != 0)
+            snprintf(na.elf, sizeof(na.elf), "%s", out.elf);
+        if (strcmp(out.ata0, pop.ata0) != 0)
+            snprintf(na.ata0, sizeof(na.ata0), "%s", out.ata0);
+        if (strcmp(out.ata0id, pop.ata0id) != 0)
+            snprintf(na.ata0id, sizeof(na.ata0id), "%s", out.ata0id);
+        if (strcmp(out.ata1, pop.ata1) != 0)
+            snprintf(na.ata1, sizeof(na.ata1), "%s", out.ata1);
+        if (strcmp(out.extra, pop.extra) != 0)
+            snprintf(na.extra, sizeof(na.extra), "%s", out.extra);
+        neutrinoArgsAssemble(&na, after, sizeof(after));
+        snprintf(argsBuf, bufSize, "%s", after);
+    }
+}
+
 
 void guiShowLaunchConfig(void)
 {
@@ -874,21 +998,22 @@ void guiShowLaunchConfig(void)
     // stored value (0=<OPL>, 1=Neutrino) and the first two per-game COMPAT_LOADER options.
     const char *defaultCoreStrs[] = {"<OPL>", "Neutrino", NULL};
     diaSetEnum(diaLaunchConfig, CFG_DEFAULT_CORE, defaultCoreStrs);
-    // NOTE(rebuild): the Neutrino core (checklist items 21/23) returns in step 07 -- until then
-    // the Default Core row is locked to <OPL> and the Neutrino Defaults sub-page is hidden.
-    diaSetInt(diaLaunchConfig, CFG_DEFAULT_CORE, 0);
-    diaSetEnabled(diaLaunchConfig, CFG_DEFAULT_CORE, 0);
-    diaSetVisible(diaLaunchConfig, LAUNCH_NEUTRINO_DEFAULTS_BUTTON, 0);
+    diaSetInt(diaLaunchConfig, CFG_DEFAULT_CORE, gDefaultCoreLoader);
     diaSetInt(diaLaunchConfig, CFG_PS2LOGO, gPS2Logo);
 
     int ret;
 reshow_launch:
     ret = diaExecuteDialog(diaLaunchConfig, -1, 1, NULL);
+    if (ret == LAUNCH_NEUTRINO_DEFAULTS_BUTTON) {
+        guiShowNeutrinoDefaults();
+        goto reshow_launch;
+    }
     if (ret == LAUNCH_OSD_DEFAULTS_BUTTON) {
         guiGameShowOSDLanguageConfig(1);
         goto reshow_launch;
     }
     if (ret) {
+        diaGetInt(diaLaunchConfig, CFG_DEFAULT_CORE, &gDefaultCoreLoader);
         diaGetInt(diaLaunchConfig, CFG_PS2LOGO, &gPS2Logo);
 
         applyConfig(-1, -1, 0);

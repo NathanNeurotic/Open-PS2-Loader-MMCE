@@ -848,3 +848,365 @@ int sbLoadCheats(const char *path, const char *file)
 
     return cheatMode;
 }
+
+// Δ1 (NHDDL-parity): a resolved neutrino.elf is only USABLE if its install is complete. Neutrino
+// chdir()s to the elf's dir (our -cwd) then opens config/system.toml; if absent it falls back to a
+// FLAT "system.toml" (SAS layout); if NEITHER loads it returns -1 = black screen post-teardown
+// (neutrino ee/loader/src/main.c:486-505). Mirror that EXACT detection so we never reject a valid
+// install: accept the elf only when config/system.toml OR flat system.toml sits beside it. A stale
+// folder (elf only, no config) is skipped so probing continues to a good install instead of
+// shadowing it. Uses its own buffer so the caller's returned path is untouched.
+static int sbNeutrinoInstallComplete(const char *elfPath)
+{
+    if (elfPath == NULL)
+        return 0;
+    const char *slash = strrchr(elfPath, '/');
+    char probe[320]; // longest caller path (~160) + "/config/system.toml" with headroom -- a TRUNCATED
+                     // probe would miss a real toml and reject a VALID install (PR #81 review)
+    int dirLen;
+
+    if (slash == NULL) // no directory component -- can't derive cwd; don't reject (custom path edge)
+        return 1;
+    dirLen = (int)(slash - elfPath);
+
+    snprintf(probe, sizeof(probe), "%.*s/config/system.toml", dirLen, elfPath);
+    if (sbFileExists(probe))
+        return 1;
+    snprintf(probe, sizeof(probe), "%.*s/system.toml", dirLen, elfPath);
+    return sbFileExists(probe);
+}
+
+// Δ5 (NHDDL-parity visibility): a stale/old neutrino folder winning silently was undiagnosable.
+// LOG the resolved pick + its version.txt (if present, like NHDDL's splash) at the single return
+// point. Returns the path unchanged so call sites read `return sbNeutrinoResolved(path)`.
+static const char *sbNeutrinoResolved(const char *path)
+{
+    if (path == NULL)
+        return NULL;
+    const char *slash = strrchr(path, '/');
+    if (slash != NULL) {
+        char vpath[320], ver[128]; // same headroom rationale as sbNeutrinoInstallComplete's probe
+        int fd;
+        snprintf(vpath, sizeof(vpath), "%.*s/version.txt", (int)(slash - path), path);
+        fd = open(vpath, O_RDONLY, 0666);
+        if (fd >= 0) {
+            int n = read(fd, ver, sizeof(ver) - 1);
+            close(fd);
+            if (n > 0) {
+                char *nl;
+                ver[n] = '\0';
+                nl = strpbrk(ver, "\r\n");
+                if (nl != NULL)
+                    *nl = '\0';
+                LOG("[NEUTRINO] using %s (%s)\n", path, ver);
+                return path;
+            }
+        }
+    }
+    LOG("[NEUTRINO] using %s\n", path);
+    return path;
+}
+
+// Probe the ACTIVE game device for a co-located neutrino.elf: (A) the games-folder prefix, then
+// (B) the bare device root. Returns the resolved path of the first COMPLETE install (Δ1), or NULL.
+// Shared by the AUTO tier (one candidate among several) and the "Game's Device" pick (the ONLY
+// candidate -- a NULL here is surfaced to the user, no MC fallback). activePrefix NULL/"" -> NULL
+// (e.g. HDD passes NULL: raw APA is not POSIX-open()-reachable).
+static const char *sbNeutrinoProbeGameDevice(const char *activePrefix)
+{
+    if (activePrefix == NULL || activePrefix[0] == '\0')
+        return NULL;
+
+    char devRoot[64]; // bare device-root token, e.g. "mass0:" (everything up to & incl. ':')
+    const char *colon = strchr(activePrefix, ':');
+    size_t rootLen = (colon != NULL) ? (size_t)(colon - activePrefix + 1) : 0;
+    if (rootLen > 0 && rootLen < sizeof(devRoot)) {
+        memcpy(devRoot, activePrefix, rootLen);
+        devRoot[rootLen] = '\0';
+    } else {
+        devRoot[0] = '\0';
+    }
+    const char *bases[2] = {activePrefix, devRoot}; // (A) the games-folder prefix, (B) the device root
+    static const char *forms[] = {
+        "%sNEUTRINO/neutrino.elf",
+        "%sneutrino/neutrino.elf",
+        "%sNEUTRINO/NEUTRINO.ELF",
+        "%sneutrino/NEUTRINO.ELF",
+    };
+    static char probe[160];
+    for (int b = 0; b < 2; b++) {
+        if (bases[b] == NULL || bases[b][0] == '\0')
+            continue;
+        for (int i = 0; i < (int)(sizeof(forms) / sizeof(forms[0])); i++) {
+            snprintf(probe, sizeof(probe), forms[i], bases[b]);
+            // Δ1: a stale elf-only folder on the game device must NOT count as a valid install.
+            if (sbFileExists(probe) && sbNeutrinoInstallComplete(probe))
+                return sbNeutrinoResolved(probe);
+        }
+    }
+    return NULL;
+}
+
+// ---- Neutrino launch-args parse / assemble (the "Launch Args" picker) ----------------
+// naAppend joins a token onto out with a single separating space; naAppendKV joins "<key><val>".
+static void naAppend(char *out, int outSize, const char *tok)
+{
+    int len = (int)strlen(out);
+    if (len >= outSize - 1) // already full (or malformed) -- nothing more fits
+        return;
+    if (len > 0)
+        out[len++] = ' ';
+    snprintf(out + len, outSize - len, "%s", tok);
+}
+
+static void naAppendKV(char *out, int outSize, const char *key, const char *val)
+{
+    char tmp[96];
+    snprintf(tmp, sizeof(tmp), "%s%s", key, val);
+    naAppend(out, outSize, tmp);
+}
+
+int sbFileExists(const char *path)
+{
+    if (path == NULL)
+        return 0;
+    int fd = open(path, O_RDONLY, 0666);
+    if (fd < 0)
+        return 0;
+    close(fd);
+    return 1;
+}
+
+// Resolve the Neutrino core ELF: probe the install locations users actually use (folder-case
+// and leading-slash variants on mc0/mc1) and return the first COMPLETE install (Δ1), or NULL.
+// Centralised so the bdm + mmce launch paths stay in sync.
+const char *sbResolveNeutrinoPath(const char *activePrefix)
+{
+    // Neutrino Device (General Settings): a driver-accurate device TYPE (NEUTRINO_DEV_*) that holds
+    // <root>:/neutrino/neutrino.elf. Resolve the type to its live device-name token(s) -- USB/MX4SIO/
+    // exFAT-HDD via the mounted BDM device, MC/MMCE by slot, APA-HDD via the mounted OPL data partition
+    // (pfs0:) -- then probe each first. The token has NO trailing ':' so the forms[] below add it.
+    // GAME'S DEVICE: resolve ONLY on the active game's own device (co-located neutrino.elf); no
+    // legacy-custom-path / MC fallback. A miss returns NULL so the launch path toasts "not found"
+    // and aborts in a live menu (every caller handles NULL that way) rather than silently using an
+    // MC core the user did not pick.
+    if (gNeutrinoDevice == NEUTRINO_DEV_GAME)
+        return sbNeutrinoProbeGameDevice(activePrefix);
+
+    char cand[2][BDM_DEVICE_ROOT_MAX];
+    int nCand = 0;
+    switch (gNeutrinoDevice) {
+        case NEUTRINO_DEV_MC:
+            snprintf(cand[nCand++], BDM_DEVICE_ROOT_MAX, "mc0");
+            snprintf(cand[nCand++], BDM_DEVICE_ROOT_MAX, "mc1");
+            break;
+        case NEUTRINO_DEV_MMCE:
+            snprintf(cand[nCand++], BDM_DEVICE_ROOT_MAX, "mmce0");
+            snprintf(cand[nCand++], BDM_DEVICE_ROOT_MAX, "mmce1");
+            break;
+        case NEUTRINO_DEV_USB:
+        case NEUTRINO_DEV_MX4SIO:
+        case NEUTRINO_DEV_EXFAT_HDD: {
+            int bt = BDM_TYPE_ATA; // NEUTRINO_DEV_EXFAT_HDD
+            if (gNeutrinoDevice == NEUTRINO_DEV_USB)
+                bt = BDM_TYPE_USB;
+            else if (gNeutrinoDevice == NEUTRINO_DEV_MX4SIO)
+                bt = BDM_TYPE_SDC;
+            char bdmRoot[BDM_DEVICE_ROOT_MAX];
+            if (bdmGetDeviceRootByType(bt, bdmRoot, sizeof(bdmRoot))) {
+                char *colon = strchr(bdmRoot, ':'); // "massN:/" -> bare "massN" token
+                if (colon != NULL)
+                    *colon = '\0';
+                snprintf(cand[nCand++], BDM_DEVICE_ROOT_MAX, "%s", bdmRoot);
+            }
+            break;
+        }
+        case NEUTRINO_DEV_APA_HDD:
+            snprintf(cand[nCand++], BDM_DEVICE_ROOT_MAX, "pfs0"); // the already-mounted OPL data partition
+            break;
+        default: // AUTO -- no explicit device root
+            break;
+    }
+    if (nCand > 0) {
+        static const char *forms[] = {
+            "%s:NEUTRINO/neutrino.elf",
+            "%s:/neutrino/neutrino.elf",
+            "%s:/NEUTRINO/neutrino.elf",
+            "%s:/neutrino/NEUTRINO.ELF",
+            "%s:/NEUTRINO/NEUTRINO.ELF",
+            "%s:NEUTRINO/NEUTRINO.ELF",
+        };
+        static char built[64];
+        for (int c = 0; c < nCand; c++) {
+            for (int i = 0; i < (int)(sizeof(forms) / sizeof(forms[0])); i++) {
+                snprintf(built, sizeof(built), forms[i], cand[c]);
+                if (sbFileExists(built) && sbNeutrinoInstallComplete(built))
+                    return sbNeutrinoResolved(built);
+            }
+        }
+        // The picked device TYPE had no neutrino.elf -- do NOT dead-end here. Fall through to the AUTO
+        // discovery below (legacy custom path -> active game device co-located -> mc0/mc1) so a picker
+        // miss degrades to NHDDL-style cross-device discovery instead of returning NULL (which makes
+        // bdmLaunchGame drop to a native launch that can die to OSDSYS -- issue #51). The chosen device
+        // was tried FIRST above, so an explicit pick is still honoured when it holds the ELF.
+    }
+
+    // Auto: a legacy custom path (settings_riptopl.cfg "neutrino_path") wins when it exists;
+    // otherwise fall back to the mc0:/mc1: auto-detect candidates below. A custom path that names
+    // the elf directly (no dir) is honoured as-is (sbNeutrinoInstallComplete returns 1 for it).
+    if (gNeutrinoPath[0] != '\0' && sbFileExists(gNeutrinoPath) && sbNeutrinoInstallComplete(gNeutrinoPath))
+        return sbNeutrinoResolved(gNeutrinoPath);
+
+    // PR #300: in AUTO, probe the ACTIVE game device for a co-located neutrino.elf BEFORE the mc0/mc1
+    // fallbacks, so a neutrino.elf dropped next to the games (USB/MMCE) just works with zero config.
+    // Δ1 (inside the helper): a stale elf-only folder on the game device must NOT shadow a complete
+    // mc0/mc1 install below (the "worked once then never" failure). Same probe as NEUTRINO_DEV_GAME,
+    // but here a miss falls through to the mc0/mc1 candidates instead of returning NULL.
+    {
+        const char *gameHit = sbNeutrinoProbeGameDevice(activePrefix);
+        if (gameHit != NULL)
+            return gameHit;
+    }
+
+    static const char *candidates[] = {
+        NEUTRINO_PATH,     // mc0:NEUTRINO/neutrino.elf
+        NEUTRINO_ALT_PATH, // mc1:NEUTRINO/neutrino.elf
+        "mc0:/neutrino/neutrino.elf",
+        "mc1:/neutrino/neutrino.elf",
+        "mc0:/neutrino/NEUTRINO.ELF",
+        "mc1:/neutrino/NEUTRINO.ELF",
+        "mc0:NEUTRINO/NEUTRINO.ELF",
+        "mc1:/NEUTRINO/NEUTRINO.ELF",
+    };
+    for (int i = 0; i < (int)(sizeof(candidates) / sizeof(candidates[0])); i++) {
+        if (sbFileExists(candidates[i]) && sbNeutrinoInstallComplete(candidates[i]))
+            return sbNeutrinoResolved(candidates[i]);
+    }
+    LOG("[NEUTRINO] no complete install found (elf without config/system.toml is skipped)\n");
+    return NULL;
+}
+
+void neutrinoArgsParse(const char *in, neutrino_args_t *na)
+{
+    memset(na, 0, sizeof(*na));
+    if (in == NULL)
+        return;
+
+    char buf[256];
+    snprintf(buf, sizeof(buf), "%s", in);
+
+    int breakSeen = 0;
+    char *tok = strtok(buf, " \t");
+    while (tok != NULL) {
+        if (breakSeen || strcmp(tok, "--b") == 0) {
+            breakSeen = 1; // --b and everything after it is for the ELF: keep verbatim, in order
+            naAppend(na->extra, sizeof(na->extra), tok);
+        } else if (strcmp(tok, "-qb") == 0) {
+            na->qb = 1;
+        } else if (strcmp(tok, "-dbc") == 0) {
+            na->dbc = 1;
+        } else if (strcmp(tok, "-logo") == 0) {
+            na->logo = 1;
+        } else if (strncmp(tok, "-cwd=", 5) == 0) {
+            snprintf(na->cwd, sizeof(na->cwd), "%s", tok + 5);
+        } else if (strncmp(tok, "-cfg=", 5) == 0) {
+            snprintf(na->cfg, sizeof(na->cfg), "%s", tok + 5);
+        } else if (strncmp(tok, "-elf=", 5) == 0) {
+            snprintf(na->elf, sizeof(na->elf), "%s", tok + 5);
+        } else if (strncmp(tok, "-ata0id=", 8) == 0) {
+            snprintf(na->ata0id, sizeof(na->ata0id), "%s", tok + 8);
+        } else if (strncmp(tok, "-ata0=", 6) == 0) {
+            snprintf(na->ata0, sizeof(na->ata0), "%s", tok + 6);
+        } else if (strncmp(tok, "-ata1=", 6) == 0) {
+            snprintf(na->ata1, sizeof(na->ata1), "%s", tok + 6);
+        } else {
+            naAppend(na->extra, sizeof(na->extra), tok); // unknown/future flag -> preserved
+        }
+        tok = strtok(NULL, " \t");
+    }
+}
+
+void neutrinoArgsAssemble(const neutrino_args_t *na, char *out, int outSize)
+{
+    if (out == NULL || outSize <= 0)
+        return;
+    out[0] = '\0';
+    if (na->qb)
+        naAppend(out, outSize, "-qb");
+    if (na->dbc)
+        naAppend(out, outSize, "-dbc");
+    if (na->logo)
+        naAppend(out, outSize, "-logo");
+    if (na->cwd[0])
+        naAppendKV(out, outSize, "-cwd=", na->cwd);
+    if (na->cfg[0])
+        naAppendKV(out, outSize, "-cfg=", na->cfg);
+    if (na->elf[0])
+        naAppendKV(out, outSize, "-elf=", na->elf);
+    if (na->ata0[0])
+        naAppendKV(out, outSize, "-ata0=", na->ata0);
+    if (na->ata0id[0])
+        naAppendKV(out, outSize, "-ata0id=", na->ata0id);
+    if (na->ata1[0])
+        naAppendKV(out, outSize, "-ata1=", na->ata1);
+    if (na->extra[0]) // extra (may hold "--b ...") goes LAST so the break + ELF args stay at the tail
+        naAppend(out, outSize, na->extra);
+}
+
+// Resolve the per-game VMC slots ($VMC_0/$VMC_1) into discrete Neutrino "-mcN=<prefix>VMC/<name>.bin"
+// arg strings (issue #47: pass an OPL-configured VMC to Neutrino on launch). vmcPrefix is the device
+// path prefix ending in its separator (e.g. "mass0:/" or "mmce0:/"); the VMC file lives at
+// <vmcPrefix>VMC/<name>.bin -- the same location OPL's own mcemu uses, and the same path scheme as
+// the already-working -dvd arg. Each configured slot becomes its OWN argv entry in sysLaunchNeutrino,
+// so a VMC name containing a space is delivered to Neutrino intact instead of being shredded by the
+// whitespace args tokenizer (the root cause of #47). Unconfigured slots are left empty. Call BEFORE
+// deinit() frees the config/device data; vmcArgs is caller-owned storage that must outlive the launch.
+void sbBuildVmcNeutrinoArgs(config_set_t *configSet, const char *vmcPrefix, neutrino_vmc_args_t *vmcArgs)
+{
+    int slot;
+    char vmcName[32];
+
+    if (vmcArgs == NULL)
+        return;
+    for (slot = 0; slot < NEUTRINO_VMC_SLOTS; slot++)
+        vmcArgs->arg[slot][0] = '\0';
+
+    if (configSet == NULL || vmcPrefix == NULL)
+        return;
+
+    for (slot = 0; slot < NEUTRINO_VMC_SLOTS; slot++) {
+        vmcName[0] = '\0';
+        configGetVMC(configSet, vmcName, sizeof(vmcName), slot);
+        if (vmcName[0] != '\0') {
+            // Per-slot disable (parity-audit #14): the user toggled this slot off without deleting
+            // its card name. Skipping the -mc emission is the whole mechanism -- the empty arg also
+            // drops the slot from vmcSlotMask, so the MMCE gameID card-switch re-arms for it and the
+            // game sees the real card in that slot.
+            int slotDisabled = 0;
+            configGetVMCDisable(configSet, slot, &slotDisabled);
+            if (slotDisabled) {
+                LOG("[NEUTRINO] VMC slot %d (%s) disabled per-game -- launching without it\n", slot, vmcName);
+                continue;
+            }
+            // Δ2 (NHDDL-parity): Neutrino ABORTS the whole boot when a -mcN VMC file can't be opened
+            // post-reset (no "boot without VMC" fallback -- neutrino fhi_config.c) = black screen. Verify
+            // the .bin exists NOW (mounts are still up; this runs pre-deinit) and skip the arg with a
+            // toast instead of handing Neutrino an unopenable path. The game then boots with its real
+            // card rather than dying. NHDDL never hits this class -- it emits no -mc args at all.
+            char binPath[160]; // matches neutrino_vmc_args_t arg sizing: bdmPrefix(96)+"VMC/"+name(31)+".bin"
+            int b = snprintf(binPath, sizeof(binPath), "%sVMC/%s.bin", vmcPrefix, vmcName);
+            if (b >= (int)sizeof(binPath) || !sbFileExists(binPath)) {
+                LOG("[NEUTRINO] VMC slot %d (%s) not found/oversize -- launching without it\n", slot, vmcName);
+                guiWarning(_l(_STR_NEUTRINO_VMC_MISSING), 6);
+                vmcArgs->arg[slot][0] = '\0';
+                continue;
+            }
+            int n = snprintf(vmcArgs->arg[slot], sizeof(vmcArgs->arg[slot]), "-mc%d=%s", slot, binPath);
+            if (n >= (int)sizeof(vmcArgs->arg[slot])) { // "-mc0=" + path overflowed the arg buffer
+                LOG("[NEUTRINO] VMC slot %d arg truncated (%d bytes) -- launching without it\n", slot, n);
+                guiWarning(_l(_STR_NEUTRINO_VMC_MISSING), 6);
+                vmcArgs->arg[slot][0] = '\0';
+            }
+        }
+    }
+}

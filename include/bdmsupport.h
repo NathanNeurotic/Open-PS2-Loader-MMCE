@@ -15,7 +15,8 @@ typedef struct
     vmc_spec_t specs; /* Card specifications */
 } bdm_vmc_infos_t;
 
-#define MAX_BDM_DEVICES 5
+#define MAX_BDM_DEVICES     5
+#define BDM_DEVICE_ROOT_MAX 32
 
 #define BDM_TYPE_UNKNOWN -1
 #define BDM_TYPE_USB     0
@@ -52,5 +53,8 @@ void bdmEnumerateDevices();
 
 void bdmResolveLBA_UDMA(bdm_device_data_t *pDeviceData);
 int bdmHDDIsPresent(u32 timeoutMs);
+
+// First mounted device of a BDM_TYPE_*: writes its massN:/ root; 1 = found.
+int bdmGetDeviceRootByType(int bdmType, char *root, int rootLen);
 
 #endif
