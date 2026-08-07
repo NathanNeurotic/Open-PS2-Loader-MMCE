@@ -31,6 +31,7 @@
 #include "include/hddsupport.h"
 #include "include/appsupport.h"
 #include "include/favsupport.h"
+#include "include/folderbrowse.h" // folderDepth -- favourites suppression inside subfolders
 #include "include/vcdsupport.h" // vcdViewActive stub -- isVcd stays 0 until item 12 lands
 
 #include "include/cheatman.h"
@@ -168,6 +169,9 @@ int gVcdFirstDiscOnly;             // hide discs 2+ of multi-disc PS1 sets
 char gBootDir[256];                // boot directory (cwd) OPL launched from; "" if undeterminable
 int gEnableILK;
 int gEnableBGArt;
+int gEnableArtTar;    // .tar art packs (item 45); no UI until gate D
+int gArtDelay;        // inactivity frames before art loads; safe default until gate D tunes it
+int gEnableFolderNav; // folder browsing in game lists (item 34)
 unsigned char gDefaultPlasBlendColor[3]; // plasma gradient low end; black = historical look
 volatile int gLastSaveErrno = 0;
 int gEnableMX4SIO;
@@ -366,8 +370,10 @@ static void itemExecFav(struct menu_item *curMenu)
 
     submenu_item_t *it = &curMenu->current->item;
 
-    // Folder rows are not favouritable (checklist item 34; isFolder is always 0 until it lands).
-    if (support->mode != FAV_MODE && it->isFolder)
+    // Folder browsing: on a source list a folder row is not favouritable, and a game favourited
+    // from INSIDE a subfolder would resolve by index against the wrong (root) view later --
+    // suppress both. Root favourites are unchanged; the FAV tab's own removals are unaffected.
+    if (support->mode != FAV_MODE && (it->isFolder || folderDepth(support->mode) > 0))
         return;
 
     if (support->mode == FAV_MODE) {
@@ -1086,6 +1092,11 @@ static void _loadConfig()
                 }
             }
             configGetInt(configOPL, CONFIG_OPL_ENABLE_BGART, &gEnableBGArt);
+            configGetInt(configOPL, CONFIG_OPL_ENABLE_ART_TAR, &gEnableArtTar);
+            configGetInt(configOPL, CONFIG_OPL_ART_DELAY, &gArtDelay);
+            if (gArtDelay < 0 || gArtDelay > 60)
+                gArtDelay = 8;
+            configGetInt(configOPL, CONFIG_OPL_FOLDER_NAV, &gEnableFolderNav);
             configGetColor(configOPL, CONFIG_OPL_PLAS_BLEND_COLOR, gDefaultPlasBlendColor);
             configGetInt(configOPL, CONFIG_OPL_COVERFLOW_COUNT, &gCoverflowCount);
             configGetInt(configOPL, CONFIG_OPL_COVERFLOW_SCALE, &gCoverflowCenterScale);
@@ -1292,6 +1303,9 @@ static void _saveConfig()
         configSetInt(configOPL, CONFIG_OPL_NEUTRINO_DEVTYPE, gNeutrinoDevice);
         configSetInt(configOPL, CONFIG_OPL_NEUTRINO_ELF_ARG, gNeutrinoElfArg);
         configSetInt(configOPL, CONFIG_OPL_ENABLE_BGART, gEnableBGArt);
+        configSetInt(configOPL, CONFIG_OPL_ENABLE_ART_TAR, gEnableArtTar);
+        configSetInt(configOPL, CONFIG_OPL_ART_DELAY, gArtDelay);
+        configSetInt(configOPL, CONFIG_OPL_FOLDER_NAV, gEnableFolderNav);
         configSetColor(configOPL, CONFIG_OPL_PLAS_BLEND_COLOR, gDefaultPlasBlendColor);
         configSetInt(configOPL, CONFIG_OPL_COVERFLOW_COUNT, gCoverflowCount);
         configSetInt(configOPL, CONFIG_OPL_COVERFLOW_SCALE, gCoverflowCenterScale);
@@ -1993,6 +2007,9 @@ static void setDefaults(void)
     gVcdFirstDiscOnly = 1;  // hide discs 2+ of multi-disc PS1 sets by default (POPSLoader parity)
     gBootDir[0] = '\0';
     gEnableBGArt = 1; // inert while gEnableArt stays at the official OFF default
+    gEnableArtTar = 0;
+    gArtDelay = 8; // official-like settle (the fork's aggressive 2-frame default is a gate-D decision, item 45)
+    gEnableFolderNav = 0;
     gDefaultPlasBlendColor[0] = 0x00;
     gDefaultPlasBlendColor[1] = 0x00;
     gDefaultPlasBlendColor[2] = 0x00;
