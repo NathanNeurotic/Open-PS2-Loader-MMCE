@@ -451,25 +451,6 @@ void guiShowNetCompatUpdateSingle(int id, item_list_t *support, config_set_t *co
     }
 }
 
-static void guiShowBlockDeviceConfig(void)
-{
-    int ret;
-
-    diaSetInt(diaBlockDevicesConfig, CFG_ENABLEUSB, gEnableUSB);
-    diaSetInt(diaBlockDevicesConfig, CFG_ENABLEILK, gEnableILK);
-    diaSetInt(diaBlockDevicesConfig, CFG_ENABLEMX4SIO, gEnableMX4SIO);
-    diaSetEnabled(diaBlockDevicesConfig, CFG_ENABLEBDMHDD, !gHDDStartMode);
-    diaSetInt(diaBlockDevicesConfig, CFG_ENABLEBDMHDD, gEnableBdmHDD);
-
-    ret = diaExecuteDialog(diaBlockDevicesConfig, -1, 1, NULL);
-    if (ret) {
-        diaGetInt(diaBlockDevicesConfig, CFG_ENABLEUSB, &gEnableUSB);
-        diaGetInt(diaBlockDevicesConfig, CFG_ENABLEILK, &gEnableILK);
-        diaGetInt(diaBlockDevicesConfig, CFG_ENABLEMX4SIO, &gEnableMX4SIO);
-        diaGetInt(diaBlockDevicesConfig, CFG_ENABLEBDMHDD, &gEnableBdmHDD);
-    }
-}
-
 static int guiUpdater(int modified)
 {
     int showAutoStartLast;
@@ -478,9 +459,6 @@ static int guiUpdater(int modified)
         diaGetInt(diaConfig, CFG_LASTPLAYED, &showAutoStartLast);
         diaSetVisible(diaConfig, CFG_LBL_AUTOSTARTLAST, showAutoStartLast);
         diaSetVisible(diaConfig, CFG_AUTOSTARTLAST, showAutoStartLast);
-
-        diaGetInt(diaConfig, CFG_BDMMODE, &gBDMStartMode);
-        diaSetVisible(diaConfig, BLOCKDEVICE_BUTTON, gBDMStartMode);
     }
     return 0;
 }
@@ -494,95 +472,119 @@ int guiDeviceTypeToIoMode(int deviceType)
         return ETH_MODE;
     else if (deviceType == 2)
         return HDD_MODE;
-    else
+    else if (deviceType == 3)
         return APP_MODE;
+    else if (deviceType == 4)
+        return MMCE_MODE;
+    else if (deviceType == 5)
+        return FAV_MODE;
+    else
+        return APP_MODE; // safe fallback for unexpected indices: Apps is always present, FAV may be disabled
 }
 
 int guiIoModeToDeviceType(int ioMode)
 {
-    switch (ioMode) {
-        case BDM_MODE:
-        case BDM_MODE1:
-        case BDM_MODE2:
-        case BDM_MODE3:
-        case BDM_MODE4:
-            return 0;
-        case ETH_MODE:
-            return 1;
-        case HDD_MODE:
-            return 2;
-        case APP_MODE:
-            return 3;
-        default:
-            return 0;
-    }
+    if (ioMode >= BDM_MODE && ioMode < ETH_MODE)
+        return 0;
+    if (ioMode == ETH_MODE)
+        return 1;
+    if (ioMode == HDD_MODE)
+        return 2;
+    if (ioMode == APP_MODE)
+        return 3;
+    if (ioMode == MMCE_MODE)
+        return 4;
+    if (ioMode == FAV_MODE)
+        return 5;
+
+    return 0;
 }
 
+// Settings page (settings-layout restructure): the slim "Settings" category -- remember/auto-start
+// last played and Exit To. Everything else moved to the Game Sources, Display, Game Launching,
+// Security, Controller, Audio, Advanced and Tools pages.
 void guiShowConfig()
 {
-    // configure the enumerations
-    const char *deviceNames[] = {_l(_STR_BDM_GAMES), _l(_STR_NET_GAMES), _l(_STR_HDD_GAMES), _l(_STR_APPS), NULL};
-    const char *deviceModes[] = {_l(_STR_OFF), _l(_STR_MANUAL), _l(_STR_AUTO), NULL};
-
-    diaSetEnum(diaConfig, CFG_DEFDEVICE, deviceNames);
-    diaSetEnum(diaConfig, CFG_BDMMODE, deviceModes);
-    diaSetEnum(diaConfig, CFG_HDDMODE, deviceModes);
-    diaSetEnum(diaConfig, CFG_ETHMODE, deviceModes);
-    diaSetEnum(diaConfig, CFG_APPMODE, deviceModes);
-    diaSetEnum(diaConfig, CFG_FAVMODE, deviceModes);
-
-    diaSetInt(diaConfig, CFG_BDMCACHE, bdmCacheSize);
-    diaSetInt(diaConfig, CFG_HDDCACHE, hddCacheSize);
-    diaSetInt(diaConfig, CFG_SMBCACHE, smbCacheSize);
-
-    diaSetInt(diaConfig, CFG_DEBUG, gEnableDebug);
-    diaSetInt(diaConfig, CFG_PS2LOGO, gPS2Logo);
-    diaSetInt(diaConfig, CFG_HDDGAMELISTCACHE, gHDDGameListCache);
+    // Exit To auto-resolves a built-in default when blank, so show a dim "Default" placeholder
+    // rather than "<not set>" -- the empty value (and thus the fallback) is kept.
+    diaSetShowDefaultWhenEmpty(diaConfig, CFG_EXITTO, 1);
     diaSetString(diaConfig, CFG_EXITTO, gExitPath);
-    diaSetInt(diaConfig, CFG_ENWRITEOP, gEnableWrite);
-    diaSetInt(diaConfig, CFG_HDDSPINDOWN, gHDDSpindown);
-    diaSetString(diaConfig, CFG_BDMPREFIX, gBDMPrefix);
-    diaSetString(diaConfig, CFG_ETHPREFIX, gETHPrefix);
+
     diaSetInt(diaConfig, CFG_LASTPLAYED, gRememberLastPlayed);
+    // NOTE(rebuild): folder browsing returns with checklist item 34 -- hide its row until then.
+    diaSetVisible(diaConfig, CFG_FOLDERNAV, 0);
     diaSetInt(diaConfig, CFG_AUTOSTARTLAST, gAutoStartLastPlayed);
     diaSetVisible(diaConfig, CFG_AUTOSTARTLAST, gRememberLastPlayed);
     diaSetVisible(diaConfig, CFG_LBL_AUTOSTARTLAST, gRememberLastPlayed);
 
-    int deviceModeIndex = guiIoModeToDeviceType(gDefaultDevice);
-    diaSetInt(diaConfig, CFG_DEFDEVICE, deviceModeIndex);
-    diaSetInt(diaConfig, CFG_BDMMODE, gBDMStartMode);
-    diaSetVisible(diaConfig, BLOCKDEVICE_BUTTON, gBDMStartMode);
-    diaSetEnabled(diaConfig, CFG_HDDMODE, !gEnableBdmHDD);
-    diaSetInt(diaConfig, CFG_HDDMODE, gHDDStartMode);
-    diaSetInt(diaConfig, CFG_ETHMODE, gETHStartMode);
-    diaSetInt(diaConfig, CFG_APPMODE, gAPPStartMode);
-    diaSetInt(diaConfig, CFG_FAVMODE, gFAVStartMode);
-
     int ret = diaExecuteDialog(diaConfig, -1, 1, &guiUpdater);
     if (ret) {
-        diaGetInt(diaConfig, CFG_DEBUG, &gEnableDebug);
-        diaGetInt(diaConfig, CFG_PS2LOGO, &gPS2Logo);
-        diaGetInt(diaConfig, CFG_HDDGAMELISTCACHE, &gHDDGameListCache);
         diaGetString(diaConfig, CFG_EXITTO, gExitPath, sizeof(gExitPath));
-        diaGetInt(diaConfig, CFG_ENWRITEOP, &gEnableWrite);
-        diaGetInt(diaConfig, CFG_HDDSPINDOWN, &gHDDSpindown);
-        diaGetString(diaConfig, CFG_BDMPREFIX, gBDMPrefix, sizeof(gBDMPrefix));
-        diaGetString(diaConfig, CFG_ETHPREFIX, gETHPrefix, sizeof(gETHPrefix));
         diaGetInt(diaConfig, CFG_LASTPLAYED, &gRememberLastPlayed);
         diaGetInt(diaConfig, CFG_AUTOSTARTLAST, &gAutoStartLastPlayed);
-        DisableCron = 1; // Disable Auto Start Last Played counter (we don't want to call it right after enable it on GUI)
-        diaGetInt(diaConfig, CFG_DEFDEVICE, &deviceModeIndex);
-        gDefaultDevice = guiDeviceTypeToIoMode(deviceModeIndex);
-        diaGetInt(diaConfig, CFG_HDDMODE, &gHDDStartMode);
-        diaGetInt(diaConfig, CFG_ETHMODE, &gETHStartMode);
-        diaGetInt(diaConfig, CFG_APPMODE, &gAPPStartMode);
-        diaGetInt(diaConfig, CFG_FAVMODE, &gFAVStartMode);
-        diaGetInt(diaConfig, CFG_BDMCACHE, &bdmCacheSize);
-        diaGetInt(diaConfig, CFG_HDDCACHE, &hddCacheSize);
-        diaGetInt(diaConfig, CFG_SMBCACHE, &smbCacheSize);
 
-        if (ret == BLOCKDEVICE_BUTTON)
-            guiShowBlockDeviceConfig();
+        DisableCron = 1; // Disable Auto Start Last Played counter (we don't want to call it right after enable it on GUI)
+
+        applyConfig(-1, -1, 0);
+        menuReinitMainMenu();
+    }
+}
+
+// Game Sources page: device start modes, the default device, and the block-device enables
+// (inlined; the separate Block Devices sub-dialog is gone).
+void guiShowDeviceConfig(void)
+{
+    const char *deviceNames[] = {_l(_STR_BDM_GAMES), _l(_STR_NET_GAMES), _l(_STR_HDD_GAMES), _l(_STR_APPS), _l(_STR_MMCE), _l(_STR_FAV), NULL};
+    const char *deviceModes[] = {_l(_STR_OFF), _l(_STR_MANUAL), _l(_STR_AUTO), NULL};
+
+    // Devices & modes
+    diaSetEnum(diaDeviceConfig, CFG_DEFDEVICE, deviceNames);
+    diaSetEnum(diaDeviceConfig, CFG_BDMMODE, deviceModes);
+    diaSetEnum(diaDeviceConfig, CFG_HDDMODE, deviceModes);
+    diaSetEnum(diaDeviceConfig, CFG_APPMODE, deviceModes);
+    diaSetEnum(diaDeviceConfig, CFG_FAVMODE, deviceModes);
+
+    int deviceModeIndex = guiIoModeToDeviceType(gDefaultDevice);
+    diaSetInt(diaDeviceConfig, CFG_DEFDEVICE, deviceModeIndex);
+    diaSetInt(diaDeviceConfig, CFG_BDMMODE, gBDMStartMode);
+    diaSetInt(diaDeviceConfig, CFG_HDDMODE, gHDDStartMode);
+    diaSetInt(diaDeviceConfig, CFG_APPMODE, gAPPStartMode);
+    diaSetInt(diaDeviceConfig, CFG_FAVMODE, gFAVStartMode);
+
+    // Block devices (inlined; interlocked with the APA HDD mode)
+    diaSetInt(diaDeviceConfig, CFG_ENABLEUSB, gEnableUSB);
+    diaSetInt(diaDeviceConfig, CFG_ENABLEILK, gEnableILK);
+    diaSetInt(diaDeviceConfig, CFG_ENABLEMX4SIO, gEnableMX4SIO);
+    diaSetInt(diaDeviceConfig, CFG_ENABLEBDMHDD, gEnableBdmHDD);
+    diaSetEnabled(diaDeviceConfig, CFG_ENABLEBDMHDD, 1); // coexists with APA
+    diaSetEnabled(diaDeviceConfig, CFG_HDDMODE, 1);
+
+    // Network Start Mode (Off/Manual/Auto). NOTE(rebuild): with SMB the only network transport
+    // until checklist items 5/6/7 land, this row IS the SMB/ETH start mode -- the mapping is
+    // exact, not an approximation. The protocol picker joins it on the Network page later.
+    diaSetEnum(diaDeviceConfig, CFG_NETSTART, deviceModes);
+    diaSetInt(diaDeviceConfig, CFG_NETSTART, gETHStartMode);
+
+    // NOTE(rebuild): MMCE returns with checklist item 1 -- show its row greyed at Off until then.
+    diaSetEnum(diaDeviceConfig, CFG_MMCEMODE, deviceModes);
+    diaSetInt(diaDeviceConfig, CFG_MMCEMODE, START_MODE_DISABLED);
+    diaSetEnabled(diaDeviceConfig, CFG_MMCEMODE, 0);
+
+    int ret = diaExecuteDialog(diaDeviceConfig, -1, 1, NULL);
+    if (ret) {
+        diaGetInt(diaDeviceConfig, CFG_DEFDEVICE, &deviceModeIndex);
+        gDefaultDevice = guiDeviceTypeToIoMode(deviceModeIndex);
+        diaGetInt(diaDeviceConfig, CFG_BDMMODE, &gBDMStartMode);
+        diaGetInt(diaDeviceConfig, CFG_HDDMODE, &gHDDStartMode);
+        diaGetInt(diaDeviceConfig, CFG_APPMODE, &gAPPStartMode);
+        diaGetInt(diaDeviceConfig, CFG_FAVMODE, &gFAVStartMode);
+
+        diaGetInt(diaDeviceConfig, CFG_ENABLEUSB, &gEnableUSB);
+        diaGetInt(diaDeviceConfig, CFG_ENABLEILK, &gEnableILK);
+        diaGetInt(diaDeviceConfig, CFG_ENABLEMX4SIO, &gEnableMX4SIO);
+        diaGetInt(diaDeviceConfig, CFG_ENABLEBDMHDD, &gEnableBdmHDD);
+
+        diaGetInt(diaDeviceConfig, CFG_NETSTART, &gETHStartMode);
 
         applyConfig(-1, -1, 0);
         menuReinitMainMenu();
@@ -591,142 +593,119 @@ void guiShowConfig()
 
 static int curTheme = -1;
 
-static int guiUIUpdater(int modified)
+
+// Deep-copy a NULL-terminated name list for handing to diaSetEnum. The CALLER must hold guiLock
+// across BOTH the getter fetch (thmGetGuiList/lngGetGuiList) and this copy: the source lists live
+// on the heap and are freed+rebuilt under guiLock on the IO worker (thmRebuildGuiNames/
+// lngRebuildLangNames; thmReinit also frees the theme NAME strings on device removal), and taking
+// the lock only inside this function left a preemption window between fetching the pointer and
+// locking (Gemini review of #165). Returns NULL on OOM (caller falls back to the live list).
+static const char **guiCopyNameList(const char **src)
 {
-    if (modified) {
-        int temp, x, y;
-        diaGetInt(diaUIConfig, UICFG_THEME, &temp);
-        if (temp != curTheme) {
-            curTheme = temp;
-            if (temp == 0) {
-                // Display the default theme's colours.
-                diaSetItemType(diaUIConfig, UICFG_BGCOL, UI_COLOUR); // Must be correctly set before doing the diaS/GetColor !!
-                diaSetItemType(diaUIConfig, UICFG_UICOL, UI_COLOUR);
-                diaSetItemType(diaUIConfig, UICFG_TXTCOL, UI_COLOUR);
-                diaSetItemType(diaUIConfig, UICFG_SELCOL, UI_COLOUR);
-                diaSetColor(diaUIConfig, UICFG_BGCOL, gDefaultBgColor);
-                diaSetColor(diaUIConfig, UICFG_UICOL, gDefaultUITextColor);
-                diaSetColor(diaUIConfig, UICFG_TXTCOL, gDefaultTextColor);
-                diaSetColor(diaUIConfig, UICFG_SELCOL, gDefaultSelTextColor);
-            } else if (temp == thmGetGuiValue()) {
-                // Display the current theme's colours.
-                diaSetItemType(diaUIConfig, UICFG_BGCOL, UI_COLOUR);
-                diaSetItemType(diaUIConfig, UICFG_UICOL, UI_COLOUR);
-                diaSetItemType(diaUIConfig, UICFG_TXTCOL, UI_COLOUR);
-                diaSetItemType(diaUIConfig, UICFG_SELCOL, UI_COLOUR);
-                diaSetColor(diaUIConfig, UICFG_BGCOL, gTheme->bgColor);
-                diaSetU64Color(diaUIConfig, UICFG_UICOL, gTheme->uiTextColor);
-                diaSetU64Color(diaUIConfig, UICFG_TXTCOL, gTheme->textColor);
-                diaSetU64Color(diaUIConfig, UICFG_SELCOL, gTheme->selTextColor);
-            } else {
-                // When another theme is highlighted in the list, its colours are not known. Don't show any colours.
-                diaSetItemType(diaUIConfig, UICFG_BGCOL, UI_SPACER);
-                diaSetItemType(diaUIConfig, UICFG_UICOL, UI_SPACER);
-                diaSetItemType(diaUIConfig, UICFG_TXTCOL, UI_SPACER);
-                diaSetItemType(diaUIConfig, UICFG_SELCOL, UI_SPACER);
+    int n = 0, i;
+    const char **copy;
+
+    if (src == NULL)
+        return NULL;
+
+    while (src[n] != NULL)
+        n++;
+    copy = (const char **)malloc((n + 1) * sizeof(char *));
+    if (copy != NULL) {
+        for (i = 0; i < n; i++) {
+            char *dup = (char *)malloc(strlen(src[i]) + 1);
+            if (dup == NULL) {
+                while (--i >= 0)
+                    free((void *)copy[i]);
+                free((void *)copy);
+                copy = NULL;
+                break;
             }
-
-            // The user cannot adjust the current theme's colours.
-            temp = !temp;
-            diaSetEnabled(diaUIConfig, UICFG_BGCOL, temp);
-            diaSetEnabled(diaUIConfig, UICFG_UICOL, temp);
-            diaSetEnabled(diaUIConfig, UICFG_TXTCOL, temp);
-            diaSetEnabled(diaUIConfig, UICFG_SELCOL, temp);
-            diaSetEnabled(diaUIConfig, UICFG_RESETCOL, temp);
+            strcpy(dup, src[i]);
+            copy[i] = dup;
         }
-
-        diaGetInt(diaUIConfig, UICFG_XOFF, &x);
-        diaGetInt(diaUIConfig, UICFG_YOFF, &y);
-        if ((x != gXOff) || (y != gYOff)) {
-            gXOff = x;
-            gYOff = y;
-            rmSetDisplayOffset(x, y);
-        }
-        diaGetInt(diaUIConfig, UICFG_OVERSCAN, &temp);
-        if (temp != gOverscan) {
-            gOverscan = temp;
-            rmSetOverscan(gOverscan);
-            guiUpdateScreenScale();
-        }
-        diaGetInt(diaUIConfig, UICFG_WIDESCREEN, &temp);
-        if (temp != gWideScreen) {
-            gWideScreen = temp;
-            rmSetAspectRatio((gWideScreen == 0) ? RM_ARATIO_4_3 : RM_ARATIO_16_9);
-            guiUpdateScreenScale();
-        }
+        if (copy != NULL)
+            copy[n] = NULL;
     }
+    return copy;
+}
 
-    return 0;
+static void guiFreeNameList(const char **list)
+{
+    int i;
+
+    if (list == NULL)
+        return;
+    for (i = 0; list[i] != NULL; i++)
+        free((void *)list[i]);
+    free((void *)list);
 }
 
 void guiShowUIConfig(void)
 {
     int themeID = -1, langID = -1;
-    curTheme = -1;
     showCfgPopup = 0;
     guiResetNotifications();
 
-    // clang-format off
-    const char *vmodeNames[] = {_l(_STR_AUTO)
-        , "PAL 640x512i @50Hz 24bit"
-        , "NTSC 640x448i @60Hz 24bit"
-        , "EDTV 640x448p @60Hz 24bit"
-        , "EDTV 640x512p @50Hz 24bit"
-        , "VGA 640x480p @60Hz 24bit"
-        , "PAL 704x576i @50Hz 24bit (HIRES)"
-        , "NTSC 704x480i @60Hz 24bit (HIRES)"
-        , "EDTV 704x480p @60Hz 24bit (HIRES)"
-        , "EDTV 704x576p @50Hz 24bit (HIRES)"
-        , "HDTV 1280x720p @60Hz 16bit (HIRES)"
-        , "HDTV 1920x1080i @60Hz 16bit (HIRES)"
-        , "PAL 640x256p @50Hz 24bit"
-        , "NTSC 640x224p @60Hz 24bit"
-        , NULL};
-    // clang-format on
-    int previousVMode;
+    const char **themeNamesSnap = NULL;
+    const char **langNamesSnap = NULL;
+
     int previousTheme;
 
-reselect_video_mode:
-    previousVMode = gVMode;
+reshow_ui:
     previousTheme = thmGetGuiValue();
-    diaSetEnum(diaUIConfig, UICFG_THEME, (const char **)thmGetGuiList());
-    diaSetEnum(diaUIConfig, UICFG_LANG, (const char **)lngGetGuiList());
-    diaSetEnum(diaUIConfig, UICFG_VMODE, vmodeNames);
+    // Snapshot the theme/language name lists into dialog-owned copies: diaSetEnum stores raw
+    // pointers, and BOTH the outer arrays (thmRebuildGuiNames/lngRebuildLangNames free+realloc)
+    // AND the theme name strings (thmReinit frees them on device removal) are rebuilt on the IO
+    // worker when a deferred device update lands. Dialog frames render OUTSIDE guiStartFrame's
+    // lock, so a device event draining mid-dialog dereferenced freed memory. Re-snapshot on every
+    // reshow pass (applyConfig below can legitimately change the lists); on OOM fall back to
+    // the live list -- the pre-existing narrow race, not a new failure mode.
+    guiFreeNameList(themeNamesSnap);
+    guiFreeNameList(langNamesSnap);
+    guiLock(); // must cover the getter FETCH too, not just the copy (Gemini review of #165)
+    themeNamesSnap = guiCopyNameList((const char **)thmGetGuiList());
+    langNamesSnap = guiCopyNameList((const char **)lngGetGuiList());
+    guiUnlock();
+    diaSetEnum(diaUIConfig, UICFG_THEME, themeNamesSnap != NULL ? themeNamesSnap : (const char **)thmGetGuiList());
+    diaSetEnum(diaUIConfig, UICFG_LANG, langNamesSnap != NULL ? langNamesSnap : (const char **)lngGetGuiList());
     diaSetInt(diaUIConfig, UICFG_THEME, thmGetGuiValue());
     diaSetInt(diaUIConfig, UICFG_LANG, lngGetGuiValue());
     diaSetInt(diaUIConfig, UICFG_AUTOSORT, gAutosort);
     diaSetInt(diaUIConfig, UICFG_AUTOREFRESH, gAutoRefresh);
     diaSetInt(diaUIConfig, UICFG_NOTIFICATIONS, gEnableNotifications);
-    diaSetInt(diaUIConfig, UICFG_COVERART, gEnableArt);
-    diaSetInt(diaUIConfig, UICFG_WIDESCREEN, gWideScreen);
-    diaSetInt(diaUIConfig, UICFG_VMODE, gVMode);
-    diaSetInt(diaUIConfig, UICFG_XOFF, gXOff);
-    diaSetInt(diaUIConfig, UICFG_YOFF, gYOff);
-    diaSetInt(diaUIConfig, UICFG_OVERSCAN, gOverscan);
-    guiUIUpdater(1);
+    diaSetVisible(diaUIConfig, UICFG_COVERFLOW_BUTTON, gTheme->coverflow != NULL);
+    const char *gameViewNames[] = {"Both", "ISO", "VCD", NULL};
+    diaSetEnum(diaUIConfig, UICFG_GAMEVIEW, gameViewNames);
 
-    int ret = diaExecuteDialog(diaUIConfig, -1, 1, guiUIUpdater);
+    int ret = diaExecuteDialog(diaUIConfig, -1, 1, NULL);
+
+    if (ret == UICFG_ARTWORK_BUTTON) {
+        guiShowArtworkConfig();
+        goto reshow_ui;
+    }
+    if (ret == UICFG_COVERFLOW_BUTTON) {
+        guiShowCoverflowConfig();
+        goto reshow_ui;
+    }
+    if (ret == UICFG_COLORS_BUTTON) {
+        guiShowColorsConfig();
+        goto reshow_ui;
+    }
+
+    // Play out the confirm bump the dialog just armed, before applyConfig() below tears down and
+    // rebuilds the GS (rmSetMode), reloads the theme and its textures, and holds guiLock over a
+    // submenu-cache rebuild -- none of which polls readPads(), so the pulse would run for all of it
+    // (#172, "really intense ... after changing the resolution"). Deliberately HERE and not at the top
+    // of applyConfig(): applyConfig is ALSO reached off the GUI thread, from _loadConfig() on the IO
+    // worker (opl.c: guiHandleDeferedIO with IO_CUSTOM_SIMPLEACTION), and every libpad call in pad.c
+
     if (ret) {
         diaGetInt(diaUIConfig, UICFG_LANG, &langID);
         diaGetInt(diaUIConfig, UICFG_THEME, &themeID);
-        if (themeID == 0) {
-            diaGetColor(diaUIConfig, UICFG_BGCOL, gDefaultBgColor);
-            diaGetColor(diaUIConfig, UICFG_UICOL, gDefaultUITextColor);
-            diaGetColor(diaUIConfig, UICFG_TXTCOL, gDefaultTextColor);
-            diaGetColor(diaUIConfig, UICFG_SELCOL, gDefaultSelTextColor);
-        }
         diaGetInt(diaUIConfig, UICFG_AUTOSORT, &gAutosort);
         diaGetInt(diaUIConfig, UICFG_AUTOREFRESH, &gAutoRefresh);
         diaGetInt(diaUIConfig, UICFG_NOTIFICATIONS, &gEnableNotifications);
-        diaGetInt(diaUIConfig, UICFG_COVERART, &gEnableArt);
-        diaGetInt(diaUIConfig, UICFG_WIDESCREEN, &gWideScreen);
-        diaGetInt(diaUIConfig, UICFG_VMODE, &gVMode);
-        diaGetInt(diaUIConfig, UICFG_XOFF, &gXOff);
-        diaGetInt(diaUIConfig, UICFG_YOFF, &gYOff);
-        diaGetInt(diaUIConfig, UICFG_OVERSCAN, &gOverscan);
-
-        if (ret == UICFG_RESETCOL)
-            setDefaultColors();
 
         if (previousTheme != themeID && isBgmPlaying())
             bgmStop();
@@ -738,14 +717,8 @@ reselect_video_mode:
             bgmStart();
     }
 
-    if (previousVMode != gVMode) {
-        if (guiConfirmVideoMode() == 0) {
-            // Restore previous video mode, without changing the theme & language settings.
-            gVMode = previousVMode;
-            applyConfig(themeID, langID, 1);
-            goto reselect_video_mode;
-        }
-    }
+    guiFreeNameList(themeNamesSnap);
+    guiFreeNameList(langNamesSnap);
 }
 
 static int netConfigUpdater(int modified)
@@ -894,6 +867,324 @@ void guiShowParentalLockConfig(void)
     }
 }
 
+void guiShowLaunchConfig(void)
+{
+    // Global default Loader Core: the core a game uses when its per-game selector is "Default".
+    // <OPL> = OPL's native ee-core; Neutrino = the external neutrino.elf. Indices 0/1 match the
+    // stored value (0=<OPL>, 1=Neutrino) and the first two per-game COMPAT_LOADER options.
+    const char *defaultCoreStrs[] = {"<OPL>", "Neutrino", NULL};
+    diaSetEnum(diaLaunchConfig, CFG_DEFAULT_CORE, defaultCoreStrs);
+    // NOTE(rebuild): the Neutrino core (checklist items 21/23) returns in step 07 -- until then
+    // the Default Core row is locked to <OPL> and the Neutrino Defaults sub-page is hidden.
+    diaSetInt(diaLaunchConfig, CFG_DEFAULT_CORE, 0);
+    diaSetEnabled(diaLaunchConfig, CFG_DEFAULT_CORE, 0);
+    diaSetVisible(diaLaunchConfig, LAUNCH_NEUTRINO_DEFAULTS_BUTTON, 0);
+    diaSetInt(diaLaunchConfig, CFG_PS2LOGO, gPS2Logo);
+
+    int ret;
+reshow_launch:
+    ret = diaExecuteDialog(diaLaunchConfig, -1, 1, NULL);
+    if (ret == LAUNCH_OSD_DEFAULTS_BUTTON) {
+        guiGameShowOSDLanguageConfig(1);
+        goto reshow_launch;
+    }
+    if (ret) {
+        diaGetInt(diaLaunchConfig, CFG_PS2LOGO, &gPS2Logo);
+
+        applyConfig(-1, -1, 0);
+        menuReinitMainMenu();
+    }
+}
+
+void guiShowSecurityConfig(void)
+{
+    diaSetInt(diaSecurityConfig, CFG_ENWRITEOP, gEnableWrite);
+
+    int ret;
+reshow_security:
+    ret = diaExecuteDialog(diaSecurityConfig, -1, 1, NULL);
+    if (ret == SECURITY_PARENTAL_BUTTON) {
+        guiShowParentalLockConfig();
+        goto reshow_security;
+    }
+    if (ret) {
+        diaGetInt(diaSecurityConfig, CFG_ENWRITEOP, &gEnableWrite);
+
+        applyConfig(-1, -1, 0);
+        menuReinitMainMenu();
+    }
+}
+
+void guiShowAdvancedConfig(void)
+{
+    diaSetInt(diaAdvancedConfig, CFG_DEBUG, gEnableDebug);
+
+    int ret;
+reshow_advanced:
+    ret = diaExecuteDialog(diaAdvancedConfig, -1, 1, NULL);
+    if (ret == ADV_PREFIX_BUTTON) {
+        guiShowPathPrefixConfig();
+        goto reshow_advanced;
+    }
+    if (ret == ADV_STORAGE_BUTTON) {
+        guiShowStorageConfig();
+        goto reshow_advanced;
+    }
+    if (ret) {
+        diaGetInt(diaAdvancedConfig, CFG_DEBUG, &gEnableDebug);
+
+        applyConfig(-1, -1, 0);
+        menuReinitMainMenu();
+    }
+}
+
+void guiShowPathPrefixConfig(void)
+{
+    diaSetString(diaPathPrefixConfig, CFG_BDMPREFIX, gBDMPrefix);
+    diaSetString(diaPathPrefixConfig, CFG_ETHPREFIX, gETHPrefix);
+
+    int ret = diaExecuteDialog(diaPathPrefixConfig, -1, 1, NULL);
+    if (ret) {
+        diaGetString(diaPathPrefixConfig, CFG_BDMPREFIX, gBDMPrefix, sizeof(gBDMPrefix));
+        diaGetString(diaPathPrefixConfig, CFG_ETHPREFIX, gETHPrefix, sizeof(gETHPrefix));
+
+        applyConfig(-1, -1, 0);
+    }
+}
+
+void guiShowStorageConfig(void)
+{
+    diaSetInt(diaStorageConfig, CFG_HDDSPINDOWN, gHDDSpindown);
+    diaSetInt(diaStorageConfig, CFG_HDDGAMELISTCACHE, gHDDGameListCache);
+    diaSetInt(diaStorageConfig, CFG_BDMCACHE, bdmCacheSize);
+    diaSetInt(diaStorageConfig, CFG_HDDCACHE, hddCacheSize);
+    diaSetInt(diaStorageConfig, CFG_SMBCACHE, smbCacheSize);
+
+    int ret = diaExecuteDialog(diaStorageConfig, -1, 1, NULL);
+    if (ret) {
+        diaGetInt(diaStorageConfig, CFG_HDDSPINDOWN, &gHDDSpindown);
+        diaGetInt(diaStorageConfig, CFG_HDDGAMELISTCACHE, &gHDDGameListCache);
+        diaGetInt(diaStorageConfig, CFG_BDMCACHE, &bdmCacheSize);
+        diaGetInt(diaStorageConfig, CFG_HDDCACHE, &hddCacheSize);
+        diaGetInt(diaStorageConfig, CFG_SMBCACHE, &smbCacheSize);
+
+        applyConfig(-1, -1, 0);
+    }
+}
+
+void guiShowToolsConfig(void)
+{
+    int ret;
+reshow_tools:
+    ret = diaExecuteDialog(diaToolsConfig, -1, 1, NULL);
+    if (ret == TOOLS_NET_UPDATE_BUTTON) {
+        guiShowNetCompatUpdate();
+        goto reshow_tools;
+    }
+    if (ret == TOOLS_NBD_BUTTON) {
+        handleLwnbdSrv();
+        goto reshow_tools;
+    }
+}
+
+void guiShowArtworkConfig(void)
+{
+    diaSetInt(diaArtworkConfig, UICFG_COVERART, gEnableArt);
+    diaSetInt(diaArtworkConfig, UICFG_ENABLE_BGART, gEnableBGArt);
+    // NOTE(rebuild): the Art Delay knob returns with checklist item 45 -- hide its row.
+    diaSetVisible(diaArtworkConfig, UICFG_ART_DELAY, 0);
+    diaSetVisible(diaArtworkConfig, UICFG_ENABLE_ART_TAR, 0); // .tar art packs return with item 45
+
+    int ret = diaExecuteDialog(diaArtworkConfig, -1, 1, NULL);
+    if (ret) {
+        diaGetInt(diaArtworkConfig, UICFG_COVERART, &gEnableArt);
+        diaGetInt(diaArtworkConfig, UICFG_ENABLE_BGART, &gEnableBGArt);
+
+        applyConfig(-1, -1, 1);
+    }
+}
+
+void guiShowColorsConfig(void)
+{
+    int themeID = thmGetGuiValue();
+    int editable = (themeID == 0 || themeID == thmFindGuiID("<Coverflow>"));
+
+    if (editable) {
+        // Display the default theme's colours.
+        diaSetColor(diaColorsConfig, UICFG_BGCOL, gDefaultBgColor);
+        diaSetColor(diaColorsConfig, UICFG_UICOL, gDefaultUITextColor);
+        diaSetColor(diaColorsConfig, UICFG_TXTCOL, gDefaultTextColor);
+        diaSetColor(diaColorsConfig, UICFG_SELCOL, gDefaultSelTextColor);
+        diaSetColor(diaColorsConfig, UICFG_PLASCOL, gDefaultPlasBlendColor);
+    } else {
+        // Display the current theme's colours (read-only).
+        diaSetColor(diaColorsConfig, UICFG_BGCOL, gTheme->bgColor);
+        diaSetColor(diaColorsConfig, UICFG_PLASCOL, gTheme->plasBlendColor); // raw uchar[3] like bgColor -- NOT the U64 form
+        diaSetU64Color(diaColorsConfig, UICFG_UICOL, gTheme->uiTextColor);
+        diaSetU64Color(diaColorsConfig, UICFG_TXTCOL, gTheme->textColor);
+        diaSetU64Color(diaColorsConfig, UICFG_SELCOL, gTheme->selTextColor);
+    }
+    diaSetEnabled(diaColorsConfig, UICFG_BGCOL, editable);
+    diaSetEnabled(diaColorsConfig, UICFG_UICOL, editable);
+    diaSetEnabled(diaColorsConfig, UICFG_TXTCOL, editable);
+    diaSetEnabled(diaColorsConfig, UICFG_SELCOL, editable);
+    diaSetEnabled(diaColorsConfig, UICFG_PLASCOL, editable);
+    diaSetEnabled(diaColorsConfig, UICFG_RESETCOL, editable);
+
+    int ret = diaExecuteDialog(diaColorsConfig, -1, 1, NULL);
+    if (ret) {
+        if (editable) {
+            diaGetColor(diaColorsConfig, UICFG_BGCOL, gDefaultBgColor);
+            diaGetColor(diaColorsConfig, UICFG_UICOL, gDefaultUITextColor);
+            diaGetColor(diaColorsConfig, UICFG_TXTCOL, gDefaultTextColor);
+            diaGetColor(diaColorsConfig, UICFG_SELCOL, gDefaultSelTextColor);
+            diaGetColor(diaColorsConfig, UICFG_PLASCOL, gDefaultPlasBlendColor);
+        }
+        if (ret == UICFG_RESETCOL)
+            setDefaultColors();
+
+        applyConfig(themeID, -1, 1);
+    }
+}
+
+// Display page live-updater: the geometry/aspect rows apply live so the user sees the change as
+// they adjust it (moved out of the old guiUIUpdater).
+static int guiDisplayUpdater(int modified)
+{
+    if (modified) {
+        int temp, x, y;
+        diaGetInt(diaDisplayConfig, UICFG_XOFF, &x);
+        diaGetInt(diaDisplayConfig, UICFG_YOFF, &y);
+        if ((x != gXOff) || (y != gYOff)) {
+            gXOff = x;
+            gYOff = y;
+            rmSetDisplayOffset(x, y);
+        }
+        diaGetInt(diaDisplayConfig, UICFG_OVERSCAN, &temp);
+        if (temp != gOverscan) {
+            gOverscan = temp;
+            rmSetOverscan(gOverscan);
+            guiUpdateScreenScale();
+        }
+        diaGetInt(diaDisplayConfig, UICFG_WIDESCREEN, &temp);
+        if (temp != gWideScreen) {
+            gWideScreen = temp;
+            rmSetAspectRatio((gWideScreen == 0) ? RM_ARATIO_4_3 : RM_ARATIO_16_9);
+            guiUpdateScreenScale();
+        }
+    }
+
+    return 0;
+}
+void guiShowDisplayConfig(void)
+{
+    // clang-format off
+    const char *vmodeNames[] = {_l(_STR_AUTO)
+        , "PAL 640x512i @50Hz 24bit"
+        , "NTSC 640x448i @60Hz 24bit"
+        , "EDTV 640x448p @60Hz 24bit"
+        , "EDTV 640x512p @50Hz 24bit"
+        , "VGA 640x480p @60Hz 24bit"
+        , "PAL 704x576i @50Hz 24bit (HIRES)"
+        , "NTSC 704x480i @60Hz 24bit (HIRES)"
+        , "EDTV 704x480p @60Hz 24bit (HIRES)"
+        , "EDTV 704x576p @50Hz 24bit (HIRES)"
+        , "HDTV 1280x720p @60Hz 16bit (HIRES)"
+        , "HDTV 1920x1080i @60Hz 16bit (HIRES)"
+        , "PAL 640x256p @50Hz 24bit"
+        , "NTSC 640x224p @60Hz 24bit"
+        , NULL};
+    // clang-format on
+    int previousVMode;
+
+reselect_video_mode:
+    previousVMode = gVMode;
+    diaSetEnum(diaDisplayConfig, UICFG_VMODE, vmodeNames);
+    diaSetInt(diaDisplayConfig, UICFG_VMODE, gVMode);
+    diaSetInt(diaDisplayConfig, UICFG_WIDESCREEN, gWideScreen);
+    diaSetInt(diaDisplayConfig, UICFG_XOFF, gXOff);
+    diaSetInt(diaDisplayConfig, UICFG_YOFF, gYOff);
+    diaSetInt(diaDisplayConfig, UICFG_OVERSCAN, gOverscan);
+
+    int ret = diaExecuteDialog(diaDisplayConfig, -1, 1, guiDisplayUpdater);
+
+    if (ret) {
+        diaGetInt(diaDisplayConfig, UICFG_VMODE, &gVMode);
+        diaGetInt(diaDisplayConfig, UICFG_WIDESCREEN, &gWideScreen);
+        diaGetInt(diaDisplayConfig, UICFG_XOFF, &gXOff);
+        diaGetInt(diaDisplayConfig, UICFG_YOFF, &gYOff);
+        diaGetInt(diaDisplayConfig, UICFG_OVERSCAN, &gOverscan);
+
+        applyConfig(-1, -1, 1);
+    }
+
+    if (previousVMode != gVMode) {
+        if (guiConfirmVideoMode() == 0) {
+            // Restore previous video mode.
+            gVMode = previousVMode;
+            applyConfig(-1, -1, 1);
+            goto reselect_video_mode;
+        }
+    }
+}
+
+void guiShowCoverflowConfig(void)
+{
+    int value;
+    int i;
+
+    // Map index<->stored value: scale 0/15/30/45 is linear (idx*15); anim 0/100/200/400 is a lookup.
+    static const int animValues[] = {0, 100, 200, 400};
+
+    const char *coverCounts[] = {"3", "5", NULL};
+    const char *centerScales[] = {_l(_STR_NONE), _l(_STR_SMALL), _l(_STR_MEDIUM), _l(_STR_LARGE), NULL};
+    const char *animSpeeds[] = {_l(_STR_OFF), _l(_STR_FAST), _l(_STR_NORMAL), _l(_STR_SLOW), NULL};
+
+    diaSetEnum(diaCoverflowConfig, COVERFLOW_CFG_COUNT, coverCounts);
+    diaSetEnum(diaCoverflowConfig, COVERFLOW_CFG_SCALE, centerScales);
+    diaSetEnum(diaCoverflowConfig, COVERFLOW_CFG_ANIM, animSpeeds);
+
+    diaSetInt(diaCoverflowConfig, COVERFLOW_CFG_COUNT, (gCoverflowCount == 5) ? 1 : 0);
+
+    int scaleIdx = gCoverflowCenterScale / 15;
+    if (scaleIdx < 0)
+        scaleIdx = 0;
+    else if (scaleIdx > 3)
+        scaleIdx = 3;
+    diaSetInt(diaCoverflowConfig, COVERFLOW_CFG_SCALE, scaleIdx);
+
+    // default to Normal (200ms) if the stored value isn't one of the table entries
+    int animIdx = 2;
+    for (i = 0; i < 4; i++)
+        if (animValues[i] == gCoverflowAnimSpeed)
+            animIdx = i;
+    diaSetInt(diaCoverflowConfig, COVERFLOW_CFG_ANIM, animIdx);
+
+    diaSetInt(diaCoverflowConfig, COVERFLOW_CFG_DIM, gCoverflowDimCovers ? 1 : 0);
+
+    int result = diaExecuteDialog(diaCoverflowConfig, -1, 1, NULL);
+    if (result) {
+        if (diaGetInt(diaCoverflowConfig, COVERFLOW_CFG_COUNT, &value))
+            gCoverflowCount = (value == 1) ? 5 : 3;
+        if (diaGetInt(diaCoverflowConfig, COVERFLOW_CFG_SCALE, &value))
+            gCoverflowCenterScale = ((value >= 0 && value <= 3) ? value : 0) * 15;
+        if (diaGetInt(diaCoverflowConfig, COVERFLOW_CFG_ANIM, &value))
+            gCoverflowAnimSpeed = animValues[(value >= 0 && value <= 3) ? value : 2];
+        if (diaGetInt(diaCoverflowConfig, COVERFLOW_CFG_DIM, &value))
+            gCoverflowDimCovers = value ? 1 : 0;
+    }
+}
+
+int guiDrawBGSettings(void)
+{
+    GSTEXTURE *bg = thmGetTexture(SETTINGS_BG);
+    if (bg) {
+        rmDrawPixmap(bg, 0, 0, ALIGN_NONE, screenWidth, screenHeight, SCALING_NONE, gDefaultCol, 0);
+        return 1;
+    }
+    return 0;
+}
+
 static void guiSetAudioSettingsState(void)
 {
     diaGetInt(diaAudioConfig, CFG_SFX, &gEnableSFX);
@@ -927,6 +1218,7 @@ void guiShowAudioConfig(void)
     diaSetInt(diaAudioConfig, CFG_BOOT_SND_VOLUME, gBootSndVolume);
     diaSetInt(diaAudioConfig, CFG_BGM_VOLUME, gBGMVolume);
     diaSetString(diaAudioConfig, CFG_DEFAULT_BGM_PATH, gDefaultBGMPath);
+    diaSetShowDefaultWhenEmpty(diaAudioConfig, CFG_DEFAULT_BGM_PATH, 1); // blank -> the theme's own bgm
 
     diaExecuteDialog(diaAudioConfig, -1, 1, guiAudioUpdater);
 }
@@ -938,7 +1230,7 @@ void guiShowControllerConfig(void)
     // configure the enumerations
     const char *scrollSpeeds[] = {_l(_STR_SLOW), _l(_STR_MEDIUM), _l(_STR_FAST), NULL};
     const char *selectButtons[] = {_l(_STR_CIRCLE), _l(_STR_CROSS), NULL};
-    const char *sensitivity[] = {_l(_STR_LOW), _l(_STR_MEDIUM), _l(_STR_HIGH), NULL};
+    const char *sensitivity[] = {_l(_STR_OFF), _l(_STR_LOW), _l(_STR_MEDIUM), _l(_STR_HIGH), NULL};
 
     diaSetEnum(diaControllerConfig, UICFG_SCROLL, scrollSpeeds);
     diaSetEnum(diaControllerConfig, CFG_SELECTBUTTON, selectButtons);

@@ -97,9 +97,8 @@ int diaShowKeyb(char *text, int maxLen, int hide_text, const char *title)
         readPads();
 
         rmStartFrame();
-        // NOTE(rebuild): the optional settings-background texture (guiDrawBGSettings)
-        // returns with the theme-engine work in checklist items 31/37.
-        guiDrawBGPlasma();
+        if (guiDrawBGSettings() == 0)
+            guiDrawBGPlasma();
         rmDrawRect(0, 0, screenWidth, screenHeight, gColDarker);
 
         // Title
@@ -293,9 +292,8 @@ static int diaShowColSel(unsigned char *r, unsigned char *g, unsigned char *b)
         readPads();
 
         rmStartFrame();
-        // NOTE(rebuild): the optional settings-background texture (guiDrawBGSettings)
-        // returns with the theme-engine work in checklist items 31/37.
-        guiDrawBGPlasma();
+        if (guiDrawBGSettings() == 0)
+            guiDrawBGPlasma();
         rmDrawRect(0, 0, screenWidth, screenHeight, gColDarker);
 
         // "Color selection"
@@ -687,9 +685,8 @@ static int diaScrollOffset = 0;
 /// renders whole ui screen (for given dialog setup)
 void diaRenderUI(struct UIItem *ui, short inMenu, struct UIItem *cur, int haveFocus)
 {
-    // NOTE(rebuild): the optional settings-background texture (guiDrawBGSettings)
-    // returns with the theme-engine work in checklist items 31/37.
-    guiDrawBGPlasma();
+    if (guiDrawBGSettings() == 0)
+        guiDrawBGPlasma();
 
     int x0 = 20;
     int y0 = 20;

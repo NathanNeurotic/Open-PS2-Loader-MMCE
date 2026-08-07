@@ -718,3 +718,217 @@ gui_strings:
   string: "%s not allowed through Favourites Menu."
 - label: FAV_PERSISTENCE_MSG
   string: "%s is not allowed while the item is marked as favourite."
+- label: ADVANCED_ARGUMENTS
+  string: Advanced Arguments
+- label: ADVANCED_SETTINGS
+  string: Advanced
+- label: ARTWORK_SETTINGS
+  string: Artwork Settings
+- label: BDMA_APPLY
+  string: VCD BDMA Apply on Launch
+- label: BDMA_MODE
+  string: BDMA Mode
+- label: BDMA_SETTINGS
+  string: BDMA Settings
+- label: BDMA_SOURCE
+  string: BDMA Source
+- label: COLORS_SETTINGS
+  string: Colors
+- label: COMM_SETTINGS
+  string: Communication Settings
+- label: CONTROLLER_EMULATION
+  string: Controller Emulation
+- label: CONTROLLER_MACROS
+  string: Controller Macros
+- label: CORE_LOADER
+  string: Loader Core
+- label: COVERFLOW_ANIM
+  string: Animation Speed
+- label: COVERFLOW_COUNT
+  string: Cover Count
+- label: COVERFLOW_DIM
+  string: Dim Side Covers
+- label: COVERFLOW_SCALE
+  string: Center Scale
+- label: COVERFLOW_SETTINGS
+  string: Coverflow Settings
+- label: DEFAULT_CORE
+  string: Default Loader Core
+- label: DISPLAY_SETTINGS
+  string: Display
+- label: ENABLEIMAGE
+  string: PS2RD Cheat Image
+- label: ENABLE_ART_TAR
+  string: Cover Art .tar Archive
+- label: FOLDER_NAV
+  string: Browse Folders in Game List
+- label: GAME_LAUNCHING
+  string: Game Launching
+- label: GAME_LIST_SETTINGS
+  string: Game List Settings
+- label: GAME_SOURCES
+  string: Game Sources
+- label: HINT_BDMA_APPLY
+  string: 'On: auto-equip the launched VCD''s matching exFAT driver to the memory card before boot (recommended). Off: manage it yourself with the BDMA Source/Mode pickers below.'
+- label: HINT_BDMA_MODE
+  string: exFAT block-device driver POPSTARTER loads. Changing it copies the modules to the card; FAT32 = none (built-in driver).
+- label: HINT_BDMA_SOURCE
+  string: Device whose POPS folder holds your BDMAssault driver files (usbd.irx.* / usbhdfsd.irx.*).
+- label: HINT_DEFAULT_CORE
+  string: Global default core for games whose per-game Loader Core is set to Default. <OPL> is the native core; Neutrino chains the external neutrino.elf. A per-game choice always overrides this.
+- label: HINT_ENABLEIMAGE
+  string: Apply a prebuilt PS2RD .img patch to your game.
+- label: HINT_FOLDER_NAV
+  string: Show subfolders of CD/DVD as browsable entries; select to open, cancel to go back
+- label: HINT_MMCEIGR_SLOT
+  string: Switch to bootcard cmd will be sent to the selected slot(s) on IGR
+- label: HINT_MMCE_USE_ALARMS
+  string: OFF may help performance but can cause MMCE timeouts to result in freezes
+- label: HINT_MMCE_WAIT_CYCLES
+  string: Lower values may improve performance but result in instabilities
+- label: HINT_MODE7
+  string: Neutrino only -- fix games that overrun an IOP buffer (-gc=7)
+- label: HINT_NEUTRINO_ARGS
+  string: Extra Neutrino flags, space-separated (e.g. -mt=dvd). Global applies to all games; per-game adds on top. Prefix a flag with $ to disable it without deleting.
+- label: HINT_NEUTRINO_BSDFS
+  string: Force Neutrino's block-device filesystem (-bsdfs). Auto = per-device default. hdl/bd are expert options; pair them with a matching -dvd= in the launch args if the auto path shape doesn't fit.
+- label: HINT_NEUTRINO_DEVICE
+  string: Device holding neutrino.elf (in a NEUTRINO/ or neutrino/ folder). Auto = the game's own device then mc0/mc1. Game's Device = the game's device only.
+- label: HINT_NEUTRINO_GSM_COMP
+  string: Field-flipping fix for games that shake or tear under a forced Neutrino Video mode. Needs a Neutrino Video mode set.
+- label: HINT_NEUTRINO_VIDEO
+  string: Force Neutrino's GS output video mode (-gsm). Off keeps the game's default.
+- label: HINT_POPSTARTER_DEVICE
+  string: Device holding POPS/POPSTARTER.ELF for PS1 VCD launches. Default = boot device (cwd) then the VCD's own device. Game's Device = the VCD's device only. Custom reveals a free-text path.
+- label: HINT_POPSTARTER_PATH
+  string: Custom POPSTARTER.ELF path; quietly falls back to the device POPS folder if blank/missing. Keyboard caps at 31 chars; longer paths via settings_riptopl.cfg.
+- label: HINT_POPSTARTER_RETROGEM_GAMEID
+  string: Render optical barcode for Pixel FX / RetroGEM / PS2Digital on PS1 VCD launch
+- label: HINT_POPS_IMPORT
+  string: Copy OPL's own Network Settings values (above) into these POPStarter fields. Nothing is written until you confirm with OK.
+- label: HINT_POPS_PORT
+  string: SMB port on the server -- 445 is the default. Leave at 0 (or 445) for a normal share; use 139 for older SMB1 servers.
+- label: HINT_RUMBLE
+  string: Short vibration when moving the cursor, confirming or going back -- needs a DualShock in analog mode
+- label: HINT_VCD_FIRST_DISC
+  string: Show only Disc 1 of a multi-disc PS1 game in the device lists (POPSLoader style). Hides files named (Disc 2), (CD 2), etc. All discs stay on the card for in-game swapping; Favourites are not filtered.
+- label: HINT_VCD_HIDE_GAMEID
+  string: Cosmetic only -- hide a leading game-ID prefix (e.g. SLUS_005.51.) from PS1/VCD list names. Names without an ID are shown as-is. Does not change launch, cover art, or favourites.
+- label: HINT_VMC_SLOT_DISABLE
+  string: Launch without this slot's VMC while keeping its card configured. Neutrino launches only; the game then uses the real card in that slot.
+- label: INTERFACE_SETTINGS
+  string: Interface
+- label: MENU_NETWORK
+  string: Network
+- label: MMCE
+  string: MMCE
+- label: MMCEIGR_SLOT
+  string: IGR Bootcard Slot(s)
+- label: MMCEMODE
+  string: MMCE Start Mode
+- label: MMCE_PREFIX
+  string: MMCE Prefix Path
+- label: MMCE_SLOT
+  string: MMCE Slot
+- label: MMCE_USE_ALARMS
+  string: Use timeout alarms
+- label: MMCE_WAIT_CYCLES
+  string: Wait cycles after /ACK low
+- label: MODE7
+  string: Mode 7
+- label: NARGS_ATA0
+  string: ATA0 Image (-ata0)
+- label: NARGS_ATA0ID
+  string: ATA0 ID (-ata0id)
+- label: NARGS_ATA1
+  string: ATA1 Image (-ata1)
+- label: NARGS_AUTO_NOTE
+  string: 'Auto: -bsd -dvd -gc -gsm -mc -dbc -logo'
+- label: NARGS_CFG
+  string: Config (-cfg)
+- label: NARGS_CWD
+  string: Working Dir (-cwd)
+- label: NARGS_DBC
+  string: Debug Colors (-dbc)
+- label: NARGS_ELF
+  string: Boot ELF (-elf)
+- label: NARGS_EXTRA
+  string: Extra Args
+- label: NARGS_LOGO
+  string: PS2 Logo (-logo)
+- label: NARGS_QB
+  string: Quick Boot (-qb)
+- label: NET_PROTOCOL
+  string: Network Protocol
+- label: NEUTRINO_ARGS
+  string: Neutrino Launch Args
+- label: NEUTRINO_BSDFS
+  string: Neutrino Filesystem
+- label: NEUTRINO_DEFAULTS
+  string: Neutrino Defaults
+- label: NEUTRINO_DEVICE
+  string: Neutrino Device
+- label: NEUTRINO_GSM_COMP
+  string: Neutrino GSM Compatibility
+- label: NEUTRINO_VIDEO
+  string: Neutrino Video
+- label: OSD_DEFAULTS
+  string: OSD Defaults
+- label: PATH_PREFIXES
+  string: Path Prefixes
+- label: PATH_SETTINGS
+  string: Path Settings
+- label: PLASCOLOR
+  string: Plasma Blend Color
+- label: POPSTARTER
+  string: POPStarter
+- label: POPSTARTER_DEVICE
+  string: POPSTARTER.ELF Device
+- label: POPSTARTER_PATH
+  string: POPSTARTER.ELF Path
+- label: POPSTARTER_RETROGEM_GAMEID
+  string: RetroGEM Game ID
+- label: POPS_IMPORT
+  string: Import POPSLoader Settings
+- label: POPS_NONE_DETECTED
+  string: No existing POPStarter SMB configuration was detected. Enter the correct network settings before creating one.
+- label: POPS_SMB_SECTION
+  string: POPStarter SMB Network
+- label: RUMBLE
+  string: Controller Vibration in Menus
+- label: SECURITY_SETTINGS
+  string: Security
+- label: STORAGE_CACHE
+  string: Storage and Cache
+- label: TOOLS
+  string: Tools
+- label: VCD_FIRST_DISC
+  string: First disc only (multi-disc PS1)
+- label: VCD_HIDE_GAMEID
+  string: Hide PS1 Game ID (VCD list)
+- label: VCD_USB_MODE_EXFAT
+  string: exFAT
+- label: VCD_USB_MODE_FAT32
+  string: fat32
+- label: VCD_USB_MODE_HINT
+  string: fat32 is recommended for non exFAT USB users.
+- label: VCD_USB_MODE_QUESTION
+  string: fat32 or exFAT USB Mode?
+- label: VCD_USB_MODE_TITLE
+  string: USB VCD Mode
+- label: VMC_SLOT1_DISABLE
+  string: Disable VMC 1 (keep card)
+- label: VMC_SLOT2_DISABLE
+  string: Disable VMC 2 (keep card)
+- label: NONE
+  string: "None"
+- label: SMALL
+  string: Small
+- label: LARGE
+  string: Large
+- label: NORMAL
+  string: Normal
+- label: MENU_CONTROLLER
+  string: Controller
+- label: MENU_AUDIO
+  string: Audio
