@@ -155,6 +155,11 @@ typedef struct _item_list_t
     int (*itemCheckVMC)(item_list_t *itemList, char *name, int createSize);
 
     int (*itemIconId)(item_list_t *itemList);
+
+    /// Launch a VCD (PS1/POPSTARTER) item by its stored name, regardless of the device's current
+    /// view. NULL for devices without a VCD view (checklist item 12). Used by the Favourites tab to
+    /// launch a VCD favourite while its source device page may be in ISO view.
+    void (*itemLaunchVcd)(item_list_t *itemList, const char *vcdName, config_set_t *configSet);
 } item_list_t;
 
 #endif

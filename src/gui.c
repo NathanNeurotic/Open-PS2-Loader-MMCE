@@ -12,6 +12,7 @@
 #include "include/ioman.h"
 #include "include/lang.h"
 #include "include/themes.h"
+#include "include/favsupport.h" // gFAVStartMode -- Favourites Start Mode row
 #include "include/pad.h"
 #include "include/util.h"
 #include "include/config.h"
@@ -528,6 +529,7 @@ void guiShowConfig()
     diaSetEnum(diaConfig, CFG_HDDMODE, deviceModes);
     diaSetEnum(diaConfig, CFG_ETHMODE, deviceModes);
     diaSetEnum(diaConfig, CFG_APPMODE, deviceModes);
+    diaSetEnum(diaConfig, CFG_FAVMODE, deviceModes);
 
     diaSetInt(diaConfig, CFG_BDMCACHE, bdmCacheSize);
     diaSetInt(diaConfig, CFG_HDDCACHE, hddCacheSize);
@@ -554,6 +556,7 @@ void guiShowConfig()
     diaSetInt(diaConfig, CFG_HDDMODE, gHDDStartMode);
     diaSetInt(diaConfig, CFG_ETHMODE, gETHStartMode);
     diaSetInt(diaConfig, CFG_APPMODE, gAPPStartMode);
+    diaSetInt(diaConfig, CFG_FAVMODE, gFAVStartMode);
 
     int ret = diaExecuteDialog(diaConfig, -1, 1, &guiUpdater);
     if (ret) {
@@ -573,6 +576,7 @@ void guiShowConfig()
         diaGetInt(diaConfig, CFG_HDDMODE, &gHDDStartMode);
         diaGetInt(diaConfig, CFG_ETHMODE, &gETHStartMode);
         diaGetInt(diaConfig, CFG_APPMODE, &gAPPStartMode);
+        diaGetInt(diaConfig, CFG_FAVMODE, &gFAVStartMode);
         diaGetInt(diaConfig, CFG_BDMCACHE, &bdmCacheSize);
         diaGetInt(diaConfig, CFG_HDDCACHE, &hddCacheSize);
         diaGetInt(diaConfig, CFG_SMBCACHE, &smbCacheSize);

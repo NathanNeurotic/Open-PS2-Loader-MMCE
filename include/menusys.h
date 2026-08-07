@@ -74,6 +74,11 @@ typedef struct menu_item
 
     void (*execCircle)(struct menu_item *curMenu);
 
+    /// R3: toggle favourite on the current row (checklist item 33)
+    void (*fav)(struct menu_item *curMenu);
+    /// L3: toggle the device's VCD (PS1) view (checklist item 12; NULL until it lands)
+    void (*toggleView)(struct menu_item *curMenu);
+
     void (*execSquare)(struct menu_item *curMenu);
 
     /// hint list
@@ -97,6 +102,8 @@ void menuAppendItem(menu_item_t *item);
 
 void submenuRebuildCache(submenu_list_t *submenu);
 submenu_list_t *submenuAppendItem(submenu_list_t **submenu, int icon_id, char *text, int id, int text_id);
+// Linear search by id + text (favourites star sync); both text args NULL-guarded.
+submenu_list_t *submenuFindItemByIdAndText(submenu_list_t *submenu, int id, const char *text);
 void submenuRemoveItem(submenu_list_t **submenu, int id);
 void submenuDestroy(submenu_list_t **submenu);
 void submenuSort(submenu_list_t **submenu);

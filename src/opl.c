@@ -30,6 +30,8 @@
 #include "include/ethsupport.h"
 #include "include/hddsupport.h"
 #include "include/appsupport.h"
+#include "include/favsupport.h"
+#include "include/vcdsupport.h" // vcdViewActive stub -- isVcd stays 0 until item 12 lands
 
 #include "include/cheatman.h"
 #include "include/sound.h"
@@ -87,6 +89,8 @@ static void clearIOModuleT(opl_io_module_t *mod)
     mod->menuItem.execCircle = NULL;
     mod->menuItem.execSquare = NULL;
     mod->menuItem.execTriangle = NULL;
+    mod->menuItem.fav = NULL;
+    mod->menuItem.toggleView = NULL;
     mod->menuItem.hints = NULL;
     mod->menuItem.icon_id = -1;
     mod->menuItem.current = NULL;
@@ -112,6 +116,13 @@ static unsigned int frameCounter;
 static char errorMessage[256];
 
 static opl_io_module_t list_support[MODE_COUNT];
+
+// Favourites accessor (see opl.h): keep list_support[] file-static, but let favsupport.c
+// reach the FAV module through this thin wrapper.
+opl_io_module_t *oplGetModule(int mode)
+{
+    return &list_support[mode];
+}
 
 // Global data
 char *gBaseMCDir;
@@ -244,6 +255,9 @@ void moduleUpdateMenuInternal(opl_io_module_t *mod, int themeChanged, int langCh
             menuAddHint(&mod->menuItem, _STR_OPTIONS, TRIANGLE_ICON);
 
         menuAddHint(&mod->menuItem, _STR_REFRESH, SELECT_ICON);
+
+        if (gFAVStartMode)
+            menuAddHint(&mod->menuItem, _STR_FAV_HINT, R3_ICON);
     }
 
     // refresh Cache
@@ -319,6 +333,49 @@ static void itemExecSquare(struct menu_item *curMenu)
         guiSwitchScreen(GUI_SCREEN_INFO);
 }
 
+// R3: toggle the current row's favourite star (checklist item 33). On the Favourites tab
+// itself R3 removes; on any source list it adds/removes by (mode, id, text).
+static void itemExecFav(struct menu_item *curMenu)
+{
+    if (!gFAVStartMode) // Favourites disabled -> R3 is a no-op (no hidden writes)
+        return;
+
+    if (!curMenu->current)
+        return;
+
+    item_list_t *support = curMenu->userdata;
+    if (!support)
+        return;
+
+    submenu_item_t *it = &curMenu->current->item;
+
+    // Folder rows are not favouritable (checklist item 34; isFolder is always 0 until it lands).
+    if (support->mode != FAV_MODE && it->isFolder)
+        return;
+
+    if (support->mode == FAV_MODE) {
+        favRemoveByIndex(it->id);
+    } else {
+        // A favourite captured while the device page is in its L3 VCD view is a PS1/.VCD favourite
+        // (checklist item 12; the stub keeps isVcd at 0 until VCD views exist).
+        int isVcd = vcdViewActive(support->mode) ? 1 : 0;
+        // Only on a device whose VCD favourites can actually be resolved/launched later: storing one
+        // on a device without itemLaunchVcd would leave a permanently-hidden, unlaunchable record.
+        if (isVcd && support->itemLaunchVcd == NULL)
+            return;
+        if (it->favourited) {
+            if (removeFavouriteByIdAndText(support->mode, it->id, it->text, isVcd))
+                it->favourited = 0; // only clear the star once the store write succeeded
+        } else {
+            if (addFavouriteItem(support->mode, it->id, it->icon_id, it->text_id, it->text, isVcd))
+                it->favourited = 1; // only show the star once the store write succeeded
+        }
+    }
+
+    sfxPlay(SFX_CONFIRM);
+    ioPutRequest(IO_CUSTOM_SIMPLEACTION, &loadFavourites);
+}
+
 static void itemExecTriangle(struct menu_item *curMenu)
 {
     if (!curMenu->current)
@@ -365,6 +422,8 @@ static void initMenuForListSupport(opl_io_module_t *mod)
     mod->menuItem.execTriangle = &itemExecTriangle;
     mod->menuItem.execSquare = &itemExecSquare;
     mod->menuItem.execCircle = &itemExecCircle;
+    mod->menuItem.fav = &itemExecFav;
+    mod->menuItem.toggleView = NULL; // VCD view toggle arrives with checklist item 12
 
     mod->menuItem.hints = NULL;
 
@@ -408,6 +467,8 @@ void initSupport(item_list_t *itemList, int mode, int force_reinit)
         startMode = gHDDStartMode;
     else if (mode == APP_MODE)
         startMode = gAPPStartMode;
+    else if (mode == FAV_MODE)
+        startMode = gFAVStartMode;
 
     if (startMode) {
         if (!mod->support) {
@@ -434,6 +495,7 @@ static void initAllSupport(int force_reinit)
     initSupport(ethGetObject(0), ETH_MODE, force_reinit || (gNetworkStartup >= ERROR_ETH_SMB_CONN));
     initSupport(hddGetObject(0), HDD_MODE, force_reinit);
     initSupport(appGetObject(0), APP_MODE, force_reinit);
+    initSupport(favGetObject(0), FAV_MODE, force_reinit);
 }
 
 static void deinitAllSupport(int exception, int modeSelected)
@@ -970,6 +1032,7 @@ static void _loadConfig()
             configGetInt(configOPL, CONFIG_OPL_ETH_MODE, &gETHStartMode);
             configGetInt(configOPL, CONFIG_OPL_APP_MODE, &gAPPStartMode);
             configGetInt(configOPL, CONFIG_OPL_ENABLE_USB, &gEnableUSB);
+            configGetInt(configOPL, CONFIG_OPL_FAV_MODE, &gFAVStartMode);
             configGetInt(configOPL, CONFIG_OPL_ENABLE_BGART, &gEnableBGArt);
             configGetColor(configOPL, CONFIG_OPL_PLAS_BLEND_COLOR, gDefaultPlasBlendColor);
             configGetInt(configOPL, CONFIG_OPL_COVERFLOW_COUNT, &gCoverflowCount);
@@ -1160,6 +1223,7 @@ static void _saveConfig()
         configSetInt(configOPL, CONFIG_OPL_HDD_CACHE, hddCacheSize);
         configSetInt(configOPL, CONFIG_OPL_SMB_CACHE, smbCacheSize);
         configSetInt(configOPL, CONFIG_OPL_ENABLE_USB, gEnableUSB);
+        configSetInt(configOPL, CONFIG_OPL_FAV_MODE, gFAVStartMode);
         configSetInt(configOPL, CONFIG_OPL_ENABLE_BGART, gEnableBGArt);
         configSetColor(configOPL, CONFIG_OPL_PLAS_BLEND_COLOR, gDefaultPlasBlendColor);
         configSetInt(configOPL, CONFIG_OPL_COVERFLOW_COUNT, gCoverflowCount);
@@ -1810,7 +1874,8 @@ static void setDefaults(void)
     gETHStartMode = START_MODE_DISABLED;
     gAPPStartMode = START_MODE_DISABLED;
 
-    gEnableUSB = 0;   // USB block device is opt-in, like the other BDM transports
+    gEnableUSB = 0; // USB block device is opt-in, like the other BDM transports
+    gFAVStartMode = START_MODE_DISABLED;
     gEnableBGArt = 1; // inert while gEnableArt stays at the official OFF default
     gDefaultPlasBlendColor[0] = 0x00;
     gDefaultPlasBlendColor[1] = 0x00;
