@@ -59,7 +59,7 @@ int bdmGetDeviceRootByType(int bdmType, char *root, int rootLen);
 
 int bdmSupportIsUDPBD(item_list_t *support); // 1 if this support is the UDPBD block device (Neutrino-only games)
 
-int bdmEnsureSourceModules(int bdmType, u32 timeoutMs); // force-load a source transport + wait for a mount
+int bdmEnsureSourceModules(int bdmType, u32 timeoutMs);             // force-load a source transport + wait for a mount
 int bdmGetDeviceSlotsByType(int bdmType, int *slots, int maxSlots); // every mounted slot of a type
 
 #endif

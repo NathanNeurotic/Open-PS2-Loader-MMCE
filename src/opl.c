@@ -1992,7 +1992,7 @@ static void setDefaults(void)
     gVcdHideGameId = 1;     // hide the PS1 game-ID prefix by default (display-only)
     gVcdFirstDiscOnly = 1;  // hide discs 2+ of multi-disc PS1 sets by default (POPSLoader parity)
     gBootDir[0] = '\0';
-    gEnableBGArt = 1;    // inert while gEnableArt stays at the official OFF default
+    gEnableBGArt = 1; // inert while gEnableArt stays at the official OFF default
     gDefaultPlasBlendColor[0] = 0x00;
     gDefaultPlasBlendColor[1] = 0x00;
     gDefaultPlasBlendColor[2] = 0x00;
