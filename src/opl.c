@@ -1874,7 +1874,7 @@ static void setDefaults(void)
     gETHStartMode = START_MODE_DISABLED;
     gAPPStartMode = START_MODE_DISABLED;
 
-    gEnableUSB = 0;   // USB block device is opt-in, like the other BDM transports
+    gEnableUSB = 0; // USB block device is opt-in, like the other BDM transports
     gFAVStartMode = START_MODE_DISABLED;
     gEnableBGArt = 1; // inert while gEnableArt stays at the official OFF default
     gDefaultPlasBlendColor[0] = 0x00;
