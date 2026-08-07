@@ -21,10 +21,10 @@
 extern int probed_fd;
 extern u32 probed_lba;
 
-extern void *icon_sys;
-extern int size_icon_sys;
-extern void *icon_icn;
-extern int size_icon_icn;
+extern unsigned char icon_sys[];
+extern unsigned int size_icon_sys;
+extern unsigned char icon_icn[];
+extern unsigned int size_icon_icn;
 
 static int mcID = -1;
 
@@ -99,6 +99,8 @@ static int checkMC()
     return mcID;
 }
 
+// Ensure mc?:OPL/ exists and contains browser save icon (opl.icn + icon.sys) so PS2/PS3
+// Memory Card Manager displays the save folder with a valid icon instead of 'Corrupted Data' (#353).
 void checkMCFolder(void)
 {
     char path[32];
@@ -114,9 +116,9 @@ void checkMCFolder(void)
     snprintf(path, sizeof(path), "mc%d:OPL/opl.icn", mcID & 1);
     fd = open(path, O_RDONLY);
     if (fd < 0) {
-        fd = openFile(path, O_WRONLY | O_CREAT | O_TRUNC);
+        fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0666);
         if (fd >= 0) {
-            write(fd, &icon_icn, size_icon_icn);
+            write(fd, icon_icn, size_icon_icn);
             close(fd);
         }
     } else {
@@ -126,9 +128,9 @@ void checkMCFolder(void)
     snprintf(path, sizeof(path), "mc%d:OPL/icon.sys", mcID & 1);
     fd = open(path, O_RDONLY);
     if (fd < 0) {
-        fd = openFile(path, O_WRONLY | O_CREAT | O_TRUNC);
+        fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0666);
         if (fd >= 0) {
-            write(fd, &icon_sys, size_icon_sys);
+            write(fd, icon_sys, size_icon_sys);
             close(fd);
         }
     } else {
@@ -138,32 +140,48 @@ void checkMCFolder(void)
 
 static int checkFile(char *path, int mode)
 {
-    // check if it is mc
-    if (strncmp(path, "mc", 2) == 0) {
+    // The "mc?:" wildcard-card resolution is mc-specific: substitute the detected card digit, or bail
+    // if no card is present.
+    if (strncmp(path, "mc", 2) == 0 && path[2] == 0x3F) {
+        if (checkMC() >= 0)
+            path[2] = mcID;
+        else
+            return 0;
+    }
 
-        // if user didn't explicitly asked for a MC (using '?' char)
-        if (path[2] == 0x3F) {
-
-            // Use default detected card
-            if (checkMC() >= 0)
-                path[2] = mcID;
-            else
-                return 0;
-        }
-
-        // in create mode, we check that the directory exist, or create it
-        if (mode & O_CREAT) {
+    // In create mode, ensure the immediate parent directory exists (create it if not) for any device
+    // path shaped "<dev>:/<subdir>/<file>" -- previously this ran for "mc" prefixes only. In practice
+    // that shape is the MMCE per-game config target mmceN:/.../CFG/<id>.cfg (the reported case);
+    // BDM/HDD homes are written as "massN:OPL/..."/"pfs0:OPL/..." with no slash after the colon and are
+    // NOT matched here -- they were never matched before either, and sbCreateFolders remains their
+    // safety net. The MMCE failure: the driver's open(O_CREAT) cannot create a file under a missing
+    // directory, and sbCreateFolders' mkdir burst return is UNCHECKED while its once-per-card memo
+    // latches regardless -- so a single mkdir missed on a busy card leaves CFG permanently absent and
+    // every per-game save fails. Before d5150a49 that was swallowed and shown as "saved"; now it
+    // honestly errors (#245, AndrewBento, MMCE). Creating the parent here makes the write persist.
+    //
+    // Only a genuine SUBdirectory is created -- never a bare device root -- because the driver owns the
+    // root and its opendir/mkdir semantics differ; `pos > devSlash + 1` requires a path component after
+    // "<dev>:/". One extra opendir per O_CREAT write only (never on reads); on MMCE that is one SIO2
+    // round-trip on an already user-initiated, infrequent save.
+    if (mode & O_CREAT) {
+        char *pos = strrchr(path, '/');
+        const char *devSlash = strstr(path, ":/");
+        if (pos != NULL && devSlash != NULL && pos > devSlash + 1) {
             char dirPath[256];
-            char *pos = strrchr(path, '/');
-            if (pos) {
-                memcpy(dirPath, path, (pos - path));
-                dirPath[(pos - path)] = '\0';
+            int n = (int)(pos - path);
+            if (n < (int)sizeof(dirPath)) {
+                memcpy(dirPath, path, n);
+                dirPath[n] = '\0';
+                // Best-effort: attempt the mkdir only when opendir says the dir is missing, but NEVER
+                // fail checkFile on the result. open() is the real source of truth -- if the dir truly
+                // could not be made, the open below fails honestly; and if opendir ever mis-reports an
+                // existing dir as missing (a device-driver quirk), the harmless mkdir-EEXIST is ignored
+                // and the write still proceeds. So this can only ever HELP a write, never block one.
                 DIR *dir = opendir(dirPath);
-                if (dir == NULL) {
-                    int res = mkdir(dirPath, 0777);
-                    if (res != 0)
-                        return 0;
-                } else
+                if (dir == NULL)
+                    mkdir(dirPath, 0777);
+                else
                     closedir(dir);
             }
         }
@@ -202,8 +220,14 @@ void *readFile(char *path, int align, int *size)
             LOG("UTIL ReadFile: Failed allocation of %d bytes", realSize);
             *size = 0;
         } else {
-            read(fd, buffer, realSize);
+            int rd = read(fd, buffer, realSize);
             close(fd);
+            if (rd != (int)realSize) {
+                LOG("UTIL ReadFile: short read %d of %d bytes\n", rd, realSize);
+                free(buffer);
+                *size = 0;
+                return NULL;
+            }
             *size = realSize;
         }
     }
@@ -214,14 +238,12 @@ int listDir(char *path, const char *separator, int maxElem,
             int (*readEntry)(int index, const char *path, const char *separator, const char *name, unsigned char d_type))
 {
     int index = 0;
-    char filename[128];
 
     if (checkFile(path, O_RDONLY)) {
         DIR *dir = opendir(path);
         struct dirent *dirent;
         if (dir != NULL) {
             while (index < maxElem && (dirent = readdir(dir)) != NULL) {
-                snprintf(filename, 128, "%s/%s", path, dirent->d_name);
                 index = readEntry(index, path, separator, dirent->d_name, dirent->d_type);
             }
 
@@ -240,9 +262,18 @@ file_buffer_t *openFileBuffer(char *fpath, int mode, short allocResult, unsigned
     int fd = openFile(fpath, mode);
     if (fd >= 0) {
         fileBuffer = (file_buffer_t *)malloc(sizeof(file_buffer_t));
+        if (fileBuffer == NULL) {
+            close(fd);
+            return NULL;
+        }
+        fileBuffer->buffer = (char *)malloc(size * sizeof(char));
+        if (fileBuffer->buffer == NULL) {
+            free(fileBuffer);
+            close(fd);
+            return NULL;
+        }
         fileBuffer->size = size;
         fileBuffer->available = 0;
-        fileBuffer->buffer = (char *)malloc(size * sizeof(char));
         if (mode == O_RDONLY) {
             fileBuffer->lastPtr = NULL;
 
@@ -257,6 +288,8 @@ file_buffer_t *openFileBuffer(char *fpath, int mode, short allocResult, unsigned
         fileBuffer->allocResult = allocResult;
         fileBuffer->fd = fd;
         fileBuffer->mode = mode;
+        fileBuffer->writeError = 0;
+        fileBuffer->totalQueued = 0;
     }
 
     return fileBuffer;
@@ -268,13 +301,21 @@ file_buffer_t *openFileBufferBuffer(short allocResult, const void *buffer, unsig
     file_buffer_t *fileBuffer = NULL;
 
     fileBuffer = (file_buffer_t *)malloc(sizeof(file_buffer_t));
+    if (fileBuffer == NULL)
+        return NULL;
+    fileBuffer->buffer = (char *)malloc((size + 1) * sizeof(char));
+    if (fileBuffer->buffer == NULL) {
+        free(fileBuffer);
+        return NULL;
+    }
     fileBuffer->size = size;
     fileBuffer->available = size;
-    fileBuffer->buffer = (char *)malloc((size + 1) * sizeof(char));
     fileBuffer->lastPtr = fileBuffer->buffer; // O_RDONLY, but with the data in the buffer.
     fileBuffer->allocResult = allocResult;
     fileBuffer->fd = -1;
     fileBuffer->mode = O_RDONLY;
+    fileBuffer->writeError = 0;
+    fileBuffer->totalQueued = 0;
 
     memcpy(fileBuffer->buffer, buffer, size);
     fileBuffer->buffer[size] = '\0';
@@ -312,6 +353,11 @@ int readFileBuffer(file_buffer_t *fileBuffer, char **outBuf)
                 length = fileBuffer->size - lineSize - 1;
                 // LOG("##### Asking for %d characters to complete buffer\n", length);
                 readSize = read(fileBuffer->fd, fileBuffer->buffer + lineSize, length);
+                if (readSize < 0) {
+                    close(fileBuffer->fd);
+                    fileBuffer->fd = -1;
+                    readSize = 0;
+                }
                 fileBuffer->buffer[lineSize + readSize] = '\0';
 
                 // Search again (from the lastly added chars only), the result will be "analyzed" in next if
@@ -322,7 +368,7 @@ int readFileBuffer(file_buffer_t *fileBuffer, char **outBuf)
                 // LOG("##### %d characters really read, line size now (\\0 not inc.): %d\n", read, lineSize);
 
                 // If buffer not full it means we are at EOF
-                if (fileBuffer->size != lineSize + 1) {
+                if (fileBuffer->fd >= 0 && fileBuffer->size != lineSize + 1) {
                     // LOG("##### Reached EOF\n");
                     close(fileBuffer->fd);
                     fileBuffer->fd = -1;
@@ -376,17 +422,20 @@ int readFileBuffer(file_buffer_t *fileBuffer, char **outBuf)
 
 void writeFileBuffer(file_buffer_t *fileBuffer, char *inBuf, int size)
 {
+    fileBuffer->totalQueued += size; // see util.h -- lets configWrite know whether buffer still holds ALL content
     // LOG("writeFileBuffer avail: %d size: %d\n", fileBuffer->available, size);
     if (fileBuffer->available && fileBuffer->available + size > fileBuffer->size) {
         // LOG("writeFileBuffer flushing: %d\n", fileBuffer->available);
-        write(fileBuffer->fd, fileBuffer->buffer, fileBuffer->available);
+        if (write(fileBuffer->fd, fileBuffer->buffer, fileBuffer->available) != (int)fileBuffer->available)
+            fileBuffer->writeError = 1; // short write / wedged device -- surfaced by closeFileBuffer
         fileBuffer->lastPtr = fileBuffer->buffer;
         fileBuffer->available = 0;
     }
 
     if (size > fileBuffer->size) {
         // LOG("writeFileBuffer direct write: %d\n", size);
-        write(fileBuffer->fd, inBuf, size);
+        if (write(fileBuffer->fd, inBuf, size) != size)
+            fileBuffer->writeError = 1;
     } else {
         memcpy(fileBuffer->lastPtr, inBuf, size);
         fileBuffer->lastPtr += size;
@@ -396,17 +445,23 @@ void writeFileBuffer(file_buffer_t *fileBuffer, char *inBuf, int size)
     }
 }
 
-void closeFileBuffer(file_buffer_t *fileBuffer)
+int closeFileBuffer(file_buffer_t *fileBuffer)
 {
+    if (fileBuffer == NULL)
+        return -1; // defensive: current callers null-check first, but never deref a null buffer
+    int err = fileBuffer->writeError;
     if (fileBuffer->fd >= 0) {
         if (fileBuffer->mode != O_RDONLY && fileBuffer->available) {
             // LOG("writeFileBuffer final write: %d\n", fileBuffer->available);
-            write(fileBuffer->fd, fileBuffer->buffer, fileBuffer->available);
+            if (write(fileBuffer->fd, fileBuffer->buffer, fileBuffer->available) != (int)fileBuffer->available)
+                err = 1;
         }
-        close(fileBuffer->fd);
+        if (close(fileBuffer->fd) < 0)
+            err = 1;
     }
     free(fileBuffer->buffer);
     free(fileBuffer);
+    return err ? -1 : 0;
 }
 
 // a simple maximum of two
@@ -499,20 +554,6 @@ int GetSystemRegion(void)
     return ConsoleRegion;
 }
 
-void logfile(char *text)
-{
-    int fd = open("mass:/opl_log.txt", O_APPEND | O_CREAT | O_WRONLY);
-    write(fd, text, strlen(text));
-    close(fd);
-}
-
-void logbuffer(char *path, void *buf, size_t size)
-{
-    int fd = open(path, O_CREAT | O_TRUNC | O_WRONLY);
-    write(fd, buf, size);
-    close(fd);
-}
-
 int CheckPS2Logo(int fd, u32 lba)
 {
     u8 logo[12 * 2048] ALIGNED(64);
@@ -528,8 +569,8 @@ int CheckPS2Logo(int fd, u32 lba)
         lseek(fd, 0, SEEK_SET);
         w = read(fd, logo, sizeof(logo)) == sizeof(logo);
     }
-    if ((lba > 0) && (fd == 0)) {       // HDD_MODE
-        for (k = 0; k <= 12 * 4; k++) { // NB: Disc sector size (2048 bytes) and HDD sector size (512 bytes) differ, hence why we multiplied the number of sectors (12) by 4.
+    if ((lba > 0) && (fd == 0)) {      // HDD_MODE
+        for (k = 0; k < 12 * 4; k++) { // NB: Disc sector size (2048 bytes) and HDD sector size (512 bytes) differ, hence why we multiplied the number of sectors (12) by 4. Exactly 48 HDD sectors fill the 12*2048 buffer; '<= 48' read one sector past the end.
             w = !(hddReadSectors(lba + k, 1, buffer));
             if (!w)
                 break;
@@ -605,7 +646,9 @@ int sysDeleteFolder(const char *folder)
 
             if (dirent->d_type == DT_DIR) {
                 /* Recursive, delete all subfolders */
-                result = sysDeleteFolder(path);
+                int r = sysDeleteFolder(path);
+                if (r < 0)
+                    result = r;
                 free(path);
             } else {
                 free(path);
@@ -655,7 +698,8 @@ int sysDeleteFolder(const char *folder)
 
         if (result >= 0) {
             result = rmdir(folder);
-            LOG("sysDeleteFolder: failed to rmdir %s: %d\n", folder, result);
+            if (result < 0)
+                LOG("sysDeleteFolder: failed to rmdir %s: %d\n", folder, result);
         }
     }
 

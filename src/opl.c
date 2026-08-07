@@ -1834,11 +1834,18 @@ static void init(void)
         padStatus = startPads();
     readPads();
     if (!getKeyPressed(KEY_START)) {
+        // Show the boot splash (not guiRenderTextScreen(), which calls guiShow()
+        // and would draw the not-yet-ready main menu as a garbled landing page
+        // before the intro splash) while the config loads.
+        guiSetBootStatus(_l(_STR_BOOT_LOADING_CONFIG));
+        guiRenderGreetingScreen();
         _loadConfig(); // only try to restore config if emergency key is not being pressed
     } else {
         LOG("--- SKIPPING OPL CONFIG LOADING\n");
         applyConfig(-1, -1, 0);
     }
+    guiSetBootStatus(_l(_STR_BOOT_READY));
+    guiRenderGreetingScreen();
 
 
     // queue deffered init of sound effects, which will take place after the preceding initialization steps within the queue are complete.
