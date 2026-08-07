@@ -10,6 +10,9 @@
 #include "include/pad.h"
 #include "include/config.h"
 #include "include/ethsupport.h"
+#include "include/favsupport.h"
+#include "include/bdmsupport.h"
+#include "include/vcdsupport.h" // vcdViewActive -- VCD games are POPSTARTER-only (Loader Core is N/A)
 #include "include/compatupd.h"
 #include "include/cheatman.h"
 #include "include/system.h"
@@ -28,6 +31,7 @@
 static int configSourceID;
 static int dmaMode;
 static int compatMode;
+static int coreLoader;
 
 static int EnableGSM;
 static int GSMVMode;
@@ -37,6 +41,7 @@ static int GSMFIELDFix;
 
 static int EnableCheat;
 static int CheatMode;
+static int EnableImage; // PS2RD prebuilt cheat-image (.img) $EnableImage toggle
 
 static int forceGlobalOSDLanguage;
 
@@ -65,8 +70,11 @@ static union
 
 static char hexid[32];
 static char altStartup[32];
+static char neutrinoArgs[256]; // per-game Neutrino extra flags (edited via the structured args sub-screen)
 static char vmc1[32];
 static char vmc2[32];
+static int vmc1Disabled; // per-slot VMC disable (parity-audit #14): keep the card name, skip the Neutrino -mc arg
+static int vmc2Disabled;
 static char hexDiscID[15];
 static char configSource[128];
 
@@ -291,6 +299,8 @@ void guiGameShowVMCMenu(int id, item_list_t *support)
     do {
         diaSetLabel(diaVMCConfig, COMPAT_VMC1_DEFINE, vmc1);
         diaSetLabel(diaVMCConfig, COMPAT_VMC2_DEFINE, vmc2);
+        diaSetInt(diaVMCConfig, COMPAT_VMC1_DISABLE, vmc1Disabled);
+        diaSetInt(diaVMCConfig, COMPAT_VMC2_DISABLE, vmc2Disabled);
 
         if (strlen(vmc1))
             diaSetLabel(diaVMCConfig, COMPAT_VMC1_ACTION, _l(_STR_RESET));
@@ -302,6 +312,9 @@ void guiGameShowVMCMenu(int id, item_list_t *support)
             diaSetLabel(diaVMCConfig, COMPAT_VMC2_ACTION, _l(_STR_USE_GENERIC));
 
         result = diaExecuteDialog(diaVMCConfig, result, 1, NULL);
+        // UI_BOOL state persists across the button-driven do/while re-entries; read it back each pass
+        diaGetInt(diaVMCConfig, COMPAT_VMC1_DISABLE, &vmc1Disabled);
+        diaGetInt(diaVMCConfig, COMPAT_VMC2_DISABLE, &vmc2Disabled);
         if (result == COMPAT_VMC1_DEFINE) {
             if (menuCheckParentalLock() == 0) {
                 if (guiGameShowVMCConfig(id, support, vmc1, 0, 0))
@@ -402,6 +415,13 @@ void guiGameShowGSConfig(void)
         "VGA 1024x768p @85Hz",
         "VGA 1280x1024p @60Hz",
         "VGA 1280x1024p @75Hz",
+        // GSM1080P=1 variant only: APPENDED last (index 29) to keep every existing $GSMVMode index
+        // pointing at the same mode; stays 1:1 index-aligned with predef_vmode[] (gsm.c), which
+        // guards the matching row under the SAME #ifdef. Selecting it triggers the triple-confirm
+        // gate in the save path below.
+#ifdef GSM_1080P
+        "HDTV 1080p @60Hz (EXPERIMENTAL)",
+#endif
         NULL};
     // clang-format on
 
@@ -436,6 +456,7 @@ static void guiGameSetCheatSettingsState(void)
 
     diaGetInt(diaCheatConfig, CHTCFG_ENABLECHEAT, &EnableCheat);
     diaGetInt(diaCheatConfig, CHTCFG_CHEATMODE, &CheatMode);
+    diaGetInt(diaCheatConfig, CHTCFG_ENABLEIMAGE, &EnableImage);
     diaSetEnabled(diaCheatConfig, CHTCFG_CHEATMODE, EnableCheat);
 }
 
@@ -569,7 +590,7 @@ static char *hex_to_str(char *str, u16 hex)
 static char *ver_to_str(char *str, u8 ma, u16 mi)
 {
     if (ma > 9)
-        ma = 0;
+        ma = 9;
 
     sprintf(str, "%X.%04X    BT %s", ma, mi, bt_ver_str[ma]);
 
@@ -799,7 +820,7 @@ void guiGameShowPadEmuConfig(int forceGlobal)
         }
 
         if (result == PADCFG_BTINFO) {
-            for (i = PADCFG_FEAT_START; i < PADCFG_FEAT_END + 1; i++)
+            for (i = PADCFG_FEAT_START; i < PADCFG_FEAT_END; i++)
                 diaSetLabel(diaPadEmuInfo, i, _l(_STR_NO));
 
             diaSetLabel(diaPadEmuInfo, PADCFG_VID, _l(_STR_NOT_CONNECTED));
@@ -942,19 +963,166 @@ void guiGameSavePadMacroGlobalConfig(config_set_t *configGame)
 }
 #endif
 
+// A FAV item must expose its SOURCE's flags (e.g. HDD DMA support), not the FAV list's (0).
+static unsigned char gameEffectiveFlags(item_list_t *support)
+{
+    if (support == NULL)
+        return 0;
+    return (support->mode == FAV_MODE) ? favGetFlags(support) : support->flags;
+}
+
+// Core-aware per-game settings: grey the rows the *other* core ignores, so the
+// Compatibility screen only offers what the selected Loader Core actually honors.
+// OPL compat mode 4 (Skip Videos) and mode 6 (Disable IGR) are OPL ee-core features
+// with no Neutrino equivalent (Neutrino has no IGR and no PSS/BIK video-skip), so
+// convertCompatmaskToModes (system.c) forwards only bits 1/2/3/5 as -gc; DL-Defaults
+// pulls OPL-bitmask data that does not map to -gc. Under the OPL core, the Neutrino
+// Args field is never read. See docs/NEUTRINO.md for the full capability mapping.
+// Device capability for the -bsdfs row: set once per dialog entry in guiGameShowCompatConfig
+// (which has the item_list_t), then AND-ed into the core-aware grey below. Needed because the
+// updater re-runs guiGameSetCoreAwareState on EVERY dialog change with no device handle -- a
+// one-shot diaSetEnabled here would be clobbered (same pattern as the UDPBD loader lock).
+static int bsdfsDeviceCapable = 1;
+// VCD (PS1) view: launches ONLY via POPSTARTER -- never OPL's core nor Neutrino. Set once per dialog
+// entry (same one-shot pattern as bsdfsDeviceCapable) so the core-aware grey keeps every Neutrino-only
+// row greyed for a VCD game even when the global default core is Neutrino (the locked "Default" row
+// would otherwise resolve to the global and un-grey them).
+static int coreNeverNeutrino = 0;
+
+// Appended "Default" (follow the global) enum indices for the per-game Neutrino Video / GSM-comp
+// pickers: values 0..5 / 0..3 persist 1:1 (system.c gsmVideoTokens); "Default" removes the key so
+// the launch legs fall back to gNeutrinoVideoDefault/gNeutrinoGsmCompDefault (Loader Core pattern).
+#define NEUTRINO_VIDEO_DEFAULT_IDX   6
+#define NEUTRINO_GSMCOMP_DEFAULT_IDX 4
+
+// Index of the appended "HDTV 1080p @60Hz (EXPERIMENTAL)" entry in gsmvmodeNames[] / predef_vmode[]
+// (both 30 long, last index 29) -- only present in the GSM1080P=1 variant. Selecting it must clear
+// a triple-confirm before it is saved.
+#ifdef GSM_1080P
+#define GSM_VMODE_1080P_IDX 29
+#endif
+
+static void guiGameSetCoreAwareState(void)
+{
+    int coreChoice = 0, neutrino = 0, neutrinoVideo = 0;
+    diaGetInt(diaCompatConfig, COMPAT_LOADER, &coreChoice);
+    // COMPAT_LOADER: 0=<OPL>, 1=Neutrino, 2=Default(follow global). The effective core is Neutrino
+    // iff explicitly Neutrino, OR "Default" while the global gDefaultCoreLoader is Neutrino -- so the
+    // Neutrino-only rows grey correctly even when the game defers its core to the global setting.
+    neutrino = (coreChoice == 1) || (coreChoice == 2 && gDefaultCoreLoader == 1);
+    if (coreNeverNeutrino)
+        neutrino = 0; // VCD (POPSTARTER-only): keep all Neutrino-only rows greyed regardless of the global
+    diaGetInt(diaCompatConfig, COMPAT_NEUTRINO_VIDEO, &neutrinoVideo);
+    // Resolve the "Default" row to the global it follows, so the comp-half grey below reflects the
+    // EFFECTIVE video mode (a game on "Default" with a non-Off global default has a live comp row).
+    if (neutrinoVideo == NEUTRINO_VIDEO_DEFAULT_IDX)
+        neutrinoVideo = gNeutrinoVideoDefault;
+
+    diaSetEnabled(diaCompatConfig, COMPAT_NEUTRINO_ARGS, neutrino);  // Neutrino-only field
+    diaSetEnabled(diaCompatConfig, COMPAT_NEUTRINO_VIDEO, neutrino); // Neutrino-only -gsm video mode
+    // The ":c" comp half is only ever emitted alongside a video mode (-gsm=v:c grammar), so it also
+    // greys while the effective Neutrino Video is Off -- the updater re-runs this on every change.
+    diaSetEnabled(diaCompatConfig, COMPAT_NEUTRINO_GSMCOMP, neutrino && neutrinoVideo != 0);
+    // -bsdfs override: Neutrino-only AND block-backed-device-only (mmce/udpfs have no fs layer;
+    // APA is always hdl). The launch side guards independently -- this grey is just honest UI.
+    diaSetEnabled(diaCompatConfig, COMPAT_NEUTRINO_BSDFS, neutrino && bsdfsDeviceCapable);
+    diaSetEnabled(diaCompatConfig, COMPAT_MODE_BASE + 3, !neutrino); // Mode 4 Skip Videos: OPL core only
+    diaSetEnabled(diaCompatConfig, COMPAT_MODE_BASE + 5, !neutrino); // Mode 6 Disable IGR: OPL core only
+    diaSetEnabled(diaCompatConfig, COMPAT_MODE_BASE + 6, neutrino);  // Mode 7 -gc=7 fix buffer overrun: Neutrino only
+    diaSetEnabled(diaCompatConfig, COMPAT_DL_DEFAULTS, !neutrino);   // OPL compat-bitmask downloader
+}
+
+static int guiGameCompatUpdater(int modified)
+{
+    if (modified)
+        guiGameSetCoreAwareState();
+    return 0;
+}
+
 void guiGameShowCompatConfig(int id, item_list_t *support, config_set_t *configSet)
 {
     int i;
 
-    if (support->flags & MODE_FLAG_COMPAT_DMA) {
-        const char *dmaModes[] = {"MDMA 0", "MDMA 1", "MDMA 2", "UDMA 0", "UDMA 1", "UDMA 2", "UDMA 3", "UDMA 4", NULL};
-        diaSetEnum(diaCompatConfig, COMPAT_DMA, dmaModes);
+    // static, NOT block-scoped: diaSetEnum stores the raw pointer and diaCompatConfig keeps
+    // re-rendering it (reshow_compat loop below). Block-locals dangled at the closing brace and
+    // the compiler reused their stack slot for the sibling arrays below -- on hardware the DMA
+    // row rendered the Neutrino video-mode list (issue #154, Blade). Upstream has the same
+    // block-scoped UB but no later arrays to reuse the slot, which is why it shows correct
+    // strings by luck. Literals only (no _l()), so static storage is safe across languages.
+    static const char *dmaModesFull[] = {"MDMA 0", "MDMA 1", "MDMA 2", "UDMA 0", "UDMA 1", "UDMA 2", "UDMA 3", "UDMA 4", NULL};
+    static const char *dmaModesNone[] = {NULL};
+    if (gameEffectiveFlags(support) & MODE_FLAG_COMPAT_DMA)
+        diaSetEnum(diaCompatConfig, COMPAT_DMA, dmaModesFull);
+    else
+        diaSetEnum(diaCompatConfig, COMPAT_DMA, dmaModesNone);
+
+    // Index 0/1 == the stored $CoreLoader value (0=<OPL>, 1=Neutrino); index 2 "Default" = no per-game
+    // key -> follow the global gDefaultCoreLoader. Keeping 0/1 aligned with the stored ints means the
+    // UDPBD lock (index 1) and the launch-side value semantics are untouched -- only "Default" is new.
+    const char *loaders[] = {"<OPL>", "Neutrino", _l(_STR_DEFAULT), NULL};
+    diaSetEnum(diaCompatConfig, COMPAT_LOADER, loaders);
+
+    // Indices map 1:1 onto system.c's gsmVideoTokens (fp1/fp2/1080ix1/ix2/ix3) -- old configs
+    // stored 0-3, which keep their meaning; x2/x3 and now "Default" are APPENDED so persisted
+    // values stay stable. "Default" (index NEUTRINO_VIDEO_DEFAULT_IDX) = no per-game key -> follow
+    // the global gNeutrinoVideoDefault, mirroring the Loader Core row's index-2 pattern.
+    const char *neutrinoVideoModes[] = {"Off", "240p", "480p", "1080i x1", "1080i x2", "1080i x3", _l(_STR_DEFAULT), NULL};
+    diaSetEnum(diaCompatConfig, COMPAT_NEUTRINO_VIDEO, neutrinoVideoModes);
+    // The ":c" compatibility half of -gsm=v:c -- field-flipping interlace fixes for games that
+    // shake/tear under a forced mode. Ignored (not emitted) while the effective video mode is Off.
+    const char *neutrinoGsmCompModes[] = {"Off", "Type 1 (GSM/OPL)", "Type 2", "Type 3", _l(_STR_DEFAULT), NULL};
+    diaSetEnum(diaCompatConfig, COMPAT_NEUTRINO_GSMCOMP, neutrinoGsmCompModes);
+
+    // -bsdfs override (parity-audit #11). Indices map 1:1 onto system.c's bsdfsTokens; the value
+    // strings are Neutrino's literal driver tokens, deliberately untranslated (like the -gsm rows).
+    const char *neutrinoBsdfsModes[] = {"Auto", "exfat", "hdl", "bd", NULL};
+    diaSetEnum(diaCompatConfig, COMPAT_NEUTRINO_BSDFS, neutrinoBsdfsModes);
+    // Capability for the row's grey: block-backed devices only. BDM instances (usb/ata-exFAT/
+    // mx4sio/ilink/udpbd/udpfsbd) qualify; mmce/udpfs are fileid backends, APA is forced hdl, and
+    // a VCD (PS1) view never launches through Neutrino at all. FAV proxies the real device, so it
+    // stays enabled and the launch-side guard arbitrates.
+    bsdfsDeviceCapable = (support == NULL) ||
+                         ((support->mode >= BDM_MODE && support->mode <= BDM_MODE6 && !vcdViewActive(support->mode)) ||
+                          support->mode == FAV_MODE);
+    // VCD games launch through POPSTARTER only, so the Loader Core is inert for them -- keep every
+    // Neutrino-only row greyed even under a Neutrino global default (guiGameSetCoreAwareState reads
+    // this). SMB likewise: ethsupport has no Neutrino launch leg, the effective core is always <OPL>.
+    coreNeverNeutrino = (support != NULL && (vcdViewActive(support->mode) || support->mode == ETH_MODE));
+
+    // UDPBD games have no OPL core backend -- they always launch via Neutrino
+    // (bdmsupport.c forces it). Lock the selector to Neutrino so the screen matches;
+    // re-enable it for every other device (the dialog struct is reused across games).
+    if (support != NULL && vcdViewActive(support->mode)) {
+        // VCD (PS1) games launch ONLY via POPSTARTER -- neither OPL's core nor Neutrino is used, so the
+        // Loader Core choice is meaningless. Pin it to the inert "Default" row (index 2 -> no per-game
+        // $CoreLoader key persisted, as before) and lock the row so the screen doesn't imply a VCD game
+        // could run under a different core.
+        diaSetInt(diaCompatConfig, COMPAT_LOADER, 2);
+        diaSetEnabled(diaCompatConfig, COMPAT_LOADER, 0);
+    } else if (support != NULL && support->mode == ETH_MODE) {
+        // SMB has no Neutrino launch leg (ethsupport never builds Neutrino args) -- the effective
+        // core is ALWAYS <OPL>. Pin the row to the inert "Default" (index 2: saving removes any
+        // stale $CoreLoader key, self-healing old Neutrino selections) and lock it. Launch-time
+        // honesty for keys set elsewhere (e.g. via Favourites) is the toast in ethLaunchGame.
+        diaSetInt(diaCompatConfig, COMPAT_LOADER, 2);
+        diaSetEnabled(diaCompatConfig, COMPAT_LOADER, 0);
+    } else if (bdmSupportIsUDPBD(support)) {
+        diaSetInt(diaCompatConfig, COMPAT_LOADER, 1);
+        diaSetEnabled(diaCompatConfig, COMPAT_LOADER, 0);
     } else {
-        const char *dmaModes[] = {NULL};
-        diaSetEnum(diaCompatConfig, COMPAT_DMA, dmaModes);
+        diaSetEnabled(diaCompatConfig, COMPAT_LOADER, 1);
     }
 
-    int result = diaExecuteDialog(diaCompatConfig, -1, 1, NULL);
+    guiGameSetCoreAwareState(); // apply the initial grey-out before the dialog is drawn
+    int result;
+reshow_compat:
+    result = diaExecuteDialog(diaCompatConfig, -1, 1, &guiGameCompatUpdater);
+    if (result == COMPAT_NEUTRINO_ARGS) {
+        // the "Neutrino Launch Args" button -> open the structured args sub-screen on the per-game
+        // args buffer, then re-enter the Compatibility dialog (mirrors guiShowConfig for the global).
+        guiShowNeutrinoArgsConfig(neutrinoArgs, sizeof(neutrinoArgs));
+        goto reshow_compat;
+    }
     if (result) {
         compatMode = 0;
         for (i = 0; i < COMPAT_MODE_COUNT; ++i) {
@@ -974,6 +1142,7 @@ void guiGameShowCompatConfig(int id, item_list_t *support, config_set_t *configS
             guiShowNetCompatUpdateSingle(id, support, configSet);
 
         diaGetInt(diaCompatConfig, COMPAT_DMA, &dmaMode);
+        diaGetInt(diaCompatConfig, COMPAT_LOADER, &coreLoader);
         diaGetString(diaCompatConfig, COMPAT_GAMEID, hexid, sizeof(hexid));
         diaGetString(diaCompatConfig, COMPAT_ALTSTARTUP, altStartup, sizeof(altStartup));
     }
@@ -993,7 +1162,7 @@ int guiGameSaveConfig(config_set_t *configSet, item_list_t *support)
         compatMode |= (mdpart ? 1 : 0) << i;
     }
 
-    if (support->flags & MODE_FLAG_COMPAT_DMA) {
+    if (gameEffectiveFlags(support) & MODE_FLAG_COMPAT_DMA) {
         diaGetInt(diaCompatConfig, COMPAT_DMA, &dmaMode);
         if (dmaMode != 7)
             result = configSetInt(configSet, CONFIG_ITEM_DMA, dmaMode);
@@ -1006,12 +1175,34 @@ int guiGameSaveConfig(config_set_t *configSet, item_list_t *support)
     else
         configRemoveKey(configSet, CONFIG_ITEM_COMPAT);
 
+    diaGetInt(diaCompatConfig, COMPAT_LOADER, &coreLoader);
+    if (coreLoader == 2) // "Default" -> drop the per-game key so the game follows gDefaultCoreLoader
+        configRemoveKey(configSet, CONFIG_ITEM_CORE_LOADER);
+    else // 0=<OPL>, 1=Neutrino -> explicit per-game override (writes even 0 so it beats a Neutrino global)
+        result = configSetInt(configSet, CONFIG_ITEM_CORE_LOADER, coreLoader);
+
     /// GSM ///
     diaGetInt(diaGSConfig, GSMCFG_ENABLEGSM, &EnableGSM);
     diaGetInt(diaGSConfig, GSMCFG_GSMVMODE, &GSMVMode);
     diaGetInt(diaGSConfig, GSMCFG_GSMXOFFSET, &GSMXOffset);
     diaGetInt(diaGSConfig, GSMCFG_GSMYOFFSET, &GSMYOffset);
     diaGetInt(diaGSConfig, GSMCFG_GSMFIELDFIX, &GSMFIELDFix);
+
+#ifdef GSM_1080P
+    // 1080p is GSM-synthetic and hardware-unvalidated: force a THREE-STEP confirmation before it can
+    // be committed. X continues / O cancels at each step; any cancel drops the selection back to 0
+    // (Auto/off, which removes the per-game key) so 1080p is never persisted without deliberate
+    // consent. Only fires when the user actually chose 1080p AND left GSM enabled. (Only compiled
+    // into the GSM1080P=1 variant, the only build where the picker exposes the 1080p entry.)
+    if (EnableGSM != 0 && GSMVMode == GSM_VMODE_1080P_IDX) {
+        if (!guiMsgBox(_l(_STR_GSM_1080P_WARNING), 1, NULL) ||
+            !guiMsgBox(_l(_STR_GSM_1080P_PROCEED), 1, NULL) ||
+            !guiMsgBox(_l(_STR_GSM_1080P_SURE), 1, NULL)) {
+            GSMVMode = 0; // cancelled at some step -> do not apply 1080p
+            diaSetInt(diaGSConfig, GSMCFG_GSMVMODE, GSMVMode);
+        }
+    }
+#endif
 
     if (gGSMSource == SETTINGS_PERGAME) {
         result = configSetInt(configSet, CONFIG_ITEM_GSMSOURCE, gGSMSource);
@@ -1051,6 +1242,7 @@ int guiGameSaveConfig(config_set_t *configSet, item_list_t *support)
     diaGetInt(diaCheatConfig, CHTCFG_CHEATSOURCE, &gCheatSource);
     diaGetInt(diaCheatConfig, CHTCFG_ENABLECHEAT, &EnableCheat);
     diaGetInt(diaCheatConfig, CHTCFG_CHEATMODE, &CheatMode);
+    diaGetInt(diaCheatConfig, CHTCFG_ENABLEIMAGE, &EnableImage);
 
     if (gCheatSource == SETTINGS_PERGAME) {
         result = configSetInt(configSet, CONFIG_ITEM_CHEATSSOURCE, gCheatSource);
@@ -1063,9 +1255,15 @@ int guiGameSaveConfig(config_set_t *configSet, item_list_t *support)
             result = configSetInt(configSet, CONFIG_ITEM_CHEATMODE, CheatMode);
         else
             configRemoveKey(configSet, CONFIG_ITEM_CHEATMODE);
+
+        if (EnableImage != 0)
+            result = configSetInt(configSet, CONFIG_ITEM_ENABLEIMAGE, EnableImage);
+        else
+            configRemoveKey(configSet, CONFIG_ITEM_ENABLEIMAGE);
     } else if (gCheatSource == SETTINGS_GLOBAL) {
         configSetInt(configGame, CONFIG_ITEM_ENABLECHEAT, EnableCheat);
         configSetInt(configGame, CONFIG_ITEM_CHEATMODE, CheatMode);
+        configSetInt(configGame, CONFIG_ITEM_ENABLEIMAGE, EnableImage);
     }
 
 #ifdef PADEMU
@@ -1079,6 +1277,8 @@ int guiGameSaveConfig(config_set_t *configSet, item_list_t *support)
     diaGetString(diaCompatConfig, COMPAT_GAMEID, hexid, sizeof(hexid));
     if (hexid[0] != '\0')
         result = configSetStr(configSet, CONFIG_ITEM_DNAS, hexid);
+    else
+        configRemoveKey(configSet, CONFIG_ITEM_DNAS); // clear stale GameID when user empties the field
 
     diaGetString(diaCompatConfig, COMPAT_ALTSTARTUP, altStartup, sizeof(altStartup));
     if (altStartup[0] != '\0')
@@ -1086,9 +1286,55 @@ int guiGameSaveConfig(config_set_t *configSet, item_list_t *support)
     else
         configRemoveKey(configSet, CONFIG_ITEM_ALTSTARTUP);
 
+    // neutrinoArgs holds the FULL per-game args string (loaded from the cfg, edited via the structured
+    // sub-screen behind the COMPAT_NEUTRINO_ARGS button) -- there is no UI truncation anymore, so just
+    // compare the whole buffer against the persisted value and rewrite/clear the key when it changed.
+    {
+        char origArgs[sizeof(neutrinoArgs)];
+        configGetStrCopy(configSet, CONFIG_ITEM_NEUTRINO_ARGS, origArgs, sizeof(origArgs));
+        if (strcmp(neutrinoArgs, origArgs) != 0) {
+            if (neutrinoArgs[0] != '\0')
+                result = configSetStr(configSet, CONFIG_ITEM_NEUTRINO_ARGS, neutrinoArgs);
+            else
+                configRemoveKey(configSet, CONFIG_ITEM_NEUTRINO_ARGS);
+        }
+    }
+
+    {
+        // "Default" (appended index) removes the key -> the launch legs fall back to the global
+        // gNeutrinoVideoDefault. Explicit values persist -- INCLUDING 0 (Off), which used to
+        // remove the key too: an explicit per-game Off must now survive a non-Off global.
+        int neutrinoVideo = NEUTRINO_VIDEO_DEFAULT_IDX;
+        diaGetInt(diaCompatConfig, COMPAT_NEUTRINO_VIDEO, &neutrinoVideo);
+        if (neutrinoVideo != NEUTRINO_VIDEO_DEFAULT_IDX)
+            result = configSetInt(configSet, CONFIG_ITEM_NEUTRINO_VIDEO, neutrinoVideo);
+        else
+            configRemoveKey(configSet, CONFIG_ITEM_NEUTRINO_VIDEO);
+    }
+
+    {
+        int neutrinoGsmComp = NEUTRINO_GSMCOMP_DEFAULT_IDX;
+        diaGetInt(diaCompatConfig, COMPAT_NEUTRINO_GSMCOMP, &neutrinoGsmComp);
+        if (neutrinoGsmComp != NEUTRINO_GSMCOMP_DEFAULT_IDX)
+            result = configSetInt(configSet, CONFIG_ITEM_NEUTRINO_GSMCOMP, neutrinoGsmComp);
+        else
+            configRemoveKey(configSet, CONFIG_ITEM_NEUTRINO_GSMCOMP);
+    }
+
+    {
+        int neutrinoBsdfs = 0;
+        diaGetInt(diaCompatConfig, COMPAT_NEUTRINO_BSDFS, &neutrinoBsdfs);
+        if (neutrinoBsdfs != 0)
+            result = configSetInt(configSet, CONFIG_ITEM_NEUTRINO_BSDFS, neutrinoBsdfs);
+        else
+            configRemoveKey(configSet, CONFIG_ITEM_NEUTRINO_BSDFS);
+    }
+
     /// VMC ///
     configSetVMC(configSet, vmc1, 0);
     configSetVMC(configSet, vmc2, 1);
+    configSetVMCDisable(configSet, 0, vmc1Disabled); // setter removes the key when 0
+    configSetVMCDisable(configSet, 1, vmc2Disabled);
 
     result = guiGameSaveOSDLanguageGameConfig(configSet, result);
     guiGameSaveOSDLanguageGlobalConfig(configGame);
@@ -1102,6 +1348,7 @@ void guiGameRemoveGlobalSettings(config_set_t *configGame)
         // Cheats
         configRemoveKey(configGame, CONFIG_ITEM_ENABLECHEAT);
         configRemoveKey(configGame, CONFIG_ITEM_CHEATMODE);
+        configRemoveKey(configGame, CONFIG_ITEM_ENABLEIMAGE);
 
         // GSM
         configRemoveKey(configGame, CONFIG_ITEM_ENABLEGSM);
@@ -1130,6 +1377,7 @@ void guiGameRemoveSettings(config_set_t *configSet)
     if (menuCheckParentalLock() == 0) {
         configRemoveKey(configSet, CONFIG_ITEM_CONFIGSOURCE);
         configRemoveKey(configSet, CONFIG_ITEM_DMA);
+        configRemoveKey(configSet, CONFIG_ITEM_CORE_LOADER);
         configRemoveKey(configSet, CONFIG_ITEM_COMPAT);
         configRemoveKey(configSet, CONFIG_ITEM_DNAS);
         configRemoveKey(configSet, CONFIG_ITEM_ALTSTARTUP);
@@ -1146,6 +1394,7 @@ void guiGameRemoveSettings(config_set_t *configSet)
         configRemoveKey(configSet, CONFIG_ITEM_CHEATSSOURCE);
         configRemoveKey(configSet, CONFIG_ITEM_ENABLECHEAT);
         configRemoveKey(configSet, CONFIG_ITEM_CHEATMODE);
+        configRemoveKey(configSet, CONFIG_ITEM_ENABLEIMAGE);
 
         // OSD Language
         configRemoveKey(configSet, CONFIG_ITEM_OSD_SETTINGS_LANGID);
@@ -1165,6 +1414,8 @@ void guiGameRemoveSettings(config_set_t *configSet)
         // VMC
         configRemoveVMC(configSet, 0);
         configRemoveVMC(configSet, 1);
+        configRemoveVMCDisable(configSet, 0);
+        configRemoveVMCDisable(configSet, 1);
 
         menuSaveConfig();
     }
@@ -1172,8 +1423,22 @@ void guiGameRemoveSettings(config_set_t *configSet)
 
 void guiGameTestSettings(int id, item_list_t *support, config_set_t *configSet)
 {
-    guiGameSaveConfig(configSet, support);
-    support->itemLaunch(support, id, configSet);
+    // Test launch: apply the in-dialog edits to a throwaway CLONE and boot from that, so the live
+    // per-game config is never modified -- "Test" must not persist. (The old code wrote the edits
+    // straight into the live configSet, which could later be flushed to disk by an unrelated Save.)
+    // itemLaunch only returns on a launch FAILURE; on success it tears OPL down / reboots, so the
+    // clone is freed only on the return (failure) path. Per-game keys go to the clone; the few
+    // GLOBAL-source settings still touch the in-RAM global config, matching pre-existing behavior.
+    config_set_t *testConfig = configClone(configSet);
+    if (testConfig == NULL) {
+        // Out of memory: fall back to the original behavior rather than refusing to test.
+        guiGameSaveConfig(configSet, support);
+        support->itemLaunch(support, id, configSet);
+        return;
+    }
+    guiGameSaveConfig(testConfig, support);
+    support->itemLaunch(support, id, testConfig);
+    configFree(testConfig);
 }
 
 static void guiGameLoadGSMConfig(config_set_t *configSet, config_set_t *configGame)
@@ -1220,11 +1485,13 @@ static void guiGameLoadCheatsConfig(config_set_t *configSet, config_set_t *confi
 {
     EnableCheat = 0;
     CheatMode = 0;
+    EnableImage = 0;
 
     // set global settings.
     gCheatSource = 0;
     configGetInt(configGame, CONFIG_ITEM_ENABLECHEAT, &EnableCheat);
     configGetInt(configGame, CONFIG_ITEM_CHEATMODE, &CheatMode);
+    configGetInt(configGame, CONFIG_ITEM_ENABLEIMAGE, &EnableImage);
 
     // override global with per-game settings if available and selected.
     configGetInt(configSet, CONFIG_ITEM_CHEATSSOURCE, &gCheatSource);
@@ -1233,12 +1500,15 @@ static void guiGameLoadCheatsConfig(config_set_t *configSet, config_set_t *confi
             EnableCheat = 0;
         if (!configGetInt(configSet, CONFIG_ITEM_CHEATMODE, &CheatMode))
             CheatMode = 0;
+        if (!configGetInt(configSet, CONFIG_ITEM_ENABLEIMAGE, &EnableImage))
+            EnableImage = 0;
     }
 
     // set gui settings.
     diaSetInt(diaCheatConfig, CHTCFG_CHEATSOURCE, gCheatSource);
     diaSetInt(diaCheatConfig, CHTCFG_ENABLECHEAT, EnableCheat);
     diaSetInt(diaCheatConfig, CHTCFG_CHEATMODE, CheatMode);
+    diaSetInt(diaCheatConfig, CHTCFG_ENABLEIMAGE, EnableImage);
 }
 
 #ifdef PADEMU
@@ -1375,9 +1645,9 @@ static int guiGameSaveOSDLanguageGameConfig(config_set_t *configSet, int result)
 {
     if (gOSDLanguageSource == SETTINGS_PERGAME) {
         if ((result = configSetInt(configSet, CONFIG_ITEM_OSD_SETTINGS_SOURCE, gOSDLanguageSource)))
-            if ((result = configSetInt(configSet, CONFIG_ITEM_OSD_SETTINGS_ENABLE, gOSDLanguageEnable))) {
-                configSetInt(configSet, CONFIG_ITEM_OSD_SETTINGS_LANGID, gOSDLanguageValue);
-                configSetInt(configSet, CONFIG_ITEM_OSD_SETTINGS_TV_ASP, gOSDTVAspectRatio);
+            if ((result = configSetInt(configSet, CONFIG_ITEM_OSD_SETTINGS_ENABLE, gOSDLanguageEnable)) && gOSDLanguageEnable) {
+                result = configSetInt(configSet, CONFIG_ITEM_OSD_SETTINGS_LANGID, gOSDLanguageValue);
+                result = configSetInt(configSet, CONFIG_ITEM_OSD_SETTINGS_TV_ASP, gOSDTVAspectRatio);
                 result = configSetInt(configSet, CONFIG_ITEM_OSD_SETTINGS_VMODE, gOSDVideOutput);
             }
     } else {
@@ -1450,7 +1720,7 @@ void guiGameLoadConfig(item_list_t *support, config_set_t *configSet)
         snprintf(configSource, sizeof(configSource), _l(_STR_DOWNLOADED_DEFAULTS));
 
     dmaMode = 7; // defaulting to UDMA 4
-    if (support->flags & MODE_FLAG_COMPAT_DMA) {
+    if (gameEffectiveFlags(support) & MODE_FLAG_COMPAT_DMA) {
         configGetInt(configSet, CONFIG_ITEM_DMA, &dmaMode);
         diaSetInt(diaCompatConfig, COMPAT_DMA, dmaMode);
     } else
@@ -1460,6 +1730,12 @@ void guiGameLoadConfig(item_list_t *support, config_set_t *configSet)
     configGetInt(configSet, CONFIG_ITEM_COMPAT, &compatMode);
     for (i = 0; i < COMPAT_MODE_COUNT; ++i)
         diaSetInt(diaCompatConfig, COMPAT_MODE_BASE + i, (compatMode & (1 << i)) > 0 ? 1 : 0);
+
+    // COMPAT_LOADER index == the stored $CoreLoader value when present (0=<OPL>, 1=Neutrino); a missing
+    // key maps to index 2 "Default" so the game defers its core to the global gDefaultCoreLoader.
+    if (!configGetInt(configSet, CONFIG_ITEM_CORE_LOADER, &coreLoader))
+        coreLoader = 2;
+    diaSetInt(diaCompatConfig, COMPAT_LOADER, coreLoader);
 
     guiGameLoadGSMConfig(configSet, configGame);
 
@@ -1480,10 +1756,41 @@ void guiGameLoadConfig(item_list_t *support, config_set_t *configSet)
     configGetStrCopy(configSet, CONFIG_ITEM_ALTSTARTUP, altStartup, sizeof(altStartup));
     diaSetString(diaCompatConfig, COMPAT_ALTSTARTUP, altStartup);
 
+    // Per-game Neutrino args live in the neutrinoArgs buffer, edited via the structured sub-screen
+    // opened by the COMPAT_NEUTRINO_ARGS button. The dialog item is a UI_BUTTON (no stringvalue), so
+    // there is nothing to diaSetString here -- loading the buffer is all that's needed.
+    neutrinoArgs[0] = '\0';
+    configGetStrCopy(configSet, CONFIG_ITEM_NEUTRINO_ARGS, neutrinoArgs, sizeof(neutrinoArgs));
+
+    int neutrinoVideo;
+    if (!configGetInt(configSet, CONFIG_ITEM_NEUTRINO_VIDEO, &neutrinoVideo))
+        neutrinoVideo = NEUTRINO_VIDEO_DEFAULT_IDX; // no per-game key -> "Default" (follow the global)
+    else if (neutrinoVideo < 0 || neutrinoVideo > 5)
+        neutrinoVideo = 0; // sanitize a corrupt/out-of-range cfg value (valid: 0=Off .. 5=1080i x3)
+    diaSetInt(diaCompatConfig, COMPAT_NEUTRINO_VIDEO, neutrinoVideo);
+
+    int neutrinoGsmComp;
+    if (!configGetInt(configSet, CONFIG_ITEM_NEUTRINO_GSMCOMP, &neutrinoGsmComp))
+        neutrinoGsmComp = NEUTRINO_GSMCOMP_DEFAULT_IDX; // no per-game key -> "Default" (follow the global)
+    else if (neutrinoGsmComp < 0 || neutrinoGsmComp > 3)
+        neutrinoGsmComp = 0; // sanitize (valid: 0=Off .. 3=field-flip type 3)
+    diaSetInt(diaCompatConfig, COMPAT_NEUTRINO_GSMCOMP, neutrinoGsmComp);
+
+    int neutrinoBsdfs = 0;
+    configGetInt(configSet, CONFIG_ITEM_NEUTRINO_BSDFS, &neutrinoBsdfs);
+    if (neutrinoBsdfs < 0 || neutrinoBsdfs > 3)
+        neutrinoBsdfs = 0; // sanitize (valid: 0=Auto, 1=exfat, 2=hdl, 3=bd)
+    diaSetInt(diaCompatConfig, COMPAT_NEUTRINO_BSDFS, neutrinoBsdfs);
+
     /// VMC ///
     vmc1[0] = '\0';
     configGetVMC(configSet, vmc1, sizeof(vmc1), 0);
 
     vmc2[0] = '\0';
     configGetVMC(configSet, vmc2, sizeof(vmc2), 1);
+
+    vmc1Disabled = 0;
+    configGetVMCDisable(configSet, 0, &vmc1Disabled);
+    vmc2Disabled = 0;
+    configGetVMCDisable(configSet, 1, &vmc2Disabled);
 }
