@@ -14,9 +14,14 @@ enum UI_ITEMS {
     UICFG_UICOL,
     UICFG_TXTCOL,
     UICFG_SELCOL,
+    UICFG_PLASCOL, // plasma blend (gradient low end) color picker -- parity-audit #15
     UICFG_RESETCOL,
     UICFG_AUTOSORT,
     UICFG_COVERART,
+    UICFG_ENABLE_BGART,
+    UICFG_ENABLE_ART_TAR,
+    UICFG_ENABLE_ANALOG_NAV,
+    UICFG_ART_DELAY,
     UICFG_WIDESCREEN,
     UICFG_AUTOREFRESH,
     UICFG_VMODE,
@@ -24,6 +29,7 @@ enum UI_ITEMS {
     UICFG_YOFF,
     UICFG_OVERSCAN,
     UICFG_NOTIFICATIONS,
+    UICFG_GAMEVIEW,
 
     CFG_DEBUG,
     CFG_PS2LOGO,
@@ -34,7 +40,15 @@ enum UI_ITEMS {
     CFG_HDDMODE,
     CFG_ETHMODE,
     CFG_APPMODE,
+    CFG_MMCEMODE,
     CFG_FAVMODE,
+    CFG_MMCEPREFIX,
+    CFG_MMCESLOT,
+    CFG_MMCEIGRSLOT,
+    CFG_MMCE_WAIT_CYCLES,
+    CFG_MMCE_USE_ALARMS,
+    CFG_MMCEGAMEID,
+    CFG_APPLYGAMEID,
     CFG_BDMCACHE,
     CFG_HDDCACHE,
     CFG_SMBCACHE,
@@ -42,7 +56,15 @@ enum UI_ITEMS {
     CFG_ENABLEILK,
     CFG_ENABLEMX4SIO,
     CFG_ENABLEBDMHDD,
+    CFG_ENABLEUDPBD,     // legacy: kept as an unused placeholder (superseded by CFG_NETPROTOCOL)
+    CFG_NETBOOTPROTOCOL, // legacy: kept as an unused placeholder (superseded by CFG_NETPROTOCOL)
+    CFG_NETSTART,        // network start mode row: Off / Manual / Auto (== START_MODE_*)
+    CFG_NETPROTOCOL,     // protocol row: SMB / UDPFS / UDPBD (Off moved to CFG_NETSTART)
+    CFG_UDPFSMODE,       // access row: Files (udpfs_ioman filesystem) vs IMG (udpfs_bd block/massN:); locked per protocol
+    CFG_SMBDIALECT,      // SMB version row: SMBv1 / SMB2; only enabled while the protocol row is SMB
     CFG_LASTPLAYED,
+    CFG_FOLDERNAV,
+    CFG_RUMBLE,
     CFG_LBL_AUTOSTARTLAST,
     CFG_AUTOSTARTLAST,
     CFG_SELECTBUTTON,
@@ -50,7 +72,6 @@ enum UI_ITEMS {
     CFG_BDMPREFIX,
     CFG_ETHPREFIX,
     CFG_HDDSPINDOWN,
-    BLOCKDEVICE_BUTTON,
 
     ABOUT_TITLE,
     ABOUT_BUILD_DETAILS,
@@ -64,6 +85,23 @@ enum UI_ITEMS {
     CFG_BOOT_SND_VOLUME,
     CFG_BGM_VOLUME,
     CFG_DEFAULT_BGM_PATH,
+    CFG_DEFAULT_CORE, // global default Loader Core (gDefaultCoreLoader); per-game "Default" follows it
+    CFG_NEUTRINO_ARGS,
+    CFG_NEUTRINO_DEVICE,
+    CFG_NEUTRINO_VIDEO,   // global default Neutrino -gsm video mode (gNeutrinoVideoDefault); per-game "Default" follows it
+    CFG_NEUTRINO_GSMCOMP, // global default -gsm ":c" comp half (gNeutrinoGsmCompDefault)
+    CFG_POPSTARTER_DEVICE,
+    CFG_LBL_POPSTARTER_PATH,
+    CFG_POPSTARTER_PATH,
+    CFG_POPSTARTER_RETROGEM_GAMEID,
+
+    CFG_BDMA_APPLY,
+    CFG_LBL_BDMASOURCE,
+    CFG_BDMASOURCE,
+    CFG_LBL_BDMAMODE,
+    CFG_BDMAMODE,
+    CFG_VCD_HIDE_GAMEID,     // display-only: hide a leading PS1 game-ID prefix from the VCD list
+    CFG_VCD_FIRST_DISC_ONLY, // #118: hide discs 2+ of a multi-disc PS1 set from the device VCD lists
 
     CFG_XSENSITIVITY,
     CFG_YSENSITIVITY,
@@ -99,14 +137,47 @@ enum UI_ITEMS {
     NETCFG_SHARE_NAME,
     NETCFG_SHARE_USERNAME,
     NETCFG_SHARE_PASSWORD,
+    NETCFG_POPS_NOTICE,
+    NETCFG_POPS_IPTYPE,
+    NETCFG_POPS_IP_0,
+    NETCFG_POPS_IP_1,
+    NETCFG_POPS_IP_2,
+    NETCFG_POPS_IP_3,
+    NETCFG_POPS_MASK_0,
+    NETCFG_POPS_MASK_1,
+    NETCFG_POPS_MASK_2,
+    NETCFG_POPS_MASK_3,
+    NETCFG_POPS_GW_0,
+    NETCFG_POPS_GW_1,
+    NETCFG_POPS_GW_2,
+    NETCFG_POPS_GW_3,
+    NETCFG_POPS_SMB_IP_0,
+    NETCFG_POPS_SMB_IP_1,
+    NETCFG_POPS_SMB_IP_2,
+    NETCFG_POPS_SMB_IP_3,
+    NETCFG_POPS_SMB_PORT,
+    NETCFG_POPS_SMB_SHARE,
+    NETCFG_POPS_SMB_USER,
+    NETCFG_POPS_SMB_PASS,
+    NETCFG_POPS_IMPORT,
     NETCFG_ETHOPMODE,
     NETCFG_RECONNECT,
     NETCFG_OK,
+    // Section labels for the SMB-only block, so it can be hidden whole when the selected network
+    // protocol is not SMB. Appended here to keep the NETCFG_*_0..N consecutive runs above intact.
+    NETCFG_LBL_SMB_SERVER,
+    NETCFG_LBL_SHARE_ADDR_TYPE,
+    NETCFG_LBL_SHARE_ADDRESS,
+    NETCFG_LBL_SHARE_PORT,
+    NETCFG_LBL_SHARE_NAME,
+    NETCFG_LBL_SHARE_USER,
+    NETCFG_LBL_SHARE_PASSWORD,
 
     CHTCFG_CHEATSOURCE,
     CHTCFG_CHEATCFG,
     CHTCFG_ENABLECHEAT,
     CHTCFG_CHEATMODE,
+    CHTCFG_ENABLEIMAGE,
 
     GSMCFG_GSMSOURCE,
     GSMCFG_GSCONFIG,
@@ -116,10 +187,32 @@ enum UI_ITEMS {
     GSMCFG_GSMYOFFSET,
     GSMCFG_GSMFIELDFIX,
 
+    UICFG_COVERFLOW_BUTTON,
+    COVERFLOW_CFG_COUNT,
+    COVERFLOW_CFG_SCALE,
+    COVERFLOW_CFG_ANIM,
+    COVERFLOW_CFG_DIM,
+
+    NARGS_QB,
+    NARGS_CWD,
+    NARGS_CFG,
+    NARGS_ELF,
+    NARGS_ATA0,
+    NARGS_ATA0ID,
+    NARGS_ATA1,
+    NARGS_EXTRA,
+    NARGS_DBC,
+    NARGS_LOGO,
+
     COMPAT_DMA = 100,
     COMPAT_ALTSTARTUP,
     COMPAT_GAMEID,
     COMPAT_DL_DEFAULTS,
+    COMPAT_LOADER,
+    COMPAT_NEUTRINO_ARGS,
+    COMPAT_NEUTRINO_VIDEO,
+    COMPAT_NEUTRINO_GSMCOMP,
+    COMPAT_NEUTRINO_BSDFS,
 
     COMPAT_LOADFROMDISC_ID,
 
@@ -127,6 +220,8 @@ enum UI_ITEMS {
     COMPAT_VMC2_ACTION_ID,
     COMPAT_VMC1_DEFINE_ID,
     COMPAT_VMC2_DEFINE_ID,
+    COMPAT_VMC1_DISABLE, // UI_BOOL rows (read via diaGetInt, not dialog results -- no _ID/NOEXIT pair needed)
+    COMPAT_VMC2_DISABLE,
 
     VMC_NAME,
     VMC_SIZE,
@@ -149,6 +244,25 @@ enum UI_ITEMS {
     OSD_LANGUAGE_VALUE,
     OSD_TVASPECT_VALUE,
     OSD_VMODE_VALUE,
+
+    VCDUSB_BTN_FAT32,
+    VCDUSB_BTN_EXFAT,
+
+    // Settings-layout restructure: sub-page buttons (chained dialogs, goto-reshow pattern)
+    UICFG_ARTWORK_BUTTON,
+    UICFG_COLORS_BUTTON,
+    LAUNCH_NEUTRINO_DEFAULTS_BUTTON,
+    LAUNCH_OSD_DEFAULTS_BUTTON,
+    VCD_BDMA_BUTTON,
+    VCD_LIST_BUTTON,
+    VCD_NET_BUTTON,
+    MMCE_COMM_BUTTON,
+    MMCE_PATH_BUTTON,
+    SECURITY_PARENTAL_BUTTON,
+    ADV_PREFIX_BUTTON,
+    ADV_STORAGE_BUTTON,
+    TOOLS_NET_UPDATE_BUTTON,
+    TOOLS_NBD_BUTTON,
 
 #ifdef PADEMU
     PADEMU_GLOBAL_BUTTON,
@@ -226,7 +340,28 @@ extern struct UIItem diaAbout[];
 extern struct UIItem diaVMC[];
 extern struct UIItem diaNetCompatUpdate[];
 extern struct UIItem diaParentalLockConfig[];
-extern struct UIItem diaBlockDevicesConfig[];
 
 extern struct UIItem diaOSDConfig[];
+extern struct UIItem diaCoverflowConfig[];
+extern struct UIItem diaNeutrinoArgs[];
+extern struct UIItem diaDeviceConfig[];
+extern struct UIItem diaVcdConfig[];
+extern struct UIItem diaMmceConfig[];
+extern struct UIItem diaVcdUsbMode[];
+extern struct UIItem diaArtworkConfig[];
+extern struct UIItem diaColorsConfig[];
+extern struct UIItem diaDisplayConfig[];
+extern struct UIItem diaLaunchConfig[];
+extern struct UIItem diaNeutrinoDefaults[];
+extern struct UIItem diaBdmaConfig[];
+extern struct UIItem diaVcdListConfig[];
+extern struct UIItem diaPopsNetConfig[];
+extern struct UIItem diaMmceCommConfig[];
+extern struct UIItem diaMmcePathConfig[];
+extern struct UIItem diaSecurityConfig[];
+extern struct UIItem diaAdvancedConfig[];
+extern struct UIItem diaPathPrefixConfig[];
+extern struct UIItem diaStorageConfig[];
+extern struct UIItem diaToolsConfig[];
+
 #endif

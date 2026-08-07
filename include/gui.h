@@ -128,6 +128,22 @@ void guiShowNetCompatUpdateSingle(int id, item_list_t *support, config_set_t *co
 void guiShowAbout();
 void guiShowConfig();
 void guiShowUIConfig();
+// Settings-layout category pages (rebuild step 06)
+void guiShowDeviceConfig(void);
+void guiShowDisplayConfig(void);
+void guiShowLaunchConfig(void);
+void guiShowControllerConfig(void);
+void guiShowSecurityConfig(void);
+void guiShowAdvancedConfig(void);
+void guiShowPathPrefixConfig(void);
+void guiShowStorageConfig(void);
+void guiShowToolsConfig(void);
+void guiShowArtworkConfig(void);
+void guiShowCoverflowConfig(void);
+void guiShowColorsConfig(void);
+int guiDrawBGSettings(void);
+int guiDeviceTypeToIoMode(int deviceType);
+int guiIoModeToDeviceType(int ioMode);
 void guiShowAudioConfig();
 void guiShowControllerConfig();
 void guiShowNetConfig();
