@@ -1022,6 +1022,8 @@ static void guiHandleOp(struct gui_update_t *item)
 
         case GUI_OP_APPEND_MENU:
             result = submenuAppendItem(item->menu.subMenu, item->submenu.icon_id, item->submenu.text, item->submenu.id, item->submenu.text_id);
+            // coverflow wrap tail: submenuAppendItem always returns the new tail
+            item->menu.menu->last = result;
             if (!item->menu.menu->submenu) { // first subitem in list
                 item->menu.menu->submenu = result;
                 if (!item->submenu.selected) {
@@ -1051,11 +1053,19 @@ static void guiHandleOp(struct gui_update_t *item)
             item->menu.menu->submenu = NULL;
             item->menu.menu->current = NULL;
             item->menu.menu->pagestart = NULL;
+            item->menu.menu->last = NULL; // coverflow wrap tail
             break;
 
         case GUI_OP_SORT:
             submenuSort(item->menu.subMenu);
             item->menu.menu->submenu = *item->menu.subMenu;
+
+            { // recompute the coverflow wrap tail after the sort reorders the list
+                submenu_list_t *tail = item->menu.menu->submenu;
+                while (tail && tail->next)
+                    tail = tail->next;
+                item->menu.menu->last = tail;
+            }
 
             if (!item->menu.menu->remindLast)
                 item->menu.menu->current = item->menu.menu->submenu;
@@ -1105,7 +1115,7 @@ static void guiDrawBusy(int alpha)
         GSTEXTURE *texture = thmGetTexture(LOAD0_ICON + (guiFrameId >> 1) % gTheme->loadingIconCount);
         if (texture && texture->Mem) {
             u64 mycolor = GS_SETREG_RGBA(0x80, 0x80, 0x80, alpha);
-            rmDrawPixmap(texture, gTheme->loadingIcon->posX, gTheme->loadingIcon->posY, gTheme->loadingIcon->aligned, gTheme->loadingIcon->width, gTheme->loadingIcon->height, gTheme->loadingIcon->scaled, mycolor);
+            rmDrawPixmap(texture, gTheme->loadingIcon->posX, gTheme->loadingIcon->posY, gTheme->loadingIcon->aligned, gTheme->loadingIcon->width, gTheme->loadingIcon->height, gTheme->loadingIcon->scaled, mycolor, 0);
         }
     }
 }
@@ -1141,10 +1151,16 @@ static void guiRenderGreeting(int alpha)
     u64 mycolor = GS_SETREG_RGBA(0x1C, 0x1C, 0x1C, alpha);
     rmDrawRect(0, 0, screenWidth, screenHeight, mycolor);
 
-    GSTEXTURE *logo = thmGetTexture(LOGO_PICTURE);
+    // If the theme/build ships animated boot-logo frames (logo0..logoN), cycle
+    // them at the loading-icon cadence; otherwise use the single LOGO_PICTURE.
+    int logoTex = LOGO_PICTURE;
+    if (gTheme->logoFrameCount >= 1)
+        logoTex = LOGO0_PICTURE + (guiFrameId >> 1) % gTheme->logoFrameCount;
+
+    GSTEXTURE *logo = thmGetTexture(logoTex);
     if (logo) {
         mycolor = GS_SETREG_RGBA(0x80, 0x80, 0x80, alpha);
-        rmDrawPixmap(logo, screenWidth >> 1, gTheme->usedHeight >> 1, ALIGN_CENTER, logo->Width, logo->Height, SCALING_RATIO, mycolor);
+        rmDrawPixmap(logo, screenWidth >> 1, gTheme->usedHeight >> 1, ALIGN_CENTER, logo->Width, logo->Height, SCALING_RATIO, mycolor, 0);
     }
 
     // Boot info: the RiptOPL version + a live status line, faded with the splash.
@@ -1374,7 +1390,7 @@ void guiDrawBGPlasma()
 
     pery = ymax;
     rmInvalidateTexture(&gBackgroundTex);
-    rmDrawPixmap(&gBackgroundTex, 0, 0, ALIGN_NONE, screenWidth, screenHeight, SCALING_NONE, gDefaultCol);
+    rmDrawPixmap(&gBackgroundTex, 0, 0, ALIGN_NONE, screenWidth, screenHeight, SCALING_NONE, gDefaultCol, 0);
 }
 
 int guiDrawIconAndText(int iconId, int textId, int font, int x, int y, u64 color)
@@ -1389,7 +1405,7 @@ int guiDrawIconAndText(int iconId, int textId, int font, int x, int y, u64 color
 
     if (iconTex && iconTex->Mem) {
         y += h >> 1;
-        rmDrawPixmap(iconTex, x, y, ALIGN_VCENTER, w, h, SCALING_RATIO, gDefaultCol);
+        rmDrawPixmap(iconTex, x, y, ALIGN_VCENTER, w, h, SCALING_RATIO, gDefaultCol, 0);
         x += rmWideScale(w) + 2;
     } else {
         // HACK: font is aligned to VCENTER, the default height icon height is 20

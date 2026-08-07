@@ -21,6 +21,11 @@ typedef struct submenu_item
 
     int *cache_id;
     int *cache_uid;
+
+    /// 1 when the item is marked as a favourite (a star is drawn next to it) -- checklist item 33
+    int favourited;
+    /// 1 when this row is a browsable folder, not a launchable game -- checklist item 34
+    int isFolder;
 } submenu_item_t;
 
 typedef struct submenu_list
@@ -56,7 +61,8 @@ typedef struct menu_item
     void *userdata;
 
     /// submenu, selection and page start (only used in static mode)
-    struct submenu_list *submenu, *current, *pagestart;
+    /// submenu, selection, page start, and list tail (the coverflow wrap walks last<->first)
+    struct submenu_list *submenu, *current, *pagestart, *last;
 
     short remindLast;
 
