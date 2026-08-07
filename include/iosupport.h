@@ -18,8 +18,8 @@ enum IO_MODES {
     ETH_MODE,
     HDD_MODE,
     APP_MODE,
-    MMCE_MODE, // reserved: MMCE support returns with checklist item 1
-    FAV_MODE,  // reserved: Favourites returns with checklist item 33
+    MMCE_MODE,  // reserved: MMCE support returns with checklist item 1
+    FAV_MODE,   // reserved: Favourites returns with checklist item 33
     UDPFS_MODE, // reserved (item 6); appended last so existing mode values don't shift
 
     MODE_COUNT
