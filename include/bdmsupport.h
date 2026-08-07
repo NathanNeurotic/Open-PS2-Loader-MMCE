@@ -15,7 +15,7 @@ typedef struct
     vmc_spec_t specs; /* Card specifications */
 } bdm_vmc_infos_t;
 
-#define MAX_BDM_DEVICES 5
+#define MAX_BDM_DEVICES     5
 #define BDM_DEVICE_ROOT_MAX 32
 
 #define BDM_TYPE_UNKNOWN -1

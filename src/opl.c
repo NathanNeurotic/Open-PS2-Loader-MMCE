@@ -149,13 +149,13 @@ int bdmCacheSize;
 int hddCacheSize;
 int smbCacheSize;
 int gEnableUSB;
-char gNeutrinoArgs[256];           // extra command-line flags appended to every Neutrino launch
-char gNeutrinoPath[256];           // custom neutrino.elf path; "" -> auto-detect on mc0:/mc1:
-int gNeutrinoDevice;               // Neutrino ELF device (NEUTRINO_DEV_*); Auto scans mc0/mc1 + honors a legacy gNeutrinoPath
-int gDefaultCoreLoader;            // global default Loader Core (0=<OPL>, 1=Neutrino); per-game $CoreLoader overrides, absent key = follow this
-int gNeutrinoVideoDefault;         // global default Neutrino -gsm video mode (0=Off..5=1080i x3); per-game $NeutrinoVideo overrides
-int gNeutrinoGsmCompDefault;       // global default -gsm ":c" field-flip half (0=off, 1-3=type)
-int gNeutrinoElfArg;               // default-on (settings key only, no UI): auto-emit -elf=cdrom0: on Neutrino launches
+char gNeutrinoArgs[256];     // extra command-line flags appended to every Neutrino launch
+char gNeutrinoPath[256];     // custom neutrino.elf path; "" -> auto-detect on mc0:/mc1:
+int gNeutrinoDevice;         // Neutrino ELF device (NEUTRINO_DEV_*); Auto scans mc0/mc1 + honors a legacy gNeutrinoPath
+int gDefaultCoreLoader;      // global default Loader Core (0=<OPL>, 1=Neutrino); per-game $CoreLoader overrides, absent key = follow this
+int gNeutrinoVideoDefault;   // global default Neutrino -gsm video mode (0=Off..5=1080i x3); per-game $NeutrinoVideo overrides
+int gNeutrinoGsmCompDefault; // global default -gsm ":c" field-flip half (0=off, 1-3=type)
+int gNeutrinoElfArg;         // default-on (settings key only, no UI): auto-emit -elf=cdrom0: on Neutrino launches
 int gEnableILK;
 int gEnableBGArt;
 unsigned char gDefaultPlasBlendColor[3]; // plasma gradient low end; black = historical look
@@ -1950,7 +1950,7 @@ static void setDefaults(void)
     gNeutrinoVideoDefault = 0; // no global -gsm until the user opts in
     gNeutrinoGsmCompDefault = 0;
     gNeutrinoElfArg = 1; // auto-emit the game ELF for Neutrino compatibility lookup by default
-    gEnableBGArt = 1; // inert while gEnableArt stays at the official OFF default
+    gEnableBGArt = 1;    // inert while gEnableArt stays at the official OFF default
     gDefaultPlasBlendColor[0] = 0x00;
     gDefaultPlasBlendColor[1] = 0x00;
     gDefaultPlasBlendColor[2] = 0x00;

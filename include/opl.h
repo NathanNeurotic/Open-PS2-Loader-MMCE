@@ -128,14 +128,14 @@ extern int smbCacheSize;
 
 extern int gEnableUSB;
 // Neutrino Device picker: a driver-accurate device TYPE that holds <root>:/neutrino/neutrino.elf.
-enum { NEUTRINO_DEV_AUTO = 0, // game device, then mc0/mc1 (legacy behaviour)
-       NEUTRINO_DEV_MC,       // mc0: / mc1:
-       NEUTRINO_DEV_USB,      // BDM "usb"        -> the mounted massN:
-       NEUTRINO_DEV_MX4SIO,   // BDM "mx4sio"/sdc -> the mounted massN:
-       NEUTRINO_DEV_MMCE,     // mmce0: / mmce1: (checklist item 1)
+enum { NEUTRINO_DEV_AUTO = 0,  // game device, then mc0/mc1 (legacy behaviour)
+       NEUTRINO_DEV_MC,        // mc0: / mc1:
+       NEUTRINO_DEV_USB,       // BDM "usb"        -> the mounted massN:
+       NEUTRINO_DEV_MX4SIO,    // BDM "mx4sio"/sdc -> the mounted massN:
+       NEUTRINO_DEV_MMCE,      // mmce0: / mmce1: (checklist item 1)
        NEUTRINO_DEV_EXFAT_HDD, // BDM "ata" internal exFAT HDD -> the mounted massN:
-       NEUTRINO_DEV_APA_HDD,  // APA HDD: the mounted OPL data partition (pfs0:)
-       NEUTRINO_DEV_GAME };   // the active game's OWN device ONLY; appended last to keep saved ints stable
+       NEUTRINO_DEV_APA_HDD,   // APA HDD: the mounted OPL data partition (pfs0:)
+       NEUTRINO_DEV_GAME };    // the active game's OWN device ONLY; appended last to keep saved ints stable
 extern int gNeutrinoDevice;
 extern int gDefaultCoreLoader;
 extern int gNeutrinoVideoDefault;
