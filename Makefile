@@ -61,13 +61,15 @@ ifneq ($(shell test -d .git; echo $$?),0)
   DIRTY = -dirty
 endif
 
-GIT_TAG = $(shell git describe --exact-match --tags 2>/dev/null)
+# Only v* release tags name a build; checkpoint tags (rebuild-NN etc.) must not hijack the
+# version string or drop the toolchain-flavour suffix.
+GIT_TAG = $(shell git describe --exact-match --tags --match "v*" 2>/dev/null)
 OPL_VERSION = v$(VERSION).$(SUBVERSION).$(PATCHLEVEL)$(if $(EXTRAVERSION),-$(EXTRAVERSION))-$(REVISION)$(if $(GIT_HASH),-$(GIT_HASH))$(if $(DIRTY),$(DIRTY))$(if $(LOCALVERSION),-$(LOCALVERSION))
 
 ifneq ($(GIT_TAG),)
 ifneq ($(GIT_TAG),latest)
 	# git revision is tagged
-	OPL_VERSION = $(GIT_TAG)$(if $(DIRTY),$(DIRTY))
+	OPL_VERSION = $(GIT_TAG)$(if $(DIRTY),$(DIRTY))$(if $(LOCALVERSION),-$(LOCALVERSION))
 endif
 endif
 
@@ -310,6 +312,8 @@ clean:	download_lwNBD
 	$(MAKE) -C modules/network/nbns clean
 	echo " -httpclient"
 	$(MAKE) -C modules/network/httpclient clean
+	echo " -atad (ata_bd)"
+	$(MAKE) -C modules/hdd/atad clean
 	echo " -xhdd"
 	$(MAKE) -C modules/hdd/xhdd clean
 	echo " -mcemu"
@@ -619,7 +623,14 @@ modules/network/smbinit/smbinit.irx: modules/network/smbinit
 $(EE_ASM_DIR)smbinit.c: modules/network/smbinit/smbinit.irx | $(EE_ASM_DIR)
 	$(BIN2C) $< $@ $(*F)_irx
 
-$(EE_ASM_DIR)ps2atad.c: $(PS2SDK)/iop/irx/ata_bd.irx | $(EE_ASM_DIR)
+# FORK-VENDORED atad (modules/hdd/atad, see its ORIGIN.txt): the SDK prebuilt latches a failed
+# first probe forever (the "40x: HardDisk Drive not detected" all-session APA death); ours makes
+# sceAtaInit retryable so the EE retry loop + xhdd's re-probe devctl genuinely heal. Generated file
+# keeps the ps2atad.c name -> symbol ps2atad_irx -> zero EE-side changes.
+modules/hdd/atad/ata_bd.irx: modules/hdd/atad
+	$(MAKE) -C $<
+
+$(EE_ASM_DIR)ps2atad.c: modules/hdd/atad/ata_bd.irx | $(EE_ASM_DIR)
 	$(BIN2C) $< $@ $(*F)_irx
 
 $(EE_ASM_DIR)hdpro_atad.c: $(PS2SDK)/iop/irx/hdproatad.irx | $(EE_ASM_DIR)

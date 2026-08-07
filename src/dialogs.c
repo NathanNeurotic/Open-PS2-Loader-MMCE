@@ -858,7 +858,7 @@ struct UIItem diaPadMacroConfig[] = {
 
 // About Menu
 struct UIItem diaAbout[] = {
-    {UI_LABEL, ABOUT_TITLE, 1, 1, -1, 0, 0, {.label = {NULL, -1}}},
+    {UI_HEADER, ABOUT_TITLE, 1, 1, -1, 0, 0, {.label = {NULL, -1}}},
     {UI_SPLITTER},
 
     // Coders
@@ -866,7 +866,7 @@ struct UIItem diaAbout[] = {
     {UI_BREAK},
 
     {UI_SPACER},
-    {UI_LABEL, 0, 1, 1, -1, 0, 15, {.label = {"BatRastard - belek666 - crazyc - dlanor - doctorxyz", -1}}},
+    {UI_LABEL, 0, 1, 1, -1, 0, 15, {.label = {"BatRastard - bbsan2k - belek666 - crazyc - dlanor - doctorxyz", -1}}},
     {UI_BREAK},
 
     {UI_SPACER},
@@ -874,7 +874,7 @@ struct UIItem diaAbout[] = {
     {UI_BREAK},
 
     {UI_SPACER},
-    {UI_LABEL, 0, 1, 1, -1, 0, 15, {.label = {"kr_ps2 - Maximus32 - misfire - Polo35 - reprep - SP193 - volca", -1}}},
+    {UI_LABEL, 0, 1, 1, -1, 0, 15, {.label = {"kr_ps2 - Maximus32 - misfire - Polo35 - reprep - saildot4k - SP193 - volca", -1}}},
     {UI_BREAK},
 
     {UI_SPACER},
@@ -888,11 +888,16 @@ struct UIItem diaAbout[] = {
     {UI_BREAK},
 
     {UI_SPACER},
-    {UI_LABEL, 0, 1, 1, -1, 0, 15, {.label = {"algol - Berion - El_Patas - EP - gledson999 - jolek - lee4", -1}}},
+    // Blade1984 and zackcage6 sit here rather than in a fork-testers block of their own: the About
+    // cannot scroll (its only navigable control is the trailing OK, and diaRenderUI pins
+    // diaScrollOffset to 0 while focus is on the first control), so a new heading + name row would
+    // push the content bottom past visibleBottom and render the credit, and the OK button,
+    // off-screen. APPEND fork testers to an existing row; never add a row.
+    {UI_LABEL, 0, 1, 1, -1, 0, 15, {.label = {"algol - Berion - Blade1984 - El_Patas - EP - gledson999 - jolek - lee4", -1}}},
     {UI_BREAK},
 
     {UI_SPACER},
-    {UI_LABEL, 0, 1, 1, -1, 0, 15, {.label = {"LocalH - RandQalan - ShaolinAssassin - yoshi314 - zero35", -1}}},
+    {UI_LABEL, 0, 1, 1, -1, 0, 15, {.label = {"LocalH - RandQalan - ShaolinAssassin - yoshi314 - zero35 - zackcage6", -1}}},
     {UI_BREAK},
 
     {UI_BREAK},
@@ -903,6 +908,15 @@ struct UIItem diaAbout[] = {
 
     {UI_SPACER},
     {UI_LABEL, 0, 1, 1, -1, 0, 15, {.label = {"icyson55", -1}}},
+    {UI_BREAK},
+
+    // Financial Support (RiptOPL fork)
+    {UI_BREAK},
+    {UI_LABEL, 0, 1, 1, -1, 0, 15, {.label = {NULL, _STR_FINANCIAL_SUPPORT}}},
+    {UI_BREAK},
+
+    {UI_SPACER},
+    {UI_LABEL, 0, 1, 1, -1, 0, 15, {.label = {"Akilluminati47", -1}}},
     {UI_BREAK},
 
     // Build Options

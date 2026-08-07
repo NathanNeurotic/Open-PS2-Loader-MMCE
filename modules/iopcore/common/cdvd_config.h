@@ -81,6 +81,11 @@ struct cdvdman_settings_bdm
     // Device ID of the block device to bind to.
     u32 bdDeviceId;
 
+    // Underlying BDM driver name of the block device to bind to (e.g. "usb", "sdc", "sd", "ata").
+    // Binding by driver token keeps a launch attached to the right transport when several BDM
+    // block devices are active; an empty string preserves the old index-only match.
+    char bdDeviceDriver[16];
+
     // Indicates the supported LBA size of the HDD (1 for LBA48, 0 for LBA28).
     u32 hddIsLBA48;
 
