@@ -39,6 +39,7 @@
 #define MAX_HOOKS      5
 #define MAX_CODES      250
 #define MAX_CHEATLIST  (MAX_HOOKS * 2 + MAX_CODES * 2)
+#define MAX_IMAGEWORDS 1024 // prebuilt PS2RD cheat image (.img): up to 4 KB of u32 patch words
 #define CHEAT_NAME_MAX 128
 
 /* Some character defines */
@@ -67,12 +68,21 @@ typedef struct
     int enabled;
 } cheat_entry_t;
 
-extern cheat_entry_t gCheats[MAX_CODES];
+// Lazily allocated (~1.03 MB) on the first cheat-file load of the session -- NULL until then.
+// It used to be permanent BSS, held even with cheats off (the default). See load_cheats().
+extern cheat_entry_t *gCheats;
 
 void InitCheatsConfig(config_set_t *configSet);
 int GetCheatsEnabled(void);
 const u32 *GetCheatsList(void);
 int load_cheats(const char *cheatfile);
+int load_cheats_buf(const char *buf); // buf must be NUL-terminated (tar members carry no NUL)
 void set_cheats_list(void);
+
+// Prebuilt PS2RD cheat image (.img): a binary patch list applied directly at boot, parallel to the
+// text .cht codes. Gated per-game by $EnableImage (default OFF).
+int GetImageEnabled(void);
+const u32 *GetImage(void);
+int LoadImage(const char *filename);
 
 #endif /* _CHEATMAN_H_ */

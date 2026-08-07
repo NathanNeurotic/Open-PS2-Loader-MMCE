@@ -27,6 +27,48 @@
 #include "include/cheat_api.h"
 #include "coreconfig.h"
 
+/*-----------------------------------------------------------*/
+/* Prebuilt PS2RD cheat-image (.img): apply at boot          */
+/*-----------------------------------------------------------*/
+// Apply the OPL-provided image: a header [Offset0, CountWords0, CountEntries] (Offset0 must already hold
+// CountWords0 in memory as a sanity gate), then CountEntries entries of [Offset, CountWords, data...]
+// written to memory. Read config->gImage DIRECTLY -- it is valid here, exactly like config->gCheatList
+// (which SetupCheats also reads straight from config) -- with NO local copy, because a 4 KB local buffer
+// overflows the ee_core's tight .bss/ram84 region. HARDENING: walk p against an explicit pEnd so a
+// malformed/oversized image can never read past MAX_IMAGEWORDS (an OOB read). Abort on any overrun.
+void LinkImage(void)
+{
+    USE_LOCAL_EECORE_CONFIG;
+    unsigned CountEntries, CountWords, Offset;
+    u32 *p = config->gImage;
+    u32 *pEnd = config->gImage + MAX_IMAGEWORDS;
+
+    Offset = *p++;
+    if (!Offset)
+        return;
+    if (p >= pEnd)
+        return;
+    CountWords = *p++;
+    if (*(u32 *)(Offset) != CountWords)
+        return;
+    if (p >= pEnd)
+        return;
+    CountEntries = *p++;
+    while (CountEntries--) {
+        if (p >= pEnd)
+            return;
+        Offset = *p++;
+        if (p >= pEnd)
+            return;
+        CountWords = *p++;
+        for (; CountWords--; Offset += 4) {
+            if (p >= pEnd)
+                return;
+            *(u32 *)(Offset) = *p++;
+        }
+    }
+}
+
 /*---------------------------------*/
 /* Setup PS2RD Cheat Engine params */
 /*---------------------------------*/
@@ -51,11 +93,15 @@ void SetupCheats()
             break;
 
         if (((code.addr & 0xfe000000) == 0x90000000) && nextCodeCanBeHook == 1) {
+            if (j + 2 > MAX_HOOKS * 2)
+                break; // hooklist full; stop rather than overflow past its MAX_HOOKS*2 words
             hooklist[j] = code.addr & 0x01FFFFFC;
             j++;
             hooklist[j] = code.val;
             j++;
         } else {
+            if (k + 2 > MAX_CODES * 2)
+                break; // codelist full; stop rather than overflow past its MAX_CODES*2 words
             codelist[k] = code.addr;
             k++;
             codelist[k] = code.val;

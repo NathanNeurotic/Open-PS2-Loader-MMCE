@@ -140,6 +140,14 @@ static int bdmReadDeviceIdentity(const char *path, char *driverName, int driverN
     fileXioDclose(dir);
     return result;
 }
+// NOTE(rebuild): the UDPBD block transport returns with checklist items 5/7 -- until then no
+// UDPBD device can be mounted, so "not UDPBD" is exact for every support that can exist.
+int bdmSupportIsUDPBD(item_list_t *support)
+{
+    (void)support;
+    return 0;
+}
+
 
 // Find the first mounted BDM device whose driver matches bdmType (BDM_TYPE_*) and write its
 // massN: FILESYSTEM root WITH a trailing slash (e.g. "mass0:/") to root. Returns 1 if such a

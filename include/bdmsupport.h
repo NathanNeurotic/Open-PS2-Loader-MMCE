@@ -57,4 +57,6 @@ int bdmHDDIsPresent(u32 timeoutMs);
 // First mounted device of a BDM_TYPE_*: writes its massN:/ root; 1 = found.
 int bdmGetDeviceRootByType(int bdmType, char *root, int rootLen);
 
+int bdmSupportIsUDPBD(item_list_t *support); // 1 if this support is the UDPBD block device (Neutrino-only games)
+
 #endif

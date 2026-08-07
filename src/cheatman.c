@@ -30,7 +30,22 @@ static int gEnableCheat; // Enables PS2RD Cheat Engine - 0 for Off, 1 for On
 static int gCheatMode;   // Cheat Mode - 0 Enable all cheats, 1 Cheats selected by user
 
 static u32 gCheatList[MAX_CHEATLIST]; // Store hooks/codes addr+val pairs
-cheat_entry_t gCheats[MAX_CODES];
+cheat_entry_t *gCheats = NULL;        // lazily allocated in load_cheats (~1.03 MB); reclaims the old permanent BSS
+
+static int gEnableImage;           // Prebuilt PS2RD cheat image (.img) - 0 Off, 1 On
+static u32 gImage[MAX_IMAGEWORDS]; // The loaded .img patch words (zeroed when none/failed)
+
+// Release the lazily-allocated ~1.03 MB cheat table (see ensureCheatTable). Every reader is
+// NULL-guarded (the cheat-selection menu and set_cheats_list), and the launch handoff never
+// references gCheats -- set_cheats_list flattens it into the small static gCheatList that
+// ee_core reads in-place, so freeing between launches is safe.
+static void freeCheatTable(void)
+{
+    if (gCheats != NULL) {
+        free(gCheats);
+        gCheats = NULL;
+    }
+}
 
 void InitCheatsConfig(config_set_t *configSet)
 {
@@ -40,17 +55,27 @@ void InitCheatsConfig(config_set_t *configSet)
     gCheatSource = 0;
     gEnableCheat = 0;
     gCheatMode = 0;
+    gEnableImage = 0;
 
     if (configGetInt(configSet, CONFIG_ITEM_CHEATSSOURCE, &gCheatSource)) {
         // Load the rest of the per-game CHEAT configuration if CHEAT is enabled.
         if (configGetInt(configSet, CONFIG_ITEM_ENABLECHEAT, &gEnableCheat) && gEnableCheat) {
             configGetInt(configSet, CONFIG_ITEM_CHEATMODE, &gCheatMode);
         }
+        configGetInt(configSet, CONFIG_ITEM_ENABLEIMAGE, &gEnableImage);
     } else {
         if (configGetInt(configGame, CONFIG_ITEM_ENABLECHEAT, &gEnableCheat) && gEnableCheat) {
             configGetInt(configGame, CONFIG_ITEM_CHEATMODE, &gCheatMode);
         }
+        configGetInt(configGame, CONFIG_ITEM_ENABLEIMAGE, &gEnableImage);
     }
+
+    // Cheats OFF for this launch: reclaim the ~1 MB table a previous cheats-ON launch may have
+    // left behind (it only survives OPL at all when that launch FAILED back to the GUI -- a
+    // successful launch hands off to ExecPS2). This runs in per-launch settings prep BEFORE any
+    // sbLoadCheats of the same launch, so a cheats-ON launch never sees a freed table.
+    if (!gEnableCheat)
+        freeCheatTable();
 }
 
 int GetCheatsEnabled(void)
@@ -63,26 +88,59 @@ const u32 *GetCheatsList(void)
     return gCheatList;
 }
 
+int GetImageEnabled(void)
+{
+    return gEnableImage;
+}
+
+const u32 *GetImage(void)
+{
+    return gImage;
+}
+
+// Load a prebuilt PS2RD cheat image (.img) into gImage. memset FIRST so a missing/short/failed load
+// leaves a clean zeroed image (the ee_core LinkImage then no-ops on the leading zero word). POSIX IO
+// only (newlib rule). Over-size files truncate to MAX_IMAGEWORDS; the ee_core bounds-checks on apply.
+int LoadImage(const char *filename)
+{
+    int fd, len;
+
+    memset(gImage, 0, sizeof(gImage));
+    fd = open(filename, O_RDONLY);
+    if (fd < 0)
+        return -1;
+    len = read(fd, gImage, sizeof(gImage));
+    close(fd);
+    return (len < 0) ? -1 : 0;
+}
+
 /*
  * make_code - Return a code object from string @s.
  */
 static code_t make_code(const char *s)
 {
     code_t code;
-    u32 address;
-    u32 value;
-    char digits[CODE_DIGITS];
+    u32 address = 0; /* init so a partial sscanf parse is safe */
+    u32 value = 0;
+    char digits[CODE_DIGITS + 1]; /* +1: NUL terminator after all CODE_DIGITS hex chars */
     int i = 0;
 
     while (*s) {
-        if (isxdigit((int)*s))
+        // Collect up to CODE_DIGITS hex chars; digits[] has room for them + NUL.
+        if (isxdigit((int)*s) && i < CODE_DIGITS)
             digits[i++] = *s;
         s++;
     }
 
     digits[i] = '\0';
 
-    sscanf(digits, "%08X %08X", &address, &value);
+    /* digits[] holds only hex chars (no spaces); no space in format string.
+     * Bail on a partial parse (< 2 items) — leaves address=0/value=0. */
+    if (sscanf(digits, "%08X%08X", &address, &value) != 2) {
+        code.addr = 0;
+        code.val = 0;
+        return code;
+    }
 
     // Return Code Address and Value
     code.addr = address;
@@ -143,9 +201,9 @@ static inline int is_cmt_str(const char *s)
  * chr_idx - Returns the index within @s of the first occurrence of the
  * specified char @c.  If no such char occurs in @s, then (-1) is returned.
  */
-static size_t chr_idx(const char *s, char c)
+static int chr_idx(const char *s, char c)
 {
-    size_t i = 0;
+    int i = 0;
 
     while (s[i] && (s[i] != c))
         i++;
@@ -255,10 +313,15 @@ static int parse_buf(const char *buf)
 
     while (*buf) {
         /* Scanner */
-        int len = chr_idx(buf, LF);
+        int lfIdx = chr_idx(buf, LF);
+        int len = lfIdx;
         if (len < 0)
             len = strlen(buf);
-        else if (len > CHEAT_LINE_MAX)
+        // Cap BOTH branches: a final line with no trailing LF longer than CHEAT_LINE_MAX used to
+        // strncpy past line[256] -- a stack smash on the launch thread. Loose .cht files always
+        // carried this; community-distributed cht.tar packs make malformed input a first-class
+        // vector, so it lands with the tar support (adversarial review of #154).
+        if (len > CHEAT_LINE_MAX)
             len = CHEAT_LINE_MAX;
 
         if (!is_empty_substr(buf, len)) {
@@ -280,8 +343,11 @@ static int parse_buf(const char *buf)
                 /* Parser */
                 code = parse_line(line, linenumber);
                 if (!(code.addr == 0 && code.val == 0)) {
-                    // Only add the cheat entry if we have a valid cheat name in temp_name
-                    if (cheat_index < MAX_CODES && temp_name[0] != NUL) {
+                    // Only add the cheat entry if we have a valid cheat name in temp_name.
+                    // Check the POST-increment index: cheat_index is pre-incremented below,
+                    // so testing "cheat_index < MAX_CODES" let the index reach MAX_CODES and
+                    // write gCheats[MAX_CODES], one past the end of the array.
+                    if (cheat_index + 1 < MAX_CODES && temp_name[0] != NUL) {
                         cheat_index++; // Move to the next cheat entry
                         strncpy(gCheats[cheat_index].name, temp_name, CHEAT_NAME_MAX);
                         gCheats[cheat_index].name[CHEAT_NAME_MAX] = NUL;
@@ -295,7 +361,9 @@ static int parse_buf(const char *buf)
             }
         }
         linenumber++;
-        buf += len + 1;
+        // Advance past the LF only when one was found. On the final line without a
+        // trailing newline, stop at the NUL rather than reading one byte past it.
+        buf += (lfIdx < 0) ? len : len + 1;
     }
 
     return 0;
@@ -339,7 +407,12 @@ static inline char *read_text_file(const char *filename, int maxsize)
     }
 
     if (filesize > 0) {
-        lseek(fd, 0, SEEK_SET);
+        if (lseek(fd, 0, SEEK_SET) != 0) {
+            LOG("%s: Can't seek to start of text file %s\n", __FUNCTION__, filename);
+            free(buf);
+            close(fd);
+            return NULL;
+        }
         if (read(fd, buf, filesize) != filesize) {
             LOG("%s: Can't read from text file %s\n", __FUNCTION__, filename);
             free(buf);
@@ -357,12 +430,32 @@ static inline char *read_text_file(const char *filename, int maxsize)
 /*
  * Load cheats from text file.
  */
+// Lazy cheat table: MAX_CODES x sizeof(cheat_entry_t) (~1.03 MB) that used to sit in BSS
+// permanently, held even with cheats off (the default). Allocated on the first cheat load and
+// kept for the session (a successful launch hands off to ExecPS2 anyway; a failed one reuses
+// the buffer on retry). An allocation failure degrades exactly like an unreadable cheat file --
+// the launch legs already toast _STR_ERR_CHEATS_LOAD_FAILED for ret < 0. Shared by the loose-
+// file loader below and the CHT/cht.tar member loader (load_cheats_buf).
+static int ensureCheatTable(void)
+{
+    if (gCheats == NULL) {
+        gCheats = (cheat_entry_t *)malloc(MAX_CODES * sizeof(cheat_entry_t));
+        if (gCheats == NULL) {
+            LOG("%s: cheat table allocation failed (%d bytes)\n", __FUNCTION__, (int)(MAX_CODES * sizeof(cheat_entry_t)));
+            return -1;
+        }
+    }
+    memset(gCheats, 0, MAX_CODES * sizeof(cheat_entry_t));
+    return 0;
+}
+
 int load_cheats(const char *cheatfile)
 {
     char *buf = NULL;
     int ret;
 
-    memset(gCheats, 0, sizeof(gCheats));
+    if (ensureCheatTable() < 0)
+        return -1;
 
     LOG("%s: Reading cheat file '%s'...\n", __FUNCTION__, cheatfile);
     buf = read_text_file(cheatfile, 0);
@@ -380,11 +473,35 @@ int load_cheats(const char *cheatfile)
     return (gCheatMode == 0) ? 0 : 1;
 }
 
+// Parse cheats from an in-memory buffer (a CHT/cht.tar member). buf MUST be NUL-terminated --
+// tar members carry no terminator, so the caller allocates rawSize+1 and terminates. wOPL's
+// variant takes an unused size parameter and feeds the raw tar buffer to the parser (a latent
+// overread); the explicit contract here avoids porting that.
+int load_cheats_buf(const char *buf)
+{
+    int ret;
+
+    if (buf == NULL || ensureCheatTable() < 0)
+        return -1;
+
+    ret = parse_buf(buf);
+    if (ret < 0)
+        return ret;
+
+    return (gCheatMode == 0) ? 0 : 1;
+}
+
 void set_cheats_list(void)
 {
     int cheatCount = 0;
 
     memset((void *)gCheatList, 0, sizeof(gCheatList));
+
+    // No cheat file was ever loaded this session: the zeroed list above ALREADY carries its
+    // addr=0 terminator, so return instead of re-testing the pointer every loop iteration
+    // (PR #101 review -- LOG in the body forces a reload of the global each pass).
+    if (gCheats == NULL)
+        return;
 
     // Populate the cheat list
     for (int i = 0; i < MAX_CODES; ++i) {
