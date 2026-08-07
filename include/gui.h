@@ -149,6 +149,11 @@ void guiGameHandleDeferedIO(int *ptr, struct UIItem *ui, int type, void *data);
 /** Renders a single frame with a specified message on the screen
  */
 void guiRenderTextScreen(const char *message);
+void guiRenderGreetingScreen(void);
+// Boot-splash status line (main thread); NULL clears both the line and the sticky label.
+void guiSetBootStatus(const char *status);
+// Boot-step localizer for deferred IO-thread steps; label must be a static/_l() string.
+void guiSetBootStatusSticky(const char *label);
 
 void guiWarning(const char *text, int count);
 

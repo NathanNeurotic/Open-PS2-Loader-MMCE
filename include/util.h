@@ -18,13 +18,19 @@ typedef struct
     unsigned int available;
     char *lastPtr;
     short allocResult;
+    int writeError;           // sticky flag: set when any buffered write()/close() fails; returned by closeFileBuffer
+    unsigned int totalQueued; // total bytes ever handed to writeFileBuffer; when == available at close
+                              // time, the WHOLE content still sits in buffer (no intermediate flush) --
+                              // configWrite's read-back verify uses that to capture the intended bytes
 } file_buffer_t;
 
 file_buffer_t *openFileBufferBuffer(short allocResult, const void *buffer, unsigned int size);
 file_buffer_t *openFileBuffer(char *fpath, int mode, short allocResult, unsigned int size);
 int readFileBuffer(file_buffer_t *readContext, char **outBuf);
 void writeFileBuffer(file_buffer_t *fileBuffer, char *inBuf, int size);
-void closeFileBuffer(file_buffer_t *fileBuffer);
+// Returns 0 on success, -1 if any write()/close() during the buffered write failed (short write,
+// wedged device, ...). Read-mode buffers always return 0. Callers that don't care may ignore it.
+int closeFileBuffer(file_buffer_t *fileBuffer);
 
 int max(int a, int b);
 int min(int a, int b);

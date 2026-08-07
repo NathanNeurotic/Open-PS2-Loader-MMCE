@@ -50,6 +50,19 @@ static int showLngPopup;
 
 static clock_t popupTimer;
 
+// Boot-splash status line: set via guiSetBootStatus(), drawn under the logo by
+// guiRenderGreeting(). Both on the MAIN thread, so gBootStatus needs no locking.
+static char gBootStatus[64] = {0};
+static int gBootStatusActive = 0;
+// Boot-step localizer: a deferred IO-thread boot step can wedge with no timeout on real
+// hardware and freeze the splash, while the MAIN thread races ahead setting "Ready." -- the
+// frozen screen would then show a useless "Ready." instead of the stuck step. An IO-thread
+// step publishes its label via guiSetBootStatusSticky(); guiRenderGreeting PREFERS it over
+// gBootStatus, so whichever ordering wins the STUCK STEP is what stays on screen. Cross-thread
+// state is a single aligned POINTER (atomic load/store on the EE) to a static _l() string --
+// no shared buffer, so no data race. Cleared by guiSetBootStatus(NULL).
+static const char *volatile gBootStickyLabel = NULL;
+
 // forward decl.
 static void guiShow();
 
@@ -1097,6 +1110,32 @@ static void guiDrawBusy(int alpha)
     }
 }
 
+// Boot-splash status line setter. Pass NULL to clear. Main-thread only (writes gBootStatus,
+// which only guiRenderGreeting on the same thread reads). guiRenderGreeting prefers any
+// IO-thread sticky label over this.
+void guiSetBootStatus(const char *status)
+{
+    if (status == NULL) {
+        gBootStatus[0] = '\0';
+        gBootStatusActive = 0;
+        gBootStickyLabel = NULL; // release the localizer latch so a fresh boot can claim the line again
+        return;
+    }
+    snprintf(gBootStatus, sizeof(gBootStatus), "%s", status);
+    gBootStatusActive = 1;
+}
+
+// Boot-step localizer setter, called from the deferred IO-thread boot steps. `label` MUST be a
+// static string (an _l() lang entry or literal) since only a POINTER to it is stored -- no copy,
+// no shared buffer, so no data race with the main-thread render (a single aligned pointer
+// store/load is atomic on the EE). If a step wedges, its label stays on the splash.
+void guiSetBootStatusSticky(const char *label)
+{
+    if (label == NULL)
+        return;
+    gBootStickyLabel = label;
+}
+
 static void guiRenderGreeting(int alpha)
 {
     u64 mycolor = GS_SETREG_RGBA(0x1C, 0x1C, 0x1C, alpha);
@@ -1107,6 +1146,33 @@ static void guiRenderGreeting(int alpha)
         mycolor = GS_SETREG_RGBA(0x80, 0x80, 0x80, alpha);
         rmDrawPixmap(logo, screenWidth >> 1, gTheme->usedHeight >> 1, ALIGN_CENTER, logo->Width, logo->Height, SCALING_RATIO, mycolor);
     }
+
+    // Boot info: the RiptOPL version + a live status line, faded with the splash.
+    // Reuses gTheme->fonts[0] (always-loaded built-in) and the same OPL_VERSION About shows.
+    u64 infoColor = GS_SETREG_RGBA(0x80, 0x80, 0x80, alpha);
+    char verLine[48];
+    snprintf(verLine, sizeof(verLine), "RiptOPL %s", OPL_VERSION);
+    fntRenderString(gTheme->fonts[0], screenWidth >> 1, (gTheme->usedHeight >> 1) + 80, ALIGN_CENTER, 0, 0, verLine, infoColor);
+    // Prefer an IO-thread boot-step label (the localizer) over the main-thread scan/Ready line,
+    // so a wedged step names itself. gBootStickyLabel is a single atomic pointer to a static string.
+    const char *bootLine = gBootStickyLabel;
+    if (bootLine == NULL && gBootStatusActive && gBootStatus[0] != '\0')
+        bootLine = gBootStatus;
+    if (bootLine != NULL)
+        fntRenderString(gTheme->fonts[0], screenWidth >> 1, gTheme->usedHeight - 40, ALIGN_CENTER, 0, 0, bootLine, infoColor);
+}
+
+// Draw one standalone boot-splash frame: the same greeting guiIntroLoop() shows,
+// at full opacity. Used as the boot "loading" screen instead of
+// guiRenderTextScreen(), whose guiShow() call would render the not-yet-ready main
+// menu (empty lists, no device selected) as a garbled landing page before the
+// intro splash. This keeps the OPL logo on screen across the config load so boot
+// shows the splash, never a half-drawn menu.
+void guiRenderGreetingScreen(void)
+{
+    guiStartFrame();
+    guiRenderGreeting(0x80);
+    guiEndFrame();
 }
 
 static float mix(float a, float b, float t)

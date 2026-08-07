@@ -704,3 +704,7 @@ gui_strings:
   string: Financial Support
 - label: DEFAULT
   string: Default
+- label: BOOT_LOADING_CONFIG
+  string: Loading settings...
+- label: BOOT_READY
+  string: Ready.
