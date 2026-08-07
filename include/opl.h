@@ -238,6 +238,10 @@ typedef struct
     submenu_list_t *subMenu;
 } opl_io_module_t;
 
+// Favourites accessor: keep list_support[] file-static, but let favsupport.c reach a
+// module through this thin wrapper.
+opl_io_module_t *oplGetModule(int mode);
+
 /*
 BLURT output char blurttext[128];
 #define BLURT                                                                           \

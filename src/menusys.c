@@ -92,6 +92,19 @@ static void menuRenameGame(submenu_list_t **submenu)
 
     item_list_t *support = selected_item->item->userdata;
 
+    if (support && support->mode == FAV_MODE) {
+        char text[128];
+        snprintf(text, sizeof(text), _l(_STR_FAV_MSG), _l(_STR_RENAME));
+        guiMsgBox(text, 0, NULL);
+        return;
+    }
+    if (selected_item->item->current->item.favourited) {
+        char text[128];
+        snprintf(text, sizeof(text), _l(_STR_FAV_PERSISTENCE_MSG), _l(_STR_RENAME));
+        guiMsgBox(text, 0, NULL);
+        return;
+    }
+
     if (support) {
         if (support->itemRename) {
             if (menuCheckParentalLock() == 0) {
@@ -125,6 +138,19 @@ static void menuDeleteGame(submenu_list_t **submenu)
         return;
 
     item_list_t *support = selected_item->item->userdata;
+
+    if (support && support->mode == FAV_MODE) {
+        char text[128];
+        snprintf(text, sizeof(text), _l(_STR_FAV_MSG), _l(_STR_DELETE));
+        guiMsgBox(text, 0, NULL);
+        return;
+    }
+    if (selected_item->item->current->item.favourited) {
+        char text[128];
+        snprintf(text, sizeof(text), _l(_STR_FAV_PERSISTENCE_MSG), _l(_STR_DELETE));
+        guiMsgBox(text, 0, NULL);
+        return;
+    }
 
     if (support) {
         if (support->itemDelete) {
@@ -446,6 +472,20 @@ submenu_list_t *submenuAppendItem(submenu_list_t **submenu, int icon_id, char *t
     newitem->prev = cur;
 
     return newitem;
+}
+
+// Linear search by id + text. Favourites uses this to locate the source-list item so the
+// favourited flag (star) stays in sync on both the FAV copy and the source copy. Both text
+// args are NULL-guarded before strcmp.
+submenu_list_t *submenuFindItemByIdAndText(submenu_list_t *submenu, int id, const char *text)
+{
+    submenu_list_t *cur = submenu;
+    while (cur) {
+        if (cur->item.id == id && text && cur->item.text && !strcmp(cur->item.text, text))
+            return cur;
+        cur = cur->next;
+    }
+    return NULL;
 }
 
 static void submenuDestroyItem(submenu_list_t *submenu)
@@ -993,6 +1033,12 @@ void menuHandleInputMain()
         menuFirstPage();
     } else if (getKeyOn(KEY_R2)) { // end
         menuLastPage();
+    } else if (getKeyOn(KEY_R3)) { // toggle favourite
+        if (selected_item->item->fav)
+            selected_item->item->fav(selected_item->item);
+    } else if (getKeyOn(KEY_L3)) { // toggle VCD view (disc list <-> POPS/*.VCD; item 12)
+        if (selected_item->item->toggleView)
+            selected_item->item->toggleView(selected_item->item);
     }
 
     // Last Played Auto Start
