@@ -21,10 +21,20 @@ typedef struct
 // normal per-file lookup. Opt-in: gEnableArtTar ships 0, so with the toggle off this is a single
 // predictable branch and the art path is byte-for-byte the behaviour hardware has already validated.
 //
-// #340 note: tarFind() lazily probes devices on its FIRST call, which is IO -- but it can only be
-// reached from cacheLoadImage, which the caller already gates behind the art idle delay
-// (guiInactiveFrames < list->delay in cacheGetTexture). So no .tar work can land while the user is
-// holding a direction, and tar.c's own s_inactive[] latch stops a failed probe from repeating.
+// #340 note -- what this actually costs, stated in full because item 45 is a flagged suspect:
+//   WHERE IT RUNS: cacheLoadImage is an ioman handler (ioRegisterHandler/ioPutRequest below), so all
+//   of this executes on the IO worker thread at priority 30 -- never on the GUI/pad thread. The
+//   caller also gates the enqueue behind the art idle delay (guiInactiveFrames < list->delay in
+//   cacheGetTexture), so nothing here is even queued while the user is holding a direction.
+//   ONE-SHOT COSTS on the first request after the toggle goes on:
+//     - tarFind() lazily probes up to 13 devices (mass0-7, mmce0/1, hdd0:, pfs0:, smb0:) with one
+//       open() each; mmce* and smb0: are the slow ones. tar.c's s_inactive[] latch stops a failed
+//       probe from repeating.
+//     - a successful parse then WRITES a sidecar index (art_cache.bin, ~64 bytes per entry) next to
+//       the archive. That is a genuine write on the art path, unlike official's read-only one. It is
+//       non-fatal (tarParseFile ignores the result) and happens only when the archive changes, but it
+//       is the thing to instrument first if a .tar-enabled build ever feels worse than a plain one.
+//   DEFAULT PATH: gEnableArtTar ships 0, so none of the above is reachable unless the user opts in.
 static int artTarLoadImage(const char *value, const char *suffix, GSTEXTURE *texture)
 {
     char name[64];
