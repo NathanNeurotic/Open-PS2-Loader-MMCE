@@ -155,6 +155,7 @@ int gAPPStartMode;
 int bdmCacheSize;
 int hddCacheSize;
 int smbCacheSize;
+int gApplyGameID;
 int gEnableUSB;
 char gNeutrinoArgs[256];     // extra command-line flags appended to every Neutrino launch
 char gNeutrinoPath[256];     // custom neutrino.elf path; "" -> auto-detect on mc0:/mc1:
@@ -330,6 +331,9 @@ static void itemExecSelect(struct menu_item *curMenu)
                     return;
                 }
                 config_set_t *configSet = menuLoadConfig();
+                // Flash the GameID barcode (Pixel FX/RetroGEM HDMI auto-profile) before handoff; this
+                // single menu chokepoint covers both the Neutrino and OPL-native cores. No-op when off.
+                guiShowGameID(support->itemGetStartup(support, curMenu->current->item.id));
                 support->itemLaunch(support, curMenu->current->item.id, configSet);
             }
         } else {
@@ -1290,6 +1294,7 @@ static void _loadConfig()
             configGetInt(configOPL, CONFIG_OPL_APP_MODE, &gAPPStartMode);
             configGetInt(configOPL, CONFIG_OPL_ENABLE_USB, &gEnableUSB);
             configGetInt(configOPL, CONFIG_OPL_FAV_MODE, &gFAVStartMode);
+            configGetInt(configOPL, CONFIG_OPL_APPLY_GAMEID, &gApplyGameID);
             configGetInt(configOPL, CONFIG_OPL_DEFAULT_GAME_VIEW, &gDefaultGameView);
             if (gDefaultGameView < GAME_VIEW_BOTH || gDefaultGameView > GAME_VIEW_VCD)
                 gDefaultGameView = GAME_VIEW_BOTH;
@@ -1599,6 +1604,7 @@ static void _saveConfig()
         configSetInt(configOPL, CONFIG_OPL_SMB_CACHE, smbCacheSize);
         configSetInt(configOPL, CONFIG_OPL_ENABLE_USB, gEnableUSB);
         configSetInt(configOPL, CONFIG_OPL_FAV_MODE, gFAVStartMode);
+        configSetInt(configOPL, CONFIG_OPL_APPLY_GAMEID, gApplyGameID);
         configSetInt(configOPL, CONFIG_OPL_DEFAULT_GAME_VIEW, gDefaultGameView);
         configSetStr(configOPL, CONFIG_OPL_POPSTARTER_PATH, gPopstarterPath);
         configSetInt(configOPL, CONFIG_OPL_POPSTARTER_DEVICE, gPopstarterDevice);
@@ -2318,6 +2324,9 @@ static void setDefaults(void)
 
     gEnableUSB = 0; // USB block device is opt-in, like the other BDM transports
     gFAVStartMode = START_MODE_DISABLED;
+    // Visual GameID barcode ships OFF, matching fork commit cc2cdfed ("GameID defaults OFF"): the
+    // HDMI auto-profile latch is only verifiable on real GameID hardware, so it stays opt-in.
+    gApplyGameID = 0;
     gNeutrinoArgs[0] = '\0';
     gNeutrinoPath[0] = '\0';
     gNeutrinoDevice = NEUTRINO_DEV_AUTO;

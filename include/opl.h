@@ -130,6 +130,7 @@ extern int bdmCacheSize;
 extern int hddCacheSize;
 extern int smbCacheSize;
 
+extern int gApplyGameID; // Display the visual GameID barcode on launch (Pixel FX / RetroGEM HDMI auto-profiles)
 extern int gEnableUSB;
 // Neutrino Device picker: a driver-accurate device TYPE that holds <root>:/neutrino/neutrino.elf.
 enum { NEUTRINO_DEV_AUTO = 0,  // game device, then mc0/mc1 (legacy behaviour)
