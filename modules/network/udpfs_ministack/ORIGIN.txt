@@ -1,0 +1,10 @@
+Vendored from rickgaiser/neutrino iop/ministack/, pinned to commit
+06188cce7cd07d2a158cb4b2646c5719fc16a565. Mini IP/UDP stack for the UDPFS transport chain
+(parses the ip= arg -> the PS2's own static IP; no DHCP). See ../udpfs_bd/ORIGIN.txt for the
+full UDPFS provenance + local changes (PS2SDK Makefile, clang-format).
+
+Local build fix (ps2dev:latest iopfixup): exports.o is listed FIRST in the Makefile's IOP_OBJS
+and _retonly is defined AFTER the export table in src/exports.tab, so iopfixup doesn't reject
+_retonly as a value-0 .text symbol. Same fix as udpfs_smap / smap_udpbd (commit 2139bcde). The
+export table stays POPULATED -- udpfs_bd imports its udp_* functions -- so it must NOT be emptied.
+Keep both on re-vendor.

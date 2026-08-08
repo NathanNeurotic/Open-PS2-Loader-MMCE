@@ -38,6 +38,7 @@ struct gui_update_t
             int id;
             int text_id;
             int selected;
+            int isFolder; // folder-browse row marker (checklist item 34)
         } submenu;
 
         struct

@@ -4,6 +4,8 @@
 #include "include/iosupport.h"
 #include "include/system.h"
 #include "include/supportbase.h"
+#include "include/folderbrowse.h" // FOLDER_SUB_MAX + folder-browse subpath state
+#include "include/gui.h"          // guiMsgBox (sbCheatsMissingContinue confirm)
 #include "include/ioman.h"
 #include "modules/iopcore/common/cdvd_config.h"
 #include "include/cheatman.h"
@@ -282,7 +284,10 @@ static int queryISOGameListCache(const struct game_cache_list *cache, base_game_
     return ENOENT;
 }
 
-static int scanForISO(char *path, char type, struct game_list_t **glist)
+// folderlist (folder-browse only, else NULL) collects subdirectory rows in a list SEPARATE from
+// glist so they never reach the games.bin cache (updateISOGameList would otherwise cache them as
+// phantom entries and poison its change-detection). Folder rows are not counted in the return value.
+static int scanForISO(char *path, char type, struct game_list_t **glist, struct game_list_t **folderlist)
 {
     int count = 0;
     struct game_cache_list cache = {0, NULL};
@@ -294,16 +299,53 @@ static int scanForISO(char *path, char type, struct game_list_t **glist)
     int cacheLoaded = loadISOGameListCache(path, &cache) == 0;
 
     if ((dir = opendir(path)) != NULL) {
-        size_t base_path_len = strlen(path);
-        strcpy(fullpath, path);
+        int pathLen = snprintf(fullpath, sizeof(fullpath), "%s", path);
+        if (pathLen < 0 || pathLen >= (int)sizeof(fullpath) - 1) {
+            closedir(dir);
+            return 0;
+        }
+        size_t base_path_len = (size_t)pathLen;
         fullpath[base_path_len] = '/';
 
         while ((dirent = readdir(dir)) != NULL) {
             int NameLen;
             int format = isValidIsoName(dirent->d_name, &NameLen);
 
-            if (format <= 0 || NameLen > ISO_GAME_NAME_MAX)
+            if (format <= 0 || NameLen > ISO_GAME_NAME_MAX) {
+                // Not a launchable ISO. With folder browsing on, a subdirectory here becomes a
+                // GAME_FORMAT_FOLDER row. d_type is untrustworthy on MMCE clone firmware (mmceman
+                // passes card-mode bits verbatim), so confirm it is a directory with an opendir probe
+                // rather than trusting the dirent flag. Leading-dot entries ("."/".."/hidden) are
+                // skipped. Folders go on the separate folderlist so the cache never sees them.
+                if (folderlist != NULL && dirent->d_name[0] != '.') {
+                    size_t dnlen = strlen(dirent->d_name);
+                    if (dnlen <= ISO_GAME_NAME_MAX && base_path_len + 1 + dnlen < sizeof(fullpath)) {
+                        strcpy(fullpath + base_path_len + 1, dirent->d_name);
+                        DIR *probe = opendir(fullpath);
+                        if (probe != NULL) {
+                            closedir(probe);
+                            struct game_list_t *fnode = malloc(sizeof(struct game_list_t));
+                            if (fnode != NULL) {
+                                base_game_info_t *fg = &fnode->gameinfo;
+                                memset(fg, 0, sizeof(base_game_info_t));
+                                fg->format = GAME_FORMAT_FOLDER;
+                                fg->media = type;
+                                strncpy(fg->name, dirent->d_name, sizeof(fg->name) - 1);
+                                fg->name[sizeof(fg->name) - 1] = '\0';
+                                fnode->next = *folderlist;
+                                *folderlist = fnode;
+                            }
+                        }
+                    }
+                }
                 continue; // Skip files that cannot be supported properly.
+            }
+
+            // d_name is filesystem-provided and can exceed what fits in fullpath
+            // (NameLen bounds the stripped name, not the raw d_name plus the path
+            // prefix); guard the total length so the strcpy cannot overflow fullpath[256].
+            if (base_path_len + 1 + strlen(dirent->d_name) >= sizeof(fullpath))
+                continue;
 
             strcpy(fullpath + base_path_len + 1, dirent->d_name);
 
@@ -356,6 +398,16 @@ static int scanForISO(char *path, char type, struct game_list_t **glist)
             count++;
         }
         closedir(dir);
+    } else {
+        // opendir() failed: the directory could not be READ (device unreadable / bus wedged), which
+        // is DISTINCT from a readable-but-empty directory (that opens fine and returns count 0). Signal
+        // a read FAILURE with a negative return so sbReadList can preserve the last-good list instead
+        // of blanking it on a transient wedge (MMCE<->MX4SIO SIO2 contention). Crucially, do NOT call
+        // updateISOGameList here -- writing count 0 would rewrite the on-disk list cache to EMPTY,
+        // persisting a transient failure across reboots.
+        if (cacheLoaded)
+            freeISOGameListCache(&cache);
+        return -1;
     }
 
     if (cacheLoaded) {
@@ -368,48 +420,123 @@ static int scanForISO(char *path, char type, struct game_list_t **glist)
     return count;
 }
 
-int sbReadList(base_game_info_t **list, const char *prefix, int *fsize, int *gamecount)
-{
-    int fd, size, id = 0, result;
-    int count;
-    char path[256];
+// Folder browsing: the current subpath below CD/DVD that the path composers inject. Set by sbReadList
+// (from the sub it is scanning) and re-set explicitly by each device's launch/delete/rename leg via
+// sbSetBrowseSub(folderGetSub(mode)), so a game inside a subfolder resolves correctly even when the
+// launch does not go through a fresh scan (e.g. the Favourites tab launching another device's game).
+static char sbBrowseSub[FOLDER_SUB_MAX] = "";
 
-    free(*list);
-    *list = NULL;
-    *fsize = -1;
-    *gamecount = 0;
+void sbSetBrowseSub(const char *sub)
+{
+    if (sub == NULL)
+        sub = "";
+    snprintf(sbBrowseSub, sizeof(sbBrowseSub), "%s", sub);
+}
+
+// De-duplicate folder rows across the CD and DVD passes (a single logical subfolder can hold both
+// media, e.g. CD/RPGs and DVD/RPGs -> one "RPGs" row). Keeps the first occurrence, frees the rest.
+// Returns the count of remaining unique folders.
+static int sbDedupFolderList(struct game_list_t **head)
+{
+    int n = 0;
+    struct game_list_t *a = *head;
+    while (a != NULL) {
+        struct game_list_t *b = a;
+        while (b->next != NULL) {
+            if (strcasecmp(b->next->gameinfo.name, a->gameinfo.name) == 0) {
+                struct game_list_t *dup = b->next;
+                b->next = dup->next;
+                free(dup);
+            } else {
+                b = b->next;
+            }
+        }
+        n++;
+        a = a->next;
+    }
+    return n;
+}
+
+int sbReadList(base_game_info_t **list, const char *prefix, const char *sub, int *fsize, int *gamecount)
+{
+    int fd = -1, size, id = 0;
+    int count, cdRet, dvdRet;
+    char path[256];
+    const int atRoot = (sub == NULL || sub[0] == '\0');
+
+    // Make this the active subpath for the path composers used before the next scan (size stat /
+    // launch). A device leg also re-sets it explicitly at launch time.
+    sbSetBrowseSub(sub);
+
+    // Build into a LOCAL list and leave the caller's *list/*gamecount/*fsize UNTOUCHED until we know
+    // the scan actually reached the device. On a TOTAL device-read failure (every directory's opendir
+    // failed AND no ul.cfg) we keep the old list -- so a transient bus wedge (e.g. the MMCE<->MX4SIO
+    // SIO2 contention) preserves the last-good list on screen instead of blanking it (issue: MMCE
+    // lists vanish on a contended bus). A readable-but-empty device still shows empty (scan returns 0,
+    // not < 0). Device removal is handled separately by page-visibility, not here.
+    base_game_info_t *newlist = NULL;
+    int newfsize = -1;
 
     // temporary storage for the game names
     struct game_list_t *dlist_head = NULL;
+    // Folder rows (kept out of the games.bin cache). Collected only when folder browsing is on AND the
+    // caller opted in by passing a non-NULL sub. A NULL sub is the opt-OUT signal for devices that do
+    // not participate in folder browsing (ETH/SMB, which uses a "\\" separator): without this gate a
+    // subdirectory in an SMB share would be listed as an ordinary, un-navigable, unlaunchable row on a
+    // device whose updateMenuFromGameList never flags it as a folder. The folder-capable callers
+    // (bdm/mmce/udpfs) always pass folderGetSub(mode), which is non-NULL ("" at the device root).
+    struct game_list_t *folder_head = NULL;
+    struct game_list_t **folderlist = (gEnableFolderNav && sub != NULL) ? &folder_head : NULL;
 
-    // count iso games in "cd" directory
-    snprintf(path, sizeof(path), "%sCD", prefix);
-    count = scanForISO(path, SCECdPS2CD, &dlist_head);
+    // count iso games in "cd" directory (descending into the browse subpath when set)
+    if (atRoot)
+        snprintf(path, sizeof(path), "%sCD", prefix);
+    else
+        snprintf(path, sizeof(path), "%sCD/%s", prefix, sub);
+    cdRet = scanForISO(path, SCECdPS2CD, &dlist_head, folderlist);
+    count = cdRet;
 
     // count iso games in "dvd" directory
-    snprintf(path, sizeof(path), "%sDVD", prefix);
-    if ((result = scanForISO(path, SCECdPS2DVD, &dlist_head)) >= 0) {
-        count = count < 0 ? result : count + result;
+    if (atRoot)
+        snprintf(path, sizeof(path), "%sDVD", prefix);
+    else
+        snprintf(path, sizeof(path), "%sDVD/%s", prefix, sub);
+    dvdRet = scanForISO(path, SCECdPS2DVD, &dlist_head, folderlist);
+    if (dvdRet >= 0) {
+        count = count < 0 ? dvdRet : count + dvdRet;
     }
 
-    // count and process games in ul.cfg
-    snprintf(path, sizeof(path), "%sul.cfg", prefix);
-    fd = openFile(path, O_RDONLY);
+    // Merge the CD/DVD folder rows into one deduped set.
+    int fcount = (folder_head != NULL) ? sbDedupFolderList(&folder_head) : 0;
+
+    // Normalise a total-failure count to 0 up front, so every allocation/copy below works off a
+    // non-negative game count. (A failed scan emits no folders, so fcount is 0 here today, but this
+    // keeps the invariant explicit and robust to future changes.)
+    if (count < 0)
+        count = 0;
+
+    // count and process games in ul.cfg -- a device-ROOT concept (USBLD split games live at the
+    // library root); never present or scanned inside a browse subfolder.
+    if (atRoot) {
+        snprintf(path, sizeof(path), "%sul.cfg", prefix);
+        fd = openFile(path, O_RDONLY);
+    }
     if (fd >= 0) {
         USBExtreme_game_entry_t GameEntry;
 
         if (count < 0)
             count = 0;
         size = getFileSize(fd);
-        *fsize = size;
+        newfsize = size;
         count += size / sizeof(USBExtreme_game_entry_t);
 
-        if (count > 0) {
-            if ((*list = (base_game_info_t *)malloc(sizeof(base_game_info_t) * count)) != NULL) {
-                memset(*list, 0, sizeof(base_game_info_t) * count);
+        int total = (count > 0 ? count : 0) + fcount;
+        if (total > 0) {
+            if ((newlist = (base_game_info_t *)malloc(sizeof(base_game_info_t) * total)) != NULL) {
+                memset(newlist, 0, sizeof(base_game_info_t) * total);
 
                 while (size > 0) {
-                    base_game_info_t *g = &(*list)[id++];
+                    base_game_info_t *g = &newlist[id++];
 
                     // populate game entry in list even if entry corrupted
                     read(fd, &GameEntry, sizeof(USBExtreme_game_entry_t));
@@ -446,27 +573,59 @@ int sbReadList(base_game_info_t **list, const char *prefix, int *fsize, int *gam
             }
         }
         close(fd);
-    } else if (count > 0) {
-        *list = (base_game_info_t *)malloc(sizeof(base_game_info_t) * count);
+    } else if (count + fcount > 0) {
+        newlist = (base_game_info_t *)malloc(sizeof(base_game_info_t) * (count + fcount));
+        if (newlist != NULL)
+            memset(newlist, 0, sizeof(base_game_info_t) * (count + fcount));
     }
 
-    if (*list != NULL) {
-        // copy the dlist into the list
-        while ((id < count) && dlist_head) {
-            // copy one game, advance
+    const int total = (count > 0 ? count : 0) + fcount;
+    if (newlist != NULL) {
+        // copy the dlist into the list, then append the folder rows after the games
+        while ((id < total) && dlist_head) {
             struct game_list_t *cur = dlist_head;
             dlist_head = dlist_head->next;
-
-            memcpy(&(*list)[id++], &cur->gameinfo, sizeof(base_game_info_t));
+            memcpy(&newlist[id++], &cur->gameinfo, sizeof(base_game_info_t));
+            free(cur);
+        }
+        while ((id < total) && folder_head) {
+            struct game_list_t *cur = folder_head;
+            folder_head = folder_head->next;
+            memcpy(&newlist[id++], &cur->gameinfo, sizeof(base_game_info_t));
             free(cur);
         }
     } else
         count = 0;
 
-    if (count > 0)
-        *gamecount = count;
+    // Free any nodes not consumed above (e.g. when the output array alloc failed).
+    while (dlist_head) {
+        struct game_list_t *cur = dlist_head;
+        dlist_head = dlist_head->next;
+        free(cur);
+    }
+    while (folder_head) {
+        struct game_list_t *cur = folder_head;
+        folder_head = folder_head->next;
+        free(cur);
+    }
 
-    return count;
+    // TOTAL device-read failure (both dir scans failed to open AND no ul.cfg): keep the caller's
+    // current list rather than blanking it. newlist is NULL here; nothing to publish or leak.
+    if (cdRet < 0 && dvdRet < 0 && fd < 0) {
+        free(newlist);
+        return *gamecount; // *list / *gamecount / *fsize untouched -> last-good list stays on screen
+    }
+
+    // Success or genuinely-empty: publish the freshly-built list (frees the previous one). Guard on
+    // newlist so a failed allocation publishes an EMPTY list (count 0) rather than a NULL pointer with
+    // a non-zero count -- an OOB on the very next render.
+    const int published = (newlist != NULL && total > 0) ? total : 0;
+    free(*list);
+    *list = newlist;
+    *fsize = newfsize;
+    *gamecount = published;
+
+    return published;
 }
 
 extern int probed_fd;
@@ -826,6 +985,64 @@ void sbCreateFolders(const char *path, int createDiscImgFolders)
 
     if (createDiscImgFolders)
         sbCreateFoldersFromList(path, discImgFolders);
+}
+
+/*
+  Offer the user a way OUT of the launch when cheats did not load (#265).
+
+  THE UNWIND IS THE WHOLE POINT OF THIS HELPER. Every leg reaches the cheat check AFTER
+  sbPrepare(), which finds its patch zone by SEARCHING THE IRX IMAGE for the sample pattern in
+  cdvdman_settings_common_sample. Returning to the menu without restoring that pattern would leave
+  the zone unrecognisable, and the NEXT launch's sbPrepare would fail to locate it -- so a single
+  cancel would break every subsequent launch until reboot. Doing it here rather than in the call
+  sites means no leg can forget.
+
+  pCommon must be the settings' common block. NOTE it is NOT always &settings->common: in
+  ethsupport, hddsupport and udpfssupport the cheat check runs BEFORE `settings` is assigned, so
+  those legs pass the same expression sbPrepare's index yields, ((u8 *)irx + index).
+
+  NOTE(rebuild): the fork appends its multi-location cheat search log to the not-found text; that
+  refinement returns with the fork's search-everywhere sbLoadCheats.
+
+  Returns 1 to continue the launch, 0 if the user cancelled (caller must return immediately).
+*/
+int sbCheatsMissingContinue(void *pCommon, int cheatResult)
+{
+    const char *text = (cheatResult == -ENOENT) ? _l(_STR_NO_CHEATS_FOUND) : _l(_STR_ERR_CHEATS_LOAD_FAILED);
+
+    // Autolaunch has no user at the pad; never block an unattended boot on a prompt.
+    if ((gAutoLaunchGame != NULL) || (gAutoLaunchBDMGame != NULL)) {
+        LOG("Cheats error (autolaunch: continuing)\n");
+        return 1;
+    }
+
+    // guiMsgBox: 2 == accept (gSelectButton), 1 == the other button. addAccept draws both icons.
+    if (guiMsgBox(text, 1, NULL) == 2)
+        return 1;
+
+    sbUnprepare(pCommon);
+    LOG("Cheats error: user cancelled the launch\n");
+
+    return 0;
+}
+
+// Load a prebuilt PS2RD cheat image from <path>IMG/<file>.img, gated by the per-game $EnableImage.
+// Mirrors sbLoadCheats; uses a 256-byte path (NOT wOPL's 64, which truncates BDM prefixes). 0 ok, -1 fail.
+int sbLoadImage(const char *path, const char *file)
+{
+    char imgfile[256];
+
+    if (!GetImageEnabled())
+        return 0;
+
+    snprintf(imgfile, sizeof(imgfile), "%sIMG/%s.img", path, file);
+    LOG("Loading Cheat Image %s\n", imgfile);
+    if (LoadImage(imgfile) < 0) {
+        LOG("Error: failed to load cheat image\n");
+        return -1;
+    }
+    LOG("Cheat image found\n");
+    return 0;
 }
 
 int sbLoadCheats(const char *path, const char *file)

@@ -11,6 +11,9 @@
 #include "include/extern_irx.h"
 #include "include/cheatman.h"
 #include "include/sound.h"
+#include "include/ethsupport.h"   // ethGetModulesLoaded() for the UDPBD<->SMB NIC interlock
+#include "include/udpfssupport.h" // udpfsGetModulesLoaded() for the UDPBD<->UDPFS-filesystem NIC interlock
+#include "include/folderbrowse.h" // folderGetSub() -- browse subpath for the game-list scan
 #include "modules/iopcore/common/cdvd_config.h"
 
 #include <usbhdfsd-common.h>
@@ -23,6 +26,19 @@
 static int iLinkModLoaded = 0;
 static int mx4sioModLoaded = 0;
 static int hddModLoaded = 0;
+static int udpbdModLoaded = 0;
+/*
+  WHICH network block transport is actually resident, as NET_BOOT_UDPBD / NET_BOOT_UDPFS, or -1
+  when none is loaded.
+
+  udpbdModLoaded alone is protocol-agnostic: both branches of the loader set it to 1, so once
+  either chain is up the module gate short-circuits. But the tab label, the tab icon and the
+  Neutrino -bsd backend all read the LIVE gNetBootProtocol. Change the picker without rebooting and
+  those three start describing a transport that is NOT the one loaded. (A restart notice is shown on
+  protocol change, but nothing enforces it.) Consumers use bdmGetLoadedNetProtocol() instead, so
+  they always describe what is really loaded.
+*/
+static int udpbdLoadedProtocol = -1;
 static s32 bdmLoadModuleLock;
 int bdmDeviceModeStarted;
 
@@ -73,6 +89,15 @@ static void bdmEventHandler(void *packet, void *opt)
     BdmGeneration++;
 }
 
+// Manual generation bump for Device-Settings applies: bdmNeedsUpdate short-circuits while the
+// generation is unchanged, so a tab hidden by a disabled enable-flag would otherwise stay hidden
+// until a physical replug even after the user re-enables the device. Bumping here makes the next
+// refresh re-evaluate visibility immediately.
+void bdmForceDeviceRefresh(void)
+{
+    BdmGeneration++;
+}
+
 static void bdmLoadBlockDeviceModules(void)
 {
     WaitSema(bdmLoadModuleLock);
@@ -103,6 +128,44 @@ static void bdmLoadBlockDeviceModules(void)
         hddModLoaded = 1;
     }
 
+    // Network block device (UDPBD or UDPFS, picked by gNetBootProtocol). NIC-exclusive with the SMB/ETH
+    // stack (smap registers "SMAP_driver") and the udpfs FILESYSTEM chain, so only load when neither is
+    // up. dev9 is refcounted (shared with ATA-HDD). Both need the PS2's static IP as an "ip=" arg --
+    // the ministack has no DHCP client.
+    if (gEnableUDPBD && !udpbdModLoaded && !ethGetModulesLoaded() && !udpfsGetModulesLoaded()) {
+        char ipArg[24];
+        sysInitDev9();
+        snprintf(ipArg, sizeof(ipArg), "ip=%d.%d.%d.%d", ps2_ip[0], ps2_ip[1], ps2_ip[2], ps2_ip[3]);
+        if (gNetBootProtocol == NET_BOOT_UDPFS) {
+            // UDPFS: a 3-IRX chain loaded in dependency order -- smap (exports to ministack + bd), then
+            // ministack (gets the ip= arg, exports to bd), then udpfs_bd (registers the "udp" BDM device).
+            LOG("[UDPFS_SMAP]:\n");
+            if (sysLoadModuleBuffer(&udpfs_smap_irx, size_udpfs_smap_irx, 0, NULL) >= 0) {
+                LOG("[UDPFS_MINISTACK]:\n");
+                if (sysLoadModuleBuffer(&udpfs_ministack_irx, size_udpfs_ministack_irx, (int)strlen(ipArg) + 1, ipArg) >= 0) {
+                    LOG("[UDPFS_BD]:\n");
+                    if (sysLoadModuleBuffer(&udpfs_bd_irx, size_udpfs_bd_irx, 0, NULL) >= 0) {
+                        udpbdModLoaded = 1;
+                        udpbdLoadedProtocol = NET_BOOT_UDPFS;
+                    }
+                }
+            }
+        } else {
+            // UDPBD: the self-contained smap_udpbd monolith (smap + ministack + udpbd in one irx).
+            LOG("[SMAP_UDPBD]:\n");
+            if (sysLoadModuleBuffer(&smap_udpbd_irx, size_smap_udpbd_irx, (int)strlen(ipArg) + 1, ipArg) >= 0) {
+                udpbdModLoaded = 1;
+                udpbdLoadedProtocol = NET_BOOT_UDPBD;
+            }
+        }
+        // Release the dev9 reference taken above if the load failed -- otherwise a failing/retrying
+        // UDPBD/UDPFS load inflates the refcounted dev9InitCount and a later HDD/ETH teardown can
+        // never power dev9 down. On success the reference is intentionally kept (the device stays
+        // mounted). Mirrors the ETH/HDD pairing.
+        if (!udpbdModLoaded)
+            sysShutdownDev9();
+    }
+
     SignalSema(bdmLoadModuleLock);
 }
 
@@ -118,6 +181,8 @@ static int bdmDetermineDeviceType(const char *driverName)
         return BDM_TYPE_SDC;
     if (!strcmp(driverName, "ata") && strlen(driverName) == 3)
         return BDM_TYPE_ATA;
+    if (!strcmp(driverName, "udp"))
+        return BDM_TYPE_UDPBD;
     return -1;
 }
 
@@ -141,12 +206,45 @@ static int bdmReadDeviceIdentity(const char *path, char *driverName, int driverN
     fileXioDclose(dir);
     return result;
 }
-// NOTE(rebuild): the UDPBD block transport returns with checklist items 5/7 -- until then no
-// UDPBD device can be mounted, so "not UDPBD" is exact for every support that can exist.
+// True when this support's device is the UDPBD block device (its games are Neutrino-only).
+// Returns 0 for non-BDM supports (incl. FAV-wrapped items, which have no source lookup here).
 int bdmSupportIsUDPBD(item_list_t *support)
 {
-    (void)support;
-    return 0;
+    if (support == NULL || support->priv == NULL)
+        return 0;
+    if (support->mode < BDM_MODE || support->mode > BDM_MODE_LAST)
+        return 0;
+    return ((bdm_device_data_t *)support->priv)->bdmDeviceType == BDM_TYPE_UDPBD;
+}
+
+// Exposed for the NIC mutual-exclusion: UDPBD and the SMB/udpfs stacks all own the single SMAP adapter.
+int bdmIsUDPBDLoaded(void)
+{
+    return udpbdModLoaded;
+}
+
+/*
+  The network block transport actually resident (NET_BOOT_UDPBD / NET_BOOT_UDPFS). Falls back to the
+  live gNetBootProtocol before anything has loaded, so first-boot labelling is unchanged.
+*/
+int bdmGetLoadedNetProtocol(void)
+{
+    return (udpbdLoadedProtocol >= 0) ? udpbdLoadedProtocol : gNetBootProtocol;
+}
+
+// Effective BDM device start mode. The UDPBD tab is not a mode-level tab like SMB -- it is a
+// hotplug-published BDM mass page, which needs the BDM pages initialized, polled, and the bdm core
+// modules loaded before smap_udpbd can even LINK. The unified network-protocol picker couples SMB to
+// gETHStartMode and UDPFS to its own derived start mode, but selecting UDPBD/UDPFSBD writes NOTHING to
+// gBDMStartMode -- with a Manual (or Off) BDM row, the UDPBD tab could NEVER appear unless the user
+// happened to enter the generic BDM placeholder tab first. Floor the EFFECTIVE mode at AUTO while a
+// BDM network transport is the selected protocol, mirroring the UDPFS_MODE derivation; the user's
+// saved gBDMStartMode is never modified or persisted.
+int bdmEffectiveStartMode(void)
+{
+    if (gEnableUDPBD && gBDMStartMode != START_MODE_AUTO)
+        return START_MODE_AUTO;
+    return gBDMStartMode;
 }
 
 // Force-load the BDM transport for a BDMA source type if it is not already up (equip-time
@@ -442,7 +540,7 @@ static int bdmUpdateGameList(item_list_t *itemList)
 {
     bdm_device_data_t *pDeviceData = (bdm_device_data_t *)itemList->priv;
 
-    sbReadList(&pDeviceData->bdmGames, pDeviceData->bdmPrefix, &pDeviceData->bdmULSizePrev, &pDeviceData->bdmGameCount);
+    sbReadList(&pDeviceData->bdmGames, pDeviceData->bdmPrefix, folderGetSub(itemList->mode), &pDeviceData->bdmULSizePrev, &pDeviceData->bdmGameCount);
     return pDeviceData->bdmGameCount;
 }
 
@@ -503,7 +601,7 @@ static void bdmRenameGame(item_list_t *itemList, int id, char *newName)
 // buffer returns the fragment COUNT for the open file.
 #define NEUTRINO_BDM_MAX_FRAGS 64
 
-static int bdmNeutrinoFragBudgetOk(const char *isoPath, const neutrino_vmc_args_t *vmcArgs)
+static int bdmNeutrinoFragBudgetOk(const char *isoPath, const neutrino_vmc_args_t *vmcArgs, int isUdp)
 {
     const char *paths[1 + NEUTRINO_VMC_SLOTS];
     int nPaths = 0, total = 0, i;
@@ -530,8 +628,14 @@ static int bdmNeutrinoFragBudgetOk(const char *isoPath, const neutrino_vmc_args_
         total += frags;
     }
 
-    if (total > NEUTRINO_BDM_MAX_FRAGS) {
-        guiWarning(_l(_STR_NEUTRINO_TOO_FRAGMENTED), 6);
+    if (total > NEUTRINO_BDM_MAX_FRAGS) { // == is fine: neutrino packs exactly-full tables
+        char msg[256];                    // headroom for the lng_fork overlay's longer translations
+        LOG("[NEUTRINO] frag budget exceeded: %d/%d across ISO + VMCs\n", total, NEUTRINO_BDM_MAX_FRAGS);
+        // The udp outcome is a consumed launch (no native fallback exists); the local outcome is a
+        // native-core fallback (which usually boots: OPL's own 64-frag table holds the ISO only --
+        // VMCs go through mcemu's contiguity check instead). Use the message that says what happens.
+        snprintf(msg, sizeof(msg), _l(isUdp ? _STR_NEUTRINO_TOO_FRAGMENTED_NET : _STR_NEUTRINO_TOO_FRAGMENTED), total, NEUTRINO_BDM_MAX_FRAGS);
+        guiWarning(msg, 6);
         return 0;
     }
     return 1;
@@ -542,25 +646,34 @@ static int bdmNeutrinoFragBudgetOk(const char *isoPath, const neutrino_vmc_args_
 // cdvdman core; Neutrino re-derives all of it from -bsd/-dvd after its own IOP reset.
 // Returns 1 = handled (handed off, or aborted with the user informed -- caller returns);
 // 0 = proceed with the native launch.
-// NOTE(rebuild): the UDP forced-core branch returns with items 5/6 (no udp driver can be
-// mounted yet); the MMCE cross-device GameID send returns with item 3.
+// NOTE(rebuild): the MMCE cross-device GameID send returns with item 3.
 static int bdmTryNeutrinoLaunch(item_list_t *itemList, base_game_info_t *game, bdm_device_data_t *pDeviceData, config_set_t *configSet)
 {
     int coreLoader = gDefaultCoreLoader; // no per-game $CoreLoader key -> follow the global default core
     configGetInt(configSet, CONFIG_ITEM_CORE_LOADER, &coreLoader);
+    // UDPBD/UDPFS have no embedded cdvdman backend -- the "udp" BDM device can ONLY boot via
+    // Neutrino, so force the core and treat every Neutrino failure below as a clean abort
+    // (falling through to the native path would deinit into a no-op = black screen).
+    int isUdp = (pDeviceData->bdmDeviceType == BDM_TYPE_UDPBD);
+    if (isUdp)
+        coreLoader = 1;
     if (!coreLoader)
         return 0;
+
+    // Abort contract: on udp the launch is unbootable without Neutrino -- consume the launch
+    // (return 1, caller stops); on local devices fall back to native (return 0).
+    int failResult = isUdp ? 1 : 0;
 
     if (game->format == GAME_FORMAT_USBLD || !strcasecmp(game->extension, ".zso")) {
         // Neutrino cannot run UL or ZSO images.
         guiWarning(_l(_STR_NEUTRINO_BAD_FORMAT), 6);
-        return 0;
+        return failResult;
     }
 
     const char *neutrinoPath = sbResolveNeutrinoPath(pDeviceData->bdmPrefix); // AUTO probes this device for a co-located install
     if (neutrinoPath == NULL) {
         guiWarning(_l(_STR_NEUTRINO_NOT_FOUND), 6);
-        return 0;
+        return failResult;
     }
 
     // Everything Neutrino actually needs from the config/device, copied to THIS stack frame
@@ -579,8 +692,8 @@ static int bdmTryNeutrinoLaunch(item_list_t *itemList, base_game_info_t *game, b
     sbCreatePath(game, partname, pDeviceData->bdmPrefix, "/", 0); // -dvd target
     snprintf(bdmCurrentDriver, sizeof(bdmCurrentDriver), "%s", pDeviceData->bdmDriver);
 
-    if (!bdmNeutrinoFragBudgetOk(partname, &neutrinoVmc))
-        return 0; // stay native: the embedded core handles fragmentation via fraglists
+    if (!bdmNeutrinoFragBudgetOk(partname, &neutrinoVmc, isUdp))
+        return failResult; // local: stay native (embedded core handles fragmentation via fraglists); udp: consumed
 
     if (gRememberLastPlayed) {
         configSetStr(configGetByType(CONFIG_LAST), "last_played", game->startup);
@@ -589,7 +702,7 @@ static int bdmTryNeutrinoLaunch(item_list_t *itemList, base_game_info_t *game, b
 
     // Preflight (driver token validation) -- abort stays in a live menu.
     if (sysNeutrinoPreflight(bdmCurrentDriver, neutrinoPath) < 0)
-        return 0;
+        return failResult;
 
     // game->startup lives inside bdmGames / gAutoLaunchBDMGame, both freed below. Copy it
     // before the teardown so sysLaunchNeutrino's -elf build reads valid stack memory.
@@ -1134,7 +1247,9 @@ int bdmUpdateDeviceData(item_list_t *itemList)
         else if (!strcmp(pDeviceData->bdmDriver, "ata") && strlen(pDeviceData->bdmDriver) == 3) {
             pDeviceData->bdmDeviceType = BDM_TYPE_ATA;
             itemList->flags = MODE_FLAG_COMPAT_DMA;
-        } else
+        } else if (!strcmp(pDeviceData->bdmDriver, "udp"))
+            pDeviceData->bdmDeviceType = BDM_TYPE_UDPBD;
+        else
             pDeviceData->bdmDeviceType = BDM_TYPE_UNKNOWN;
 
         // If the device is backed by the ATA driver then get the supported LBA size for the drive.

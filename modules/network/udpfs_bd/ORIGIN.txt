@@ -1,0 +1,33 @@
+Vendored from rickgaiser/neutrino (https://github.com/rickgaiser/neutrino)
+Pinned to commit 06188cce7cd07d2a158cb4b2646c5719fc16a565.
+
+UDPFS ("UDP File System") is Neutrino's successor to UDPBD, over the UDPRDMA transport
+(zero-copy DMA, Go-Back-N ARQ, broadcast service discovery on service 0xF5F5 / UDP port
+0xF5F6). This vendors the BLOCK-DEVICE variant (udpfs_bd, built UDPFS_BD=1) as a 3-IRX
+load chain, exactly as Neutrino ships it:
+
+  modules/network/udpfs_smap/      <- iop/smap/      (SMAP NIC driver; exports smap_fifo_read)
+  modules/network/udpfs_ministack/ <- iop/ministack/ (mini IP/UDP stack; exports udp_bind/...; takes ip=)
+  modules/network/udpfs_bd/        <- iop/udpfs/      (udprdma + udpfs_core + udpfs_bd; UDPFS_BD=1)
+
+RiptOPL loads them in sequence (smap, then ministack with ip=, then udpfs_bd). udpfs_bd
+registers BDM token "udp" via bdm_connect_bd() + mounts massN:, so it rides OPL's existing
+BDM pipeline like UDPBD. UDPFS is wire-INCOMPATIBLE with UDPBD (SUDPBDv2) -- the PC server is
+pcm720/udpfsd -b, NOT udpbd-server. UDPFS, UDPBD and SMB are NIC-exclusive (single
+SMAP adapter); RiptOPL's network-boot protocol picker loads exactly one of UDPBD/UDPFS, so
+they never co-load (their MODNAMEs "SMAP"/"ministack"/"UDPFS" vs UDPBD's "SMAP_driver" also
+never collide for that reason).
+
+LOCAL CHANGES vs upstream (re-apply after re-vendoring):
+  - udpfs_bd.c: lazy-connect + reconnect watchdog thread (a UDPFS server is typically
+    hand-started after the PS2 boots), and the read/write callbacks no longer
+    bdm_disconnect_bd() from INSIDE the callback (re-entrant teardown of the calling
+    BDM/fatfs stack) -- the watchdog performs disconnect + re-discovery outside callback
+    context, keyed off the UDPRDMA session state.
+  - Build: each module gets a PS2SDK Makefile (Makefile.iopglobal) instead of Neutrino's
+    Rules.make; udpfs_bd builds with -DFEATURE_UDPFS_BD -DUDPRDMA_MAX_SOCKETS=1. The other
+    udpfs variants (udpfs_fhi.c, udpfs_ioman.c) were dropped (block-device variant only).
+  - mprintf.h copied from neutrino iop/common/ into udpfs_smap/ + udpfs_bd/ (smap/udpfs pull
+    it from -I../common upstream; ministack ships its own).
+  - src/*.c and src/*.h reformatted with the repo clang-format (CI-format-check lints every
+    .c/.h, exclude:none). Whitespace-only; module logic unmodified.

@@ -961,9 +961,15 @@ static const char *getDeviceName(const char *driver)
         return "apa";
     if (!strcmp(driver, "mmce"))
         return "mmce";
-    // NOTE(rebuild): the "udp"/"udpfs" network transport tokens return with checklist
-    // items 5/6/7 -- no network block device can be mounted until then, so falling
-    // through to "unsupported" (which aborts the launch with a toast) is exact.
+    if (!strcmp(driver, "udp"))
+        // Both BLOCK transports register the "udp" BDM token; the RESIDENT protocol picks the Neutrino
+        // backing store: -bsd=udpbd (smap_udpbd / SUDPBDv2) vs -bsd=udpfsbd (the udpfs_bd UDPRDMA toml).
+        return (bdmGetLoadedNetProtocol() == NET_BOOT_UDPFS) ? "udpfsbd" : "udpbd";
+    if (!strcmp(driver, "udpfs"))
+        // UDPFS *filesystem* device (udpfssupport / udpfs_ioman): the stock Neutrino -bsd token loads
+        // config/bsd-udpfs.toml (the FHI filesystem driver), then opens -dvd=udpfs:<path> by name -- no
+        // massN: block device and no fraglist. Distinct from the "udp" block tokens above.
+        return "udpfs";
     return "unsupported";
 }
 

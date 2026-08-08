@@ -451,6 +451,8 @@ static submenu_list_t *submenuAllocItem(int icon_id, char *text, int id, int tex
     it->item.id = id;
     it->item.cache_id = NULL;
     it->item.cache_uid = NULL;
+    it->item.favourited = 0;
+    it->item.isFolder = 0;
     submenuRebuildCache(it);
 
     return it;
@@ -630,7 +632,12 @@ void submenuSort(submenu_list_t **submenu)
             char *txt1 = submenuItemGetText(&tip->item);
             char *txt2 = submenuItemGetText(&nxt->item);
 
-            int cmp = strcasecmp(txt1, txt2);
+            // Folder browsing: folders group ahead of games; within each group sort by title.
+            int cmp;
+            if (tip->item.isFolder != nxt->item.isFolder)
+                cmp = tip->item.isFolder ? -1 : 1;
+            else
+                cmp = strcasecmp(txt1, txt2);
 
             if (cmp > 0) {
                 swap(tip, nxt);

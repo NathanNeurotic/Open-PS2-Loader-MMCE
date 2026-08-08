@@ -1,0 +1,10 @@
+Vendored from rickgaiser/neutrino iop/smap/, pinned to commit
+06188cce7cd07d2a158cb4b2646c5719fc16a565. SMAP NIC driver for the UDPFS transport chain.
+See ../udpfs_bd/ORIGIN.txt for the full UDPFS provenance + local changes (PS2SDK Makefile,
+mprintf.h, clang-format).
+
+Local build fix (ps2dev:latest iopfixup): exports.o is listed FIRST in the Makefile's IOP_OBJS
+and _retonly is defined AFTER the export table in src/exports.tab, so iopfixup doesn't reject
+_retonly as a value-0 .text symbol. Same fix as smap_udpbd (commit 2139bcde). The export table
+stays POPULATED here -- udpfs_ministack and udpfs_bd import its smap_* functions, so unlike
+smap_udpbd it must NOT be emptied. Keep both on re-vendor.

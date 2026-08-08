@@ -1,0 +1,12 @@
+void _retonly(); /* defined AFTER the table so it is not a value-0 .text symbol (ps2dev iopfixup) */
+DECLARE_EXPORT_TABLE(mstack, 1, 0)
+    DECLARE_EXPORT(_retonly)
+    DECLARE_EXPORT(_retonly)
+    DECLARE_EXPORT(_retonly)
+    DECLARE_EXPORT(_retonly)
+    DECLARE_EXPORT(udp_bind)
+    DECLARE_EXPORT(udp_packet_init)
+    DECLARE_EXPORT(udp_packet_send_ll)
+END_EXPORT_TABLE
+
+void _retonly(){};

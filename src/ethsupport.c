@@ -11,6 +11,8 @@
 #include "include/system.h"
 #include "include/extern_irx.h"
 #include "include/cheatman.h"
+#include "include/udpfssupport.h" // udpfsGetModulesLoaded() for the SMB<->UDPFS-filesystem NIC interlock
+#include "include/bdmsupport.h"   // bdmIsUDPBDLoaded() for the SMB<->UDPBD NIC interlock
 #include "modules/iopcore/common/cdvd_config.h"
 
 #define NEWLIB_PORT_AWARE
@@ -270,9 +272,29 @@ static void ethInitSMB(void)
     }
 }
 
+int ethGetModulesLoaded(void)
+{
+    return ethModulesLoaded;
+}
+
 static int ethLoadModules(void)
 {
     LOG("ETHSUPPORT LoadModules\n");
+
+    // UDPBD owns the single SMAP NIC ("SMAP_driver" modname); refuse to bring up the SMB stack on top
+    // of it. The Device-hub UI already interlocks the two; this is the runtime backstop.
+    if (bdmIsUDPBDLoaded()) {
+        LOG("ETHSUPPORT: UDPBD active -- not loading the SMB NIC stack\n");
+        return -1;
+    }
+    // Same NIC exclusivity vs the udpfs FILESYSTEM chain (udpfs_smap + ministack). The other two
+    // directions already guard symmetrically (udpfssupport checks eth+bdm, bdmsupport checks
+    // eth+udpfs); without this one an in-session UDPFS->SMB protocol switch could double-drive the
+    // SMAP EMAC with two drivers -- at best SMB fails to start, at worst the IOP wedges.
+    if (udpfsGetModulesLoaded()) {
+        LOG("ETHSUPPORT: UDPFS filesystem NIC active -- not loading the SMB NIC stack\n");
+        return -1;
+    }
 
     if (!ethModulesLoaded) {
         ethModulesLoaded = 1;
@@ -490,7 +512,7 @@ static int ethUpdateGameList(item_list_t *itemList)
         if (gNetworkStartup != 0)
             return 0;
 
-        if ((sbReadList(&ethGames, ethPrefix, &ethULSizePrev, &ethGameCount)) < 0) {
+        if ((sbReadList(&ethGames, ethPrefix, /* sub: */ NULL, &ethULSizePrev, &ethGameCount)) < 0) {
             gNetworkStartup = ERROR_ETH_SMB_LISTGAMES;
             ethDisplayErrorStatus();
         }

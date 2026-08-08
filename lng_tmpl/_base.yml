@@ -952,3 +952,19 @@ gui_strings:
   string: Not enough memory card space for the BDMA modules.
 - label: BDMA_ERR_IO
   string: Error writing the BDMA modules to the memory card.
+- label: UDPBD_NEEDS_STATIC_IP
+  string: UDPBD needs a static PS2 IP. Set one in Network Config (DHCP is currently on).
+- label: NETBOOT_RESTART
+  string: Restart OPL to apply the network boot protocol change.
+- label: NET_UDPFS_TAB_HINT
+  string: UDPFS on -- open the new UDPFS tab and press Confirm to connect. PC side runs udpfsd -fsroot <games folder>.
+- label: NET_UDPBD_TAB_HINT
+  string: Network block device on -- its tab appears once the PC server answers (udpfsd -bdpath for UDPFS Image, udpbd-server for UDPBD).
+- label: NEUTRINO_TOO_FRAGMENTED_NET
+  string: Too fragmented for Neutrino (%d fragments, limit %d incl. VMCs) -- defragment on the PC; launch aborted.
+- label: UDPFS_GAMES
+  string: UDPFS Games
+- label: NET_NEEDS_NEUTRINO
+  string: Network (UDP) games can only boot via the Neutrino core. Check that neutrino.elf is present and the format is supported.
+- label: VCD_NOT_ON_NET
+  string: 'PS1 (.VCD) games can''t be launched over the network device.'
