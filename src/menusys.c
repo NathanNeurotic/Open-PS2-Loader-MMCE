@@ -732,6 +732,9 @@ static void menuNextV()
     if (cur && cur->next) {
         selected_item->item->current = cur->next;
         sfxPlay(SFX_CURSOR);
+        // coverflow slide animation; the wrap branch below stays instant
+        if (gTheme->coverflow)
+            thmTriggerCoverflowAnim(1);
 
         // if the current item is beyond the page start, move the page start one page down
         cur = selected_item->item->pagestart;
@@ -745,6 +748,23 @@ static void menuNextV()
         selected_item->item->pagestart = selected_item->item->current;
     } else { // wrap to start
         menuFirstPage();
+        /*
+          Animate the wrap too, but ONLY in coverflow (#271).
+
+          The carousel's visible window already wraps -- drawCoverFlow fans covers[] out through
+          menu->item->last / ->submenu -- so last->first is a single VISUAL step there, exactly like
+          every other move. Leaving it instant (10c19f1b's documented intent) therefore singled out
+          the two entries at the seam: stepping onto the first game, and the step immediately after
+          it, got no slide and no scale transfer while every other step did. That is what the
+          reporter sees as the selection "clipping/skipping on the first game and the one following
+          it", and it is also the most likely source of "the 3D effect drops to a flat 2D scroll" --
+          because at the seam it literally does.
+
+          The flat list views keep the instant jump: there the wrap really is an N-item page jump,
+          not one step, so a one-step slide would misrepresent it.
+        */
+        if (gTheme->coverflow)
+            thmTriggerCoverflowAnim(1);
     }
 }
 
@@ -762,8 +782,15 @@ static void menuPrevV()
             while (--itms && selected_item->item->pagestart->prev)
                 selected_item->item->pagestart = selected_item->item->pagestart->prev;
         }
+
+        // coverflow slide animation; the wrap branch below stays instant
+        if (gTheme->coverflow)
+            thmTriggerCoverflowAnim(-1);
     } else { // wrap to end
         menuLastPage();
+        // Mirror of the wrap in menuNextV -- see the rationale there (#271).
+        if (gTheme->coverflow)
+            thmTriggerCoverflowAnim(-1);
     }
 }
 
@@ -1032,16 +1059,51 @@ void menuRenderMain(void)
     }
 }
 
+// Coverflow rotates the nav axis on the MAIN screen only: Left/Right step through the
+// carousel (a vertical list move) while Up/Down switch device menus. Non-coverflow themes
+// behave exactly as before. The info screen is intentionally NOT rotated (menuHandleInputInfo).
+static void menuNavigateLeft()
+{
+    if (gTheme->coverflow)
+        menuPrevV();
+    else
+        menuPrevH();
+}
+
+static void menuNavigateRight()
+{
+    if (gTheme->coverflow)
+        menuNextV();
+    else
+        menuNextH();
+}
+
+static void menuNavigateUp()
+{
+    if (gTheme->coverflow)
+        menuPrevH();
+    else
+        menuPrevV();
+}
+
+static void menuNavigateDown()
+{
+    if (gTheme->coverflow)
+        menuNextH();
+    else
+        menuNextV();
+}
+
 void menuHandleInputMain()
 {
     if (getKey(KEY_LEFT)) {
-        menuPrevH();
+        menuNavigateLeft();
     } else if (getKey(KEY_RIGHT)) {
-        menuNextH();
+        menuNavigateRight();
     } else if (getKey(KEY_UP)) {
-        menuPrevV();
+        menuNavigateUp();
     } else if (getKey(KEY_DOWN)) {
-        menuNextV();
+        menuNavigateDown();
     } else if (getKeyOn(KEY_CROSS)) {
         selected_item->item->execCross(selected_item->item);
     } else if (getKeyOn(KEY_TRIANGLE)) {
