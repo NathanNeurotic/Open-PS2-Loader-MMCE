@@ -150,6 +150,13 @@ void guiShowNeutrinoArgsConfig(char *argsBuf, int bufSize);
 void guiShowAudioConfig();
 void guiShowControllerConfig();
 void guiShowNetConfig();
+void guiShowVcdConfig(void); // POPStarter settings hub (device/path/RetroGEM; chains BDMA/List/Net sub-pages)
+// One-shot POPSTARTER USB driver pick (FAT32 vs exFAT), shown on EVERY USB VCD launch
+// (maintainer directive 2026-08-01: the user picks per launch, never a sticky default).
+int guiShowVcdUsbMode(void);
+void guiShowBdmaConfig(void);    // BDMA (exFAT driver stack) source/mode equip page
+void guiShowVcdListConfig(void); // VCD list options (hide game-id prefix, first-disc-only)
+void guiShowPopsNetConfig(void); // POPSTARTER's OWN IPCONFIG.DAT/SMBCONFIG.DAT editor
 void guiShowParentalLockConfig();
 
 void guiCheckNotifications(int checkTheme, int checkLang);

@@ -54,6 +54,7 @@ int sbReadList(base_game_info_t **list, const char *prefix, const char *sub, int
 void sbSetBrowseSub(const char *sub);
 int sbCheatsMissingContinue(void *pCommon, int cheatResult);
 int sbLoadImage(const char *path, const char *file);
+void sbSetDiscAttributes(config_set_t *config, int isPS1, int isCD); // #System/#Media/#DiscType identity stamp
 int sbPrepare(base_game_info_t *game, config_set_t *configSet, int size_cdvdman, void **cdvdman_irx, int *patchindex);
 void sbUnprepare(void *pCommon);
 void sbRebuildULCfg(base_game_info_t **list, const char *prefix, int gamecount, int excludeID);

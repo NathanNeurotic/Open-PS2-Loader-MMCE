@@ -968,3 +968,57 @@ gui_strings:
   string: Network (UDP) games can only boot via the Neutrino core. Check that neutrino.elf is present and the format is supported.
 - label: VCD_NOT_ON_NET
   string: 'PS1 (.VCD) games can''t be launched over the network device.'
+- label: MX4SIO_PADEMU_WARN
+  string: MX4SIO and pad emulation share the SIO2 bus and the game may fail to boot.
+- label: MMCE_GAMEID_UNSETTLED
+  string: MMCE card switch not confirmed -- launching anyway
+- label: UDPFSBD_GAMES
+  string: UDPFSBD Games
+- label: UDPBD_GAMES
+  string: UDPBD Games
+- label: BOOT_LOADING_DRIVERS
+  string: Loading storage drivers...
+- label: BOOT_LOADING_USB
+  string: Loading USB storage driver...
+- label: POPSTARTER_NOT_FOUND
+  string: Missing POPSTARTER.ELF
+- label: POPSTARTER_SMB_MISSING
+  string: Missing POPSTARTER SMB requirements
+- label: NEUTRINO_SMB_FALLBACK
+  string: SMB games have no Neutrino support -- launching with the OPL core.
+- label: NEUTRINO_VMC_HDD_UNSUPPORTED
+  string: Neutrino cannot use a VMC on APA HDD (no pfs support) -- launching without it.
+- label: VCD
+  string: VCD
+- label: VCD_ON
+  string: Showing VCD games
+- label: VCD_OFF
+  string: Showing disc games
+- label: BOOT_SCANNING_BDM
+  string: Scanning USB / card / network drives...
+- label: BOOT_SCANNING_NET
+  string: Starting network...
+- label: BOOT_SCANNING_HDD
+  string: Scanning HDD...
+- label: BDMA_SRC_USB
+  string: USB
+- label: BDMA_SRC_MX4SIO
+  string: MX4SIO
+- label: BDMA_SRC_MMCE
+  string: MMCE
+- label: BDMA_SRC_HDD
+  string: Internal HDD
+- label: BDMA_MODE_FAT32
+  string: USB (FAT32)
+- label: BDMA_MODE_USBEXFAT
+  string: USB (exFAT)
+- label: BDMA_MODE_MX4SIO
+  string: MX4SIO (exFAT)
+- label: BDMA_MODE_MMCE
+  string: MMCE (exFAT)
+- label: BDMA_MODE_ATA
+  string: HDD (exFAT)
+- label: POPS_LOADED_FROM
+  string: Loaded from %s
+- label: POPSTARTER_NET_ERR
+  string: Couldn't write POPSTARTER network config to the memory card.

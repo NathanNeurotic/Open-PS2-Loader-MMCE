@@ -1045,6 +1045,16 @@ int sbLoadImage(const char *path, const char *file)
     return 0;
 }
 
+// Stamp the console/media identity attributes every game config carries. #System is the console
+// axis a theme maps to a PS1/PS2 glyph; #Media stays the disc axis; #DiscType is the combined
+// console+media token so one AttributeImage glyph can distinguish PS1-CD from PS2-CD (issue #49).
+void sbSetDiscAttributes(config_set_t *config, int isPS1, int isCD)
+{
+    configSetStr(config, CONFIG_ITEM_SYSTEM, isPS1 ? "PS1" : "PS2");
+    configSetStr(config, CONFIG_ITEM_MEDIA, isCD ? "CD" : "DVD");
+    configSetStr(config, CONFIG_ITEM_DISCTYPE, isPS1 ? "PS1CD" : (isCD ? "PS2CD" : "PS2DVD"));
+}
+
 int sbLoadCheats(const char *path, const char *file)
 {
     char cheatfile[64];

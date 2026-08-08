@@ -26,6 +26,7 @@ enum MENU_IDs {
     MENU_INTERFACE,
     MENU_DISPLAY,
     MENU_GAME_LAUNCHING,
+    MENU_POPSTARTER, // NOTE(rebuild): MENU_MMCE joins with checklist item 1
     MENU_NETWORK,
     MENU_CONTROLLER,
     MENU_AUDIO,
@@ -250,6 +251,7 @@ static void menuInitMainMenu(void)
     submenuAppendItem(&mainMenu, -1, NULL, MENU_INTERFACE, _STR_INTERFACE_SETTINGS);
     submenuAppendItem(&mainMenu, -1, NULL, MENU_DISPLAY, _STR_DISPLAY_SETTINGS);
     submenuAppendItem(&mainMenu, -1, NULL, MENU_GAME_LAUNCHING, _STR_GAME_LAUNCHING);
+    submenuAppendItem(&mainMenu, -1, NULL, MENU_POPSTARTER, _STR_POPSTARTER);
     submenuAppendItem(&mainMenu, -1, NULL, MENU_NETWORK, _STR_MENU_NETWORK);
     submenuAppendItem(&mainMenu, -1, NULL, MENU_CONTROLLER, _STR_MENU_CONTROLLER);
     submenuAppendItem(&mainMenu, -1, NULL, MENU_AUDIO, _STR_MENU_AUDIO);
@@ -437,6 +439,14 @@ void submenuRebuildCache(submenu_list_t *submenu)
 
         submenu = submenu->next;
     }
+}
+
+// True once the global menu list contains a registered device/mode tab (returns menu != NULL).
+// initSupport uses the FALSE case to spot "user enabled the FIRST tab from the start menu",
+// where nothing would otherwise take them to it (#254).
+int menuHasRegisteredItems(void)
+{
+    return menu != NULL;
 }
 
 static submenu_list_t *submenuAllocItem(int icon_id, char *text, int id, int text_id)
@@ -939,6 +949,9 @@ void menuHandleInputMenu()
         } else if (id == MENU_GAME_LAUNCHING) {
             if (menuCheckParentalLock() == 0)
                 guiShowLaunchConfig();
+        } else if (id == MENU_POPSTARTER) {
+            if (menuCheckParentalLock() == 0)
+                guiShowVcdConfig();
         } else if (id == MENU_NETWORK) {
             if (menuCheckParentalLock() == 0)
                 guiShowNetConfig();

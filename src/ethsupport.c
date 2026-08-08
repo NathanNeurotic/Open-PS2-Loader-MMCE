@@ -3,6 +3,7 @@
 #include "include/gui.h"
 #include "include/supportbase.h"
 #include "include/ethsupport.h"
+#include "include/vcdsupport.h"
 #include "include/util.h"
 #include "include/renderman.h"
 #include "include/themes.h"
@@ -11,8 +12,9 @@
 #include "include/system.h"
 #include "include/extern_irx.h"
 #include "include/cheatman.h"
-#include "include/udpfssupport.h" // udpfsGetModulesLoaded() for the SMB<->UDPFS-filesystem NIC interlock
 #include "include/bdmsupport.h"   // bdmIsUDPBDLoaded() for the SMB<->UDPBD NIC interlock
+#include "include/udpfssupport.h" // udpfsGetModulesLoaded() for the SMB<->UDPFS-filesystem NIC interlock
+#include "include/mmcesupport.h"  // mmceSendGameID() cross-device game-id (#261)
 #include "modules/iopcore/common/cdvd_config.h"
 
 #define NEWLIB_PORT_AWARE
@@ -213,7 +215,7 @@ static int ethInitApplyConfig(void)
         }
     } while (ethApplyNetIFConfig() != 0);
 
-    // Before the network configuration is applied, wait for a valid link status.
+    // Wait for the link to re-establish after applying the NIF link-mode setting.
     if (ethWaitValidNetIFLinkState() != 0) {
         gNetworkStartup = ERROR_ETH_LINK_FAIL;
         return ERROR_ETH_LINK_FAIL;
@@ -316,10 +318,11 @@ static int ethLoadModules(void)
                     LOG("[PS2IPS]:\n");
                     sysLoadModuleBuffer(&ps2ips_irx, size_ps2ips_irx, 0, NULL);
                     LOG("[HTTPCLIENT]:\n");
-                    sysLoadModuleBuffer(&httpclient_irx, size_httpclient_irx, 0, NULL);
+                    if (sysLoadModuleBuffer(&httpclient_irx, size_httpclient_irx, 0, NULL) >= 0) {
+                        if (HttpInit() < 0)
+                            LOG("ETHSUPPORT: httpclient RPC bind failed; compat update unavailable\n");
+                    }
                     ps2ip_init();
-                    HttpInit();
-
                     LOG("ETHSUPPORT Modules loaded\n");
                     return 0;
                 }
@@ -422,8 +425,22 @@ static void smbLoadModules(void)
 
     if (ret == 0) {
         gNetworkStartup = ERROR_ETH_MODULE_SMBMAN_FAILURE;
-        LOG("[SMBMAN]:\n");
-        if (sysLoadModuleBuffer(&smbman_irx, size_smbman_irx, 0, NULL) >= 0) {
+        /*
+          Load ONE SMB filesystem driver, chosen by the SMB Version picker. Both register the same
+          iomanX device name ("smb", hence the "smb0:" paths everywhere), so only one may ever be
+          resident -- and every path in OPL stays identical whichever one it is.
+
+            smbman  -- PS2SDK's SMB1 driver, consumed prebuilt. Unchanged, still the default.
+            smb2man -- our SMB2/SMB3 driver over vendored libsmb2 (modules/network/smb2man).
+
+          Anything other than an explicit SMB2 selection falls back to smbman: losing SMB2 is
+          recoverable, booting with no filesystem driver at all is not.
+        */
+        // NOTE(rebuild): SMB2 (smb2man + gSMBDialect) returns with checklist item 4 -- until then
+        // this build speaks SMBv1 unconditionally, exactly like every pre-dialect build.
+        const int useSmb2 = 0;
+        LOG(useSmb2 ? "[SMB2MAN]:\n" : "[SMBMAN]:\n");
+        if (sysLoadModuleBuffer((void *)&smbman_irx, size_smbman_irx, 0, NULL) >= 0) {
             LOG("[NBNS]:\n");
             sysLoadModuleBuffer(&nbns_irx, size_nbns_irx, 0, NULL);
             nbnsInit();
@@ -456,7 +473,7 @@ void ethInit(item_list_t *itemList)
         ethModifiedDVDPrev = 0;
         ethGameCount = 0;
         ethGames = NULL;
-        configGetInt(configGetByType(CONFIG_OPL), "eth_frames_delay", &ethGameList.delay);
+        ethGameList.delay = gArtDelay;
         gNetworkStartup = ERROR_ETH_NOT_STARTED;
         ioPutRequest(IO_CUSTOM_SIMPLEACTION, &smbLoadModules);
         ethGameList.enabled = 1;
@@ -475,6 +492,13 @@ static int ethNeedsUpdate(item_list_t *itemList)
     int result;
 
     result = 0;
+
+    // VCD view: force a rescan once on toggle; once a share is selected, the VCD list refreshes on
+    // toggle only (skip disc heuristics). With no share yet, fall through so the share list updates.
+    if (vcdConsumeDirty(itemList->mode))
+        return 1;
+    if (gPCShareName[0] && vcdViewActive(itemList->mode))
+        return 0;
 
     if (ethULSizePrev == -2)
         result = 1;
@@ -512,7 +536,13 @@ static int ethUpdateGameList(item_list_t *itemList)
         if (gNetworkStartup != 0)
             return 0;
 
-        if ((sbReadList(&ethGames, ethPrefix, /* sub: */ NULL, &ethULSizePrev, &ethGameCount)) < 0) {
+        if (vcdViewActive(itemList->mode)) {
+            int r = vcdFillGameList(ethPrefix, &ethGames);
+            if (r >= 0) // r < 0: transient scan failure -> preserve the last-good list
+                ethGameCount = r;
+            // NULL sub opts SMB/ETH out of folder-row collection: it uses a "\\" separator and does not
+            // participate in folder browsing (see the folderlist gate in sbReadList).
+        } else if ((sbReadList(&ethGames, ethPrefix, /* sub: */ NULL, &ethULSizePrev, &ethGameCount)) < 0) {
             gNetworkStartup = ERROR_ETH_SMB_LISTGAMES;
             ethDisplayErrorStatus();
         }
@@ -531,6 +561,10 @@ static int ethUpdateGameList(item_list_t *itemList)
         if (count > 0) {
             free(ethGames);
             ethGames = (base_game_info_t *)malloc(sizeof(base_game_info_t) * count);
+            // On allocation failure, skip population so the loop below never
+            // dereferences NULL; ethGameCount is then set to 0 after the loop.
+            if (ethGames == NULL)
+                count = 0;
             for (i = 0; i < count; i++) {
                 LOG("ETHSUPPORT Share found: %s\n", sharelist[i].ShareName);
                 base_game_info_t *g = &ethGames[i];
@@ -544,7 +578,11 @@ static int ethUpdateGameList(item_list_t *itemList)
                 g->sizeMB = 0;
             }
             ethGameCount = count;
-        } else if (count < 0) {
+        } else if (count == 0) {
+            free(ethGames);
+            ethGames = NULL;
+            ethGameCount = 0;
+        } else {
             gNetworkStartup = ERROR_ETH_SMB_LISTSHARES;
             ethDisplayErrorStatus();
         }
@@ -577,6 +615,9 @@ static int ethGetGameNameLength(item_list_t *itemList, int id)
 
 static char *ethGetGameStartup(item_list_t *itemList, int id)
 {
+    // VCD view keys per-game data (CFG/art) off the VCD filename, not a disc ID (see sbPopulateConfig).
+    if (vcdViewActive(itemList->mode))
+        return ethGames[id].name;
     return ethGames[id].startup;
 }
 
@@ -592,6 +633,37 @@ static void ethRenameGame(item_list_t *itemList, int id, char *newName)
     ethULSizePrev = -2;
 }
 
+// Launch a PS1/.VCD entry BY NAME via POPSTARTER over SMB (view-independent entry point: the in-view
+// menu launch below and the Favourites tab both use it). ethPrefix is static and smb: paths use '\'
+// (auto-detected by vcdSep); UNMOUNT_EXCEPTION keeps the share mounted across the IOP reset.
+static void ethLaunchVcd(item_list_t *itemList, const char *vcdName, config_set_t *configSet)
+{
+    char vcdElf[256], vcdSelector[320];
+
+    if (!gPCShareName[0] || vcdName == NULL || vcdName[0] == '\0' || !strcasecmp(vcdName, "POPSTARTER")) // reserved-name belt: the scanner no longer lists it (#154); strcasecmp -- FAT is case-insensitive
+        return;
+    if (!vcdResolvePopstarter(ethPrefix, vcdElf, sizeof(vcdElf))) {
+        guiMsgBox(_l(_STR_POPSTARTER_NOT_FOUND), 0, NULL);
+        return;
+    }
+    // Fill every missing external from this share's direct POPS/ folder, including optional icons
+    // and utility IRX even when the required network stack was already complete. SMB keeps its hard
+    // gate: all four network modules must exist after this best-effort install.
+    (void)vcdInstallPopstarterMc(ethPrefix);
+    if (!vcdSmbModulesPresent()) {
+        guiMsgBox(_l(_STR_POPSTARTER_SMB_MISSING), 0, NULL);
+        return;
+    }
+    vcdBuildSelector(ethPrefix, VCD_PREFIX_SMB, vcdName, vcdSelector, sizeof(vcdSelector));
+    size_t prefixLen = strlen(ethPrefix);
+    char separator = (prefixLen > 0 && ethPrefix[prefixLen - 1] == '\\') ? '\\' : '/';
+    char vcdFullPath[256];
+    snprintf(vcdFullPath, sizeof(vcdFullPath), "%sPOPS%c%s.VCD", ethPrefix, separator, vcdName);
+    vcdPrepareRetroGemBarcode(vcdFullPath);
+    deinit(UNMOUNT_EXCEPTION, itemList->mode); // keep the SMB mount alive across the IOP reset
+    sysLaunchPopstarter(vcdElf, vcdSelector);
+}
+
 static void ethLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
 {
     int i, compatmask;
@@ -603,6 +675,12 @@ static void ethLaunchGame(item_list_t *itemList, int id, config_set_t *configSet
     u32 layer1_start, layer1_offset;
     unsigned short int layer1_part;
 
+    // VCD view (SMB): hand off to POPSTARTER by name, only once a share is selected.
+    if (gPCShareName[0] && game != NULL && vcdViewActive(itemList->mode)) {
+        ethLaunchVcd(itemList, game->name, configSet);
+        return;
+    }
+
     if (!gPCShareName[0]) {
         memcpy(gPCShareName, game->name, sizeof(gPCShareName));
         ethULSizePrev = -2;
@@ -611,6 +689,20 @@ static void ethLaunchGame(item_list_t *itemList, int id, config_set_t *configSet
         ioPutRequest(IO_CUSTOM_SIMPLEACTION, &ethInitSMB);
         ioPutRequest(IO_MENU_UPDATE_DEFFERED, &ethGameList.mode); // reload the game list
         return;
+    }
+
+    // $CoreLoader honesty: SMB has no Neutrino launch leg (nothing here builds -bsd/-dvd args),
+    // so a per-game Neutrino selection -- or a Neutrino global default -- silently resolves to the
+    // OPL core. Toast once at launch instead of leaving the setting looking honored. Pre-deinit,
+    // so the toast renders; the launch then proceeds normally. Covers Favourites-origin launches
+    // too (they delegate to this leg), which the compat-dialog lock in guigame.c cannot reach.
+    {
+        int coreLoader = gDefaultCoreLoader;
+        configGetInt(configSet, CONFIG_ITEM_CORE_LOADER, &coreLoader);
+        if (coreLoader == 2)                 // "Default" sentinel: the dialog never persists it (index 2 removes the
+            coreLoader = gDefaultCoreLoader; // key), but a hand-edited cfg can carry it (Gemini, #161)
+        if (coreLoader)
+            guiWarning(_l(_STR_NEUTRINO_SMB_FALLBACK), 6);
     }
 
     char vmc_name[32];
@@ -660,14 +752,13 @@ static void ethLaunchGame(item_list_t *itemList, int id, config_set_t *configSet
     compatmask = sbPrepare(game, configSet, size_smb_cdvdman_irx, smb_cdvdman_irx, &i);
 
     if ((result = sbLoadCheats(ethPrefix, game->startup)) < 0) {
-        switch (result) {
-            case -ENOENT:
-                guiWarning(_l(_STR_NO_CHEATS_FOUND), 10);
-                break;
-            default:
-                guiWarning(_l(_STR_ERR_CHEATS_LOAD_FAILED), 10);
-        }
+        // #265: let the user back out instead of sitting through the whole load. The helper does
+        // the sbUnprepare itself -- see include/supportbase.h; skipping it breaks the NEXT launch.
+        // `settings` is not assigned until below, so derive the common block from the IRX base.
+        if (!sbCheatsMissingContinue((u8 *)(&smb_cdvdman_irx) + i, result))
+            return;
     }
+    sbLoadImage(ethPrefix, game->startup);
 
     settings = (struct cdvdman_settings_smb *)((u8 *)(&smb_cdvdman_irx) + i);
 
@@ -682,6 +773,21 @@ static void ethLaunchGame(item_list_t *itemList, int id, config_set_t *configSet
             snprintf(settings->filename, sizeof(settings->filename), "ul.%08X.%s", USBA_crc32(game->name), game->startup);
             settings->common.flags |= IOPCORE_SMB_FORMAT_USBLD;
     }
+
+    /*
+      Hand the chosen dialect to the in-game reader. smbdisp.c reads these bits once, at negotiate
+      time, to pick between smb.c (SMB1) and smb2.c (SMB2).
+
+      They live in common.flags because cdvdman_settings_smb's SMB fields share a union with FIDs[]
+      and cannot grow; common.flags already carries IOPCORE_SMB_FORMAT_USBLD for the same reason.
+      Note this must come AFTER the format switch above, which also ORs into common.flags.
+
+      Only SMB1/SMB2 are emitted -- gSMBDialect is clamped to those on load, and the picker offers
+      no third value. Leaving the bits clear for SMB1 keeps the wire format identical to every
+      build that predates the dialect field.
+    */
+    // NOTE(rebuild): the in-game SMB2 dialect flag (IOPCORE_SMB_DIALECT_V2) returns with item 4;
+    // leaving the bits clear keeps the wire format identical to every pre-dialect build.
 
     sprintf(settings->smb_ip, "%u.%u.%u.%u", pc_ip[0], pc_ip[1], pc_ip[2], pc_ip[3]);
     settings->smb_port = gPCPort;
@@ -725,7 +831,10 @@ static void ethLaunchGame(item_list_t *itemList, int id, config_set_t *configSet
 
     if (configGetStrCopy(configSet, CONFIG_ITEM_ALTSTARTUP, filename, sizeof(filename)) == 0)
         strcpy(filename, game->startup);
-    deinit(NO_EXCEPTION, ETH_MODE); // CAREFUL: deinit will call ethCleanUp, so ethGames/game will be freed
+    // MMCE cross-device game-id (#261): push the disc id to a present MMCE card before the SMB teardown
+    // (self-probes mmce0/mmce1; no-ops if no card / feature off). Read `game` before deinit frees it.
+    mmceSendGameID(game->startup, NULL, 0); // SMB has no Neutrino branch -> nothing to protect, no -mc args
+    deinit(NO_EXCEPTION, ETH_MODE);         // CAREFUL: deinit will call ethCleanUp, so ethGames/game will be freed
 
     settings->common.fakemodule_flags |= FAKE_MODULE_FLAG_DEV9;
     settings->common.fakemodule_flags |= FAKE_MODULE_FLAG_SMAP;
@@ -744,11 +853,19 @@ static config_set_t *ethGetConfig(item_list_t *itemList, int id)
 static int ethGetImage(item_list_t *itemList, char *folder, int isRelative, char *value, char *suffix, GSTEXTURE *resultTex, short psm)
 {
     char path[256];
+
+    // OPL's own ART\<name>_COV.png is the PRIMARY lookup (same path PS2 uses; the cache also retries once
+    // with a strict PS1 ID).
     if (isRelative)
         snprintf(path, sizeof(path), "%s%s\\%s_%s", ethPrefix, folder, value, suffix);
     else
         snprintf(path, sizeof(path), "%s%s_%s", folder, value, suffix);
-    return texDiscoverLoad(resultTex, path, -1);
+    int r = texDiscoverLoad(resultTex, path, -1);
+    // On a VCD (PS1) genuine miss, fall back to the POPSLoader-style suffixless cover next to the .VCD.
+    // ethPrefix ends in '\\', so vcdLoadPopsCover auto-detects the SMB separator. Cover/icon, VCD view only.
+    if (r == ERR_BAD_FILE && isRelative && vcdViewActive(itemList->mode))
+        r = vcdLoadPopsCover(ethPrefix, value, suffix, resultTex);
+    return r;
 }
 
 static int ethGetTextId(item_list_t *itemList)
@@ -791,10 +908,11 @@ static void ethShutdown(item_list_t *itemList)
     }
 
     // UI may have initialized modules outside of ETH mode, so deinitialize regardless of the enabled status.
+    int ethWasLoaded = ethModulesLoaded; // capture BEFORE ethDeinitModules() clears ethModulesLoaded
     ethDeinitModules();
 
     // Only shut down dev9 from here, if it was initialized from here before.
-    if (ethModulesLoaded)
+    if (ethWasLoaded)
         sysShutdownDev9();
 }
 
@@ -811,7 +929,7 @@ static char *ethGetPrefix(item_list_t *itemList)
 static item_list_t ethGameList = {
     ETH_MODE, 1, 0, 0, MENU_MIN_INACTIVE_FRAMES, ETH_MODE_UPDATE_DELAY, NULL, NULL, &ethGetTextId, &ethGetPrefix, &ethInit, &ethNeedsUpdate,
     &ethUpdateGameList, &ethGetGameCount, &ethGetGame, &ethGetGameName, &ethGetGameNameLength, &ethGetGameStartup, &ethDeleteGame, &ethRenameGame,
-    &ethLaunchGame, &ethGetConfig, &ethGetImage, &ethCleanUp, &ethShutdown, &ethCheckVMC, &ethGetIconId};
+    &ethLaunchGame, &ethGetConfig, &ethGetImage, &ethCleanUp, &ethShutdown, &ethCheckVMC, &ethGetIconId, &ethLaunchVcd};
 
 static int ethReadNetConfig(void)
 {

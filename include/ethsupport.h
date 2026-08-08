@@ -9,7 +9,7 @@
 typedef struct
 {
     int active;       /* Activation flag */
-    char fname[64];   /* File name (memorycard?.bin) */
+    char fname[80];   /* File name (memorycard?.bin): worst-case = 31(prefix)+5(\\VMC\\)+31(name)+4(.bin)+1(NUL) = 72 bytes; rounded up to 80 */
     u16 fid;          /* SMB File ID */
     int flags;        /* Card flag */
     vmc_spec_t specs; /* Card specifications */

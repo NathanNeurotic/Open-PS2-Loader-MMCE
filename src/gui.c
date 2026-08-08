@@ -20,6 +20,7 @@
 #include "include/ethsupport.h"
 #include "include/udpfssupport.h" // udpfsGetModulesLoaded() -- network-protocol restart-notice check
 #include "include/bdmsupport.h"   // bdmIsUDPBDLoaded() + bdmForceDeviceRefresh()
+#include "include/vcdsupport.h"   // POPStarter pages: BDMA equip, list options, POPS net config
 #include "include/compatupd.h"
 #include "include/pggsm.h"
 #include "include/cheatman.h"
@@ -732,6 +733,7 @@ reshow_ui:
     diaSetVisible(diaUIConfig, UICFG_COVERFLOW_BUTTON, gTheme->coverflow != NULL);
     const char *gameViewNames[] = {"Both", "ISO", "VCD", NULL};
     diaSetEnum(diaUIConfig, UICFG_GAMEVIEW, gameViewNames);
+    diaSetInt(diaUIConfig, UICFG_GAMEVIEW, gDefaultGameView);
 
     int ret = diaExecuteDialog(diaUIConfig, -1, 1, NULL);
 
@@ -761,11 +763,24 @@ reshow_ui:
         diaGetInt(diaUIConfig, UICFG_AUTOSORT, &gAutosort);
         diaGetInt(diaUIConfig, UICFG_AUTOREFRESH, &gAutoRefresh);
         diaGetInt(diaUIConfig, UICFG_NOTIFICATIONS, &gEnableNotifications);
+        int previousGameView = gDefaultGameView;
+        diaGetInt(diaUIConfig, UICFG_GAMEVIEW, &gDefaultGameView);
+        int gameViewChanged = gDefaultGameView != previousGameView;
+        if (gameViewChanged) {
+            vcdMarkAllDirty(); // rebuild every VCD-capable page so the new default view takes effect
+        }
 
         if (previousTheme != themeID && isBgmPlaying())
             bgmStop();
 
         applyConfig(themeID, langID, 1);
+        if (gameViewChanged) {
+            // applyConfig(..., skipDeviceRefresh=1) deliberately avoids device scans. Queue after it
+            // returns so HDD (which has no automatic refresh) cannot retain PS2 rows while rendering
+            // uses the new VCD view, without racing the theme/menu bookkeeping above.
+            oplQueueVcdDeviceUpdates();
+            loadFavourites(); // queued after source pages so the FAV resolver sees their rebuilt rows
+        }
         sfxInit(0);
 
         if (gEnableBGM && !isBgmPlaying())
@@ -979,6 +994,329 @@ void guiShowNetConfig(void)
             gNetworkStartup = ERROR_ETH_SMB_LOGON;
 
         applyConfig(-1, -1, 0);
+    }
+}
+
+// POPStarter page live-updater: reveal the free-text POPSTARTER.ELF Path field only when the
+// device picker is "Custom".
+static int guiVcdUpdater(int modified)
+{
+    int popsDev;
+
+    if (modified) {
+        diaGetInt(diaVcdConfig, CFG_POPSTARTER_DEVICE, &popsDev);
+        diaSetVisible(diaVcdConfig, CFG_LBL_POPSTARTER_PATH, popsDev == POPS_DEV_CUSTOM);
+        diaSetVisible(diaVcdConfig, CFG_POPSTARTER_PATH, popsDev == POPS_DEV_CUSTOM);
+    }
+    return 0;
+}
+
+// BDMA Settings live-updater: hide the manual BDMA Source/Mode pickers while "VCD BDMA Apply on
+// Launch" is ON (it auto-equips); re-reveal them live when toggled off.
+static int guiBdmaUpdater(int modified)
+{
+    int bdmaApply;
+
+    if (modified) {
+        diaGetInt(diaBdmaConfig, CFG_BDMA_APPLY, &bdmaApply);
+        diaSetVisible(diaBdmaConfig, CFG_LBL_BDMASOURCE, !bdmaApply);
+        diaSetVisible(diaBdmaConfig, CFG_BDMASOURCE, !bdmaApply);
+        diaSetVisible(diaBdmaConfig, CFG_LBL_BDMAMODE, !bdmaApply);
+        diaSetVisible(diaBdmaConfig, CFG_BDMAMODE, !bdmaApply);
+    }
+    return 0;
+}
+
+// USB .VCD launches only: force the fat32/exFAT POPSTARTER driver pick EVERY launch -- the PS2
+// cannot detect the filesystem a USB stick is actually formatted with, so the user chooses per
+// launch. Returns the pressed button's id (VCDUSB_BTN_FAT32 / VCDUSB_BTN_EXFAT) or UIID_BTN_CANCEL.
+int guiShowVcdUsbMode(void)
+{
+    return diaExecuteDialog(diaVcdUsbMode, -1, 1, NULL);
+}
+
+// POPStarter page (settings-layout restructure, was VCD Settings): PS1-via-POPSTARTER launch
+// config (POPSTARTER.ELF device/path). The BDMA equip, VCD list display options and POPStarter
+// network settings are chained sub-dialogs (guiShowBdmaConfig / guiShowVcdListConfig /
+// guiShowPopsNetConfig). CFG ids are shared with the old rows, so saved config values map through
+// unchanged.
+void guiShowVcdConfig(void)
+{
+    // POPSTARTER.ELF device TYPE (POPS_DEV_*). MUST stay in sync with vcdResolvePopstarter() (vcdsupport.c).
+    const char *popsDevStrs[] = {_l(_STR_DEFAULT), "Memory Card", "USB", "MX4SIO", "MMCE", "HDD (exFAT)", "HDD (APA)", "Custom", _l(_STR_GAMES_DEVICE), NULL}; // "Game's Device" (POPS_DEV_GAME) appended last to match the enum tail
+    diaSetEnum(diaVcdConfig, CFG_POPSTARTER_DEVICE, popsDevStrs);
+    diaSetInt(diaVcdConfig, CFG_POPSTARTER_DEVICE, gPopstarterDevice);
+    diaSetString(diaVcdConfig, CFG_POPSTARTER_PATH, gPopstarterPath);
+    diaSetShowDefaultWhenEmpty(diaVcdConfig, CFG_POPSTARTER_PATH, 1);
+    diaSetInt(diaVcdConfig, CFG_POPSTARTER_RETROGEM_GAMEID, gPopstarterRetroGemGameID);
+
+    // POPSTARTER Path is the Custom-only escape hatch (guiVcdUpdater re-reveals it live).
+    diaSetVisible(diaVcdConfig, CFG_LBL_POPSTARTER_PATH, gPopstarterDevice == POPS_DEV_CUSTOM);
+    diaSetVisible(diaVcdConfig, CFG_POPSTARTER_PATH, gPopstarterDevice == POPS_DEV_CUSTOM);
+
+    int ret;
+reshow_vcd:
+    ret = diaExecuteDialog(diaVcdConfig, -1, 1, &guiVcdUpdater);
+    if (ret == VCD_BDMA_BUTTON) {
+        guiShowBdmaConfig();
+        goto reshow_vcd;
+    }
+    if (ret == VCD_LIST_BUTTON) {
+        guiShowVcdListConfig();
+        goto reshow_vcd;
+    }
+    if (ret == VCD_NET_BUTTON) {
+        guiShowPopsNetConfig();
+        goto reshow_vcd;
+    }
+    if (ret) {
+        diaGetInt(diaVcdConfig, CFG_POPSTARTER_DEVICE, &gPopstarterDevice);
+        diaGetInt(diaVcdConfig, CFG_POPSTARTER_RETROGEM_GAMEID, &gPopstarterRetroGemGameID);
+
+        {
+            // The dialog field is char[32]; only adopt the typed value if it actually changed, so
+            // opening+saving this page never truncates a longer path stored via the cfg.
+            char tmpPop[sizeof(gPopstarterPath)];
+            diaGetString(diaVcdConfig, CFG_POPSTARTER_PATH, tmpPop, sizeof(tmpPop));
+            if (strncmp(tmpPop, gPopstarterPath, 31) != 0)
+                snprintf(gPopstarterPath, sizeof(gPopstarterPath), "%s", tmpPop);
+        }
+        applyConfig(-1, -1, 0);
+        menuReinitMainMenu();
+    }
+}
+
+// POPStarter -> BDMA Settings (BDMAssault exFAT-driver equip). MODE reflects what's ACTUALLY on the
+// card (marker read), so the page is honest even if POPSLoader or a prior session set it.
+void guiShowBdmaConfig(void)
+{
+    const char *bdmaSourceStrs[] = {_l(_STR_BDMA_SRC_USB), _l(_STR_BDMA_SRC_MX4SIO), _l(_STR_BDMA_SRC_MMCE), _l(_STR_BDMA_SRC_HDD), NULL};
+    const char *bdmaModeStrs[] = {_l(_STR_BDMA_MODE_FAT32), _l(_STR_BDMA_MODE_USBEXFAT), _l(_STR_BDMA_MODE_MX4SIO), _l(_STR_BDMA_MODE_MMCE), _l(_STR_BDMA_MODE_ATA), NULL};
+    gBdmaMode = vcdReadBdmaMode();
+    diaSetEnum(diaBdmaConfig, CFG_BDMASOURCE, bdmaSourceStrs);
+    diaSetEnum(diaBdmaConfig, CFG_BDMAMODE, bdmaModeStrs);
+    diaSetInt(diaBdmaConfig, CFG_BDMASOURCE, gBdmaSource);
+    diaSetInt(diaBdmaConfig, CFG_BDMAMODE, gBdmaMode);
+    diaSetInt(diaBdmaConfig, CFG_BDMA_APPLY, gBdmaApplyOnLaunch);
+    // "VCD BDMA Apply on Launch" ON auto-equips, so hide the manual SOURCE/MODE pickers
+    // (guiBdmaUpdater re-reveals them live when toggled off).
+    diaSetVisible(diaBdmaConfig, CFG_LBL_BDMASOURCE, !gBdmaApplyOnLaunch);
+    diaSetVisible(diaBdmaConfig, CFG_BDMASOURCE, !gBdmaApplyOnLaunch);
+    diaSetVisible(diaBdmaConfig, CFG_LBL_BDMAMODE, !gBdmaApplyOnLaunch);
+    diaSetVisible(diaBdmaConfig, CFG_BDMAMODE, !gBdmaApplyOnLaunch);
+
+    int ret = diaExecuteDialog(diaBdmaConfig, -1, 1, &guiBdmaUpdater);
+    if (ret) {
+        diaGetInt(diaBdmaConfig, CFG_BDMA_APPLY, &gBdmaApplyOnLaunch);
+        {
+            // Equip BDMA modules only when SOURCE or MODE actually changed (the equip copies files to
+            // the memory card). vcdEquipBdma is free-space-gated + truncation-safe, so a failure never
+            // corrupts the card; report it and resync MODE to what's really equipped.
+            int oldSrc = gBdmaSource, oldMode = gBdmaMode; // baselines (MODE = card's actual state)
+            int newSrc = oldSrc, newMode = oldMode;
+            diaGetInt(diaBdmaConfig, CFG_BDMASOURCE, &newSrc);
+            diaGetInt(diaBdmaConfig, CFG_BDMAMODE, &newMode);
+            // Re-equip on any MODE change, and on a SOURCE change only when MODE installs modules. FAT32
+            // ignores the source, so a SOURCE-only move while already FAT32 must NOT re-run the pointless work.
+            if (newMode != oldMode || (newMode != VCD_BDMA_FAT32 && newSrc != oldSrc)) {
+                char bdmaDiag[160];
+                int er = vcdEquipBdma(newSrc, newMode, bdmaDiag, sizeof(bdmaDiag));
+                if (er == -4) {
+                    char msg[256];
+                    snprintf(msg, sizeof(msg), "%s\n%s", _l(_STR_BDMA_ERR_SRC), bdmaDiag);
+                    guiMsgBox(msg, 0, NULL);
+                } else if (er == -2)
+                    guiMsgBox(_l(_STR_BDMA_ERR_SPACE), 0, NULL);
+                else if (er == -3)
+                    guiMsgBox(_l(_STR_BDMA_ERR_IO), 0, NULL);
+                gBdmaMode = vcdReadBdmaMode(); // MODE = what is now actually equipped
+            }
+            gBdmaSource = newSrc; // remember the source preference regardless of equip outcome
+        }
+        applyConfig(-1, -1, 0);
+    }
+}
+
+// POPStarter -> Game List Settings (VCD list display options).
+void guiShowVcdListConfig(void)
+{
+    diaSetInt(diaVcdListConfig, CFG_VCD_HIDE_GAMEID, gVcdHideGameId);
+    diaSetInt(diaVcdListConfig, CFG_VCD_FIRST_DISC_ONLY, gVcdFirstDiscOnly);
+
+    int rebuildVcdLists = 0;
+    int ret = diaExecuteDialog(diaVcdListConfig, -1, 1, NULL);
+    if (ret) {
+        {
+            // #195: hide-gameid is NO LONGER purely cosmetic -- it is now a SORT KEY. The menu sort
+            // (submenuSort) orders by the DISPLAYED title, i.e. past the hidden prefix, so a change must
+            // re-sort every VCD-capable page. vcdMarkAllDirty() + rebuildVcdLists forces that menu rebuild
+            // and its submenuSort re-runs against the new vcdDisplayName key -- WITHOUT re-reading any
+            // device. Do NOT invalidate the HDD VCD cache here (unlike first-disc-only below): this toggle
+            // changes only the DISPLAY ORDER, not the list CONTENTS, and submenuSort reorders the cached
+            // rows in place. hddVcdInvalidateCache() would force an unnecessary full re-walk of every
+            // __.POPS partition (pfs1: remount) plus a transient empty HDD VCD page on every flip (audit
+            // 2026-07-17 of the CodeRabbit #200 fix -- my "sorted with the old key" note was true but
+            // irrelevant, the menu sort fixes the order regardless of the backing array).
+            int previousHideGameId = gVcdHideGameId;
+            diaGetInt(diaVcdListConfig, CFG_VCD_HIDE_GAMEID, &gVcdHideGameId);
+            if (gVcdHideGameId != previousHideGameId) {
+                vcdMarkAllDirty();
+                rebuildVcdLists = 1;
+            }
+        }
+        {
+            // #118: first-disc-only changes the VCD list CONTENTS (discs hidden/shown), so unlike the
+            // cosmetic hide-gameid it must rebuild every VCD-capable device page when toggled. Device
+            // lists only -- Favourites are intentionally left unfiltered (an explicit user pick).
+            int previousFirstDiscOnly = gVcdFirstDiscOnly;
+            diaGetInt(diaVcdListConfig, CFG_VCD_FIRST_DISC_ONLY, &gVcdFirstDiscOnly);
+            if (gVcdFirstDiscOnly != previousFirstDiscOnly) {
+                vcdMarkAllDirty();
+                hddVcdInvalidateCache(); // scan-time filter changed -> the cached HDD VCD list is stale
+                rebuildVcdLists = 1;
+            }
+        }
+        applyConfig(-1, -1, 0);
+        menuReinitMainMenu();
+        // Queue after applyConfig/menu reinit so the IO worker cannot rebuild a submenu concurrently
+        // with their support/menu bookkeeping on the GUI thread.
+        if (rebuildVcdLists)
+            oplQueueVcdDeviceUpdates();
+    }
+}
+
+// POPStarter -> Network Settings live-updater: DHCP = no static IP/mask/gateway triple.
+static int guiPopsNetUpdater(int modified)
+{
+    int isPopsDhcp, i;
+
+    if (modified) {
+        diaGetInt(diaPopsNetConfig, NETCFG_POPS_IPTYPE, &isPopsDhcp);
+        for (i = 0; i < 4; i++) {
+            diaSetEnabled(diaPopsNetConfig, NETCFG_POPS_IP_0 + i, !isPopsDhcp);
+            diaSetEnabled(diaPopsNetConfig, NETCFG_POPS_MASK_0 + i, !isPopsDhcp);
+            diaSetEnabled(diaPopsNetConfig, NETCFG_POPS_GW_0 + i, !isPopsDhcp);
+        }
+    }
+
+    return 0;
+}
+
+// POPStarter -> Network Settings (VCD over SMB). Shows POPSTARTER's OWN IPCONFIG.DAT /
+// SMBCONFIG.DAT contents. Absent files leave the fields blank with the notice visible -- absence
+// means unknown/unconfigured, NEVER "use OPL's values". Only an explicit edit or the Import button
+// fills them, and only an actual change vs the read-time snapshot is written back on OK (the save
+// matrix below). Moved out of guiShowNetConfig by the settings-layout restructure; the Import
+// source is now the SAVED OPL network globals (the OPL fields no longer share this dialog).
+void guiShowPopsNetConfig(void)
+{
+    size_t i;
+    const char *ipAddrConfModes[] = {_l(_STR_IP_ADDRESS_TYPE_STATIC), _l(_STR_IP_ADDRESS_TYPE_DHCP), NULL};
+    // POPStarter read-time snapshot for the change-detection save matrix, + static storage for the
+    // "Loaded from %s" notice (diaSetLabel stores a RAW POINTER -- it must outlive the dialog).
+    static vcd_popsnet_t popsOriginal;
+    static char popsNotice[128];
+    diaSetEnum(diaPopsNetConfig, NETCFG_POPS_IPTYPE, ipAddrConfModes); // same Static/DHCP index convention
+
+    vcdReadPopstarterNet(&popsOriginal);
+    diaSetInt(diaPopsNetConfig, NETCFG_POPS_IPTYPE, popsOriginal.ipDhcp);
+    for (i = 0; i < 4; ++i) {
+        diaSetInt(diaPopsNetConfig, NETCFG_POPS_IP_0 + i, popsOriginal.ps2Ip[i]);
+        diaSetInt(diaPopsNetConfig, NETCFG_POPS_MASK_0 + i, popsOriginal.ps2Mask[i]);
+        diaSetInt(diaPopsNetConfig, NETCFG_POPS_GW_0 + i, popsOriginal.ps2Gw[i]);
+        diaSetInt(diaPopsNetConfig, NETCFG_POPS_SMB_IP_0 + i, popsOriginal.smbIp[i]);
+
+        diaSetEnabled(diaPopsNetConfig, NETCFG_POPS_IP_0 + i, !popsOriginal.ipDhcp);
+        diaSetEnabled(diaPopsNetConfig, NETCFG_POPS_MASK_0 + i, !popsOriginal.ipDhcp);
+        diaSetEnabled(diaPopsNetConfig, NETCFG_POPS_GW_0 + i, !popsOriginal.ipDhcp);
+    }
+    diaSetInt(diaPopsNetConfig, NETCFG_POPS_SMB_PORT, popsOriginal.smbPort);
+    diaSetString(diaPopsNetConfig, NETCFG_POPS_SMB_SHARE, popsOriginal.smbShare);
+    diaSetString(diaPopsNetConfig, NETCFG_POPS_SMB_USER, popsOriginal.smbUser);
+    diaSetString(diaPopsNetConfig, NETCFG_POPS_SMB_PASS, popsOriginal.smbPass);
+
+    if (popsOriginal.smbExists || popsOriginal.ipExists) {
+        snprintf(popsNotice, sizeof(popsNotice), _l(_STR_POPS_LOADED_FROM),
+                 popsOriginal.smbExists ? popsOriginal.smbDir : popsOriginal.ipDir);
+        diaSetLabel(diaPopsNetConfig, NETCFG_POPS_NOTICE, popsNotice);
+    } else {
+        diaSetLabel(diaPopsNetConfig, NETCFG_POPS_NOTICE, _l(_STR_POPS_NONE_DETECTED));
+    }
+
+    int result;
+    do {
+        result = diaExecuteDialog(diaPopsNetConfig, -1, 1, &guiPopsNetUpdater);
+        if (result == NETCFG_POPS_IMPORT) {
+            // IMPORT: the ONE sanctioned path that copies OPL's saved Network Settings into the
+            // POPStarter fields. Pressing the button exits the dialog with its id; the dialog
+            // struct keeps every field's value across the re-execution, so nothing the user typed
+            // elsewhere is lost.
+            char s[32];
+
+            diaSetInt(diaPopsNetConfig, NETCFG_POPS_IPTYPE, ps2_ip_use_dhcp);
+            for (i = 0; i < 4; ++i) {
+                diaSetInt(diaPopsNetConfig, NETCFG_POPS_IP_0 + i, ps2_ip[i]);
+                diaSetInt(diaPopsNetConfig, NETCFG_POPS_MASK_0 + i, ps2_netmask[i]);
+                diaSetInt(diaPopsNetConfig, NETCFG_POPS_GW_0 + i, ps2_gateway[i]);
+
+                diaSetEnabled(diaPopsNetConfig, NETCFG_POPS_IP_0 + i, !ps2_ip_use_dhcp);
+                diaSetEnabled(diaPopsNetConfig, NETCFG_POPS_MASK_0 + i, !ps2_ip_use_dhcp);
+                diaSetEnabled(diaPopsNetConfig, NETCFG_POPS_GW_0 + i, !ps2_ip_use_dhcp);
+            }
+
+            // A NetBIOS share name can't be turned into an IP -- leave the POPStarter server IP
+            // untouched in that case instead of importing a wrong value.
+            if (!gPCShareAddressIsNetBIOS) {
+                for (i = 0; i < 4; ++i)
+                    diaSetInt(diaPopsNetConfig, NETCFG_POPS_SMB_IP_0 + i, pc_ip[i]);
+            }
+            diaSetInt(diaPopsNetConfig, NETCFG_POPS_SMB_PORT, gPCPort);
+            snprintf(s, sizeof(s), "%s", gPCShareName);
+            diaSetString(diaPopsNetConfig, NETCFG_POPS_SMB_SHARE, s);
+            snprintf(s, sizeof(s), "%s", gPCUserName);
+            diaSetString(diaPopsNetConfig, NETCFG_POPS_SMB_USER, s);
+            snprintf(s, sizeof(s), "%s", gPCPassword);
+            diaSetString(diaPopsNetConfig, NETCFG_POPS_SMB_PASS, s);
+        }
+    } while (result == NETCFG_POPS_IMPORT);
+
+    if (result) {
+        // POPStarter save matrix (POPSLoader parity): compare the dialog's POPStarter fields against
+        // the read-time snapshot and write ONLY what actually changed -- and only when the file
+        // already exists (overwrite at its origin dir) or the user supplied complete values (create
+        // at createDir). Blank/incomplete fields with no existing file create NOTHING: absence must
+        // never turn into a fabricated configuration.
+        vcd_popsnet_t popsCur = popsOriginal; // carries the origin dirs + exists flags over
+        diaGetInt(diaPopsNetConfig, NETCFG_POPS_IPTYPE, &popsCur.ipDhcp);
+        for (i = 0; i < 4; ++i) {
+            diaGetInt(diaPopsNetConfig, NETCFG_POPS_IP_0 + i, &popsCur.ps2Ip[i]);
+            diaGetInt(diaPopsNetConfig, NETCFG_POPS_MASK_0 + i, &popsCur.ps2Mask[i]);
+            diaGetInt(diaPopsNetConfig, NETCFG_POPS_GW_0 + i, &popsCur.ps2Gw[i]);
+            diaGetInt(diaPopsNetConfig, NETCFG_POPS_SMB_IP_0 + i, &popsCur.smbIp[i]);
+        }
+        diaGetInt(diaPopsNetConfig, NETCFG_POPS_SMB_PORT, &popsCur.smbPort);
+        diaGetString(diaPopsNetConfig, NETCFG_POPS_SMB_SHARE, popsCur.smbShare, sizeof(popsCur.smbShare));
+        diaGetString(diaPopsNetConfig, NETCFG_POPS_SMB_USER, popsCur.smbUser, sizeof(popsCur.smbUser));
+        diaGetString(diaPopsNetConfig, NETCFG_POPS_SMB_PASS, popsCur.smbPass, sizeof(popsCur.smbPass));
+
+        int popsMask = vcdPopsNetChanged(&popsOriginal, &popsCur);
+        int popsSmbComplete = popsCur.smbShare[0] != '\0' &&
+                              (popsCur.smbIp[0] | popsCur.smbIp[1] | popsCur.smbIp[2] | popsCur.smbIp[3]) != 0;
+        int popsIpComplete = (popsCur.ps2Ip[0] | popsCur.ps2Ip[1] | popsCur.ps2Ip[2] | popsCur.ps2Ip[3]) != 0 &&
+                             (popsCur.ps2Mask[0] | popsCur.ps2Mask[1] | popsCur.ps2Mask[2] | popsCur.ps2Mask[3]) != 0 &&
+                             (popsCur.ps2Gw[0] | popsCur.ps2Gw[1] | popsCur.ps2Gw[2] | popsCur.ps2Gw[3]) != 0;
+        int writeSmb = (popsMask & 1) && (popsOriginal.smbExists || popsSmbComplete);
+        int writeIp = (popsMask & 2) && (popsOriginal.ipExists || popsCur.ipDhcp || popsIpComplete);
+        // Creating a fresh SMBCONFIG.DAT with no IPCONFIG.DAT anywhere: create the pair -- POPStarter
+        // expects IPCONFIG.DAT to exist even when blank (DHCP). An incomplete static entry becomes a
+        // BLANK file (never garbage); the user can complete it later and it will overwrite.
+        if (writeSmb && !popsOriginal.smbExists && !popsOriginal.ipExists) {
+            writeIp = 1;
+            if (!popsCur.ipDhcp && !popsIpComplete)
+                popsCur.ipDhcp = 1;
+        }
+        if ((writeSmb || writeIp) && vcdWritePopstarterNetFiles(&popsCur, writeSmb, writeIp) != 0)
+            guiMsgBox(_l(_STR_POPSTARTER_NET_ERR), 0, NULL);
     }
 }
 

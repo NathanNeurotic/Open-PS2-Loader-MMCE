@@ -114,7 +114,7 @@ typedef struct _McImageSpec
 #endif
 
 #ifdef SMB_DRIVER
-    char fname[64]; /* Vmc file name (memorycard?.bin) */
+    char fname[80]; /* Vmc file name (memorycard?.bin): worst-case = 31+5+31+4+1 = 72 bytes; must match smb_vmc_infos_t.fname in include/ethsupport.h */
     u16 fid;        /* SMB Vmc file id */
 #endif
 
