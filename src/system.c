@@ -251,6 +251,24 @@ void sysReset(int modload_mask)
     LOG("[POWEROFF]:\n");
     sysLoadModuleBuffer(&poweroff_irx, size_poweroff_irx, 0, NULL);
 
+    /*
+      usbd is the USB HOST STACK, not a storage driver: it must be resident before ANY usbd client
+      loads, and it stays unconditional (independent of gEnableUSB, which gates only usbmass_bd).
+      The PADEMU block ~20 lines below loads ds34usb.irx/ds34bt.irx, and both hard-import usbd
+      (each module's iop/imports.lst carries a usbd_IMPORTS_start block). Without usbd resident their
+      loadcore link stage fails, neither registers its SIF RPC server, and ds34usb_init()'s unbounded
+      "do { SifBindRpc } while (!server)" spin never terminates -- sysReset() never returns, init()
+      never runs, and the console black-screens before the GS is even initialised.
+
+      This lives HERE, matching fork master (src/system.c, after POWEROFF), NOT in bdmLoadModules().
+      Official OPL loads usbd inside bdmsupport.c and steps 01..11 followed official; rebuild-12 then
+      landed the FORK's bdmsupport.c byte-identically -- and the fork's copy has no usbd load, because
+      the fork does it right here. Both halves of that contract now match the fork. Do not move it
+      back into bdmLoadModules() without also removing the fork-parity claim on bdmsupport.c.
+    */
+    LOG("[USBD]:\n");
+    sysLoadModuleBuffer(&usbd_irx, size_usbd_irx, 0, NULL);
+
     if (modload_mask & SYS_LOAD_USB_MODULES) {
         bdmLoadModules();
     }
