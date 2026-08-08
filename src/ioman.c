@@ -342,14 +342,16 @@ int ioBlockOps(int block)
         isIOBlocked = 1;
 
         ThreadID = GetThreadId();
-        ReferThreadStatus(ThreadID, &status);
+        int haveStatus = (ReferThreadStatus(ThreadID, &status) == 0);
         ChangeThreadPriority(ThreadID, 90);
 
         // wait for all io to finish
         while (ioHasPendingRequests()) {
         };
 
-        ChangeThreadPriority(ThreadID, status.current_priority);
+        // Only restore the saved priority if ReferThreadStatus actually filled it.
+        if (haveStatus)
+            ChangeThreadPriority(ThreadID, status.current_priority);
 
         // now all io should be blocked
     } else if (!block && isIOBlocked) {
