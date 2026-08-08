@@ -33,6 +33,7 @@
 #include "include/appsupport.h"
 #include "include/favsupport.h"
 #include "include/folderbrowse.h" // folderDepth -- favourites suppression inside subfolders
+#include "include/tar.h"          // tarInvalidate -- re-arm the .tar probe on a settings apply
 #include "include/vcdsupport.h"   // vcdViewActive stub -- isVcd stays 0 until item 12 lands
 
 #include "include/cheatman.h"
@@ -1693,6 +1694,16 @@ static void _saveConfig()
 
 void applyConfig(int themeID, int langID, int skipDeviceRefresh)
 {
+    // A deliberate settings apply may make new art available, so clear the .tar "no archive
+    // anywhere" latch and let it be probed once more. That latch (tar.c s_inactive[]) is write-once
+    // and process-wide with no self-clearing path, so without this a user who boots with the loader
+    // already ON and no archive present -- then plugs one in -- keeps getting nothing until a
+    // reboot. The Artwork page's own toggle-flip re-arm only covers the case where the toggle
+    // CHANGES; this covers the rest.
+    // NOTE(rebuild): the fork pairs this with cacheInvalidateFailMemo(), which the rebuild's
+    // official-derived texcache does not have. Only the .tar half applies here.
+    tarInvalidate(TAR_KIND_ART);
+
     if (gDefaultDevice < 0 || gDefaultDevice > APP_MODE)
         gDefaultDevice = APP_MODE;
 
