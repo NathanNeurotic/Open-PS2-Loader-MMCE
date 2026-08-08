@@ -2344,7 +2344,7 @@ static void setDefaults(void)
     gVcdHideGameId = 1;     // hide the PS1 game-ID prefix by default (display-only)
     gVcdFirstDiscOnly = 1;  // hide discs 2+ of multi-disc PS1 sets by default (POPSLoader parity)
     gBootDir[0] = '\0';
-    gEnableBGArt = 1; // inert while gEnableArt stays at the official OFF default
+    gEnableBGArt = 1; // fork parity; gEnableArt is 1 above, so this is live
     gEnableArtTar = 0;
     gArtDelay = 8; // official-like settle (the fork's aggressive 2-frame default is a gate-D decision, item 45)
     gEnableFolderNav = 0;
