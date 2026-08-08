@@ -81,7 +81,7 @@ static submenu_list_t *gameMenuCurrent;
 static submenu_list_t *appMenu;
 static submenu_list_t *appMenuCurrent;
 
-static s32 menuSemaId;
+static s32 menuSemaId = -1;
 static s32 menuListSemaId = -1;
 static ee_sema_t menuSema;
 
@@ -326,10 +326,13 @@ void menuInit()
     appMenuCurrent = NULL;
     menuInitMainMenu();
 
-    menuSema.init_count = 1;
-    menuSema.max_count = 1;
-    menuSema.option = 0;
-    menuSemaId = CreateSema(&menuSema);
+    // Create once; recreating on a second menuInit would leak the prior semaphore.
+    if (menuSemaId < 0) {
+        menuSema.init_count = 1;
+        menuSema.max_count = 1;
+        menuSema.option = 0;
+        menuSemaId = CreateSema(&menuSema);
+    }
     if (menuListSemaId < 0) {
         menuListSemaId = sbCreateSemaphore();
     }
@@ -362,6 +365,7 @@ void menuEnd()
     }
 
     DeleteSema(menuSemaId);
+    menuSemaId = -1;
     DeleteSema(menuListSemaId);
     menuListSemaId = -1;
 }

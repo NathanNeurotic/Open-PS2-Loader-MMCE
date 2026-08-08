@@ -424,8 +424,10 @@ extern void *_gp;
 
 static int bgmThreadID, bgmIoThreadID;
 static int outSema, inSema;
-static unsigned char terminateFlag, bgmIsPlaying;
-static unsigned char rdPtr, wrPtr;
+// Shared between the BGM playback thread and the main thread; volatile so updates
+// are observed across threads rather than cached in a register.
+static volatile unsigned char terminateFlag, bgmIsPlaying;
+static volatile unsigned char rdPtr, wrPtr;
 static char bgmBuffer[BGM_RING_BUFFER_COUNT][BGM_RING_BUFFER_SIZE];
 static volatile unsigned char bgmThreadRunning, bgmIoThreadRunning;
 
