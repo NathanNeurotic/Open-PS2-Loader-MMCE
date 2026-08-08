@@ -18,6 +18,8 @@
 #include "include/config.h"
 #include "include/system.h"
 #include "include/ethsupport.h"
+#include "include/udpfssupport.h" // udpfsGetModulesLoaded() -- network-protocol restart-notice check
+#include "include/bdmsupport.h"   // bdmIsUDPBDLoaded() + bdmForceDeviceRefresh()
 #include "include/compatupd.h"
 #include "include/pggsm.h"
 #include "include/cheatman.h"
@@ -291,7 +293,7 @@ static void guiShowNotifications(void)
     int y = 10;
     int yadd = 35;
 
-    if (showPartPopup || showThmPopup || showLngPopup || showCfgPopup) {
+    if (showPartPopup || showThmPopup || showLngPopup || showCfgPopup || showNetDhcpPopup) {
         if (!popupTimer) {
             popupTimer = clock() + 5000 * (CLOCKS_PER_SEC / 1000);
             sfxPlay(SFX_MESSAGE);
@@ -330,12 +332,21 @@ static void guiShowNotifications(void)
                 *(col_pos + 1) = '\0';
 
             guiRenderNotifications(notification, y);
+            y += yadd;
+        }
+
+        // One-time network notice set at config load: a UDP transport left on DHCP (the ministack has
+        // no DHCP client; it binds the static PS2 IP fields as-is, so an unset static IP fails silently).
+        if (showNetDhcpPopup) {
+            guiRenderNotifications(_l(_STR_UDPBD_NEEDS_STATIC_IP), y);
+            y += yadd;
         }
 
         if (clock() >= popupTimer) {
             guiResetNotifications();
             showPartPopup = 0;
             showCfgPopup = 0;
+            showNetDhcpPopup = 0;
         }
     }
 }
@@ -567,11 +578,11 @@ void guiShowDeviceConfig(void)
     diaSetEnabled(diaDeviceConfig, CFG_ENABLEBDMHDD, 1); // coexists with APA
     diaSetEnabled(diaDeviceConfig, CFG_HDDMODE, 1);
 
-    // Network Start Mode (Off/Manual/Auto). NOTE(rebuild): with SMB the only network transport
-    // until checklist items 5/6/7 land, this row IS the SMB/ETH start mode -- the mapping is
-    // exact, not an approximation. The protocol picker joins it on the Network page later.
+    // Network Start Mode (Off/Manual/Auto) == gNetStartMode (START_MODE_*); the SAME three options
+    // (and indices) as every other device's start row, so reuse the localized deviceModes.
+    // The Protocol/Access rows live on the Network page.
     diaSetEnum(diaDeviceConfig, CFG_NETSTART, deviceModes);
-    diaSetInt(diaDeviceConfig, CFG_NETSTART, gETHStartMode);
+    diaSetInt(diaDeviceConfig, CFG_NETSTART, gNetStartMode);
 
     // NOTE(rebuild): MMCE returns with checklist item 1 -- show its row greyed at Off until then.
     diaSetEnum(diaDeviceConfig, CFG_MMCEMODE, deviceModes);
@@ -580,6 +591,7 @@ void guiShowDeviceConfig(void)
 
     int ret = diaExecuteDialog(diaDeviceConfig, -1, 1, NULL);
     if (ret) {
+        int netProtocolWas = gNetworkProtocol;
         diaGetInt(diaDeviceConfig, CFG_DEFDEVICE, &deviceModeIndex);
         gDefaultDevice = guiDeviceTypeToIoMode(deviceModeIndex);
         diaGetInt(diaDeviceConfig, CFG_BDMMODE, &gBDMStartMode);
@@ -592,7 +604,42 @@ void guiShowDeviceConfig(void)
         diaGetInt(diaDeviceConfig, CFG_ENABLEMX4SIO, &gEnableMX4SIO);
         diaGetInt(diaDeviceConfig, CFG_ENABLEBDMHDD, &gEnableBdmHDD);
 
-        diaGetInt(diaDeviceConfig, CFG_NETSTART, &gETHStartMode);
+        // Network Start Mode read-back: Start=Off forces the protocol OFF; switching Start back on
+        // with no protocol memory (was OFF) lands on SMB, the common default. The protocol itself is
+        // picked on the Network page. Then re-derive the legacy shadows downstream consumers read.
+        diaGetInt(diaDeviceConfig, CFG_NETSTART, &gNetStartMode);
+        if (gNetStartMode == START_MODE_DISABLED)
+            gNetworkProtocol = NET_PROTO_OFF;
+        else if (gNetworkProtocol == NET_PROTO_OFF)
+            gNetworkProtocol = NET_PROTO_SMB;
+        gEnableUDPBD = (gNetworkProtocol == NET_PROTO_UDPBD || gNetworkProtocol == NET_PROTO_UDPFSBD);
+        gNetBootProtocol = (gNetworkProtocol == NET_PROTO_UDPFSBD) ? NET_BOOT_UDPFS : NET_BOOT_UDPBD;
+        // SMB's start mode IS the network start row (Auto = boot connect, Manual = on-entry);
+        // every non-SMB protocol forces the SMB/ETH stack off so only one transport claims the NIC.
+        gETHStartMode = (gNetworkProtocol == NET_PROTO_SMB) ? gNetStartMode : START_MODE_DISABLED;
+
+        // "Nothing happens" guard: enabling a network protocol gives NO feedback -- the UDPFS tab
+        // joins the ring silently (Manual start waits for a Confirm-press inside it), and the block
+        // transports show a tab only once the PC server answers.
+        if (gNetworkProtocol != netProtocolWas) {
+            if (gNetworkProtocol == NET_PROTO_UDPFS)
+                guiMsgBox(_l(_STR_NET_UDPFS_TAB_HINT), 0, NULL);
+            else if (gNetworkProtocol == NET_PROTO_UDPFSBD || gNetworkProtocol == NET_PROTO_UDPBD)
+                guiMsgBox(_l(_STR_NET_UDPBD_TAB_HINT), 0, NULL);
+        }
+
+        // Each network transport loads its IOP module chain once per boot (the load latch is not
+        // cleared live). If any network stack is already up and the Start toggle changed the active
+        // protocol, the switch takes effect only after a restart -- say so instead of silently
+        // doing nothing.
+        if (gNetworkProtocol != netProtocolWas &&
+            (bdmIsUDPBDLoaded() || ethGetModulesLoaded() || udpfsGetModulesLoaded()))
+            guiMsgBox(_l(_STR_NETBOOT_RESTART), 0, NULL);
+
+        // A BDM tab can be latched hidden (bdmNeedsUpdate short-circuits until the device generation
+        // bumps). Re-evaluate device visibility now so re-enabling a device here brings its tab back
+        // without a physical replug.
+        bdmForceDeviceRefresh();
 
         applyConfig(-1, -1, 0);
         menuReinitMainMenu();
@@ -731,13 +778,14 @@ reshow_ui:
 
 static int netConfigUpdater(int modified)
 {
-    int showAdvancedOptions, isNetBIOS, isDHCPEnabled, i;
+    int showAdvancedOptions, isNetBIOS, isDHCPEnabled, netProto, i;
 
     if (modified) {
         diaGetInt(diaNetConfig, NETCFG_SHOW_ADVANCED_OPTS, &showAdvancedOptions);
 
         diaGetInt(diaNetConfig, NETCFG_PS2_IP_ADDR_TYPE, &isDHCPEnabled);
         diaGetInt(diaNetConfig, NETCFG_SHARE_ADDR_TYPE, &isNetBIOS);
+        diaGetInt(diaNetConfig, CFG_NETPROTOCOL, &netProto);
         diaSetVisible(diaNetConfig, NETCFG_SHARE_NB_ADDR, isNetBIOS);
 
         for (i = 0; i < 4; i++) {
@@ -754,6 +802,22 @@ static int netConfigUpdater(int modified)
 
         diaSetEnabled(diaNetConfig, NETCFG_SHARE_PORT, showAdvancedOptions);
         diaSetEnabled(diaNetConfig, NETCFG_ETHOPMODE, showAdvancedOptions);
+
+        // Protocol: lock Access to Files for SMB and to IMG for UDPBD (only UDPFS offers the free
+        // toggle) -- snap the value so a stale IMG left over from UDPFS can never mis-derive to
+        // UDPFSBD under SMB, AND grey the control so the lock is visible.
+        // NOTE(rebuild): the SMB Version row stays greyed at SMBv1 until item 4 lands (the fork
+        // enables it while SMB is the selected protocol).
+        diaSetEnabled(diaNetConfig, CFG_SMBDIALECT, 0);
+        if (netProto == 0) { // SMB -> Files, locked
+            diaSetInt(diaNetConfig, CFG_UDPFSMODE, 0);
+            diaSetEnabled(diaNetConfig, CFG_UDPFSMODE, 0);
+        } else if (netProto == 2) { // UDPBD -> IMG, locked
+            diaSetInt(diaNetConfig, CFG_UDPFSMODE, 1);
+            diaSetEnabled(diaNetConfig, CFG_UDPFSMODE, 0);
+        } else { // UDPFS -> Files/IMG free
+            diaSetEnabled(diaNetConfig, CFG_UDPFSMODE, 1);
+        }
     }
 
     return 0;
@@ -765,9 +829,17 @@ void guiShowNetConfig(void)
     const char *ethOpModes[] = {_l(_STR_AUTO), _l(_STR_ETH_100MFDX), _l(_STR_ETH_100MHDX), _l(_STR_ETH_10MFDX), _l(_STR_ETH_10MHDX), NULL};
     const char *addrConfModes[] = {_l(_STR_ADDR_TYPE_IP), _l(_STR_ADDR_TYPE_NETBIOS), NULL};
     const char *ipAddrConfModes[] = {_l(_STR_IP_ADDRESS_TYPE_STATIC), _l(_STR_IP_ADDRESS_TYPE_DHCP), NULL};
+    const char *netProtocols[] = {"SMB", "UDPFS", "UDPBD", NULL}; // UDPBD = SUDPBDv2 server -- protocol names, not translated
+    const char *udpfsModes[] = {"Files", "IMG", NULL};            // Access: Files=udpfs_ioman filesystem, IMG=udpfs_bd block
+    // NOTE(rebuild): SMBv1 only until item 4 re-adds the SMB2 dialect; the row shows the active
+    // dialect and stays greyed (netConfigUpdater keeps it disabled).
+    const char *smbDialects[] = {"SMBv1", NULL};
     diaSetEnum(diaNetConfig, NETCFG_PS2_IP_ADDR_TYPE, ipAddrConfModes);
     diaSetEnum(diaNetConfig, NETCFG_SHARE_ADDR_TYPE, addrConfModes);
     diaSetEnum(diaNetConfig, NETCFG_ETHOPMODE, ethOpModes);
+    diaSetEnum(diaNetConfig, CFG_NETPROTOCOL, netProtocols);
+    diaSetEnum(diaNetConfig, CFG_UDPFSMODE, udpfsModes);
+    diaSetEnum(diaNetConfig, CFG_SMBDIALECT, smbDialects);
 
     // upload current values
     diaSetInt(diaNetConfig, NETCFG_SHOW_ADVANCED_OPTS, 0);
@@ -803,6 +875,24 @@ void guiShowNetConfig(void)
     diaSetString(diaNetConfig, NETCFG_SHARE_PASSWORD, gPCPassword);
     diaSetInt(diaNetConfig, NETCFG_ETHOPMODE, gETHOpMode);
 
+    // Protocol rows, seeded from the authoritative gNetworkProtocol.
+    //   Protocol: SMB(0)/UDPFS(1)/UDPBD(2)  -- OFF and UDPFSBD both collapse to their protocol
+    //   Access:   Files(0)/IMG(1); IMG only distinct for UDPFS (-> UDPFSBD backend)
+    // A NET_PROTO_OFF backend has no protocol memory, so seed the protocol row to SMB -- the common
+    // default a user reaches when they switch the Game Sources Start row from Off to Manual/Auto.
+    int netProtoVal = (gNetworkProtocol == NET_PROTO_UDPBD)                                          ? 2 :
+                      (gNetworkProtocol == NET_PROTO_UDPFS || gNetworkProtocol == NET_PROTO_UDPFSBD) ? 1 :
+                                                                                                       0; // SMB / OFF
+    // IMG for the udpfs block backend AND UDPBD (IMG-locked), so the seed already matches the lock.
+    int netAccessVal = (gNetworkProtocol == NET_PROTO_UDPFSBD || gNetworkProtocol == NET_PROTO_UDPBD) ? 1 : 0;
+    diaSetInt(diaNetConfig, CFG_NETPROTOCOL, netProtoVal);
+    diaSetInt(diaNetConfig, CFG_UDPFSMODE, netAccessVal);
+    diaSetInt(diaNetConfig, CFG_SMBDIALECT, 0); // SMBv1 -- the only dialect until item 4
+    // Seed the initial grey/lock: diaExecuteDialog renders the FIRST frame before it calls
+    // netConfigUpdater, so without this the first frame flashes every row enabled.
+    diaSetEnabled(diaNetConfig, CFG_UDPFSMODE, netProtoVal == 1);
+    diaSetEnabled(diaNetConfig, CFG_SMBDIALECT, 0); // NOTE(rebuild): greyed until item 4
+
     // Update the spacer item between the OK and reconnect buttons (See dialogs.c).
     if (gNetworkStartup == 0) {
         diaSetLabel(diaNetConfig, NETCFG_OK, _l(_STR_OK));
@@ -835,6 +925,55 @@ void guiShowNetConfig(void)
         diaGetString(diaNetConfig, NETCFG_SHARE_NAME, gPCShareName, sizeof(gPCShareName));
         diaGetString(diaNetConfig, NETCFG_SHARE_USERNAME, gPCUserName, sizeof(gPCUserName));
         diaGetString(diaNetConfig, NETCFG_SHARE_PASSWORD, gPCPassword, sizeof(gPCPassword));
+
+        // Fold the Protocol/Access rows back into the authoritative gNetworkProtocol. PROTOCOL-FIRST:
+        // the Access value is consulted ONLY for UDPFS, so a stale IMG under SMB/UDPBD can never
+        // mis-derive. The Game Sources "Network Start Mode" row decides whether the stack runs at
+        // all: Start=Off -> OFF regardless of the protocol picked here. Then re-derive the legacy
+        // shadows (gEnableUDPBD / gNetBootProtocol / gETHStartMode) downstream consumers read.
+        // NOTE(rebuild): the fork also reads the SMB dialect row back here (item 4).
+        int netProtocolWas = gNetworkProtocol;
+        int netProtoVal2, netAccessVal2;
+        diaGetInt(diaNetConfig, CFG_NETPROTOCOL, &netProtoVal2);
+        diaGetInt(diaNetConfig, CFG_UDPFSMODE, &netAccessVal2);
+        gNetworkProtocol = (gNetStartMode == START_MODE_DISABLED) ? NET_PROTO_OFF :
+                           (netProtoVal2 == 0)                    ? NET_PROTO_SMB :
+                           (netProtoVal2 == 2)                    ? NET_PROTO_UDPBD :
+                           (netAccessVal2 == 1)                   ? NET_PROTO_UDPFSBD :
+                                                                    NET_PROTO_UDPFS; // UDPFS + Files
+        gEnableUDPBD = (gNetworkProtocol == NET_PROTO_UDPBD || gNetworkProtocol == NET_PROTO_UDPFSBD);
+        gNetBootProtocol = (gNetworkProtocol == NET_PROTO_UDPFSBD) ? NET_BOOT_UDPFS : NET_BOOT_UDPBD;
+        // SMB's start mode IS the network start row (Auto = boot connect, Manual = on-entry);
+        // every non-SMB protocol forces the SMB/ETH stack off so only one transport claims the NIC.
+        gETHStartMode = (gNetworkProtocol == NET_PROTO_SMB) ? gNetStartMode : START_MODE_DISABLED;
+
+        // The UDP transports' ministack has no DHCP client; with DHCP on, ps2_ip[] is never refreshed, so
+        // they need a static PS2 IP. Warn when switching TO a UDP protocol (UDPFS/UDPFSBD/UDPBD) from a
+        // non-UDP one while DHCP is on. SMB is exempt (it runs the full ETH stack that acquires a lease).
+        int nowUdp = (gNetworkProtocol == NET_PROTO_UDPFS || gNetworkProtocol == NET_PROTO_UDPFSBD || gNetworkProtocol == NET_PROTO_UDPBD);
+        int wasUdp = (netProtocolWas == NET_PROTO_UDPFS || netProtocolWas == NET_PROTO_UDPFSBD || netProtocolWas == NET_PROTO_UDPBD);
+        if (nowUdp && !wasUdp && ps2_ip_use_dhcp)
+            guiMsgBox(_l(_STR_UDPBD_NEEDS_STATIC_IP), 0, NULL);
+
+        // "Nothing happens" guard: enabling a network protocol gives NO feedback -- the UDPFS tab
+        // joins the ring silently and then waits for a Confirm-press inside it (Manual start), and
+        // the block transports show a tab only once the PC server answers. Tell the user what to
+        // expect + which PC server to run, right at the moment they turn it on. Shown BEFORE the
+        // restart notice below: when a restart is pending, the restart message must be the LAST
+        // word so the guidance reads as "after that".
+        if (gNetworkProtocol != netProtocolWas) {
+            if (gNetworkProtocol == NET_PROTO_UDPFS)
+                guiMsgBox(_l(_STR_NET_UDPFS_TAB_HINT), 0, NULL);
+            else if (gNetworkProtocol == NET_PROTO_UDPFSBD || gNetworkProtocol == NET_PROTO_UDPBD)
+                guiMsgBox(_l(_STR_NET_UDPBD_TAB_HINT), 0, NULL);
+        }
+
+        // Each network transport loads its IOP module chain once per boot (the load latch is not cleared
+        // live). If any network stack is already up and the user changed protocol, the switch takes effect
+        // only after a restart -- say so instead of silently doing nothing.
+        if (gNetworkProtocol != netProtocolWas &&
+            (bdmIsUDPBDLoaded() || ethGetModulesLoaded() || udpfsGetModulesLoaded()))
+            guiMsgBox(_l(_STR_NETBOOT_RESTART), 0, NULL);
 
         if (result == NETCFG_RECONNECT && gNetworkStartup < ERROR_ETH_SMB_CONN)
             gNetworkStartup = ERROR_ETH_SMB_LOGON;
@@ -1451,6 +1590,8 @@ static void guiHandleOp(struct gui_update_t *item)
 
         case GUI_OP_APPEND_MENU:
             result = submenuAppendItem(item->menu.subMenu, item->submenu.icon_id, item->submenu.text, item->submenu.id, item->submenu.text_id);
+            if (result != NULL)
+                result->item.isFolder = item->submenu.isFolder; // folder-browse row marker
             // coverflow wrap tail: submenuAppendItem always returns the new tail
             item->menu.menu->last = result;
             if (!item->menu.menu->submenu) { // first subitem in list
@@ -2093,7 +2234,9 @@ void guiMainLoop(void)
         // Render overlaying gui thingies :)
         guiDrawOverlays();
 
-        if (gEnableNotifications)
+        // The DHCP notice is a misconfiguration warning, not a courtesy popup -- show it even
+        // when the user has notifications off (it explains an otherwise-silent empty games page).
+        if (gEnableNotifications || showNetDhcpPopup)
             guiShowNotifications();
 
         // handle deferred operations

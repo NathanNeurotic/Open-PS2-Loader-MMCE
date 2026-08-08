@@ -1,0 +1,39 @@
+Vendored from rickgaiser/neutrino (https://github.com/rickgaiser/neutrino)
+Pinned to commit 06188cce7cd07d2a158cb4b2646c5719fc16a565.
+
+UDPFS ("UDP File System") is Neutrino's successor to UDPBD, over the UDPRDMA transport
+(zero-copy DMA, Go-Back-N ARQ, broadcast service discovery on service 0xF5F5 / UDP port
+0xF5F6). This vendors the FILESYSTEM variant (udpfs_ioman, built UDPFS_IOMAN=1) as a 3-IRX
+load chain, exactly as Neutrino ships it:
+
+  modules/network/udpfs_smap/      <- iop/smap/      (SMAP NIC driver; exports smap_fifo_read)
+  modules/network/udpfs_ministack/ <- iop/ministack/ (mini IP/UDP stack; exports udp_bind/...; takes ip=)
+  modules/network/udpfs_ioman/     <- iop/udpfs/      (udprdma + udpfs_core + udpfs_ioman; UDPFS_IOMAN=1)
+
+RiptOPL loads them in sequence (smap, then ministack with ip=, then udpfs_ioman). Unlike the
+BLOCK-DEVICE sibling (udpfs_bd, which bdm_connect_bd()s a "udp" massN: device), udpfs_ioman
+registers a real iomanX FILESYSTEM device "udpfs:" via AddDrv() (IOP_DT_FSEXT | IOP_DT_FS).
+OPL browses it with the same opendir/readdir/fileXioMount("iso:") calls it uses for SMB shares
+(no massN:, no fragment list, no disk image -- the PC serves a directory whose CD/ and DVD/
+subfolders hold the ISOs, the standard OPL layout OPL's scanner expects on every device).
+Both variants share udprdma.c + udpfs_core.c (the FEATURE_UDPFS_* #ifdefs select block vs
+filesystem) and are wire-INCOMPATIBLE with UDPBD (SUDPBDv2) -- the PC server is
+pcm720/udpfsd -d, NOT udpbd-server. UDPFS, UDPBD and SMB are NIC-exclusive (single
+SMAP adapter); RiptOPL's network-protocol selector loads exactly one, so they never co-load.
+This variant carries a distinct MODNAME "UDPFS_IO" (vs udpfs_bd's "UDPFS") so the two udpfs
+IRX can never RegisterLibraryEntries-collide even if a future path tried to co-load them.
+
+LOCAL CHANGES vs upstream (re-apply after re-vendoring):
+  - udpfs_ioman.c: AddDrv registration never fails on a missed first discovery, and a
+    lazy-connect/reconnect watchdog thread (the udpfs_bd pattern) re-discovers the server
+    forever -- upstream's connect-once wrapper left 'udpfs:' permanently dead when the server
+    wasn't reachable within the ~5s load-time window (PHY autonegotiation alone eats ~3s).
+  - Build: each module gets a PS2SDK Makefile (Makefile.iopglobal) instead of Neutrino's
+    Rules.make; udpfs_ioman builds with -DFEATURE_UDPFS_IOMAN -DUDPRDMA_MAX_SOCKETS=1. The
+    src/ tree is shared verbatim with udpfs_bd (same udprdma/udpfs_core/main.c/imports.lst,
+    which are already multi-variant via FEATURE_UDPFS_* #ifdefs); only udpfs_ioman.c differs
+    from udpfs_bd.c, and the Makefile flag + IOP_BIN + MODNAME select the variant.
+  - mprintf.h copied from neutrino iop/common/ (smap/udpfs pull it from -I../common upstream;
+    ministack ships its own).
+  - src/*.c and src/*.h reformatted with the repo clang-format (CI-format-check lints every
+    .c/.h, exclude:none). Whitespace-only; module logic unmodified.

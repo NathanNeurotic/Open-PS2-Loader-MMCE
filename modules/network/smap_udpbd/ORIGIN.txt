@@ -1,0 +1,36 @@
+Vendored from NHDDL (https://github.com/pcm720/nhddl) iop/smap_udpbd/
+Pinned to commit 821b6c9b4a19678d33a4166fd2abdd0034dcaba2.
+
+Upstream origin: rickgaiser/neutrino UDPBD. Protocol: SUDPBDv2 -- the PS2 client and the
+PC-side udpbd-server MUST speak the same protocol version.
+
+This is the IOP-side SMAP NIC driver + mini IP stack + UDPBD block-device driver. It lets
+RiptOPL mount a PC-served network block device as massN: so games can be launched over the
+LAN via the external Neutrino core (-bsd=udpbd). It is a pure BDM block driver
+(bdm_connect_bd) that plugs into the same bdm.irx + bdmfs_fatfs.irx stack OPL already loads;
+it presents driver token "udp" and takes a single module arg: ip=<A.B.C.D> (the PS2's static
+IP). It registers IOP module name "SMAP_driver" -- the SAME name as PS2SDK smap.irx (OPL's
+SMB/ETH stack) -- so UDPBD and SMB are mutually exclusive on the single Ethernet adapter.
+
+Built by our root Makefile via the standard PS2SDK IOP recipe (mirrors how we build
+modules/network/SMSUTILS and modules/network/smap-ingame).
+
+LOCAL CHANGE vs upstream: src/exports.tab was reduced to an EMPTY export table. Upstream NHDDL
+declared a vestigial "smap" table of 4 _retonly stubs, which left _retonly as a value-0 .text
+symbol that ps2dev:latest's stricter iopfixup rejects. Nothing in RiptOPL imports a "smap"
+library from this module, so exporting nothing is safe and self-contained.
+
+LOCAL CHANGE vs upstream: the src/*.c and src/*.h files were reformatted with the repo's
+clang-format (.clang-format, clang-format 12) to satisfy the CI-format-check workflow, which
+lints every .c/.h in the tree (exclude: none). This is whitespace-only; module logic is
+unmodified. To update: re-vendor the iop/smap_udpbd/ tree from a newer NHDDL commit, bump the
+pin above, re-empty exports.tab, and re-run clang-format on the sources before committing.
+
+LOCAL CHANGE vs upstream: security-audit hardening (re-apply after re-vendoring):
+  - src/udpbd.c _cmd_read_rdma(): bound the wire-controlled `size` against g_read_size (the bytes
+    still expected) BEFORE the dev9 DMA, mirroring the existing MTU check. Upstream only bounded
+    `size` against the MTU, so a single oversized/out-of-order RDMA reply could DMA past the
+    destination buffer and underflow the unsigned g_read_size (the completion test then never
+    fires). This is an OOB-write guard against a malicious/buggy server or a spoofed LAN reply.
+  - src/imports.lst: added I_bzero (smap.c:571 calls bzero; upstream relied on the compiler
+    inlining the constant-size call at -O2, which is fragile at -O0 / future toolchains).

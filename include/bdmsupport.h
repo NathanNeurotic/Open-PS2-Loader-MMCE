@@ -23,6 +23,7 @@ typedef struct
 #define BDM_TYPE_ILINK   1
 #define BDM_TYPE_SDC     2
 #define BDM_TYPE_ATA     3
+#define BDM_TYPE_UDPBD   4
 
 typedef struct
 {
@@ -58,6 +59,10 @@ int bdmHDDIsPresent(u32 timeoutMs);
 int bdmGetDeviceRootByType(int bdmType, char *root, int rootLen);
 
 int bdmSupportIsUDPBD(item_list_t *support); // 1 if this support is the UDPBD block device (Neutrino-only games)
+int bdmIsUDPBDLoaded(void);                  // 1 if the UDPBD NIC stack is loaded (the SMB stack must not load on top)
+int bdmGetLoadedNetProtocol(void);           // NET_BOOT_* actually resident, else the live gNetBootProtocol
+void bdmForceDeviceRefresh(void);            // bump the device generation so the next refresh re-evaluates visibility
+int bdmEffectiveStartMode(void);             // gBDMStartMode floored to Auto while a UDPBD/UDPFSBD protocol is selected
 
 int bdmEnsureSourceModules(int bdmType, u32 timeoutMs);             // force-load a source transport + wait for a mount
 int bdmGetDeviceSlotsByType(int bdmType, int *slots, int maxSlots); // every mounted slot of a type

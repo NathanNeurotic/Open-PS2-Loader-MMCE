@@ -177,6 +177,37 @@ extern unsigned char gDefaultPlasBlendColor[3];
 extern int gEnableILK;
 extern int gEnableMX4SIO;
 extern int gEnableBdmHDD;
+extern int gEnableUDPBD; // UDPBD network block device (smap_udpbd); NIC-exclusive with the SMB/ETH stack
+// Network-boot transport chosen when gEnableUDPBD is on. Both register the "udp" BDM token and are
+// NIC-exclusive with SMB; they differ in wire protocol + which IOP module(s) OPL loads to list games.
+enum {
+    NET_BOOT_UDPBD = 0, // smap_udpbd monolith (SUDPBDv2); Neutrino launch -bsd=udpbd
+    NET_BOOT_UDPFS = 1, // udpfs smap+ministack+udpfs_bd chain (UDPRDMA); Neutrino launch -bsd=udpfsbd
+};
+extern int gNetBootProtocol; // NET_BOOT_UDPBD | NET_BOOT_UDPFS (legacy shadow, derived from gNetworkProtocol)
+
+// Unified network-protocol selector. The single NIC (SMAP) carries at most ONE network transport per
+// session, so these are mutually exclusive by construction -- one enum instead of the old
+// {gETHStartMode, gEnableUDPBD, gNetBootProtocol} trio + interlock. Local devices (USB/HDD) are
+// independent. gETHStartMode / gEnableUDPBD / gNetBootProtocol are kept as DERIVED shadows so
+// downstream consumers can migrate incrementally.
+// USER-FACING picker is Off / SMB / UDPFS / UDPBD. UDPFS is ONE menu entry with a "UDPFS Access"
+// sub-mode (Files -> NET_PROTO_UDPFS filesystem / Image -> NET_PROTO_UDPFSBD block), since one udpfs
+// protocol serves both (only one IOP backend can bind port 0xF5F6 per boot). UDPBD (SUDPBDv2) is a
+// SEPARATE, wire-incompatible protocol (its own server, port 0xBDBD) and stays first-class so users on
+// the older udpbd-server are never stranded -- it is neither hidden nor auto-migrated.
+// NOTE(rebuild): the fork pairs this with an SMB dialect sub-row (SMBv1/SMB2, gSMBDialect); that
+// returns with checklist item 4 -- until then the rebuild speaks SMBv1 only and the dialect row
+// stays greyed at SMBv1.
+enum NETWORK_PROTOCOL {
+    NET_PROTO_OFF = 0,     // no NIC device (SMAP idle) -- fork default
+    NET_PROTO_SMB = 1,     // SMB/ETH stack (== legacy gETHStartMode > DISABLED)
+    NET_PROTO_UDPFS = 2,   // udpfs FILESYSTEM (udpfs_ioman "udpfs:"); loose ISOs -- picker "UDPFS", access=Files
+    NET_PROTO_UDPFSBD = 3, // udpfs BLOCK device (udpfs_bd -> massN:, UDPRDMA) -- picker "UDPFS", access=Image
+    NET_PROTO_UDPBD = 4,   // smap_udpbd / SUDPBDv2 monolith -- picker "UDPBD"; server = udpbd-server (0xBDBD)
+};
+extern int gNetworkProtocol; // enum NETWORK_PROTOCOL -- authoritative backend; the three above are derived shadows
+extern int gNetStartMode;    // START_MODE_* -- network start row (Off/Manual/Auto); DISABLED <=> protocol OFF
 
 extern int gAutosort;
 extern int gAutoRefresh;
@@ -212,6 +243,7 @@ extern int gOSDLanguageEnable;
 extern int gOSDLanguageSource;
 
 extern int showCfgPopup;
+extern int showNetDhcpPopup; // boot toast: UDP transport selected while IP Type = DHCP (needs static IP)
 
 #ifdef IGS
 #define IGS_VERSION "0.1"

@@ -1,0 +1,7 @@
+/* Upstream NHDDL declared a vestigial "smap" export table of 4 _retonly stubs. Nothing in RiptOPL
+   imports a "smap" library from this module -- the SMB/ETH stack uses the real smap.irx, and
+   smap_udpbd uses its own self-contained ministack -- and that stub left _retonly as a value-0 .text
+   symbol that ps2dev:latest's iopfixup rejects. Export nothing: an empty table is valid, builds
+   cleanly, and keeps the module self-contained. (Local change vs upstream; see ../ORIGIN.txt.) */
+DECLARE_EXPORT_TABLE(smap, 1, 1)
+END_EXPORT_TABLE

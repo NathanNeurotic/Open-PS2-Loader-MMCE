@@ -14,6 +14,9 @@ enum GAME_FORMAT {
     GAME_FORMAT_USBLD = 0,
     GAME_FORMAT_OLD_ISO,
     GAME_FORMAT_ISO,
+    // A browsable subdirectory row (folder navigation, opt-in). Never launched, never written to the
+    // games.bin cache and never stored as a favourite; the dispatch intercepts it to descend instead.
+    GAME_FORMAT_FOLDER,
 };
 
 typedef struct
@@ -42,7 +45,15 @@ typedef struct
 int isValidIsoName(char *name, int *pNameLen);
 int sbIsSameSize(const char *prefix, int prevSize);
 int sbCreateSemaphore(void);
-int sbReadList(base_game_info_t **list, const char *prefix, int *fsize, int *gamecount);
+// sub = current browse subpath below CD/DVD ("" at root); NULL opts the caller OUT of folder rows
+// (ETH/SMB). On a TOTAL device-read failure the caller's list is left untouched (last-good list);
+// GAME_FORMAT_FOLDER rows, and the ul.cfg (USBLD) leg -- a device-root-only concept -- is skipped
+// inside subfolders.
+int sbReadList(base_game_info_t **list, const char *prefix, const char *sub, int *fsize, int *gamecount);
+// Folder browsing: set the active subpath the path composers inject (see sbBrowseSub in supportbase.c).
+void sbSetBrowseSub(const char *sub);
+int sbCheatsMissingContinue(void *pCommon, int cheatResult);
+int sbLoadImage(const char *path, const char *file);
 int sbPrepare(base_game_info_t *game, config_set_t *configSet, int size_cdvdman, void **cdvdman_irx, int *patchindex);
 void sbUnprepare(void *pCommon);
 void sbRebuildULCfg(base_game_info_t **list, const char *prefix, int gamecount, int excludeID);

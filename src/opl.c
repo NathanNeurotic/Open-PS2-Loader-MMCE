@@ -28,6 +28,7 @@
 #include "include/supportbase.h"
 #include "include/bdmsupport.h"
 #include "include/ethsupport.h"
+#include "include/udpfssupport.h"
 #include "include/hddsupport.h"
 #include "include/appsupport.h"
 #include "include/favsupport.h"
@@ -176,6 +177,10 @@ unsigned char gDefaultPlasBlendColor[3]; // plasma gradient low end; black = his
 volatile int gLastSaveErrno = 0;
 int gEnableMX4SIO;
 int gEnableBdmHDD;
+int gEnableUDPBD;
+int gNetBootProtocol; // NET_BOOT_UDPBD | NET_BOOT_UDPFS (legacy shadow, derived from gNetworkProtocol)
+int gNetworkProtocol; // enum NETWORK_PROTOCOL -- authoritative backend selector (Off/SMB/UDPBD/UDPFSBD/UDPFS)
+int gNetStartMode;    // START_MODE_* -- the Off/Manual/Auto network start row (see the 3-row Network setting)
 int gAutosort;
 int gAutoRefresh;
 int gEnableNotifications;
@@ -200,6 +205,7 @@ int gPadEmuSource;
 int gFadeDelay;
 int toggleSfx;
 int showCfgPopup;
+int showNetDhcpPopup; // a UDP transport is selected but IP Type is DHCP -- ministack needs a static IP
 #ifdef PADEMU
 int gEnablePadEmu;
 int gPadEmuSettings;
@@ -306,6 +312,13 @@ static void itemExecSelect(struct menu_item *curMenu)
     if (support) {
         if (support->enabled) {
             if (curMenu->current) {
+                // Folder browsing: a folder row DESCENDS (rescan one level deeper) instead of
+                // launching. folderDescend marks the mode dirty; the deferred update rebuilds the list.
+                if (curMenu->current->item.isFolder) {
+                    if (folderDescend(support->mode, curMenu->current->item.text))
+                        ioPutRequest(IO_MENU_UPDATE_DEFFERED, &support->mode);
+                    return;
+                }
                 config_set_t *configSet = menuLoadConfig();
                 support->itemLaunch(support, curMenu->current->item.id, configSet);
             }
@@ -336,20 +349,39 @@ static void itemExecRefresh(struct menu_item *curMenu)
     }
 }
 
+// Folder browsing: the cancel button (whichever of Cross/Circle is not Select) ascends a level.
+static void itemFolderAscend(struct menu_item *curMenu)
+{
+    item_list_t *support = curMenu ? curMenu->userdata : NULL;
+    if (support == NULL || folderDepth(support->mode) == 0)
+        return;
+    if (folderAscend(support->mode)) {
+        sfxPlay(SFX_CANCEL);
+        ioPutRequest(IO_MENU_UPDATE_DEFFERED, &support->mode);
+    }
+}
+
 static void itemExecCross(struct menu_item *curMenu)
 {
     if (gSelectButton == KEY_CROSS)
         itemExecSelect(curMenu);
+    else
+        itemFolderAscend(curMenu); // Cross is the cancel button here -> ascend a folder level
 }
 
 static void itemExecCircle(struct menu_item *curMenu)
 {
     if (gSelectButton == KEY_CIRCLE)
         itemExecSelect(curMenu);
+    else
+        itemFolderAscend(curMenu); // Circle is the cancel button here -> ascend a folder level
 }
 
 static void itemExecSquare(struct menu_item *curMenu)
 {
+    // Folder browsing: a folder row has no info screen (#Size/#DiscType would stat a directory).
+    if (curMenu->current && curMenu->current->item.isFolder)
+        return;
     if (curMenu->current && gTheme->infoElems.first)
         guiSwitchScreen(GUI_SCREEN_INFO);
 }
@@ -402,6 +434,10 @@ static void itemExecFav(struct menu_item *curMenu)
 static void itemExecTriangle(struct menu_item *curMenu)
 {
     if (!curMenu->current)
+        return;
+
+    // Folder browsing: a folder row has no per-game settings menu.
+    if (curMenu->current->item.isFolder)
         return;
 
     item_list_t *support = curMenu->userdata;
@@ -483,7 +519,9 @@ void initSupport(item_list_t *itemList, int mode, int force_reinit)
     // Set the start mode flag based on device type.
     int startMode = 0;
     if (mode >= BDM_MODE && mode < ETH_MODE)
-        startMode = gBDMStartMode;
+        // Effective, not raw: a selected UDPBD/UDPFSBD network protocol floors BDM to Auto so its
+        // hotplug tab can exist (see bdmEffectiveStartMode) -- the saved setting is untouched.
+        startMode = bdmEffectiveStartMode();
     else if (mode == ETH_MODE)
         startMode = gETHStartMode;
     else if (mode == HDD_MODE)
@@ -492,12 +530,27 @@ void initSupport(item_list_t *itemList, int mode, int force_reinit)
         startMode = gAPPStartMode;
     else if (mode == FAV_MODE)
         startMode = gFAVStartMode;
+    else if (mode == UDPFS_MODE)
+        // UDPFS filesystem tab honours the network start row: Auto loads the udpfs IRX chain + mount at
+        // boot, Manual defers it to tab-entry. Live only while its protocol is the selected one, so
+        // exactly one network tab is ever enabled.
+        startMode = (gNetworkProtocol == NET_PROTO_UDPFS) ? gNetStartMode : START_MODE_DISABLED;
 
     if (startMode) {
         if (!mod->support) {
             mod->support = itemList;
             mod->support->owner = mod;
             initMenuForListSupport(mod);
+        } else {
+            // Re-enable after a prior disable: the support + its menu item already exist (registered on
+            // an earlier enable), so the !mod->support branch above -- the ONLY place that sets
+            // menuItem.visible = 1 -- is skipped. Disabling a mode (else branch below) set visible = 0
+            // but LEFT mod->support non-NULL, so without restoring it here a tab that was ever toggled
+            // off stays hidden for the rest of the session even when re-selected. This is why picking a
+            // network protocol after having switched away from it showed no tab. BDM device tabs escape
+            // this via bdmNeedsUpdate's per-refresh visibility (and bdmInitDevicesData overrides it on
+            // its own path); ETH/UDPFS/APP/FAV/HDD have no such hook, so restore it here.
+            mod->menuItem.visible = 1;
         }
 
         if (((force_reinit) && (mod->support->enabled)) || (startMode == START_MODE_AUTO && !mod->support->enabled)) {
@@ -516,6 +569,9 @@ static void initAllSupport(int force_reinit)
 {
     bdmEnumerateDevices();
     initSupport(ethGetObject(0), ETH_MODE, force_reinit || (gNetworkStartup >= ERROR_ETH_SMB_CONN));
+    // UDPFS filesystem shares the single NIC with SMB/UDPBD; its start-mode gate (initSupport) is live
+    // only when gNetworkProtocol == NET_PROTO_UDPFS, so exactly one network tab is ever enabled.
+    initSupport(udpfsGetObject(0), UDPFS_MODE, force_reinit);
     initSupport(hddGetObject(0), HDD_MODE, force_reinit);
     initSupport(appGetObject(0), APP_MODE, force_reinit);
     initSupport(favGetObject(0), FAV_MODE, force_reinit);
@@ -758,27 +814,62 @@ static void updateMenuFromGameList(opl_io_module_t *mdl)
     // read the new game list
     struct gui_update_t *gup = NULL;
     int count = mdl->support->itemUpdate(mdl->support);
+
+    // Folder browsing: while inside a subfolder, show the breadcrumb ("Device: RPGs/SNES") as the page
+    // title. folderGetSub() points at persistent static state, so the char* stays valid. At the device
+    // root the device name set above stands. Only one device is ever inside a folder at a time (the
+    // browse state resets to root on device switch), so a single static crumb buffer is safe.
+    const int folderMode = folderModeSupported(mdl->support->mode);
+    if (folderMode && folderDepth(mdl->support->mode) > 0) {
+        static char folderCrumb[256]; // generous headroom for a localized device name + subpath
+        snprintf(folderCrumb, sizeof(folderCrumb), "%s: %s", _l(mdl->support->itemTextId(mdl->support)), folderGetSub(mdl->support->mode));
+        mdl->menuItem.text = folderCrumb;
+        mdl->menuItem.text_id = -1;
+    }
+
     if (count > 0) {
-        int i;
+        // Folder browsing: emit in TWO passes -- folders first, then the games -- so folders always sit
+        // at the TOP of the list regardless of the Auto Sort setting. Each row keeps id=i (its array
+        // index), so favourites still resolve by id+text no matter the display order. Devices that never
+        // produce folder rows use a single pass, byte-for-byte the original behaviour. When Auto Sort is
+        // on, submenuSort's folder-first comparator keeps this grouping while sorting each group.
+        int passes = (gEnableFolderNav && folderMode) ? 2 : 1;
+        int pass, i;
 
-        for (i = 0; i < count; ++i) {
+        for (pass = 0; pass < passes; ++pass) {
+            for (i = 0; i < count; ++i) {
+                // Flag folder rows so the dispatch descends and the renderer marks them. Only the
+                // loose-file tree devices return base_game_info_t from itemGet, so gate on the mode.
+                int isFolderRow = 0;
+                if (folderMode && mdl->support->itemGet != NULL) {
+                    base_game_info_t *ginfo = (base_game_info_t *)mdl->support->itemGet(mdl->support, i);
+                    isFolderRow = (ginfo != NULL && ginfo->format == GAME_FORMAT_FOLDER);
+                }
+                // Pass 0 emits folders, pass 1 emits games (single-pass mode emits every row).
+                if (passes == 2 && ((pass == 0) != (isFolderRow != 0)))
+                    continue;
 
-            gup = guiOpCreate(GUI_OP_APPEND_MENU);
+                gup = guiOpCreate(GUI_OP_APPEND_MENU);
+                if (!gup) // OOM: skip this entry rather than deref NULL
+                    continue;
 
-            gup->menu.menu = &mdl->menuItem;
-            gup->menu.subMenu = &mdl->subMenu;
+                gup->menu.menu = &mdl->menuItem;
+                gup->menu.subMenu = &mdl->subMenu;
 
-            gup->submenu.icon_id = -1;
-            gup->submenu.id = i;
-            gup->submenu.text = mdl->support->itemGetName(mdl->support, i);
-            gup->submenu.text_id = -1;
-            gup->submenu.selected = 0;
+                gup->submenu.icon_id = -1;
+                gup->submenu.id = i;
+                gup->submenu.text = mdl->support->itemGetName(mdl->support, i);
+                gup->submenu.text_id = -1;
+                gup->submenu.selected = 0;
+                gup->submenu.isFolder = isFolderRow;
 
-            if (gRememberLastPlayed && temp && strcmp(temp, mdl->support->itemGetStartup(mdl->support, i)) == 0) {
-                gup->submenu.selected = 1; // Select Last Played Game
+                // Last-played auto-select never targets a folder row (its startup is empty).
+                if (gRememberLastPlayed && temp && !isFolderRow && strcmp(temp, mdl->support->itemGetStartup(mdl->support, i)) == 0) {
+                    gup->submenu.selected = 1; // Select Last Played Game
+                }
+
+                guiDeferUpdate(gup);
             }
-
-            guiDeferUpdate(gup);
         }
     }
 
@@ -1118,6 +1209,68 @@ static void _loadConfig()
             configGetInt(configOPL, CONFIG_OPL_ENABLE_ILINK, &gEnableILK);
             configGetInt(configOPL, CONFIG_OPL_ENABLE_MX4SIO, &gEnableMX4SIO);
             configGetInt(configOPL, CONFIG_OPL_ENABLE_BDMHDD, &gEnableBdmHDD);
+            int udpbdKeyPresent = configGetInt(configOPL, CONFIG_OPL_ENABLE_UDPBD, &gEnableUDPBD);
+            configGetInt(configOPL, CONFIG_OPL_NET_BOOT_PROTOCOL, &gNetBootProtocol);
+            // Unified network-protocol selector (single SMAP NIC -> at most one transport per session).
+            // Read the new key if present (authoritative); otherwise DERIVE it from the three legacy keys,
+            // preserving the historical "network BDM wins over SMB" precedence (imported/hand-edited configs
+            // could set both; at boot UDPBD loaded first, so it won). NET_PROTO_UDPFS (filesystem) has no
+            // legacy encoding, so it is only ever reached by an explicit new-format value -- backward-safe.
+            // The legacy branch keys off the FILE's enable_udpbd, not the defaulted global -- a legacy
+            // config must only ever derive from what IT expressed, never inherit a defaulted enable flag.
+            if (!configGetInt(configOPL, CONFIG_OPL_NETWORK_PROTOCOL, &gNetworkProtocol)) {
+                if (udpbdKeyPresent)
+                    gNetworkProtocol = gEnableUDPBD ? ((gNetBootProtocol == NET_BOOT_UDPFS) ? NET_PROTO_UDPFSBD : NET_PROTO_UDPBD) : ((gETHStartMode != START_MODE_DISABLED) ? NET_PROTO_SMB : NET_PROTO_OFF);
+                else if (gETHStartMode != START_MODE_DISABLED)
+                    gNetworkProtocol = NET_PROTO_SMB;
+                // else: the file never expressed ANY network choice -> the shipped default stands (Off)
+            }
+            // UDPBD (SUDPBDv2) is a first-class protocol, NOT folded away: it is wire-incompatible with
+            // UDPRDMA (SUDPBDv2 on 0xBDBD vs UDPFS on 0xF5F6), so users still on the older udpbd-server
+            // must be able to keep it. A saved or legacy-derived NET_PROTO_UDPBD is preserved as-is.
+            // Re-derive the legacy shadows from the authoritative selector so downstream consumers
+            // (ethsupport start path, system.c getDeviceName, bdmsupport) stay consistent no matter which
+            // config format was loaded. SMB keeps its prior Auto/Manual start-mode; a fresh SMB pick that
+            // had eth_mode=0 gets Manual. Any non-SMB protocol forces SMB off (preserves UDPBD-wins).
+            // NOTE(rebuild): the fork also loads the SMB dialect (gSMBDialect, SMBv1/SMB2) here --
+            // that returns with checklist item 4; until then the rebuild speaks SMBv1 unconditionally.
+            gEnableUDPBD = (gNetworkProtocol == NET_PROTO_UDPBD || gNetworkProtocol == NET_PROTO_UDPFSBD);
+            gNetBootProtocol = (gNetworkProtocol == NET_PROTO_UDPFSBD) ? NET_BOOT_UDPFS : NET_BOOT_UDPBD;
+            if (gNetworkProtocol == NET_PROTO_SMB) {
+                if (gETHStartMode == START_MODE_DISABLED)
+                    gETHStartMode = START_MODE_MANUAL;
+            } else {
+                gETHStartMode = START_MODE_DISABLED;
+            }
+
+            // Network start row (Off/Manual/Auto). A config predating this field has no net_start_mode
+            // key -- derive it from the protocol we just resolved so an existing user keeps working:
+            //   OFF   -> Off (Row 1); SMB -> its persisted eth_mode (so a prior SMB=Auto survives);
+            //   UDPFS -> Manual (matches the old hardcoded UDPFS_MODE start gate); block -> Auto
+            //   (matches the old bdm boot-connect for UDPBD/UDPFSBD, where start mode is cosmetic).
+            if (!configGetInt(configOPL, CONFIG_OPL_NET_START_MODE, &gNetStartMode)) {
+                if (gNetworkProtocol == NET_PROTO_OFF)
+                    gNetStartMode = START_MODE_DISABLED;
+                else if (gNetworkProtocol == NET_PROTO_SMB)
+                    gNetStartMode = gETHStartMode;
+                else if (gNetworkProtocol == NET_PROTO_UDPFS)
+                    gNetStartMode = START_MODE_MANUAL;
+                else
+                    gNetStartMode = START_MODE_AUTO; // UDPFSBD / UDPBD block
+            }
+            // Reconcile the two persisted halves; a hand-edited/stale config can disagree either way:
+            //  - Protocol Off + a live start row is contradictory the OTHER direction: the dialog would
+            //    show that start mode against its SMB fallback protocol, so accepting ANY change would
+            //    silently enable SMB. Off wins -- it is the authoritative "network is off".
+            //  - A live protocol with an Off row (or a value outside the enum -- an out-of-range int can
+            //    reach here from a hand-edited file) must start: floor it to Manual.
+            if (gNetworkProtocol == NET_PROTO_OFF)
+                gNetStartMode = START_MODE_DISABLED;
+            else if (gNetStartMode < START_MODE_MANUAL || gNetStartMode > START_MODE_AUTO)
+                gNetStartMode = START_MODE_MANUAL;
+            // Keep the SMB start-mode shadow in lockstep with the authoritative row.
+            if (gNetworkProtocol == NET_PROTO_SMB)
+                gETHStartMode = gNetStartMode;
             configGetInt(configOPL, CONFIG_OPL_SFX, &gEnableSFX);
             configGetInt(configOPL, CONFIG_OPL_BOOT_SND, &gEnableBootSND);
             configGetInt(configOPL, CONFIG_OPL_BGM, &gEnableBGM);
@@ -1163,6 +1316,14 @@ static void _loadConfig()
             configGetStrCopy(configNet, CONFIG_NET_NBD_DEFAULT_EXPORT, gExportName, sizeof(gExportName));
         }
     }
+
+    // A UDP transport binds the ministack to the STATIC PS2 IP fields (it has no DHCP client), so IP
+    // Type = DHCP means whatever stale/default address sits there gets used -- discovery then fails
+    // with an empty games page and no error. The Device-Settings dialog warns only at the moment of
+    // switching protocols; surface it as a boot toast too so an already-configured user sees it.
+    showNetDhcpPopup = (ps2_ip_use_dhcp &&
+                        (gNetworkProtocol == NET_PROTO_UDPFS || gNetworkProtocol == NET_PROTO_UDPFSBD ||
+                         gNetworkProtocol == NET_PROTO_UDPBD));
 
     applyConfig(themeID, langID, 0);
 
@@ -1314,6 +1475,13 @@ static void _saveConfig()
         configSetInt(configOPL, CONFIG_OPL_ENABLE_ILINK, gEnableILK);
         configSetInt(configOPL, CONFIG_OPL_ENABLE_MX4SIO, gEnableMX4SIO);
         configSetInt(configOPL, CONFIG_OPL_ENABLE_BDMHDD, gEnableBdmHDD);
+        configSetInt(configOPL, CONFIG_OPL_ENABLE_UDPBD, gEnableUDPBD);
+        configSetInt(configOPL, CONFIG_OPL_NET_BOOT_PROTOCOL, gNetBootProtocol);
+        // Dual-write: the authoritative unified selector PLUS the three legacy keys (derived shadows),
+        // so a config saved by this build still boots correctly on an older OPL that only reads the legacy keys.
+        // NOTE(rebuild): the fork also persists the SMB dialect here (item 4).
+        configSetInt(configOPL, CONFIG_OPL_NETWORK_PROTOCOL, gNetworkProtocol);
+        configSetInt(configOPL, CONFIG_OPL_NET_START_MODE, gNetStartMode);
         configSetInt(configOPL, CONFIG_OPL_SFX, gEnableSFX);
         configSetInt(configOPL, CONFIG_OPL_BOOT_SND, gEnableBootSND);
         configSetInt(configOPL, CONFIG_OPL_BGM, gEnableBGM);
@@ -2016,6 +2184,17 @@ static void setDefaults(void)
     gEnableILK = 0;
     gEnableMX4SIO = 0;
     gEnableBdmHDD = 0;
+    gEnableUDPBD = 0;                  // the UDPBD BLOCK device stays opt-in
+    gNetBootProtocol = NET_BOOT_UDPBD; // default transport when network boot is enabled (back-compat)
+    // Unified network selector defaults to OFF. The reason is the NIC latch: every network stack
+    // loads its IOP chain ONCE per boot and never unloads (re-binding the UDPRDMA socket bricks
+    // UDPFS; smap registers a single SMAP_driver), so whichever protocol is active FIRST owns the
+    // adapter until a restart -- the settings page even tells you so (NETBOOT_RESTART). Defaulting
+    // to Off means nothing claims the NIC at boot, so the first protocol the user picks in Device
+    // Settings comes up live -- the apply path re-derives the gEnableUDPBD/gNetBootProtocol shadows
+    // and forces a device refresh already. A saved net protocol in the config overrides this.
+    gNetworkProtocol = NET_PROTO_OFF;
+    gNetStartMode = START_MODE_DISABLED; // Off in the 3-row Network setting; migration reconciles old configs
 
     frameCounter = 0;
 
