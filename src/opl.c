@@ -2089,6 +2089,21 @@ static int loadLwnbdSvr(void)
         }
     }
 
+    if (ret != 0) {
+        /* The server is not starting, so nothing will ever consume the network stack a FAILED
+         * bring-up just left resident (netman/smap/ps2ip, DEV9 powered). Tear it down NOW, while
+         * the state is fresh and known (#307): unloadLwnbdSvr reboots the IOP via reset() ->
+         * sysReset(), whose unbounded SifIopReset/SifIopSync waits are the wedge when they run
+         * against a live, half-configured stack. Every other network teardown in the tree
+         * (ethCleanUp/ethShutdown) does deinit + DEV9 shutdown and never reboots afterwards; this
+         * makes the NBD lifecycle match. The loaded-check mirrors ethShutdown: DEV9's refcount is
+         * shared with BDM/HDD, so only release it when the eth path actually holds it. */
+        int ethWasLoaded = ethGetModulesLoaded();
+        ethDeinitModules();
+        if (ethWasLoaded)
+            sysShutdownDev9();
+    }
+
     padInit(0);
 
     // init all pads
@@ -2103,7 +2118,19 @@ static int loadLwnbdSvr(void)
 
 static void unloadLwnbdSvr(void)
 {
+    /* Graceful teardown BEFORE the IOP reboot (#307): reset() -> sysReset() parks the EE in
+     * unbounded SifIopReset/SifIopSync waits, and those wedge when they run against a live,
+     * DEV9-powered, half-configured network stack (failed offline bring-up). An earlier #307
+     * attempt skipped the RPC teardown entirely and the console still froze, proving the reset --
+     * not the teardown -- is the hazardous step. So do here what every other network teardown in
+     * the tree does (ethShutdown: deinit + DEV9 power-off, no reboot after) and let the reset
+     * below reboot a clean IOP. The loaded-check mirrors ethShutdown: DEV9's refcount is shared
+     * with BDM/HDD, so only release it when the eth path actually holds it (a failed bring-up
+     * already released it in loadLwnbdSvr). */
+    int ethWasLoaded = ethGetModulesLoaded();
     ethDeinitModules();
+    if (ethWasLoaded)
+        sysShutdownDev9();
     unloadPads();
 
     reset();
@@ -2114,9 +2141,18 @@ static void unloadLwnbdSvr(void)
     // reinit the input pads
     padInit(0);
 
-    int ret = 0;
-    while (!ret)
+    /* Bounded retry (#307): an unbounded startPads loop turns a half-completed IOP reset into a
+     * hard freeze at exactly the reported "NBD Server unloading..." screen. ~5 s of retries covers
+     * a slow IOP; if pads still won't start, degrade (log + continue, the menu's own pad handling
+     * recovers on later polls) instead of wedging forever. */
+    int ret = 0, tries = 0;
+    while (!ret && tries++ < 100) {
         ret = startPads();
+        if (!ret)
+            delay(50);
+    }
+    if (!ret)
+        LOG("unloadLwnbdSvr: pads did not start after IOP reset (%d tries)\n", tries);
 
     // now start io again
     ioBlockOps(0);
