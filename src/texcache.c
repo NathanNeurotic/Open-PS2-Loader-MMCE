@@ -5,6 +5,7 @@
 #include "include/gui.h"
 #include "include/util.h"
 #include "include/renderman.h"
+#include "include/tar.h"
 
 typedef struct
 {
@@ -15,6 +16,42 @@ typedef struct
     int cacheUID;
     char *value;
 } load_image_request_t;
+
+// .tar art packs (checklist item 45). Tries "<value>_<suffix>.png" inside ART/art.tar before the
+// normal per-file lookup. Opt-in: gEnableArtTar ships 0, so with the toggle off this is a single
+// predictable branch and the art path is byte-for-byte the behaviour hardware has already validated.
+//
+// #340 note: tarFind() lazily probes devices on its FIRST call, which is IO -- but it can only be
+// reached from cacheLoadImage, which the caller already gates behind the art idle delay
+// (guiInactiveFrames < list->delay in cacheGetTexture). So no .tar work can land while the user is
+// holding a direction, and tar.c's own s_inactive[] latch stops a failed probe from repeating.
+static int artTarLoadImage(const char *value, const char *suffix, GSTEXTURE *texture)
+{
+    char name[64];
+    TarEntryBase *entry;
+    void *buffer;
+    int result;
+
+    if (snprintf(name, sizeof(name), "%s_%s.png", value, suffix) >= (int)sizeof(name))
+        return -1;
+
+    entry = tarFind(TAR_KIND_ART, name);
+    if (entry == NULL)
+        return -1;
+
+    buffer = malloc(entry->rawSize);
+    if (buffer == NULL)
+        return -1;
+
+    if (tarRead(TAR_KIND_ART, entry, buffer, entry->rawSize) != entry->rawSize) {
+        free(buffer);
+        return -1;
+    }
+
+    result = texLoadFromMemory(texture, buffer, entry->rawSize);
+    free(buffer);
+    return result;
+}
 
 // Io handled action...
 static void cacheLoadImage(void *data)
@@ -37,7 +74,16 @@ static void cacheLoadImage(void *data)
     GSTEXTURE *texture = &req->entry->texture;
     texFree(texture);
 
-    if (handler->itemGetImage(handler, req->cache->prefix, req->cache->isPrefixRelative, req->value, req->cache->suffix, texture, GS_PSM_CT24) < 0)
+    int result = -1;
+
+    if (gEnableArtTar)
+        result = artTarLoadImage(req->value, req->cache->suffix, texture);
+
+    // Fall through to the per-file lookup whenever the archive is off, absent, or lacks this key.
+    if (result < 0)
+        result = handler->itemGetImage(handler, req->cache->prefix, req->cache->isPrefixRelative, req->value, req->cache->suffix, texture, GS_PSM_CT24);
+
+    if (result < 0)
         req->entry->lastUsed = 0;
     else
         req->entry->lastUsed = guiFrameId;

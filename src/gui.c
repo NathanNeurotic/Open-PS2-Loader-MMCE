@@ -26,6 +26,8 @@
 #include "include/cheatman.h"
 #include "include/sound.h"
 #include "include/guigame.h"
+#include "include/appsupport.h" // appGetObject() -- push a live Art Delay change onto the APPS list
+#include "include/tar.h"        // tarInvalidate -- re-arm the .tar probe when the toggle flips
 
 #include <limits.h>
 #include <stdlib.h>
@@ -1597,18 +1599,57 @@ reshow_tools:
     }
 }
 
+static const char *artDelayNames[] = {"0 (Instant)", "2 (Fast)", "5 (Medium)", "8 (Standard)", NULL};
+static const int artDelayValues[] = {0, 2, 5, 8};
+
+static int artDelayToEnum(int delay)
+{
+    if (delay <= 0)
+        return 0;
+    if (delay <= 3)
+        return 1;
+    if (delay <= 6)
+        return 2;
+    return 3;
+}
+
+// Interface -> Artwork Settings (cover art display + ART.TAR loading).
 void guiShowArtworkConfig(void)
 {
     diaSetInt(diaArtworkConfig, UICFG_COVERART, gEnableArt);
     diaSetInt(diaArtworkConfig, UICFG_ENABLE_BGART, gEnableBGArt);
-    // NOTE(rebuild): the Art Delay knob returns with checklist item 45 -- hide its row.
-    diaSetVisible(diaArtworkConfig, UICFG_ART_DELAY, 0);
-    diaSetVisible(diaArtworkConfig, UICFG_ENABLE_ART_TAR, 0); // .tar art packs return with item 45
+    diaSetInt(diaArtworkConfig, UICFG_ENABLE_ART_TAR, gEnableArtTar);
+    diaSetEnum(diaArtworkConfig, UICFG_ART_DELAY, artDelayNames);
+    diaSetInt(diaArtworkConfig, UICFG_ART_DELAY, artDelayToEnum(gArtDelay));
 
     int ret = diaExecuteDialog(diaArtworkConfig, -1, 1, NULL);
     if (ret) {
         diaGetInt(diaArtworkConfig, UICFG_COVERART, &gEnableArt);
         diaGetInt(diaArtworkConfig, UICFG_ENABLE_BGART, &gEnableBGArt);
+        {
+            // Re-arm the .tar probe when the toggle actually flips. tarFind's "no archive anywhere"
+            // latch is write-once and process-wide, so a user who turns the loader on after boot would
+            // otherwise keep getting nothing until a reboot -- which looks exactly like "the toggle
+            // does nothing".
+            int previousArtTar = gEnableArtTar;
+            diaGetInt(diaArtworkConfig, UICFG_ENABLE_ART_TAR, &gEnableArtTar);
+            if (gEnableArtTar != previousArtTar)
+                tarInvalidate(TAR_KIND_ART);
+        }
+        int artDelayIdx = 0;
+        diaGetInt(diaArtworkConfig, UICFG_ART_DELAY, &artDelayIdx);
+        if (artDelayIdx >= 0 && artDelayIdx < 4) {
+            gArtDelay = artDelayValues[artDelayIdx];
+            // Push the new delay onto the already-built lists so it takes effect without a re-init.
+            // NOTE(rebuild): the fork also updates mmceGetObject(1) here -- that joins with item 1.
+            // BDM lists are absent from this list in the fork too: bdmsupport seeds itemList->delay in
+            // bdmInit, so a BDM tab keeps its previous delay until the device is re-initialised.
+            item_list_t *lists[] = {appGetObject(1), hddGetObject(1), ethGetObject(1), udpfsGetObject(1), favGetObject(1)};
+            for (int i = 0; i < 5; i++) {
+                if (lists[i] != NULL)
+                    lists[i]->delay = gArtDelay;
+            }
+        }
 
         applyConfig(-1, -1, 1);
     }

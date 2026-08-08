@@ -1341,7 +1341,10 @@ static void _loadConfig()
             configGetInt(configOPL, CONFIG_OPL_ENABLE_BGART, &gEnableBGArt);
             configGetInt(configOPL, CONFIG_OPL_ENABLE_ART_TAR, &gEnableArtTar);
             configGetInt(configOPL, CONFIG_OPL_ART_DELAY, &gArtDelay);
-            if (gArtDelay < 0 || gArtDelay > 60)
+            // Keep the stored domain identical to the Artwork page's enum {0,2,5,8} (item 45), so a
+            // hand-edited or legacy value cannot render as a delay the UI is unable to express.
+            // Fork parity except the fallback: the fork lands on 2, we land on 8 (see setDefaults).
+            if (gArtDelay != 0 && gArtDelay != 2 && gArtDelay != 5 && gArtDelay != 8)
                 gArtDelay = 8;
             configGetInt(configOPL, CONFIG_OPL_FOLDER_NAV, &gEnableFolderNav);
             configGetColor(configOPL, CONFIG_OPL_PLAS_BLEND_COLOR, gDefaultPlasBlendColor);
