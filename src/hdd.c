@@ -270,6 +270,100 @@ void hddFreeHDLGamelist(hdl_games_list_t *game_list)
 }
 
 //-------------------------------------------------------------------------
+static int hddPopsNameCompare(const void *a, const void *b)
+{
+    return strcmp((const char *)a, (const char *)b);
+}
+
+#define HDD_APA_ATTR_MAIN_PARTITION 0x0000
+#define HDD_APA_FS_TYPE_PFS         0x0100
+
+// POPS' pooled HDD layout recognizes exactly eleven container labels: __.POPS and __.POPS0..9.
+// A looser prefix match misclassifies labels such as __.POPS12, which POPSLoader treats as a possible
+// one-game hidden partition and accepts only after finding IMAGE0.VCD at its root.
+static int hddIsPopsContainerName(const char *name)
+{
+    if (name == NULL || strncmp(name, "__.POPS", 7) != 0)
+        return 0;
+    return name[7] == '\0' || (name[7] >= '0' && name[7] <= '9' && name[8] == '\0');
+}
+
+int hddIsPopsPartitionGame(const char *name)
+{
+    if (name == NULL)
+        return 0;
+    if (strncmp(name, "PP.", 3) != 0 && strncmp(name, "__.", 3) != 0)
+        return 0;
+    if (name[3] == '\0')
+        return 0; // require a non-empty tail after PP. / __.
+    return !hddIsPopsContainerName(name);
+}
+
+// Enumerate the HDD's PS1/VCD APA partitions: exact __.POPS / __.POPS0..9 multi-VCD containers and
+// PP.<name> / __.<name> one-game installs. Mirror POPSLoader's APA-table filter: only main PFS records
+// can be mounted and scanned. In particular, ordinary HDL games also commonly use PP.* labels but have
+// mode 0x1337; filtering them here avoids a failed PFS mount for every PS2 game during a VCD refresh.
+int hddGetPopsPartitionList(hdd_pops_list_t *list)
+{
+    iox_dirent_t dirent;
+    int fd, i, count = 0;
+    char(*names)[APA_IDMAX + 1] = NULL;
+
+    list->count = 0;
+    list->names = NULL;
+
+    if ((fd = fileXioDopen("hdd0:")) < 0)
+        return 0;
+
+    while (fileXioDread(fd, &dirent) > 0) {
+        if (dirent.stat.attr != HDD_APA_ATTR_MAIN_PARTITION || dirent.stat.mode != HDD_APA_FS_TYPE_PFS)
+            continue; // skip APA sub-partitions and HDL/raw/system formats
+        if (!hddIsPopsContainerName(dirent.name) && !hddIsPopsPartitionGame(dirent.name))
+            continue; // not an HDD-resident PS1/VCD source
+
+        int dup = 0;
+        for (i = 0; i < count; i++) {
+            if (!strncmp(names[i], dirent.name, APA_IDMAX)) {
+                dup = 1;
+                break;
+            }
+        }
+        if (dup)
+            continue;
+
+        char(*grown)[APA_IDMAX + 1] = realloc(names, (count + 1) * sizeof(*names));
+        if (grown == NULL)
+            break; // OOM: keep what we already collected
+        names = grown;
+        strncpy(names[count], dirent.name, APA_IDMAX);
+        names[count][APA_IDMAX] = '\0';
+        count++;
+    }
+    fileXioDclose(fd);
+
+    if (count == 0) {
+        free(names);
+        return 0;
+    }
+
+    qsort(names, count, sizeof(*names), hddPopsNameCompare);
+
+    list->names = names;
+    list->count = count;
+    return count;
+}
+
+//-------------------------------------------------------------------------
+void hddFreePopsPartitionList(hdd_pops_list_t *list)
+{
+    if (list != NULL) {
+        free(list->names);
+        list->names = NULL;
+        list->count = 0;
+    }
+}
+
+//-------------------------------------------------------------------------
 int hddSetHDLGameInfo(hdl_game_info_t *ginfo)
 {
     if (hddReadSectors(ginfo->start_sector, 2, IOBuffer) != 0)

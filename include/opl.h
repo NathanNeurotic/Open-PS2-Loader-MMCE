@@ -81,6 +81,10 @@ void handleLwnbdSrv();
 void deinit(int exception, int modeSelected);
 // Neutrino keep-IOP handoff: deinit that spares a SECOND mode's mounts (the neutrino.elf device).
 void deinitEx(int exception, int modeSelected, int modeSelected2);
+extern int gDeinitTerminal; // 1 while deinit() runs for exit/poweroff, 0 for a game/app LAUNCH teardown.
+// Enqueue a deferred list rebuild for every enabled VCD-capable page (vcdMarkAllDirty is
+// side-effect-free by design; runtime view changes must explicitly queue the rebuilds).
+void oplQueueVcdDeviceUpdates(void);
 
 // Shutdown minimal services initiated for auto loading.
 void miniDeinit(config_set_t *configSet);

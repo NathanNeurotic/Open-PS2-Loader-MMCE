@@ -114,6 +114,11 @@ static void deferredAudioInit(void);
 
 // frame counter
 static unsigned int frameCounter;
+// Per-mode background-rescan throttle (Fix B): the every-frame (updateDelay==0) device rescans
+// enumerate the SIO2/mass bus; space them by a minimum wall-clock interval so they don't run
+// unthrottled. A real device change bypasses the throttle via bdmGetGeneration().
+static clock_t lastBgRescan[MODE_COUNT];
+static unsigned int lastSeenBdmGeneration;
 
 static char errorMessage[256];
 
@@ -285,6 +290,11 @@ void moduleUpdateMenuInternal(opl_io_module_t *mod, int themeChanged, int langCh
 
         if (gFAVStartMode)
             menuAddHint(&mod->menuItem, _STR_FAV_HINT, R3_ICON);
+
+        // L3 toggles the device's disc list <-> its VCD (PS1-via-POPSTARTER) list -- only under the
+        // "Both" default-view setting; ISO/VCD lock the page, so the toggle and its hint go away.
+        if (vcdModeSupported(mod->support->mode) && gDefaultGameView == GAME_VIEW_BOTH)
+            menuAddHint(&mod->menuItem, _STR_VCD, L3_ICON);
     }
 
     // refresh Cache
@@ -326,7 +336,7 @@ static void itemExecSelect(struct menu_item *curMenu)
             // If we're trying to enable BDM support we need to enable it for all BDM menu slots.
             if (support->mode == BDM_MODE) {
                 // Initialize support for all bdm modules.
-                for (int i = 0; i <= BDM_MODE4; i++) {
+                for (int i = BDM_MODE; i <= BDM_MODE_LAST; i++) {
                     opl_io_module_t *mod = &list_support[i];
                     itemInitSupport(mod->support);
                 }
@@ -347,6 +357,26 @@ static void itemExecRefresh(struct menu_item *curMenu)
         ioPutRequest(IO_MENU_UPDATE_DEFFERED, &support->mode);
         sfxPlay(SFX_CONFIRM);
     }
+}
+
+// L3: toggle the device's list between its disc games and its VCD (PS1-via-POPSTARTER) list. Only
+// device classes that have a VCD view (vcdModeSupported) respond. vcdToggleView marks the mode
+// dirty; the deferred update + the support's NeedsUpdate (vcdConsumeDirty) then force the rescan.
+static void itemExecToggleView(struct menu_item *curMenu)
+{
+    item_list_t *support = curMenu->userdata;
+    if (!support || !vcdModeSupported(support->mode))
+        return;
+    if (gDefaultGameView != GAME_VIEW_BOTH)
+        return; // the global default-view setting locks the page to one type -> L3 is inert
+
+    // Folder browsing: the VCD/POPS list has no folder tree, so drop any ISO-view subfolder position
+    // back to root on a view toggle (the deferred rebuild below restores the plain device title).
+    folderReset(support->mode);
+    vcdToggleView(support->mode);
+    sfxPlay(SFX_CONFIRM);
+    guiWarning(vcdViewActive(support->mode) ? _l(_STR_VCD_ON) : _l(_STR_VCD_OFF), 2);
+    ioPutRequest(IO_MENU_UPDATE_DEFFERED, &support->mode);
 }
 
 // Folder browsing: the cancel button (whichever of Cross/Circle is not Select) ascends a level.
@@ -482,16 +512,18 @@ static void initMenuForListSupport(opl_io_module_t *mod)
     mod->menuItem.execSquare = &itemExecSquare;
     mod->menuItem.execCircle = &itemExecCircle;
     mod->menuItem.fav = &itemExecFav;
-    mod->menuItem.toggleView = NULL; // VCD view toggle arrives with checklist item 12
+    mod->menuItem.toggleView = &itemExecToggleView;
 
     mod->menuItem.hints = NULL;
 
     moduleUpdateMenuInternal(mod, 0, 0);
 
     struct gui_update_t *mc = guiOpCreate(GUI_OP_ADD_MENU);
-    mc->menu.menu = &mod->menuItem;
-    mc->menu.subMenu = &mod->subMenu;
-    guiDeferUpdate(mc);
+    if (mc) { // guiOpCreate returns NULL on OOM -- skip the deferred op rather than deref NULL
+        mc->menu.menu = &mod->menuItem;
+        mc->menu.subMenu = &mod->subMenu;
+        guiDeferUpdate(mc);
+    }
 }
 
 static void clearMenuGameList(opl_io_module_t *mdl)
@@ -541,6 +573,21 @@ void initSupport(item_list_t *itemList, int mode, int force_reinit)
             mod->support = itemList;
             mod->support->owner = mod;
             initMenuForListSupport(mod);
+
+            // First-ever tab while the GUI sits on the start menu (fresh/default config, every
+            // mode OFF): take the user TO the new tab, or they stay on the "default interface"
+            // with no visible way to it (#254 follow-up: "Apps section does not appear in the
+            // default interface even if enabled, until a theme is applied" -- the theme apply was
+            // just the thing that returned them to the tab screen). Boot is unaffected:
+            // deferredInit's default-device select queues AFTER this one and wins; multi-mode
+            // enables land on the last registered tab.
+            if (!menuHasRegisteredItems()) {
+                struct gui_update_t *sel = guiOpCreate(GUI_OP_SELECT_MENU);
+                if (sel) {
+                    sel->menu.menu = &mod->menuItem;
+                    guiDeferUpdate(sel);
+                }
+            }
         } else {
             // Re-enable after a prior disable: the support + its menu item already exist (registered on
             // an earlier enable), so the !mod->support branch above -- the ONLY place that sets
@@ -565,13 +612,27 @@ void initSupport(item_list_t *itemList, int mode, int force_reinit)
     }
 }
 
+// Boot-splash status (#297): true only across init()'s synchronous boot device-load, so the
+// in-initAllSupport greeting redraws fire ONLY during boot -- not on a post-boot settings refresh
+// (which runs on the IO thread with the menu showing; an ungated redraw would flash the boot logo).
+static int gBootInProgress = 0;
+
 static void initAllSupport(int force_reinit)
 {
+    guiSetBootStatus(_l(_STR_BOOT_SCANNING_BDM));
+    if (gBootInProgress)
+        guiRenderGreetingScreen();
     bdmEnumerateDevices();
+    guiSetBootStatus(_l(_STR_BOOT_SCANNING_NET));
+    if (gBootInProgress)
+        guiRenderGreetingScreen();
     initSupport(ethGetObject(0), ETH_MODE, force_reinit || (gNetworkStartup >= ERROR_ETH_SMB_CONN));
     // UDPFS filesystem shares the single NIC with SMB/UDPBD; its start-mode gate (initSupport) is live
     // only when gNetworkProtocol == NET_PROTO_UDPFS, so exactly one network tab is ever enabled.
     initSupport(udpfsGetObject(0), UDPFS_MODE, force_reinit);
+    guiSetBootStatus(_l(_STR_BOOT_SCANNING_HDD));
+    if (gBootInProgress)
+        guiRenderGreetingScreen();
     initSupport(hddGetObject(0), HDD_MODE, force_reinit);
     initSupport(appGetObject(0), APP_MODE, force_reinit);
     initSupport(favGetObject(0), FAV_MODE, force_reinit);
@@ -582,6 +643,19 @@ static void deinitAllSupport(int exception, int modeSelected)
     for (int i = 0; i < MODE_COUNT; i++) {
         if (list_support[i].support != NULL)
             moduleCleanup(&list_support[i], exception, modeSelected);
+    }
+}
+
+void oplQueueVcdDeviceUpdates(void)
+{
+    // vcdMarkAllDirty() is intentionally side-effect-free because it also runs during early config
+    // loading, before the IO worker and device modules are ready. Runtime callers must explicitly
+    // enqueue the enabled pages. This matters most for HDD, whose updateDelay=-1 means a dirty view
+    // otherwise keeps displaying the old submenu indefinitely while rendering uses the new view.
+    for (int i = 0; i < MODE_COUNT; i++) {
+        item_list_t *support = list_support[i].support;
+        if (support != NULL && support->enabled && support->mode != FAV_MODE && vcdModeSupported(support->mode))
+            ioPutRequest(IO_MENU_UPDATE_DEFFERED, &support->mode);
     }
 }
 
@@ -900,6 +974,27 @@ void menuDeferredUpdate(void *data)
 }
 
 #define MENU_GENERAL_UPDATE_DELAY 60
+// Minimum wall-clock gap between background rescans of the SAME updateDelay==0 device (Fix B). At
+// ~2 s this drops the steady SIO2/mass enumeration rate well below the old every-60-frames cadence,
+// cutting MX4SIO bus contention, while a real device change still refreshes immediately
+// (BdmGeneration bypass below). clock() = microseconds.
+#define MENU_BG_RESCAN_MIN_INTERVAL_TICKS (2 * CLOCKS_PER_SEC)
+/*
+  Idle time required before STEADY-STATE background probes may run at all, in frames (~1 s NTSC).
+
+  The short gate (MENU_MIN_INACTIVE_FRAMES = 8, ~133 ms) is tuned for "the user paused between
+  inputs" -- right for waking cover-art loads, and WRONG for device probes. Frame analysis of a
+  tester capture (#271) showed why: tapping through the list at a steady ~4.3 taps/s leaves
+  ~130 ms release gaps, which sit exactly AT the short gate, so throttled probes leaked into
+  active navigation and a probe firing into a tap gap contends with the pads on SIO2 -- the tap
+  landing inside the resulting read-miss burst is eaten.
+
+  60 frames of REAL idleness is far above any tap gap, so probes never fire mid-navigation, and a
+  parked console still probes within a second of the user stopping. Hotplug stays immediate-ish:
+  the BdmGeneration bypass below keeps the SHORT gate, so a plugged device is picked up in the
+  next tap gap rather than after a full second.
+*/
+#define MENU_BG_RESCAN_MIN_INACTIVE_FRAMES 60
 
 static void menuUpdateHook()
 {
@@ -908,20 +1003,68 @@ static void menuUpdateHook()
     // if timer exceeds some threshold, schedule updates of the available input sources
     frameCounter++;
 
+    // Keep background refresh work out of the shared IO queue while the user is actively navigating.
+    if (guiInactiveFrames < MENU_MIN_INACTIVE_FRAMES)
+        return;
+
+    // Let the current queue drain before adding background refresh work.
+    if (ioHasPendingRequests())
+        return;
+
+    // NOTE(rebuild): the fork also yields to pending cover-art work here (cacheHasPendingArt);
+    // that gate returns with the art-cache rework (item 45).
+
+    // Steady-state probes additionally require REAL idleness (see the define): a tap gap passes the
+    // short gate above, and a probe fired into it contends with the pads on SIO2 and eats the next
+    // tap (#271). Event-driven work (the genChanged hotplug bypass below) keeps the short gate.
+    int longIdle = (guiInactiveFrames >= MENU_BG_RESCAN_MIN_INACTIVE_FRAMES);
+
     // schedule updates of all the list handlers
-    if (gAutoRefresh) {
+    // Periodic background rescans. Both steady-state rescans enqueue standard requests and are
+    // rendered with the unified busy overlay.
+    if (gAutoRefresh && longIdle) {
         for (i = 0; i < MODE_COUNT; i++) {
             if ((list_support[i].support && list_support[i].support->enabled) && ((list_support[i].support->updateDelay > 0) && (frameCounter % list_support[i].support->updateDelay == 0)))
                 ioPutRequest(IO_MENU_UPDATE_DEFFERED, &list_support[i].support->mode);
         }
     }
 
-    // Schedule updates of all list handlers that are to run every frame, regardless of whether auto refresh is active or not.
+    // Schedule updates of the every-frame (updateDelay==0) list handlers -- all BDM/MX4SIO. These
+    // enumerate the SIO2/mass bus, so throttle each to a minimum wall-clock interval instead of
+    // firing every MENU_GENERAL_UPDATE_DELAY frames. A genuine BDM device change (hotplug/removal
+    // via BdmGeneration, or a Device-Settings apply) bypasses the throttle so detection stays
+    // immediate.
     if (frameCounter % MENU_GENERAL_UPDATE_DELAY == 0) {
+        unsigned int gen = bdmGetGeneration();
+        int genChanged = (gen != lastSeenBdmGeneration);
+        clock_t now = clock();
+        // Consume the generation bump only if every hotplug-driven enqueue is ACCEPTED:
+        // ioPutRequest can fail (queue blocked during teardown, allocation failure), and
+        // committing lastSeenBdmGeneration up front would silently eat the one immediate-rescan
+        // event a hotplug gets. Leaving the generation unconsumed makes the next 1 s tick retry
+        // the whole event instead.
+        int genConsumed = 1;
         for (i = 0; i < MODE_COUNT; i++) {
-            if ((list_support[i].support && list_support[i].support->enabled) && (list_support[i].support->updateDelay == 0))
-                ioPutRequest(IO_MENU_UPDATE_DEFFERED, &list_support[i].support->mode);
+            if ((list_support[i].support && list_support[i].support->enabled) && (list_support[i].support->updateDelay == 0)) {
+                int mode = list_support[i].support->mode;
+                // elapsed form is single-wrap-safe; zero-initialized timestamp allows one immediate rescan.
+                // genChanged (hotplug / Device-Settings apply) deliberately requires NEITHER longIdle:
+                // it fires precisely BECAUSE a device changed, the scan populates a page the
+                // user is waiting on, and a plugged device should be noticed in the
+                // next tap gap rather than after a second of stillness (#271).
+                if (genChanged || (longIdle && (now - lastBgRescan[mode]) >= MENU_BG_RESCAN_MIN_INTERVAL_TICKS)) {
+                    // Stamp the throttle only on an accepted request, so a rejected one retries on
+                    // the next tick instead of being silently skipped for a full interval.
+                    int accepted = (ioPutRequest(IO_MENU_UPDATE_DEFFERED, &list_support[i].support->mode) == IO_OK);
+                    if (accepted)
+                        lastBgRescan[mode] = now;
+                    else if (genChanged)
+                        genConsumed = 0;
+                }
+            }
         }
+        if (genConsumed)
+            lastSeenBdmGeneration = gen;
     }
 }
 
@@ -1150,6 +1293,14 @@ static void _loadConfig()
             configGetInt(configOPL, CONFIG_OPL_DEFAULT_GAME_VIEW, &gDefaultGameView);
             if (gDefaultGameView < GAME_VIEW_BOTH || gDefaultGameView > GAME_VIEW_VCD)
                 gDefaultGameView = GAME_VIEW_BOTH;
+            // A boot default-view locked to one type (VCD or ISO) must force the same one-shot
+            // rescan the settings dialog does on a view change (gui.c). Without it, vcdViewActive()
+            // short-circuits bdm/hdd/eth NeedsUpdate before the initial-scan trigger and the
+            // list stays blank on boot -- a manual SELECT does not recover it (NeedsUpdate still
+            // returns 0), only re-toggling the view does. This runs before applyConfig()'s first
+            // support scans, so each VCD-capable page consumes the dirty flag on its first refresh.
+            if (gDefaultGameView != GAME_VIEW_BOTH)
+                vcdMarkAllDirty();
             configGetStrCopy(configOPL, CONFIG_OPL_POPSTARTER_PATH, gPopstarterPath, sizeof(gPopstarterPath));
             // POPSTARTER device TYPE (POPS_DEV_*). Absent in legacy configs: a non-empty custom
             // popstarter_path migrates to Custom (honour the old override); otherwise Default (cwd).
@@ -2002,11 +2153,19 @@ static void moduleCleanup(opl_io_module_t *mod, int exception, int modeSelected)
     clearMenuGameList(mod);
 }
 
+// 1 while deinit() tears down for exit/poweroff, 0 for a game/app launch. Consumed by device shutdowns
+// that must behave differently on the launch path (hddShutdown keeps DEV9 powered so the post-deinit
+// POPSTARTER.ELF read from the ATA-backed massN: mount still works; ee_core/POPSTARTER reset the IOP
+// themselves, so skipping the power-off on launches leaks nothing).
+int gDeinitTerminal = 0;
+
 // deinitEx: deinit for the Neutrino keep-IOP handoff -- spares TWO modes' mounts (the game
 // device AND the device holding neutrino.elf), since Neutrino reads its -cwd config/modules
 // and the ISO through OPL's live mounts before performing its own IOP reset.
 void deinitEx(int exception, int modeSelected, int modeSelected2)
 {
+    gDeinitTerminal = (modeSelected == IO_MODE_SELECTED_ALL || modeSelected == IO_MODE_SELECTED_NONE);
+
     // block all io ops, wait for the ones still running to finish
     ioBlockOps(1);
     guiExecDeferredOps();
@@ -2036,6 +2195,8 @@ void deinitEx(int exception, int modeSelected, int modeSelected2)
 
 void deinit(int exception, int modeSelected)
 {
+    gDeinitTerminal = (modeSelected == IO_MODE_SELECTED_ALL || modeSelected == IO_MODE_SELECTED_NONE);
+
     // block all io ops, wait for the ones still running to finish
     ioBlockOps(1);
     guiExecDeferredOps();
@@ -2244,6 +2405,7 @@ static void init(void)
     while (!padStatus)
         padStatus = startPads();
     readPads();
+    gBootInProgress = 1; // gate the in-initAllSupport greeting redraws to the boot pass only (#297)
     if (!getKeyPressed(KEY_START)) {
         // Show the boot splash (not guiRenderTextScreen(), which calls guiShow()
         // and would draw the not-yet-ready main menu as a garbled landing page
@@ -2257,6 +2419,7 @@ static void init(void)
     }
     guiSetBootStatus(_l(_STR_BOOT_READY));
     guiRenderGreetingScreen();
+    gBootInProgress = 0;
 
 
     // queue deffered init of sound effects, which will take place after the preceding initialization steps within the queue are complete.
@@ -2462,6 +2625,45 @@ static void autoLaunchBDMGame(char *argv[])
 }
 
 // --------------------- Main --------------------
+// Basename of the ELF OPL was booted as (argv[0]); pairs with gBootDir. Static: consumers
+// outside this file go through gBootDir only.
+static char gBootElfName[64];
+
+static void setBootDir(const char *bootPath)
+{
+    gBootDir[0] = '\0';
+    gBootElfName[0] = '\0';
+    if (bootPath == NULL || bootPath[0] == '\0')
+        return;
+
+    // Launchers are not consistent about separators (wLaunchELF variants can hand backslash paths);
+    // normalize to '/' before splitting so the folder/basename split can't misfire.
+    char path[sizeof(gBootDir)];
+    snprintf(path, sizeof(path), "%s", bootPath);
+    for (char *p = path; *p != '\0'; p++) {
+        if (*p == '\\')
+            *p = '/';
+    }
+
+    const char *slash = strrchr(path, '/');
+    if (slash != NULL) {
+        size_t len = (size_t)(slash - path); // keep the folder, drop the trailing '/' + filename
+        if (len > 0 && len < sizeof(gBootDir)) {
+            memcpy(gBootDir, path, len);
+            gBootDir[len] = '\0';
+            snprintf(gBootElfName, sizeof(gBootElfName), "%s", slash + 1);
+        }
+    } else {
+        const char *colon = strrchr(path, ':'); // "mass0:X.ELF" -> device root "mass0:"
+        if (colon != NULL && (size_t)(colon - path) + 1 < sizeof(gBootDir)) {
+            size_t len = (size_t)(colon - path) + 1;
+            memcpy(gBootDir, path, len);
+            gBootDir[len] = '\0';
+            snprintf(gBootElfName, sizeof(gBootElfName), "%s", colon + 1);
+        }
+    }
+}
+
 int main(int argc, char *argv[])
 {
 #ifdef __DECI2_DEBUG
@@ -2476,6 +2678,21 @@ int main(int argc, char *argv[])
     // reset, load modules
     reset();
     ResetDeckardXParams();
+
+    // Settings live in the boot directory (cwd). Resolve it once, before any config init -- the
+    // autolaunch path below calls miniInit() -> configInit(). argv[0] is the launcher's boot path;
+    // getcwd() backs it up. Empty only if both are unusable, in which case configInit falls back to
+    // the memory-card default.
+    setBootDir(argc >= 1 ? argv[0] : NULL);
+    if (gBootDir[0] == '\0') {
+        char cwd[256];
+        if (getcwd(cwd, sizeof(cwd)) != NULL && cwd[0] != '\0') {
+            int n = (int)strlen(cwd);
+            while (n > 0 && cwd[n - 1] == '/') // configInit appends '/', so drop any trailing one
+                cwd[--n] = '\0';
+            snprintf(gBootDir, sizeof(gBootDir), "%s", cwd);
+        }
+    }
 
     if (argc >= 5) {
         /* argv[0] boot path

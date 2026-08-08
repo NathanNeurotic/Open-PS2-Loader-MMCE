@@ -94,6 +94,9 @@ typedef struct menu_list
 
 void menuInit();
 void menuEnd();
+// True once the global menu list contains a registered device/mode tab; initSupport uses the FALSE
+// case to spot "user enabled the FIRST tab from the start menu" (#254).
+int menuHasRegisteredItems(void);
 void menuReinitMainMenu(void);
 void menuInitGameMenu(void);
 void menuInitAppMenu(void);

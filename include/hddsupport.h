@@ -32,6 +32,15 @@ typedef struct
     hdl_game_info_t *games;
 } hdl_games_list_t;
 
+// HDD PS1/VCD sources: exact __.POPS / __.POPS0..9 containers (many named .VCD files) plus
+// partition-installed PP.<name> / __.<name> games (one root IMAGE0.VCD). This is the sorted,
+// deduped list of matching main PFS partitions enumerated from the APA partition table.
+typedef struct
+{
+    int count;
+    char (*names)[APA_IDMAX + 1]; // malloc'd labels, e.g. "__.POPS3", "PP.Game", "__.Hidden"
+} hdd_pops_list_t;
+
 typedef struct
 {
     u32 start;
@@ -57,6 +66,12 @@ typedef enum {
     HDD_LOADMODULES_STATUS_COUNT,
 } hdd_loadmodules_status;
 
+// See hddLoadModulesReady() below the prototypes -- the single evaluate-once way to ask "is the ATA
+// stack actually resident?". Callers used to test `hddLoadModules() >= 0`, which also accepted
+// BUSYLOADING(2) -- returned for the whole session after a FAILED first load consumed the one-shot
+// count -- so "nothing is loaded" read as success and the APA page sat silently empty under both
+// Auto and Manual (Vapor). Pair with the retryable-failure change in hddLoadModules.
+
 int hddCheck(void);
 u32 hddGetTotalSectors(void);
 int hddIs48bit(void);
@@ -65,12 +80,34 @@ void hddSetIdleTimeout(int timeout);
 void hddSetIdleImmediate(void);
 int hddGetHDLGamelist(hdl_games_list_t *game_list);
 void hddFreeHDLGamelist(hdl_games_list_t *game_list);
+// True for a one-game PP.<name> / __.<name> partition label, excluding the exact __.POPS[0-9]?
+// container names. Matching is case-sensitive, like POPSTARTER's partition selector.
+int hddIsPopsPartitionGame(const char *name);
+// Enumerate the present classic-container and one-game APA/PFS partitions. Fills a sorted, deduped
+// list; returns the count (0 on none/error). Free via hddFreePopsPartitionList.
+int hddGetPopsPartitionList(hdd_pops_list_t *list);
+void hddFreePopsPartitionList(hdd_pops_list_t *list);
 int hddSetHDLGameInfo(hdl_game_info_t *ginfo);
 int hddDeleteHDLGame(hdl_game_info_t *ginfo);
+
+// Drop the once-per-session HDD VCD list cache so the next VCD-view update re-walks the partitions.
+// Needed only when a SCAN-TIME filter changes (gVcdFirstDiscOnly); view flips reuse the built list.
+void hddVcdInvalidateCache(void);
 
 void hddInit(item_list_t *itemList);
 item_list_t *hddGetObject(int initOnly);
 int hddLoadModules(void);
+
+// Load (or confirm) the ATA stack and report residency, evaluating hddLoadModules EXACTLY ONCE.
+// A function, not a macro taking the call as its argument: the earlier HDD_LOADMODULES_OK(
+// hddLoadModules()) macro double-evaluated on any non-NOERROR first result -- and with the
+// retryable-failure change, a FAILED load would have immediately re-run the whole load (second
+// dev9 init + second error toast) inside one condition (CodeRabbit review of #241; vetted).
+static inline int hddLoadModulesReady(void)
+{
+    int r = hddLoadModules();
+    return r == HDD_LOADMODULES_STATUS_NOERROR || r == HDD_LOADMODULES_STATUS_ALREADYLOADED;
+}
 void hddLoadSupportModules(void);
 void hddLaunchGame(item_list_t *itemList, int id, config_set_t *configSet);
 int hddIsPresent();
