@@ -39,7 +39,7 @@ static int gInitComplete;
 static gui_callback_t gFrameHook;
 
 static s32 gSemaId;
-static s32 gGUILockSemaId;
+static s32 gGUILockSemaId = -1; // -1 = not created yet (guiLock/guiUnlock no-op; see guiLock)
 static ee_sema_t gQueueSema;
 
 static int screenWidth;
@@ -182,15 +182,23 @@ void guiEnd()
 
     DeleteSema(gSemaId);
     DeleteSema(gGUILockSemaId);
+    gGUILockSemaId = -1; // post-shutdown callers no-op instead of waiting on a deleted id
 }
 
 void guiLock(void)
 {
+    // Not-ready guard: lngInit/thmInit rebuild the GUI name lists BEFORE guiInit creates this
+    // semaphore (opl.c init order), and everything is single-threaded until the GUI/IO threads
+    // exist -- a no-op lock is correct there, and WaitSema on id 0/garbage is not.
+    if (gGUILockSemaId < 0)
+        return;
     WaitSema(gGUILockSemaId);
 }
 
 void guiUnlock(void)
 {
+    if (gGUILockSemaId < 0)
+        return;
     SignalSema(gGUILockSemaId);
 }
 
