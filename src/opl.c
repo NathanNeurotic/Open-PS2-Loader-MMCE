@@ -973,12 +973,12 @@ void menuDeferredUpdate(void *data)
     }
 }
 
-#define MENU_GENERAL_UPDATE_DELAY 60
+#define MENU_GENERAL_UPDATE_DELAY          60
 // Minimum wall-clock gap between background rescans of the SAME updateDelay==0 device (Fix B). At
 // ~2 s this drops the steady SIO2/mass enumeration rate well below the old every-60-frames cadence,
 // cutting MX4SIO bus contention, while a real device change still refreshes immediately
 // (BdmGeneration bypass below). clock() = microseconds.
-#define MENU_BG_RESCAN_MIN_INTERVAL_TICKS (2 * CLOCKS_PER_SEC)
+#define MENU_BG_RESCAN_MIN_INTERVAL_TICKS  (2 * CLOCKS_PER_SEC)
 /*
   Idle time required before STEADY-STATE background probes may run at all, in frames (~1 s NTSC).
 
