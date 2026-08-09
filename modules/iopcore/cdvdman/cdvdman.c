@@ -101,6 +101,7 @@ static void oplShutdown(int poff)
     if (vmcShutdownCb != NULL)
         vmcShutdownCb();
     DeviceUnmount();
+
     if (poff) {
         DeviceStop();
 #ifdef __USE_DEV9
@@ -388,7 +389,13 @@ static int cdvdman_read(u32 lsn, u32 sectors, u16 sector_size, void *buf)
 
             // Copy the data for buffer.
             // For any sector other than 2048 one sector at a time is copied.
-            memcpy((void *)((u32)buf + offset), cdvdman_buf, nbytes);
+            // Copy only the data cdvdman_read_sectors actually produced
+            // (nsectors * 2048): cdvdman_buf holds 2048 bytes per sector, so using
+            // nbytes (nsectors * sector_size, e.g. 2340) over-read cdvdman_buf past
+            // its valid data and could write past the destination sector. For the
+            // non-2048 sizes, offset + 2048 stays within sector_size and the manual
+            // header fixup below fills the rest of the slot.
+            memcpy((void *)((u32)buf + offset), cdvdman_buf, nsectors * 2048);
 
             // For these custom sizes we need to manually fix the header.
             // For 2340 we have 12bytes. 4 are position.
