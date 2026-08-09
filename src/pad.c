@@ -193,6 +193,12 @@ static void updatePadState(struct pad_data_t *pad, int state)
         pad->state = state;
 }
 
+// Left-stick navigation: the stick is MERGED into the d-pad bits, so analog nav is always available
+// and the X/Y Sensitivity rows are its control. Those rows offer FOUR options (Off/Low/Medium/High)
+// -- this switch must have four cases to match. It previously had three (upstream's), so index 3
+// ("High") fell into `default` and came out LESS sensitive than "Medium", and index 0 ("Off") mapped
+// to a 100 deadzone that still navigated. A 128 deadzone cannot be exceeded by a 0..255 axis centred
+// at 127, and the explicit `< 128` guards below make that intent unmistakable: Off really is off.
 static u32 readLeftJoy(struct pad_data_t *pad, u32 pdata)
 {
     u32 padData = pdata;
@@ -201,41 +207,51 @@ static u32 readLeftJoy(struct pad_data_t *pad, u32 pdata)
     if ((pad->buttons.mode >> 4) == 0x07) {
         switch (gXSensitivity) {
             case 0:
-                xDeadzone = 100;
+                xDeadzone = 128;
                 break;
             case 1:
-                xDeadzone = 80;
+                xDeadzone = 100;
                 break;
             case 2:
+                xDeadzone = 80;
+                break;
+            case 3:
                 xDeadzone = 60;
                 break;
             default:
-                xDeadzone = 80;
+                xDeadzone = 100;
         }
 
         switch (gYSensitivity) {
             case 0:
-                yDeadzone = 100;
+                yDeadzone = 128;
                 break;
             case 1:
-                yDeadzone = 80;
+                yDeadzone = 100;
                 break;
             case 2:
+                yDeadzone = 80;
+                break;
+            case 3:
                 yDeadzone = 60;
                 break;
             default:
-                yDeadzone = 80;
+                yDeadzone = 100;
         }
 
-        if (pad->buttons.ljoy_h < 127 - xDeadzone)
-            padData |= PAD_LEFT;
-        else if (pad->buttons.ljoy_h > 127 + xDeadzone)
-            padData |= PAD_RIGHT;
+        if (xDeadzone < 128) {
+            if (pad->buttons.ljoy_h < 127 - xDeadzone)
+                padData |= PAD_LEFT;
+            else if (pad->buttons.ljoy_h > 127 + xDeadzone)
+                padData |= PAD_RIGHT;
+        }
 
-        if (pad->buttons.ljoy_v < 127 - yDeadzone)
-            padData |= PAD_UP;
-        else if (pad->buttons.ljoy_v > 127 + yDeadzone)
-            padData |= PAD_DOWN;
+        if (yDeadzone < 128) {
+            if (pad->buttons.ljoy_v < 127 - yDeadzone)
+                padData |= PAD_UP;
+            else if (pad->buttons.ljoy_v > 127 + yDeadzone)
+                padData |= PAD_DOWN;
+        }
     }
 
     return padData;
