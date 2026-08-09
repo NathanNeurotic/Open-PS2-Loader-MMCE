@@ -2938,6 +2938,15 @@ void guiShowGameID(const char *startup)
 
 void guiWarning(const char *text, int count)
 {
+    // Pre-GUI callers exist: autolaunch (miniInit) never runs rmInit/thmInit/guiInit, so rendering
+    // here would draw through a NULL gsGlobal/gTheme. Launch-path helpers shared between the menu
+    // and autolaunch (the Neutrino/VMC toasts in bdmsupport/hddsupport/supportbase) rely on this
+    // guard instead of each call site checking the autolaunch globals.
+    if (gTheme == NULL) {
+        LOG("guiWarning (pre-GUI): %s\n", text);
+        return;
+    }
+
     guiStartFrame();
 
     guiShow();
@@ -3068,6 +3077,9 @@ void guiManageCheats(void)
     int selectedCheat = 0;
     int visibleCheats = 10; // Maximum number of cheats visible on screen
 
+    if (gCheats == NULL) // defensive: the menu is only reachable after load_cheats, but never deref NULL
+        return;
+
     while (cheatCount < MAX_CODES && strlen(gCheats[cheatCount].name) > 0)
         cheatCount++;
 
@@ -3092,6 +3104,16 @@ void guiManageCheats(void)
         if (getKeyOn(gSelectButton)) {
             if (!(strncasecmp(gCheats[selectedCheat].name, "mastercode", 10) == 0 || strncasecmp(gCheats[selectedCheat].name, "master code", 11) == 0))
                 gCheats[selectedCheat].enabled = !gCheats[selectedCheat].enabled;
+        }
+
+        if (getKeyOn(KEY_SQUARE)) {
+            // Disable All: clear every cheat's enabled flag in one press. Skip the mastercode (the
+            // per-cheat toggle can't touch it either -- it is the engine enabler, not a cheat).
+            for (int i = 0; i < cheatCount; i++) {
+                if (!(strncasecmp(gCheats[i].name, "mastercode", 10) == 0 || strncasecmp(gCheats[i].name, "master code", 11) == 0))
+                    gCheats[i].enabled = 0;
+            }
+            sfxPlay(SFX_CURSOR);
         }
 
         if (getKeyOn(KEY_START))
@@ -3129,6 +3151,7 @@ void guiManageCheats(void)
         }
 
         guiDrawIconAndText(gSelectButton == KEY_CIRCLE ? CIRCLE_ICON : CROSS_ICON, _STR_SELECT, gTheme->fonts[0], 70, 417, gTheme->selTextColor);
+        guiDrawIconAndText(SQUARE_ICON, _STR_DISABLE_ALL, gTheme->fonts[0], 270, 417, gTheme->selTextColor);
         guiDrawIconAndText(START_ICON, _STR_RUN, gTheme->fonts[0], 500, 417, gTheme->selTextColor);
 
         guiEndFrame();

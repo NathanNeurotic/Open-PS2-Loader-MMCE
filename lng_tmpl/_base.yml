@@ -1022,3 +1022,7 @@ gui_strings:
   string: Loaded from %s
 - label: POPSTARTER_NET_ERR
   string: Couldn't write POPSTARTER network config to the memory card.
+- label: NEUTRINO_SETTING_NA
+  string: This setting is not used with the Neutrino core.
+- label: DISABLE_ALL
+  string: Disable All
