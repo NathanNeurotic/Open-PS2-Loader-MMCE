@@ -33,6 +33,7 @@
 #include "include/appsupport.h"
 #include "include/favsupport.h"
 #include "include/folderbrowse.h" // folderDepth -- favourites suppression inside subfolders
+#include "include/mmcesupport.h"  // mmceLoadModules() -- MMCE boot branch of resolveBootDirToMass
 #include "include/tar.h"          // tarInvalidate -- re-arm the .tar probe on a settings apply
 #include "include/vcdsupport.h"   // vcdViewActive stub -- isVcd stays 0 until item 12 lands
 
@@ -1223,10 +1224,110 @@ static int tryAlternateDevice(int types)
     return 0;
 }
 
+// Basename of the ELF OPL was booted as (argv[0]); pairs with gBootDir. resolveBootDirToMass uses
+// it to verify WHICH mounted massN: slot is the boot device (launcher slot numbering need not
+// match OPL's). Empty when the boot dir came from getcwd() or argv[0] had no filename part.
+static char gBootElfName[64];
+// BDM_TYPE_* of the resolved boot device, BDM_TYPE_UNKNOWN for non-BDM boots. Set by
+// resolveBootDirToMass(); consumed by the _saveConfig re-resolve retry.
+static int gBootDirBdmType = BDM_TYPE_UNKNOWN;
+
+static void resolveBootDirToMass(void)
+{
+    if (gBootDir[0] == '\0')
+        return;
+
+    // uLE hands APA-HDD boots as "hdd0:<partition>:pfs:/..." -- a launch identity OPL can never open
+    // (OPL's own APA mount is pfs0: on the +OPL partition, a different namespace). Unresolvable: drop
+    // to legacy discovery, whose checkLoadConfigHDD probes the APA config location properly.
+    if (!strncmp(gBootDir, "hdd", 3)) {
+        LOG("BOOT unresolvable APA boot dir %s -> legacy discovery\n", gBootDir);
+        gBootDir[0] = '\0';
+        configEnd();
+        configInit(NULL);
+        return;
+    }
+
+    // CD-ROM / ISO boot (PS3 PS2-Classic ISO or PS2 disc boot): cdrom0: is read-only hardware.
+    // Re-home the config to the Memory Card (mc?:OPL) so saves land on Memory Card Slot 1/2 (#353).
+    if (!strncmp(gBootDir, "cdrom", 5)) {
+        LOG("BOOT read-only cdrom boot dir %s -> redirecting config home to MC\n", gBootDir);
+        gBootDir[0] = '\0';
+        configEnd();
+        configInit(NULL);
+        return;
+    }
+
+    // MMCE boot: the mmceman driver is likewise not loaded at boot time (sysReset loads none of the
+    // device stacks), so mmceN: is unreadable exactly when settings must load. Load it (idempotent)
+    // and give the card a moment to register its filesystem. mmceN: IS the readable namespace, so no
+    // prefix rewrite is needed.
+    if (!strncmp(gBootDir, "mmce", 4)) {
+        // NOTE(rebuild): mmceLoadModules() is still the no-op stub here (MMCE is checklist items 1-3,
+        // on WAIT), so the driver never loads and the opendir poll below always times out. That lands
+        // on the "keep as config home" fallback -- which is the CORRECT feature-off behaviour, and the
+        // one that matters: it is precisely the branch that keeps mc untouched. An MMCE boot therefore
+        // reads defaults for now and its first successful save lands on mmce once item 1 makes the
+        // driver real. Cost is the ~10 x delay(1) poll on an MMCE boot only.
+        mmceLoadModules();
+        char devRoot[8];
+        const char *colon = strchr(gBootDir, ':');
+        size_t rootLen = colon ? (size_t)(colon - gBootDir) + 1 : 0;
+        if (rootLen > 0 && rootLen < sizeof(devRoot)) {
+            memcpy(devRoot, gBootDir, rootLen);
+            devRoot[rootLen] = '\0';
+            for (int tries = 0; tries < 10; tries++) { // ~2 s total: the driver detects a present card in ms
+                DIR *dir = opendir(devRoot);
+                if (dir != NULL) {
+                    closedir(dir);
+                    return; // mounted -- the boot dir is readable as-is
+                }
+                delay(1);
+            }
+        }
+        // Card still settling after the wait. It served this very ELF milliseconds ago, so it IS present
+        // -- it just has not re-registered its mmceman filesystem yet. Do NOT blank gBootDir and re-home
+        // the config to a plain memory card here (the old configInit(NULL) fallback): with an empty boot
+        // dir, configGetDir() returns the legacy mc?: default, so _saveConfig's checkMCFolder() + the
+        // per-file O_CREAT stamped an unwanted mc?:OPL folder and settings onto a SEPARATE plain mc card
+        // (FifthFox, HW 2026-07-16). mc is never an MMCE user's config home. Keep mmce as the home: this
+        // boot falls back to defaults if the card is still settling, and the first save lands on mmce
+        // once it has mounted (a truly dead card fails the save visibly -- the same contract the BDM boot
+        // device honours below). mc stays untouched.
+        LOG("BOOT MMCE boot device %s not mounted after wait -> keep as config home (mc untouched)\n", gBootDir);
+        return;
+    }
+
+    char before[sizeof(gBootDir)];
+    snprintf(before, sizeof(before), "%s", gBootDir);
+    gBootDirBdmType = BDM_TYPE_UNKNOWN; // classify fresh from the prefix
+    int ret = bdmResolveBootDir(gBootDir, sizeof(gBootDir), gBootElfName, &gBootDirBdmType);
+    if (ret < 0) {
+        // The boot device's BDM stack did not mount within the resolve budget. It served this ELF, so it
+        // IS present -- do NOT blank gBootDir and re-home the config to a plain mc here (the old
+        // configInit(NULL)). An empty boot dir makes configGetDir() fall to the legacy mc?: default, and
+        // _saveConfig's checkMCFolder() + the per-file O_CREAT then stamp an mc?:OPL folder + settings
+        // onto a plain memory card (FifthFox, HW 2026-07-16 -- extended from the MMCE case above at
+        // NathanNeurotic's request). mc is never the boot device's config home. Keep the boot identity as
+        // the home (the config sets were already homed there by init()'s configInit): this boot reads
+        // defaults if the stack is still coming up, and a save targets the boot device -- failing visibly
+        // if it is genuinely gone -- never a plain mc. bdmResolveBootDir leaves gBootDir UNCHANGED on a
+        // failed resolve (it only rewrites on success), so the identity here is intact.
+        LOG("BOOT boot device %s not mounted after resolve -> keep as config home (mc untouched)\n", before);
+        return;
+    }
+    if (ret > 0 && strcmp(before, gBootDir) != 0) {
+        LOG("BOOT resolved boot dir %s -> %s\n", before, gBootDir);
+        configEnd();
+        configInit(gBootDir); // re-point the config sets from the unreadable prefix to the massN: path
+    }
+}
+
 static void _loadConfig()
 {
     int value, themeID = -1, langID = -1;
     const char *temp;
+    resolveBootDirToMass(); // usb0:/ata0:/mx4sio0:/APPS -> mass0:/APPS (boot-device massN:) before the first read
     int result = configReadMulti(lscstatus);
 
     if (lscstatus & CONFIG_OPL) {
@@ -2737,10 +2838,6 @@ static void autoLaunchBDMGame(char *argv[])
 }
 
 // --------------------- Main --------------------
-// Basename of the ELF OPL was booted as (argv[0]); pairs with gBootDir. Static: consumers
-// outside this file go through gBootDir only.
-static char gBootElfName[64];
-
 static void setBootDir(const char *bootPath)
 {
     gBootDir[0] = '\0';
