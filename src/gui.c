@@ -261,7 +261,11 @@ void guiCheckNotifications(int checkTheme, int checkLang)
 {
     if (gEnableNotifications) {
         if (checkTheme) {
-            if (thmGetGuiValue() != 0)
+            // Only DISK themes have a path to announce; the built-ins (<OPL>, <Coverflow>) return NULL
+            // from thmGetFilePath. The old `!= 0` test was correct only while theme IDs ran 0..nThemes;
+            // this tree's themes.c adds a built-in at nThemes+1, so a saved <Coverflow> passed the test
+            // and fed NULL to the "%s" in _STR_THM_NOTIFICATION on EVERY boot. Coverflow is our default.
+            if (thmGetFilePath(thmGetGuiValue()) != NULL)
                 showThmPopup = 1;
         }
 
@@ -859,9 +863,14 @@ void guiShowNetConfig(void)
     diaSetEnum(diaNetConfig, CFG_SMBDIALECT, smbDialects);
 
     // upload current values
-    diaSetInt(diaNetConfig, NETCFG_SHOW_ADVANCED_OPTS, 0);
-    diaSetEnabled(diaNetConfig, NETCFG_ETHOPMODE, 0);
-    diaSetEnabled(diaNetConfig, NETCFG_SHARE_PORT, 0);
+    // Open the Network Config with advanced options ON so SMB Port + ETH op-mode are immediately
+    // editable. Forcing 0 here contradicted the row's own def=1 in dialogs.c AND overwrote it:
+    // diaSetInt writes both `def` and `current`, so even diaResetValue restored the 0. It matters
+    // because this fork defaults the SMB port to 1111 -- anyone pointing at a normal 445 server hit
+    // a greyed field first.
+    diaSetInt(diaNetConfig, NETCFG_SHOW_ADVANCED_OPTS, 1);
+    diaSetEnabled(diaNetConfig, NETCFG_ETHOPMODE, 1);
+    diaSetEnabled(diaNetConfig, NETCFG_SHARE_PORT, 1);
 
     diaSetInt(diaNetConfig, NETCFG_PS2_IP_ADDR_TYPE, ps2_ip_use_dhcp);
     diaSetInt(diaNetConfig, NETCFG_SHARE_ADDR_TYPE, gPCShareAddressIsNetBIOS);
@@ -2059,9 +2068,13 @@ static void guiHandleDeferredOps(void)
 
         gCompletedOps++;
     }
-    SignalSema(gSemaId);
-
+    // Clear the now-dangling tail pointer INSIDE the lock. The drain loop freed every node and emptied
+    // gUpdateList; doing this AFTER SignalSema let an IO-thread guiDeferUpdate slip in (rebuild the list,
+    // set gUpdateEnd) only to have it clobbered here -> the next enqueue's gUpdateEnd->next was a NULL deref.
+    // Not a rare interleaving: the IO worker is prio 30 and the GUI thread prio 31, and lower wins on EE,
+    // so the thread woken by SignalSema preempts us immediately.
     gUpdateEnd = NULL;
+    SignalSema(gSemaId);
 }
 
 void guiExecDeferredOps(void)
@@ -2385,7 +2398,9 @@ int guiAlignMenuHints(menu_hint_item_t *hint, int font, int width)
 
     for (; hint; hint = hint->next) {
         GSTEXTURE *iconTex = thmGetTexture(hint->icon_id);
-        w = (iconTex->Width * 20) / iconTex->Height;
+        // A disk theme with use_default=0 that omits circle.png/cross.png leaves this texture NULL
+        // (thmGetTexture's documented contract); guiDrawIconAndText in this same file already guards.
+        w = iconTex ? (iconTex->Width * 20) / iconTex->Height : 20;
         char *text = _l(hint->text_id);
 
         x -= rmWideScale(w) + 2;
@@ -2407,7 +2422,9 @@ int guiAlignSubMenuHints(int hintCount, int *textID, int *iconID, int font, int 
 
     for (i = 0; i < hintCount; i++) {
         GSTEXTURE *iconTex = thmGetTexture(iconID[i]);
-        w = (iconTex->Width * 20) / iconTex->Height;
+        // A disk theme with use_default=0 that omits circle.png/cross.png leaves this texture NULL
+        // (thmGetTexture's documented contract); guiDrawIconAndText in this same file already guards.
+        w = iconTex ? (iconTex->Width * 20) / iconTex->Height : 20;
         char *text = _l(textID[i]);
 
         x -= rmWideScale(w) + 2;
@@ -2773,7 +2790,12 @@ void guiHandleDeferedIO(int *ptr, const char *message, int type, void *data, int
 
 void guiGameHandleDeferedIO(int *ptr, struct UIItem *ui, int type, void *data)
 {
-    ioPutRequest(type, data);
+    // A rejected request never runs, so nothing will ever clear *ptr and the loop below spins
+    // forever. The sibling guiHandleDeferedIO already checks this; this one did not.
+    if (ioPutRequest(type, data) != IO_OK) {
+        *ptr = 0;
+        return;
+    }
 
     while (*ptr) {
         guiStartFrame();
