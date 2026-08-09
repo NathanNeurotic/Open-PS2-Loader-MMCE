@@ -20,6 +20,7 @@
 #include "../ee_core/include/coreconfig.h"
 
 #include "include/pggsm.h"
+#include "include/guigame.h" // SETTINGS_* -- $GSMSource values shared with the GS settings page
 
 static int gEnableGSM;   // Enables GSM - 0 for Off, 1 for On
 static int gGSMVMode;    // See the related predef_vmode
@@ -40,8 +41,37 @@ void InitGSMConfig(config_set_t *configSet)
     gGSMFIELDFix = 0;
 
     if (configGetInt(configSet, CONFIG_ITEM_GSMSOURCE, &gGSMSource)) {
-        // Load the rest of the per-game GSM configuration, only if GSM is enabled.
-        if (configGetInt(configSet, CONFIG_ITEM_ENABLEGSM, &gEnableGSM) && gEnableGSM) {
+        if (gGSMSource == SETTINGS_PERGAME_MIXED) {
+            // Per-key inheritance: a key present in the GAME's config wins, a key absent follows the
+            // GLOBAL block. Only reachable from $GSMSource == 2, which no config written by any
+            // existing build can contain -- so every config in the field still resolves through the
+            // two untouched branches below, bit for bit. That is the whole point of a new value:
+            // the half of this behaviour nobody can test on hardware yet is also the half nothing
+            // can reach by accident.
+            //
+            // Why NOT simply retrofit this onto SETTINGS_PERGAME: the per-game save leg removes
+            // zero-valued keys, so an absent key there means BOTH "never set" AND "explicitly 0",
+            // and 0 is a real choice in every one of these (mode 0 = NTSC, offsets 0 = centred,
+            // absent $EnableGSM is the GUI's only way to say "GSM off for this game"). Inheriting on
+            // absence would therefore have changed games that work today -- including pulling a
+            // global 1080p into a game that had deliberately chosen NTSC, bypassing the GUI's
+            // triple-confirm.
+            if (!configGetInt(configSet, CONFIG_ITEM_ENABLEGSM, &gEnableGSM))
+                if (!configGetInt(configGame, CONFIG_ITEM_ENABLEGSM, &gEnableGSM))
+                    gEnableGSM = 0;
+
+            if (gEnableGSM) {
+                if (!configGetInt(configSet, CONFIG_ITEM_GSMVMODE, &gGSMVMode))
+                    configGetInt(configGame, CONFIG_ITEM_GSMVMODE, &gGSMVMode);
+                if (!configGetInt(configSet, CONFIG_ITEM_GSMXOFFSET, &gGSMXOffset))
+                    configGetInt(configGame, CONFIG_ITEM_GSMXOFFSET, &gGSMXOffset);
+                if (!configGetInt(configSet, CONFIG_ITEM_GSMYOFFSET, &gGSMYOffset))
+                    configGetInt(configGame, CONFIG_ITEM_GSMYOFFSET, &gGSMYOffset);
+                if (!configGetInt(configSet, CONFIG_ITEM_GSMFIELDFIX, &gGSMFIELDFix))
+                    configGetInt(configGame, CONFIG_ITEM_GSMFIELDFIX, &gGSMFIELDFix);
+            }
+        } else if (configGetInt(configSet, CONFIG_ITEM_ENABLEGSM, &gEnableGSM) && gEnableGSM) {
+            // LEGACY per-game ($GSMSource == 1): section-level, no inheritance. Unchanged.
             configGetInt(configSet, CONFIG_ITEM_GSMVMODE, &gGSMVMode);
             configGetInt(configSet, CONFIG_ITEM_GSMXOFFSET, &gGSMXOffset);
             configGetInt(configSet, CONFIG_ITEM_GSMYOFFSET, &gGSMYOffset);
