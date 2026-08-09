@@ -42,12 +42,19 @@ PADEMU ?= 1
 #build that is already hardware-proven. Named DUALSENSE=1 release assets return with item 58.
 DUALSENSE ?= 0
 
-#Enables/disables the experimental, hardware-UNVALIDATED GSM 1080p video mode (a GSM-synthetic
-#progressive raster; see ee_core DTV_1080P). Kept OFF in every default build; the rolling release
-#ships ONE ready-made GSM1080P=1 build as a named RIPTOPL-PS2DEVLATESTSDK-1080p.ELF asset
-#(latest-SDK flavour only), gated behind a triple-confirm in the GUI. When 0, none of the 1080p
-#table/GUI/engine code is compiled in.
-GSM1080P ?= 0
+#GSM 1080p video mode (a GSM-synthetic progressive raster; see ee_core DTV_1080P). ON in every
+#build since it was confirmed working on real hardware (RT4K reported 1080p and displayed it
+#correctly, 2026-08-09) -- it is no longer shipped as an isolated variant.
+#
+#DEFAULTING THIS TO 1 IS LOAD-BEARING, not just convenience: $GSMVMode is stored as a RAW INDEX
+#into gsmvmodeNames[]/predef_vmode[], and the 1080p entry is APPENDED LAST. With the flag
+#optional the list was 29 entries in one build and 30 in another, so a per-game video mode saved
+#by one flavour meant a DIFFERENT mode when read by the other -- and both flavours ship in the
+#same release. One list length everywhere removes that entire class of bug.
+#Kept as an escape hatch (build with GSM1080P=0) if a console ever regresses; nothing we PUBLISH
+#should set it to 0, or the index divergence comes back.
+#The mode itself stays gated behind the triple-confirm in the GUI.
+GSM1080P ?= 1
 
 #Enables/disables building of an edition of OPL that will support the DTL-T10000 (SDK v2.3+)
 DTL_T10000 ?= 0
