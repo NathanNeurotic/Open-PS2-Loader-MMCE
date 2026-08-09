@@ -1154,6 +1154,35 @@ static void menuRenderElements(theme_element_t *elem)
     SignalSema(menuSemaId);
 }
 
+// Per-page element families fall back to the GAMES family when the theme defines none. Neither
+// built-in theme (<OPL>, <Coverflow>) declares a single appsInfo*/favsInfo*/vcdInfo* element, and
+// validateBackgroundElems only auto-adds a background to a NON-empty info group -- so dispatching
+// straight to .first handed menuRenderElements a NULL list and the info screen (Square) drew
+// NOTHING for apps, favourites and the PS1/VCD view. The main families are unaffected in practice
+// (validateBackgroundElems seeds them a background, so .first is never NULL) but take the same
+// guard so the two paths cannot drift again.
+static theme_elems_t *menuGetInfoElems(item_list_t *list)
+{
+    if (list != NULL && vcdViewActive(list->mode))
+        return gTheme->vcdInfoElems.first ? &gTheme->vcdInfoElems : &gTheme->infoElems;
+    if (list != NULL && list->mode == FAV_MODE)
+        return gTheme->favsInfoElems.first ? &gTheme->favsInfoElems : &gTheme->infoElems;
+    if (list != NULL && list->mode == APP_MODE)
+        return gTheme->appsInfoElems.first ? &gTheme->appsInfoElems : &gTheme->infoElems;
+    return &gTheme->infoElems;
+}
+
+static theme_elems_t *menuGetMainElems(item_list_t *list)
+{
+    if (list != NULL && vcdViewActive(list->mode))
+        return gTheme->vcdMainElems.first ? &gTheme->vcdMainElems : &gTheme->mainElems;
+    if (list != NULL && list->mode == FAV_MODE)
+        return gTheme->favsMainElems.first ? &gTheme->favsMainElems : &gTheme->mainElems;
+    if (list != NULL && list->mode == APP_MODE)
+        return gTheme->appsMainElems.first ? &gTheme->appsMainElems : &gTheme->mainElems;
+    return &gTheme->mainElems;
+}
+
 void menuRenderMain(void)
 {
     item_list_t *list = selected_item->item->userdata;
@@ -1164,16 +1193,16 @@ void menuRenderMain(void)
         // SEPARATE cover cache from the device's ISO list -- the view reuses the device's game list
         // (same item ids), so a shared cache thrashes on every L3 toggle. This also covers the
         // Favourites tab's own VCD view: VCD favourites render with the PS1 family, not the favs one.
-        menuRenderElements(gTheme->vcdMainElems.first);
+        menuRenderElements(menuGetMainElems(list)->first);
         gTheme->itemsList = thmResolveItemsList(&gTheme->vcdMainElems, gTheme->vcdItemsList ? gTheme->vcdItemsList : gTheme->gamesItemsList, selected_item->item->icon_id);
     } else if (list->mode == FAV_MODE) {
-        menuRenderElements(gTheme->favsMainElems.first);
+        menuRenderElements(menuGetMainElems(list)->first);
         gTheme->itemsList = thmResolveItemsList(&gTheme->favsMainElems, gTheme->favsItemsList ? gTheme->favsItemsList : gTheme->gamesItemsList, selected_item->item->icon_id);
     } else if (list->mode == APP_MODE) {
-        menuRenderElements(gTheme->appsMainElems.first);
+        menuRenderElements(menuGetMainElems(list)->first);
         gTheme->itemsList = thmResolveItemsList(&gTheme->appsMainElems, gTheme->appsItemsList ? gTheme->appsItemsList : gTheme->gamesItemsList, selected_item->item->icon_id);
     } else {
-        menuRenderElements(gTheme->mainElems.first);
+        menuRenderElements(menuGetMainElems(list)->first);
         // Always falls back to gamesItemsList, never NULL: the scroll/paging code (menuNextV/PrevV/
         // Page) derefs gTheme->itemsList->extended with no NULL check.
         gTheme->itemsList = thmResolveItemsList(&gTheme->mainElems, gTheme->gamesItemsList, selected_item->item->icon_id);
@@ -1270,16 +1299,16 @@ void menuRenderInfo(void)
     item_list_t *list = selected_item->item->userdata;
 
     if (vcdViewActive(list->mode)) {
-        menuRenderElements(gTheme->vcdInfoElems.first);
+        menuRenderElements(menuGetInfoElems(list)->first);
         gTheme->itemsList = thmResolveItemsList(&gTheme->vcdInfoElems, gTheme->vcdItemsList ? gTheme->vcdItemsList : gTheme->gamesItemsList, selected_item->item->icon_id);
     } else if (list->mode == FAV_MODE) {
-        menuRenderElements(gTheme->favsInfoElems.first);
+        menuRenderElements(menuGetInfoElems(list)->first);
         gTheme->itemsList = thmResolveItemsList(&gTheme->favsInfoElems, gTheme->favsItemsList ? gTheme->favsItemsList : gTheme->gamesItemsList, selected_item->item->icon_id);
     } else if (list->mode == APP_MODE) {
-        menuRenderElements(gTheme->appsInfoElems.first);
+        menuRenderElements(menuGetInfoElems(list)->first);
         gTheme->itemsList = thmResolveItemsList(&gTheme->appsInfoElems, gTheme->appsItemsList ? gTheme->appsItemsList : gTheme->gamesItemsList, selected_item->item->icon_id);
     } else {
-        menuRenderElements(gTheme->infoElems.first);
+        menuRenderElements(menuGetInfoElems(list)->first);
         gTheme->itemsList = thmResolveItemsList(&gTheme->infoElems, gTheme->gamesItemsList, selected_item->item->icon_id);
     }
 }
