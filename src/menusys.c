@@ -18,6 +18,8 @@
 #include "include/system.h"
 #include "include/ioman.h"
 #include "include/sound.h"
+#include "include/vcdsupport.h" // vcdViewActive() -- VCD launches never use Neutrino
+#include "include/bdmsupport.h" // bdmSupportIsUDPBD() -- UDPBD games are Neutrino-only
 #include <assert.h>
 
 enum MENU_IDs {
@@ -801,9 +803,18 @@ static void menuPrevV()
 static void menuNextPage()
 {
     submenu_list_t *cur = selected_item->item->pagestart;
+    int displayed = ((items_list_t *)gTheme->itemsList->extended)->displayedItems;
 
-    if (cur && cur->next) {
-        int itms = ((items_list_t *)gTheme->itemsList->extended)->displayedItems + 1;
+    // Probe to the item one row past the bottom of the current page. If the end comes first, the
+    // whole list already fits on screen -> R1 is a no-op (don't over-scroll a sub-page list, which
+    // previously collapsed it to just the last item -- #48).
+    submenu_list_t *probe = cur;
+    int n = displayed;
+    while (n-- && probe)
+        probe = probe->next;
+
+    if (cur && probe) {
+        int itms = displayed + 1;
         sfxPlay(SFX_CURSOR);
 
         while (--itms && cur->next)
@@ -811,8 +822,6 @@ static void menuNextPage()
 
         selected_item->item->current = cur;
         selected_item->item->pagestart = selected_item->item->current;
-    } else { // wrap to start
-        menuFirstPage();
     }
 }
 
@@ -1246,6 +1255,30 @@ void menuRenderGameMenu()
     guiDrawSubMenuHints();
 }
 
+// Is the effective launch core for the selected game Neutrino? Per-game Cheats/GSM/PADEMU/OSD are
+// OPL-core features, so under Neutrino they must say so rather than opening a panel that cannot
+// take effect (checklist item 22's guidance half).
+static int gameMenuCoreIsNeutrino(void)
+{
+    int coreLoader = gDefaultCoreLoader; // no per-game $CoreLoader key -> follow the global default core
+    if (itemConfig != NULL)
+        configGetInt(itemConfig, CONFIG_ITEM_CORE_LOADER, &coreLoader);
+    // VCD (PS1) games launch ONLY via POPSTARTER -- never Neutrino -- so a keyless VCD must not
+    // inherit a Neutrino global default here, or its Cheats/GSM/OSD menu entries get blocked with
+    // the wrong "not available under Neutrino" message. SMB is the same shape: ethsupport has no
+    // Neutrino launch leg, the effective core is always <OPL>, so its panels ARE live and must not
+    // be blocked under a Neutrino global default.
+    if (selected_item != NULL && selected_item->item != NULL) {
+        item_list_t *support = (item_list_t *)selected_item->item->userdata;
+        if (support != NULL && (vcdViewActive(support->mode) || support->mode == ETH_MODE))
+            return 0;
+    }
+    // UDPBD games are Neutrino-only even while $CoreLoader is still its OPL default.
+    if (!coreLoader && selected_item != NULL && selected_item->item != NULL)
+        coreLoader = bdmSupportIsUDPBD(selected_item->item->userdata);
+    return coreLoader;
+}
+
 void menuHandleInputGameMenu()
 {
     if (!gameMenu)
@@ -1280,19 +1313,34 @@ void menuHandleInputGameMenu()
         if (menuID == GAME_COMPAT_SETTINGS) {
             guiGameShowCompatConfig(selected_item->item->current->item.id, selected_item->item->userdata, itemConfig);
         } else if (menuID == GAME_CHEAT_SETTINGS) {
-            guiGameShowCheatConfig();
+            if (gameMenuCoreIsNeutrino())
+                guiMsgBox(_l(_STR_NEUTRINO_SETTING_NA), 0, NULL);
+            else
+                guiGameShowCheatConfig();
         } else if (menuID == GAME_GSM_SETTINGS) {
-            guiGameShowGSConfig();
+            if (gameMenuCoreIsNeutrino())
+                guiMsgBox(_l(_STR_NEUTRINO_SETTING_NA), 0, NULL);
+            else
+                guiGameShowGSConfig();
         } else if (menuID == GAME_VMC_SETTINGS) {
             guiGameShowVMCMenu(selected_item->item->current->item.id, selected_item->item->userdata);
 #ifdef PADEMU
         } else if (menuID == GAME_PADEMU_SETTINGS) {
-            guiGameShowPadEmuConfig(0);
+            if (gameMenuCoreIsNeutrino())
+                guiMsgBox(_l(_STR_NEUTRINO_SETTING_NA), 0, NULL);
+            else
+                guiGameShowPadEmuConfig(0);
         } else if (menuID == GAME_PADMACRO_SETTINGS) {
-            guiGameShowPadMacroConfig(0);
+            if (gameMenuCoreIsNeutrino())
+                guiMsgBox(_l(_STR_NEUTRINO_SETTING_NA), 0, NULL);
+            else
+                guiGameShowPadMacroConfig(0);
 #endif
         } else if (menuID == GAME_OSD_LANGUAGE_SETTINGS) {
-            guiGameShowOSDLanguageConfig(0);
+            if (gameMenuCoreIsNeutrino())
+                guiMsgBox(_l(_STR_NEUTRINO_SETTING_NA), 0, NULL);
+            else
+                guiGameShowOSDLanguageConfig(0);
         } else if (menuID == GAME_SAVE_CHANGES) {
             if (guiGameSaveConfig(itemConfig, selected_item->item->userdata))
                 configSetInt(itemConfig, CONFIG_ITEM_CONFIGSOURCE, CONFIG_SOURCE_USER);
