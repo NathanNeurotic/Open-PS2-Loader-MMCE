@@ -1759,6 +1759,7 @@ void guiShowDisplayConfig(void)
         , NULL};
     // clang-format on
     int previousVMode;
+    int ret;
 
 reselect_video_mode:
     previousVMode = gVMode;
@@ -1770,7 +1771,16 @@ reselect_video_mode:
     diaSetInt(diaDisplayConfig, UICFG_OVERSCAN, gOverscan);
     diaSetInt(diaDisplayConfig, CFG_APPLYGAMEID, gApplyGameID); // RetroGEM/Pixel FX GameID barcode
 
-    int ret = diaExecuteDialog(diaDisplayConfig, -1, 1, guiDisplayUpdater);
+reshow_display:
+    ret = diaExecuteDialog(diaDisplayConfig, -1, 1, guiDisplayUpdater);
+
+    // The GSM defaults sub-page writes straight into the global config set, so re-enter WITHOUT
+    // going back through the diaSetInt block above -- otherwise the rows the user already changed
+    // on this page would be reset from the (not yet committed) globals.
+    if (ret == DISPLAY_GSM_DEFAULTS_BUTTON) {
+        guiGameShowGSConfig(1);
+        goto reshow_display;
+    }
 
     if (ret) {
         diaGetInt(diaDisplayConfig, UICFG_VMODE, &gVMode);
