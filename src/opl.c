@@ -691,6 +691,23 @@ int oplPath2Mode(const char *path)
     return -1;
 }
 
+// Art lookup addressed by IO MODE rather than by a device string. appsupport resolves each app's art
+// source to a mode once at scan time (appSetArtSource), so the per-cover lookup does not have to
+// re-derive it from a path on every request.
+int oplGetAppImageByMode(int mode, char *folder, int isRelative, char *value, char *suffix, GSTEXTURE *resultTex, short psm)
+{
+    item_list_t *listSupport;
+
+    if (mode < 0 || mode >= MODE_COUNT)
+        return -1;
+
+    listSupport = list_support[mode].support;
+    if ((listSupport != NULL) && (listSupport->enabled))
+        return listSupport->itemGetImage(listSupport, folder, isRelative, value, suffix, resultTex, psm);
+
+    return -1;
+}
+
 int oplGetAppImage(const char *device, char *folder, int isRelative, char *value, char *suffix, GSTEXTURE *resultTex, short psm)
 {
     int i, remaining, elfbootmode;
