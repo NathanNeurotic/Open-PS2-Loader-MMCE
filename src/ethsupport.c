@@ -438,8 +438,7 @@ static void smbLoadModules(void)
         */
         // NOTE(rebuild): SMB2 (smb2man + gSMBDialect) returns with checklist item 4 -- until then
         // this build speaks SMBv1 unconditionally, exactly like every pre-dialect build.
-        const int useSmb2 = 0;
-        LOG(useSmb2 ? "[SMB2MAN]:\n" : "[SMBMAN]:\n");
+        LOG("[SMBMAN]:\n");
         if (sysLoadModuleBuffer((void *)&smbman_irx, size_smbman_irx, 0, NULL) >= 0) {
             LOG("[NBNS]:\n");
             sysLoadModuleBuffer(&nbns_irx, size_nbns_irx, 0, NULL);

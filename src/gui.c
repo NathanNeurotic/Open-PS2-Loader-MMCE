@@ -653,8 +653,6 @@ void guiShowDeviceConfig(void)
     }
 }
 
-static int curTheme = -1;
-
 
 // Deep-copy a NULL-terminated name list for handing to diaSetEnum. The CALLER must hold guiLock
 // across BOTH the getter fetch (thmGetGuiList/lngGetGuiList) and this copy: the source lists live
