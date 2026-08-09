@@ -42,6 +42,13 @@ PADEMU ?= 1
 #build that is already hardware-proven. Named DUALSENSE=1 release assets return with item 58.
 DUALSENSE ?= 0
 
+#Enables/disables the experimental, hardware-UNVALIDATED GSM 1080p video mode (a GSM-synthetic
+#progressive raster; see ee_core DTV_1080P). Kept OFF in every default build; the rolling release
+#ships ONE ready-made GSM1080P=1 build as a named RIPTOPL-PS2DEVLATESTSDK-1080p.ELF asset
+#(latest-SDK flavour only), gated behind a triple-confirm in the GUI. When 0, none of the 1080p
+#table/GUI/engine code is compiled in.
+GSM1080P ?= 0
+
 #Enables/disables building of an edition of OPL that will support the DTL-T10000 (SDK v2.3+)
 DTL_T10000 ?= 0
 
@@ -160,6 +167,13 @@ ifeq ($(DTL_T10000),1)
   UDNL_OUT = $(PS2SDK)/iop/irx/udnl-t300.irx
 else
   UDNL_OUT = $(PS2SDK)/iop/irx/udnl.irx
+endif
+
+# Experimental 1080p GSM mode: compile the table/GUI/gate (main EE build) and the ee_core raster
+# handler (via EECORE_EXTRA_FLAGS -> ee_core/Makefile) only when explicitly requested.
+ifeq ($(GSM1080P),1)
+  EE_CFLAGS += -DGSM_1080P
+  EECORE_EXTRA_FLAGS += GSM1080P=1
 endif
 
 ifeq ($(IGS),1)

@@ -1030,3 +1030,9 @@ gui_strings:
   string: Loading theme sounds...
 - label: BOOT_BUILDING_MENU
   string: Building menu...
+- label: GSM_1080P_WARNING
+  string: WARNING -- forcing 1080p is experimental and unverified. It may show no picture or, on some hardware, stress the console. Proceed at your own risk. Cross = continue, Circle = cancel.
+- label: GSM_1080P_PROCEED
+  string: Proceed with forcing 1080p for this game?
+- label: GSM_1080P_SURE
+  string: Are you sure? Cross applies 1080p, Circle cancels.

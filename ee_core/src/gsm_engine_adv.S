@@ -127,6 +127,116 @@ DTV576P_end:
 
 # -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
+# DTV_1080P: manually program a progressive 1920x1080 raster. Mode 0x54 is GSM-synthetic (the ROM
+# SetGsCrt has no case for it), so this routine writes SMODE1/SYNCH1/SYNCH2/SYNCV/SMODE2/SRFSH
+# directly. Re-ported from the pre-rewrite engine (OPL commit f5b31427). Register VALUES are the
+# ones DOCUMENTED in that source and decode cleanly against the SMODE1 table above (GCONT=1 YPbPr,
+# VHP=0 progressive); the historical code additionally OR'd the GS base address into the FIRST
+# SMODE1 write only -- an obvious bug (its other two SMODE1 writes do not), so that OR is dropped
+# here and all three writes are consistent. NOT hardware-validated in this fork -- gated behind a
+# triple-confirm + per-game opt-in + the Triangle+Cross 480p recovery combo.
+# Compiled ONLY into the dedicated GSM1080P=1 variant build (-DGSM_1080P); absent from every
+# default build so the untested raster code cannot ship in a mainline flavour.
+#ifdef GSM_1080P
+.ent DTV_1080P
+DTV_1080P:
+    # $v0 = GS base address
+    lui     $v0, (GS_BASE >> 16)
+
+# *GS_SMODE1=0x00000003422304B1  (VHP=0 progressive, GCONT=1 component, PLL reset asserted)
+    lui     $v1, 0x0003
+    ori     $v1, 0x4223
+    dsll    $v1, 16
+    ori     $v1, 0x04B1
+    sd      $v1, GS_SMODE1($v0)             # store it
+
+# Newer GS revisions ((*GS_CSR>>16 & 0xFF) >= 0x19) want different SYNCH values.
+    ld      $v1, GS_CSR($v0)
+    dsrl    $v1, 16
+    andi    $v1, 0xFF
+    sltiu   $v1, 0x19
+    bnez    $v1, DTV_1080P_oldGS
+    nop
+
+# *GS_SYNCH1=0x000344200B04182D
+    lui     $v1, 0x0003
+    ori     $v1, 0x4420
+    dsll    $v1, 16
+    ori     $v1, 0x0B04
+    dsll    $v1, 16
+    ori     $v1, 0x182D
+    sd      $v1, GS_SYNCH1($v0)             # store it
+# *GS_SYNCH2=0x0020FB61
+    lui     $v1, 0x0020
+    ori     $v1, 0xFB61
+    sd      $v1, GS_SYNCH2($v0)             # store it
+    b       DTV_1080P_syncv
+    nop
+
+DTV_1080P_oldGS:
+# *GS_SYNCH1=0x000344200B043829
+    lui     $v1, 0x0003
+    ori     $v1, 0x4420
+    dsll    $v1, 16
+    ori     $v1, 0x0B04
+    dsll    $v1, 16
+    ori     $v1, 0x3829
+    sd      $v1, GS_SYNCH1($v0)             # store it
+# *GS_SYNCH2=0x0020EB63
+    lui     $v1, 0x0020
+    ori     $v1, 0xEB63
+    sd      $v1, GS_SYNCH2($v0)             # store it
+
+DTV_1080P_syncv:
+# *GS_SYNCV=0x0150E00201C00005
+    lui     $v1, 0x0150
+    ori     $v1, 0xE002
+    dsll    $v1, 16
+    ori     $v1, 0x01C0
+    dsll    $v1, 16
+    ori     $v1, 0x0005
+    sd      $v1, GS_SYNCV($v0)              # store it
+
+# *GS_SMODE2=0  (progressive, non-interlaced -- FFMD is irrelevant; same rule as DTV_576P above)
+    sd      $zero, GS_SMODE2($v0)           # store it
+
+# *GS_SRFSH=4
+    li      $v1, 4
+    sd      $v1, GS_SRFSH($v0)              # store it
+
+# *GS_SMODE1=0x00000003422204B1  (PLL still resetting, one status bit toggled)
+    lui     $v1, 0x0003
+    ori     $v1, 0x4222
+    dsll    $v1, 16
+    ori     $v1, 0x04B1
+    sd      $v1, GS_SMODE1($v0)             # store it
+
+# Let the PLL settle before releasing reset.
+    li      $v1, 0x7A120
+DTV_1080P_delay:
+    vnop
+    vnop
+    addiu   $v1, $v1, -1                   # explicit 3-operand form (matches the rest of this file)
+    vnop
+    vnop
+    bnez    $v1, DTV_1080P_delay
+    nop
+
+# *GS_SMODE1=0x00000003422004B1  (SINT/PRST cleared -- sync on, reset released)
+    lui     $v1, 0x0003
+    ori     $v1, 0x4220
+    dsll    $v1, 16
+    ori     $v1, 0x04B1
+    sd      $v1, GS_SMODE1($v0)             # store it
+
+    jr      $ra
+    nop
+
+.end DTV_1080P
+#endif /* GSM_1080P */
+
+# -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
 # ----------------------------
 # SMODE1
 # .--------.-------.---------------.----------------------------------.-------.

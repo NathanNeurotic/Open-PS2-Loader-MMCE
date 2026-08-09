@@ -71,7 +71,9 @@ void PrepareGSM(char *cmdline, struct GsmConfig_t *config)
     // Therefore there are many variables involved here that can lead us to success or fail, depending on the already mentioned circumstances.
     //
     // clang-format off
-    static const predef_vmode_struct predef_vmode[29] = {
+    // Initializer-sized ([] not a fixed count): the GSM1080P=1 variant appends one row below, and
+    // the clamp at the end reads sizeof(predef_vmode) so it tracks 29 or 30 automatically.
+    static const predef_vmode_struct predef_vmode[] = {
         //                                                            DH    DW   MAGV MAGH  DY   DX              VS  VDP  VBPE  VBP VFPE  VFP
         {GS_INTERLACED,    GS_MODE_NTSC,        GS_FIELD, makeDISPLAY(447,  2559, 0,   3,   46,  700), makeSYNCV(6,  480,  6,    26,  6,   1)},
         {GS_INTERLACED,    GS_MODE_NTSC,        GS_FRAME, makeDISPLAY(223,  2559, 0,   3,   26,  700), makeSYNCV(6,  480,  6,    26,  6,   2)},
@@ -101,28 +103,47 @@ void PrepareGSM(char *cmdline, struct GsmConfig_t *config)
         {GS_NONINTERLACED, GS_MODE_VGA_1024_75, GS_FRAME, makeDISPLAY(767,  1023, 0,   0,   30,  260), makeSYNCV(3,  768,  0,    28,  0,   1)},
         {GS_NONINTERLACED, GS_MODE_VGA_1024_85, GS_FRAME, makeDISPLAY(767,  1023, 0,   0,   30,  290), makeSYNCV(3,  768,  0,    36,  0,   1)},
         {GS_NONINTERLACED, GS_MODE_VGA_1280_60, GS_FRAME, makeDISPLAY(1023, 1279, 1,   1,   40,  350), makeSYNCV(3,  1024, 0,    38,  0,   1)},
-        {GS_NONINTERLACED, GS_MODE_VGA_1280_75, GS_FRAME, makeDISPLAY(1023, 1279, 1,   1,   40,  350), makeSYNCV(3,  1024, 0,    38,  0,   1)}}; //ends predef_vmode definition
+        {GS_NONINTERLACED, GS_MODE_VGA_1280_75, GS_FRAME, makeDISPLAY(1023, 1279, 1,   1,   40,  350), makeSYNCV(3,  1024, 0,    38,  0,   1)},
+        // GSM1080P=1 variant only: APPENDED at the LAST index (not inserted after 1080i) because
+        // $GSMVMode is a stored raw index -- a mid-list insert would silently remap every existing
+        // saved VGA/HDTV config. display/syncv identical to the 1080i row; only the mode (0x54,
+        // GSM-synthetic) + NONINTERLACED/FRAME differ. Emitted via the ee_core DTV_1080P handler,
+        // behind a triple-confirm in the GUI. EXPERIMENTAL / not HW-validated.
+#ifdef GSM_1080P
+        {GS_NONINTERLACED, GS_MODE_DTV_1080P,   GS_FRAME, makeDISPLAY(1079, 1919, 1,   2,   48,  238), makeSYNCV(10, 1080, 2,    28,  0,   5)},
+#endif
+    }; //ends predef_vmode definition
     // clang-format on
     int k576p_fix, kGsDxDyOffsetSupported, fd, FIELD_fix;
     char romver[16], romverNum[5], *pROMDate;
 
+    // Clamp the externally-sourced video-mode index before it indexes predef_vmode[]
+    // below; gGSMVMode comes from a user-editable config and is otherwise unbounded.
+    if (gGSMVMode < 0 || gGSMVMode >= (int)(sizeof(predef_vmode) / sizeof(predef_vmode[0])))
+        gGSMVMode = 0;
+
 #ifdef _DTL_T10000
-    if (predef_vmode[gGSMVMode].mode == GS_MODE_DTV_576P) // There is no 576P code implemented for development TOOLs.
-        gGSMVMode = 2;                                    // Change to PAL instead.
+    // Dev TOOLs implement neither 576P nor the synthetic 1080P raster -> fall back to PAL.
+    if (predef_vmode[gGSMVMode].mode == GS_MODE_DTV_576P || predef_vmode[gGSMVMode].mode == GS_MODE_DTV_1080P)
+        gGSMVMode = 2; // Change to PAL instead.
 #endif
 
     k576p_fix = 0;
     kGsDxDyOffsetSupported = 0;
     if ((fd = open("rom0:ROMVER", O_RDONLY)) >= 0) {
-        // Read ROM version
-        read(fd, romver, sizeof(romver));
+        // Read ROM version, leaving room for a terminator; rom0:ROMVER is not
+        // guaranteed to contain a NUL within the buffer.
+        int romverLen = read(fd, romver, sizeof(romver) - 1);
+        if (romverLen < 0)
+            romverLen = 0;
+        romver[romverLen] = '\0';
         close(fd);
 
         strncpy(romverNum, romver, 4);
         romverNum[4] = '\0';
 
         // ROMVER string format: VVVVRTYYYYMMDD\n
-        pROMDate = &romver[strlen(romver) - 9];
+        pROMDate = (strlen(romver) >= 9) ? &romver[strlen(romver) - 9] : romver;
 
         /* Enable 576P add-on code for v2.00 and earlier. Note that the earlier PSX models already seem to support the 576P mode, despite being older than the SCPH-70000 series.
            1. The PSX (v1.80) has the same GS as the SCPH-75000 (v2.20), which is also shared with one of the SCPH-70000 (v2.00) models.
@@ -138,20 +159,6 @@ void PrepareGSM(char *cmdline, struct GsmConfig_t *config)
     }
 
     FIELD_fix = gGSMFIELDFix != 0 ? 1 : 0;
-
-    if (cmdline) {
-        sprintf(cmdline, "%hhu %hhu %hhu %llu %llu %hu %u %u %d %d %d", predef_vmode[gGSMVMode].interlace,
-                predef_vmode[gGSMVMode].mode,
-                predef_vmode[gGSMVMode].ffmd,
-                predef_vmode[gGSMVMode].display,
-                predef_vmode[gGSMVMode].syncv,
-                ((predef_vmode[gGSMVMode].ffmd) << 1) | (predef_vmode[gGSMVMode].interlace),
-                (u32)gGSMXOffset,
-                (u32)gGSMYOffset,
-                k576p_fix,
-                kGsDxDyOffsetSupported,
-                FIELD_fix);
-    }
 
     if (config) {
         config->interlace = predef_vmode[gGSMVMode].interlace;

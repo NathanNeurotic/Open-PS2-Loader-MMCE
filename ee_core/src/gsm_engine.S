@@ -168,6 +168,42 @@ Hook_SetGsCrt:
  * Otherwise, call the original SetGsCrt() syscall handler and let it configure the GS for us.
  */
 
+#ifdef GSM_1080P                                    /* experimental 1080p variant build only */
+    li      $a3, GS_MODE_DTV_1080P                  # 0x54 has NO ROM SetGsCrt case, so it is never
+    bne     $a1, $a3, Chk_DTV_576P                  # native -- always route it to our own handler.
+    nop
+
+/*
+ * Disarm the GS data-write breakpoint for the duration of the custom raster.
+ *
+ * DTV_1080P programs the GS directly (SMODE1 x3 / SYNCH1 / SYNCH2 / SYNCV / SMODE2 / SRFSH) as a
+ * precise, timing-sensitive PLL reset sequence. GSHandler is armed via a breakpoint on GS register
+ * writes, so with it live EVERY store inside DTV_1080P traps into a debug exception and is re-issued
+ * through GSHandler -- which also REWRITES values per GSMFlags (SMODE2_fix=1 substitutes
+ * Target_SMODE2 for our write). That corrupts the sequence, and the display never syncs: black screen.
+ *
+ * The pre-rewrite engine (f5b31427), whose 1080p worked on real hardware, bracketed its whole DTV_*
+ * dispatch this way -- Disable before, Enable after. The Disable half was lost in the engine rewrite,
+ * which went unnoticed because the only custom raster left, DTV_576P, is only reached on consoles that
+ * do NOT natively support 576P, so it practically never ran. 1080p has no ROM case at all, so it is
+ * the first mode in this engine generation that ALWAYS takes the custom-raster path -- and the first
+ * to need the breakpoint disabled again. Enable_GSBreakpoint at Skip_Call_Original_SetGsCrt below
+ * re-arms it on the way out (the other half of the original's bracket).
+ *
+ * Deliberately scoped to the 1080p path only: every other mode keeps the current engine's long-standing
+ * behaviour, so a mainline build is bit-for-bit unaffected by this experimental variant's fix.
+ * ($ra is already saved on the stack by this hook's prologue; DTV_1080P sets up its own $v0/$v1/$a0.)
+ */
+    jal     Disable_GSBreakpoint
+    nop
+
+    jal     DTV_1080P
+    nop
+    b Skip_Call_Original_SetGsCrt
+    nop
+
+Chk_DTV_576P:
+#endif
     li      $a3, GS_MODE_DTV_576P
     la      $t0, GSMFlags
     bne     $a1, $a3, Call_SetGsCrt
