@@ -1797,7 +1797,7 @@ int loadConfig(int types)
     lscstatus = types;
     lscret = 0;
 
-    guiHandleDeferedIO(&lscstatus, _l(_STR_LOADING_SETTINGS), IO_CUSTOM_SIMPLEACTION, &_loadConfig);
+    guiHandleDeferedIO(&lscstatus, _l(_STR_LOADING_SETTINGS), IO_CUSTOM_SIMPLEACTION, &_loadConfig, OPL_DEFERRED_IO_TIMEOUT_MS);
 
     return lscret;
 }
@@ -1808,7 +1808,7 @@ int saveConfig(int types, int showUI)
     lscstatus = types;
     lscret = 0;
 
-    guiHandleDeferedIO(&lscstatus, _l(_STR_SAVING_SETTINGS), IO_CUSTOM_SIMPLEACTION, &_saveConfig);
+    guiHandleDeferedIO(&lscstatus, _l(_STR_SAVING_SETTINGS), IO_CUSTOM_SIMPLEACTION, &_saveConfig, OPL_DEFERRED_IO_TIMEOUT_MS);
 
     if (showUI) {
         if (lscret) {
@@ -2075,7 +2075,7 @@ int oplUpdateGameCompatSingle(int id, item_list_t *support, config_set_t *config
     CompatUpdSingleConfigSet = configSet;
     CompatUpdSingleStatus = 1;
 
-    guiHandleDeferedIO(&CompatUpdSingleStatus, _l(_STR_PLEASE_WAIT), IO_CUSTOM_SIMPLEACTION, &_updateCompatSingle);
+    guiHandleDeferedIO(&CompatUpdSingleStatus, _l(_STR_PLEASE_WAIT), IO_CUSTOM_SIMPLEACTION, &_updateCompatSingle, 0); // network fetch: wait unbounded
 
     return CompatUpdateStatus;
 }

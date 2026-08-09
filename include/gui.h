@@ -167,8 +167,14 @@ void guiCheckNotifications(int checkTheme, int checkLang);
  * @param message The message to display while working
  * @param type the io operation type
  * @param data the data for the operation
+ * @param timeoutMs abandon the wait after this many ms if the deferred IO never completes (a wedged
+ *        IOP fileXio channel on failing storage); 0 = wait forever (network compat-list update).
  */
-void guiHandleDeferedIO(int *ptr, const char *message, int type, void *data);
+// Bound for guiHandleDeferedIO's wait on a deferred config save/load. Far beyond any real config
+// write; only a genuinely stuck device (which would otherwise freeze the GUI forever on "Saving...")
+// reaches it, after which the caller falls into its normal failure path ("Error saving settings").
+#define OPL_DEFERRED_IO_TIMEOUT_MS 30000
+void guiHandleDeferedIO(int *ptr, const char *message, int type, void *data, int timeoutMs);
 
 void guiGameHandleDeferedIO(int *ptr, struct UIItem *ui, int type, void *data);
 
