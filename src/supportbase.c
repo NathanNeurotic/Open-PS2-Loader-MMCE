@@ -859,15 +859,30 @@ void sbRebuildULCfg(base_game_info_t **list, const char *prefix, int gamecount, 
 
 static void sbCreatePath_name(const base_game_info_t *game, char *path, const char *prefix, const char *sep, int part, const char *game_name)
 {
+    // Folder browsing: a game inside a subfolder sits at <prefix>CD|DVD/<sub>/<name>. sbBrowseSub is
+    // "" for the normal device-root case, so subseg collapses to nothing and the path is unchanged.
+    // WITHOUT this, every consumer of sbCreatePath composed a DEVICE-ROOT path for a game the user
+    // opened from a subfolder: launch open()s a file that is not there, and sbDelete unlink()s the
+    // root path -- which, if a same-named ISO exists at the root, silently deletes the WRONG game.
+    // ul.cfg (USBLD) is a device-root-only concept and is deliberately left unprefixed.
+    char subseg[FOLDER_SUB_MAX + 2];
+    if (sbBrowseSub[0] != '\0')
+        snprintf(subseg, sizeof(subseg), "%s%s", sbBrowseSub, sep);
+    else
+        subseg[0] = '\0';
+
     switch (game->format) {
         case GAME_FORMAT_USBLD:
             snprintf(path, 256, "%sul.%08X.%s.%02x", prefix, USBA_crc32(game_name), game->startup, part);
             break;
         case GAME_FORMAT_ISO:
-            snprintf(path, 256, "%s%s%s%s%s", prefix, (game->media == SCECdPS2CD) ? "CD" : "DVD", sep, game_name, game->extension);
+            snprintf(path, 256, "%s%s%s%s%s%s", prefix, (game->media == SCECdPS2CD) ? "CD" : "DVD", sep, subseg, game_name, game->extension);
             break;
         case GAME_FORMAT_OLD_ISO:
-            snprintf(path, 256, "%s%s%s%s.%s%s", prefix, (game->media == SCECdPS2CD) ? "CD" : "DVD", sep, game->startup, game_name, game->extension);
+            snprintf(path, 256, "%s%s%s%s%s.%s%s", prefix, (game->media == SCECdPS2CD) ? "CD" : "DVD", sep, subseg, game->startup, game_name, game->extension);
+            break;
+        case GAME_FORMAT_FOLDER:
+            path[0] = '\0'; // a folder is never launched / deleted / renamed / pathed
             break;
     }
 }
