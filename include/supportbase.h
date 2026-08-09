@@ -52,6 +52,9 @@ int sbCreateSemaphore(void);
 int sbReadList(base_game_info_t **list, const char *prefix, const char *sub, int *fsize, int *gamecount);
 // Folder browsing: set the active subpath the path composers inject (see sbBrowseSub in supportbase.c).
 void sbSetBrowseSub(const char *sub);
+const char *sbGetCheatSearchLog(void);
+// "No cheats found" text with the locations actually probed appended (#265).
+const char *sbCheatsNotFoundText(void);
 int sbCheatsMissingContinue(void *pCommon, int cheatResult);
 int sbLoadImage(const char *path, const char *file);
 void sbSetDiscAttributes(config_set_t *config, int isPS1, int isCD); // #System/#Media/#DiscType identity stamp
