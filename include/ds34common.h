@@ -13,6 +13,9 @@
 #define DS4_PID_SLIM        0x09CC // PS4 Slim Controller
 #define GUITAR_HERO_PS3_PID 0x0100 // PS3 Guitar Hero Guitar
 #define ROCK_BAND_PS3_PID   0x0200 // PS3 Rock Band Guitar
+#ifdef DS5_ENABLE
+#define DS5_PID 0x0CE6 // PS5 DualSense Controller
+#endif
 
 // NOTE: struct member prefixed with "n" means it's active-low (i.e. value of 0 indicates button is pressed, value 1 is released)
 enum DS2ButtonBitNumber {
@@ -281,6 +284,65 @@ struct ds4report
     uint16_t Finger2Y      : 12;
 
 } __attribute__((packed));
+
+#ifdef DS5_ENABLE
+// PS5 DualSense USB extended input report (transplanted verbatim from wOPL). Only compiled
+// when DUALSENSE=1 -- the layout differs from DS4, so DS5 gets its own parse branch.
+struct ds5report
+{
+    uint8_t ReportID;
+    uint8_t LeftStickX;
+    uint8_t LeftStickY;
+    uint8_t RightStickX;
+    uint8_t RightStickY;
+    uint8_t PressureL2;
+    uint8_t PressureR2;
+    uint8_t Counter1;
+    uint8_t Dpad       : 4;
+    uint8_t Square     : 1;
+    uint8_t Cross      : 1;
+    uint8_t Circle     : 1;
+    uint8_t Triangle   : 1;
+    uint8_t L1         : 1;
+    uint8_t R1         : 1;
+    uint8_t L2         : 1;
+    uint8_t R2         : 1;
+    uint8_t Create     : 1;
+    uint8_t Option     : 1;
+    uint8_t L3         : 1;
+    uint8_t R3         : 1;
+    uint8_t PSButton   : 1;
+    uint8_t TPad       : 1;
+    uint8_t Microphone : 1;
+    uint8_t Reserved2  : 1;
+    uint8_t Reserved3  : 4;
+    uint8_t Reserved4;
+    uint32_t Counter2;
+    int16_t GyroX;
+    int16_t GyroY;
+    int16_t GyroZ;
+    int16_t AccelX;
+    int16_t AccelY;
+    int16_t AccelZ;
+    uint32_t SensorTimestamp;
+    uint8_t Temperature;
+    uint32_t Finger1ID      : 7;
+    uint32_t nFinger1Active : 1;
+    uint32_t Finger1X       : 12;
+    uint32_t Finger1Y       : 12;
+    uint32_t Finger2ID      : 7;
+    uint32_t nFinger2Active : 1;
+    uint32_t Finger2X       : 12;
+    uint32_t Finger2Y       : 12;
+    uint8_t Reserved7[12];
+    uint8_t Battery     : 4;
+    uint8_t Power       : 4;
+    uint8_t Reserved8   : 4;
+    uint8_t Usb_plugged : 1;
+    uint8_t Reserved9   : 3;
+    uint8_t Reserved10[9];
+} __attribute__((packed));
+#endif
 
 /**
  * Translate DS3 pad data into DS2 pad data.
