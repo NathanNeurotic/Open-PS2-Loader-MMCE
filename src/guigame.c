@@ -357,7 +357,20 @@ static void guiGameSetGSMSettingsState(void)
     if (previousSource != gGSMSource && gGSMSource == SETTINGS_GLOBAL) {
         config_set_t *configSet = gameMenuLoadConfig(diaGSConfig);
         configRemoveKey(configSet, CONFIG_ITEM_GSMSOURCE);
+        // Also drop the game's own GSM keys. They were inert before only because the old resolver
+        // never looked at them once $GSMSource was gone -- but per-key inheritance DOES look, so a
+        // leftover key would silently keep overriding the global the user just switched to.
+        configRemoveKey(configSet, CONFIG_ITEM_ENABLEGSM);
+        configRemoveKey(configSet, CONFIG_ITEM_GSMVMODE);
+        configRemoveKey(configSet, CONFIG_ITEM_GSMXOFFSET);
+        configRemoveKey(configSet, CONFIG_ITEM_GSMYOFFSET);
+        configRemoveKey(configSet, CONFIG_ITEM_GSMFIELDFIX);
         guiGameLoadGSMConfig(configSet, configGetByType(CONFIG_GAME));
+    } else if (previousSource != gGSMSource && gGSMSource == SETTINGS_PERGAME_MIXED) {
+        // 1 -> 2 must NOT reload: the rows already hold the resolved values and saving pins them
+        // all explicitly, so switching is a behavioural no-op until a row is set to Default.
+        config_set_t *configSet = gameMenuLoadConfig(diaGSConfig);
+        configSetInt(configSet, CONFIG_ITEM_GSMSOURCE, gGSMSource);
     } else if (previousSource != gGSMSource && gGSMSource == SETTINGS_PERGAME) {
         config_set_t *configSet = gameMenuLoadConfig(diaGSConfig);
         configSetInt(configSet, CONFIG_ITEM_GSMSOURCE, gGSMSource);
@@ -380,10 +393,24 @@ static int guiGameGSMUpdater(int modified)
     return 0;
 }
 
+// UI-only sentinel for "this row follows the global". Appended LAST to gsmvmodeNames below, so it
+// sits one past the final real mode. It is NEVER written to disk -- picking it REMOVES $GSMVMode --
+// so unlike the real modes its index does not have to stay stable across builds.
+// Index of the last REAL mode in gsmvmodeNames[] / predef_vmode[]: 28 for the 29 base modes, 29 when
+// the 1080p row is compiled in (which is every shipped build -- Makefile GSM1080P ?= 1).
+#ifdef GSM_1080P
+#define GSM_VMODE_LAST_REAL_IDX 29
+#else
+#define GSM_VMODE_LAST_REAL_IDX 28
+#endif
+#define GSM_VMODE_DEFAULT_IDX (GSM_VMODE_LAST_REAL_IDX + 1)
+
 void guiGameShowGSConfig(void)
 {
     // configure the enumerations
-    const char *settingsSource[] = {_l(_STR_GLOBAL_SETTINGS), _l(_STR_PERGAME_SETTINGS), NULL};
+    // Third source: per-KEY inheritance. Only offered here (the GSM page); the cheats/VMC/etc
+    // pages keep the original two-way choice.
+    const char *settingsSource[] = {_l(_STR_GLOBAL_SETTINGS), _l(_STR_PERGAME_SETTINGS), _l(_STR_PERGAME_MIXED_SETTINGS), NULL};
     // clang-format off
     const char *gsmvmodeNames[] = {
         "NTSC",
@@ -422,6 +449,9 @@ void guiGameShowGSConfig(void)
 #ifdef GSM_1080P
         "HDTV 1080p @60Hz (EXPERIMENTAL)",
 #endif
+        // "Default" = follow the global $GSMVMode. LAST, after every real mode, and never stored
+        // (the save leg removes the key instead), so it cannot disturb the raw indices above.
+        _l(_STR_DEFAULT),
         NULL};
     // clang-format on
 
@@ -1205,7 +1235,21 @@ int guiGameSaveConfig(config_set_t *configSet, item_list_t *support)
     }
 #endif
 
-    if (gGSMSource == SETTINGS_PERGAME) {
+    if (gGSMSource == SETTINGS_PERGAME_MIXED) {
+        // Per-key: write EVERY value explicitly, INCLUDING 0, so an explicit per-game choice
+        // always beats the global. The legacy arm below strips zeros, which is exactly why its
+        // absent keys are ambiguous and cannot support inheritance. Only the video mode has a
+        // Default state today; picking it REMOVES the key, and gsm.c then falls back to global.
+        result = configSetInt(configSet, CONFIG_ITEM_GSMSOURCE, gGSMSource);
+        result = configSetInt(configSet, CONFIG_ITEM_ENABLEGSM, EnableGSM);
+        if (GSMVMode == GSM_VMODE_DEFAULT_IDX)
+            configRemoveKey(configSet, CONFIG_ITEM_GSMVMODE);
+        else
+            result = configSetInt(configSet, CONFIG_ITEM_GSMVMODE, GSMVMode);
+        result = configSetInt(configSet, CONFIG_ITEM_GSMXOFFSET, GSMXOffset);
+        result = configSetInt(configSet, CONFIG_ITEM_GSMYOFFSET, GSMYOffset);
+        result = configSetInt(configSet, CONFIG_ITEM_GSMFIELDFIX, GSMFIELDFix);
+    } else if (gGSMSource == SETTINGS_PERGAME) {
         result = configSetInt(configSet, CONFIG_ITEM_GSMSOURCE, gGSMSource);
         if (EnableGSM != 0)
             result = configSetInt(configSet, CONFIG_ITEM_ENABLEGSM, EnableGSM);
@@ -1460,7 +1504,18 @@ static void guiGameLoadGSMConfig(config_set_t *configSet, config_set_t *configGa
 
     // override global with per-game settings if available and selected.
     configGetInt(configSet, CONFIG_ITEM_GSMSOURCE, &gGSMSource);
-    if (gGSMSource == SETTINGS_PERGAME) {
+    if (gGSMSource == SETTINGS_PERGAME_MIXED) {
+        // Per-key: the globals were already loaded above, so only OVERRIDE where the game has its
+        // own key. An absent $GSMVMode is a deliberate Default (the save leg removed it), so show
+        // the Default row rather than the inherited value -- otherwise the user could not tell
+        // "following global" from "pinned to the same mode".
+        configGetInt(configSet, CONFIG_ITEM_ENABLEGSM, &EnableGSM);
+        if (!configGetInt(configSet, CONFIG_ITEM_GSMVMODE, &GSMVMode))
+            GSMVMode = GSM_VMODE_DEFAULT_IDX;
+        configGetInt(configSet, CONFIG_ITEM_GSMXOFFSET, &GSMXOffset);
+        configGetInt(configSet, CONFIG_ITEM_GSMYOFFSET, &GSMYOffset);
+        configGetInt(configSet, CONFIG_ITEM_GSMFIELDFIX, &GSMFIELDFix);
+    } else if (gGSMSource == SETTINGS_PERGAME) {
         if (!configGetInt(configSet, CONFIG_ITEM_ENABLEGSM, &EnableGSM))
             EnableGSM = 0;
         if (!configGetInt(configSet, CONFIG_ITEM_GSMVMODE, &GSMVMode))
