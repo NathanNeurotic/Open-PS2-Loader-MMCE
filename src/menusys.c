@@ -7,6 +7,7 @@
 #include "include/opl.h"
 #include "include/diag.h"
 #include "include/menusys.h"
+#include "include/supportbase.h" // sbSetConfigStatSize -- defer the #Size stat off the scroll path
 #include "include/iosupport.h"
 #include "include/renderman.h"
 #include "include/fntsys.h"
@@ -184,6 +185,59 @@ static void _menuLoadConfig()
     }
     actionStatus = 0;
     SignalSema(menuSemaId);
+}
+
+// Opening the info screen needs #Size, which the scroll-time config load deliberately skips
+// (sbConfigStatSize off -> no slow per-game stat while browsing). Rebuild the current item's
+// config once with the size resolved and swap it in, but only if the selection is unchanged --
+// the user may have scrolled away before this IO request ran. game->sizeMB is cached afterwards,
+// so subsequent scrolls/info views show the size with no further stat.
+static void _menuResolveInfoSize()
+{
+    item_list_t *list = NULL;
+    config_set_t *loadedConfig = NULL;
+    int configId = -1;
+
+    WaitSema(menuSemaId);
+    if (selected_item != NULL && selected_item->item != NULL && selected_item->item->current != NULL && itemConfigId >= 0 && itemConfigId == selected_item->item->current->item.id) {
+        list = selected_item->item->userdata;
+        configId = itemConfigId;
+    }
+    SignalSema(menuSemaId);
+
+    if (list == NULL || configId < 0)
+        return;
+
+    // itemGetConfig runs OUTSIDE the semaphore on purpose: it is the slow call (a CFG read plus the
+    // ISO stat this whole mechanism exists to defer), and holding menuSemaId across it would block
+    // the GUI thread for exactly as long as the stat we are trying to keep off the scroll path.
+    sbSetConfigStatSize(1);
+    loadedConfig = list->itemGetConfig(list, configId);
+    sbSetConfigStatSize(0);
+
+    if (loadedConfig == NULL)
+        return;
+
+    // Re-check the selection under the sema: if the user scrolled away while the stat ran, the
+    // freshly loaded config belongs to a row that is no longer current -- drop it rather than
+    // publish someone else's #Size.
+    WaitSema(menuSemaId);
+    if (selected_item != NULL && selected_item->item != NULL && selected_item->item->current != NULL && itemConfigId == configId && itemConfigId == selected_item->item->current->item.id) {
+        if (itemConfig != NULL)
+            configFree(itemConfig);
+        itemConfig = loadedConfig;
+        loadedConfig = NULL;
+    }
+    SignalSema(menuSemaId);
+
+    if (loadedConfig != NULL)
+        configFree(loadedConfig);
+}
+
+// Queued when the info screen opens: resolve #Size for the current item without blocking the UI.
+void menuRequestInfoSize(void)
+{
+    ioPutRequest(IO_CUSTOM_SIMPLEACTION, &_menuResolveInfoSize);
 }
 
 static void _menuSaveConfig()
