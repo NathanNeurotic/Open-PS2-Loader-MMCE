@@ -1,0 +1,229 @@
+translations:
+  AUTOSORT: ゲームやアルファベット順に並びゆん
+  RUMBLE: メニューぬ中ぬコントローラー振動
+  HINT_RUMBLE: カーソル動かすねー、決定しやい戻いやいすしぇー短さん振動すん —— アナログモードぬDualShockぬ要ゆん
+  FOLDER_NAV: ゲームリストぬ中ぬフォルダー見ゆん
+  HINT_FOLDER_NAV: CD/DVDぬサブフォルダー、見ゆる項目んかい見しゆん；選むねー開ち、キャンセルねー戻ゆん
+  SETTINGS_NO_HOME: メモリーカードぇー見当たらん —— 設定ぇー保存ならん。OPLぇーネットワーク機器から起動さっとーくとぅ、設定ぇーローカルカードんかいあらんとーならん。
+  ERROR_SAVING_SETTINGS_TO: "%sんかい設定ぇー書ちきらんたん (エラー %d)"
+  GENERAL_SETTINGS: 一般設定
+  DEVICE_SETTINGS: 機器設定
+  LAUNCH_PS2_DISC: PS2 ディスク起動
+  DISC_LAUNCH_ERR: ドライブにPS2ディスクがあらんむん。
+  DEFAULT: デフォルト
+  HINT_MODE7: Neutrino 専用 -- IOP バッファーをあふれゆるゲームを修正(-gc=7)
+  MODE7: Mode 7
+  ENABLEIMAGE: PS2RD チートイメージ
+  HINT_ENABLEIMAGE: ゲームにPS2RD .img パッチを当てゅん。
+  UDPBD_GAMES: UDPBD Games
+  MMCE: MMCE
+  MMCE_GAMES: MMCE ゲーム
+  MMCEMODE: MMCE 起動モード
+  MMCE_PREFIX: MMCE プレフィックスパス
+  MMCE_SLOT: MMCE スロット
+  MMCEIGR_SLOT: IGR ブートカードスロット
+  HINT_MMCEIGR_SLOT: IGR 時、選択したスロットにブートカードコマンドを送ゆん
+  MMCE_ADVANCED: 詳細
+  MMCE_SETTINGS: MMCE 設定
+  MMCE_SEMA: ロックセマエンキュー方式
+  HINT_MMCE_SEMA: THFIFO は互換性向上に役立つが、パフォーマンスが落ちゅる場合あん
+  MMCE_WAIT_CYCLES: /ACK ロー後の待機サイクル
+  HINT_MMCE_WAIT_CYCLES: 値を小さくすればパフォーマンス向上するが、不安定になゆる場合あん
+  MMCE_USE_ALARMS: タイムアウトアラームを使用
+  HINT_MMCE_USE_ALARMS: OFF にすればパフォーマンス向上するが、MMCE タイムアウト時にフリーズすることあん
+  CORE_LOADER: Loader Core
+  NEUTRINO_BAD_FORMAT: Neutrino はこのファイル形式に対応しとらん、<OPL> コアで起動すん
+  NEUTRINO_NOT_FOUND: Neutrino ELF が見つからん、<OPL> コアで起動すん
+  UDPBD_NEEDS_STATIC_IP: UDPBD には静的PS2 IPが必要やん。ネットワーク設定で指定しみそーれ（DHCP 有効中）。
+  NEUTRINO_SETTING_NA: この設定は Neutrino コアでは使わんむん。
+  POPSTARTER_NOT_FOUND: POPSTARTER.ELF が見つからん
+  POPSTARTER_SMB_MISSING: POPSTARTER の SMB 要件が足らん
+  WRITE_POPSTARTER_NET: POPSTARTER ネットワーク設定を書き込む
+  HINT_WRITE_POPSTARTER_NET: IP と SMB 共有の値をメモリーカード上の POPSTARTER 用 IPCONFIG.DAT / SMBCONFIG.DAT にも保存すん（VCD-over-SMB 向け）。
+  POPSTARTER_NET_ERR: POPSTARTER ネットワーク設定をメモリーカードに書き込めんかた。
+  VCD: VCD
+  VCD_ON: VCD ゲームを表示中
+  VCD_OFF: ディスクゲームを表示中
+  NEUTRINO_ARGS: Neutrino 起動引数
+  HINT_NEUTRINO_ARGS: 'Neutrino 追加フラグをスペース区切りで入力（例: -mt=dvd）。グローバルは全ゲームに適用、ゲーム別は追加分。フラグの前に $ を付けると削除せずに無効化できゅん。'
+  NEUTRINO_VIDEO: Neutrino ビデオ
+  HINT_NEUTRINO_VIDEO: Neutrino の GS 出力ビデオモードを強制指定(-gsm)。Off でゲームのデフォルトを維持すん。
+  NEUTRINO_PATH: Neutrino ELF パス
+  HINT_NEUTRINO_PATH: 'neutrino.elf のフルパス（例: mc0:NEUTRINO/neutrino.elf）。空白の場合は mc0/mc1 を自動検索すん。'
+  POPSTARTER_PATH: POPSTARTER.ELF パス
+  HINT_POPSTARTER_PATH: カスタム POPSTARTER.ELF パス。空白・未検出の場合はデバイスの POPS フォルダーに自動フォールバックすん。キーボードは31文字まで、長いパスは settings_riptopl.cfg で設定可。
+  BDMA_SOURCE: BDMA ソース
+  HINT_BDMA_SOURCE: BDMAssault ドライバーファイル（usbd.irx.* / usbhdfsd.irx.*）を持つデバイス。
+  BDMA_MODE: BDMA モード
+  HINT_BDMA_MODE: POPSTARTER が読み込む exFAT ブロックデバイスドライバー。変更するとモジュールをカードにコピーすん。FAT32 = 組み込みドライバー（コピーなし）。
+  BDMA_SRC_USB: USB
+  BDMA_SRC_MX4SIO: MX4SIO
+  BDMA_SRC_MMCE: MMCE
+  BDMA_SRC_HDD: 内蔵HDD
+  BDMA_MODE_FAT32: USB (FAT32)
+  BDMA_MODE_USBEXFAT: USB (exFAT)
+  BDMA_MODE_MX4SIO: MX4SIO (exFAT)
+  BDMA_MODE_MMCE: MMCE (exFAT)
+  BDMA_MODE_ATA: HDD (exFAT)
+  BDMA_ERR_SRC: ソースデバイスに BDMA モジュールファイルが見つからん。
+  BDMA_ERR_SPACE: BDMA モジュールを保存するメモリーカードの空き容量が足らん。
+  BDMA_ERR_IO: BDMA モジュールのメモリーカードへの書き込みにエラーが発生したん。
+  COVERFLOW_SETTINGS: Coverflow 設定
+  COVERFLOW_COUNT: カバー表示数
+  COVERFLOW_SCALE: 中央スケール
+  COVERFLOW_ANIM: アニメーション速度
+  COVERFLOW_DIM: サイドカバーを暗くすん
+  NONE: なし
+  SMALL: 小
+  LARGE: 大
+  NORMAL: 標準
+  FAV: お気に入り
+  FAVMODE: お気に入り起動モード
+  FAV_HINT: お気に入り
+  FAV_MSG: '%s はお気に入りメニューから起動できやびらん。'
+  FAV_PERSISTENCE_MSG: '%s はお気に入りに登録中、この操作はできやびらん。'
+  NEUTRINO_DEVICE: Neutrino 機器
+  HINT_NEUTRINO_DEVICE: neutrino.elf を持つ機器（NEUTRINO/ または neutrino/ フォルダー内）。自動検索は mc0 から mc1 の順に行ゅん。
+  NARGS_QB: クイック起動 (-qb)
+  NARGS_CWD: 作業ディレクトリ (-cwd)
+  NARGS_CFG: 設定ファイル (-cfg)
+  NARGS_ELF: 起動 ELF (-elf)
+  NARGS_ATA0: ATA0 イメージ (-ata0)
+  NARGS_ATA0ID: ATA0 ID (-ata0id)
+  NARGS_ATA1: ATA1 イメージ (-ata1)
+  NARGS_EXTRA: 追加引数
+  NARGS_AUTO_NOTE: 'Auto: -bsd -dvd -gc -gsm -mc -dbc -logo'
+  ENABLE_ART_TAR: カバーアートの.tarアーカイブ
+  DISABLE_ALL: すべて無効化
+  BOOT_LOADING_CONFIG: 設定を読み込み中...
+  BOOT_SCANNING_BDM: USB / カード / ネットワークをスキャン中...
+  BOOT_SCANNING_NET: ネットワークを開始中...
+  BOOT_SCANNING_HDD: HDD をスキャン中...
+  BOOT_READY: 準備完了。
+  UDPFS_GAMES: "UDPFSぬゲーム"
+  UDPFSBD_GAMES: "UDPFSBDぬゲーム"
+  NET_PROTOCOL: "ネットワークプロトコル"
+  NET_NEEDS_NEUTRINO: "ネットワーク（UDP）ぬゲームやNeutrino coreっしどぅブートないん。neutrino.elfぬあいねー、フォーマットん対応しちょーるかくとぅ確認さびら。"
+  VCD_NOT_ON_NET: "PS1（.VCD）ぬゲームやネットワーク機器っし起動でぇきらん。"
+  MX4SIO_PADEMU_WARN: "MX4SIOとぅパッドエミュレーションやSIO2バスいっしょーに使いる、ゲームぬブートしんでぇる事ぬあん。"
+  HINT_OSD_SETTINGS_LNG: "カスタムぬ言語設定を強制すん"
+  OSD_SETTINGS_TVASPECT: "画面ぬ大ささ"
+  FULL_SCREEN: "全画面"
+  OSD_SETTINGS_VMODE: "ビデオモード"
+  SYSTEM_DEFAULT: "システムぬ既定"
+  HIGH: "高さん"
+  LOW: "低さん"
+  XSENSITIVITY: "アナログX軸ぬ感度"
+  YSENSITIVITY: "アナログY軸ぬ感度"
+  FILE_COUNT: "見ぃきたファイル：%i"
+  CHEAT_SELECTION: "チートぬ選択"
+  HDD_HINT: "HDDやひとぅっちゃーどぅ許さりーる、有効にないねーAPAかGPTぬロックさりーん。"
+  MMCE_GAMEID_NEUTRINO_SKIP: "MMCE GameIDや適用さらん -- neutrino.elfやくぬカードんかいあん（替いーねーNeutrinoぬアンロードさりーん）。"
+  POPSTARTER_DEVICE: "POPSTARTER.ELF機器"
+  HINT_POPSTARTER_DEVICE: "PS1 VCDぬ起動んかいPOPS/POPSTARTER.ELF収みてぃある機器。既定＝ブート機器（cwd）ぬ後、VCD自身ぬ機器。カスタムやフリーテキストぬパス表示すん。"
+  BDMA_APPLY: "起動時んかいVCD BDMAを適用"
+  HINT_BDMA_APPLY: "オン：ブート前んかい起動さるVCDんかい合ーるexFATドライバーをメモリーカードんかい自動装備すん（推奨）。オフ：下ぬBDMA Source/Modeぬ選択っし自分し管理すん。"
+  NETBOOT_RESTART: "ネットワークブートプロトコルぬ変更を適用すんちOPLを再起動さびら。"
+  UDPFS_MODE: "UDPFS アクセス"
+  "MENU": "メニュー"
+  "APPS": "アプリ"
+  "DEBUG": "デバッグ色"
+  "COVERART": "カバー絵"
+  "IP_ADDRESS_TYPE_DHCP": "DHCP"
+  "PORT": "Port"
+  "ADDR_TYPE_IP": "IP"
+  "ADDR_TYPE_NETBIOS": "NetBIOS"
+  "ENABLE_WRITE": "書ちくみ動作"
+  "MODE1": "Mode 1"
+  "MODE2": "Mode 2"
+  "MODE3": "Mode 3"
+  "MODE4": "Mode 4"
+  "MODE5": "Mode 5"
+  "MODE6": "Mode 6"
+  "ENABLEGSM": "GSM 選択"
+  "OVERSCAN": "オーバースキャン"
+  "ENABLECHEAT": "PS2RD チートエンジン"
+  "PADEMU_ENABLE": "パッドエミュレータ"
+  "DS34USB_MODE": "DualShock3/4 USB"
+  "PADEMU_PORT": "エミュレーション"
+  "PADEMU_VIB": "振動"
+  "PADEMU_WORKAROUND": "にせDS3 対処"
+  "SFX": "音効果"
+  "BOOT_SND": "起動音"
+  "ENABLE_NOTIFICATIONS": "通知"
+  "OPTIONS": "オプション"
+  "GLOBAL_SETTINGS": "ぜんたい"
+  "INFO_GENRE": "ジャンル"
+  "INFO_RELEASE": "発売"
+  "INFO_DESCRIPTION": "説明"
+  "BLOCKDEVICE_SETTINGS": "ブロックデバイス"
+  "CONTROLLER_SETTINGS": "コントローラ設定"
+  "HINT_BDM_START": "Block Device Manager ぬオン/オフ。"
+  "HINT_BLOCK_DEVICES": "ブロックデバイス（例：USB）ぬオン/オフ。"
+  "USB_GAMES": "USB ゲーム"
+  "ILINK_GAMES": "iLink ゲーム"
+  "MX4SIO_GAMES": "MX4SIO ゲーム"
+  "PADMACROCONFIG": "PADMACRO ぬ設定"
+  "PADMACRO_SETTINGS": "パッドマクロ設定"
+  "PADMACRO_ENABLE": "パッドマクロ"
+  "PADMACRO_SLOWDOWN": "アナログ減速："
+  "HINT_PADMACRO_SLOWDOWN_AXIS": "ボタン押ちゃる時アナログスティックぬ範囲小さくすん"
+  "LEFT_ANALOG": "左スティック"
+  "RIGHT_ANALOG": "右スティック"
+  "PADMACRO_INVERT_AXIS": "アナログ軸反転："
+  "HINT_PADMACRO_INVERT_AXIS": "アナログスティックぬ軸反転すん"
+  "TURBO_SPEED": "ターボボタン速さ"
+  "HINT_TURBO_SPEED": "ターボ有効時ぬボタン押す速さ"
+  "ACT_WHILE_PRESSED": "ボタン押しゃーる間"
+  "ACT_TOGGLED": "ボタンし切替"
+  "LANGUAGE_JAPANESE": "日本語"
+  "LANGUAGE_ENGLISH": "英語"
+  "LANGUAGE_FRENCH": "フランス語"
+  "LANGUAGE_SPANISH": "スペイン語"
+  "LANGUAGE_GERMAN": "ドイツ語"
+  "LANGUAGE_ITALIAN": "イタリア語"
+  "LANGUAGE_DUTCH": "オランダ語"
+  "LANGUAGE_PORTUGUESE": "ポルトガル語"
+  "LANGUAGE_RUSSIAN": "ロシア語"
+  "LANGUAGE_KOREAN": "韓国語"
+  "LANGUAGE_TRAD_CHINESE": "繁体字中国語"
+  "LANGUAGE_SIMPL_CHINESE": "簡体字中国語"
+  "OSD_SETTINGS": "OSD 設定"
+  "OSD_SETTINGS_LNG": "OSD 言葉"
+  "ENABLE_LNG": "言葉替ゆん"
+  "BGM": "BGM"
+  "BGM_VOLUME": "BGM 音量"
+  "DEF_BGM_PATH": "標準テーマ音楽"
+  "DEF_BGM_PATH_HINT": "内蔵テーマぬ音楽ストリームぬパス設定すん。"
+  "BOOT_SCANNING_MC": "メモリーカードスキャン中…"
+  "BOOT_LOADING_DRIVERS": "ストレージドライバ読込中…"
+  "BOOT_LOADING_USB": "USB ストレージドライバ読込中…"
+  "BOOT_ARMING_MMCE": "MMCE ゲームID 準備中…"
+  "BOOT_LOADING_SOUNDS": "テーマ音読込中…"
+  "BOOT_BUILDING_MENU": "メニュー作成中…"
+  "NET_UDPFS_TAB_HINT": "UDPFSがオン -- 新しいUDPFSタブ開きてぃ、Confirm押ちゃーい繋じゅん。PCぬ側ー udpfsd -fsroot <games folder> 走らしゅん。"
+  "NET_UDPBD_TAB_HINT": "ネットワークブロックデバイスがオン -- PCサーバーが返事すしぇータブぬ出ぃてぃちゅん(UDPFS Imageーudpfsd -bdpath、UDPBDーudpbd-server)。"
+  "NEUTRINO_VMC_MISSING": "ゲームぐとぅぬVMCファイルぬ見ぃきらん -- くれーねーらんまま起動すん(ゲームー、まくとぅぬカード使ゆん)。"
+  "NEUTRINO_DEV_UNSUPPORTED": "Neutrino やくぬデバイスから起動でぃきらん -- 起動中止。"
+  "NEUTRINO_TOML_SYNC_FAILED": "Neutrinoぬネットワーク設定(bsd toml)ねーらん、書ちきーならん -- 起動ー止みたん。neutrinoフォルダー確かみーり。"
+  "NEUTRINO_TOO_FRAGMENTED": "Neutrinoんかいー分かりーぎさん(%dぬフラグメント、限界%d VMCsくみてぃ) -- 代わいにOPLコア試ちょーん。"
+  "NEUTRINO_TOO_FRAGMENTED_NET": "Neutrinoんかいー分かりーぎさん(%dぬフラグメント、限界%d VMCsくみてぃ) -- PCさーにデフラグさーい。起動ー止みたん。"
+  "NEUTRINO_GSM_COMP": "Neutrino GSM 互換性"
+  "HINT_NEUTRINO_GSM_COMP": "強制ぬNeutrino Videoモードんかいてぃ揺りーん、破りーるゲームぬためぬフィールドフリップぬ直し。Neutrino Videoモードぬ設定ぬ要いん。"
+  "NARGS_DBC": "デバッグ色 (-dbc)"
+  "NARGS_LOGO": "PS2 ロゴ (-logo)"
+  "VMC_SLOT1_DISABLE": "VMC 1 無効（カード残す）"
+  "VMC_SLOT2_DISABLE": "VMC 2 無効（カード残す）"
+  "HINT_VMC_SLOT_DISABLE": "くぬスロットぬカードー設定さんまま、くぬスロットぬVMCねーらんさーに起動すん。Neutrinoぬ起動びけーん。ゲームー、くぬスロットぬまくとぅぬカード使ゆん。"
+  "NEUTRINO_BSDFS": "Neutrino ファイルシステム"
+  "HINT_NEUTRINO_BSDFS": "Neutrinoぬブロックデバイスファイルシステム(-bsdfs)ぬ強制。Auto=デバイスぐとぅぬデフォルト。hdl/bdーエキスパートぬオプションやん。オートぬパスぬ形ぬ合わんねー、起動ぬargsんかい合うる-dvd=とぅ一緒に使ーい。"
+  "PLASCOLOR": "プラズマ混色"
+  "VCD_HIDE_GAMEID": "PS1 ゲームID 隠す（VCD リスト）"
+  "HINT_VCD_HIDE_GAMEID": "見た目びけーん -- PS1/VCDぬリストぬ名前から頭ぬゲームID(例:SLUS_005.51.)隠しゅん。IDねーらん名前ーそぅままぬ見しゅん。起動、カバーアート、favouritesー変わらん。"
+  "VCD_FIRST_DISC": "最初ぬディスクだき（複数ディスクPS1）"
+  "HINT_VCD_FIRST_DISC": "デバイスリストゥんかい、マルチディスクぬPS1ゲームぬディスク1 びけーん見しゅん(POPSLoaderぬやーい)。(Disc 2)、(CD 2)ぬぐとぅる名前ぬファイルー隠しゅん。ディスクー全部カードんかいぬくてぃ、ゲームぬ中さーに取ぃ替ぃーならん。Favouritesーフィルターさらん。"
+  "GAMES_DEVICE": "ゲームぬデバイス"
+  "DEFAULT_CORE": "標準ローダーコア"
+  "HINT_DEFAULT_CORE": "ゲームぐとぅぬLoader CoreぬDefaultんかいなとーるゲームぬグローバルなデフォルトコア。<OPL>ーネイティブぬコアやん。Neutrinoー外ぬneutrino.elfちなじゅん。ゲームぐとぅぬ選択ー、いちんくれー上書きすん。"
+  "VCD_SETTINGS": "VCD 設定"
+  "FINANCIAL_SUPPORT": "資金支援"

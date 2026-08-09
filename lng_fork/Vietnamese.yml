@@ -1,0 +1,229 @@
+translations:
+  AUTOSORT: Sắp xếp trò chơi theo bảng chữ cái
+  RUMBLE: Rung tay cầm trong menu
+  HINT_RUMBLE: Rung ngắn khi di chuyển con trỏ, xác nhận hoặc quay lại -- cần DualShock ở chế độ analog
+  FOLDER_NAV: Duyệt thư mục trong danh sách trò chơi
+  HINT_FOLDER_NAV: Hiển thị thư mục con của CD/DVD dưới dạng mục duyệt được; chọn để mở, hủy để quay lại
+  SETTINGS_NO_HOME: Không tìm thấy thẻ nhớ -- không thể lưu cài đặt. OPL đã khởi động từ thiết bị mạng, cài đặt phải nằm trên thẻ nhớ cục bộ.
+  ERROR_SAVING_SETTINGS_TO: Không thể ghi cài đặt vào %s (lỗi %d)
+  GENERAL_SETTINGS: Cài đặt chung
+  DEVICE_SETTINGS: Cài đặt thiết bị
+  LAUNCH_PS2_DISC: Khởi động đĩa PS2
+  DISC_LAUNCH_ERR: Không có đĩa PS2 trong ổ đĩa.
+  DEFAULT: Mặc định
+  HINT_MODE7: Chỉ dành cho Neutrino -- sửa lỗi game tràn bộ nhớ IOP (-gc=7)
+  MODE7: Mode 7
+  ENABLEIMAGE: Hình ảnh cheat PS2RD
+  HINT_ENABLEIMAGE: Áp dụng bản vá PS2RD .img dựng sẵn cho game của bạn.
+  UDPBD_GAMES: UDPBD Games
+  MMCE: MMCE
+  MMCE_GAMES: MMCE Games
+  MMCEMODE: Chế độ khởi động MMCE
+  MMCE_PREFIX: Đường dẫn tiền tố MMCE
+  MMCE_SLOT: Khe cắm MMCE
+  MMCEIGR_SLOT: Khe cắm bootcard IGR
+  HINT_MMCEIGR_SLOT: Lệnh chuyển sang bootcard sẽ được gửi đến khe đã chọn khi IGR
+  MMCE_ADVANCED: Nâng cao
+  MMCE_SETTINGS: Cài đặt MMCE
+  MMCE_SEMA: Phương thức xếp hàng Lock Sema
+  HINT_MMCE_SEMA: THFIFO có thể cải thiện tương thích nhưng giảm hiệu năng
+  MMCE_WAIT_CYCLES: Chu kỳ chờ sau /ACK thấp
+  HINT_MMCE_WAIT_CYCLES: Giá trị thấp hơn có thể cải thiện hiệu năng nhưng gây mất ổn định
+  MMCE_USE_ALARMS: Dùng cảnh báo hết giờ
+  HINT_MMCE_USE_ALARMS: TẮT có thể cải thiện hiệu năng nhưng khi MMCE hết giờ có thể bị đóng băng
+  CORE_LOADER: Loader Core
+  NEUTRINO_BAD_FORMAT: Neutrino không hỗ trợ định dạng này, khởi động bằng lõi <OPL>
+  NEUTRINO_NOT_FOUND: Không tìm thấy Neutrino ELF, khởi động bằng lõi <OPL>
+  UDPBD_NEEDS_STATIC_IP: UDPBD cần IP tĩnh cho PS2. Đặt trong Cấu hình mạng (DHCP đang bật).
+  NEUTRINO_SETTING_NA: Cài đặt này không dùng với lõi Neutrino.
+  POPSTARTER_NOT_FOUND: Thiếu POPSTARTER.ELF
+  POPSTARTER_SMB_MISSING: Thiếu yêu cầu SMB cho POPSTARTER
+  WRITE_POPSTARTER_NET: Ghi cấu hình mạng POPSTARTER
+  HINT_WRITE_POPSTARTER_NET: Cũng lưu các giá trị IP + SMB vào IPCONFIG.DAT / SMBCONFIG.DAT của POPSTARTER trên thẻ nhớ (dành cho VCD qua SMB).
+  POPSTARTER_NET_ERR: Không thể ghi cấu hình mạng POPSTARTER vào thẻ nhớ.
+  VCD: VCD
+  VCD_ON: Đang hiển thị game VCD
+  VCD_OFF: Đang hiển thị game đĩa
+  NEUTRINO_ARGS: Tham số khởi động Neutrino
+  HINT_NEUTRINO_ARGS: Cờ Neutrino bổ sung, cách nhau bằng dấu cách (vd. -mt=dvd). Toàn cục áp dụng cho tất cả game; riêng game cộng thêm. Thêm $ trước cờ để tắt mà không xóa.
+  NEUTRINO_VIDEO: Video Neutrino
+  HINT_NEUTRINO_VIDEO: Buộc chế độ video GS của Neutrino (-gsm). Tắt giữ mặc định của game.
+  NEUTRINO_PATH: Đường dẫn Neutrino ELF
+  HINT_NEUTRINO_PATH: Đường dẫn đầy đủ tới neutrino.elf (vd. mc0:NEUTRINO/neutrino.elf). Để trống = tự tìm trên mc0/mc1.
+  POPSTARTER_PATH: Đường dẫn POPSTARTER.ELF
+  HINT_POPSTARTER_PATH: Đường dẫn tùy chỉnh POPSTARTER.ELF; tự dùng thư mục POPS trên thiết bị nếu để trống/thiếu. Bàn phím giới hạn 31 ký tự; đường dài hơn qua settings_riptopl.cfg.
+  BDMA_SOURCE: Nguồn BDMA
+  HINT_BDMA_SOURCE: Thiết bị có thư mục POPS chứa các tệp driver BDMAssault (usbd.irx.* / usbhdfsd.irx.*).
+  BDMA_MODE: Chế độ BDMA
+  HINT_BDMA_MODE: Driver thiết bị khối exFAT mà POPSTARTER tải. Thay đổi sẽ sao chép module vào thẻ; FAT32 = không cần (driver tích hợp sẵn).
+  BDMA_SRC_USB: USB
+  BDMA_SRC_MX4SIO: MX4SIO
+  BDMA_SRC_MMCE: MMCE
+  BDMA_SRC_HDD: Ổ cứng trong
+  BDMA_MODE_FAT32: USB (FAT32)
+  BDMA_MODE_USBEXFAT: USB (exFAT)
+  BDMA_MODE_MX4SIO: MX4SIO (exFAT)
+  BDMA_MODE_MMCE: MMCE (exFAT)
+  BDMA_MODE_ATA: HDD (exFAT)
+  BDMA_ERR_SRC: Không tìm thấy tệp module BDMA trên thiết bị nguồn.
+  BDMA_ERR_SPACE: Thẻ nhớ không đủ dung lượng cho module BDMA.
+  BDMA_ERR_IO: Lỗi khi ghi module BDMA vào thẻ nhớ.
+  COVERFLOW_SETTINGS: Cài đặt Coverflow
+  COVERFLOW_COUNT: Số lượng bìa
+  COVERFLOW_SCALE: Tỉ lệ trung tâm
+  COVERFLOW_ANIM: Tốc độ hoạt ảnh
+  COVERFLOW_DIM: Làm tối bìa bên
+  NONE: Không có
+  SMALL: Nhỏ
+  LARGE: Lớn
+  NORMAL: Bình thường
+  FAV: Yêu thích
+  FAVMODE: Chế độ khởi động Yêu thích
+  FAV_HINT: Yêu thích
+  FAV_MSG: '%s không được phép trong Menu Yêu thích.'
+  FAV_PERSISTENCE_MSG: '%s không được phép khi mục đang được đánh dấu yêu thích.'
+  NEUTRINO_DEVICE: Thiết bị Neutrino
+  HINT_NEUTRINO_DEVICE: Thiết bị chứa neutrino.elf (trong thư mục NEUTRINO/ hoặc neutrino/). Tự động quét mc0 rồi mc1.
+  NARGS_QB: Khởi động nhanh (-qb)
+  NARGS_CWD: Thư mục làm việc (-cwd)
+  NARGS_CFG: Cấu hình (-cfg)
+  NARGS_ELF: ELF khởi động (-elf)
+  NARGS_ATA0: Ảnh ATA0 (-ata0)
+  NARGS_ATA0ID: ID ATA0 (-ata0id)
+  NARGS_ATA1: Ảnh ATA1 (-ata1)
+  NARGS_EXTRA: Tham số bổ sung
+  NARGS_AUTO_NOTE: 'Tự động: -bsd -dvd -gc -gsm -mc -dbc -logo'
+  ENABLE_ART_TAR: Kho .tar ảnh bìa
+  DISABLE_ALL: Tắt tất cả
+  BOOT_LOADING_CONFIG: Đang tải cài đặt...
+  BOOT_SCANNING_BDM: Đang quét ổ USB / thẻ / mạng...
+  BOOT_SCANNING_NET: Đang khởi động mạng...
+  BOOT_SCANNING_HDD: Đang quét HDD...
+  BOOT_READY: Sẵn sàng.
+  UDPFS_GAMES: "Trò chơi UDPFS"
+  UDPFSBD_GAMES: "Trò chơi UDPFSBD"
+  NET_PROTOCOL: "Giao thức mạng"
+  NET_NEEDS_NEUTRINO: "Trò chơi mạng (UDP) chỉ có thể khởi động qua lõi Neutrino. Hãy kiểm tra neutrino.elf có tồn tại và định dạng được hỗ trợ."
+  VCD_NOT_ON_NET: "Trò chơi PS1 (.VCD) không thể khởi chạy qua thiết bị mạng."
+  MX4SIO_PADEMU_WARN: "MX4SIO và giả lập tay cầm dùng chung bus SIO2 nên trò chơi có thể không khởi động được."
+  HINT_OSD_SETTINGS_LNG: "Buộc dùng cấu hình ngôn ngữ tùy chỉnh"
+  OSD_SETTINGS_TVASPECT: "Kích thước màn hình"
+  FULL_SCREEN: "Toàn màn hình"
+  OSD_SETTINGS_VMODE: "Chế độ hình ảnh"
+  SYSTEM_DEFAULT: "Mặc định hệ thống"
+  HIGH: "Cao"
+  LOW: "Thấp"
+  XSENSITIVITY: "Độ nhạy trục X analog"
+  YSENSITIVITY: "Độ nhạy trục Y analog"
+  FILE_COUNT: "Tệp tìm thấy: %i"
+  CHEAT_SELECTION: "Chọn cheat"
+  HDD_HINT: "Chỉ cho phép một HDD, khi bật sẽ khóa APA hoặc GPT."
+  MMCE_GAMEID_NEUTRINO_SKIP: "Không áp dụng MMCE GameID -- neutrino.elf nằm trên thẻ này (chuyển đổi sẽ gỡ Neutrino)."
+  POPSTARTER_DEVICE: "Thiết bị POPSTARTER.ELF"
+  HINT_POPSTARTER_DEVICE: "Thiết bị chứa POPS/POPSTARTER.ELF để khởi chạy PS1 VCD. Mặc định = thiết bị khởi động (cwd) rồi đến thiết bị của chính VCD. Tùy chỉnh sẽ hiện ô nhập đường dẫn tự do."
+  BDMA_APPLY: "Áp dụng VCD BDMA khi khởi chạy"
+  HINT_BDMA_APPLY: "Bật: tự động nạp driver exFAT phù hợp của VCD được khởi chạy vào thẻ nhớ trước khi khởi động (khuyến nghị). Tắt: tự quản lý bằng bộ chọn Nguồn/Chế độ BDMA bên dưới."
+  NETBOOT_RESTART: "Khởi động lại OPL để áp dụng thay đổi giao thức khởi động mạng."
+  UDPFS_MODE: "Truy cập UDPFS"
+  "MENU": "Menu"
+  "APPS": "Ứng dụng"
+  "DEBUG": "Màu Gỡ lỗi"
+  "COVERART": "Ảnh bìa"
+  "IP_ADDRESS_TYPE_DHCP": "DHCP"
+  "PORT": "Port"
+  "ADDR_TYPE_IP": "IP"
+  "ADDR_TYPE_NETBIOS": "NetBIOS"
+  "ENABLE_WRITE": "Thao tác ghi"
+  "MODE1": "Chế độ 1"
+  "MODE2": "Chế độ 2"
+  "MODE3": "Chế độ 3"
+  "MODE4": "Chế độ 4"
+  "MODE5": "Chế độ 5"
+  "MODE6": "Chế độ 6"
+  "ENABLEGSM": "Bộ chọn GSM"
+  "OVERSCAN": "Overscan"
+  "ENABLECHEAT": "Bộ máy Cheat PS2RD"
+  "PADEMU_ENABLE": "Giả lập Tay cầm"
+  "DS34USB_MODE": "DualShock3/4 USB"
+  "PADEMU_PORT": "Giả lập"
+  "PADEMU_VIB": "Rung"
+  "PADEMU_WORKAROUND": "Cách khắc phục Giả DS3"
+  "SFX": "Hiệu ứng âm thanh"
+  "BOOT_SND": "Âm thanh khởi động"
+  "ENABLE_NOTIFICATIONS": "Thông báo"
+  "OPTIONS": "Tùy chọn"
+  "GLOBAL_SETTINGS": "Toàn cục"
+  "INFO_GENRE": "Thể loại"
+  "INFO_RELEASE": "Phát hành"
+  "INFO_DESCRIPTION": "Mô tả"
+  "BLOCKDEVICE_SETTINGS": "Thiết bị khối"
+  "CONTROLLER_SETTINGS": "Cài đặt Tay cầm"
+  "HINT_BDM_START": "Bật/tắt Trình quản lý Thiết bị khối (BDM)."
+  "HINT_BLOCK_DEVICES": "Bật/tắt Thiết bị khối (ví dụ: USB)."
+  "USB_GAMES": "Game USB"
+  "ILINK_GAMES": "Game iLink"
+  "MX4SIO_GAMES": "Game MX4SIO"
+  "PADMACROCONFIG": "Cấu hình PADMACRO"
+  "PADMACRO_SETTINGS": "Cài đặt Macro Tay cầm"
+  "PADMACRO_ENABLE": "Macro Tay cầm"
+  "PADMACRO_SLOWDOWN": "Giảm tốc analog:"
+  "HINT_PADMACRO_SLOWDOWN_AXIS": "Giảm phạm vi của cần analog khi nhấn nút"
+  "LEFT_ANALOG": "Cần trái"
+  "RIGHT_ANALOG": "Cần phải"
+  "PADMACRO_INVERT_AXIS": "Đảo trục analog:"
+  "HINT_PADMACRO_INVERT_AXIS": "Đảo ngược trục cần analog"
+  "TURBO_SPEED": "Tốc độ nút turbo"
+  "HINT_TURBO_SPEED": "Tốc độ nhấn nút khi turbo đang bật"
+  "ACT_WHILE_PRESSED": "Khi giữ nút"
+  "ACT_TOGGLED": "Bật/tắt bằng nút"
+  "LANGUAGE_JAPANESE": "TIẾNG NHẬT"
+  "LANGUAGE_ENGLISH": "TIẾNG ANH"
+  "LANGUAGE_FRENCH": "TIẾNG PHÁP"
+  "LANGUAGE_SPANISH": "TIẾNG TÂY BAN NHA"
+  "LANGUAGE_GERMAN": "TIẾNG ĐỨC"
+  "LANGUAGE_ITALIAN": "TIẾNG Ý"
+  "LANGUAGE_DUTCH": "TIẾNG HÀ LAN"
+  "LANGUAGE_PORTUGUESE": "TIẾNG BỒ ĐÀO NHA"
+  "LANGUAGE_RUSSIAN": "TIẾNG NGA"
+  "LANGUAGE_KOREAN": "TIẾNG HÀN"
+  "LANGUAGE_TRAD_CHINESE": "TIẾNG TRUNG PHỒN THỂ"
+  "LANGUAGE_SIMPL_CHINESE": "TIẾNG TRUNG GIẢN THỂ"
+  "OSD_SETTINGS": "Cài đặt OSD"
+  "OSD_SETTINGS_LNG": "Ngôn ngữ OSD"
+  "ENABLE_LNG": "Đổi ngôn ngữ"
+  "BGM": "Nhạc nền"
+  "BGM_VOLUME": "Âm lượng nhạc nền"
+  "DEF_BGM_PATH": "Nhạc chủ đề mặc định"
+  "DEF_BGM_PATH_HINT": "Đặt đường dẫn phát nhạc cho chủ đề nội bộ."
+  "BOOT_SCANNING_MC": "Đang quét thẻ nhớ..."
+  "BOOT_LOADING_DRIVERS": "Đang tải trình điều khiển lưu trữ..."
+  "BOOT_LOADING_USB": "Đang tải trình điều khiển lưu trữ USB..."
+  "BOOT_ARMING_MMCE": "Đang kích hoạt game-ID MMCE..."
+  "BOOT_LOADING_SOUNDS": "Đang tải âm thanh chủ đề..."
+  "BOOT_BUILDING_MENU": "Đang dựng menu..."
+  "NET_UDPFS_TAB_HINT": "UDPFS đang bật -- mở tab UDPFS mới và nhấn Confirm để kết nối. Phía PC chạy udpfsd -fsroot <games folder>."
+  "NET_UDPBD_TAB_HINT": "Thiết bị khối qua mạng đang bật -- tab của nó xuất hiện khi máy chủ PC phản hồi (udpfsd -bdpath cho UDPFS Image, udpbd-server cho UDPBD)."
+  "NEUTRINO_VMC_MISSING": "Không tìm thấy tệp VMC theo từng game -- đang khởi chạy mà không có nó (game dùng thẻ thật của nó)."
+  "NEUTRINO_DEV_UNSUPPORTED": "Neutrino không thể khởi chạy từ thiết bị này -- đã hủy khởi chạy."
+  "NEUTRINO_TOML_SYNC_FAILED": "Cấu hình mạng của Neutrino (bsd toml) bị thiếu hoặc không ghi được -- đã hủy khởi chạy, hãy kiểm tra thư mục neutrino."
+  "NEUTRINO_TOO_FRAGMENTED": "Quá phân mảnh đối với Neutrino (%d mảnh, giới hạn %d bao gồm cả VMC) -- đang thử dùng lõi OPL thay thế."
+  "NEUTRINO_TOO_FRAGMENTED_NET": "Quá phân mảnh đối với Neutrino (%d mảnh, giới hạn %d bao gồm cả VMC) -- hãy chống phân mảnh trên PC; đã hủy khởi chạy."
+  "NEUTRINO_GSM_COMP": "Tương thích GSM Neutrino"
+  "HINT_NEUTRINO_GSM_COMP": "Bản sửa lỗi đảo trường (field-flipping) cho các game bị rung hoặc xé hình dưới chế độ Neutrino Video được ép buộc. Cần đặt một chế độ Neutrino Video."
+  "NARGS_DBC": "Màu Gỡ lỗi (-dbc)"
+  "NARGS_LOGO": "Logo PS2 (-logo)"
+  "VMC_SLOT1_DISABLE": "Tắt VMC 1 (giữ thẻ)"
+  "VMC_SLOT2_DISABLE": "Tắt VMC 2 (giữ thẻ)"
+  "HINT_VMC_SLOT_DISABLE": "Khởi chạy mà không dùng VMC của khe này trong khi vẫn giữ thẻ của nó được cấu hình. Chỉ áp dụng khi khởi chạy bằng Neutrino; game sau đó sẽ dùng thẻ thật trong khe đó."
+  "NEUTRINO_BSDFS": "Hệ thống tệp Neutrino"
+  "HINT_NEUTRINO_BSDFS": "Buộc hệ thống tệp thiết bị khối của Neutrino (-bsdfs). Auto = mặc định theo từng thiết bị. hdl/bd là các tùy chọn dành cho chuyên gia; hãy ghép chúng với một -dvd= tương ứng trong đối số khởi chạy nếu dạng đường dẫn tự động không phù hợp."
+  "PLASCOLOR": "Màu hòa trộn Plasma"
+  "VCD_HIDE_GAMEID": "Ẩn Game ID PS1 (danh sách VCD)"
+  "HINT_VCD_HIDE_GAMEID": "Chỉ mang tính thẩm mỹ -- ẩn tiền tố game-ID ở đầu (ví dụ SLUS_005.51.) khỏi tên trong danh sách PS1/VCD. Các tên không có ID sẽ hiển thị nguyên trạng. Không thay đổi việc khởi chạy, ảnh bìa hay mục yêu thích."
+  "VCD_FIRST_DISC": "Chỉ đĩa đầu tiên (PS1 nhiều đĩa)"
+  "HINT_VCD_FIRST_DISC": "Chỉ hiển thị Đĩa 1 của một game PS1 nhiều đĩa trong danh sách thiết bị (kiểu POPSLoader). Ẩn các tệp có tên (Disc 2), (CD 2), v.v. Tất cả các đĩa vẫn nằm trên thẻ để hoán đổi trong game; Mục yêu thích không bị lọc."
+  "GAMES_DEVICE": "Thiết bị của Game"
+  "DEFAULT_CORE": "Lõi tải mặc định"
+  "HINT_DEFAULT_CORE": "Lõi mặc định toàn cục cho các game có Loader Core theo từng game được đặt thành Default. <OPL> là lõi gốc; Neutrino nối chuỗi tới neutrino.elf bên ngoài. Lựa chọn theo từng game luôn ghi đè giá trị này."
+  "VCD_SETTINGS": "Cài đặt VCD"
+  "FINANCIAL_SUPPORT": "Hỗ trợ tài chính"

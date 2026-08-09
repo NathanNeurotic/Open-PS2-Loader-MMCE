@@ -1,0 +1,229 @@
+translations:
+  AUTOSORT: Sortér spil alfabetisk
+  RUMBLE: Controllervibration i menuer
+  HINT_RUMBLE: Kort vibration ved flytning af markøren, bekræftelse eller tilbage -- kræver en DualShock i analog tilstand
+  FOLDER_NAV: Gennemse mapper i spillisten
+  HINT_FOLDER_NAV: Vis undermapper på CD/DVD som mapper til gennemsyn -- vælg for at åbne, annuller for at gå tilbage
+  SETTINGS_NO_HOME: Intet hukommelseskort fundet -- indstillinger kan ikke gemmes. OPL blev startet fra en netværksenhed, hvis indstillinger skal ligge på et lokalt kort.
+  ERROR_SAVING_SETTINGS_TO: Kunne ikke skrive indstillinger til %s (fejl %d)
+  GENERAL_SETTINGS: Generelle indstillinger
+  DEVICE_SETTINGS: Enhedsindstillinger
+  LAUNCH_PS2_DISC: Start PS2-disk
+  DISC_LAUNCH_ERR: Ingen PS2-disk i drevet.
+  DEFAULT: Standard
+  HINT_MODE7: Kun Neutrino -- ret spil der overskrider en IOP-buffer (-gc=7)
+  MODE7: Mode 7
+  ENABLEIMAGE: PS2RD Cheat-billede
+  HINT_ENABLEIMAGE: Anvend et færdigbygget PS2RD .img-patch på dit spil.
+  UDPBD_GAMES: UDPBD Games
+  MMCE: MMCE
+  MMCE_GAMES: MMCE-spil
+  MMCEMODE: MMCE-starttilstand
+  MMCE_PREFIX: MMCE-præfiksti
+  MMCE_SLOT: MMCE-slot
+  MMCEIGR_SLOT: IGR-opstartskortstik(s)
+  HINT_MMCEIGR_SLOT: Skift til bootcard-kommando sendes til det/de valgte slot(s) ved IGR
+  MMCE_ADVANCED: Avanceret
+  MMCE_SETTINGS: MMCE-indstillinger
+  MMCE_SEMA: Lås sema-kømetode
+  HINT_MMCE_SEMA: THFIFO kan hjælpe kompatibilitet, men forringe ydeevne
+  MMCE_WAIT_CYCLES: Ventetakter efter /ACK lav
+  HINT_MMCE_WAIT_CYCLES: Lavere værdier kan forbedre ydeevne, men medføre ustabilitet
+  MMCE_USE_ALARMS: Brug timeout-alarmer
+  HINT_MMCE_USE_ALARMS: FRA kan hjælpe ydeevne, men MMCE-timeouts kan medføre frysninger
+  CORE_LOADER: Loader-kerne
+  NEUTRINO_BAD_FORMAT: Neutrino understøtter ikke dette filformat, starter med <OPL>-kernen
+  NEUTRINO_NOT_FOUND: Neutrino ELF ikke fundet, starter med <OPL>-kernen
+  UDPBD_NEEDS_STATIC_IP: UDPBD kræver en statisk PS2 IP. Indstil én i Netværkskonfiguration (DHCP er aktivt).
+  NEUTRINO_SETTING_NA: Denne indstilling bruges ikke med Neutrino-kernen.
+  POPSTARTER_NOT_FOUND: Mangler POPSTARTER.ELF
+  POPSTARTER_SMB_MISSING: Mangler POPSTARTER SMB-forudsætninger
+  WRITE_POPSTARTER_NET: Skriv POPSTARTER-netværkskonfig
+  HINT_WRITE_POPSTARTER_NET: Gem også disse IP + SMB-delingsværdier til POPSTARTERs egne IPCONFIG.DAT / SMBCONFIG.DAT på hukommelseskortet (til VCD over SMB).
+  POPSTARTER_NET_ERR: Kunne ikke skrive POPSTARTER-netværkskonfig til hukommelseskortet.
+  VCD: VCD
+  VCD_ON: Viser VCD-spil
+  VCD_OFF: Viser diskspil
+  NEUTRINO_ARGS: Neutrino-startargumenter
+  HINT_NEUTRINO_ARGS: 'Ekstra Neutrino-flag, mellemrumsadskilt (f.eks. -mt=dvd). Global gælder alle spil; per spil tilføjes ovenpå. Præfiks et flag med $ for at deaktivere det uden at slette det.'
+  NEUTRINO_VIDEO: Neutrino-video
+  HINT_NEUTRINO_VIDEO: Tving Neutrinos GS-outputvideotilstand (-gsm). Fra bevarer spillets standard.
+  NEUTRINO_PATH: Neutrino ELF-sti
+  HINT_NEUTRINO_PATH: Fuld sti til neutrino.elf (f.eks. mc0:NEUTRINO/neutrino.elf). Tom = auto-søg på mc0/mc1.
+  POPSTARTER_PATH: POPSTARTER.ELF-sti
+  HINT_POPSTARTER_PATH: Brugerdefineret POPSTARTER.ELF-sti; falder stille tilbage til enhedens POPS-mappe hvis tom/manglende. Tastatur begrænset til 31 tegn; længere stier via settings_riptopl.cfg.
+  BDMA_SOURCE: BDMA-kilde
+  HINT_BDMA_SOURCE: Enhed hvis POPS-mappe indeholder dine BDMAssault-driverfiler (usbd.irx.* / usbhdfsd.irx.*).
+  BDMA_MODE: BDMA-tilstand
+  HINT_BDMA_MODE: exFAT-blokenhedsdriveren POPSTARTER indlæser. Ændring kopierer modulerne til kortet; FAT32 = ingen (indbygget driver).
+  BDMA_SRC_USB: USB
+  BDMA_SRC_MX4SIO: MX4SIO
+  BDMA_SRC_MMCE: MMCE
+  BDMA_SRC_HDD: Intern HDD
+  BDMA_MODE_FAT32: USB (FAT32)
+  BDMA_MODE_USBEXFAT: USB (exFAT)
+  BDMA_MODE_MX4SIO: MX4SIO (exFAT)
+  BDMA_MODE_MMCE: MMCE (exFAT)
+  BDMA_MODE_ATA: HDD (exFAT)
+  BDMA_ERR_SRC: BDMA-modulfiler ikke fundet på kildeenheden.
+  BDMA_ERR_SPACE: Ikke nok hukommelseskortplads til BDMA-modulerne.
+  BDMA_ERR_IO: Fejl ved skrivning af BDMA-moduler til hukommelseskortet.
+  COVERFLOW_SETTINGS: Coverflow-indstillinger
+  COVERFLOW_COUNT: Coverantal
+  COVERFLOW_SCALE: Centersskala
+  COVERFLOW_ANIM: Animationshastighed
+  COVERFLOW_DIM: Dæmp sidecovers
+  NONE: Ingen
+  SMALL: Lille
+  LARGE: Stor
+  NORMAL: Normal
+  FAV: Favoritter
+  FAVMODE: Favorit-starttilstand
+  FAV_HINT: Favorit
+  FAV_MSG: '%s er ikke tilladt via Favoritmenuen.'
+  FAV_PERSISTENCE_MSG: '%s er ikke tilladt, mens elementet er markeret som favorit.'
+  NEUTRINO_DEVICE: Neutrino-enhed
+  HINT_NEUTRINO_DEVICE: Enhed med neutrino.elf (i en NEUTRINO/ eller neutrino/ mappe). Auto søger mc0 og derefter mc1.
+  NARGS_QB: Hurtig start (-qb)
+  NARGS_CWD: Arbejdsmappe (-cwd)
+  NARGS_CFG: Konfig (-cfg)
+  NARGS_ELF: Start-ELF (-elf)
+  NARGS_ATA0: ATA0-billede (-ata0)
+  NARGS_ATA0ID: ATA0-id (-ata0id)
+  NARGS_ATA1: ATA1-billede (-ata1)
+  NARGS_EXTRA: Ekstra argumenter
+  NARGS_AUTO_NOTE: 'Auto: -bsd -dvd -gc -gsm -mc -dbc -logo'
+  ENABLE_ART_TAR: .tar-arkiv med omslag
+  DISABLE_ALL: Deaktiver alle
+  BOOT_LOADING_CONFIG: Indlæser indstillinger...
+  BOOT_SCANNING_BDM: Scanner USB / kort / netværksdrev...
+  BOOT_SCANNING_NET: Starter netværk...
+  BOOT_SCANNING_HDD: Scanner HDD...
+  BOOT_READY: Klar.
+  UDPFS_GAMES: "UDPFS-spil"
+  UDPFSBD_GAMES: "UDPFSBD-spil"
+  NET_PROTOCOL: "Netværksprotokol"
+  NET_NEEDS_NEUTRINO: "Netværksspil (UDP) kan kun starte via Neutrino-kernen. Kontrollér, at neutrino.elf findes, og at formatet understøttes."
+  VCD_NOT_ON_NET: "PS1-spil (.VCD) kan ikke startes via netværksenheden."
+  MX4SIO_PADEMU_WARN: "MX4SIO og controller-emulering deler SIO2-bussen, og spillet starter måske ikke."
+  HINT_OSD_SETTINGS_LNG: "Gennemtving en tilpasset sprogindstilling"
+  OSD_SETTINGS_TVASPECT: "Skærmstørrelse"
+  FULL_SCREEN: "Fuld skærm"
+  OSD_SETTINGS_VMODE: "Videotilstand"
+  SYSTEM_DEFAULT: "Systemstandard"
+  HIGH: "Høj"
+  LOW: "Lav"
+  XSENSITIVITY: "Følsomhed analog X-akse"
+  YSENSITIVITY: "Følsomhed analog Y-akse"
+  FILE_COUNT: "Filer fundet: %i"
+  CHEAT_SELECTION: "Snydevalg"
+  HDD_HINT: "Kun én HDD tilladt; aktivering låser APA eller GPT."
+  MMCE_GAMEID_NEUTRINO_SKIP: "MMCE GameID ikke anvendt -- neutrino.elf er på dette kort (skift ville udlæse Neutrino)."
+  POPSTARTER_DEVICE: "POPSTARTER.ELF-enhed"
+  HINT_POPSTARTER_DEVICE: "Enhed med POPS/POPSTARTER.ELF til start af PS1-VCD'er. Standard = startenhed (cwd) derefter VCD'ens egen enhed. Tilpasset viser et frit stifelt."
+  BDMA_APPLY: "Anvend VCD BDMA ved start"
+  HINT_BDMA_APPLY: "Til: udstyrer automatisk den startede VCD's matchende exFAT-driver på hukommelseskortet før start (anbefales). Fra: håndtér det selv med BDMA-kilde/tilstand-vælgerne nedenfor."
+  NETBOOT_RESTART: "Genstart OPL for at anvende ændringen af netværksstartprotokollen."
+  UDPFS_MODE: "UDPFS-adgang"
+  "MENU": "Menu"
+  "APPS": "Apps"
+  "DEBUG": "Fejlfindingsfarver"
+  "COVERART": "Coveromslag"
+  "IP_ADDRESS_TYPE_DHCP": "DHCP"
+  "PORT": "Port"
+  "ADDR_TYPE_IP": "IP"
+  "ADDR_TYPE_NETBIOS": "NetBIOS"
+  "ENABLE_WRITE": "Skrivehandlinger"
+  "MODE1": "Tilstand 1"
+  "MODE2": "Tilstand 2"
+  "MODE3": "Tilstand 3"
+  "MODE4": "Tilstand 4"
+  "MODE5": "Tilstand 5"
+  "MODE6": "Tilstand 6"
+  "ENABLEGSM": "GSM-vælger"
+  "OVERSCAN": "Overscan"
+  "ENABLECHEAT": "PS2RD-snydemotor"
+  "PADEMU_ENABLE": "Controlleremulator"
+  "DS34USB_MODE": "DualShock3/4 USB"
+  "PADEMU_PORT": "Emulering"
+  "PADEMU_VIB": "Vibration"
+  "PADEMU_WORKAROUND": "Falsk DS3-løsning"
+  "SFX": "Lydeffekter"
+  "BOOT_SND": "Opstartslyd"
+  "ENABLE_NOTIFICATIONS": "Notifikationer"
+  "OPTIONS": "Indstillinger"
+  "GLOBAL_SETTINGS": "Global"
+  "INFO_GENRE": "Genre"
+  "INFO_RELEASE": "Udgivelse"
+  "INFO_DESCRIPTION": "Beskrivelse"
+  "BLOCKDEVICE_SETTINGS": "Blokenheder"
+  "CONTROLLER_SETTINGS": "Controllerindstillinger"
+  "HINT_BDM_START": "Slå Block Device Manager til/fra."
+  "HINT_BLOCK_DEVICES": "Slå blokenheder til/fra (f.eks. USB)."
+  "USB_GAMES": "USB-spil"
+  "ILINK_GAMES": "iLink-spil"
+  "MX4SIO_GAMES": "MX4SIO-spil"
+  "PADMACROCONFIG": "Konfigurer PADMACRO"
+  "PADMACRO_SETTINGS": "Pad-makroindstillinger"
+  "PADMACRO_ENABLE": "Pad-makroer"
+  "PADMACRO_SLOWDOWN": "Analog nedbremsning:"
+  "HINT_PADMACRO_SLOWDOWN_AXIS": "Reducer det analoge stiks rækkevidde, når knappen trykkes ned"
+  "LEFT_ANALOG": "Venstre stik"
+  "RIGHT_ANALOG": "Højre stik"
+  "PADMACRO_INVERT_AXIS": "Analog akse-invertering:"
+  "HINT_PADMACRO_INVERT_AXIS": "Inverter det analoge stiks akse"
+  "TURBO_SPEED": "Turboknaphastighed"
+  "HINT_TURBO_SPEED": "Hvor hurtigt knappen trykkes, når turbo er aktiv"
+  "ACT_WHILE_PRESSED": "Mens knappen holdes nede"
+  "ACT_TOGGLED": "Skiftes med knappen"
+  "LANGUAGE_JAPANESE": "JAPANSK"
+  "LANGUAGE_ENGLISH": "ENGELSK"
+  "LANGUAGE_FRENCH": "FRANSK"
+  "LANGUAGE_SPANISH": "SPANSK"
+  "LANGUAGE_GERMAN": "TYSK"
+  "LANGUAGE_ITALIAN": "ITALIENSK"
+  "LANGUAGE_DUTCH": "HOLLANDSK"
+  "LANGUAGE_PORTUGUESE": "PORTUGISISK"
+  "LANGUAGE_RUSSIAN": "RUSSISK"
+  "LANGUAGE_KOREAN": "KOREANSK"
+  "LANGUAGE_TRAD_CHINESE": "TRADITIONELT KINESISK"
+  "LANGUAGE_SIMPL_CHINESE": "FORENKLET KINESISK"
+  "OSD_SETTINGS": "OSD-indstillinger"
+  "OSD_SETTINGS_LNG": "OSD-sprog"
+  "ENABLE_LNG": "Skift sprog"
+  "BGM": "Baggrundsmusik"
+  "BGM_VOLUME": "Baggrundsmusikkens lydstyrke"
+  "DEF_BGM_PATH": "Standard temamusik"
+  "DEF_BGM_PATH_HINT": "Angiv sti til streaming af musik til internt tema."
+  "BOOT_SCANNING_MC": "Scanner hukommelseskort..."
+  "BOOT_LOADING_DRIVERS": "Indlæser lagerdrivere..."
+  "BOOT_LOADING_USB": "Indlæser USB-lagerdriver..."
+  "BOOT_ARMING_MMCE": "Aktiverer MMCE-spil-ID..."
+  "BOOT_LOADING_SOUNDS": "Indlæser temalyde..."
+  "BOOT_BUILDING_MENU": "Bygger menu..."
+  "NET_UDPFS_TAB_HINT": "UDPFS til -- åbn den nye UDPFS-fane og tryk på Bekræft for at forbinde. På PC-siden køres udpfsd -fsroot <games folder>."
+  "NET_UDPBD_TAB_HINT": "Netværksblokenhed til -- dens fane vises, når PC-serveren svarer (udpfsd -bdpath for UDPFS Image, udpbd-server for UDPBD)."
+  "NEUTRINO_VMC_MISSING": "VMC-fil pr. spil blev ikke fundet -- starter uden den (spillet bruger sit rigtige kort)."
+  "NEUTRINO_DEV_UNSUPPORTED": "Neutrino kan ikke starte fra denne enhed -- start afbrudt."
+  "NEUTRINO_TOML_SYNC_FAILED": "Neutrino-netværkskonfiguration (bsd toml) mangler eller kan ikke skrives -- start afbrudt, tjek neutrino-mappen."
+  "NEUTRINO_TOO_FRAGMENTED": "For fragmenteret til Neutrino (%d fragmenter, grænse %d inkl. VMC'er) -- prøver OPL-kernen i stedet."
+  "NEUTRINO_TOO_FRAGMENTED_NET": "For fragmenteret til Neutrino (%d fragmenter, grænse %d inkl. VMC'er) -- defragmentér på pc'en; start afbrudt."
+  "NEUTRINO_GSM_COMP": "Neutrino GSM-kompatibilitet"
+  "HINT_NEUTRINO_GSM_COMP": "Field-flipping-rettelse for spil, der ryster eller flænser under en fremtvunget Neutrino Video-tilstand. Kræver en Neutrino Video-tilstand indstillet."
+  "NARGS_DBC": "Fejlfindingsfarver (-dbc)"
+  "NARGS_LOGO": "PS2-logo (-logo)"
+  "VMC_SLOT1_DISABLE": "Deaktiver VMC 1 (behold kort)"
+  "VMC_SLOT2_DISABLE": "Deaktiver VMC 2 (behold kort)"
+  "HINT_VMC_SLOT_DISABLE": "Start uden denne plads' VMC, mens dens kort forbliver konfigureret. Kun Neutrino-start; spillet bruger derefter det rigtige kort i den plads."
+  "NEUTRINO_BSDFS": "Neutrino-filsystem"
+  "HINT_NEUTRINO_BSDFS": "Fremtving Neutrinos blokenheds-filsystem (-bsdfs). Auto = standard pr. enhed. hdl/bd er ekspertindstillinger; kombinér dem med et matchende -dvd= i startargumenterne, hvis den automatiske stiform ikke passer."
+  "PLASCOLOR": "Plasma-blandingsfarve"
+  "VCD_HIDE_GAMEID": "Skjul PS1-spil-ID (VCD-liste)"
+  "HINT_VCD_HIDE_GAMEID": "Kun kosmetisk -- skjul et indledende spil-ID-præfiks (f.eks. SLUS_005.51.) fra navne i PS1/VCD-listen. Navne uden et ID vises som de er. Ændrer ikke start, cover-art eller favoritter."
+  "VCD_FIRST_DISC": "Kun første disk (fler-disk PS1)"
+  "HINT_VCD_FIRST_DISC": "Vis kun disk 1 af et PS1-spil med flere diske i enhedslisterne (POPSLoader-stil). Skjuler filer med navne som (Disc 2), (CD 2) osv. Alle diske forbliver på kortet til skift under spil; Favoritter filtreres ikke."
+  "GAMES_DEVICE": "Spillets enhed"
+  "DEFAULT_CORE": "Standard Loader Core"
+  "HINT_DEFAULT_CORE": "Global standardkerne for spil, hvis Loader Core pr. spil er sat til Default. <OPL> er den native kerne; Neutrino kæder den eksterne neutrino.elf. Et valg pr. spil tilsidesætter altid dette."
+  "VCD_SETTINGS": "VCD-indstillinger"
+  "FINANCIAL_SUPPORT": "Økonomisk støtte"

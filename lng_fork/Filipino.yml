@@ -1,0 +1,229 @@
+translations:
+  AUTOSORT: Isaayos ang Laro Ayon sa Alpabeto
+  RUMBLE: Pag-vibrate ng Kontroler sa Menu
+  HINT_RUMBLE: Maikling vibration kapag ginagalaw ang cursor, kinukumpirma o bumabalik -- kailangan ng DualShock na naka-analog mode
+  FOLDER_NAV: Mag-browse ng Folder sa Listahan ng Laro
+  HINT_FOLDER_NAV: Ipakita ang mga subfolder ng CD/DVD bilang mabu-browse na entry; piliin para buksan, kanselahin para bumalik
+  SETTINGS_NO_HOME: Walang nakitang memory card -- hindi ma-save ang mga setting. Naka-boot ang OPL mula sa network device, na ang mga setting ay dapat nasa lokal na card.
+  ERROR_SAVING_SETTINGS_TO: Hindi maisulat ang mga setting sa %s (error %d)
+  GENERAL_SETTINGS: Pangkalahatang Mga Setting
+  DEVICE_SETTINGS: Mga Setting ng Device
+  LAUNCH_PS2_DISC: I-launch ang PS2 Disc
+  DISC_LAUNCH_ERR: Walang PS2 disc sa drive.
+  DEFAULT: Default
+  HINT_MODE7: Neutrino lamang -- ayusin ang mga laro na lumagpas sa IOP buffer (-gc=7)
+  MODE7: Mode 7
+  ENABLEIMAGE: PS2RD Cheat Image
+  HINT_ENABLEIMAGE: Mag-apply ng prebuilt na PS2RD .img patch sa iyong laro.
+  UDPBD_GAMES: UDPBD Games
+  MMCE: MMCE
+  MMCE_GAMES: MMCE Games
+  MMCEMODE: MMCE Start Mode
+  MMCE_PREFIX: MMCE Prefix Path
+  MMCE_SLOT: MMCE Slot
+  MMCEIGR_SLOT: IGR Bootcard Slot(s)
+  HINT_MMCEIGR_SLOT: Ang utos na lumipat sa bootcard ay ipapadala sa napiling slot(s) sa IGR
+  MMCE_ADVANCED: Advanced
+  MMCE_SETTINGS: MMCE Settings
+  MMCE_SEMA: Lock Sema Enqueuing Method
+  HINT_MMCE_SEMA: Maaaring makatulong ang THFIFO sa compatibility ngunit makakapagpabagal ng performance
+  MMCE_WAIT_CYCLES: Maghintay ng cycles pagkatapos ng /ACK low
+  HINT_MMCE_WAIT_CYCLES: Ang mas mababang halaga ay maaaring mapabuti ang performance ngunit maaaring magdulot ng kawalang-tatag
+  MMCE_USE_ALARMS: Gumamit ng timeout alarms
+  HINT_MMCE_USE_ALARMS: Ang OFF ay maaaring makatulong sa performance ngunit maaaring maging sanhi ng MMCE timeout na mag-freeze
+  CORE_LOADER: Loader Core
+  NEUTRINO_BAD_FORMAT: Hindi sinusuportahan ng Neutrino ang format na ito, inilulunsad gamit ang <OPL> core
+  NEUTRINO_NOT_FOUND: Hindi nahanap ang Neutrino ELF, inilulunsad gamit ang <OPL> core
+  UDPBD_NEEDS_STATIC_IP: Kailangan ng UDPBD ng static na PS2 IP. Itakda sa Network Config (naka-on ang DHCP ngayon).
+  NEUTRINO_SETTING_NA: Hindi ginagamit ang setting na ito sa Neutrino core.
+  POPSTARTER_NOT_FOUND: Nawawala ang POPSTARTER.ELF
+  POPSTARTER_SMB_MISSING: Nawawala ang mga kinakailangan ng POPSTARTER para sa SMB
+  WRITE_POPSTARTER_NET: I-save ang POPSTARTER Network Config
+  HINT_WRITE_POPSTARTER_NET: I-save din ang mga IP + SMB share na ito sa sariling IPCONFIG.DAT / SMBCONFIG.DAT ng POPSTARTER sa memory card (para sa VCD-over-SMB).
+  POPSTARTER_NET_ERR: Hindi nasulat ang POPSTARTER network config sa memory card.
+  VCD: VCD
+  VCD_ON: Ipinapakita ang mga VCD game
+  VCD_OFF: Ipinapakita ang mga disc game
+  NEUTRINO_ARGS: Neutrino Launch Args
+  HINT_NEUTRINO_ARGS: Karagdagang Neutrino flags, pinaghiwalay ng espasyo (hal. -mt=dvd). Ang Global ay naaangkop sa lahat ng laro; ang per-game ay nadaragdag pa. Lagyan ng $ prefix ang isang flag para i-disable nang hindi binubura.
+  NEUTRINO_VIDEO: Neutrino Video
+  HINT_NEUTRINO_VIDEO: Pilitin ang GS output video mode ng Neutrino (-gsm). Ang Off ay pinapanatili ang default ng laro.
+  NEUTRINO_PATH: Neutrino ELF Path
+  HINT_NEUTRINO_PATH: 'Buong path patungo sa neutrino.elf (hal. mc0:NEUTRINO/neutrino.elf). Blangko = auto-detect sa mc0/mc1.'
+  POPSTARTER_PATH: POPSTARTER.ELF Path
+  HINT_POPSTARTER_PATH: Custom na POPSTARTER.ELF path; bumabalik sa POPS folder ng device kung blangko/nawawala. Ang keyboard ay limitado sa 31 chars; mas mahabang paths sa pamamagitan ng settings_riptopl.cfg.
+  BDMA_SOURCE: BDMA Source
+  HINT_BDMA_SOURCE: Device na ang POPS folder ay naglalaman ng iyong BDMAssault driver files (usbd.irx.* / usbhdfsd.irx.*).
+  BDMA_MODE: BDMA Mode
+  HINT_BDMA_MODE: exFAT block-device driver na inilulunsad ng POPSTARTER. Ang pagbabago nito ay nagkokopya ng mga module sa card; FAT32 = wala (built-in driver).
+  BDMA_SRC_USB: USB
+  BDMA_SRC_MX4SIO: MX4SIO
+  BDMA_SRC_MMCE: MMCE
+  BDMA_SRC_HDD: Internal HDD
+  BDMA_MODE_FAT32: USB (FAT32)
+  BDMA_MODE_USBEXFAT: USB (exFAT)
+  BDMA_MODE_MX4SIO: MX4SIO (exFAT)
+  BDMA_MODE_MMCE: MMCE (exFAT)
+  BDMA_MODE_ATA: HDD (exFAT)
+  BDMA_ERR_SRC: Hindi nahanap ang mga BDMA module file sa source device.
+  BDMA_ERR_SPACE: Hindi sapat ang espasyo ng memory card para sa mga BDMA module.
+  BDMA_ERR_IO: Error sa pagsulat ng mga BDMA module sa memory card.
+  COVERFLOW_SETTINGS: Coverflow Settings
+  COVERFLOW_COUNT: Bilang ng Cover
+  COVERFLOW_SCALE: Center Scale
+  COVERFLOW_ANIM: Bilis ng Animation
+  COVERFLOW_DIM: Dimimin ang Mga Side Cover
+  NONE: Wala
+  SMALL: Maliit
+  LARGE: Malaki
+  NORMAL: Normal
+  FAV: Mga Paborito
+  FAVMODE: Favourites Start Mode
+  FAV_HINT: Paborito
+  FAV_MSG: '%s ay hindi pinapayagan sa Favourites Menu.'
+  FAV_PERSISTENCE_MSG: '%s ay hindi pinapayagan habang naka-marka ang item bilang paborito.'
+  NEUTRINO_DEVICE: Neutrino Device
+  HINT_NEUTRINO_DEVICE: Device na naglalaman ng neutrino.elf (sa loob ng NEUTRINO/ o neutrino/ folder). Ang Auto ay nagsa-scan muna sa mc0 pagkatapos mc1.
+  NARGS_QB: Quick Boot (-qb)
+  NARGS_CWD: Working Dir (-cwd)
+  NARGS_CFG: Config (-cfg)
+  NARGS_ELF: Boot ELF (-elf)
+  NARGS_ATA0: ATA0 Image (-ata0)
+  NARGS_ATA0ID: ATA0 ID (-ata0id)
+  NARGS_ATA1: ATA1 Image (-ata1)
+  NARGS_EXTRA: Karagdagang Args
+  NARGS_AUTO_NOTE: 'Auto: -bsd -dvd -gc -gsm -mc -dbc -logo'
+  ENABLE_ART_TAR: .tar archive ng pabalat
+  DISABLE_ALL: I-disable Lahat
+  BOOT_LOADING_CONFIG: Naglo-load ng mga setting...
+  BOOT_SCANNING_BDM: Sina-scan ang USB / card / network drives...
+  BOOT_SCANNING_NET: Sinisimulan ang network...
+  BOOT_SCANNING_HDD: Sina-scan ang HDD...
+  BOOT_READY: Handa na.
+  UDPFS_GAMES: "Mga Laro sa UDPFS"
+  UDPFSBD_GAMES: "Mga Laro sa UDPFSBD"
+  NET_PROTOCOL: "Protocol ng Network"
+  NET_NEEDS_NEUTRINO: "Ang mga larong network (UDP) ay maaari lamang mag-boot sa pamamagitan ng Neutrino core. Tiyaking naroon ang neutrino.elf at suportado ang format."
+  VCD_NOT_ON_NET: "Hindi mailulunsad ang mga larong PS1 (.VCD) sa pamamagitan ng network device."
+  MX4SIO_PADEMU_WARN: "Ang MX4SIO at pad emulation ay nagbabahagi ng SIO2 bus at maaaring mabigo ang laro sa pag-boot."
+  HINT_OSD_SETTINGS_LNG: "Piliting gumamit ng custom na configuration ng wika"
+  OSD_SETTINGS_TVASPECT: "Laki ng Screen"
+  FULL_SCREEN: "Buong Screen"
+  OSD_SETTINGS_VMODE: "Video Mode"
+  SYSTEM_DEFAULT: "Default ng System"
+  HIGH: "Mataas"
+  LOW: "Mababa"
+  XSENSITIVITY: "Sensitivity ng Analog X-Axis"
+  YSENSITIVITY: "Sensitivity ng Analog Y-Axis"
+  FILE_COUNT: "Mga file na natagpuan: %i"
+  CHEAT_SELECTION: "Pagpili ng Cheat"
+  HDD_HINT: "Isang HDD lang ang pinapayagan, kapag inilagay ay ni-lock ang APA o GPT."
+  MMCE_GAMEID_NEUTRINO_SKIP: "Hindi inilapat ang MMCE GameID -- naroon ang neutrino.elf sa card na ito (kapag pinalitan ito ay mai-uload ang Neutrino)."
+  POPSTARTER_DEVICE: "Device ng POPSTARTER.ELF"
+  HINT_POPSTARTER_DEVICE: "Device na naglalaman ng POPS/POPSTARTER.ELF para sa mga paglulunsad ng PS1 VCD. Default = boot device (cwd) tapos ang sariling device ng VCD. Ang Custom ay nagpapakita ng free-text na path."
+  BDMA_APPLY: "Ilapat ang VCD BDMA sa Paglulunsad"
+  HINT_BDMA_APPLY: "Naka-on: awtomatikong ikabit ang tugmang exFAT driver ng inilunsad na VCD sa memory card bago mag-boot (inirerekomenda). Naka-off: pamahalaan ito nang mag-isa gamit ang mga pantukoy na Source/Mode ng BDMA sa ibaba."
+  NETBOOT_RESTART: "I-restart ang OPL para ilapat ang pagbabago sa network boot protocol."
+  UDPFS_MODE: "Pag-access ng UDPFS"
+  "MENU": "Menu"
+  "APPS": "Apps"
+  "DEBUG": "Mga Kulay ng Debug"
+  "COVERART": "Cover Art"
+  "IP_ADDRESS_TYPE_DHCP": "DHCP"
+  "PORT": "Port"
+  "ADDR_TYPE_IP": "IP"
+  "ADDR_TYPE_NETBIOS": "NetBIOS"
+  "ENABLE_WRITE": "Mga Write Operation"
+  "MODE1": "Mode 1"
+  "MODE2": "Mode 2"
+  "MODE3": "Mode 3"
+  "MODE4": "Mode 4"
+  "MODE5": "Mode 5"
+  "MODE6": "Mode 6"
+  "ENABLEGSM": "GSM Selector"
+  "OVERSCAN": "Overscan"
+  "ENABLECHEAT": "PS2RD Cheat Engine"
+  "PADEMU_ENABLE": "Pad Emulator"
+  "DS34USB_MODE": "DualShock3/4 USB"
+  "PADEMU_PORT": "Emulation"
+  "PADEMU_VIB": "Vibration"
+  "PADEMU_WORKAROUND": "Fake DS3 Workaround"
+  "SFX": "Mga Sound Effect"
+  "BOOT_SND": "Boot Sound"
+  "ENABLE_NOTIFICATIONS": "Mga Notification"
+  "OPTIONS": "Mga Opsyon"
+  "GLOBAL_SETTINGS": "Global"
+  "INFO_GENRE": "Genre"
+  "INFO_RELEASE": "Release"
+  "INFO_DESCRIPTION": "Deskripsyon"
+  "BLOCKDEVICE_SETTINGS": "Mga Block Device"
+  "CONTROLLER_SETTINGS": "Mga Setting ng Controller"
+  "HINT_BDM_START": "I-on/off ang Block Device Manager."
+  "HINT_BLOCK_DEVICES": "I-on/off ang Mga Block Device (hal. USB)."
+  "USB_GAMES": "Mga USB Game"
+  "ILINK_GAMES": "Mga iLink Game"
+  "MX4SIO_GAMES": "Mga MX4SIO Game"
+  "PADMACROCONFIG": "I-configure ang PADMACRO"
+  "PADMACRO_SETTINGS": "Mga Setting ng Pad macro"
+  "PADMACRO_ENABLE": "Mga Pad macro"
+  "PADMACRO_SLOWDOWN": "Pagbagal ng analog:"
+  "HINT_PADMACRO_SLOWDOWN_AXIS": "Bawasan ang saklaw ng analog stick kapag pinindot ang button"
+  "LEFT_ANALOG": "Kaliwang stick"
+  "RIGHT_ANALOG": "Kanang stick"
+  "PADMACRO_INVERT_AXIS": "Pag-invert ng analog axis:"
+  "HINT_PADMACRO_INVERT_AXIS": "I-invert ang axis ng analog stick"
+  "TURBO_SPEED": "Bilis ng turbo button"
+  "HINT_TURBO_SPEED": "Gaano kabilis pindutin ang button kapag aktibo ang turbo"
+  "ACT_WHILE_PRESSED": "Habang pinindot ang button"
+  "ACT_TOGGLED": "I-toggle sa pamamagitan ng button"
+  "LANGUAGE_JAPANESE": "HAPON"
+  "LANGUAGE_ENGLISH": "INGLES"
+  "LANGUAGE_FRENCH": "PRANSES"
+  "LANGUAGE_SPANISH": "KASTILA"
+  "LANGUAGE_GERMAN": "ALEMAN"
+  "LANGUAGE_ITALIAN": "ITALYANO"
+  "LANGUAGE_DUTCH": "OLANDES"
+  "LANGUAGE_PORTUGUESE": "PORTUGES"
+  "LANGUAGE_RUSSIAN": "RUSO"
+  "LANGUAGE_KOREAN": "KOREANO"
+  "LANGUAGE_TRAD_CHINESE": "TRADISYONAL NA INTSIK"
+  "LANGUAGE_SIMPL_CHINESE": "PINASIMPLENG INTSIK"
+  "OSD_SETTINGS": "Mga setting ng OSD"
+  "OSD_SETTINGS_LNG": "Wika ng OSD"
+  "ENABLE_LNG": "Palitan ang wika"
+  "BGM": "Background Music"
+  "BGM_VOLUME": "Volume ng Background Music"
+  "DEF_BGM_PATH": "Default na Theme Music"
+  "DEF_BGM_PATH_HINT": "Itakda ang path para i-stream ang musika ng internal na theme."
+  "BOOT_SCANNING_MC": "Ini-scan ang mga memory card..."
+  "BOOT_LOADING_DRIVERS": "Nilo-load ang mga storage driver..."
+  "BOOT_LOADING_USB": "Nilo-load ang USB storage driver..."
+  "BOOT_ARMING_MMCE": "Inihahanda ang MMCE game-ID..."
+  "BOOT_LOADING_SOUNDS": "Nilo-load ang mga tunog ng theme..."
+  "BOOT_BUILDING_MENU": "Binubuo ang menu..."
+  "NET_UDPFS_TAB_HINT": "Naka-on ang UDPFS -- buksan ang bagong UDPFS tab at pindutin ang Confirm para kumonekta. Sa panig ng PC ay tumatakbo ang udpfsd -fsroot <games folder>."
+  "NET_UDPBD_TAB_HINT": "Naka-on ang network block device -- lumalabas ang tab nito kapag sumagot na ang PC server (udpfsd -bdpath para sa UDPFS Image, udpbd-server para sa UDPBD)."
+  "NEUTRINO_VMC_MISSING": "Hindi natagpuan ang per-game na VMC file -- inilulunsad nang wala ito (gagamitin ng laro ang tunay nitong card)."
+  "NEUTRINO_DEV_UNSUPPORTED": "Hindi makakapaglunsad ang Neutrino mula sa device na ito -- itinigil ang paglunsad."
+  "NEUTRINO_TOML_SYNC_FAILED": "Nawawala o hindi masulatan ang network config ng Neutrino (bsd toml) -- ikinansela ang paglulunsad, tingnan ang neutrino folder."
+  "NEUTRINO_TOO_FRAGMENTED": "Masyadong fragmented para sa Neutrino (%d fragments, limitasyon %d kasama ang mga VMC) -- sinusubukan na lang ang OPL core."
+  "NEUTRINO_TOO_FRAGMENTED_NET": "Masyadong fragmented para sa Neutrino (%d fragments, limitasyon %d kasama ang mga VMC) -- i-defragment sa PC; ikinansela ang paglulunsad."
+  "NEUTRINO_GSM_COMP": "Compatibility ng Neutrino GSM"
+  "HINT_NEUTRINO_GSM_COMP": "Ayos na nagpapalit ng field para sa mga laro na nanginginig o napupunit sa ilalim ng sapilitang Neutrino Video mode. Kailangang may nakatakdang Neutrino Video mode."
+  "NARGS_DBC": "Mga Kulay ng Debug (-dbc)"
+  "NARGS_LOGO": "PS2 Logo (-logo)"
+  "VMC_SLOT1_DISABLE": "I-disable ang VMC 1 (panatilihin ang card)"
+  "VMC_SLOT2_DISABLE": "I-disable ang VMC 2 (panatilihin ang card)"
+  "HINT_VMC_SLOT_DISABLE": "Maglunsad nang walang VMC ng slot na ito habang nananatiling naka-configure ang card nito. Mga paglulunsad ng Neutrino lamang; gagamitin ng laro ang tunay na card sa slot na iyon."
+  "NEUTRINO_BSDFS": "Neutrino Filesystem"
+  "HINT_NEUTRINO_BSDFS": "Piliting gamitin ang block-device filesystem ng Neutrino (-bsdfs). Auto = default kada device. Ang hdl/bd ay mga expert na opsyon; ipares ang mga ito sa katugmang -dvd= sa launch args kung hindi bagay ang hugis ng auto na path."
+  "PLASCOLOR": "Kulay ng Plasma Blend"
+  "VCD_HIDE_GAMEID": "Itago ang PS1 Game ID (VCD list)"
+  "HINT_VCD_HIDE_GAMEID": "Pangkosmetiko lamang -- itago ang nauunang game-ID prefix (hal. SLUS_005.51.) sa mga pangalan ng PS1/VCD list. Ang mga pangalang walang ID ay ipinapakita nang buo. Hindi binabago ang paglulunsad, cover art, o mga favourites."
+  "VCD_FIRST_DISC": "Unang disc lang (multi-disc PS1)"
+  "HINT_VCD_FIRST_DISC": "Ipakita lamang ang Disc 1 ng isang multi-disc na PS1 game sa mga listahan ng device (istilong POPSLoader). Itinatago ang mga file na pinangalanang (Disc 2), (CD 2), atbp. Nananatili ang lahat ng disc sa card para sa in-game na pagpapalit; hindi sinasala ang mga Favourites."
+  "GAMES_DEVICE": "Device ng Laro"
+  "DEFAULT_CORE": "Default na Loader Core"
+  "HINT_DEFAULT_CORE": "Global na default na core para sa mga laro na naka-set sa Default ang per-game na Loader Core. Ang <OPL> ang native na core; ikinakadena ng Neutrino ang panlabas na neutrino.elf. Palaging pinapangibabawan ito ng per-game na pagpili."
+  "VCD_SETTINGS": "Mga Setting ng VCD"
+  "FINANCIAL_SUPPORT": "Suportang Pinansyal"

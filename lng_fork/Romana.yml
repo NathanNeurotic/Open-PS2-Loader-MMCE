@@ -1,0 +1,229 @@
+translations:
+  AUTOSORT: Sortează jocurile alfabetic
+  RUMBLE: Vibrația controllerului în meniuri
+  HINT_RUMBLE: Vibrație scurtă la mutarea cursorului, confirmare sau revenire -- necesită un DualShock în mod analog
+  FOLDER_NAV: Răsfoiește foldere în lista de jocuri
+  HINT_FOLDER_NAV: Afișează subfolderele de pe CD/DVD ca intrări navigabile; selectează pentru a deschide, anulează pentru a reveni
+  SETTINGS_NO_HOME: Niciun card de memorie găsit -- setările nu pot fi salvate. OPL a pornit de pe un dispozitiv de rețea, ale cărui setări trebuie să fie pe un card local.
+  ERROR_SAVING_SETTINGS_TO: Setările nu au putut fi scrise în %s (eroare %d)
+  GENERAL_SETTINGS: Setări Generale
+  DEVICE_SETTINGS: Setări Dispozitiv
+  LAUNCH_PS2_DISC: Lansează Disc PS2
+  DISC_LAUNCH_ERR: Niciun disc PS2 în unitate.
+  DEFAULT: Implicit
+  HINT_MODE7: Doar Neutrino -- corectează jocuri care depășesc un buffer IOP (-gc=7)
+  MODE7: Mode 7
+  ENABLEIMAGE: Imagine Cheat PS2RD
+  HINT_ENABLEIMAGE: Aplică un patch PS2RD .img pregătit pentru jocul tău.
+  UDPBD_GAMES: UDPBD Games
+  MMCE: MMCE
+  MMCE_GAMES: MMCE Games
+  MMCEMODE: Mod Pornire MMCE
+  MMCE_PREFIX: Cale Prefix MMCE
+  MMCE_SLOT: Slot MMCE
+  MMCEIGR_SLOT: Slot(uri) Bootcard IGR
+  HINT_MMCEIGR_SLOT: Comanda de comutare la bootcard va fi trimisă la slotul(urile) selectat(e) la IGR
+  MMCE_ADVANCED: Avansat
+  MMCE_SETTINGS: Setări MMCE
+  MMCE_SEMA: Metodă Blocare Coadă Sema
+  HINT_MMCE_SEMA: THFIFO poate ajuta compatibilitatea dar poate reduce performanța
+  MMCE_WAIT_CYCLES: Cicluri de așteptare după /ACK jos
+  HINT_MMCE_WAIT_CYCLES: Valorile mai mici pot îmbunătăți performanța dar pot cauza instabilități
+  MMCE_USE_ALARMS: Folosește alarme timeout
+  HINT_MMCE_USE_ALARMS: OFF poate ajuta performanța dar poate cauza blocări la timeout MMCE
+  CORE_LOADER: Nucleu Loader
+  NEUTRINO_BAD_FORMAT: Neutrino nu suportă acest format de fișier, lansare cu nucleul <OPL>
+  NEUTRINO_NOT_FOUND: ELF Neutrino negăsit, lansare cu nucleul <OPL>
+  UDPBD_NEEDS_STATIC_IP: UDPBD necesită un IP static pentru PS2. Setați unul în Config Rețea (DHCP este activ).
+  NEUTRINO_SETTING_NA: Această setare nu este folosită cu nucleul Neutrino.
+  POPSTARTER_NOT_FOUND: Lipsește POPSTARTER.ELF
+  POPSTARTER_SMB_MISSING: Lipsesc cerințele SMB pentru POPSTARTER
+  WRITE_POPSTARTER_NET: Scrie Config Rețea POPSTARTER
+  HINT_WRITE_POPSTARTER_NET: Salvează și valorile IP + SMB în IPCONFIG.DAT / SMBCONFIG.DAT proprii ale POPSTARTER pe cardul de memorie (pentru VCD prin SMB).
+  POPSTARTER_NET_ERR: Nu s-a putut scrie configurația de rețea POPSTARTER pe cardul de memorie.
+  VCD: VCD
+  VCD_ON: Se afișează jocuri VCD
+  VCD_OFF: Se afișează jocuri disc
+  NEUTRINO_ARGS: Argumente Lansare Neutrino
+  HINT_NEUTRINO_ARGS: Indicatori Neutrino suplimentari, separați prin spațiu (ex. -mt=dvd). Global se aplică tuturor jocurilor; per-joc se adaugă în plus. Prefixați un indicator cu $ pentru a-l dezactiva fără a-l șterge.
+  NEUTRINO_VIDEO: Video Neutrino
+  HINT_NEUTRINO_VIDEO: Forțează modul video de ieșire GS al Neutrino (-gsm). Off păstrează implicit-ul jocului.
+  NEUTRINO_PATH: Cale ELF Neutrino
+  HINT_NEUTRINO_PATH: Calea completă spre neutrino.elf (ex. mc0:NEUTRINO/neutrino.elf). Gol = detectare automată pe mc0/mc1.
+  POPSTARTER_PATH: Cale POPSTARTER.ELF
+  HINT_POPSTARTER_PATH: Cale personalizată POPSTARTER.ELF; revine automat la dosarul POPS al dispozitivului dacă e gol/lipsă. Tastatura e limitată la 31 de caractere; căi mai lungi prin settings_riptopl.cfg.
+  BDMA_SOURCE: Sursă BDMA
+  HINT_BDMA_SOURCE: Dispozitivul al cărui dosar POPS conține fișierele driver BDMAssault (usbd.irx.* / usbhdfsd.irx.*).
+  BDMA_MODE: Mod BDMA
+  HINT_BDMA_MODE: Driver dispozitiv bloc exFAT pe care POPSTARTER îl încarcă. Schimbarea lui copiază modulele pe card; FAT32 = niciunul (driver încorporat).
+  BDMA_SRC_USB: USB
+  BDMA_SRC_MX4SIO: MX4SIO
+  BDMA_SRC_MMCE: MMCE
+  BDMA_SRC_HDD: HDD intern
+  BDMA_MODE_FAT32: USB (FAT32)
+  BDMA_MODE_USBEXFAT: USB (exFAT)
+  BDMA_MODE_MX4SIO: MX4SIO (exFAT)
+  BDMA_MODE_MMCE: MMCE (exFAT)
+  BDMA_MODE_ATA: HDD (exFAT)
+  BDMA_ERR_SRC: Fișierele modul BDMA nu au fost găsite pe dispozitivul sursă.
+  BDMA_ERR_SPACE: Spațiu insuficient pe cardul de memorie pentru modulele BDMA.
+  BDMA_ERR_IO: Eroare la scrierea modulelor BDMA pe cardul de memorie.
+  COVERFLOW_SETTINGS: Setări Coverflow
+  COVERFLOW_COUNT: Număr Coperte
+  COVERFLOW_SCALE: Scară Centru
+  COVERFLOW_ANIM: Viteză Animație
+  COVERFLOW_DIM: Estompează Coperte Laterale
+  NONE: Niciunul
+  SMALL: Mic
+  LARGE: Mare
+  NORMAL: Normal
+  FAV: Favorite
+  FAVMODE: Mod Pornire Favorite
+  FAV_HINT: Favorit
+  FAV_MSG: '%s nu este permis prin Meniul de Favorite.'
+  FAV_PERSISTENCE_MSG: '%s nu este permis cât timp elementul este marcat ca favorit.'
+  NEUTRINO_DEVICE: Dispozitiv Neutrino
+  HINT_NEUTRINO_DEVICE: Dispozitivul care conține neutrino.elf (într-un dosar NEUTRINO/ sau neutrino/). Auto scanează mai întâi mc0, apoi mc1.
+  NARGS_QB: Pornire Rapidă (-qb)
+  NARGS_CWD: Dosar de Lucru (-cwd)
+  NARGS_CFG: Configurare (-cfg)
+  NARGS_ELF: ELF de Pornire (-elf)
+  NARGS_ATA0: Imagine ATA0 (-ata0)
+  NARGS_ATA0ID: ID ATA0 (-ata0id)
+  NARGS_ATA1: Imagine ATA1 (-ata1)
+  NARGS_EXTRA: Argumente Suplimentare
+  NARGS_AUTO_NOTE: 'Auto: -bsd -dvd -gc -gsm -mc -dbc -logo'
+  ENABLE_ART_TAR: Arhivă .tar cu coperte
+  DISABLE_ALL: Dezactivează tot
+  BOOT_LOADING_CONFIG: Se încarcă setările...
+  BOOT_SCANNING_BDM: Se scanează unitățile USB / card / rețea...
+  BOOT_SCANNING_NET: Se pornește rețeaua...
+  BOOT_SCANNING_HDD: Se scanează HDD...
+  BOOT_READY: Gata.
+  UDPFS_GAMES: "Jocuri UDPFS"
+  UDPFSBD_GAMES: "Jocuri UDPFSBD"
+  NET_PROTOCOL: "Protocol de rețea"
+  NET_NEEDS_NEUTRINO: "Jocurile de rețea (UDP) pot fi pornite doar prin nucleul Neutrino. Verificați dacă neutrino.elf este prezent și dacă formatul este acceptat."
+  VCD_NOT_ON_NET: "Jocurile PS1 (.VCD) nu pot fi pornite de pe dispozitivul de rețea."
+  MX4SIO_PADEMU_WARN: "MX4SIO și emularea controlerului folosesc aceeași magistrală SIO2, iar jocul s-ar putea să nu pornească."
+  HINT_OSD_SETTINGS_LNG: "Impune o limbă personalizată"
+  OSD_SETTINGS_TVASPECT: "Dimensiune ecran"
+  FULL_SCREEN: "Ecran complet"
+  OSD_SETTINGS_VMODE: "Mod video"
+  SYSTEM_DEFAULT: "Implicit sistem"
+  HIGH: "Ridicată"
+  LOW: "Scăzută"
+  XSENSITIVITY: "Sensibilitate analogică axa X"
+  YSENSITIVITY: "Sensibilitate analogică axa Y"
+  FILE_COUNT: "Fișiere găsite: %i"
+  CHEAT_SELECTION: "Selectare cheat-uri"
+  HDD_HINT: "Este permis un singur HDD; activarea blochează APA sau GPT."
+  MMCE_GAMEID_NEUTRINO_SKIP: "MMCE GameID neaplicat -- neutrino.elf este pe acest card (schimbarea ar descărca Neutrino)."
+  POPSTARTER_DEVICE: "Dispozitiv POPSTARTER.ELF"
+  HINT_POPSTARTER_DEVICE: "Dispozitivul care conține POPS/POPSTARTER.ELF pentru pornirea PS1 VCD. Implicit = dispozitivul de pornire (cwd), apoi dispozitivul propriu al VCD-ului. Custom afișează un câmp liber pentru cale."
+  BDMA_APPLY: "Aplică VCD BDMA la pornire"
+  HINT_BDMA_APPLY: "Pornit: înainte de pornire pune automat pe cardul de memorie driverul exFAT potrivit al VCD-ului lansat (recomandat). Oprit: gestionați manual cu selectoarele BDMA Source/Mode de mai jos."
+  NETBOOT_RESTART: "Reporniți OPL pentru a aplica modificarea protocolului de pornire din rețea."
+  UDPFS_MODE: "Acces UDPFS"
+  "MENU": "Meniu"
+  "APPS": "Aplicații"
+  "DEBUG": "Culori depanare"
+  "COVERART": "Coperți"
+  "IP_ADDRESS_TYPE_DHCP": "DHCP"
+  "PORT": "Port"
+  "ADDR_TYPE_IP": "IP"
+  "ADDR_TYPE_NETBIOS": "NetBIOS"
+  "ENABLE_WRITE": "Operații de scriere"
+  "MODE1": "Mod 1"
+  "MODE2": "Mod 2"
+  "MODE3": "Mod 3"
+  "MODE4": "Mod 4"
+  "MODE5": "Mod 5"
+  "MODE6": "Mod 6"
+  "ENABLEGSM": "Selector GSM"
+  "OVERSCAN": "Overscan"
+  "ENABLECHEAT": "Motor de coduri PS2RD"
+  "PADEMU_ENABLE": "Emulator controler"
+  "DS34USB_MODE": "DualShock3/4 USB"
+  "PADEMU_PORT": "Emulare"
+  "PADEMU_VIB": "Vibrație"
+  "PADEMU_WORKAROUND": "Soluție DS3 fals"
+  "SFX": "Efecte sonore"
+  "BOOT_SND": "Sunet la pornire"
+  "ENABLE_NOTIFICATIONS": "Notificări"
+  "OPTIONS": "Opțiuni"
+  "GLOBAL_SETTINGS": "Global"
+  "INFO_GENRE": "Gen"
+  "INFO_RELEASE": "Lansare"
+  "INFO_DESCRIPTION": "Descriere"
+  "BLOCKDEVICE_SETTINGS": "Dispozitive bloc"
+  "CONTROLLER_SETTINGS": "Setări controler"
+  "HINT_BDM_START": "Activează/dezactivează Managerul de dispozitive bloc."
+  "HINT_BLOCK_DEVICES": "Activează/dezactivează dispozitivele bloc (ex. USB)."
+  "USB_GAMES": "Jocuri USB"
+  "ILINK_GAMES": "Jocuri iLink"
+  "MX4SIO_GAMES": "Jocuri MX4SIO"
+  "PADMACROCONFIG": "Configurează PADMACRO"
+  "PADMACRO_SETTINGS": "Setări macro controler"
+  "PADMACRO_ENABLE": "Macrouri controler"
+  "PADMACRO_SLOWDOWN": "Încetinire analogică:"
+  "HINT_PADMACRO_SLOWDOWN_AXIS": "Reduce raza manetei analogice când butonul este apăsat"
+  "LEFT_ANALOG": "Maneta stângă"
+  "RIGHT_ANALOG": "Maneta dreaptă"
+  "PADMACRO_INVERT_AXIS": "Inversare axă analogică:"
+  "HINT_PADMACRO_INVERT_AXIS": "Inversează axa manetei analogice"
+  "TURBO_SPEED": "Viteză buton turbo"
+  "HINT_TURBO_SPEED": "Cât de rapid se apasă butonul când turbo este activ"
+  "ACT_WHILE_PRESSED": "Cât timp butonul este apăsat"
+  "ACT_TOGGLED": "Comutat prin buton"
+  "LANGUAGE_JAPANESE": "JAPONEZĂ"
+  "LANGUAGE_ENGLISH": "ENGLEZĂ"
+  "LANGUAGE_FRENCH": "FRANCEZĂ"
+  "LANGUAGE_SPANISH": "SPANIOLĂ"
+  "LANGUAGE_GERMAN": "GERMANĂ"
+  "LANGUAGE_ITALIAN": "ITALIANĂ"
+  "LANGUAGE_DUTCH": "OLANDEZĂ"
+  "LANGUAGE_PORTUGUESE": "PORTUGHEZĂ"
+  "LANGUAGE_RUSSIAN": "RUSĂ"
+  "LANGUAGE_KOREAN": "COREEANĂ"
+  "LANGUAGE_TRAD_CHINESE": "CHINEZĂ TRADIȚIONALĂ"
+  "LANGUAGE_SIMPL_CHINESE": "CHINEZĂ SIMPLIFICATĂ"
+  "OSD_SETTINGS": "Setări OSD"
+  "OSD_SETTINGS_LNG": "Limbă OSD"
+  "ENABLE_LNG": "Schimbă limba"
+  "BGM": "Muzică de fundal"
+  "BGM_VOLUME": "Volum muzică de fundal"
+  "DEF_BGM_PATH": "Muzică temă implicită"
+  "DEF_BGM_PATH_HINT": "Setează calea pentru redarea muzicii temei interne."
+  "BOOT_SCANNING_MC": "Se scanează cardurile de memorie..."
+  "BOOT_LOADING_DRIVERS": "Se încarcă driverele de stocare..."
+  "BOOT_LOADING_USB": "Se încarcă driverul de stocare USB..."
+  "BOOT_ARMING_MMCE": "Se pregătește game-ID MMCE..."
+  "BOOT_LOADING_SOUNDS": "Se încarcă sunetele temei..."
+  "BOOT_BUILDING_MENU": "Se construiește meniul..."
+  "NET_UDPFS_TAB_HINT": "UDPFS activat -- deschide noua fila UDPFS si apasa Confirmare pentru a conecta. Partea PC ruleaza udpfsd -fsroot <games folder>."
+  "NET_UDPBD_TAB_HINT": "Dispozitiv bloc de retea activat -- fila sa apare dupa ce serverul PC raspunde (udpfsd -bdpath pentru UDPFS Image, udpbd-server pentru UDPBD)."
+  "NEUTRINO_VMC_MISSING": "Fisierul VMC per joc nu a fost gasit -- se lanseaza fara el (jocul foloseste cardul real)."
+  "NEUTRINO_DEV_UNSUPPORTED": "Neutrino nu poate lansa de pe acest dispozitiv -- lansare anulată."
+  "NEUTRINO_TOML_SYNC_FAILED": "Configuratia de retea Neutrino (bsd toml) lipseste sau nu poate fi scrisa -- lansare anulata, verifica folderul neutrino."
+  "NEUTRINO_TOO_FRAGMENTED": "Prea fragmentat pentru Neutrino (%d fragmente, limita %d incl. VMC-uri) -- se incearca in schimb nucleul OPL."
+  "NEUTRINO_TOO_FRAGMENTED_NET": "Prea fragmentat pentru Neutrino (%d fragmente, limita %d incl. VMC-uri) -- defragmenteaza pe PC; lansare anulata."
+  "NEUTRINO_GSM_COMP": "Compatibilitate GSM Neutrino"
+  "HINT_NEUTRINO_GSM_COMP": "Corectie de inversare a campurilor pentru jocurile care tremura sau se rup sub un mod Video Neutrino fortat. Necesita un mod Video Neutrino setat."
+  "NARGS_DBC": "Culori depanare (-dbc)"
+  "NARGS_LOGO": "Logo PS2 (-logo)"
+  "VMC_SLOT1_DISABLE": "Dezactivează VMC 1 (păstrează cardul)"
+  "VMC_SLOT2_DISABLE": "Dezactivează VMC 2 (păstrează cardul)"
+  "HINT_VMC_SLOT_DISABLE": "Lanseaza fara VMC-ul acestui slot, pastrand cardul configurat. Doar lansarile Neutrino; jocul foloseste apoi cardul real din acel slot."
+  "NEUTRINO_BSDFS": "Sistem de fișiere Neutrino"
+  "HINT_NEUTRINO_BSDFS": "Forteaza sistemul de fisiere al dispozitivului bloc al Neutrino (-bsdfs). Auto = implicit pentru fiecare dispozitiv. hdl/bd sunt optiuni pentru experti; asociaza-le cu un -dvd= potrivit in argumentele de lansare daca forma caii automate nu se potriveste."
+  "PLASCOLOR": "Culoare amestec plasmă"
+  "VCD_HIDE_GAMEID": "Ascunde ID joc PS1 (listă VCD)"
+  "HINT_VCD_HIDE_GAMEID": "Doar cosmetic -- ascunde un prefix de ID de joc de la inceput (de ex. SLUS_005.51.) din numele listelor PS1/VCD. Numele fara ID sunt afisate ca atare. Nu modifica lansarea, coperta sau favoritele."
+  "VCD_FIRST_DISC": "Doar primul disc (PS1 multi-disc)"
+  "HINT_VCD_FIRST_DISC": "Afiseaza doar Discul 1 al unui joc PS1 pe mai multe discuri in listele de dispozitive (stil POPSLoader). Ascunde fisierele denumite (Disc 2), (CD 2) etc. Toate discurile raman pe card pentru schimbarea in timpul jocului; Favoritele nu sunt filtrate."
+  "GAMES_DEVICE": "Dispozitivul jocului"
+  "DEFAULT_CORE": "Nucleu de încărcare implicit"
+  "HINT_DEFAULT_CORE": "Nucleul implicit global pentru jocurile al caror Nucleu de incarcare per joc este setat la Implicit. <OPL> este nucleul nativ; Neutrino inlantuie neutrino.elf extern. O alegere per joc suprascrie intotdeauna aceasta setare."
+  "VCD_SETTINGS": "Setări VCD"
+  "FINANCIAL_SUPPORT": "Sprijin financiar"

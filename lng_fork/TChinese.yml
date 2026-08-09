@@ -1,0 +1,229 @@
+translations:
+  AUTOSORT: 遊戲按字母排序
+  RUMBLE: 選單中控制器震動
+  HINT_RUMBLE: 移動游標、確認或返回時短暫震動 -- 需要類比模式的 DualShock
+  FOLDER_NAV: 在遊戲清單中瀏覽資料夾
+  HINT_FOLDER_NAV: 將 CD/DVD 的子資料夾顯示為可瀏覽項目，選取開啟，取消返回
+  SETTINGS_NO_HOME: 找不到記憶卡 -- 無法儲存設定。OPL 從網路裝置啟動，設定必須存放在本機記憶卡上。
+  ERROR_SAVING_SETTINGS_TO: 無法將設定寫入 %s（錯誤 %d）
+  GENERAL_SETTINGS: 一般設定
+  DEVICE_SETTINGS: 裝置設定
+  LAUNCH_PS2_DISC: 啟動 PS2 光碟
+  DISC_LAUNCH_ERR: 光碟機中沒有 PS2 光碟。
+  DEFAULT: 預設
+  HINT_MODE7: 僅限 Neutrino — 修正導致 IOP 緩衝區溢位的遊戲 (-gc=7)
+  MODE7: Mode 7
+  ENABLEIMAGE: PS2RD 金手指映像
+  HINT_ENABLEIMAGE: 為遊戲套用預建的 PS2RD .img 補丁。
+  UDPBD_GAMES: UDPBD Games
+  MMCE: MMCE
+  MMCE_GAMES: MMCE Games
+  MMCEMODE: MMCE 啟動模式
+  MMCE_PREFIX: MMCE 前置路徑
+  MMCE_SLOT: MMCE 插槽
+  MMCEIGR_SLOT: IGR 開機卡插槽
+  HINT_MMCEIGR_SLOT: IGR 時，切換開機卡指令將發送至所選插槽
+  MMCE_ADVANCED: 進階
+  MMCE_SETTINGS: MMCE 設定
+  MMCE_SEMA: 鎖定 Sema 排隊方式
+  HINT_MMCE_SEMA: THFIFO 可能提升相容性，但會降低效能
+  MMCE_WAIT_CYCLES: /ACK 低電位後等待週期數
+  HINT_MMCE_WAIT_CYCLES: 較低的值可能提升效能，但可能造成不穩定
+  MMCE_USE_ALARMS: 使用逾時警報
+  HINT_MMCE_USE_ALARMS: 關閉可能提升效能，但 MMCE 逾時時可能造成當機
+  CORE_LOADER: 核心載入器
+  NEUTRINO_BAD_FORMAT: Neutrino 不支援此檔案格式，改以 <OPL> 核心啟動
+  NEUTRINO_NOT_FOUND: 找不到 Neutrino ELF，改以 <OPL> 核心啟動
+  UDPBD_NEEDS_STATIC_IP: UDPBD 需要靜態 PS2 IP。請在網路設定中指定（目前已啟用 DHCP）。
+  NEUTRINO_SETTING_NA: 此設定不適用於 Neutrino 核心。
+  POPSTARTER_NOT_FOUND: 找不到 POPSTARTER.ELF
+  POPSTARTER_SMB_MISSING: POPSTARTER SMB 相依檔案不存在
+  WRITE_POPSTARTER_NET: 寫入 POPSTARTER 網路設定
+  HINT_WRITE_POPSTARTER_NET: 同時將 IP 及 SMB 共享值儲存至記憶卡上 POPSTARTER 自身的 IPCONFIG.DAT / SMBCONFIG.DAT（用於 VCD over SMB）。
+  POPSTARTER_NET_ERR: 無法將 POPSTARTER 網路設定寫入記憶卡。
+  VCD: VCD
+  VCD_ON: 顯示 VCD 遊戲
+  VCD_OFF: 顯示光碟遊戲
+  NEUTRINO_ARGS: Neutrino 啟動參數
+  HINT_NEUTRINO_ARGS: 額外的 Neutrino 旗標，以空格分隔（例如 -mt=dvd）。全域設定套用至所有遊戲；個別遊戲設定疊加於其上。在旗標前加 $ 可停用而不刪除。
+  NEUTRINO_VIDEO: Neutrino 影像
+  HINT_NEUTRINO_VIDEO: 強制指定 Neutrino 的 GS 輸出影像模式 (-gsm)。關閉則保留遊戲預設值。
+  NEUTRINO_PATH: Neutrino ELF 路徑
+  HINT_NEUTRINO_PATH: neutrino.elf 的完整路徑（例如 mc0:NEUTRINO/neutrino.elf）。留空則自動在 mc0/mc1 偵測。
+  POPSTARTER_PATH: POPSTARTER.ELF 路徑
+  HINT_POPSTARTER_PATH: 自訂 POPSTARTER.ELF 路徑；留空或找不到時自動改用裝置 POPS 資料夾。鍵盤輸入上限 31 字元；較長路徑請透過 settings_riptopl.cfg 設定。
+  BDMA_SOURCE: BDMA 來源
+  HINT_BDMA_SOURCE: 存放 BDMAssault 驅動程式檔案 (usbd.irx.* / usbhdfsd.irx.*) 之 POPS 資料夾所在裝置。
+  BDMA_MODE: BDMA 模式
+  HINT_BDMA_MODE: POPSTARTER 載入的 exFAT 區塊裝置驅動程式。變更時會將模組複製至記憶卡；FAT32 = 無（使用內建驅動程式）。
+  BDMA_SRC_USB: USB
+  BDMA_SRC_MX4SIO: MX4SIO
+  BDMA_SRC_MMCE: MMCE
+  BDMA_SRC_HDD: 內置硬碟
+  BDMA_MODE_FAT32: USB (FAT32)
+  BDMA_MODE_USBEXFAT: USB (exFAT)
+  BDMA_MODE_MX4SIO: MX4SIO (exFAT)
+  BDMA_MODE_MMCE: MMCE (exFAT)
+  BDMA_MODE_ATA: HDD (exFAT)
+  BDMA_ERR_SRC: 在來源裝置上找不到 BDMA 模組檔案。
+  BDMA_ERR_SPACE: 記憶卡空間不足，無法存放 BDMA 模組。
+  BDMA_ERR_IO: 將 BDMA 模組寫入記憶卡時發生錯誤。
+  COVERFLOW_SETTINGS: Coverflow 設定
+  COVERFLOW_COUNT: 封面數量
+  COVERFLOW_SCALE: 中央縮放
+  COVERFLOW_ANIM: 動畫速度
+  COVERFLOW_DIM: 暗化側邊封面
+  NONE: 無
+  SMALL: 小
+  LARGE: 大
+  NORMAL: 正常
+  FAV: 最愛
+  FAVMODE: 最愛啟動模式
+  FAV_HINT: 最愛
+  FAV_MSG: '%s 不允許透過最愛選單操作。'
+  FAV_PERSISTENCE_MSG: '%s 在項目標記為最愛時不可使用。'
+  NEUTRINO_DEVICE: Neutrino 裝置
+  HINT_NEUTRINO_DEVICE: 存放 neutrino.elf 的裝置（位於 NEUTRINO/ 或 neutrino/ 資料夾）。Auto 模式依序掃描 mc0 再掃描 mc1。
+  NARGS_QB: 快速開機 (-qb)
+  NARGS_CWD: 工作目錄 (-cwd)
+  NARGS_CFG: 設定檔 (-cfg)
+  NARGS_ELF: 開機 ELF (-elf)
+  NARGS_ATA0: ATA0 映像 (-ata0)
+  NARGS_ATA0ID: ATA0 ID (-ata0id)
+  NARGS_ATA1: ATA1 映像 (-ata1)
+  NARGS_EXTRA: 額外參數
+  NARGS_AUTO_NOTE: 'Auto: -bsd -dvd -gc -gsm -mc -dbc -logo'
+  ENABLE_ART_TAR: 封面圖 .tar 封存檔
+  DISABLE_ALL: 全部停用
+  BOOT_LOADING_CONFIG: 正在載入設定...
+  BOOT_SCANNING_BDM: 正在掃描 USB / 記憶卡 / 網路磁碟...
+  BOOT_SCANNING_NET: 正在啟動網路...
+  BOOT_SCANNING_HDD: 正在掃描 HDD...
+  BOOT_READY: 就緒。
+  UDPFS_GAMES: "UDPFS 遊戲"
+  UDPFSBD_GAMES: "UDPFSBD 遊戲"
+  NET_PROTOCOL: "網路協定"
+  NET_NEEDS_NEUTRINO: "網路（UDP）遊戲只能透過 Neutrino 核心啟動。請檢查 neutrino.elf 是否存在且格式受支援。"
+  VCD_NOT_ON_NET: "PS1（.VCD）遊戲無法透過網路裝置啟動。"
+  MX4SIO_PADEMU_WARN: "MX4SIO 與手把模擬共用 SIO2 匯流排，遊戲可能無法啟動。"
+  HINT_OSD_SETTINGS_LNG: "強制使用自訂語言設定"
+  OSD_SETTINGS_TVASPECT: "螢幕尺寸"
+  FULL_SCREEN: "全螢幕"
+  OSD_SETTINGS_VMODE: "視訊模式"
+  SYSTEM_DEFAULT: "系統預設"
+  HIGH: "高"
+  LOW: "低"
+  XSENSITIVITY: "類比搖桿 X 軸靈敏度"
+  YSENSITIVITY: "類比搖桿 Y 軸靈敏度"
+  FILE_COUNT: "找到檔案：%i"
+  CHEAT_SELECTION: "金手指選擇"
+  HDD_HINT: "僅允許一個 HDD，啟用後將鎖定為 APA 或 GPT。"
+  MMCE_GAMEID_NEUTRINO_SKIP: "未套用 MMCE GameID -- 此卡上存在 neutrino.elf（切換會卸載 Neutrino）。"
+  POPSTARTER_DEVICE: "POPSTARTER.ELF 裝置"
+  HINT_POPSTARTER_DEVICE: "用於 PS1 VCD 啟動、存放 POPS/POPSTARTER.ELF 的裝置。預設 = 啟動裝置（cwd），其次為 VCD 自身裝置。自訂會顯示自由輸入路徑。"
+  BDMA_APPLY: "啟動時套用 VCD BDMA"
+  HINT_BDMA_APPLY: "開啟：啟動前自動將所啟動 VCD 對應的 exFAT 驅動裝載到記憶卡（建議）。關閉：使用下方的 BDMA 來源/模式選擇器自行管理。"
+  NETBOOT_RESTART: "重新啟動 OPL 以套用網路啟動協定的變更。"
+  UDPFS_MODE: "UDPFS 存取"
+  "MENU": "選單"
+  "APPS": "應用程式"
+  "DEBUG": "除錯顏色"
+  "COVERART": "封面圖"
+  "IP_ADDRESS_TYPE_DHCP": "DHCP"
+  "PORT": "Port"
+  "ADDR_TYPE_IP": "IP"
+  "ADDR_TYPE_NETBIOS": "NetBIOS"
+  "ENABLE_WRITE": "寫入操作"
+  "MODE1": "模式 1"
+  "MODE2": "模式 2"
+  "MODE3": "模式 3"
+  "MODE4": "模式 4"
+  "MODE5": "模式 5"
+  "MODE6": "模式 6"
+  "ENABLEGSM": "GSM 選擇器"
+  "OVERSCAN": "過掃描"
+  "ENABLECHEAT": "PS2RD 金手指引擎"
+  "PADEMU_ENABLE": "手把模擬器"
+  "DS34USB_MODE": "DualShock3/4 USB"
+  "PADEMU_PORT": "模擬"
+  "PADEMU_VIB": "震動"
+  "PADEMU_WORKAROUND": "偽 DS3 相容處理"
+  "SFX": "音效"
+  "BOOT_SND": "開機音效"
+  "ENABLE_NOTIFICATIONS": "通知"
+  "OPTIONS": "選項"
+  "GLOBAL_SETTINGS": "全域"
+  "INFO_GENRE": "類型"
+  "INFO_RELEASE": "發行"
+  "INFO_DESCRIPTION": "說明"
+  "BLOCKDEVICE_SETTINGS": "區塊裝置"
+  "CONTROLLER_SETTINGS": "控制器設定"
+  "HINT_BDM_START": "開啟／關閉區塊裝置管理員。"
+  "HINT_BLOCK_DEVICES": "開啟／關閉區塊裝置（例如 USB）。"
+  "USB_GAMES": "USB 遊戲"
+  "ILINK_GAMES": "iLink 遊戲"
+  "MX4SIO_GAMES": "MX4SIO 遊戲"
+  "PADMACROCONFIG": "設定 PADMACRO"
+  "PADMACRO_SETTINGS": "手把巨集設定"
+  "PADMACRO_ENABLE": "手把巨集"
+  "PADMACRO_SLOWDOWN": "類比減速："
+  "HINT_PADMACRO_SLOWDOWN_AXIS": "按下按鈕時降低類比搖桿的範圍"
+  "LEFT_ANALOG": "左搖桿"
+  "RIGHT_ANALOG": "右搖桿"
+  "PADMACRO_INVERT_AXIS": "類比軸反轉："
+  "HINT_PADMACRO_INVERT_AXIS": "反轉類比搖桿軸向"
+  "TURBO_SPEED": "連發按鈕速度"
+  "HINT_TURBO_SPEED": "連發啟用時按下按鈕的速度"
+  "ACT_WHILE_PRESSED": "按住按鈕時"
+  "ACT_TOGGLED": "以按鈕切換"
+  "LANGUAGE_JAPANESE": "日文"
+  "LANGUAGE_ENGLISH": "英文"
+  "LANGUAGE_FRENCH": "法文"
+  "LANGUAGE_SPANISH": "西班牙文"
+  "LANGUAGE_GERMAN": "德文"
+  "LANGUAGE_ITALIAN": "義大利文"
+  "LANGUAGE_DUTCH": "荷蘭文"
+  "LANGUAGE_PORTUGUESE": "葡萄牙文"
+  "LANGUAGE_RUSSIAN": "俄文"
+  "LANGUAGE_KOREAN": "韓文"
+  "LANGUAGE_TRAD_CHINESE": "繁體中文"
+  "LANGUAGE_SIMPL_CHINESE": "簡體中文"
+  "OSD_SETTINGS": "OSD 設定"
+  "OSD_SETTINGS_LNG": "OSD 語言"
+  "ENABLE_LNG": "變更語言"
+  "BGM": "背景音樂"
+  "BGM_VOLUME": "背景音樂音量"
+  "DEF_BGM_PATH": "預設主題音樂"
+  "DEF_BGM_PATH_HINT": "設定內建主題串流音樂的路徑。"
+  "BOOT_SCANNING_MC": "正在掃描記憶卡…"
+  "BOOT_LOADING_DRIVERS": "正在載入儲存裝置驅動程式…"
+  "BOOT_LOADING_USB": "正在載入 USB 儲存裝置驅動程式…"
+  "BOOT_ARMING_MMCE": "正在啟用 MMCE game-ID…"
+  "BOOT_LOADING_SOUNDS": "正在載入主題音效…"
+  "BOOT_BUILDING_MENU": "正在建立選單…"
+  "NET_UDPFS_TAB_HINT": "UDPFS 已開啟——開啟新的 UDPFS 分頁並按下確認以連線。PC 端執行 udpfsd -fsroot <games folder>。"
+  "NET_UDPBD_TAB_HINT": "網路區塊裝置已開啟——當 PC 伺服器回應後，其分頁便會出現（UDPFS 映像用 udpfsd -bdpath，UDPBD 用 udpbd-server）。"
+  "NEUTRINO_VMC_MISSING": "找不到各遊戲的 VMC 檔案——將不使用它啟動（遊戲會使用其實體卡片）。"
+  "NEUTRINO_DEV_UNSUPPORTED": "Neutrino 無法從此裝置啟動 -- 已中止啟動。"
+  "NEUTRINO_TOML_SYNC_FAILED": "Neutrino 網路設定（bsd toml）遺失或無法寫入——已中止啟動，請檢查 neutrino 資料夾。"
+  "NEUTRINO_TOO_FRAGMENTED": "對 Neutrino 而言過於分散（%d 個片段，上限 %d 含 VMC）——改為嘗試 OPL 核心。"
+  "NEUTRINO_TOO_FRAGMENTED_NET": "對 Neutrino 而言過於分散（%d 個片段，上限 %d 含 VMC）——請在 PC 上進行重組；已中止啟動。"
+  "NEUTRINO_GSM_COMP": "Neutrino GSM 相容性"
+  "HINT_NEUTRINO_GSM_COMP": "針對在強制 Neutrino Video 模式下抖動或撕裂的遊戲，提供欄位翻轉（field-flipping）修正。需先設定 Neutrino Video 模式。"
+  "NARGS_DBC": "除錯顏色 (-dbc)"
+  "NARGS_LOGO": "PS2 標誌 (-logo)"
+  "VMC_SLOT1_DISABLE": "停用 VMC 1（保留卡片）"
+  "VMC_SLOT2_DISABLE": "停用 VMC 2（保留卡片）"
+  "HINT_VMC_SLOT_DISABLE": "在保留此插槽卡片設定的情況下，不使用此插槽的 VMC 啟動。僅限 Neutrino 啟動；遊戲隨後會使用該插槽中的實體卡片。"
+  "NEUTRINO_BSDFS": "Neutrino 檔案系統"
+  "HINT_NEUTRINO_BSDFS": "強制指定 Neutrino 的區塊裝置檔案系統（-bsdfs）。Auto = 各裝置預設值。hdl/bd 為進階選項；若自動路徑形式不符，請在啟動參數中搭配對應的 -dvd= 使用。"
+  "PLASCOLOR": "電漿混合顏色"
+  "VCD_HIDE_GAMEID": "隱藏 PS1 遊戲 ID（VCD 清單）"
+  "HINT_VCD_HIDE_GAMEID": "僅為外觀效果——在 PS1/VCD 清單名稱中隱藏開頭的遊戲 ID 前綴（例如 SLUS_005.51.）。沒有 ID 的名稱會照原樣顯示。不會變更啟動、封面圖或我的最愛。"
+  "VCD_FIRST_DISC": "僅第一片光碟（多片 PS1）"
+  "HINT_VCD_FIRST_DISC": "在裝置清單中只顯示多光碟 PS1 遊戲的第 1 片光碟（POPSLoader 風格）。隱藏名稱含 (Disc 2)、(CD 2) 等的檔案。所有光碟仍保留在卡片上以供遊戲中切換；我的最愛不受篩選影響。"
+  "GAMES_DEVICE": "遊戲裝置"
+  "DEFAULT_CORE": "預設載入核心"
+  "HINT_DEFAULT_CORE": "當各遊戲的 Loader Core 設為 Default 時，套用的全域預設核心。<OPL> 為原生核心；Neutrino 會串接外部的 neutrino.elf。各遊戲的個別選擇一律優先於此設定。"
+  "VCD_SETTINGS": "VCD 設定"
+  "FINANCIAL_SUPPORT": "財務支持"

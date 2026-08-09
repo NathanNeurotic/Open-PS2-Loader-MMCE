@@ -108,6 +108,25 @@ def update_translation_yml(base_obj: Dict[str, Any], translation_obj: Dict[str, 
     yaml.dump(translation_obj, output_file, **YAML_DUMP_ARGS)
 
 
+def overlay_translation_yml(translation_obj: Dict[str, Any], overlay_obj: Dict[str, Any], output_file: TextIOWrapper) -> None:
+    # Fork-maintained overlay: fill in translations for labels this fork added
+    # (or that upstream hasn't translated yet) without touching the upstream
+    # language files in lng_src/. Only GAPS are filled -- a label that already
+    # carries a plain-string (human) translation is left untouched, so once
+    # upstream translates a label the overlay quietly steps aside. Re-running is
+    # idempotent (a filled label becomes a plain string and is skipped next time).
+    translations = translation_obj.setdefault('translations', {})
+    overlay = (overlay_obj or {}).get('translations', {}) or {}
+    for label, value in overlay.items():
+        if not isinstance(value, str):
+            continue  # only plain-string overlay entries are applied
+        if isinstance(translations.get(label), str):
+            continue  # already translated (don't clobber a human translation)
+        translations[label] = value
+
+    yaml.dump(translation_obj, output_file, **YAML_DUMP_ARGS)
+
+
 def make_lng(
     base_obj: Dict[str, Any],
     translation_obj: Dict[str, Any],
@@ -141,22 +160,29 @@ if __name__ == '__main__':
     action_group.add_argument('--make_source', action='store_true')
     action_group.add_argument('--make_template_yml', action='store_true')
     action_group.add_argument('--update_translation_yml', action='store_true')
+    action_group.add_argument('--overlay_translation_yml', action='store_true')
     action_group.add_argument('--make_lng', action='store_true')
 
     parser.add_argument('--base', type=argparse.FileType('r', encoding='utf-8'), required=True, metavar="BASE_YML")
     parser.add_argument('--translation', type=argparse.FileType('r+', encoding='utf-8'), metavar="LANG_YML")
+    parser.add_argument('--overlay', type=argparse.FileType('r', encoding='utf-8'), metavar="OVERLAY_YML")
     parser.add_argument('output_file', nargs='?', type=argparse.FileType('w', encoding='utf-8'), default=sys.stdout)
 
     args = parser.parse_args()
     if args.translation is None:
-        if args.make_lng or args.update_translation_yml:
+        if args.make_lng or args.update_translation_yml or args.overlay_translation_yml:
             option = ''
             if args.make_lng:
                 option = 'make_lng'
             elif args.update_translation_yml:
                 option = 'update_translation_yml'
+            elif args.overlay_translation_yml:
+                option = 'overlay_translation_yml'
 
             raise KeyError(f"Translation YML is required when --{option} option is selected")
+
+    if args.overlay_translation_yml and args.overlay is None:
+        raise KeyError("Overlay YML is required when --overlay_translation_yml option is selected")
 
     base_obj = yaml.safe_load(args.base)
     if args.make_header:
@@ -169,6 +195,12 @@ if __name__ == '__main__':
         translation_obj = yaml.safe_load(args.translation)
         args.translation.seek(0)
         update_translation_yml(base_obj, translation_obj, args.translation)
+        args.translation.truncate()
+    elif args.overlay_translation_yml:
+        translation_obj = yaml.safe_load(args.translation)
+        overlay_obj = yaml.safe_load(args.overlay)
+        args.translation.seek(0)
+        overlay_translation_yml(translation_obj, overlay_obj, args.translation)
         args.translation.truncate()
     elif args.make_lng:
         translation_obj = yaml.safe_load(args.translation)

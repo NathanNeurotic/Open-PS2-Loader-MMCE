@@ -1,0 +1,229 @@
+translations:
+  AUTOSORT: Rendit lojrat alfabetikisht
+  RUMBLE: Dridhje e komandës në menu
+  HINT_RUMBLE: Dridhje e shkurtër kur lëviz kursorin, konfirmon ose kthehesh -- kërkon një DualShock në modalitet analog
+  FOLDER_NAV: Shfleto dosjet në listën e lojrave
+  HINT_FOLDER_NAV: Shfaq nëndosjet e CD/DVD si hyrje të shfletueshme; zgjidh për të hapur, anulo për t'u kthyer
+  SETTINGS_NO_HOME: Nuk u gjet kartë memorie -- cilësimet nuk mund të ruhen. OPL u nis nga një pajisje rrjeti, cilësimet e së cilës duhet të qëndrojnë në një kartë lokale.
+  ERROR_SAVING_SETTINGS_TO: Cilësimet nuk u shkruan dot te %s (gabimi %d)
+  GENERAL_SETTINGS: Cilësimet e Përgjithshme
+  DEVICE_SETTINGS: Cilësimet e Pajisjes
+  LAUNCH_PS2_DISC: Nisja e Diskut PS2
+  DISC_LAUNCH_ERR: Nuk ka disk PS2 në lexues.
+  DEFAULT: Parazgjedhje
+  HINT_MODE7: Vetëm Neutrino -- rregullon lojërat që tejkalojnë një bufer IOP (-gc=7)
+  MODE7: Mode 7
+  ENABLEIMAGE: Imazhi i Mashtrimit PS2RD
+  HINT_ENABLEIMAGE: Zbato një patch të parandërtuar PS2RD .img në lojën tënde.
+  UDPBD_GAMES: UDPBD Games
+  MMCE: MMCE
+  MMCE_GAMES: MMCE Games
+  MMCEMODE: Modaliteti i Nisjes MMCE
+  MMCE_PREFIX: Shtegu i Prefiksit MMCE
+  MMCE_SLOT: Foleja MMCE
+  MMCEIGR_SLOT: Foleja/et e Kartës IGR
+  HINT_MMCEIGR_SLOT: Komanda e kalimit në kartë do t'i dërgohet folejeve të zgjedhura gjatë IGR
+  MMCE_ADVANCED: Të Avancuara
+  MMCE_SETTINGS: Cilësimet MMCE
+  MMCE_SEMA: Metoda e Radhës së Bllokimit Sema
+  HINT_MMCE_SEMA: THFIFO mund të ndihmojë me përputhshmërinë por të përkeqësojë performancën
+  MMCE_WAIT_CYCLES: Ciklet e pritjes pas /ACK të ulët
+  HINT_MMCE_WAIT_CYCLES: Vlerat më të ulëta mund të përmirësojnë performancën por shkaktojnë paqëndrueshmëri
+  MMCE_USE_ALARMS: Përdor alarme me afat kohor
+  HINT_MMCE_USE_ALARMS: OFF mund të ndihmojë performancën por mund të shkaktojë ngecje nga afatet kohore MMCE
+  CORE_LOADER: Bërthama e Ngarkuesit
+  NEUTRINO_BAD_FORMAT: Neutrino nuk e mbështet këtë format skedari, niset me bërthamën <OPL>
+  NEUTRINO_NOT_FOUND: ELF i Neutrino nuk u gjet, niset me bërthamën <OPL>
+  UDPBD_NEEDS_STATIC_IP: UDPBD kërkon një IP statike të PS2. Vendoseni në Konfigurimin e Rrjetit (DHCP është aktiv).
+  NEUTRINO_SETTING_NA: Kjo cilësim nuk përdoret me bërthamën Neutrino.
+  POPSTARTER_NOT_FOUND: Mungon POPSTARTER.ELF
+  POPSTARTER_SMB_MISSING: Mungojnë kërkesat SMB të POPSTARTER
+  WRITE_POPSTARTER_NET: Shkruaj Konfigurimin e Rrjetit POPSTARTER
+  HINT_WRITE_POPSTARTER_NET: Ruaj gjithashtu këto vlera IP + SMB në IPCONFIG.DAT / SMBCONFIG.DAT të POPSTARTER në kartën e memories (për VCD mbi SMB).
+  POPSTARTER_NET_ERR: Nuk u shkrua konfigurimi i rrjetit POPSTARTER në kartën e memories.
+  VCD: VCD
+  VCD_ON: Po shfaq lojërat VCD
+  VCD_OFF: Po shfaq lojërat e diskut
+  NEUTRINO_ARGS: Argumente të Nisjes Neutrino
+  HINT_NEUTRINO_ARGS: Flamurë shtesë Neutrino, të ndarë me hapësira (p.sh. -mt=dvd). Globale zbatohet për të gjitha lojërat; për-lojë shtohet sipër. Parashtro një flamur me $ për ta çaktivizuar pa fshirë.
+  NEUTRINO_VIDEO: Video Neutrino
+  HINT_NEUTRINO_VIDEO: Detyro modalitetin e videos GS të Neutrino (-gsm). Joaktive mban parazgjedhjen e lojës.
+  NEUTRINO_PATH: Shtegu ELF i Neutrino
+  HINT_NEUTRINO_PATH: Shtegu i plotë drejt neutrino.elf (p.sh. mc0:NEUTRINO/neutrino.elf). Bosh = zbulim automatik në mc0/mc1.
+  POPSTARTER_PATH: Shtegu POPSTARTER.ELF
+  HINT_POPSTARTER_PATH: Shtegu i personalizuar POPSTARTER.ELF; kthehet pa zhurmë te dosja POPS e pajisjes nëse është bosh/mungon. Tastiera kufizohet në 31 karaktere; shtegje më të gjata nëpërmjet settings_riptopl.cfg.
+  BDMA_SOURCE: Burimi BDMA
+  HINT_BDMA_SOURCE: Pajisja dosja POPS e së cilës mban skedarët e drejtuesit BDMAssault (usbd.irx.* / usbhdfsd.irx.*).
+  BDMA_MODE: Modaliteti BDMA
+  HINT_BDMA_MODE: Drejtuesi i pajisjes bllok exFAT që ngarkon POPSTARTER. Ndryshimi i tij kopjon modulet në kartë; FAT32 = asnjë (drejtues i integruar).
+  BDMA_SRC_USB: USB
+  BDMA_SRC_MX4SIO: MX4SIO
+  BDMA_SRC_MMCE: MMCE
+  BDMA_SRC_HDD: HDD i brendshëm
+  BDMA_MODE_FAT32: USB (FAT32)
+  BDMA_MODE_USBEXFAT: USB (exFAT)
+  BDMA_MODE_MX4SIO: MX4SIO (exFAT)
+  BDMA_MODE_MMCE: MMCE (exFAT)
+  BDMA_MODE_ATA: HDD (exFAT)
+  BDMA_ERR_SRC: Skedarët e modulit BDMA nuk u gjetën në pajisjen burimore.
+  BDMA_ERR_SPACE: Hapësirë e pamjaftueshme në kartën e memories për modulet BDMA.
+  BDMA_ERR_IO: Gabim gjatë shkrimit të moduleve BDMA në kartën e memories.
+  COVERFLOW_SETTINGS: Cilësimet Coverflow
+  COVERFLOW_COUNT: Numri i Kopertinave
+  COVERFLOW_SCALE: Shkalla Qendrore
+  COVERFLOW_ANIM: Shpejtësia e Animacionit
+  COVERFLOW_DIM: Errëso Kopertinат Anësore
+  NONE: Asnjë
+  SMALL: I vogël
+  LARGE: I madh
+  NORMAL: Normal
+  FAV: Të Preferuarat
+  FAVMODE: Modaliteti i Nisjes së Të Preferuarave
+  FAV_HINT: E preferuar
+  FAV_MSG: '%s nuk lejohet nëpërmjet Menysë së Të Preferuarave.'
+  FAV_PERSISTENCE_MSG: '%s nuk lejohet ndërkohë që elementi është shënuar si i preferuar.'
+  NEUTRINO_DEVICE: Pajisja Neutrino
+  HINT_NEUTRINO_DEVICE: Pajisja që mban neutrino.elf (në një dosje NEUTRINO/ ose neutrino/). Zbulimi automatik skanon mc0 dhe pastaj mc1.
+  NARGS_QB: Nisje e Shpejtë (-qb)
+  NARGS_CWD: Drejtoria e Punës (-cwd)
+  NARGS_CFG: Konfigurimi (-cfg)
+  NARGS_ELF: ELF i Nisjes (-elf)
+  NARGS_ATA0: Imazhi ATA0 (-ata0)
+  NARGS_ATA0ID: ID ATA0 (-ata0id)
+  NARGS_ATA1: Imazhi ATA1 (-ata1)
+  NARGS_EXTRA: Argumente Shtesë
+  NARGS_AUTO_NOTE: 'Auto: -bsd -dvd -gc -gsm -mc -dbc -logo'
+  ENABLE_ART_TAR: Arkiv .tar i kopertinave
+  DISABLE_ALL: Çaktivizo të gjitha
+  BOOT_LOADING_CONFIG: Po ngarkohen cilësimet...
+  BOOT_SCANNING_BDM: Po skanohen disqet USB / kartë / rrjet...
+  BOOT_SCANNING_NET: Po niset rrjeti...
+  BOOT_SCANNING_HDD: Po skanohet HDD...
+  BOOT_READY: Gati.
+  UDPFS_GAMES: "Lojëra UDPFS"
+  UDPFSBD_GAMES: "Lojëra UDPFSBD"
+  NET_PROTOCOL: "Protokolli i rrjetit"
+  NET_NEEDS_NEUTRINO: "Lojërat e rrjetit (UDP) nisen vetëm përmes bërthamës Neutrino. Sigurohu që neutrino.elf ekziston dhe formati mbështetet."
+  VCD_NOT_ON_NET: "Lojërat PS1 (.VCD) nuk mund të nisen përmes pajisjes së rrjetit."
+  MX4SIO_PADEMU_WARN: "MX4SIO dhe emulimi i kontrollerit ndajnë të njëjtën bus SIO2 dhe loja mund të mos niset."
+  HINT_OSD_SETTINGS_LNG: "Detyro një konfigurim gjuhe të personalizuar"
+  OSD_SETTINGS_TVASPECT: "Madhësia e ekranit"
+  FULL_SCREEN: "Ekran i plotë"
+  OSD_SETTINGS_VMODE: "Modaliteti i videos"
+  SYSTEM_DEFAULT: "Parazgjedhja e sistemit"
+  HIGH: "E lartë"
+  LOW: "E ulët"
+  XSENSITIVITY: "Ndjeshmëria e boshtit X analog"
+  YSENSITIVITY: "Ndjeshmëria e boshtit Y analog"
+  FILE_COUNT: "Skedarë të gjetur: %i"
+  CHEAT_SELECTION: "Zgjedhja e mashtrimeve"
+  HDD_HINT: "Lejohet vetëm një HDD; aktivizimi kyç APA ose GPT."
+  MMCE_GAMEID_NEUTRINO_SKIP: "MMCE GameID nuk u zbatua -- neutrino.elf ndodhet në këtë kartë (ndërrimi i saj do ta shkarkonte Neutrino)."
+  POPSTARTER_DEVICE: "Pajisja POPSTARTER.ELF"
+  HINT_POPSTARTER_DEVICE: "Pajisja që mban POPS/POPSTARTER.ELF për nisjet PS1 VCD. Parazgjedhja = pajisja e nisjes (cwd) pastaj vetë pajisja e VCD-së. E personalizuara shfaq një shteg teksti të lirë."
+  BDMA_APPLY: "Zbato VCD BDMA gjatë nisjes"
+  HINT_BDMA_APPLY: "Aktiv: pajis automatikisht kartën e memories me drejtuesin përkatës exFAT të VCD-së së nisur para nisjes (rekomandohet). Joaktiv: menaxhoje vetë me zgjedhësit Source/Mode të BDMA më poshtë."
+  NETBOOT_RESTART: "Rinis OPL-në për të zbatuar ndryshimin e protokollit të nisjes në rrjet."
+  UDPFS_MODE: "Qasja UDPFS"
+  "MENU": "Menyja"
+  "APPS": "Aplikacione"
+  "DEBUG": "Ngjyra Debug"
+  "COVERART": "Kopertina"
+  "IP_ADDRESS_TYPE_DHCP": "DHCP"
+  "PORT": "Port"
+  "ADDR_TYPE_IP": "IP"
+  "ADDR_TYPE_NETBIOS": "NetBIOS"
+  "ENABLE_WRITE": "Operacione Shkrimi"
+  "MODE1": "Modaliteti 1"
+  "MODE2": "Modaliteti 2"
+  "MODE3": "Modaliteti 3"
+  "MODE4": "Modaliteti 4"
+  "MODE5": "Modaliteti 5"
+  "MODE6": "Modaliteti 6"
+  "ENABLEGSM": "Zgjedhësi GSM"
+  "OVERSCAN": "Overscan"
+  "ENABLECHEAT": "Motori i Kodeve PS2RD"
+  "PADEMU_ENABLE": "Emulator Kontrolluesi"
+  "DS34USB_MODE": "DualShock3/4 USB"
+  "PADEMU_PORT": "Emulimi"
+  "PADEMU_VIB": "Dridhja"
+  "PADEMU_WORKAROUND": "Zgjidhje për DS3 të Rremë"
+  "SFX": "Efekte Zanore"
+  "BOOT_SND": "Tingulli i Nisjes"
+  "ENABLE_NOTIFICATIONS": "Njoftime"
+  "OPTIONS": "Opsione"
+  "GLOBAL_SETTINGS": "Globale"
+  "INFO_GENRE": "Zhanri"
+  "INFO_RELEASE": "Publikimi"
+  "INFO_DESCRIPTION": "Përshkrimi"
+  "BLOCKDEVICE_SETTINGS": "Pajisje Bllok"
+  "CONTROLLER_SETTINGS": "Cilësimet e Kontrolluesit"
+  "HINT_BDM_START": "Ndiz/fik Menaxherin e Pajisjeve Bllok."
+  "HINT_BLOCK_DEVICES": "Ndiz/fik Pajisjet Bllok (p.sh. USB)."
+  "USB_GAMES": "Lojëra USB"
+  "ILINK_GAMES": "Lojëra iLink"
+  "MX4SIO_GAMES": "Lojëra MX4SIO"
+  "PADMACROCONFIG": "Konfiguro PADMACRO"
+  "PADMACRO_SETTINGS": "Cilësimet e Pad macro"
+  "PADMACRO_ENABLE": "Pad macros"
+  "PADMACRO_SLOWDOWN": "Ngadalësim analog:"
+  "HINT_PADMACRO_SLOWDOWN_AXIS": "Zvogëlon rrezen e levës analoge kur shtypet butoni"
+  "LEFT_ANALOG": "Leva majtas"
+  "RIGHT_ANALOG": "Leva djathtas"
+  "PADMACRO_INVERT_AXIS": "Përmbys boshtin analog:"
+  "HINT_PADMACRO_INVERT_AXIS": "Përmbys boshtin e levës analoge"
+  "TURBO_SPEED": "Shpejtësia e butonit turbo"
+  "HINT_TURBO_SPEED": "Sa shpejt të shtypet butoni kur turbo është aktiv"
+  "ACT_WHILE_PRESSED": "Ndërsa butoni është shtypur"
+  "ACT_TOGGLED": "Ndërruar nga butoni"
+  "LANGUAGE_JAPANESE": "JAPONISHT"
+  "LANGUAGE_ENGLISH": "ANGLISHT"
+  "LANGUAGE_FRENCH": "FRËNGJISHT"
+  "LANGUAGE_SPANISH": "SPANJISHT"
+  "LANGUAGE_GERMAN": "GJERMANISHT"
+  "LANGUAGE_ITALIAN": "ITALISHT"
+  "LANGUAGE_DUTCH": "HOLANDISHT"
+  "LANGUAGE_PORTUGUESE": "PORTUGALISHT"
+  "LANGUAGE_RUSSIAN": "RUSISHT"
+  "LANGUAGE_KOREAN": "KOREANISHT"
+  "LANGUAGE_TRAD_CHINESE": "KINEZISHT TRADICIONALE"
+  "LANGUAGE_SIMPL_CHINESE": "KINEZISHT E THJESHTUAR"
+  "OSD_SETTINGS": "Cilësimet OSD"
+  "OSD_SETTINGS_LNG": "Gjuha OSD"
+  "ENABLE_LNG": "Ndrysho gjuhën"
+  "BGM": "Muzikë Sfondi"
+  "BGM_VOLUME": "Volumi i Muzikës së Sfondit"
+  "DEF_BGM_PATH": "Muzika e Parazgjedhur e Temës"
+  "DEF_BGM_PATH_HINT": "Cakto shtegun për të transmetuar muzikë për temën e brendshme."
+  "BOOT_SCANNING_MC": "Duke skanuar kartat e kujtesës..."
+  "BOOT_LOADING_DRIVERS": "Duke ngarkuar drejtuesit e ruajtjes..."
+  "BOOT_LOADING_USB": "Duke ngarkuar drejtuesin USB..."
+  "BOOT_ARMING_MMCE": "Duke armatosur ID-në e lojës MMCE..."
+  "BOOT_LOADING_SOUNDS": "Duke ngarkuar tingujt e temës..."
+  "BOOT_BUILDING_MENU": "Duke ndërtuar menynë..."
+  "NET_UDPFS_TAB_HINT": "UDPFS është aktive -- hap skedën e re UDPFS dhe shtyp Konfirmo për t'u lidhur. Ana e PC-së ekzekuton udpfsd -fsroot <games folder>."
+  "NET_UDPBD_TAB_HINT": "Pajisja bllok e rrjetit është aktive -- skeda e saj shfaqet sapo serveri i PC-së përgjigjet (udpfsd -bdpath për UDPFS Image, udpbd-server për UDPBD)."
+  "NEUTRINO_VMC_MISSING": "Skedari VMC për këtë lojë nuk u gjet -- po niset pa të (loja përdor kartën e saj reale)."
+  "NEUTRINO_DEV_UNSUPPORTED": "Neutrino nuk mund të nisë nga kjo pajisje -- nisja u ndërpre."
+  "NEUTRINO_TOML_SYNC_FAILED": "Konfigurimi i rrjetit të Neutrino (bsd toml) mungon ose nuk mund të shkruhet -- nisja u ndërpre, kontrollo dosjen neutrino."
+  "NEUTRINO_TOO_FRAGMENTED": "Tepër i fragmentuar për Neutrino (%d fragmente, kufiri %d përfshirë VMC-të) -- po provohet bërthama OPL në vend të tij."
+  "NEUTRINO_TOO_FRAGMENTED_NET": "Tepër i fragmentuar për Neutrino (%d fragmente, kufiri %d përfshirë VMC-të) -- defragmento në PC; nisja u ndërpre."
+  "NEUTRINO_GSM_COMP": "Përputhshmëria GSM e Neutrino"
+  "HINT_NEUTRINO_GSM_COMP": "Rregullim me ndërrim fushash për lojërat që dridhen ose grisen nën një mënyrë Video të detyruar të Neutrino. Kërkon një mënyrë Video të Neutrino të vendosur."
+  "NARGS_DBC": "Ngjyra Debug (-dbc)"
+  "NARGS_LOGO": "Logoja PS2 (-logo)"
+  "VMC_SLOT1_DISABLE": "Çaktivizo VMC 1 (mbaj kartën)"
+  "VMC_SLOT2_DISABLE": "Çaktivizo VMC 2 (mbaj kartën)"
+  "HINT_VMC_SLOT_DISABLE": "Nis pa VMC-në e kësaj foleje ndërsa mban kartën e saj të konfiguruar. Vetëm nisjet me Neutrino; loja më pas përdor kartën reale në atë fole."
+  "NEUTRINO_BSDFS": "Sistemi i Skedarëve Neutrino"
+  "HINT_NEUTRINO_BSDFS": "Detyro sistemin e skedarëve të pajisjes bllok të Neutrino (-bsdfs). Auto = paracaktimi për çdo pajisje. hdl/bd janë opsione për ekspertë; çiftojini me një -dvd= përkatës në argumentet e nisjes nëse forma e rrugës automatike nuk përshtatet."
+  "PLASCOLOR": "Ngjyra e Përzierjes Plasma"
+  "VCD_HIDE_GAMEID": "Fshih ID-në e Lojës PS1 (lista VCD)"
+  "HINT_VCD_HIDE_GAMEID": "Vetëm kozmetike -- fsheh një prefiks ID-je loje në krye (p.sh. SLUS_005.51.) nga emrat e listës PS1/VCD. Emrat pa ID shfaqen ashtu siç janë. Nuk ndryshon nisjen, artin e kopertinës apo të preferuarat."
+  "VCD_FIRST_DISC": "Vetëm disku i parë (PS1 me shumë disqe)"
+  "HINT_VCD_FIRST_DISC": "Shfaq vetëm Diskun 1 të një loje PS1 me disqe të shumtë në listat e pajisjeve (stili POPSLoader). Fsheh skedarët e emërtuar (Disc 2), (CD 2), etj. Të gjithë disqet mbeten në kartë për ndërrim gjatë lojës; Të preferuarat nuk filtrohen."
+  "GAMES_DEVICE": "Pajisja e Lojës"
+  "DEFAULT_CORE": "Bërthama e Parazgjedhur e Ngarkuesit"
+  "HINT_DEFAULT_CORE": "Bërthama globale e paracaktuar për lojërat, bërthama e ngarkuesit e të cilave për çdo lojë është vendosur në Default. <OPL> është bërthama vendase; Neutrino zinxhiron neutrino.elf të jashtëm. Një zgjedhje për çdo lojë e mbivendos gjithmonë këtë."
+  "VCD_SETTINGS": "Cilësimet VCD"
+  "FINANCIAL_SUPPORT": "Mbështetje Financiare"
