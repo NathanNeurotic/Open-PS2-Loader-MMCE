@@ -1622,6 +1622,29 @@ static int trySaveAlternateDevice(int types)
     return 0;
 }
 
+// configWriteMulti SUMS per-set results, and configWrite returns 1 for an UNMODIFIED set without
+// touching the disk -- so a failed write of the master settings can hide behind untouched sibling
+// sets and the save reports success ("Settings saved" toast, no retry). Concretely: OPL modified and
+// failing returns 0, NETWORK and GAME untouched return 1 each, the sum is 2, and 2 > 0 reads as
+// success. configWrite clears a set's modified flag only when its write actually succeeded, and
+// _saveConfig configSet*s every set it means to save (marking it modified) -- so any REQUESTED set
+// still marked modified after the write IS a failed write. Returns 0 in that case, the raw sum
+// otherwise.
+static int configWriteChecked(int types)
+{
+    int result = configWriteMulti(types);
+    if (result > 0) {
+        for (int bit = 1; bit < (1 << CONFIG_INDEX_COUNT); bit <<= 1) {
+            if (types & bit) {
+                config_set_t *cfg = configGetByType(bit); // NULL only if a requested set was never allocated
+                if (cfg != NULL && cfg->modified)
+                    return 0;
+            }
+        }
+    }
+    return result;
+}
+
 static void _saveConfig()
 {
     char temp[256];
@@ -1742,8 +1765,10 @@ static void _saveConfig()
         configPrepareNotifications(gBaseMCDir);
     }
 
-    lscret = configWriteMulti(lscstatus);
-    if (lscret == 0)
+    lscret = configWriteChecked(lscstatus);
+    // <= 0, not == 0: configWriteChecked can only return 0 or a positive sum today, but the guard
+    // costs nothing and a negative would otherwise read as success here.
+    if (lscret <= 0)
         lscret = trySaveAlternateDevice(lscstatus);
     lscstatus = 0;
 }
