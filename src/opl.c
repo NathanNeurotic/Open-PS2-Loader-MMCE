@@ -2603,6 +2603,8 @@ static void init(void)
 
 static void deferredInit(void)
 {
+    guiSetBootStatusSticky(_l(_STR_BOOT_BUILDING_MENU)); // boot-step localizer (IO thread) -- reaching
+                                                         // here means the device init chain cleared; see gui.c
 
     // inform GUI main init part is over
     struct gui_update_t *id = guiOpCreate(GUI_INIT_DONE);
@@ -2619,6 +2621,7 @@ static void deferredAudioInit(void)
 {
     int ret;
 
+    guiSetBootStatusSticky(_l(_STR_BOOT_LOADING_SOUNDS)); // boot-step localizer (IO thread) -- see gui.c
     audioInit();
     ret = sfxInit(1);
     if (ret < 0)
