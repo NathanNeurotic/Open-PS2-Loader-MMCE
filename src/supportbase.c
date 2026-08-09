@@ -1043,7 +1043,26 @@ config_set_t *sbPopulateConfig(base_game_info_t *game, const char *prefix, const
         sbSetDiscAttributes(config, isPS1, isPS1 || game->media == SCECdPS2CD);
     }
 
-    configSetStr(config, CONFIG_ITEM_STARTUP, isVcd ? game->name : game->startup);
+    // #Startup is the GAME ID a theme displays. A PS2 game has a real disc id in game->startup; a
+    // VCD had nothing, so it stamped the whole FILENAME and themes rendered that -- long titles then
+    // overflowed into the cover art (#380). Prefer the PS1 disc id parsed out of the name.
+    //
+    // vcdExtractGameId is PURE STRING PARSING -- no file IO -- so this is free on the config path.
+    // The richer retrogemGetVcdGameID() (which reads SYSTEM.CNF from inside the image) is NOT used
+    // here on purpose: it opens and reads the .VCD, and this runs per selection. That resolver stays
+    // where it is, on the launch path.
+    //
+    // DISPLAY ONLY. The per-game CONFIG KEY above deliberately still uses cfgKey (the filename for a
+    // VCD): the id is absent whenever the file is not named AAAA_NNN.NN*, so keying configs by it
+    // would silently split one game's settings across two files as soon as extraction failed.
+    // Identity and display are separate concerns; only display changes here.
+    if (isVcd) {
+        char vcdId[VCD_ID_MAX];
+        configSetStr(config, CONFIG_ITEM_STARTUP,
+                     vcdExtractGameId(game->name, vcdId, sizeof(vcdId)) ? vcdId : game->name);
+    } else {
+        configSetStr(config, CONFIG_ITEM_STARTUP, game->startup);
+    }
 
     return config;
 }
