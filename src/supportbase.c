@@ -9,7 +9,7 @@
 #include "include/ioman.h"
 #include "modules/iopcore/common/cdvd_config.h"
 #include "include/cheatman.h"
-#include "include/tar.h"      // CHT/cht.tar cheat archives (#154)
+#include "include/tar.h" // CHT/cht.tar cheat archives (#154)
 #include "include/pggsm.h"
 #include "include/cheatman.h"
 #include "include/ps2cnf.h"
