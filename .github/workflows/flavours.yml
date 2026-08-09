@@ -8,10 +8,20 @@ name: build-flavours
 # This file is the ONLY RiptOPL addition on the rebuild base branch; the source tree stays
 # byte-identical to upstream. Each ELF self-identifies via LOCALVERSION ("-<FLAVOUR>" suffix).
 
+# Until now this fired ONLY on push to rebuild/**, so master had NO CI at all and pull requests were
+# never built -- a regression could land on master unbuilt. The rebuild becomes master at v1.0, so
+# master must be covered before that happens, not after.
+#
+# push is restricted to the two INTEGRATION branches on purpose. Adding pull_request while leaving
+# push on 'rebuild/**' made every PR build TWICE (once for the branch push, once for the PR event) --
+# observed on PR #410, 6 build jobs where 3 were wanted. Feature branches are covered by their PR;
+# these two branches are covered by the merge that lands on them.
 on:
   push:
     branches:
-      - 'rebuild/**'
+      - master
+      - rebuild/main
+  pull_request:
   workflow_dispatch:
 
 jobs:
