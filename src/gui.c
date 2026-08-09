@@ -2700,7 +2700,11 @@ int guiMsgBox(const char *text, int addAccept, struct UIItem *ui)
         else
             guiShow();
 
-        rmDrawRect(0, 0, screenWidth, screenHeight, gColDarker);
+        // With a `ui` the CALLER chose what sits behind this box, so keep that context visible.
+        // With ui == NULL the backdrop is just whichever menu happened to be on screen -- it carries
+        // no information and, at gColDarker's ~75%, left the menu legible straight through the
+        // message. Errors get their own background in that case.
+        rmDrawRect(0, 0, screenWidth, screenHeight, ui ? gColDarker : gColBlack);
 
         rmDrawLine(50, 75, screenWidth - 50, 75, gColWhite);
         rmDrawLine(50, 410, screenWidth - 50, 410, gColWhite);
@@ -2751,7 +2755,14 @@ void guiRenderTextScreen(const char *message)
 
     guiShow();
 
-    rmDrawRect(0, 0, screenWidth, screenHeight, gColDarker);
+    // Opaque backdrop, not gColDarker. This is a non-interactive STATUS screen ("Please wait",
+    // "NBD Server unloading..."), and gColDarker is only alpha 0x60 of a 0x80 maximum -- i.e. ~75%
+    // -- so the menu underneath stayed clearly legible through the message. On a CRT that reads as
+    // a transparent error with the settings menu showing through it, which is exactly what the
+    // tester reported (and photographed) three times. Whatever is behind a status screen carries no
+    // information, so it is hidden. Interactive dialogs deliberately KEEP the translucent overlay
+    // (see guiConfirmVideoMode, where seeing the mode behind the prompt is the entire point).
+    rmDrawRect(0, 0, screenWidth, screenHeight, gColBlack);
 
     fntRenderString(gTheme->fonts[0], screenWidth >> 1, gTheme->usedHeight >> 1, ALIGN_CENTER, 0, 0, message, gTheme->textColor);
 
@@ -2921,7 +2932,9 @@ void guiWarning(const char *text, int count)
 
     guiShow();
 
-    rmDrawRect(0, 0, screenWidth, screenHeight, gColDarker);
+    // Same reasoning as guiRenderTextScreen: a warning is a non-interactive surface shown for a
+    // fixed number of frames, so it gets an opaque backdrop rather than a ~75% wash.
+    rmDrawRect(0, 0, screenWidth, screenHeight, gColBlack);
 
     rmDrawLine(50, 75, screenWidth - 50, 75, gColWhite);
     rmDrawLine(50, 410, screenWidth - 50, 410, gColWhite);
