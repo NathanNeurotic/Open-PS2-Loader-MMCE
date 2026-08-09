@@ -256,10 +256,23 @@ static void _menuSaveConfig()
         setErrorMessagePathCode(_STR_ERROR_SAVING_SETTINGS_TO, itemConfig ? itemConfig->filename : "", gLastSaveErrno);
 }
 
+// Every path out of here MUST either queue a load that will clear actionStatus, or clear it itself.
+// The old version had two paths that did neither: the selection changed but the idle-frame gate was
+// not met, or the row was current with itemConfig still NULL. Both left actionStatus=1 with nothing
+// in flight, so guiHandleDeferedIO span on a load that was never requested -- an outright hang
+// before rebuild-38, and a 30s freeze plus a bogus error toast after it.
+// NOTE(rebuild): the fork also swaps list->delay for MENU_APP_CONFIG_IDLE_FRAMES on APP_MODE. That
+// constant does not exist here and is a separate tuning change, so the idle gate is left exactly as
+// it was; only the completion contract is repaired.
 static void _menuRequestConfig()
 {
+    int shouldQueueLoad = 0;
+
     WaitSema(menuSemaId);
-    if (selected_item->item->current != NULL && itemConfigId != selected_item->item->current->item.id) {
+    if (selected_item == NULL || selected_item->item == NULL || selected_item->item->current == NULL) {
+        // The list can be rebuilt out from under us between the GUI's check and this callback.
+        actionStatus = 0;
+    } else if (itemConfigId != selected_item->item->current->item.id) {
         if (itemConfig) {
             configFree(itemConfig);
             itemConfig = NULL;
@@ -267,12 +280,24 @@ static void _menuRequestConfig()
         item_list_t *list = selected_item->item->userdata;
         if (itemConfigId == -1 || guiInactiveFrames >= list->delay) {
             itemConfigId = selected_item->item->current->item.id;
-            ioPutRequest(IO_CUSTOM_SIMPLEACTION, &_menuLoadConfig);
-        }
-    } else if (itemConfig)
+            shouldQueueLoad = 1;
+        } else
+            actionStatus = 0; // still settling: nothing queued, so release the waiter now
+    } else if (itemConfig == NULL && actionStatus != 0) {
+        shouldQueueLoad = 1; // right row, but its config never landed -- ask again
+    } else
         actionStatus = 0;
 
     SignalSema(menuSemaId);
+
+    // Queue OUTSIDE the sema: _menuLoadConfig takes it too.
+    if (shouldQueueLoad && ioPutRequest(IO_CUSTOM_SIMPLEACTION, &_menuLoadConfig) != IO_OK) {
+        WaitSema(menuSemaId);
+        if (itemConfig == NULL)
+            itemConfigId = -1; // let the next pass retry rather than caching a row that never loaded
+        actionStatus = 0;
+        SignalSema(menuSemaId);
+    }
 }
 
 config_set_t *menuLoadConfig()
