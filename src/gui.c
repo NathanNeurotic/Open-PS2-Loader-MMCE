@@ -2709,9 +2709,70 @@ void guiUpdateScreenScale(void)
     fntUpdateAspectRatio();
 }
 
+// Greedily word-wrap `text` to innerW, writing '\n'-separated lines into out. Returns the line count.
+//
+// fntRenderString does NOT wrap: it lays a string on ONE line and CLIPS at the window edge (only an
+// explicit '\n' starts a new line), so a long message ran off BOTH screen edges and was unreadable
+// -- reported on the 1080p warning, which is simply the longest string we ship.
+// NOTE: src/dia.c carries the same algorithm inline for its hint box. Deliberately not merged here:
+// that copy is entangled with the hint box's own geometry (it needs the line count to size the box
+// before rendering), and this is a message-box fix, not a refactor of a working path.
+static int guiWrapText(const char *text, int innerW, char *out, int outSize)
+{
+    int wlen = 0, lineW = 0, lines = 1;
+    int spaceW = rmUnScaleX(fntCalcDimensions(gTheme->fonts[0], " "));
+    const char *p = text;
+
+    if (out == NULL || outSize <= 0)
+        return 0;
+
+    while (*p) {
+        while (*p == ' ') // collapse runs of spaces; we re-insert our own single separators
+            p++;
+        if (!*p)
+            break;
+
+        // An explicit newline in the source string is honoured as a hard break.
+        if (*p == '\n') {
+            if (wlen < outSize - 1)
+                out[wlen++] = '\n';
+            lines++;
+            lineW = 0;
+            p++;
+            continue;
+        }
+
+        char word[96];
+        int k = 0;
+        while (*p && *p != ' ' && *p != '\n' && k < (int)sizeof(word) - 1)
+            word[k++] = *p++;
+        word[k] = '\0';
+        int wordW = rmUnScaleX(fntCalcDimensions(gTheme->fonts[0], word));
+
+        if (lineW > 0 && (lineW + spaceW + wordW) > innerW) { // does not fit -> break the line
+            if (wlen < outSize - 1)
+                out[wlen++] = '\n';
+            lines++;
+            lineW = 0;
+        } else if (lineW > 0) { // same line -> re-insert the separating space
+            if (wlen < outSize - 1)
+                out[wlen++] = ' ';
+            lineW += spaceW;
+        }
+        for (int i = 0; i < k && wlen < outSize - 1; i++)
+            out[wlen++] = word[i];
+        lineW += wordW;
+    }
+    out[wlen] = '\0';
+    return lines;
+}
+
 int guiMsgBox(const char *text, int addAccept, struct UIItem *ui)
 {
     int terminate = 0;
+    // Wrapped once up front, not per frame: the result depends only on `text` and the screen width.
+    char wrapped[512];
+    int lines = guiWrapText(text, screenWidth - 120, wrapped, sizeof(wrapped));
 
     sfxPlay(SFX_MESSAGE);
 
@@ -2739,7 +2800,26 @@ int guiMsgBox(const char *text, int addAccept, struct UIItem *ui)
         rmDrawLine(50, 75, screenWidth - 50, 75, gColWhite);
         rmDrawLine(50, 410, screenWidth - 50, 410, gColWhite);
 
-        fntRenderString(gTheme->fonts[0], screenWidth >> 1, gTheme->usedHeight >> 1, ALIGN_CENTER, 0, 0, text, gTheme->textColor);
+        // Render the wrapped lines ONE AT A TIME: ALIGN_CENTER centres on the measured width of the
+        // WHOLE string, so handing it a multi-line buffer would centre it as a single long run and
+        // leave every line off-centre. Block is vertically centred on the old single-line position.
+        {
+            int lineH = MENU_ITEM_HEIGHT;
+            int ly = (gTheme->usedHeight >> 1) - ((lines - 1) * lineH) / 2;
+            const char *ls = wrapped;
+            while (ls != NULL) {
+                const char *eol = strchr(ls, '\n');
+                char line[192];
+                int n = eol ? (int)(eol - ls) : (int)strlen(ls);
+                if (n > (int)sizeof(line) - 1)
+                    n = (int)sizeof(line) - 1;
+                memcpy(line, ls, n);
+                line[n] = '\0';
+                fntRenderString(gTheme->fonts[0], screenWidth >> 1, ly, ALIGN_CENTER, 0, 0, line, gTheme->textColor);
+                ly += lineH;
+                ls = eol ? eol + 1 : NULL;
+            }
+        }
         guiDrawIconAndText(gSelectButton == KEY_CIRCLE ? CROSS_ICON : CIRCLE_ICON, _STR_BACK, gTheme->fonts[0], 500, 417, gTheme->selTextColor);
         if (addAccept)
             guiDrawIconAndText(gSelectButton == KEY_CIRCLE ? CIRCLE_ICON : CROSS_ICON, _STR_ACCEPT, gTheme->fonts[0], 70, 417, gTheme->selTextColor);
