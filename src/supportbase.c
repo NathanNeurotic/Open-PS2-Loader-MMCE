@@ -1057,7 +1057,10 @@ void sbSetDiscAttributes(config_set_t *config, int isPS1, int isCD)
 
 int sbLoadCheats(const char *path, const char *file)
 {
-    char cheatfile[64];
+    // 256, not 64: the path prefix here is a full device root (e.g. "mass0:/" plus an OPL data
+    // folder), and a 64-byte buffer silently TRUNCATED the "<path>CHT/<file>.cht" it builds -- so
+    // cheats simply never loaded on longer BDM paths, with no diagnostic. Matches the fork.
+    char cheatfile[256];
     int cheatMode = 0;
 
     if (GetCheatsEnabled()) {

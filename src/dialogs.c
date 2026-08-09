@@ -1624,10 +1624,12 @@ struct UIItem diaControllerConfig[] = {
     {UI_ENUM, CFG_YSENSITIVITY, 1, 1, -1, 0, 0, {.intvalue = {0, 0}}},
     {UI_BREAK},
 
-    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {"Left Stick Navigation", -1}}},
-    {UI_SPACER},
-    {UI_BOOL, UICFG_ENABLE_ANALOG_NAV, 1, 1, -1, 0, 0, {.intvalue = {0, 0}}},
-    {UI_BREAK},
+    // NOTE(rebuild): checklist item 44 ("Left Stick Navigation") is deliberately NOT re-added -- the
+    // analog stick always merges into the d-pad and the REAL control is the X/Y Sensitivity rows
+    // above (Off = a 128 deadzone, which is what actually disables stick navigation). The boolean
+    // was dead in the fork too: gEnableAnalogNav has no reader anywhere and its checkbox was never
+    // synced in the UI page, so the row rendered as a flippable control wired to nothing. Removed
+    // rather than greyed, because unlike MMCE/rumble this feature is never coming back.
 
     // Menu Rumble moved here from the old General Settings (diaConfig) by the layout restructure.
     {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {NULL, _STR_RUMBLE}}},
