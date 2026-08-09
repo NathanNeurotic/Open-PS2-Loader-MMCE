@@ -1042,3 +1042,5 @@ gui_strings:
   string: "Save settings to a folder you choose, e.g. mass0:/OPL. Leave blank to use the folder OPL booted from. The device is loaded on demand, so it need not be mounted when you type it."
 - label: PERGAME_MIXED_SETTINGS
   string: Per Game + Global
+- label: GSM_DEFAULTS
+  string: GSM Defaults (All Games)

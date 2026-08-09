@@ -701,6 +701,12 @@ struct UIItem diaDisplayConfig[] = {
     {UI_BOOL, CFG_APPLYGAMEID, 1, 1, -1, 0, 0, {.intvalue = {0, 0}}},
     {UI_BREAK},
 
+    // The GLOBAL half of GSM: the $EnableGSM/$GSMVMode/... block in the global config, which every
+    // game inherits unless it sets its own. Distinct from UICFG_VMODE above -- that is the video
+    // mode of the OPL MENU, this is the video mode games are launched in.
+    {UI_BUTTON, DISPLAY_GSM_DEFAULTS_BUTTON, 1, 1, -1, 0, 0, {.label = {NULL, _STR_GSM_DEFAULTS}}},
+    {UI_BREAK},
+
     // buttons
     {UI_OK, 0, 1, 1, -1, 0, 0, {.label = {NULL, _STR_OK}}},
     {UI_BREAK},

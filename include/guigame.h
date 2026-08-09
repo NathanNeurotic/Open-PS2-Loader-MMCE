@@ -19,7 +19,7 @@ char *gameConfigSource(void);
 int guiGameVmcNameHandler(char *text, int maxLen);
 void guiGameShowVMCMenu(int id, item_list_t *support);
 void guiGameShowCompatConfig(int id, item_list_t *support, config_set_t *configSet);
-void guiGameShowGSConfig(void);
+void guiGameShowGSConfig(int forceGlobal);
 void guiGameShowCheatConfig(void);
 
 #ifdef PADEMU

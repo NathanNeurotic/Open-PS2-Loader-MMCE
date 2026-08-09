@@ -1469,7 +1469,7 @@ void menuHandleInputGameMenu()
             if (gameMenuCoreIsNeutrino())
                 guiMsgBox(_l(_STR_NEUTRINO_SETTING_NA), 0, NULL);
             else
-                guiGameShowGSConfig();
+                guiGameShowGSConfig(0);
         } else if (menuID == GAME_VMC_SETTINGS) {
             guiGameShowVMCMenu(selected_item->item->current->item.id, selected_item->item->userdata);
 #ifdef PADEMU

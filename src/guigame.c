@@ -38,6 +38,10 @@ static int GSMVMode;
 static int GSMXOffset;
 static int GSMYOffset;
 static int GSMFIELDFix;
+// Set while the GSM page is being shown as the GLOBAL defaults page (Settings -> Display Settings),
+// where there is no game and therefore no per-game config set: the load/save legs must stay off
+// configSet entirely, because configGetInt() dereferences it without a NULL check.
+static int forceGlobalGSM = 0;
 
 static int EnableCheat;
 static int CheatMode;
@@ -80,6 +84,7 @@ static char configSource[128];
 
 // forward declarations.
 static void guiGameLoadGSMConfig(config_set_t *configSet, config_set_t *configGame);
+static void guiGameSaveGSMGlobalConfig(config_set_t *configGame);
 static void guiGameLoadCheatsConfig(config_set_t *configSet, config_set_t *configGame);
 #ifdef PADEMU
 static void guiGameLoadPadEmuConfig(config_set_t *configSet, config_set_t *configGame);
@@ -405,7 +410,10 @@ static int guiGameGSMUpdater(int modified)
 #endif
 #define GSM_VMODE_DEFAULT_IDX (GSM_VMODE_LAST_REAL_IDX + 1)
 
-void guiGameShowGSConfig(void)
+// forceGlobal: shown from Settings -> Display Settings as the GLOBAL defaults page instead of from a
+// game's settings. Same dialog, source row pinned to Global, values read from and written back to
+// the global config set -- that block is what every game inherits when it has no GSM keys of its own.
+void guiGameShowGSConfig(int forceGlobal)
 {
     // configure the enumerations
     // Third source: per-KEY inheritance. Only offered here (the GSM page); the cheats/VMC/etc
@@ -455,15 +463,36 @@ void guiGameShowGSConfig(void)
         NULL};
     // clang-format on
 
+    forceGlobalGSM = forceGlobal;
+    if (forceGlobal) {
+        // "Default" means "follow the global", which is meaningless on the page that IS the global.
+        // Drop it: its index is one past the last real mode, and the global save leg writes
+        // $GSMVMode verbatim, so leaving it selectable here would put an out-of-range raw index on
+        // disk. diaSetEnum stops at the first NULL, so this just shortens the list.
+        gsmvmodeNames[GSM_VMODE_DEFAULT_IDX] = NULL;
+    }
+
     diaSetEnum(diaGSConfig, GSMCFG_GSMSOURCE, settingsSource);
     diaSetEnum(diaGSConfig, GSMCFG_GSMVMODE, gsmvmodeNames);
+    diaSetEnabled(diaGSConfig, GSMCFG_GSMSOURCE, !forceGlobal);
+
+    if (forceGlobal)
+        guiGameLoadGSMConfig(NULL, configGetByType(CONFIG_GAME));
 
     diaSetEnabled(diaGSConfig, GSMCFG_GSMVMODE, EnableGSM);
     diaSetEnabled(diaGSConfig, GSMCFG_GSMXOFFSET, EnableGSM);
     diaSetEnabled(diaGSConfig, GSMCFG_GSMYOFFSET, EnableGSM);
     diaSetEnabled(diaGSConfig, GSMCFG_GSMFIELDFIX, EnableGSM);
 
-    diaExecuteDialog(diaGSConfig, -1, 1, &guiGameGSMUpdater);
+    int ret = diaExecuteDialog(diaGSConfig, -1, 1, &guiGameGSMUpdater);
+
+    if (forceGlobal) {
+        // The per-game page is read back later by guiGameSaveConfig; the global one has no such
+        // caller, so it commits its own rows here. Only on OK -- matching guiShowNeutrinoDefaults().
+        if (ret)
+            guiGameSaveGSMGlobalConfig(configGetByType(CONFIG_GAME));
+        forceGlobalGSM = 0;
+    }
 }
 
 // CHEATS
@@ -1031,7 +1060,47 @@ static int coreNeverNeutrino = 0;
 // a triple-confirm before it is saved.
 #ifdef GSM_1080P
 #define GSM_VMODE_1080P_IDX 29
+
+// 1080p is GSM-synthetic and hardware-unvalidated: force a THREE-STEP confirmation before it can
+// reach disk, because a display that cannot sync leaves the user with a black screen and no way to
+// undo it from the console. Only fires when the user actually chose 1080p AND left GSM enabled.
+// Shared by the per-game and the global save legs -- the global one is the wider blast radius of
+// the two, since it is what every game with no GSM keys of its own inherits.
+static void guiGameConfirmGSM1080p(void)
+{
+    if (EnableGSM != 0 && GSMVMode == GSM_VMODE_1080P_IDX) {
+        if (!guiMsgBox(_l(_STR_GSM_1080P_WARNING), 1, NULL) ||
+            !guiMsgBox(_l(_STR_GSM_1080P_PROCEED), 1, NULL) ||
+            !guiMsgBox(_l(_STR_GSM_1080P_SURE), 1, NULL)) {
+            GSMVMode = 0; // cancelled at some step -> do not apply 1080p
+            diaSetInt(diaGSConfig, GSMCFG_GSMVMODE, GSMVMode);
+        }
+    }
+}
 #endif
+
+// Commits the GSM rows straight into the GLOBAL config set. Used only by the Display Settings
+// defaults page: the per-game page is read back by guiGameSaveConfig() instead. Deliberately NOT
+// driven off the statics at MENU_SAVE_CHANGES time -- statics left over from a game's settings visit
+// (or never loaded at all on a fresh boot) would silently overwrite the global block with zeros.
+static void guiGameSaveGSMGlobalConfig(config_set_t *configGame)
+{
+    diaGetInt(diaGSConfig, GSMCFG_ENABLEGSM, &EnableGSM);
+    diaGetInt(diaGSConfig, GSMCFG_GSMVMODE, &GSMVMode);
+    diaGetInt(diaGSConfig, GSMCFG_GSMXOFFSET, &GSMXOffset);
+    diaGetInt(diaGSConfig, GSMCFG_GSMYOFFSET, &GSMYOffset);
+    diaGetInt(diaGSConfig, GSMCFG_GSMFIELDFIX, &GSMFIELDFix);
+
+#ifdef GSM_1080P
+    guiGameConfirmGSM1080p();
+#endif
+
+    configSetInt(configGame, CONFIG_ITEM_ENABLEGSM, EnableGSM);
+    configSetInt(configGame, CONFIG_ITEM_GSMVMODE, GSMVMode);
+    configSetInt(configGame, CONFIG_ITEM_GSMXOFFSET, GSMXOffset);
+    configSetInt(configGame, CONFIG_ITEM_GSMYOFFSET, GSMYOffset);
+    configSetInt(configGame, CONFIG_ITEM_GSMFIELDFIX, GSMFIELDFix);
+}
 
 static void guiGameSetCoreAwareState(void)
 {
@@ -1220,19 +1289,7 @@ int guiGameSaveConfig(config_set_t *configSet, item_list_t *support)
     diaGetInt(diaGSConfig, GSMCFG_GSMFIELDFIX, &GSMFIELDFix);
 
 #ifdef GSM_1080P
-    // 1080p is GSM-synthetic and hardware-unvalidated: force a THREE-STEP confirmation before it can
-    // be committed. X continues / O cancels at each step; any cancel drops the selection back to 0
-    // (Auto/off, which removes the per-game key) so 1080p is never persisted without deliberate
-    // consent. Only fires when the user actually chose 1080p AND left GSM enabled. (Only compiled
-    // in when GSM1080P is set, which is now the default for every build.)
-    if (EnableGSM != 0 && GSMVMode == GSM_VMODE_1080P_IDX) {
-        if (!guiMsgBox(_l(_STR_GSM_1080P_WARNING), 1, NULL) ||
-            !guiMsgBox(_l(_STR_GSM_1080P_PROCEED), 1, NULL) ||
-            !guiMsgBox(_l(_STR_GSM_1080P_SURE), 1, NULL)) {
-            GSMVMode = 0; // cancelled at some step -> do not apply 1080p
-            diaSetInt(diaGSConfig, GSMCFG_GSMVMODE, GSMVMode);
-        }
-    }
+    guiGameConfirmGSM1080p();
 #endif
 
     if (gGSMSource == SETTINGS_PERGAME_MIXED) {
@@ -1503,7 +1560,13 @@ static void guiGameLoadGSMConfig(config_set_t *configSet, config_set_t *configGa
     configGetInt(configGame, CONFIG_ITEM_GSMFIELDFIX, &GSMFIELDFix);
 
     // override global with per-game settings if available and selected.
-    configGetInt(configSet, CONFIG_ITEM_GSMSOURCE, &gGSMSource);
+    if (forceGlobalGSM) {
+        // Global defaults page: there is no game, so configSet is NULL. What was loaded above IS
+        // the answer -- and the source row is pinned to Global.
+        gGSMSource = SETTINGS_GLOBAL;
+    } else {
+        configGetInt(configSet, CONFIG_ITEM_GSMSOURCE, &gGSMSource);
+    }
     if (gGSMSource == SETTINGS_PERGAME_MIXED) {
         // Per-key: the globals were already loaded above, so only OVERRIDE where the game has its
         // own key. An absent $GSMVMode is a deliberate Default (the save leg removed it), so show
