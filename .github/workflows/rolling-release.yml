@@ -104,8 +104,9 @@ jobs:
 
       # NOTE(rebuild): the fork runs a step here that is not applicable yet --
       #   Install menu-coherent mmceman (#254)
-      # It returns with its checklist item (MMCE = items 1-3, GSM 1080p = item 29), both of
-      # which are on WAIT. Removed rather than left to fail/WARN every single run.
+      # It returns with checklist items 1-3 (MMCE), which are still on WAIT. Removed rather than
+      # left to fail/WARN every single run. (GSM 1080p, item 29, has since LANDED -- its build
+      # step is restored in the ps2dev-latest job below.)
 
       - name: Build (make clean release)
         # LOCALVERSION brands the in-ELF version string ("-PS2DEVPINNEDSDK") so hardware reports
@@ -219,8 +220,9 @@ jobs:
 
       # NOTE(rebuild): the fork runs a step here that is not applicable yet --
       #   Install menu-coherent mmceman (latest-only)
-      # It returns with its checklist item (MMCE = items 1-3, GSM 1080p = item 29), both of
-      # which are on WAIT. Removed rather than left to fail/WARN every single run.
+      # It returns with checklist items 1-3 (MMCE), which are still on WAIT. Removed rather than
+      # left to fail/WARN every single run. (GSM 1080p, item 29, has since LANDED -- its build
+      # step is restored in the ps2dev-latest job below.)
 
       - name: Build (make clean release)
         # LOCALVERSION brands the in-ELF version string ("-PS2DEVLATESTSDK") so hardware reports
@@ -274,10 +276,26 @@ jobs:
             echo "WARN: PS2DEVLATESTSDK DUALSENSE=1 build failed; skipping DS5 asset this run" >&2
           fi
 
-      # NOTE(rebuild): the fork runs a step here that is not applicable yet --
-      #   Build + stage experimental 1080p GSM loader (PS2DEVLATESTSDK)
-      # It returns with its checklist item (MMCE = items 1-3, GSM 1080p = item 29), both of
-      # which are on WAIT. Removed rather than left to fail/WARN every single run.
+      - name: Build + stage experimental 1080p GSM loader (PS2DEVLATESTSDK)
+        # The re-added GSM 1080p mode is a hardware-UNVALIDATED synthetic raster (see ee_core
+        # DTV_1080P). It is compiled ONLY into this dedicated variant, ONLY on the latest-SDK
+        # flavour (like a stricter DS5), and gated behind a triple-confirm in the GUI. Every other
+        # asset -- all flavours' main ELFs, the -ds5 loaders, the VARIANTS zip -- is 1080p-free.
+        # Best-effort: a 1080p build hiccup must not sink the required primary flavour.
+        # LOCALVERSION carries "-PS2DEVLATESTSDK-1080p" so hardware reports self-identify.
+        run: |
+          make --trace clean
+          rm -f RIPTOPL-*.ELF   # drop the main build's leftover named ELF (already staged) so the 1080p output is unambiguous
+          if make --trace LOCALVERSION=PS2DEVLATESTSDK-1080p GSM1080P=1 release; then
+            GSM_ELF="$(ls RIPTOPL-*.ELF 2>/dev/null | head -n1)"
+            if [ -n "${GSM_ELF:-}" ] && [ -f "$GSM_ELF" ]; then
+              cp -f "$GSM_ELF" rolling/RIPTOPL-PS2DEVLATESTSDK-1080p.ELF
+            else
+              echo "WARN: PS2DEVLATESTSDK GSM1080P=1 build produced no ELF; skipping 1080p asset this run" >&2
+            fi
+          else
+            echo "WARN: PS2DEVLATESTSDK GSM1080P=1 build failed; skipping 1080p asset this run" >&2
+          fi
 
       - name: Build variant + debug extras (ps2dev:latest = standard)
         # Runs after staging the main ELF so the per-build `make clean` can't wipe it.

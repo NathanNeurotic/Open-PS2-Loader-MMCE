@@ -32,6 +32,12 @@ ifeq ($(DTL_T10000),1)
     EE_CFLAGS += -D_DTL_T10000
 endif
 
+# Experimental 1080p raster handler (DTV_1080P in gsm_engine_adv.S + its dispatch). The .S files are
+# preprocessed, so -DGSM_1080P gates the #ifdef blocks. Forwarded from the top Makefile's GSM1080P=1.
+ifeq ($(GSM1080P),1)
+    EE_CFLAGS += -DGSM_1080P
+endif
+
 ifeq ($(LOAD_DEBUG_MODULES),1)
 EE_CFLAGS += -D__LOAD_DEBUG_MODULES
     ifeq ($(DECI2_DEBUG),1)

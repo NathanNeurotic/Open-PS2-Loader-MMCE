@@ -32,6 +32,7 @@
 
 #Add - on video modes(made possible by SP193 and reprep)
 GS_MODE_DTV_576P=0x53
+GS_MODE_DTV_1080P=0x54
 
 #GSMSourceSetGsCrt
 .equ Source_INT,      0 # HALF

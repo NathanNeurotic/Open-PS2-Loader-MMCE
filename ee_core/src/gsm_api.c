@@ -25,9 +25,13 @@ extern void (*Old_SetGsCrt)(short int interlace, short int mode, short int ffmd)
 
 // Taken from gsKit
 // NTSC
-#define GS_MODE_NTSC 0x02
+#define GS_MODE_NTSC      0x02
 // PAL
-#define GS_MODE_PAL  0x03
+#define GS_MODE_PAL       0x03
+// GSM-synthetic forced-1080p mode. NOT a gsKit/ROM mode -- the BIOS has no SetGsCrt case for it, which
+// is why the engine programs its raster itself (DTV_1080P). Kept in sync with the same value in
+// ee_core/include/gsm_defines.h (asm) and include/renderman.h (EE C).
+#define GS_MODE_DTV_1080P 0x54
 
 struct GSMDestSetGsCrt
 {
@@ -84,7 +88,10 @@ static unsigned int KSEG_backup[2]; // Copies of the original words at 0x8000010
 void UpdateGSMParams(s16 interlace, s16 mode, s16 ffmd, u64 display, u64 syncv, u64 smode2, u32 dx_offset, u32 dy_offset, int k576p_fix, int kGsDxDyOffsetSupported, int FIELD_fix)
 {
     unsigned int hvParam = GetGsVParam();
-    int gs_DH, gs_DW, gs_DY, gs_DX;
+    // Initialised: _GetGsDxDyOffset() below is a ROM syscall and only writes these out-params for
+    // modes the BIOS actually implements. A GSM-synthetic mode has no ROM case, so the ROM can leave
+    // them untouched -- reading them uninitialised would add stack garbage to the raster origin.
+    int gs_DH = 0, gs_DW = 0, gs_DY = 0, gs_DX = 0;
 
     GSMDestSetGsCrt.interlace = interlace;
     GSMDestSetGsCrt.mode = mode;
@@ -110,7 +117,10 @@ void UpdateGSMParams(s16 interlace, s16 mode, s16 ffmd, u64 display, u64 syncv, 
     GSMFlags.FIELD_fix = (FIELD_fix ? (1 << 2) : 0);
     GSMFlags.gs576P_param = (k576p_fix ? (1 << 1) : 0) | (hvParam & 1);
 
-    if (kGsDxDyOffsetSupported && (!(mode >= GS_MODE_NTSC && mode <= GS_MODE_PAL))) {
+    // GS_MODE_DTV_1080P (0x54) is GSM-synthetic -- the BIOS has no case for it (that is exactly why we
+    // program its raster ourselves), so asking the ROM for its DX/DY offset is meaningless. The
+    // pre-rewrite engine, whose 1080p worked on hardware, made no such call for it at all.
+    if (kGsDxDyOffsetSupported && mode != GS_MODE_DTV_1080P && (!(mode >= GS_MODE_NTSC && mode <= GS_MODE_PAL))) {
         _GetGsDxDyOffset(mode, &gs_DX, &gs_DY, &gs_DW, &gs_DH);
         GSMFlags.dx_offset += gs_DX;
         GSMFlags.dy_offset += gs_DY;
