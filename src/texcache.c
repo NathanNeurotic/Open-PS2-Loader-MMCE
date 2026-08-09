@@ -224,7 +224,22 @@ GSTEXTURE *cacheGetTexture(image_cache_t *cache, item_list_t *list, int *cacheId
 
         *UID = cache->nextUID++;
 
-        ioPutRequest(IO_CACHE_LOAD_ART, req);
+        // A REFUSED request never runs, so nothing ever clears qr -- and qr is what marks this slot
+        // "load in flight". Left set, the entry is permanently invisible to BOTH the read path and
+        // the eviction scan above (which only considers entries with !qr), so the slot is dead for
+        // the rest of the session and its art never appears again. Backgrounds and screenshots are
+        // the visible casualties: their caches are ONE slot deep, so a single refusal kills the art
+        // type outright, while a 10-slot cover cache just loses one of ten and shrugs it off.
+        // Roll the slot back instead, leaving it free for the next frame to retry.
+        // (Third instance of this discarded-return shape; see rebuild-38 and rebuild-43.)
+        if (ioPutRequest(IO_CACHE_LOAD_ART, req) != IO_OK) {
+            // Reuse the module's own definition of an empty slot rather than hand-setting fields
+            // (cacheClearItem leaves lastUsed = -1, UID = 0). freeTxt = 0: the texture was already
+            // released by the cacheClearItem(.., 1) above, and the entry has held nothing since.
+            cacheClearItem(oldestEntry, 0);
+            *cacheId = -1; // the cache API's "no entry" sentinel, as used by themes.c
+            free(req);
+        }
     }
 
     return NULL;
