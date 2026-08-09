@@ -1147,13 +1147,21 @@ static int checkLoadConfigBDM(int types)
     int bdm_result;
     int is_hdd = 0;
 
+    // Probe the CURRENT settings filename, then the legacy one, so an existing install is still
+    // discovered (read-fallback migration; the next save rewrites it under the current name).
+    // These MUST be the CONFIG_OPL_FILENAME macros: config.c writes the file through them, so a
+    // hardcoded name here silently searches for a file this build never creates.
     // check USB
-    bdm_result = bdmFindPartition(path, "conf_opl.cfg", 0);
+    bdm_result = bdmFindPartition(path, CONFIG_OPL_FILENAME, 0);
+    if (!bdm_result)
+        bdm_result = bdmFindPartition(path, CONFIG_OPL_FILENAME_LEGACY, 0);
     // if not on USB, check BDM HDD
     if (bdm_result == 0) {
         // wait for up to 5 seconds for the HDD to spin up and become accessible...
         if (hddLoadModules() >= 0 && bdmHDDIsPresent(5000)) {
-            bdm_result = bdmFindPartition(path, "conf_opl.cfg", 0);
+            bdm_result = bdmFindPartition(path, CONFIG_OPL_FILENAME, 0);
+            if (!bdm_result)
+                bdm_result = bdmFindPartition(path, CONFIG_OPL_FILENAME_LEGACY, 0);
             if (bdm_result)
                 is_hdd = 1;
         }
@@ -1183,8 +1191,13 @@ static int checkLoadConfigHDD(int types)
     hddLoadModules();
     hddLoadSupportModules();
 
-    snprintf(path, sizeof(path), "%sconf_opl.cfg", gHDDPrefix);
+    snprintf(path, sizeof(path), "%s%s", gHDDPrefix, CONFIG_OPL_FILENAME);
     value = open(path, O_RDONLY);
+    if (value < 0) {
+        // Legacy fallback so an existing conf_riptopl.cfg install is still found (auto-migrates on save).
+        snprintf(path, sizeof(path), "%s%s", gHDDPrefix, CONFIG_OPL_FILENAME_LEGACY);
+        value = open(path, O_RDONLY);
+    }
     if (value >= 0) {
         close(value);
         configEnd();
@@ -1538,13 +1551,15 @@ static int trySaveConfigBDM(int types)
     char path[64];
     int bdm_result;
 
+    // SAVE path: current filename only -- no legacy probe. Writing under the legacy name would
+    // un-migrate an install that the load path above just migrated forward.
     // check USB
-    bdm_result = bdmFindPartition(path, "conf_opl.cfg", 1);
+    bdm_result = bdmFindPartition(path, CONFIG_OPL_FILENAME, 1);
     // if not on USB, check BDM HDD
     if (bdm_result == 0) {
         // wait for up to 5 seconds for the HDD to spin up and become accessible...
         if (hddLoadModules() >= 0 && bdmHDDIsPresent(5000)) {
-            bdm_result = bdmFindPartition(path, "conf_opl.cfg", 1);
+            bdm_result = bdmFindPartition(path, CONFIG_OPL_FILENAME, 1);
         }
     }
 
