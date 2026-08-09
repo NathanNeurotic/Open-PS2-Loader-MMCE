@@ -14,6 +14,7 @@ enum OPL_MODULE_ID {
     OPL_MODULE_ID_ILINKBD,
 
     // mx4sio mode modules
+    OPL_MODULE_ID_SIO2MAN,
     OPL_MODULE_ID_MX4SIOBD,
 
     // SMB mode modules

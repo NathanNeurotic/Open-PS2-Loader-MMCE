@@ -6,6 +6,7 @@
 
 void EnableCheats(void);
 void DisableCheats(void);
+void LinkImage(void);
 
 /**
  * code_t - a code object

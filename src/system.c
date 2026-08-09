@@ -683,6 +683,11 @@ static unsigned int sendIrxKernelRAM(const char *startup, const char *mode_str, 
         irxptr_tab[modcount++].ptr = (void *)&IEEE1394_bd_irx;
     }
     if (modules & CORE_IRX_MX4SIO) {
+        // mx4sio_bd requires PS2SDK's sio2man after the game-side IOP reset. Without it the block
+        // device never comes up in-game and the launch hangs. Keep these adjacent and ordered;
+        // ee_core loads them in the same order.
+        irxptr_tab[modcount].info = size_sio2man_irx | SET_OPL_MOD_ID(OPL_MODULE_ID_SIO2MAN);
+        irxptr_tab[modcount++].ptr = (void *)&sio2man_irx;
         irxptr_tab[modcount].info = size_mx4sio_bd_irx | SET_OPL_MOD_ID(OPL_MODULE_ID_MX4SIOBD);
         irxptr_tab[modcount++].ptr = (void *)&mx4sio_bd_irx;
     }
@@ -1561,6 +1566,10 @@ void sysLaunchLoaderElf(const char *filename, const char *mode_str, int size_cdv
         config->gCheatList = GetCheatsList();
     } else
         config->gCheatList = NULL;
+
+    // PS2RD .img cheats (item 26). Without this the EE loads the .img into RAM and then never hands
+    // the pointer to the core, so LinkImage() had nothing to link and the whole feature was dead.
+    config->gImage = GetImageEnabled() ? (u32 *)GetImage() : NULL;
 
     sprintf(config->g_ps2_ip, "%u.%u.%u.%u", local_ip_address[0], local_ip_address[1], local_ip_address[2], local_ip_address[3]);
     sprintf(config->g_ps2_netmask, "%u.%u.%u.%u", local_netmask[0], local_netmask[1], local_netmask[2], local_netmask[3]);
