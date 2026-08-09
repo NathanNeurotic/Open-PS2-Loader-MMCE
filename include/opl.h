@@ -270,6 +270,9 @@ extern int gPadMacroSettings;
 extern int gScrollSpeed;
 // Exit path
 extern char gExitPath[256];
+// Opt-in "Custom Settings Path" (General Settings). Empty = unset. Typed by the user, so it may name
+// a device that is not mounted yet -- the load/save paths lazy-load it via bdmResolveBootDir().
+extern char gCustomSettingsPath[64];
 // Enable Debug Colors
 extern int gEnableDebug;
 

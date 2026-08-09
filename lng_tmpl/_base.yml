@@ -1036,3 +1036,7 @@ gui_strings:
   string: Proceed with forcing 1080p for this game?
 - label: GSM_1080P_SURE
   string: Are you sure? Cross applies 1080p, Circle cancels.
+- label: CUSTOM_SETTINGS_PATH
+  string: Custom Settings Path
+- label: HINT_CUSTOM_SETTINGS_PATH
+  string: "Save settings to a folder you choose, e.g. mass0:/OPL. Leave blank to use the folder OPL booted from. The device is loaded on demand, so it need not be mounted when you type it."
