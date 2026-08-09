@@ -1,5 +1,6 @@
 #include "include/opl.h"
 #include "include/ioman.h"
+#include "include/util.h" // delay() -- bounded drain in ioBlockOpsTimed
 #include <kernel.h>
 #include <string.h>
 #include <malloc.h>
@@ -333,7 +334,7 @@ int ioPrintf(const char *format, ...)
     return ret;
 }
 
-int ioBlockOps(int block)
+int ioBlockOpsTimed(int block, int timeoutTicks)
 {
     ee_thread_status_t status;
     int ThreadID;
@@ -342,12 +343,24 @@ int ioBlockOps(int block)
         isIOBlocked = 1;
 
         ThreadID = GetThreadId();
-        int haveStatus = (ReferThreadStatus(ThreadID, &status) == 0);
+        // EE ReferThreadStatus() returns the thread status (>= 0) or a negative error, NOT 0 on
+        // success (that is the IOP thbase variant). An `== 0` test is always false, so haveStatus
+        // would always be 0 and the saved priority below would never be restored -- leaving this
+        // (usually the main GUI) thread pinned at priority 90 for the rest of the session.
+        int haveStatus = (ReferThreadStatus(ThreadID, &status) >= 0);
         ChangeThreadPriority(ThreadID, 90);
 
-        // wait for all io to finish
+        // Wait for the in-flight IO handler(s) to finish. timeoutTicks < 0 waits unbounded
+        // (the historical behaviour); a non-negative value caps the wait. The NBD preflight
+        // passes a bound so a request stuck on a removed/slow device fails the start instead
+        // of freezing after audio and pads have already been dismantled.
         while (ioHasPendingRequests()) {
-        };
+            if (timeoutTicks == 0)
+                break;
+            delay(1);
+            if (timeoutTicks > 0)
+                timeoutTicks--;
+        }
 
         // Only restore the saved priority if ReferThreadStatus actually filled it.
         if (haveStatus)
@@ -359,4 +372,10 @@ int ioBlockOps(int block)
     }
 
     return IO_OK;
+}
+
+int ioBlockOps(int block)
+{
+    // Unbounded wait (historical behavior) for all non-teardown callers.
+    return ioBlockOpsTimed(block, -1);
 }

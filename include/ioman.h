@@ -53,6 +53,14 @@ int ioPrintf(const char *format, ...);
 */
 int ioBlockOps(int block);
 
+/** As ioBlockOps, but caps the drain wait at timeoutTicks (< 0 = unbounded).
+ Used by the NBD preflight so a request stuck on a removed/slow device cannot
+ hang the start indefinitely.
+ @param block If nonzero, will issue blocking, otherwise it will unblock
+ @param timeoutTicks Max delay(1) ticks to wait for pending IO; < 0 = unbounded
+*/
+int ioBlockOpsTimed(int block, int timeoutTicks);
+
 #ifdef __DEBUG
 #define PREINIT_LOG(...) printf(__VA_ARGS__)
 #define LOG(...)         ioPrintf(__VA_ARGS__)
