@@ -80,20 +80,27 @@ lbl_startlocate:
         }
 #endif
 
-        // copy the path into main 'dir' var
+        // copy the path segment into cdvdman_dirname, bounded to the buffer. The
+        // #ifdef debug check above only break()s in debug builds; release had no
+        // protection against a segment longer than the 32-byte buffer.
+        if (len >= (int)sizeof(cdvdman_dirname))
+            len = sizeof(cdvdman_dirname) - 1;
         strncpy(cdvdman_dirname, p, len);
         cdvdman_dirname[len] = 0;
     } else {
-#ifdef __IOPCORE_DEBUG
+        // No slash: p is the final filename. Bound the copy (release previously
+        // used an unbounded strcpy, with only a debug-only break check).
         len = strlen(p);
-
+#ifdef __IOPCORE_DEBUG
         if (len >= sizeof(cdvdman_dirname)) {
             DPRINTF("cdvdman_locatefile: filename too long: (%d chars) \"%s\"\n", len, p);
             asm volatile("break\n");
         }
 #endif
-
-        strcpy(cdvdman_dirname, p);
+        if (len >= (int)sizeof(cdvdman_dirname))
+            len = sizeof(cdvdman_dirname) - 1;
+        strncpy(cdvdman_dirname, p, len);
+        cdvdman_dirname[len] = 0;
     }
 
     while (tocLength > 0) {
@@ -114,6 +121,11 @@ lbl_startlocate:
 
             filename_len = tocEntryPointer->filenameLength;
             if (filename_len) {
+                // filenameLength is on-disc data (u8, 0-255); clamp to the buffer so a
+                // non-compliant or crafted ISO cannot overflow cdvdman_curdir[15]. The
+                // match below only strncmp()s the first 12 chars, so this is lossless.
+                if (filename_len >= (int)sizeof(cdvdman_curdir))
+                    filename_len = sizeof(cdvdman_curdir) - 1;
                 strncpy(cdvdman_curdir, tocEntryPointer->filename, filename_len); // copy filename
                 cdvdman_curdir[filename_len] = 0;
 
