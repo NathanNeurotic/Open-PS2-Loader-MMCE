@@ -12,7 +12,13 @@
 #define TAR_BLOCK_SIZE 512
 #define MAX_FILE_SIZE  (4 * 1024 * 1024) // 4 MiB
 #define ARC_MAGIC      "ARC\0"
-#define ARC_VERSION    3
+// 4: the v3 indexer STOPPED at the first end-of-archive marker, so a concatenated art.tar was
+// indexed only up to its first member and the sidecar cached that TRUNCATED result. The sidecar
+// is validated against the tar's SIZE alone (tar.c tarReadCache), which does not change, and
+// tarInvalidate only drops the RAM copy -- so without a version bump every affected user would
+// keep their short index forever. Bumping forces a one-time re-scan. Cost: sidecars are no longer
+// interchangeable with wOPL/sOPL's, which is acceptable -- the file is a regenerable cache.
+#define ARC_VERSION    4
 
 typedef struct
 {

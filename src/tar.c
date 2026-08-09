@@ -269,8 +269,18 @@ static int tarParseFile(TarKind kind, const char *path)
         if (r != TAR_BLOCK_SIZE)
             goto fail;
 
+        // Do NOT stop at the first end-of-archive marker. A tar EOF marker is a run of zero
+        // blocks, and a CONCATENATED art.tar (a covers pack + a BG pack + a SCR pack merged with
+        // cat / copy /b, which is how these packs are actually distributed) carries one MID-FILE.
+        // Breaking here indexed only the FIRST member and silently dropped every entry after it --
+        // in practice every _BG/_SCR/_SCR2, while the covers in the first member kept working.
+        // This is GNU tar's --ignore-zeros semantics. The scan now ends only at a real EOF (the
+        // read()==0 above); trailing padding on a well-formed archive costs a few extra 512-byte
+        // reads. Note the ordering tell: within one game "_BG" sorts BEFORE "_COV", so a single
+        // truncated archive would have lost COVERS first -- covers surviving is only possible if
+        // they sit in an earlier concatenated member.
         if (isZeroBlock(header))
-            break;
+            continue;
 
         char typeflag = (char)header[156];
         u64 rawSize = parseOctal((char *)header + 124, 12);
