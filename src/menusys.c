@@ -18,6 +18,7 @@
 #include "include/system.h"
 #include "include/ioman.h"
 #include "include/sound.h"
+#include "include/favsupport.h" // gFAVStartMode -- the Favourites tab counts as "something to show"
 #include "include/vcdsupport.h" // vcdViewActive() -- VCD launches never use Neutrino
 #include "include/bdmsupport.h" // bdmSupportIsUDPBD() -- UDPBD games are Neutrino-only
 #include <assert.h>
@@ -65,6 +66,7 @@ static menu_list_t *menu;
 static menu_list_t *selected_item;
 
 static int actionStatus;
+static int menuSaveResult; // last per-game configWrite() result, published by _menuSaveConfig
 static int itemConfigId;
 static config_set_t *itemConfig;
 
@@ -190,7 +192,8 @@ static void _menuSaveConfig()
 
     WaitSema(menuSemaId);
     result = configWrite(itemConfig);
-    itemConfigId = -1; // to invalidate cache and force reload
+    itemConfigId = -1;       // to invalidate cache and force reload
+    menuSaveResult = result; // publish BEFORE actionStatus=0 -- that flag is the waiter's release signal
     actionStatus = 0;
     SignalSema(menuSemaId);
 
@@ -235,10 +238,12 @@ config_set_t *gameMenuLoadConfig(struct UIItem *ui)
     return itemConfig;
 }
 
-void menuSaveConfig()
+int menuSaveConfig()
 {
     actionStatus = 1;
+    menuSaveResult = 0;
     guiHandleDeferedIO(&actionStatus, _l(_STR_SAVING_SETTINGS), IO_CUSTOM_SIMPLEACTION, &_menuSaveConfig);
+    return menuSaveResult;
 }
 
 static void menuInitMainMenu(void)
@@ -1035,8 +1040,14 @@ void menuHandleInputMenu()
     }
 
     if (getKeyOn(KEY_START) || getKeyOn(gSelectButton == KEY_CIRCLE ? KEY_CROSS : KEY_CIRCLE)) {
-        // Check if there is anything to show the user, at all.
-        if (gAPPStartMode || gETHStartMode || gBDMStartMode || gHDDStartMode) {
+        // Check if there is anything to show the user, at all. This MUST list every tab that can
+        // hold rows, or the user gets trapped in the settings menu with no way back to the list:
+        // gFAVStartMode was missing, so a Favourites-only setup could not escape at all.
+        // bdmEffectiveStartMode() rather than raw gBDMStartMode: UDPBD floors the BDM start mode, so
+        // a UDPBD-only rig has rows while gBDMStartMode itself is still disabled.
+        // NOTE(rebuild): the fork also ORs gMMCEStartMode here; that global arrives with checklist
+        // item 1, and until then no MMCE tab can hold rows, so omitting it changes nothing.
+        if (gAPPStartMode || gETHStartMode || bdmEffectiveStartMode() || gHDDStartMode || gFAVStartMode) {
             guiSwitchScreen(GUI_SCREEN_MAIN);
             refreshMenuPosition();
         }
@@ -1344,9 +1355,15 @@ void menuHandleInputGameMenu()
         } else if (menuID == GAME_SAVE_CHANGES) {
             if (guiGameSaveConfig(itemConfig, selected_item->item->userdata))
                 configSetInt(itemConfig, CONFIG_ITEM_CONFIGSOURCE, CONFIG_SOURCE_USER);
-            menuSaveConfig();
-            saveConfig(CONFIG_GAME, 0);
-            guiMsgBox(_l(_STR_GAME_SETTINGS_SAVED), 0, NULL);
+            int okItem = menuSaveConfig();           // per-game CFG/<id>.cfg (itemConfig)
+            int okGame = saveConfig(CONFIG_GAME, 0); // the global game config set
+            // #245: claim "saved" only when BOTH writes actually persisted. This modal was
+            // UNCONDITIONAL, so a failed write showed "Game settings saved" immediately followed
+            // by the async "error writing settings!" toast -- the exact contradiction Andrew
+            // reported. On failure the error toast already names the path and errno; don't also
+            // lie that it saved.
+            if (okItem && okGame)
+                guiMsgBox(_l(_STR_GAME_SETTINGS_SAVED), 0, NULL);
             guiGameLoadConfig(selected_item->item->userdata, gameMenuLoadConfig(NULL));
         } else if (menuID == GAME_TEST_CHANGES) {
             guiGameTestSettings(selected_item->item->current->item.id, selected_item->item->userdata, itemConfig);
