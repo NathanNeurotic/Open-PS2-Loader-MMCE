@@ -943,7 +943,12 @@ void menuSetSelectedItem(menu_item_t *item)
 
 void menuRenderMenu()
 {
-    guiDrawBGPlasma();
+    // Optional themed settings background (use_settings_bg): guiDrawBGSettings draws it and
+    // returns non-zero; 0 means the theme has none, so fall back to the plasma. dia.c already
+    // did this for dialogs -- these three menu screens did not, so a theme that shipped a
+    // settings background got it on its dialogs and the plasma on its menus.
+    if (guiDrawBGSettings() == 0)
+        guiDrawBGPlasma();
 
     if (!mainMenu)
         return;
@@ -1308,7 +1313,12 @@ void menuHandleInputInfo()
 
 void menuRenderGameMenu()
 {
-    guiDrawBGPlasma();
+    // Optional themed settings background (use_settings_bg): guiDrawBGSettings draws it and
+    // returns non-zero; 0 means the theme has none, so fall back to the plasma. dia.c already
+    // did this for dialogs -- these three menu screens did not, so a theme that shipped a
+    // settings background got it on its dialogs and the plasma on its menus.
+    if (guiDrawBGSettings() == 0)
+        guiDrawBGPlasma();
 
     if (!gameMenu)
         return;
@@ -1485,7 +1495,12 @@ void menuHandleInputGameMenu()
 
 void menuRenderAppMenu()
 {
-    guiDrawBGPlasma();
+    // Optional themed settings background (use_settings_bg): guiDrawBGSettings draws it and
+    // returns non-zero; 0 means the theme has none, so fall back to the plasma. dia.c already
+    // did this for dialogs -- these three menu screens did not, so a theme that shipped a
+    // settings background got it on its dialogs and the plasma on its menus.
+    if (guiDrawBGSettings() == 0)
+        guiDrawBGPlasma();
 
     if (!appMenu)
         return;

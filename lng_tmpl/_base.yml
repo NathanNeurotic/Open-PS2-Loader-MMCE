@@ -1026,3 +1026,7 @@ gui_strings:
   string: This setting is not used with the Neutrino core.
 - label: DISABLE_ALL
   string: Disable All
+- label: BOOT_LOADING_SOUNDS
+  string: Loading theme sounds...
+- label: BOOT_BUILDING_MENU
+  string: Building menu...
