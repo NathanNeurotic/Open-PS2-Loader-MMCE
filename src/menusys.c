@@ -1074,12 +1074,25 @@ void menuRenderMain(void)
 {
     item_list_t *list = selected_item->item->userdata;
 
-    if (list->mode == APP_MODE) {
+    if (vcdViewActive(list->mode)) {
+        // VCD/PS1 listings render with the vcd family (vcdMain*; each slot falls back at parse time to
+        // appsMain* then main*). The VCD list uses its OWN items-list slot (vcdItemsList) so it keeps a
+        // SEPARATE cover cache from the device's ISO list -- the view reuses the device's game list
+        // (same item ids), so a shared cache thrashes on every L3 toggle. This also covers the
+        // Favourites tab's own VCD view: VCD favourites render with the PS1 family, not the favs one.
+        menuRenderElements(gTheme->vcdMainElems.first);
+        gTheme->itemsList = thmResolveItemsList(&gTheme->vcdMainElems, gTheme->vcdItemsList ? gTheme->vcdItemsList : gTheme->gamesItemsList, selected_item->item->icon_id);
+    } else if (list->mode == FAV_MODE) {
+        menuRenderElements(gTheme->favsMainElems.first);
+        gTheme->itemsList = thmResolveItemsList(&gTheme->favsMainElems, gTheme->favsItemsList ? gTheme->favsItemsList : gTheme->gamesItemsList, selected_item->item->icon_id);
+    } else if (list->mode == APP_MODE) {
         menuRenderElements(gTheme->appsMainElems.first);
-        gTheme->itemsList = gTheme->appsItemsList;
+        gTheme->itemsList = thmResolveItemsList(&gTheme->appsMainElems, gTheme->appsItemsList ? gTheme->appsItemsList : gTheme->gamesItemsList, selected_item->item->icon_id);
     } else {
         menuRenderElements(gTheme->mainElems.first);
-        gTheme->itemsList = gTheme->gamesItemsList;
+        // Always falls back to gamesItemsList, never NULL: the scroll/paging code (menuNextV/PrevV/
+        // Page) derefs gTheme->itemsList->extended with no NULL check.
+        gTheme->itemsList = thmResolveItemsList(&gTheme->mainElems, gTheme->gamesItemsList, selected_item->item->icon_id);
     }
 }
 
@@ -1172,12 +1185,18 @@ void menuRenderInfo(void)
 {
     item_list_t *list = selected_item->item->userdata;
 
-    if (list->mode == APP_MODE) {
+    if (vcdViewActive(list->mode)) {
+        menuRenderElements(gTheme->vcdInfoElems.first);
+        gTheme->itemsList = thmResolveItemsList(&gTheme->vcdInfoElems, gTheme->vcdItemsList ? gTheme->vcdItemsList : gTheme->gamesItemsList, selected_item->item->icon_id);
+    } else if (list->mode == FAV_MODE) {
+        menuRenderElements(gTheme->favsInfoElems.first);
+        gTheme->itemsList = thmResolveItemsList(&gTheme->favsInfoElems, gTheme->favsItemsList ? gTheme->favsItemsList : gTheme->gamesItemsList, selected_item->item->icon_id);
+    } else if (list->mode == APP_MODE) {
         menuRenderElements(gTheme->appsInfoElems.first);
-        gTheme->itemsList = gTheme->appsItemsList;
+        gTheme->itemsList = thmResolveItemsList(&gTheme->appsInfoElems, gTheme->appsItemsList ? gTheme->appsItemsList : gTheme->gamesItemsList, selected_item->item->icon_id);
     } else {
         menuRenderElements(gTheme->infoElems.first);
-        gTheme->itemsList = gTheme->gamesItemsList;
+        gTheme->itemsList = thmResolveItemsList(&gTheme->infoElems, gTheme->gamesItemsList, selected_item->item->icon_id);
     }
 }
 
