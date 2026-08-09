@@ -1,6 +1,23 @@
 # Auto detect text files and perform LF normalization
 * text=auto
 
+# Binary loader/driver payloads shipped verbatim to the memory card: the POPSTARTER assets plus the
+# BDMAssault IRX variants. NEVER line-ending normalize these -- a stray CRLF<->LF pass corrupts the
+# IRX and POPSTARTER then fails to load it.
+#
+# BOTH lines are needed, and the directory rule is spelled POPS/ on purpose. The BDMAssault variants
+# are named usbd.irx.ata / usbhdfsd.irx.mmce / ... -- the extension is the MODE, so they do NOT end
+# in ".irx" and `*.irx` alone misses every one of them. Upstream spells this rule `pops/*`, which
+# matches nothing on a case-sensitive checkout (the directory is POPS/), so the CI runner never
+# applied it; using the real casing here is a deliberate divergence, not a typo.
+POPS/* binary
+*.irx binary
+
+# Internet shortcuts are a Windows-native format and must check out with CRLF. pc/PS2-Servers.url is
+# copied straight into the release package, so this is load-bearing at publish time, not cosmetic.
+*.url text eol=crlf
+*.bat text eol=crlf
+
 # Custom for Visual Studio
 *.cs   diff=csharp
 

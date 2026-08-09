@@ -2392,13 +2392,20 @@ static void setDefaults(void)
     hddCacheSize = 8;
     smbCacheSize = 16;
 
-    ps2_ip_use_dhcp = 1;
+    // Network defaults are ONE coherent set, not four independent knobs -- restoring the fork's
+    // opinionated fresh-install profile (this had reverted to the upstream 192.168.0.x / DHCP one).
+    // Static addressing on 192.168.1.x, the far more common home subnet, with the PS2 and the PC on
+    // the same wire: the UDP transports (UDPBD / UDPFS / NBD) run on a ministack that needs a STATIC
+    // ip, so defaulting to DHCP hands a fresh install a config those transports cannot use.
+    // gPCShareAddressIsNetBIOS follows the same logic -- raw-IP SMB addressing is what matches the
+    // static defaults directly below; NetBIOS name resolution is the opt-in.
+    ps2_ip_use_dhcp = 0;
     gETHOpMode = ETH_OP_MODE_AUTO;
-    gPCShareAddressIsNetBIOS = 1;
+    gPCShareAddressIsNetBIOS = 0; // raw-IP SMB addressing by default (matches the static defaults below)
     gPCShareNBAddress[0] = '\0';
     ps2_ip[0] = 192;
     ps2_ip[1] = 168;
-    ps2_ip[2] = 0;
+    ps2_ip[2] = 1;
     ps2_ip[3] = 10;
     ps2_netmask[0] = 255;
     ps2_netmask[1] = 255;
@@ -2406,15 +2413,15 @@ static void setDefaults(void)
     ps2_netmask[3] = 0;
     ps2_gateway[0] = 192;
     ps2_gateway[1] = 168;
-    ps2_gateway[2] = 0;
+    ps2_gateway[2] = 1;
     ps2_gateway[3] = 1;
     pc_ip[0] = 192;
     pc_ip[1] = 168;
-    pc_ip[2] = 0;
-    pc_ip[3] = 2;
+    pc_ip[2] = 1;
+    pc_ip[3] = 100;
     ps2_dns[0] = 192;
     ps2_dns[1] = 168;
-    ps2_dns[2] = 0;
+    ps2_dns[2] = 1;
     ps2_dns[3] = 1;
     gPCPort = 1111; // RiptOPL default SMB port (was 445): matches the bundled PC server tooling
     gPCShareName[0] = '\0';

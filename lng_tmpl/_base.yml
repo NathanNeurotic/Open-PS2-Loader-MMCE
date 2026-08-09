@@ -141,7 +141,7 @@ gui_strings:
 - label: ERROR_LOADING_ID
   string: Error while loading the Game ID.
 - label: AUTOSORT
-  string: Automatic Sorting
+  string: Sort Games Alphabetically
 - label: ERR_LOADING_LANGFILE
   string: Error loading the language file.
 - label: DEBUG
@@ -305,7 +305,7 @@ gui_strings:
 - label: BDM_PREFIX
   string: BDM Prefix Path
 - label: HINT_EXITPATH
-  string: Boots custom ELF after an IGR.
+  string: "Boots a custom ELF after an IGR. Keep it on the memory card (mc0:/mc1:) -- the post-reset loader can't reach MMCE; for MMCE, chain through an MC loader like PS2BBL."
 - label: HINT_SPINDOWN
   string: Value in minute(s), 0 to disable spin down.
 - label: HDD_SPINDOWN
