@@ -9,6 +9,7 @@
 #include "include/ioman.h"
 #include "modules/iopcore/common/cdvd_config.h"
 #include "include/cheatman.h"
+#include "include/tar.h"      // CHT/cht.tar cheat archives (#154)
 #include "include/pggsm.h"
 #include "include/cheatman.h"
 #include "include/ps2cnf.h"
@@ -1006,9 +1007,51 @@ void sbCreateFolders(const char *path, int createDiscImgFolders)
 
   Returns 1 to continue the launch, 0 if the user cancelled (caller must return immediately).
 */
+#define CHT_TAR_MEMBER_MAX (1024 * 1024)
+
+/*
+  Cheat search log (#265): the locations sbLoadCheats actually probed this run, appended to the
+  "no cheats found" text so the user is told exactly where OPL looked. Paths are not translatable
+  text, so this is appended to the localized string rather than needing a new .lng label.
+*/
+static char cheatSearchLog[512];
+
+static void sbCheatLogAppend(const char *what)
+{
+    size_t used = strlen(cheatSearchLog);
+
+    if (used + 2 >= sizeof(cheatSearchLog))
+        return; // full: drop rather than truncate mid-path, which would mislead
+
+    snprintf(cheatSearchLog + used, sizeof(cheatSearchLog) - used, "%s%s", used ? "\n" : "", what);
+}
+
+const char *sbGetCheatSearchLog(void)
+{
+    return cheatSearchLog;
+}
+
+/*
+  Build the "no cheats found" text with the locations actually probed appended (#265). Returns a
+  static buffer, valid until the next call. If the log is somehow empty the localized string is
+  returned unchanged, so this can never render a bare header with nothing under it.
+*/
+const char *sbCheatsNotFoundText(void)
+{
+    static char msg[640];
+    const char *log = sbGetCheatSearchLog();
+
+    if (log == NULL || log[0] == 0)
+        return _l(_STR_NO_CHEATS_FOUND);
+
+    snprintf(msg, sizeof(msg), "%s\n\n%s", _l(_STR_NO_CHEATS_FOUND), log);
+
+    return msg;
+}
+
 int sbCheatsMissingContinue(void *pCommon, int cheatResult)
 {
-    const char *text = (cheatResult == -ENOENT) ? _l(_STR_NO_CHEATS_FOUND) : _l(_STR_ERR_CHEATS_LOAD_FAILED);
+    const char *text = (cheatResult == -ENOENT) ? sbCheatsNotFoundText() : _l(_STR_ERR_CHEATS_LOAD_FAILED);
 
     // Autolaunch has no user at the pad; never block an unattended boot on a prompt.
     if ((gAutoLaunchGame != NULL) || (gAutoLaunchBDMGame != NULL)) {
@@ -1063,13 +1106,77 @@ int sbLoadCheats(const char *path, const char *file)
     char cheatfile[256];
     int cheatMode = 0;
 
-    if (GetCheatsEnabled()) {
-        snprintf(cheatfile, sizeof(cheatfile), "%sCHT/%s.cht", path, file);
-        LOG("Loading Cheat File %s\n", cheatfile);
+    cheatSearchLog[0] = 0;
 
-        if ((cheatMode = load_cheats(cheatfile)) < 0)
+    if (GetCheatsEnabled()) {
+        // CHT/cht.tar -- a flat ustar of <startup>.cht members at a device root -- is probed FIRST,
+        // cross-device (the tar engine's own device order). The CHT kind's tables have shipped inert
+        // in src/tar.c since the art port; this is what finally uses them. The loose
+        // CHT/<startup>.cht below stays the untouched fallback for any tar miss or failure.
+        char member[64];
+        if (snprintf(member, sizeof(member), "%s.cht", file) < (int)sizeof(member)) {
+            const TarEntryBase *entry = tarFind(TAR_KIND_CHT, member);
+            sbCheatLogAppend("CHT/cht.tar");
+            /*
+              Retry the member in UPPERCASE (#265). tarFind matches the archived name byte-for-byte,
+              so a pack built with "<ID>.CHT" members missed entirely. Only the EXTENSION is
+              re-cased -- the startup id is already canonical uppercase (SLUS_123.45).
+            */
+            if (entry == NULL && snprintf(member, sizeof(member), "%s.CHT", file) < (int)sizeof(member))
+                entry = tarFind(TAR_KIND_CHT, member);
+            // rawSize == 0 counts as a miss so an empty tar member never shadows a possibly-valid
+            // loose CHT/<id>.cht below; over-cap members likewise fall through.
+            if (entry != NULL && entry->rawSize > 0 && entry->rawSize <= CHT_TAR_MEMBER_MAX) {
+                // rawSize+1: tar members carry no NUL and the parser needs a terminator.
+                char *tarBuf = (char *)malloc(entry->rawSize + 1);
+                if (tarBuf != NULL) {
+                    if (tarRead(TAR_KIND_CHT, entry, tarBuf, entry->rawSize) == entry->rawSize) {
+                        tarBuf[entry->rawSize] = '\0';
+                        cheatMode = load_cheats_buf(tarBuf);
+                    } else
+                        cheatMode = -1;
+                    free(tarBuf);
+                    if (cheatMode >= 0) {
+                        LOG("Cheats found in CHT/cht.tar (%s)\n", tarGetDevicePrefix(TAR_KIND_CHT));
+                        if ((gAutoLaunchGame == NULL) && (gAutoLaunchBDMGame == NULL) && (cheatMode == 1))
+                            guiManageCheats();
+                        return cheatMode;
+                    }
+                    LOG("Error: cht.tar member failed to load; trying the loose file\n");
+                }
+            }
+        }
+
+        /*
+          Try lowercase then UPPERCASE (#265). PFS (HDD) is case-sensitive and the BDM FAT drivers do
+          not fold case on lookup either, so a file saved as "<ID>.CHT" -- which is what several
+          published cheat packs ship -- was simply invisible. Both spellings go into the search log so
+          the user is told exactly what was looked for.
+        */
+        static const char *chtExt[] = {"cht", "CHT"};
+        unsigned int ext;
+
+        cheatMode = -1;
+
+        for (ext = 0; ext < sizeof(chtExt) / sizeof(chtExt[0]); ext++) {
+            snprintf(cheatfile, sizeof(cheatfile), "%sCHT/%s.%s", path, file, chtExt[ext]);
+            LOG("Loading Cheat File %s\n", cheatfile);
+            sbCheatLogAppend(cheatfile);
+
+            if ((cheatMode = load_cheats(cheatfile)) >= 0)
+                break;
+        }
+
+        if (cheatMode < 0) {
+            // Distinguish absent from unreadable so the launch legs' "No cheats found" branch fires
+            // for a merely-missing file instead of the scary "failed to load cheats" toast.
+            int probe = open(cheatfile, O_RDONLY);
+            if (probe < 0)
+                cheatMode = -ENOENT;
+            else
+                close(probe);
             LOG("Error: failed to load cheats\n");
-        else {
+        } else {
             LOG("Cheats found\n");
             if ((gAutoLaunchGame == NULL) && (gAutoLaunchBDMGame == NULL) && (cheatMode == 1))
                 guiManageCheats();
