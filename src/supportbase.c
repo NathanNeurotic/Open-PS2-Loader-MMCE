@@ -5,6 +5,7 @@
 #include "include/system.h"
 #include "include/supportbase.h"
 #include "include/folderbrowse.h" // FOLDER_SUB_MAX + folder-browse subpath state
+#include "include/vcdsupport.h"   // vcdExtractGameId + VCD_ID_MAX -- VCD per-game CFG keying
 #include "include/gui.h"          // guiMsgBox (sbCheatsMissingContinue confirm)
 #include "include/ioman.h"
 #include "modules/iopcore/common/cdvd_config.h"
@@ -944,17 +945,43 @@ config_set_t *sbPopulateConfig(base_game_info_t *game, const char *prefix, const
     char path[256];
     struct stat st;
 
-    snprintf(path, sizeof(path), "%sCFG%s%s.cfg", prefix, sep, game->startup);
+    // VCD data is keyed primarily by the full filename basename; a strict leading disc ID is only
+    // a compatibility fallback when the filename CFG is absent. Everything else keys by startup ID.
+    // WHY: game->startup is char[13] (GAME_STARTUP_MAX 12) and vcdsupport.c copies the WHOLE VCD
+    // basename into it, so keying a VCD by startup TRUNCATES at 12 chars -- "Final Fantasy VII
+    // (Disc 1)" and "(Disc 2)" both become "Final Fantas" and SHARE one CFG file, silently
+    // cross-applying per-game core/VMC/video/GSM settings. Real PS2 disc IDs are 11 chars and fit,
+    // which is why the official base never exhibits this; VCD names do not.
+    const int isVcd = !strcasecmp(game->extension, ".VCD");
+    const char *cfgKey = isVcd ? game->name : game->startup;
+
+    snprintf(path, sizeof(path), "%sCFG%s%s.cfg", prefix, sep, cfgKey);
     config_set_t *config = configAlloc(0, NULL, path);
-    configRead(config); // Does not matter if the config file could be loaded or not.
+    int configLoaded = configRead(config); // Does not matter if the config file could be loaded or not.
+
+    // Compatibility only: filename remains the VCD identity, but an existing disc-ID config may be
+    // loaded when the primary filename config is absent. Keep the primary object if both miss so a
+    // future save creates CFG/<filename>.cfg rather than inventing an ID-keyed file.
+    if (!configLoaded && isVcd) {
+        char fallbackKey[VCD_ID_MAX];
+        if (vcdExtractGameId(game->name, fallbackKey, sizeof(fallbackKey))) {
+            snprintf(path, sizeof(path), "%sCFG%s%s.cfg", prefix, sep, fallbackKey);
+            config_set_t *fallback = configAlloc(0, NULL, path);
+            if (fallback != NULL) {
+                if (configRead(fallback)) {
+                    configMerge(config, fallback);
+                    config->modified = 0;
+                }
+                configFree(fallback);
+            }
+        }
+    }
 
     // Get game size if not already set (deferred off the scroll path; see sbConfigStatSize). A .VCD (PS1) has
     // no meaningful ISO size and its file lives in POPS/, not CD/DVD/, so statting the CD/DVD path always
     // misses, leaves sizeMB at 0, never caches, and re-probes the shared MMCE bus on every info entry (#120).
     // Hard-stop it by EXTENSION here (not mutable view state) so a .VCD can never reach the ISO stat path,
     // even during the L3 view-toggle window (game->sizeMB stays 0 -> "0 MiB" is still written below).
-    const int isVcd = !strcasecmp(game->extension, ".VCD");
-
     // Folder browsing: prepend the current subpath so the stat resolves a game that lives inside a
     // subfolder. sbBrowseSub is "" at the device root, collapsing subseg away. Without this a
     // folder-nav game stats a path that does not exist and silently reports 0 MiB.
@@ -998,12 +1025,25 @@ config_set_t *sbPopulateConfig(base_game_info_t *game, const char *prefix, const
             configSetStr(config, CONFIG_ITEM_FORMAT, "ISO");
         else if (!strcmp(game->extension, ".zso"))
             configSetStr(config, CONFIG_ITEM_FORMAT, "ZSO");
+        else if (isVcd)
+            configSetStr(config, CONFIG_ITEM_FORMAT, "VCD"); // VCD listing -> the VCD format glyph
     } else if (game->format == GAME_FORMAT_USBLD)
         configSetStr(config, CONFIG_ITEM_FORMAT, "UL");
 
-    configSetStr(config, CONFIG_ITEM_MEDIA, game->media == SCECdPS2CD ? "CD" : "DVD");
+    // #System/#Media/#DiscType badges: a PS1 (POPSTARTER/.VCD) disc is always a CD; PS2 uses
+    // game->media. A folder row is not a disc -- leave the disc attributes unset so no disc badge
+    // renders on it. This call SUPERSEDES the bare CONFIG_ITEM_MEDIA write that used to live here:
+    // sbSetDiscAttributes stamps #Media itself, plus the #System and #DiscType axes that the bare
+    // write never set. Without it, sbSetDiscAttributes had exactly ONE caller (hddsupport.c), so
+    // the #System glyph was blank on USB, iLink, MX4SIO, BDM-HDD, SMB, UDPFS and FAV -- every
+    // library except APA-HDD -- while the adjacent #Media badge drew fine, leaving a visible hole
+    // in the shipped Coverflow theme.
+    if (game->format != GAME_FORMAT_FOLDER) {
+        int isPS1 = isVcd;
+        sbSetDiscAttributes(config, isPS1, isPS1 || game->media == SCECdPS2CD);
+    }
 
-    configSetStr(config, CONFIG_ITEM_STARTUP, game->startup);
+    configSetStr(config, CONFIG_ITEM_STARTUP, isVcd ? game->name : game->startup);
 
     return config;
 }
