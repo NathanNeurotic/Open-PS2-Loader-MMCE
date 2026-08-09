@@ -222,6 +222,7 @@ int gPadMacroSettings;
 #endif
 int gScrollSpeed;
 char gExitPath[256];
+char gCustomSettingsPath[64];
 int gEnableDebug;
 int gPS2Logo;
 int gDefaultDevice;
@@ -1221,13 +1222,101 @@ static int checkLoadConfigHDD(int types)
 }
 
 // When this function is called, the current device for loading/saving config is the memory card.
+// "Custom Settings Path" bootstrap.
+//
+// THE CHICKEN-AND-EGG: the user's chosen path is stored in CONFIG_OPL_CUSTOM_SETTINGS_PATH, which
+// lives INSIDE the config file that path points at. At boot we cannot read the setting without
+// already knowing it. So the path is ALSO mirrored to a tiny plain-text "config.path" file in the
+// CWD -- the one location that is readable before any device driver is up, because it is where OPL
+// was launched from. Boot reads the redirect; the setting inside the config is what the GUI edits
+// and what keeps the two in sync on save.
+static const char *configPathRedirectFile = "config.path";
+
+static int readConfigPathRedirect(char *outPath, int outPathLen)
+{
+    int fd;
+    int len;
+
+    fd = open((char *)configPathRedirectFile, O_RDONLY);
+    if (fd < 0)
+        return 0;
+
+    len = read(fd, outPath, outPathLen - 1);
+    close(fd);
+    if (len <= 0)
+        return 0;
+
+    // Written by hand as often as by us -- tolerate trailing newline/whitespace.
+    while (len > 0 && (outPath[len - 1] == '\r' || outPath[len - 1] == '\n' || outPath[len - 1] == ' ' || outPath[len - 1] == '\t'))
+        len--;
+    outPath[len] = '\0';
+
+    return len > 0;
+}
+
+static void writeConfigPathRedirect(const char *path)
+{
+    int fd = open((char *)configPathRedirectFile, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+    if (fd >= 0) {
+        write(fd, path, strlen(path));
+        write(fd, "\n", 1);
+        close(fd);
+    }
+}
+
+// Make a typed settings path usable: the user may name a device that is not mounted yet (that is the
+// whole point of typing it rather than picking from a list), so force-load its transport and rewrite
+// the prefix to the massN: OPL can actually read. Returns 1 when `path` is ready to hand to
+// configInit(), 0 when it is not a BDM path at all (mc?:/pfs0:/mmce -- usable as typed), and -1 when
+// it names a BDM device that never mounted.
+//
+// A -1 MUST NOT silently fall back to mc: an unreachable path is a user error to surface, and
+// re-homing onto whatever memory card happens to be inserted is exactly the incident item 11 exists
+// to prevent (a stray mc?:OPL folder stamped onto an unrelated card).
+static int prepareCustomSettingsPath(char *path, int pathLen)
+{
+    int bdmType = BDM_TYPE_UNKNOWN;
+
+    if (path == NULL || path[0] == '\0')
+        return 0;
+
+    // Not a BDM namespace -> nothing to load; mc?: is ROM-backed and pfs0:/mmce are handled by their
+    // own stacks, which are already up by the time a save runs.
+    if (strncmp(path, "mass", 4) && strncmp(path, "usb", 3) && strncmp(path, "ata", 3) &&
+        strncmp(path, "mx4sio", 6) && strncmp(path, "sd", 2) && strncmp(path, "ilink", 5))
+        return 0;
+
+    // elfName is empty: we are resolving a settings folder, not the boot ELF, so there is no
+    // filename to verify the slot with -- the first mounted device of the right type wins.
+    return bdmResolveBootDir(path, pathLen, "", &bdmType);
+}
+
 static int tryAlternateDevice(int types)
 {
     char pwd[8];
+    char redirectPath[64];
     int value;
     DIR *dir;
 
     getcwd(pwd, sizeof(pwd));
+
+    // The user's Custom Settings Path, if one was set, takes precedence over every discovery probe
+    // below -- it is an explicit instruction, not a guess.
+    if (readConfigPathRedirect(redirectPath, sizeof(redirectPath))) {
+        if (prepareCustomSettingsPath(redirectPath, sizeof(redirectPath)) >= 0) {
+            LOG("CONFIG custom settings path -> %s\n", redirectPath);
+            configEnd();
+            configInit(redirectPath);
+            value = configReadMulti(types);
+            if (value & CONFIG_OPL)
+                return value;
+        } else {
+            // Named a BDM device that never mounted. Fall through to discovery so this boot still
+            // has settings, but do NOT rewrite the redirect -- the user's choice stands, and the
+            // next boot (card reinserted) picks it up again.
+            LOG("CONFIG custom settings path %s did not mount; using discovery this boot\n", redirectPath);
+        }
+    }
 
     // First, try the device that OPL booted from.
     if (!strncmp(pwd, "mass", 4) && (pwd[4] == ':' || pwd[5] == ':')) {
@@ -1463,6 +1552,7 @@ static void _loadConfig()
             configGetInt(configOPL, CONFIG_OPL_PS2LOGO, &gPS2Logo);
             configGetInt(configOPL, CONFIG_OPL_HDD_GAME_LIST_CACHE, &gHDDGameListCache);
             configGetStrCopy(configOPL, CONFIG_OPL_EXIT_PATH, gExitPath, sizeof(gExitPath));
+            configGetStrCopy(configOPL, CONFIG_OPL_CUSTOM_SETTINGS_PATH, gCustomSettingsPath, sizeof(gCustomSettingsPath));
             configGetInt(configOPL, CONFIG_OPL_AUTO_SORT, &gAutosort);
             configGetInt(configOPL, CONFIG_OPL_AUTO_REFRESH, &gAutoRefresh);
             configGetInt(configOPL, CONFIG_OPL_DEFAULT_DEVICE, &gDefaultDevice);
@@ -1778,6 +1868,7 @@ static void _saveConfig()
         configSetInt(configOPL, CONFIG_OPL_PS2LOGO, gPS2Logo);
         configSetInt(configOPL, CONFIG_OPL_HDD_GAME_LIST_CACHE, gHDDGameListCache);
         configSetStr(configOPL, CONFIG_OPL_EXIT_PATH, gExitPath);
+        configSetStr(configOPL, CONFIG_OPL_CUSTOM_SETTINGS_PATH, gCustomSettingsPath);
         configSetInt(configOPL, CONFIG_OPL_AUTO_SORT, gAutosort);
         configSetInt(configOPL, CONFIG_OPL_AUTO_REFRESH, gAutoRefresh);
         configSetInt(configOPL, CONFIG_OPL_DEFAULT_DEVICE, gDefaultDevice);
@@ -1872,6 +1963,25 @@ static void _saveConfig()
     if (!strncmp(path, "mc", 2)) {
         checkMCFolder();
         configPrepareNotifications(gBaseMCDir);
+    }
+
+    // Custom Settings Path: re-home the config set BEFORE the write, so this save (and every later
+    // one) lands where the user asked. Typed paths may name a device that is not mounted yet, so
+    // resolve/lazy-load first; a path that never mounts is left alone and the write falls through to
+    // the normal home -- deliberately NOT re-homed onto mc, which would scatter settings onto an
+    // unrelated memory card (the incident item 11 exists to prevent).
+    if (gCustomSettingsPath[0] != '\0') {
+        char target[sizeof(gCustomSettingsPath)];
+        snprintf(target, sizeof(target), "%s", gCustomSettingsPath);
+        if (prepareCustomSettingsPath(target, sizeof(target)) >= 0) {
+            configSetMove(target);
+            // Mirror it to the cwd redirect: this key lives inside the config we are about to write
+            // to `target`, so without the pointer the NEXT boot could not find it. Written even when
+            // the value is unchanged -- cheap, and it self-heals a deleted/corrupt redirect.
+            writeConfigPathRedirect(target);
+        } else {
+            LOG("CONFIG custom settings path %s unreachable; saving to the normal home\n", gCustomSettingsPath);
+        }
     }
 
     lscret = configWriteChecked(lscstatus);
@@ -2596,6 +2706,7 @@ static void setDefaults(void)
     gHDDSpindown = 20;
     gScrollSpeed = 1;
     gExitPath[0] = '\0';
+    gCustomSettingsPath[0] = '\0'; // opt-in: empty means "use the normal boot-dir/discovery home"
     gDefaultDevice = APP_MODE;
     gAutosort = 1;
     gAutoRefresh = 0;

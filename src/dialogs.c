@@ -275,6 +275,11 @@ struct UIItem diaConfig[] = {
     {UI_STRING, CFG_EXITTO, 1, 1, _STR_HINT_EXITPATH, 0, 0, {.stringvalue = {"", "", NULL}}},
     {UI_BREAK},
 
+    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {NULL, _STR_CUSTOM_SETTINGS_PATH}}},
+    {UI_SPACER},
+    {UI_STRING, CFG_CUSTOMCFGPATH, 1, 1, _STR_HINT_CUSTOM_SETTINGS_PATH, 0, 0, {.stringvalue = {"", "", NULL}}},
+    {UI_BREAK},
+
     // buttons
     {UI_OK, 0, 1, 1, -1, 0, 0, {.label = {NULL, _STR_OK}}},
     {UI_BREAK},

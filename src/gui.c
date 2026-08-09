@@ -535,6 +535,10 @@ void guiShowConfig()
     // rather than "<not set>" -- the empty value (and thus the fallback) is kept.
     diaSetShowDefaultWhenEmpty(diaConfig, CFG_EXITTO, 1);
     diaSetString(diaConfig, CFG_EXITTO, gExitPath);
+    // Custom Settings Path: blank = the normal boot-dir/discovery home, so it gets the same dim
+    // "Default" placeholder treatment rather than "<not set>".
+    diaSetShowDefaultWhenEmpty(diaConfig, CFG_CUSTOMCFGPATH, 1);
+    diaSetString(diaConfig, CFG_CUSTOMCFGPATH, gCustomSettingsPath);
 
     diaSetInt(diaConfig, CFG_LASTPLAYED, gRememberLastPlayed);
     diaSetInt(diaConfig, CFG_FOLDERNAV, gEnableFolderNav);
@@ -545,6 +549,7 @@ void guiShowConfig()
     int ret = diaExecuteDialog(diaConfig, -1, 1, &guiUpdater);
     if (ret) {
         diaGetString(diaConfig, CFG_EXITTO, gExitPath, sizeof(gExitPath));
+        diaGetString(diaConfig, CFG_CUSTOMCFGPATH, gCustomSettingsPath, sizeof(gCustomSettingsPath));
         diaGetInt(diaConfig, CFG_LASTPLAYED, &gRememberLastPlayed);
         diaGetInt(diaConfig, CFG_FOLDERNAV, &gEnableFolderNav);
         diaGetInt(diaConfig, CFG_AUTOSTARTLAST, &gAutoStartLastPlayed);

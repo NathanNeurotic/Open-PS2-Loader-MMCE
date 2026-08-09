@@ -35,6 +35,7 @@ enum UI_ITEMS {
     CFG_PS2LOGO,
     CFG_HDDGAMELISTCACHE,
     CFG_EXITTO,
+    CFG_CUSTOMCFGPATH, // opt-in "Custom Settings Path" (typed)
     CFG_DEFDEVICE,
     CFG_BDMMODE,
     CFG_HDDMODE,
