@@ -482,6 +482,7 @@ jobs:
           #   POPS/                           -- POPSTARTER.ELF + every auto-installed MC external + BDMA variants.
           #   neutrino/                       -- the official latest Neutrino core (rickgaiser/neutrino), extracted for drag-and-drop.
           #   PS2-Servers.url                 -- link to the UDPFS / SMB / UDPBD all-in-one PC server.
+          #   OrbitOPL-Toolbox.url            -- link to the cross-platform PC library manager.
           PKG=riptopl_pkg
           rm -rf "$PKG"
           mkdir -p "$PKG/APP_RIPTOPL-PS2DEVLATESTSDK" "$PKG/POPSTARTER" "$PKG/POPS"
@@ -516,6 +517,11 @@ jobs:
           # embedded in the RiptOPL install package.
           test -f pc/PS2-Servers.url
           cp -f pc/PS2-Servers.url "$PKG/PS2-Servers.url"
+          # OrbitOPL Toolbox: the PC-side library manager (import discs, fetch covers/screenshots,
+          # ZSO compression, per-game settings, VMC management). Shipped as a shortcut for the same
+          # reason as PS2-Servers -- link the maintained tool, never vendor a copy of it.
+          test -f pc/OrbitOPL-Toolbox.url
+          cp -f pc/OrbitOPL-Toolbox.url "$PKG/OrbitOPL-Toolbox.url"
           # neutrino/ (package folder) -- the official latest pre-release of the Neutrino core,
           # EXTRACTED into a plain folder so the user just drag-and-drops it onto the card (no
           # zip-in-zip). Best-effort: a fetch/extract failure still publishes the rest. The archive
@@ -560,7 +566,7 @@ jobs:
           ZIP="RIPTOPL-${REL}-${SHA}.zip"
           (
             cd "$PKG"
-            zip -r -X "../rolling/${ZIP}" APP_RIPTOPL-PS2DEVLATESTSDK POPSTARTER POPS PS2-Servers.url >/dev/null
+            zip -r -X "../rolling/${ZIP}" APP_RIPTOPL-PS2DEVLATESTSDK POPSTARTER POPS PS2-Servers.url OrbitOPL-Toolbox.url >/dev/null
             if [ -d APP_RIPTOPL-PS2DEVPINNEDSDK ]; then zip -r -X "../rolling/${ZIP}" APP_RIPTOPL-PS2DEVPINNEDSDK >/dev/null; fi
             if [ -d APP_RIPTOPL-OFFICIALSDK ]; then zip -r -X "../rolling/${ZIP}" APP_RIPTOPL-OFFICIALSDK >/dev/null; fi
             # the extracted neutrino/ folder (drag-and-drop; replaces the old zip-in-zip neutrino_*.7z)
@@ -649,6 +655,12 @@ jobs:
             printf 'package, or visit https://github.com/NathanNeurotic/PS2-Servers, for the maintained\n'
             printf 'UDPFS / SMBv1 / UDPBD all-in-one launcher. Follow its protocol-specific setup and\n'
             printf 'match RiptOPL network settings to the server you start.\n'
+            printf '\n## PC library manager\n'
+            printf 'Open **OrbitOPL-Toolbox.url** from the package, or visit\n'
+            printf 'https://github.com/Luden02/OrbitOPL-Toolbox -- a cross-platform (Windows / macOS / Linux)\n'
+            printf 'desktop app for managing an OPL library: import games from disc images, fetch cover art and\n'
+            printf 'screenshots, compress ISOs to ZSO, edit per-game settings, and manage virtual memory cards.\n'
+            printf 'Third-party and independently maintained; RiptOPL only links it.\n'
             printf '\n## In this build\n'
             printf -- '- External Neutrino core option: per-game core selector + global/per-game launch args\n'
             printf -- '- Coverflow cover-art render mode (default theme)\n'
@@ -662,6 +674,7 @@ jobs:
             printf -- '- Neutrino args: prefix a flag with $ to disable it without deleting; "Test launch" boots without saving\n'
             printf -- '- DualSense / DS5 USB controller support\n'
             printf -- '- PS2-Servers.url: opens the maintained UDPFS / SMBv1 / UDPBD all-in-one PC launcher\n'
+            printf -- '- OrbitOPL-Toolbox.url: opens OrbitOPL Toolbox, the cross-platform PC library manager\n'
             printf '\n## Needs testing -- please report from real hardware\n'
             printf -- '- GameID barcode: enable it on the Display page, then confirm your Pixel FX / RetroGEM /\n'
             printf -- '  PS2Digital auto-loads the per-game profile (the HDMI latch is hardware-only -- not emulator-testable).\n'
