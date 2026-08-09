@@ -1,0 +1,74 @@
+name: Neutrino Watch
+
+# Keeps the rolling release "cutting edge" with respect to the upstream Neutrino core.
+#
+# Pushes to master already refresh the rolling release on their own (rolling-release.yml), which
+# re-fetches the latest Neutrino each run. This watcher covers the OTHER half: when the official
+# Neutrino repo publishes a newer build than the one currently bundled in our rolling release, it
+# re-dispatches rolling-release.yml so the package rebundles the latest Neutrino -- without waiting
+# for an OPL commit.
+#
+# It is only a slow safety net -- any push to master rebundles Neutrino anyway -- so it ticks about
+# once every 10 days rather than the every-3h it used to; use workflow_dispatch for an on-demand check.
+#
+# Cheap + conditional: every run is two read-only API calls; it only dispatches a rebuild when the
+# upstream Neutrino version actually differs from what's already bundled (parsed from the rolling
+# release notes' "Included build:" line that rolling-release.yml writes). workflow_dispatch via the
+# GITHUB_TOKEN DOES start a new run (it's the documented exception to the no-recursion rule).
+
+on:
+  schedule:
+    # ~Every 10 days. cron has no "every N days" operator that spans month boundaries, so pin the
+    # days explicitly: the 1st, 11th and 21st (gaps of 10, 10, then 8-11 into the next month).
+    # Deliberately NOT "*/10" for day-of-month -- that also fires on the 31st, one day after the
+    # 21st+10 tick, i.e. two runs back to back in the 7 long months.
+    # Off-hour + offset minute to dodge the top-of-hour cron backlog.
+    - cron: "41 5 1,11,21 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: write # required to dispatch rolling-release.yml
+
+concurrency:
+  group: neutrino-watch
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      NEUTRINO_REPO: rickgaiser/neutrino
+    steps:
+      - name: Compare upstream Neutrino against the bundled build; rebuild rolling if newer
+        run: |
+          set -eu
+          # Upstream: version embedded in the .7z asset name of Neutrino's "latest" pre-release.
+          NEU="$(gh release view latest --repo "$NEUTRINO_REPO" --json assets \
+            --jq '.assets[].name' 2>/dev/null | grep -E '^neutrino_.*\.7z$' | head -n1 \
+            | sed -e 's/^neutrino_//' -e 's/\.7z$//' || true)"
+          # Currently bundled: parsed from our rolling release notes (rolling-release.yml writes
+          # "Included build: <ver> -- ...").
+          CUR="$(gh release view rolling --repo "$GITHUB_REPOSITORY" --json body \
+            --jq '.body' 2>/dev/null | sed -n 's/.*Included build: \([^ ]*\).*/\1/p' | head -n1 || true)"
+          echo "upstream Neutrino = [$NEU]"
+          echo "rolling bundles   = [$CUR]"
+
+          if [ -z "$NEU" ]; then
+            echo "Could not read the upstream Neutrino version (transient?); nothing to do."
+            exit 0
+          fi
+          # Act ONLY on a genuine version difference. If CUR is empty -- rolling has never bundled
+          # Neutrino yet, OR a prior rolling build's best-effort fetch failed and wrote no
+          # "Included build:" line -- do NOT dispatch: otherwise a persistent upstream outage would
+          # re-trigger a full (expensive) rebuild on every cron tick. That state self-heals on the
+          # next push to master (rolling-release re-fetches Neutrino) or a manual rolling dispatch.
+          if [ -z "$CUR" ]; then
+            echo "Rolling has no recorded bundled Neutrino version; deferring to the next push-to-master rebuild."
+          elif [ "$NEU" != "$CUR" ]; then
+            echo "Neutrino changed ($CUR -> $NEU): dispatching rolling-release.yml to rebundle."
+            gh workflow run rolling-release.yml --repo "$GITHUB_REPOSITORY" --ref master
+          else
+            echo "Rolling already bundles the latest Neutrino ($NEU). Nothing to do."
+          fi
