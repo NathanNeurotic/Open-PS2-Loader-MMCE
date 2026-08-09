@@ -711,6 +711,15 @@ jobs:
             if ls rolling/RIPTOPL-LANGS-*.zip >/dev/null 2>&1; then
               printf -- '- RIPTOPL-LANGS-*.zip: extra UI language files (.lng + non-Latin fonts) -- copy into your OPL folder\n'
             fi
+            printf '\n## Using a language other than English?\n'
+            printf 'If you have lang_*.lng files from a PRE-REBUILD RiptOPL build, DELETE them and use the ones\n'
+            printf 'in RIPTOPL-LANGS-*.zip above. That older line numbered its strings differently, and a .lng\n'
+            printf 'is a bare list consumed BY LINE POSITION -- no version, no label names -- so OPL cannot\n'
+            printf 'detect a mismatch: the menus would just show unrelated text instead of failing visibly.\n'
+            printf '\n'
+            printf 'Packs from this rebuild line are safe to keep: strings are only ever APPENDED, so an older\n'
+            printf 'pack still lines up and any strings it predates simply appear in English until you update\n'
+            printf 'it. English itself is always correct -- it is compiled into the ELF, not read from a .lng.\n'
             printf '\nSHA256 (also published as SHA256SUMS.txt):\n'
             printf '```\n'
             cat rolling/SHA256SUMS.txt
