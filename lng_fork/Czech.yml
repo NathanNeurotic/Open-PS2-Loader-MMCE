@@ -1,0 +1,229 @@
+translations:
+  AUTOSORT: Řadit hry podle abecedy
+  RUMBLE: Vibrace ovladače v nabídkách
+  HINT_RUMBLE: Krátká vibrace při pohybu kurzoru, potvrzení nebo návratu -- vyžaduje DualShock v analogovém režimu
+  FOLDER_NAV: Procházet složky v seznamu her
+  HINT_FOLDER_NAV: Zobrazit podsložky CD/DVD jako procházené položky -- vyber pro otevření, zruš pro návrat
+  SETTINGS_NO_HOME: Paměťová karta nenalezena -- nastavení nelze uložit. OPL byl spuštěn ze síťového zařízení, jehož nastavení musí být na místní kartě.
+  ERROR_SAVING_SETTINGS_TO: Nelze zapsat nastavení na %s (chyba %d)
+  GENERAL_SETTINGS: Obecná nastavení
+  DEVICE_SETTINGS: Nastavení zařízení
+  LAUNCH_PS2_DISC: Spustit PS2 disk
+  DISC_LAUNCH_ERR: V mechanice není žádný PS2 disk.
+  DEFAULT: Výchozí
+  HINT_MODE7: Pouze Neutrino -- oprava her přetékajících IOP buffer (-gc=7)
+  MODE7: Mode 7
+  ENABLEIMAGE: PS2RD Cheat Image
+  HINT_ENABLEIMAGE: Aplikovat předpřipravený PS2RD .img patch na vaši hru.
+  UDPBD_GAMES: UDPBD Games
+  MMCE: MMCE
+  MMCE_GAMES: MMCE Games
+  MMCEMODE: MMCE Startovní režim
+  MMCE_PREFIX: MMCE Předpona cesty
+  MMCE_SLOT: MMCE Slot
+  MMCEIGR_SLOT: IGR Bootcard Slot(y)
+  HINT_MMCEIGR_SLOT: Příkaz přepnutí na bootcard bude odeslán do vybraného slotu při IGR
+  MMCE_ADVANCED: Pokročilé
+  MMCE_SETTINGS: MMCE Nastavení
+  MMCE_SEMA: Metoda zámku Sema fronty
+  HINT_MMCE_SEMA: THFIFO může pomoci s kompatibilitou, ale zhoršit výkon
+  MMCE_WAIT_CYCLES: Čekací cykly po /ACK low
+  HINT_MMCE_WAIT_CYCLES: Nižší hodnoty mohou zlepšit výkon, ale způsobit nestabilitu
+  MMCE_USE_ALARMS: Použít časové limity alarmů
+  HINT_MMCE_USE_ALARMS: OFF může zlepšit výkon, ale MMCE timeouty mohou způsobit zamrznutí
+  CORE_LOADER: Loader Core
+  NEUTRINO_BAD_FORMAT: Neutrino nepodporuje tento formát souboru, spouštím s jádrem <OPL>
+  NEUTRINO_NOT_FOUND: Neutrino ELF nenalezeno, spouštím s jádrem <OPL>
+  UDPBD_NEEDS_STATIC_IP: UDPBD vyžaduje statickou IP PS2. Nastavte ji v Síťové konfiguraci (DHCP je zapnuto).
+  NEUTRINO_SETTING_NA: Toto nastavení se s jádrem Neutrino nepoužívá.
+  POPSTARTER_NOT_FOUND: Chybí POPSTARTER.ELF
+  POPSTARTER_SMB_MISSING: Chybí požadavky POPSTARTER SMB
+  WRITE_POPSTARTER_NET: Zapsat síťovou konfiguraci POPSTARTER
+  HINT_WRITE_POPSTARTER_NET: Uložit také tyto hodnoty IP + SMB sdílení do vlastních souborů POPSTARTER IPCONFIG.DAT / SMBCONFIG.DAT na paměťové kartě (pro VCD přes SMB).
+  POPSTARTER_NET_ERR: Nepodařilo se zapsat síťovou konfiguraci POPSTARTER na paměťovou kartu.
+  VCD: VCD
+  VCD_ON: Zobrazuji VCD hry
+  VCD_OFF: Zobrazuji diskové hry
+  NEUTRINO_ARGS: Neutrino Spouštěcí Args
+  HINT_NEUTRINO_ARGS: 'Extra příznaky Neutrino, oddělené mezerami (např. -mt=dvd). Globální platí pro všechny hry; na hru se přidá navíc. Prefix příznaku $ ho zakáže bez smazání.'
+  NEUTRINO_VIDEO: Neutrino Video
+  HINT_NEUTRINO_VIDEO: 'Vynutit výstupní video režim GS Neutrino (-gsm). Vypnuto ponechá výchozí nastavení hry.'
+  NEUTRINO_PATH: Neutrino ELF Cesta
+  HINT_NEUTRINO_PATH: Úplná cesta k neutrino.elf (např. mc0:NEUTRINO/neutrino.elf). Prázdné = automatická detekce na mc0/mc1.
+  POPSTARTER_PATH: POPSTARTER.ELF Cesta
+  HINT_POPSTARTER_PATH: Vlastní cesta k POPSTARTER.ELF; pokud je prázdná/chybí, použije složku POPS na zařízení. Klávesnice max. 31 znaků; delší cesty přes settings_riptopl.cfg.
+  BDMA_SOURCE: BDMA Zdroj
+  HINT_BDMA_SOURCE: Zařízení, jehož složka POPS obsahuje soubory ovladače BDMAssault (usbd.irx.* / usbhdfsd.irx.*).
+  BDMA_MODE: BDMA Režim
+  HINT_BDMA_MODE: Ovladač blokového zařízení exFAT, který POPSTARTER načte. Změna zkopíruje moduly na kartu; FAT32 = žádný (vestavěný ovladač).
+  BDMA_SRC_USB: USB
+  BDMA_SRC_MX4SIO: MX4SIO
+  BDMA_SRC_MMCE: MMCE
+  BDMA_SRC_HDD: Interní HDD
+  BDMA_MODE_FAT32: USB (FAT32)
+  BDMA_MODE_USBEXFAT: USB (exFAT)
+  BDMA_MODE_MX4SIO: MX4SIO (exFAT)
+  BDMA_MODE_MMCE: MMCE (exFAT)
+  BDMA_MODE_ATA: HDD (exFAT)
+  BDMA_ERR_SRC: Soubory modulu BDMA nenalezeny na zdrojovém zařízení.
+  BDMA_ERR_SPACE: Na paměťové kartě není dostatek místa pro moduly BDMA.
+  BDMA_ERR_IO: Chyba při zápisu modulů BDMA na paměťovou kartu.
+  COVERFLOW_SETTINGS: Nastavení Coverflow
+  COVERFLOW_COUNT: Počet obalů
+  COVERFLOW_SCALE: Měřítko středu
+  COVERFLOW_ANIM: Rychlost animace
+  COVERFLOW_DIM: Ztmavit boční obaly
+  NONE: Žádný
+  SMALL: Malý
+  LARGE: Velký
+  NORMAL: Normální
+  FAV: Oblíbené
+  FAVMODE: Oblíbené Startovní režim
+  FAV_HINT: Oblíbená
+  FAV_MSG: '%s není povolen v nabídce Oblíbených.'
+  FAV_PERSISTENCE_MSG: '%s není povoleno, dokud je položka označena jako oblíbená.'
+  NEUTRINO_DEVICE: Neutrino Zařízení
+  HINT_NEUTRINO_DEVICE: Zařízení obsahující neutrino.elf (ve složce NEUTRINO/ nebo neutrino/). Auto prohledá nejprve mc0, poté mc1.
+  NARGS_QB: Rychlý start (-qb)
+  NARGS_CWD: Pracovní adresář (-cwd)
+  NARGS_CFG: Konfigurace (-cfg)
+  NARGS_ELF: Spouštěcí ELF (-elf)
+  NARGS_ATA0: Obraz ATA0 (-ata0)
+  NARGS_ATA0ID: ATA0 ID (-ata0id)
+  NARGS_ATA1: Obraz ATA1 (-ata1)
+  NARGS_EXTRA: Extra Args
+  NARGS_AUTO_NOTE: 'Auto: -bsd -dvd -gc -gsm -mc -dbc -logo'
+  ENABLE_ART_TAR: Archiv obalů .tar
+  DISABLE_ALL: Vypnout vše
+  BOOT_LOADING_CONFIG: Načítání nastavení...
+  BOOT_SCANNING_BDM: Prohledávání USB / karty / síťových disků...
+  BOOT_SCANNING_NET: Spouštění sítě...
+  BOOT_SCANNING_HDD: Prohledávání HDD...
+  BOOT_READY: Hotovo.
+  UDPFS_GAMES: "Hry UDPFS"
+  UDPFSBD_GAMES: "Hry UDPFSBD"
+  NET_PROTOCOL: "Síťový protokol"
+  NET_NEEDS_NEUTRINO: "Síťové (UDP) hry lze spustit pouze přes jádro Neutrino. Ověřte, že je neutrino.elf přítomen a formát je podporován."
+  VCD_NOT_ON_NET: "Hry PS1 (.VCD) nelze spustit ze síťového zařízení."
+  MX4SIO_PADEMU_WARN: "MX4SIO a emulace ovladače sdílejí sběrnici SIO2 a hra se nemusí spustit."
+  HINT_OSD_SETTINGS_LNG: "Vynutit vlastní jazyk"
+  OSD_SETTINGS_TVASPECT: "Velikost obrazu"
+  FULL_SCREEN: "Celá obrazovka"
+  OSD_SETTINGS_VMODE: "Režim videa"
+  SYSTEM_DEFAULT: "Výchozí systému"
+  HIGH: "Vysoká"
+  LOW: "Nízká"
+  XSENSITIVITY: "Citlivost analogu, osa X"
+  YSENSITIVITY: "Citlivost analogu, osa Y"
+  FILE_COUNT: "Nalezené soubory: %i"
+  CHEAT_SELECTION: "Výběr cheatů"
+  HDD_HINT: "Povolen je jen jeden HDD; zapnutí uzamkne APA nebo GPT."
+  MMCE_GAMEID_NEUTRINO_SKIP: "MMCE GameID nepoužito -- neutrino.elf je na této kartě (přepnutí by vyložilo Neutrino)."
+  POPSTARTER_DEVICE: "Zařízení POPSTARTER.ELF"
+  HINT_POPSTARTER_DEVICE: "Zařízení s POPS/POPSTARTER.ELF pro spouštění PS1 VCD. Výchozí = zaváděcí zařízení (cwd), poté vlastní zařízení VCD. Custom zobrazí volné pole pro cestu."
+  BDMA_APPLY: "Použít VCD BDMA při spuštění"
+  HINT_BDMA_APPLY: "Zap.: před spuštěním automaticky nasadí na paměťovou kartu odpovídající ovladač exFAT spouštěného VCD (doporučeno). Vyp.: spravujte ručně pomocí voleb BDMA Source/Mode níže."
+  NETBOOT_RESTART: "Restartujte OPL pro použití změny protokolu síťového spouštění."
+  UDPFS_MODE: "Přístup UDPFS"
+  "MENU": "Menu"
+  "APPS": "Aplikace"
+  "DEBUG": "Ladicí barvy"
+  "COVERART": "Obal hry"
+  "IP_ADDRESS_TYPE_DHCP": "DHCP"
+  "PORT": "Port"
+  "ADDR_TYPE_IP": "IP"
+  "ADDR_TYPE_NETBIOS": "NetBIOS"
+  "ENABLE_WRITE": "Operace zápisu"
+  "MODE1": "Režim 1"
+  "MODE2": "Režim 2"
+  "MODE3": "Režim 3"
+  "MODE4": "Režim 4"
+  "MODE5": "Režim 5"
+  "MODE6": "Režim 6"
+  "ENABLEGSM": "Výběr GSM"
+  "OVERSCAN": "Overscan"
+  "ENABLECHEAT": "Cheat engine PS2RD"
+  "PADEMU_ENABLE": "Emulátor ovladače"
+  "DS34USB_MODE": "DualShock3/4 USB"
+  "PADEMU_PORT": "Emulace"
+  "PADEMU_VIB": "Vibrace"
+  "PADEMU_WORKAROUND": "Náhrada za falešný DS3"
+  "SFX": "Zvukové efekty"
+  "BOOT_SND": "Zvuk při spuštění"
+  "ENABLE_NOTIFICATIONS": "Oznámení"
+  "OPTIONS": "Možnosti"
+  "GLOBAL_SETTINGS": "Obecné"
+  "INFO_GENRE": "Žánr"
+  "INFO_RELEASE": "Vydání"
+  "INFO_DESCRIPTION": "Popis"
+  "BLOCKDEVICE_SETTINGS": "Bloková zařízení"
+  "CONTROLLER_SETTINGS": "Nastavení ovladače"
+  "HINT_BDM_START": "Zapne/vypne správce blokových zařízení (BDM)."
+  "HINT_BLOCK_DEVICES": "Zapne/vypne bloková zařízení (např. USB)."
+  "USB_GAMES": "Hry USB"
+  "ILINK_GAMES": "Hry iLink"
+  "MX4SIO_GAMES": "Hry MX4SIO"
+  "PADMACROCONFIG": "Nastavit PADMACRO"
+  "PADMACRO_SETTINGS": "Nastavení maker ovladače"
+  "PADMACRO_ENABLE": "Makra ovladače"
+  "PADMACRO_SLOWDOWN": "Zpomalení analogu:"
+  "HINT_PADMACRO_SLOWDOWN_AXIS": "Sníží rozsah analogové páčky při stisknutí tlačítka"
+  "LEFT_ANALOG": "Levá páčka"
+  "RIGHT_ANALOG": "Pravá páčka"
+  "PADMACRO_INVERT_AXIS": "Invertovat osu analogu:"
+  "HINT_PADMACRO_INVERT_AXIS": "Invertuje osu analogové páčky"
+  "TURBO_SPEED": "Rychlost turbo tlačítka"
+  "HINT_TURBO_SPEED": "Jak rychle tisknout tlačítko, když je turbo aktivní"
+  "ACT_WHILE_PRESSED": "Při stisknutém tlačítku"
+  "ACT_TOGGLED": "Přepínáno tlačítkem"
+  "LANGUAGE_JAPANESE": "JAPONŠTINA"
+  "LANGUAGE_ENGLISH": "ANGLIČTINA"
+  "LANGUAGE_FRENCH": "FRANCOUZŠTINA"
+  "LANGUAGE_SPANISH": "ŠPANĚLŠTINA"
+  "LANGUAGE_GERMAN": "NĚMČINA"
+  "LANGUAGE_ITALIAN": "ITALŠTINA"
+  "LANGUAGE_DUTCH": "NIZOZEMŠTINA"
+  "LANGUAGE_PORTUGUESE": "PORTUGALŠTINA"
+  "LANGUAGE_RUSSIAN": "RUŠTINA"
+  "LANGUAGE_KOREAN": "KOREJŠTINA"
+  "LANGUAGE_TRAD_CHINESE": "TRADIČNÍ ČÍNŠTINA"
+  "LANGUAGE_SIMPL_CHINESE": "ZJEDNODUŠENÁ ČÍNŠTINA"
+  "OSD_SETTINGS": "Nastavení OSD"
+  "OSD_SETTINGS_LNG": "Jazyk OSD"
+  "ENABLE_LNG": "Změnit jazyk"
+  "BGM": "Hudba na pozadí"
+  "BGM_VOLUME": "Hlasitost hudby na pozadí"
+  "DEF_BGM_PATH": "Výchozí hudba motivu"
+  "DEF_BGM_PATH_HINT": "Nastaví cestu k přehrávané hudbě pro interní motiv."
+  "BOOT_SCANNING_MC": "Prohledávání paměťových karet..."
+  "BOOT_LOADING_DRIVERS": "Načítání ovladačů úložišť..."
+  "BOOT_LOADING_USB": "Načítání ovladače úložiště USB..."
+  "BOOT_ARMING_MMCE": "Aktivace herního ID MMCE..."
+  "BOOT_LOADING_SOUNDS": "Načítání zvuků motivu..."
+  "BOOT_BUILDING_MENU": "Sestavování menu..."
+  "NET_UDPFS_TAB_HINT": "UDPFS zapnuto -- otevřete novou kartu UDPFS a stiskněte Potvrdit pro připojení. Na straně PC běží udpfsd -fsroot <games folder>."
+  "NET_UDPBD_TAB_HINT": "Síťové blokové zařízení zapnuto -- jeho karta se objeví, jakmile odpoví PC server (udpfsd -bdpath pro UDPFS Image, udpbd-server pro UDPBD)."
+  "NEUTRINO_VMC_MISSING": "Soubor VMC pro danou hru nenalezen -- spouštím bez něj (hra použije svou skutečnou kartu)."
+  "NEUTRINO_DEV_UNSUPPORTED": "Neutrino nelze spustit z tohoto zařízení -- spuštění přerušeno."
+  "NEUTRINO_TOML_SYNC_FAILED": "Síťová konfigurace Neutrina (bsd toml) chybí nebo do ní nelze zapisovat -- spuštění přerušeno, zkontrolujte složku neutrino."
+  "NEUTRINO_TOO_FRAGMENTED": "Příliš fragmentované pro Neutrino (%d fragmentů, limit %d včetně VMC) -- zkouším místo toho jádro OPL."
+  "NEUTRINO_TOO_FRAGMENTED_NET": "Příliš fragmentované pro Neutrino (%d fragmentů, limit %d včetně VMC) -- defragmentujte na PC; spuštění přerušeno."
+  "NEUTRINO_GSM_COMP": "Kompatibilita Neutrino GSM"
+  "HINT_NEUTRINO_GSM_COMP": "Oprava přepínáním polí pro hry, které se třesou nebo trhají při vynuceném Neutrino Video režimu. Vyžaduje nastavený Neutrino Video režim."
+  "NARGS_DBC": "Ladicí barvy (-dbc)"
+  "NARGS_LOGO": "Logo PS2 (-logo)"
+  "VMC_SLOT1_DISABLE": "Vypnout VMC 1 (ponechat kartu)"
+  "VMC_SLOT2_DISABLE": "Vypnout VMC 2 (ponechat kartu)"
+  "HINT_VMC_SLOT_DISABLE": "Spustí bez VMC tohoto slotu, přičemž jeho kartu ponechá nakonfigurovanou. Pouze spuštění přes Neutrino; hra pak použije skutečnou kartu v tomto slotu."
+  "NEUTRINO_BSDFS": "Souborový systém Neutrino"
+  "HINT_NEUTRINO_BSDFS": "Vynutí souborový systém blokového zařízení Neutrina (-bsdfs). Auto = výchozí pro dané zařízení. hdl/bd jsou expertní volby; zkombinujte je s odpovídajícím -dvd= v argumentech spuštění, pokud automatický tvar cesty nevyhovuje."
+  "PLASCOLOR": "Barva prolnutí plazmy"
+  "VCD_HIDE_GAMEID": "Skrýt herní ID PS1 (seznam VCD)"
+  "HINT_VCD_HIDE_GAMEID": "Pouze kosmetické -- skryje úvodní prefix s ID hry (např. SLUS_005.51.) z názvů v seznamu PS1/VCD. Názvy bez ID se zobrazují tak, jak jsou. Nemění spuštění, obal ani oblíbené."
+  "VCD_FIRST_DISC": "Pouze první disk (vícediskové PS1)"
+  "HINT_VCD_FIRST_DISC": "Zobrazí v seznamech zařízení pouze Disc 1 vícediskové hry PS1 (styl POPSLoader). Skryje soubory pojmenované (Disc 2), (CD 2) atd. Všechny disky zůstávají na kartě pro přepínání během hry; Oblíbené se nefiltrují."
+  "GAMES_DEVICE": "Zařízení hry"
+  "DEFAULT_CORE": "Výchozí jádro loaderu"
+  "HINT_DEFAULT_CORE": "Globální výchozí jádro pro hry, jejichž Loader Core pro danou hru je nastaven na Default. <OPL> je nativní jádro; Neutrino řetězí externí neutrino.elf. Volba u konkrétní hry toto vždy přepíše."
+  "VCD_SETTINGS": "Nastavení VCD"
+  "FINANCIAL_SUPPORT": "Finanční podpora"

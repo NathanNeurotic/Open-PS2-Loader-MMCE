@@ -1,0 +1,229 @@
+translations:
+  AUTOSORT: Sortera spel alfabetiskt
+  RUMBLE: Handkontrollsvibration i menyer
+  HINT_RUMBLE: Kort vibration när du flyttar markören, bekräftar eller går tillbaka -- kräver en DualShock i analogt läge
+  FOLDER_NAV: Bläddra bland mappar i spellistan
+  HINT_FOLDER_NAV: Visa undermappar på CD/DVD som bläddringsbara poster; välj för att öppna, avbryt för att gå tillbaka
+  SETTINGS_NO_HOME: Inget minneskort hittades -- inställningarna kan inte sparas. OPL startades från en nätverksenhet, vars inställningar måste finnas på ett lokalt kort.
+  ERROR_SAVING_SETTINGS_TO: Kunde inte skriva inställningarna till %s (fel %d)
+  GENERAL_SETTINGS: Allmänna inställningar
+  DEVICE_SETTINGS: Enhetsinställningar
+  LAUNCH_PS2_DISC: Starta PS2-skiva
+  DISC_LAUNCH_ERR: Ingen PS2-skiva i enheten.
+  DEFAULT: Standard
+  HINT_MODE7: Endast Neutrino -- åtgärdar spel som överskrider en IOP-buffert (-gc=7)
+  MODE7: Mode 7
+  ENABLEIMAGE: PS2RD Fuskbild
+  HINT_ENABLEIMAGE: Applicera en förbyggd PS2RD .img-patch på ditt spel.
+  UDPBD_GAMES: UDPBD Games
+  MMCE: MMCE
+  MMCE_GAMES: MMCE Games
+  MMCEMODE: MMCE Startläge
+  MMCE_PREFIX: MMCE Prefix-sökväg
+  MMCE_SLOT: MMCE Slot
+  MMCEIGR_SLOT: IGR Startkorts-slot(s)
+  HINT_MMCEIGR_SLOT: Kommandot att byta till startkort skickas till vald(a) slot(s) vid IGR
+  MMCE_ADVANCED: Avancerat
+  MMCE_SETTINGS: MMCE Inställningar
+  MMCE_SEMA: Lås Sema-kömetod
+  HINT_MMCE_SEMA: THFIFO kan förbättra kompatibilitet men försämra prestanda
+  MMCE_WAIT_CYCLES: Vänta cykler efter /ACK låg
+  HINT_MMCE_WAIT_CYCLES: Lägre värden kan förbättra prestanda men orsaka instabilitet
+  MMCE_USE_ALARMS: Använd timeout-alarm
+  HINT_MMCE_USE_ALARMS: AV kan förbättra prestanda men kan orsaka att MMCE-timeouts leder till frysningar
+  CORE_LOADER: Loader Core
+  NEUTRINO_BAD_FORMAT: Neutrino stöder inte detta filformat, startar med <OPL>-kärnan
+  NEUTRINO_NOT_FOUND: Neutrino ELF hittades inte, startar med <OPL>-kärnan
+  UDPBD_NEEDS_STATIC_IP: UDPBD kräver en statisk PS2-IP. Ange en i Nätverkskonfiguration (DHCP är för närvarande på).
+  NEUTRINO_SETTING_NA: Denna inställning används inte med Neutrino-kärnan.
+  POPSTARTER_NOT_FOUND: Saknar POPSTARTER.ELF
+  POPSTARTER_SMB_MISSING: Saknar POPSTARTER SMB-krav
+  WRITE_POPSTARTER_NET: Skriv POPSTARTER Nätverkskonfiguration
+  HINT_WRITE_POPSTARTER_NET: Spara även dessa IP + SMB-delningsvärden till POPSTARTER's egna IPCONFIG.DAT / SMBCONFIG.DAT på minneskortet (för VCD via SMB).
+  POPSTARTER_NET_ERR: Kunde inte skriva POPSTARTER-nätverkskonfiguration till minneskortet.
+  VCD: VCD
+  VCD_ON: Visar VCD-spel
+  VCD_OFF: Visar skivspel
+  NEUTRINO_ARGS: Neutrino Startargument
+  HINT_NEUTRINO_ARGS: Extra Neutrino-flaggor, blankstegsavskilda (t.ex. -mt=dvd). Global gäller alla spel; per-spel läggs till ovanpå. Prefix en flagga med $ för att inaktivera den utan att ta bort den.
+  NEUTRINO_VIDEO: Neutrino Video
+  HINT_NEUTRINO_VIDEO: Tvinga Neutrinos GS-utdatavideoläge (-gsm). Av behåller spelets standard.
+  NEUTRINO_PATH: Neutrino ELF Sökväg
+  HINT_NEUTRINO_PATH: Fullständig sökväg till neutrino.elf (t.ex. mc0:NEUTRINO/neutrino.elf). Tom = automatisk sökning på mc0/mc1.
+  POPSTARTER_PATH: POPSTARTER.ELF Sökväg
+  HINT_POPSTARTER_PATH: Anpassad POPSTARTER.ELF-sökväg; faller tyst tillbaka till enhetens POPS-mapp om tom/saknas. Tangentbord begränsas till 31 tecken; längre sökvägar via settings_riptopl.cfg.
+  BDMA_SOURCE: BDMA Källa
+  HINT_BDMA_SOURCE: Enhet vars POPS-mapp innehåller dina BDMAssault-drivrutinsfiler (usbd.irx.* / usbhdfsd.irx.*).
+  BDMA_MODE: BDMA Läge
+  HINT_BDMA_MODE: exFAT-blockenhets-drivrutin som POPSTARTER läser in. Att ändra detta kopierar modulerna till kortet; FAT32 = ingen (inbyggd drivrutin).
+  BDMA_SRC_USB: USB
+  BDMA_SRC_MX4SIO: MX4SIO
+  BDMA_SRC_MMCE: MMCE
+  BDMA_SRC_HDD: Intern HDD
+  BDMA_MODE_FAT32: USB (FAT32)
+  BDMA_MODE_USBEXFAT: USB (exFAT)
+  BDMA_MODE_MX4SIO: MX4SIO (exFAT)
+  BDMA_MODE_MMCE: MMCE (exFAT)
+  BDMA_MODE_ATA: HDD (exFAT)
+  BDMA_ERR_SRC: BDMA-modulfiler hittades inte på källenheten.
+  BDMA_ERR_SPACE: Otillräckligt minneskortsutrymme för BDMA-modulerna.
+  BDMA_ERR_IO: Fel vid skrivning av BDMA-modulerna till minneskortet.
+  COVERFLOW_SETTINGS: Coverflow Inställningar
+  COVERFLOW_COUNT: Antal omslag
+  COVERFLOW_SCALE: Centrumskala
+  COVERFLOW_ANIM: Animationshastighet
+  COVERFLOW_DIM: Dämpa sidoomslag
+  NONE: Ingen
+  SMALL: Liten
+  LARGE: Stor
+  NORMAL: Normal
+  FAV: Favoriter
+  FAVMODE: Favoriter Startläge
+  FAV_HINT: Favorit
+  FAV_MSG: '%s är inte tillåtet via Favoritmenyn.'
+  FAV_PERSISTENCE_MSG: '%s är inte tillåtet medan objektet är markerat som favorit.'
+  NEUTRINO_DEVICE: Neutrino-enhet
+  HINT_NEUTRINO_DEVICE: Enhet som innehåller neutrino.elf (i en NEUTRINO/- eller neutrino/-mapp). Auto söker igenom mc0 sedan mc1.
+  NARGS_QB: Snabbstart (-qb)
+  NARGS_CWD: Arbetskatalog (-cwd)
+  NARGS_CFG: Konfiguration (-cfg)
+  NARGS_ELF: Start-ELF (-elf)
+  NARGS_ATA0: ATA0-avbild (-ata0)
+  NARGS_ATA0ID: ATA0 ID (-ata0id)
+  NARGS_ATA1: ATA1-avbild (-ata1)
+  NARGS_EXTRA: Extra argument
+  NARGS_AUTO_NOTE: 'Auto: -bsd -dvd -gc -gsm -mc -dbc -logo'
+  ENABLE_ART_TAR: .tar-arkiv med omslag
+  DISABLE_ALL: Inaktivera alla
+  BOOT_LOADING_CONFIG: Läser in inställningar...
+  BOOT_SCANNING_BDM: Söker igenom USB / kort / nätverksenheter...
+  BOOT_SCANNING_NET: Startar nätverk...
+  BOOT_SCANNING_HDD: Söker igenom HDD...
+  BOOT_READY: Klar.
+  UDPFS_GAMES: "UDPFS-spel"
+  UDPFSBD_GAMES: "UDPFSBD-spel"
+  NET_PROTOCOL: "Nätverksprotokoll"
+  NET_NEEDS_NEUTRINO: "Nätverksspel (UDP) kan bara starta via Neutrino-kärnan. Kontrollera att neutrino.elf finns och att formatet stöds."
+  VCD_NOT_ON_NET: "PS1-spel (.VCD) kan inte startas via nätverksenheten."
+  MX4SIO_PADEMU_WARN: "MX4SIO och handkontrollsemulering delar SIO2-bussen och spelet kanske inte startar."
+  HINT_OSD_SETTINGS_LNG: "Tvinga en anpassad språkinställning"
+  OSD_SETTINGS_TVASPECT: "Skärmstorlek"
+  FULL_SCREEN: "Helskärm"
+  OSD_SETTINGS_VMODE: "Videoläge"
+  SYSTEM_DEFAULT: "Systemstandard"
+  HIGH: "Hög"
+  LOW: "Låg"
+  XSENSITIVITY: "Känslighet analog X-axel"
+  YSENSITIVITY: "Känslighet analog Y-axel"
+  FILE_COUNT: "Filer hittade: %i"
+  CHEAT_SELECTION: "Fuskval"
+  HDD_HINT: "Endast en HDD tillåts; aktivering låser APA eller GPT."
+  MMCE_GAMEID_NEUTRINO_SKIP: "MMCE GameID tillämpades inte -- neutrino.elf finns på detta kort (att byta skulle ladda ur Neutrino)."
+  POPSTARTER_DEVICE: "POPSTARTER.ELF-enhet"
+  HINT_POPSTARTER_DEVICE: "Enhet med POPS/POPSTARTER.ELF för start av PS1-VCD:er. Standard = startenhet (cwd) sedan VCD:ns egen enhet. Anpassad visar ett fritt sökvägsfält."
+  BDMA_APPLY: "Tillämpa VCD BDMA vid start"
+  HINT_BDMA_APPLY: "På: utrustar automatiskt den startade VCD:ns matchande exFAT-drivrutin på minneskortet före start (rekommenderas). Av: hantera det själv med BDMA-källa/läge-väljarna nedan."
+  NETBOOT_RESTART: "Starta om OPL för att tillämpa ändringen av nätverksstartprotokollet."
+  UDPFS_MODE: "UDPFS-åtkomst"
+  "MENU": "Meny"
+  "APPS": "Appar"
+  "DEBUG": "Felsökningsfärger"
+  "COVERART": "Omslagsbild"
+  "IP_ADDRESS_TYPE_DHCP": "DHCP"
+  "PORT": "Port"
+  "ADDR_TYPE_IP": "IP"
+  "ADDR_TYPE_NETBIOS": "NetBIOS"
+  "ENABLE_WRITE": "Skrivåtgärder"
+  "MODE1": "Läge 1"
+  "MODE2": "Läge 2"
+  "MODE3": "Läge 3"
+  "MODE4": "Läge 4"
+  "MODE5": "Läge 5"
+  "MODE6": "Läge 6"
+  "ENABLEGSM": "GSM-väljare"
+  "OVERSCAN": "Overscan"
+  "ENABLECHEAT": "PS2RD Fuskmotor"
+  "PADEMU_ENABLE": "Handkontrollsemulator"
+  "DS34USB_MODE": "DualShock3/4 USB"
+  "PADEMU_PORT": "Emulering"
+  "PADEMU_VIB": "Vibration"
+  "PADEMU_WORKAROUND": "Falsk DS3-lösning"
+  "SFX": "Ljudeffekter"
+  "BOOT_SND": "Startljud"
+  "ENABLE_NOTIFICATIONS": "Notiser"
+  "OPTIONS": "Alternativ"
+  "GLOBAL_SETTINGS": "Globalt"
+  "INFO_GENRE": "Genre"
+  "INFO_RELEASE": "Utgivning"
+  "INFO_DESCRIPTION": "Beskrivning"
+  "BLOCKDEVICE_SETTINGS": "Blockenheter"
+  "CONTROLLER_SETTINGS": "Handkontrollsinställningar"
+  "HINT_BDM_START": "Slå på/av Block Device Manager."
+  "HINT_BLOCK_DEVICES": "Slå på/av blockenheter (t.ex. USB)."
+  "USB_GAMES": "USB-spel"
+  "ILINK_GAMES": "iLink-spel"
+  "MX4SIO_GAMES": "MX4SIO-spel"
+  "PADMACROCONFIG": "Konfigurera PADMACRO"
+  "PADMACRO_SETTINGS": "Pad-makroinställningar"
+  "PADMACRO_ENABLE": "Pad-makron"
+  "PADMACRO_SLOWDOWN": "Analog nedbromsning:"
+  "HINT_PADMACRO_SLOWDOWN_AXIS": "Minska den analoga spakens omfång när knappen trycks in"
+  "LEFT_ANALOG": "Vänster spak"
+  "RIGHT_ANALOG": "Höger spak"
+  "PADMACRO_INVERT_AXIS": "Invertera analog axel:"
+  "HINT_PADMACRO_INVERT_AXIS": "Invertera den analoga spakens axel"
+  "TURBO_SPEED": "Turboknappens hastighet"
+  "HINT_TURBO_SPEED": "Hur snabbt knappen trycks in när turbo är aktiv"
+  "ACT_WHILE_PRESSED": "Medan knappen hålls in"
+  "ACT_TOGGLED": "Växlas med knappen"
+  "LANGUAGE_JAPANESE": "JAPANSKA"
+  "LANGUAGE_ENGLISH": "ENGELSKA"
+  "LANGUAGE_FRENCH": "FRANSKA"
+  "LANGUAGE_SPANISH": "SPANSKA"
+  "LANGUAGE_GERMAN": "TYSKA"
+  "LANGUAGE_ITALIAN": "ITALIENSKA"
+  "LANGUAGE_DUTCH": "NEDERLÄNDSKA"
+  "LANGUAGE_PORTUGUESE": "PORTUGISISKA"
+  "LANGUAGE_RUSSIAN": "RYSKA"
+  "LANGUAGE_KOREAN": "KOREANSKA"
+  "LANGUAGE_TRAD_CHINESE": "TRADITIONELL KINESISKA"
+  "LANGUAGE_SIMPL_CHINESE": "FÖRENKLAD KINESISKA"
+  "OSD_SETTINGS": "OSD-inställningar"
+  "OSD_SETTINGS_LNG": "OSD-språk"
+  "ENABLE_LNG": "Byt språk"
+  "BGM": "Bakgrundsmusik"
+  "BGM_VOLUME": "Bakgrundsmusikvolym"
+  "DEF_BGM_PATH": "Standardtemamusik"
+  "DEF_BGM_PATH_HINT": "Ange sökväg för att strömma musik till det interna temat."
+  "BOOT_SCANNING_MC": "Söker efter minneskort..."
+  "BOOT_LOADING_DRIVERS": "Läser in lagringsdrivrutiner..."
+  "BOOT_LOADING_USB": "Läser in USB-lagringsdrivrutin..."
+  "BOOT_ARMING_MMCE": "Aktiverar MMCE spel-ID..."
+  "BOOT_LOADING_SOUNDS": "Läser in temaljud..."
+  "BOOT_BUILDING_MENU": "Bygger meny..."
+  "NET_UDPFS_TAB_HINT": "UDPFS på -- öppna den nya UDPFS-fliken och tryck Bekräfta för att ansluta. På PC-sidan körs udpfsd -fsroot <games folder>."
+  "NET_UDPBD_TAB_HINT": "Nätverksblockenhet på -- dess flik visas när PC-servern svarar (udpfsd -bdpath för UDPFS Image, udpbd-server för UDPBD)."
+  "NEUTRINO_VMC_MISSING": "VMC-fil per spel hittades inte -- startar utan den (spelet använder sitt verkliga kort)."
+  "NEUTRINO_DEV_UNSUPPORTED": "Neutrino kan inte starta från denna enhet -- start avbruten."
+  "NEUTRINO_TOML_SYNC_FAILED": "Neutrinos nätverkskonfiguration (bsd toml) saknas eller går inte att skriva -- start avbruten, kontrollera neutrino-mappen."
+  "NEUTRINO_TOO_FRAGMENTED": "För fragmenterad för Neutrino (%d fragment, gräns %d inkl. VMC) -- försöker med OPL-kärnan istället."
+  "NEUTRINO_TOO_FRAGMENTED_NET": "För fragmenterad för Neutrino (%d fragment, gräns %d inkl. VMC) -- defragmentera på PC:n; start avbruten."
+  "NEUTRINO_GSM_COMP": "Neutrino GSM-kompatibilitet"
+  "HINT_NEUTRINO_GSM_COMP": "Fältväxlingsfix för spel som skakar eller river under ett framtvingat Neutrino Video-läge. Kräver att ett Neutrino Video-läge är inställt."
+  "NARGS_DBC": "Felsökningsfärger (-dbc)"
+  "NARGS_LOGO": "PS2-logotyp (-logo)"
+  "VMC_SLOT1_DISABLE": "Inaktivera VMC 1 (behåll kort)"
+  "VMC_SLOT2_DISABLE": "Inaktivera VMC 2 (behåll kort)"
+  "HINT_VMC_SLOT_DISABLE": "Starta utan denna plats VMC medan dess kort förblir konfigurerat. Endast Neutrino-start; spelet använder då det verkliga kortet i den platsen."
+  "NEUTRINO_BSDFS": "Neutrino-filsystem"
+  "HINT_NEUTRINO_BSDFS": "Tvinga Neutrinos blockenhets-filsystem (-bsdfs). Auto = standard per enhet. hdl/bd är expertalternativ; kombinera dem med ett matchande -dvd= i startargumenten om den automatiska sökvägsformen inte passar."
+  "PLASCOLOR": "Plasmablandningsfärg"
+  "VCD_HIDE_GAMEID": "Dölj PS1 spel-ID (VCD-lista)"
+  "HINT_VCD_HIDE_GAMEID": "Endast kosmetiskt -- dölj ett inledande spel-ID-prefix (t.ex. SLUS_005.51.) från namn i PS1/VCD-listan. Namn utan ett ID visas som de är. Ändrar inte start, omslagsbilder eller favoriter."
+  "VCD_FIRST_DISC": "Endast första skivan (flerskivig PS1)"
+  "HINT_VCD_FIRST_DISC": "Visa endast Disc 1 av ett PS1-spel med flera skivor i enhetslistorna (POPSLoader-stil). Döljer filer med namn som (Disc 2), (CD 2) osv. Alla skivor stannar kvar på kortet för byte under spelet; Favoriter filtreras inte."
+  "GAMES_DEVICE": "Spelets enhet"
+  "DEFAULT_CORE": "Standardladdarkärna"
+  "HINT_DEFAULT_CORE": "Global standardkärna för spel vars Loader Core per spel är inställd på Default. <OPL> är den inbyggda kärnan; Neutrino kedjar den externa neutrino.elf. Ett val per spel åsidosätter alltid detta."
+  "VCD_SETTINGS": "VCD-inställningar"
+  "FINANCIAL_SUPPORT": "Ekonomiskt stöd"

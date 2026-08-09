@@ -1,0 +1,229 @@
+translations:
+  AUTOSORT: Games alfabetisch sorteren
+  RUMBLE: Controllertrilling in menu's
+  HINT_RUMBLE: Korte trilling bij verplaatsen van de cursor, bevestigen of teruggaan -- vereist een DualShock in analoge modus
+  FOLDER_NAV: Mappen doorbladeren in gamelijst
+  HINT_FOLDER_NAV: Toon submappen van cd/dvd als doorbladerbare items -- selecteer om te openen, annuleer om terug te gaan
+  SETTINGS_NO_HOME: Geen geheugenkaart gevonden -- instellingen kunnen niet worden opgeslagen. OPL is opgestart vanaf een netwerkapparaat, waarvan de instellingen op een lokale kaart moeten staan.
+  ERROR_SAVING_SETTINGS_TO: Kan instellingen niet naar %s schrijven (fout %d)
+  GENERAL_SETTINGS: Algemene instellingen
+  DEVICE_SETTINGS: Apparaatinstellingen
+  LAUNCH_PS2_DISC: PS2-schijf starten
+  DISC_LAUNCH_ERR: Geen PS2-schijf in het station.
+  DEFAULT: Standaard
+  HINT_MODE7: Alleen Neutrino -- herstel spellen die een IOP-buffer overschrijden (-gc=7)
+  MODE7: Mode 7
+  ENABLEIMAGE: PS2RD Cheat-image
+  HINT_ENABLEIMAGE: Pas een voorgebouwde PS2RD .img-patch toe op je spel.
+  UDPBD_GAMES: UDPBD Games
+  MMCE: MMCE
+  MMCE_GAMES: MMCE Games
+  MMCEMODE: MMCE startmodus
+  MMCE_PREFIX: MMCE voorvoegselpad
+  MMCE_SLOT: MMCE-slot
+  MMCEIGR_SLOT: IGR-opstartkaartslot(s)
+  HINT_MMCEIGR_SLOT: Bij IGR wordt de schakelaarcommand naar het/de geselecteerde slot(s) gestuurd
+  MMCE_ADVANCED: Geavanceerd
+  MMCE_SETTINGS: MMCE-instellingen
+  MMCE_SEMA: Vergrendeling Sema-wachtrijmethode
+  HINT_MMCE_SEMA: THFIFO kan de compatibiliteit verbeteren maar de prestaties verslechteren
+  MMCE_WAIT_CYCLES: Wachtcycli na /ACK laag
+  HINT_MMCE_WAIT_CYCLES: Lagere waarden kunnen de prestaties verbeteren maar instabiliteit veroorzaken
+  MMCE_USE_ALARMS: Gebruik time-outalarms
+  HINT_MMCE_USE_ALARMS: UIT kan prestaties verbeteren maar MMCE-time-outs kunnen bevriezingen veroorzaken
+  CORE_LOADER: Loader Core
+  NEUTRINO_BAD_FORMAT: Neutrino ondersteunt dit bestandsformaat niet; gestart met <OPL>-kern
+  NEUTRINO_NOT_FOUND: Neutrino ELF niet gevonden; gestart met <OPL>-kern
+  UDPBD_NEEDS_STATIC_IP: UDPBD vereist een statisch PS2-IP. Stel dit in bij Netwerkconfiguratie (DHCP is momenteel ingeschakeld).
+  NEUTRINO_SETTING_NA: Deze instelling wordt niet gebruikt met de Neutrino-kern.
+  POPSTARTER_NOT_FOUND: POPSTARTER.ELF ontbreekt
+  POPSTARTER_SMB_MISSING: POPSTARTER SMB-vereisten ontbreken
+  WRITE_POPSTARTER_NET: POPSTARTER-netwerkconfiguratie schrijven
+  HINT_WRITE_POPSTARTER_NET: Sla ook deze IP- en SMB-sharewaarden op in POPSTARTER's eigen IPCONFIG.DAT / SMBCONFIG.DAT op de geheugenkaart (voor VCD via SMB).
+  POPSTARTER_NET_ERR: Kan POPSTARTER-netwerkconfiguratie niet naar de geheugenkaart schrijven.
+  VCD: VCD
+  VCD_ON: VCD-spellen worden getoond
+  VCD_OFF: Schijfspellen worden getoond
+  NEUTRINO_ARGS: Neutrino opstartargumenten
+  HINT_NEUTRINO_ARGS: Extra Neutrino-vlaggen, spatie-gescheiden (bijv. -mt=dvd). Globaal geldt voor alle spellen; per spel wordt bovenop toegevoegd. Prefix een vlag met $ om hem te deactiveren zonder te verwijderen.
+  NEUTRINO_VIDEO: Neutrino Video
+  HINT_NEUTRINO_VIDEO: Forceer Neutrino's GS-uitvoervideomodus (-gsm). Uit behoudt de standaard van het spel.
+  NEUTRINO_PATH: Neutrino ELF-pad
+  HINT_NEUTRINO_PATH: Volledig pad naar neutrino.elf (bijv. mc0:NEUTRINO/neutrino.elf). Leeg = automatisch zoeken op mc0/mc1.
+  POPSTARTER_PATH: POPSTARTER.ELF-pad
+  HINT_POPSTARTER_PATH: Aangepast POPSTARTER.ELF-pad; valt stil terug op de POPS-map van het apparaat indien leeg/ontbrekend. Toetsenbord beperkt tot 31 tekens; langere paden via settings_riptopl.cfg.
+  BDMA_SOURCE: BDMA-bron
+  HINT_BDMA_SOURCE: Apparaat waarvan de POPS-map de BDMAssault-stuurprogrammabestanden bevat (usbd.irx.* / usbhdfsd.irx.*).
+  BDMA_MODE: BDMA-modus
+  HINT_BDMA_MODE: exFAT-blokapparaatstuurprogramma dat POPSTARTER laadt. Wijzigen kopieert de modules naar de kaart; FAT32 = geen (ingebouwd stuurprogramma).
+  BDMA_SRC_USB: USB
+  BDMA_SRC_MX4SIO: MX4SIO
+  BDMA_SRC_MMCE: MMCE
+  BDMA_SRC_HDD: Interne HDD
+  BDMA_MODE_FAT32: USB (FAT32)
+  BDMA_MODE_USBEXFAT: USB (exFAT)
+  BDMA_MODE_MX4SIO: MX4SIO (exFAT)
+  BDMA_MODE_MMCE: MMCE (exFAT)
+  BDMA_MODE_ATA: HDD (exFAT)
+  BDMA_ERR_SRC: BDMA-modulebestanden niet gevonden op het bronapparaat.
+  BDMA_ERR_SPACE: Onvoldoende geheugenkaartruimte voor de BDMA-modules.
+  BDMA_ERR_IO: Fout bij schrijven van de BDMA-modules naar de geheugenkaart.
+  COVERFLOW_SETTINGS: Coverflow-instellingen
+  COVERFLOW_COUNT: Aantal hoezen
+  COVERFLOW_SCALE: Middenschaal
+  COVERFLOW_ANIM: Animatiesnelheid
+  COVERFLOW_DIM: Zijhoezen dimmen
+  NONE: Geen
+  SMALL: Klein
+  LARGE: Groot
+  NORMAL: Normaal
+  FAV: Favorieten
+  FAVMODE: Favorieten startmodus
+  FAV_HINT: Favoriet
+  FAV_MSG: '%s is niet toegestaan via het favorietenmenu.'
+  FAV_PERSISTENCE_MSG: '%s is niet toegestaan terwijl het item als favoriet is gemarkeerd.'
+  NEUTRINO_DEVICE: Neutrino-apparaat
+  HINT_NEUTRINO_DEVICE: Apparaat met neutrino.elf (in een NEUTRINO/- of neutrino/-map). Auto scant eerst mc0, dan mc1.
+  NARGS_QB: Snel opstarten (-qb)
+  NARGS_CWD: Werkmap (-cwd)
+  NARGS_CFG: Configuratie (-cfg)
+  NARGS_ELF: Opstart-ELF (-elf)
+  NARGS_ATA0: ATA0-image (-ata0)
+  NARGS_ATA0ID: ATA0-ID (-ata0id)
+  NARGS_ATA1: ATA1-image (-ata1)
+  NARGS_EXTRA: Extra argumenten
+  NARGS_AUTO_NOTE: 'Auto: -bsd -dvd -gc -gsm -mc -dbc -logo'
+  ENABLE_ART_TAR: .tar-archief met hoezen
+  DISABLE_ALL: Alles uitschakelen
+  BOOT_LOADING_CONFIG: Instellingen laden...
+  BOOT_SCANNING_BDM: USB / kaart / netwerkschijven scannen...
+  BOOT_SCANNING_NET: Netwerk starten...
+  BOOT_SCANNING_HDD: HDD scannen...
+  BOOT_READY: Klaar.
+  UDPFS_GAMES: "UDPFS-spellen"
+  UDPFSBD_GAMES: "UDPFSBD-spellen"
+  NET_PROTOCOL: "Netwerkprotocol"
+  NET_NEEDS_NEUTRINO: "Netwerkspellen (UDP) kunnen alleen starten via de Neutrino-core. Controleer of neutrino.elf aanwezig is en het formaat wordt ondersteund."
+  VCD_NOT_ON_NET: "PS1-spellen (.VCD) kunnen niet via het netwerkapparaat worden gestart."
+  MX4SIO_PADEMU_WARN: "MX4SIO en pad-emulatie delen de SIO2-bus en het spel start mogelijk niet."
+  HINT_OSD_SETTINGS_LNG: "Een aangepaste taalinstelling afdwingen"
+  OSD_SETTINGS_TVASPECT: "Schermgrootte"
+  FULL_SCREEN: "Volledig scherm"
+  OSD_SETTINGS_VMODE: "Videomodus"
+  SYSTEM_DEFAULT: "Systeemstandaard"
+  HIGH: "Hoog"
+  LOW: "Laag"
+  XSENSITIVITY: "Gevoeligheid analoge X-as"
+  YSENSITIVITY: "Gevoeligheid analoge Y-as"
+  FILE_COUNT: "Bestanden gevonden: %i"
+  CHEAT_SELECTION: "Cheatselectie"
+  HDD_HINT: "Slechts één HDD toegestaan; inschakelen vergrendelt APA of GPT."
+  MMCE_GAMEID_NEUTRINO_SKIP: "MMCE GameID niet toegepast -- neutrino.elf staat op deze kaart (wisselen zou Neutrino ontladen)."
+  POPSTARTER_DEVICE: "POPSTARTER.ELF-apparaat"
+  HINT_POPSTARTER_DEVICE: "Apparaat met POPS/POPSTARTER.ELF voor het starten van PS1-VCD's. Standaard = bootapparaat (cwd) daarna het eigen apparaat van de VCD. Aangepast toont een vrij pad-veld."
+  BDMA_APPLY: "VCD BDMA toepassen bij starten"
+  HINT_BDMA_APPLY: "Aan: rust automatisch de bijpassende exFAT-driver van de gestarte VCD uit op de geheugenkaart vóór het booten (aanbevolen). Uit: beheer dit zelf met de BDMA-bron/modus-kiezers hieronder."
+  NETBOOT_RESTART: "Herstart OPL om de wijziging van het netwerk-bootprotocol toe te passen."
+  UDPFS_MODE: "UDPFS-toegang"
+  "MENU": "Menu"
+  "APPS": "Apps"
+  "DEBUG": "Debugkleuren"
+  "COVERART": "Omslagafbeelding"
+  "IP_ADDRESS_TYPE_DHCP": "DHCP"
+  "PORT": "Port"
+  "ADDR_TYPE_IP": "IP"
+  "ADDR_TYPE_NETBIOS": "NetBIOS"
+  "ENABLE_WRITE": "Schrijfbewerkingen"
+  "MODE1": "Modus 1"
+  "MODE2": "Modus 2"
+  "MODE3": "Modus 3"
+  "MODE4": "Modus 4"
+  "MODE5": "Modus 5"
+  "MODE6": "Modus 6"
+  "ENABLEGSM": "GSM-selector"
+  "OVERSCAN": "Overscan"
+  "ENABLECHEAT": "PS2RD-cheatengine"
+  "PADEMU_ENABLE": "Pad-emulator"
+  "DS34USB_MODE": "DualShock3/4 USB"
+  "PADEMU_PORT": "Emulatie"
+  "PADEMU_VIB": "Trilling"
+  "PADEMU_WORKAROUND": "Nep-DS3-oplossing"
+  "SFX": "Geluidseffecten"
+  "BOOT_SND": "Opstartgeluid"
+  "ENABLE_NOTIFICATIONS": "Meldingen"
+  "OPTIONS": "Opties"
+  "GLOBAL_SETTINGS": "Globaal"
+  "INFO_GENRE": "Genre"
+  "INFO_RELEASE": "Uitgave"
+  "INFO_DESCRIPTION": "Beschrijving"
+  "BLOCKDEVICE_SETTINGS": "Blokapparaten"
+  "CONTROLLER_SETTINGS": "Controllerinstellingen"
+  "HINT_BDM_START": "Block Device Manager in-/uitschakelen."
+  "HINT_BLOCK_DEVICES": "Blokapparaten in-/uitschakelen (bijv. USB)."
+  "USB_GAMES": "USB-games"
+  "ILINK_GAMES": "iLink-games"
+  "MX4SIO_GAMES": "MX4SIO-games"
+  "PADMACROCONFIG": "PADMACRO configureren"
+  "PADMACRO_SETTINGS": "Padmacro-instellingen"
+  "PADMACRO_ENABLE": "Padmacro's"
+  "PADMACRO_SLOWDOWN": "Analoge vertraging:"
+  "HINT_PADMACRO_SLOWDOWN_AXIS": "Bereik van de analoge stick verkleinen wanneer een knop wordt ingedrukt"
+  "LEFT_ANALOG": "Linkerstick"
+  "RIGHT_ANALOG": "Rechterstick"
+  "PADMACRO_INVERT_AXIS": "Analoge as omkeren:"
+  "HINT_PADMACRO_INVERT_AXIS": "As van de analoge stick omkeren"
+  "TURBO_SPEED": "Turboknopsnelheid"
+  "HINT_TURBO_SPEED": "Hoe snel de knop wordt ingedrukt wanneer turbo actief is"
+  "ACT_WHILE_PRESSED": "Terwijl knop ingedrukt"
+  "ACT_TOGGLED": "In-/uitgeschakeld met knop"
+  "LANGUAGE_JAPANESE": "JAPANS"
+  "LANGUAGE_ENGLISH": "ENGELS"
+  "LANGUAGE_FRENCH": "FRANS"
+  "LANGUAGE_SPANISH": "SPAANS"
+  "LANGUAGE_GERMAN": "DUITS"
+  "LANGUAGE_ITALIAN": "ITALIAANS"
+  "LANGUAGE_DUTCH": "NEDERLANDS"
+  "LANGUAGE_PORTUGUESE": "PORTUGEES"
+  "LANGUAGE_RUSSIAN": "RUSSISCH"
+  "LANGUAGE_KOREAN": "KOREAANS"
+  "LANGUAGE_TRAD_CHINESE": "TRADITIONEEL CHINEES"
+  "LANGUAGE_SIMPL_CHINESE": "VEREENVOUDIGD CHINEES"
+  "OSD_SETTINGS": "OSD-instellingen"
+  "OSD_SETTINGS_LNG": "OSD-taal"
+  "ENABLE_LNG": "Taal wijzigen"
+  "BGM": "Achtergrondmuziek"
+  "BGM_VOLUME": "Volume achtergrondmuziek"
+  "DEF_BGM_PATH": "Standaard themamuziek"
+  "DEF_BGM_PATH_HINT": "Stel het pad in voor het streamen van muziek voor het interne thema."
+  "BOOT_SCANNING_MC": "Geheugenkaarten scannen..."
+  "BOOT_LOADING_DRIVERS": "Opslagstuurprogramma's laden..."
+  "BOOT_LOADING_USB": "USB-opslagstuurprogramma laden..."
+  "BOOT_ARMING_MMCE": "MMCE game-ID activeren..."
+  "BOOT_LOADING_SOUNDS": "Themageluiden laden..."
+  "BOOT_BUILDING_MENU": "Menu opbouwen..."
+  "NET_UDPFS_TAB_HINT": "UDPFS aan -- open het nieuwe UDPFS-tabblad en druk op Bevestigen om te verbinden. Aan de pc-kant draait udpfsd -fsroot <games folder>."
+  "NET_UDPBD_TAB_HINT": "Netwerk-block-device aan -- het tabblad verschijnt zodra de pc-server antwoordt (udpfsd -bdpath voor UDPFS Image, udpbd-server voor UDPBD)."
+  "NEUTRINO_VMC_MISSING": "VMC-bestand per spel niet gevonden -- start zonder dit (het spel gebruikt zijn echte kaart)."
+  "NEUTRINO_DEV_UNSUPPORTED": "Neutrino kan niet vanaf dit apparaat starten -- starten afgebroken."
+  "NEUTRINO_TOML_SYNC_FAILED": "Neutrino-netwerkconfiguratie (bsd toml) ontbreekt of is niet schrijfbaar -- starten afgebroken, controleer de neutrino-map."
+  "NEUTRINO_TOO_FRAGMENTED": "Te gefragmenteerd voor Neutrino (%d fragmenten, limiet %d incl. VMC's) -- de OPL-core wordt in plaats daarvan geprobeerd."
+  "NEUTRINO_TOO_FRAGMENTED_NET": "Te gefragmenteerd voor Neutrino (%d fragmenten, limiet %d incl. VMC's) -- defragmenteer op de pc; starten afgebroken."
+  "NEUTRINO_GSM_COMP": "Neutrino GSM-compatibiliteit"
+  "HINT_NEUTRINO_GSM_COMP": "Field-flipping-oplossing voor spellen die schudden of scheuren onder een geforceerde Neutrino-videomodus. Vereist een ingestelde Neutrino-videomodus."
+  "NARGS_DBC": "Debugkleuren (-dbc)"
+  "NARGS_LOGO": "PS2-logo (-logo)"
+  "VMC_SLOT1_DISABLE": "VMC 1 uitschakelen (kaart behouden)"
+  "VMC_SLOT2_DISABLE": "VMC 2 uitschakelen (kaart behouden)"
+  "HINT_VMC_SLOT_DISABLE": "Start zonder de VMC van dit slot terwijl de kaart geconfigureerd blijft. Alleen bij het starten van Neutrino; het spel gebruikt dan de echte kaart in dat slot."
+  "NEUTRINO_BSDFS": "Neutrino-bestandssysteem"
+  "HINT_NEUTRINO_BSDFS": "Forceer Neutrino's block-device-bestandssysteem (-bsdfs). Auto = standaard per apparaat. hdl/bd zijn opties voor experts; combineer ze met een bijpassende -dvd= in de opstartargumenten als de vorm van het auto-pad niet past."
+  "PLASCOLOR": "Plasma-mengkleur"
+  "VCD_HIDE_GAMEID": "PS1 game-ID verbergen (VCD-lijst)"
+  "HINT_VCD_HIDE_GAMEID": "Alleen cosmetisch -- verberg een voorloopprefix met spel-ID (bijv. SLUS_005.51.) in de namen van de PS1/VCD-lijst. Namen zonder ID worden ongewijzigd getoond. Verandert niets aan opstarten, hoesillustratie of favorieten."
+  "VCD_FIRST_DISC": "Alleen eerste disc (multi-disc PS1)"
+  "HINT_VCD_FIRST_DISC": "Toon alleen Disc 1 van een PS1-spel met meerdere discs in de apparaatlijsten (POPSLoader-stijl). Verbergt bestanden met de naam (Disc 2), (CD 2), enz. Alle discs blijven op de kaart staan om tijdens het spel te wisselen; Favorieten worden niet gefilterd."
+  "GAMES_DEVICE": "Apparaat van game"
+  "DEFAULT_CORE": "Standaard Loader Core"
+  "HINT_DEFAULT_CORE": "Globale standaardcore voor spellen waarvan de Loader Core per spel op Default is ingesteld. <OPL> is de native core; Neutrino koppelt de externe neutrino.elf. Een keuze per spel overschrijft dit altijd."
+  "VCD_SETTINGS": "VCD-instellingen"
+  "FINANCIAL_SUPPORT": "Financiële steun"

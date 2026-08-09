@@ -1,0 +1,229 @@
+translations:
+  AUTOSORT: Ordenar jogos por ordem alfabética
+  RUMBLE: Vibração do comando nos menus
+  HINT_RUMBLE: Vibração curta ao mover o cursor, confirmar ou voltar -- requer um DualShock em modo analógico
+  FOLDER_NAV: Navegar por pastas na lista de jogos
+  HINT_FOLDER_NAV: Mostra subpastas de CD/DVD como entradas navegáveis; selecionar para abrir, cancelar para voltar
+  SETTINGS_NO_HOME: Nenhum cartão de memória encontrado -- não é possível guardar as definições. O OPL arrancou de um dispositivo de rede, cujas definições têm de ficar num cartão local.
+  ERROR_SAVING_SETTINGS_TO: Não foi possível gravar as definições em %s (erro %d)
+  GENERAL_SETTINGS: Definições Gerais
+  DEVICE_SETTINGS: Definições de Dispositivo
+  LAUNCH_PS2_DISC: Lançar Disco PS2
+  DISC_LAUNCH_ERR: Nenhum disco PS2 na unidade.
+  DEFAULT: Predefinição
+  HINT_MODE7: Apenas Neutrino -- corrige jogos que ultrapassam um buffer IOP (-gc=7)
+  MODE7: Modo 7
+  ENABLEIMAGE: Imagem de Cheats PS2RD
+  HINT_ENABLEIMAGE: Aplica um patch .img PS2RD pré-compilado ao seu jogo.
+  UDPBD_GAMES: UDPBD Games
+  MMCE: MMCE
+  MMCE_GAMES: MMCE Games
+  MMCEMODE: Modo de Arranque MMCE
+  MMCE_PREFIX: Caminho de Prefixo MMCE
+  MMCE_SLOT: Slot MMCE
+  MMCEIGR_SLOT: Slot(s) de Bootcard IGR
+  HINT_MMCEIGR_SLOT: O comando para mudar para bootcard será enviado ao(s) slot(s) selecionado(s) no IGR
+  MMCE_ADVANCED: Avançado
+  MMCE_SETTINGS: Definições MMCE
+  MMCE_SEMA: Método de Fila de Sema de Bloqueio
+  HINT_MMCE_SEMA: THFIFO pode ajudar na compatibilidade mas piorar o desempenho
+  MMCE_WAIT_CYCLES: Ciclos de espera após /ACK baixo
+  HINT_MMCE_WAIT_CYCLES: Valores mais baixos podem melhorar o desempenho mas causar instabilidades
+  MMCE_USE_ALARMS: Usar alarmes de tempo limite
+  HINT_MMCE_USE_ALARMS: DESLIGADO pode ajudar o desempenho mas pode causar bloqueios por tempo limite MMCE
+  CORE_LOADER: Núcleo do Carregador
+  NEUTRINO_BAD_FORMAT: Neutrino não suporta este formato de ficheiro, a lançar com núcleo <OPL>
+  NEUTRINO_NOT_FOUND: ELF Neutrino não encontrado, a lançar com núcleo <OPL>
+  UDPBD_NEEDS_STATIC_IP: UDPBD requer um IP PS2 estático. Defina um nas Definições de Rede (DHCP está ativo).
+  NEUTRINO_SETTING_NA: Esta definição não é usada com o núcleo Neutrino.
+  POPSTARTER_NOT_FOUND: POPSTARTER.ELF em falta
+  POPSTARTER_SMB_MISSING: Requisitos SMB do POPSTARTER em falta
+  WRITE_POPSTARTER_NET: Gravar Config de Rede do POPSTARTER
+  HINT_WRITE_POPSTARTER_NET: Guarda também estes valores de IP + partilha SMB nos ficheiros IPCONFIG.DAT / SMBCONFIG.DAT do POPSTARTER no cartão de memória (para VCD via SMB).
+  POPSTARTER_NET_ERR: Não foi possível gravar a configuração de rede do POPSTARTER no cartão de memória.
+  VCD: VCD
+  VCD_ON: A mostrar jogos VCD
+  VCD_OFF: A mostrar jogos de disco
+  NEUTRINO_ARGS: Args de Lançamento Neutrino
+  HINT_NEUTRINO_ARGS: Flags extra do Neutrino, separadas por espaço (ex. -mt=dvd). Global aplica-se a todos os jogos; por jogo acrescenta. Prefixe uma flag com $ para desativá-la sem apagar.
+  NEUTRINO_VIDEO: Vídeo Neutrino
+  HINT_NEUTRINO_VIDEO: Força o modo de vídeo GS do Neutrino (-gsm). Desligado mantém a predefinição do jogo.
+  NEUTRINO_PATH: Caminho do ELF Neutrino
+  HINT_NEUTRINO_PATH: Caminho completo para neutrino.elf (ex. mc0:NEUTRINO/neutrino.elf). Vazio = deteção automática em mc0/mc1.
+  POPSTARTER_PATH: Caminho de POPSTARTER.ELF
+  HINT_POPSTARTER_PATH: Caminho personalizado para POPSTARTER.ELF; usa silenciosamente a pasta POPS do dispositivo se vazio/ausente. Teclado limitado a 31 caracteres; caminhos mais longos via settings_riptopl.cfg.
+  BDMA_SOURCE: Fonte BDMA
+  HINT_BDMA_SOURCE: Dispositivo cuja pasta POPS contém os ficheiros do driver BDMAssault (usbd.irx.* / usbhdfsd.irx.*).
+  BDMA_MODE: Modo BDMA
+  HINT_BDMA_MODE: Driver de dispositivo de bloco exFAT que o POPSTARTER carrega. Alterá-lo copia os módulos para o cartão; FAT32 = nenhum (driver integrado).
+  BDMA_SRC_USB: USB
+  BDMA_SRC_MX4SIO: MX4SIO
+  BDMA_SRC_MMCE: MMCE
+  BDMA_SRC_HDD: HDD interno
+  BDMA_MODE_FAT32: USB (FAT32)
+  BDMA_MODE_USBEXFAT: USB (exFAT)
+  BDMA_MODE_MX4SIO: MX4SIO (exFAT)
+  BDMA_MODE_MMCE: MMCE (exFAT)
+  BDMA_MODE_ATA: HDD (exFAT)
+  BDMA_ERR_SRC: Ficheiros de módulo BDMA não encontrados no dispositivo de origem.
+  BDMA_ERR_SPACE: Espaço insuficiente no cartão de memória para os módulos BDMA.
+  BDMA_ERR_IO: Erro ao gravar os módulos BDMA no cartão de memória.
+  COVERFLOW_SETTINGS: Definições de Coverflow
+  COVERFLOW_COUNT: Número de Capas
+  COVERFLOW_SCALE: Escala Central
+  COVERFLOW_ANIM: Velocidade de Animação
+  COVERFLOW_DIM: Escurecer Capas Laterais
+  NONE: Nenhum
+  SMALL: Pequeno
+  LARGE: Grande
+  NORMAL: Normal
+  FAV: Favoritos
+  FAVMODE: Modo de Arranque de Favoritos
+  FAV_HINT: Favorito
+  FAV_MSG: '%s não é permitido no Menu de Favoritos.'
+  FAV_PERSISTENCE_MSG: '%s não é permitido enquanto o item estiver marcado como favorito.'
+  NEUTRINO_DEVICE: Dispositivo Neutrino
+  HINT_NEUTRINO_DEVICE: Dispositivo que contém neutrino.elf (numa pasta NEUTRINO/ ou neutrino/). Auto analisa mc0 e depois mc1.
+  NARGS_QB: Arranque Rápido (-qb)
+  NARGS_CWD: Diretório de Trabalho (-cwd)
+  NARGS_CFG: Config (-cfg)
+  NARGS_ELF: ELF de Arranque (-elf)
+  NARGS_ATA0: Imagem ATA0 (-ata0)
+  NARGS_ATA0ID: ID ATA0 (-ata0id)
+  NARGS_ATA1: Imagem ATA1 (-ata1)
+  NARGS_EXTRA: Args Extra
+  NARGS_AUTO_NOTE: 'Auto: -bsd -dvd -gc -gsm -mc -dbc -logo'
+  ENABLE_ART_TAR: Arquivo .tar de capas
+  DISABLE_ALL: Desativar tudo
+  BOOT_LOADING_CONFIG: A carregar definições...
+  BOOT_SCANNING_BDM: A analisar unidades USB / cartão / rede...
+  BOOT_SCANNING_NET: A iniciar a rede...
+  BOOT_SCANNING_HDD: A analisar HDD...
+  BOOT_READY: Pronto.
+  UDPFS_GAMES: "Jogos UDPFS"
+  UDPFSBD_GAMES: "Jogos UDPFSBD"
+  NET_PROTOCOL: "Protocolo de rede"
+  NET_NEEDS_NEUTRINO: "Os jogos de rede (UDP) só podem arrancar através do núcleo Neutrino. Verifique se o neutrino.elf está presente e se o formato é suportado."
+  VCD_NOT_ON_NET: "Os jogos PS1 (.VCD) não podem ser iniciados através do dispositivo de rede."
+  MX4SIO_PADEMU_WARN: "O MX4SIO e a emulação de comando partilham o barramento SIO2 e o jogo pode não arrancar."
+  HINT_OSD_SETTINGS_LNG: "Forçar uma configuração de idioma personalizada"
+  OSD_SETTINGS_TVASPECT: "Tamanho do ecrã"
+  FULL_SCREEN: "Ecrã inteiro"
+  OSD_SETTINGS_VMODE: "Modo de vídeo"
+  SYSTEM_DEFAULT: "Predefinição do sistema"
+  HIGH: "Alta"
+  LOW: "Baixa"
+  XSENSITIVITY: "Sensibilidade analógica do eixo X"
+  YSENSITIVITY: "Sensibilidade analógica do eixo Y"
+  FILE_COUNT: "Ficheiros encontrados: %i"
+  CHEAT_SELECTION: "Seleção de batotas"
+  HDD_HINT: "Só é permitido um HDD; ativá-lo bloqueia APA ou GPT."
+  MMCE_GAMEID_NEUTRINO_SKIP: "GameID MMCE não aplicado -- o neutrino.elf está neste cartão (mudar iria descarregar o Neutrino)."
+  POPSTARTER_DEVICE: "Dispositivo POPSTARTER.ELF"
+  HINT_POPSTARTER_DEVICE: "Dispositivo com POPS/POPSTARTER.ELF para arranques VCD PS1. Predefinição = dispositivo de arranque (cwd) e depois o próprio dispositivo do VCD. Personalizado mostra um caminho livre."
+  BDMA_APPLY: "Aplicar VCD BDMA ao iniciar"
+  HINT_BDMA_APPLY: "Ligado: equipa automaticamente o controlador exFAT correspondente do VCD iniciado no cartão de memória antes do arranque (recomendado). Desligado: gira manualmente com os seletores de Origem/Modo BDMA abaixo."
+  NETBOOT_RESTART: "Reinicie o OPL para aplicar a alteração do protocolo de arranque de rede."
+  UDPFS_MODE: "Acesso UDPFS"
+  "MENU": "Menu"
+  "APPS": "Apps"
+  "DEBUG": "Cores de Depuração"
+  "COVERART": "Capa"
+  "IP_ADDRESS_TYPE_DHCP": "DHCP"
+  "PORT": "Port"
+  "ADDR_TYPE_IP": "IP"
+  "ADDR_TYPE_NETBIOS": "NetBIOS"
+  "ENABLE_WRITE": "Operações de Escrita"
+  "MODE1": "Modo 1"
+  "MODE2": "Modo 2"
+  "MODE3": "Modo 3"
+  "MODE4": "Modo 4"
+  "MODE5": "Modo 5"
+  "MODE6": "Modo 6"
+  "ENABLEGSM": "Seletor GSM"
+  "OVERSCAN": "Overscan"
+  "ENABLECHEAT": "Motor de Trapaças PS2RD"
+  "PADEMU_ENABLE": "Emulador de Controle"
+  "DS34USB_MODE": "DualShock3/4 USB"
+  "PADEMU_PORT": "Emulação"
+  "PADEMU_VIB": "Vibração"
+  "PADEMU_WORKAROUND": "Solução para DS3 Falso"
+  "SFX": "Efeitos Sonoros"
+  "BOOT_SND": "Som de Inicialização"
+  "ENABLE_NOTIFICATIONS": "Notificações"
+  "OPTIONS": "Opções"
+  "GLOBAL_SETTINGS": "Global"
+  "INFO_GENRE": "Gênero"
+  "INFO_RELEASE": "Lançamento"
+  "INFO_DESCRIPTION": "Descrição"
+  "BLOCKDEVICE_SETTINGS": "Dispositivos de Bloco"
+  "CONTROLLER_SETTINGS": "Configurações do Controle"
+  "HINT_BDM_START": "Ativar/desativar o Gerenciador de Dispositivos de Bloco (BDM)."
+  "HINT_BLOCK_DEVICES": "Ativar/desativar Dispositivos de Bloco (ex.: USB)."
+  "USB_GAMES": "Jogos USB"
+  "ILINK_GAMES": "Jogos iLink"
+  "MX4SIO_GAMES": "Jogos MX4SIO"
+  "PADMACROCONFIG": "Configurar PADMACRO"
+  "PADMACRO_SETTINGS": "Configurações de Macro do Controle"
+  "PADMACRO_ENABLE": "Macros do Controle"
+  "PADMACRO_SLOWDOWN": "Redução analógica:"
+  "HINT_PADMACRO_SLOWDOWN_AXIS": "Reduz o alcance do analógico quando o botão é pressionado"
+  "LEFT_ANALOG": "Analógico esquerdo"
+  "RIGHT_ANALOG": "Analógico direito"
+  "PADMACRO_INVERT_AXIS": "Inverter eixo analógico:"
+  "HINT_PADMACRO_INVERT_AXIS": "Inverte o eixo do analógico"
+  "TURBO_SPEED": "Velocidade do botão turbo"
+  "HINT_TURBO_SPEED": "Quão rápido pressionar o botão quando o turbo está ativo"
+  "ACT_WHILE_PRESSED": "Enquanto o botão está pressionado"
+  "ACT_TOGGLED": "Alternado pelo botão"
+  "LANGUAGE_JAPANESE": "JAPONÊS"
+  "LANGUAGE_ENGLISH": "INGLÊS"
+  "LANGUAGE_FRENCH": "FRANCÊS"
+  "LANGUAGE_SPANISH": "ESPANHOL"
+  "LANGUAGE_GERMAN": "ALEMÃO"
+  "LANGUAGE_ITALIAN": "ITALIANO"
+  "LANGUAGE_DUTCH": "HOLANDÊS"
+  "LANGUAGE_PORTUGUESE": "PORTUGUÊS"
+  "LANGUAGE_RUSSIAN": "RUSSO"
+  "LANGUAGE_KOREAN": "COREANO"
+  "LANGUAGE_TRAD_CHINESE": "CHINÊS TRADICIONAL"
+  "LANGUAGE_SIMPL_CHINESE": "CHINÊS SIMPLIFICADO"
+  "OSD_SETTINGS": "Configurações do OSD"
+  "OSD_SETTINGS_LNG": "Idioma do OSD"
+  "ENABLE_LNG": "Alterar idioma"
+  "BGM": "Música de Fundo"
+  "BGM_VOLUME": "Volume da Música de Fundo"
+  "DEF_BGM_PATH": "Música Padrão do Tema"
+  "DEF_BGM_PATH_HINT": "Definir caminho para transmitir a música do tema interno."
+  "BOOT_SCANNING_MC": "Verificando cartões de memória..."
+  "BOOT_LOADING_DRIVERS": "Carregando drivers de armazenamento..."
+  "BOOT_LOADING_USB": "Carregando driver de armazenamento USB..."
+  "BOOT_ARMING_MMCE": "Ativando ID de jogo MMCE..."
+  "BOOT_LOADING_SOUNDS": "Carregando sons do tema..."
+  "BOOT_BUILDING_MENU": "Construindo menu..."
+  "NET_UDPFS_TAB_HINT": "UDPFS ativado -- abra a nova aba UDPFS e pressione Confirmar para conectar. O lado do PC executa udpfsd -fsroot <games folder>."
+  "NET_UDPBD_TAB_HINT": "Dispositivo de bloco de rede ativado -- sua aba aparece assim que o servidor do PC responder (udpfsd -bdpath para Imagem UDPFS, udpbd-server para UDPBD)."
+  "NEUTRINO_VMC_MISSING": "Arquivo VMC por jogo não encontrado -- inicializando sem ele (o jogo usa seu cartão real)."
+  "NEUTRINO_DEV_UNSUPPORTED": "Neutrino não pode iniciar deste dispositivo -- inicialização cancelada."
+  "NEUTRINO_TOML_SYNC_FAILED": "Configuração de rede do Neutrino (bsd toml) ausente ou não gravável -- inicialização abortada, verifique a pasta neutrino."
+  "NEUTRINO_TOO_FRAGMENTED": "Fragmentado demais para o Neutrino (%d fragmentos, limite %d incl. VMCs) -- tentando o núcleo OPL em vez disso."
+  "NEUTRINO_TOO_FRAGMENTED_NET": "Fragmentado demais para o Neutrino (%d fragmentos, limite %d incl. VMCs) -- desfragmente no PC; inicialização abortada."
+  "NEUTRINO_GSM_COMP": "Compatibilidade GSM do Neutrino"
+  "HINT_NEUTRINO_GSM_COMP": "Correção de inversão de campo para jogos que tremem ou rasgam sob um modo de Vídeo Neutrino forçado. Requer um modo de Vídeo Neutrino definido."
+  "NARGS_DBC": "Cores de Depuração (-dbc)"
+  "NARGS_LOGO": "Logo PS2 (-logo)"
+  "VMC_SLOT1_DISABLE": "Desativar VMC 1 (manter cartão)"
+  "VMC_SLOT2_DISABLE": "Desativar VMC 2 (manter cartão)"
+  "HINT_VMC_SLOT_DISABLE": "Inicia sem o VMC deste slot, mantendo seu cartão configurado. Apenas inicializações do Neutrino; o jogo então usa o cartão real naquele slot."
+  "NEUTRINO_BSDFS": "Sistema de Arquivos do Neutrino"
+  "HINT_NEUTRINO_BSDFS": "Força o sistema de arquivos de dispositivo de bloco do Neutrino (-bsdfs). Auto = padrão por dispositivo. hdl/bd são opções avançadas; combine-as com um -dvd= correspondente nos argumentos de inicialização se o formato do caminho automático não se encaixar."
+  "PLASCOLOR": "Cor de Mistura do Plasma"
+  "VCD_HIDE_GAMEID": "Ocultar ID de Jogo PS1 (lista VCD)"
+  "HINT_VCD_HIDE_GAMEID": "Apenas cosmético -- oculta um prefixo de ID de jogo inicial (por exemplo, SLUS_005.51.) dos nomes das listas PS1/VCD. Nomes sem um ID são mostrados como estão. Não altera a inicialização, a capa nem os favoritos."
+  "VCD_FIRST_DISC": "Apenas o primeiro disco (PS1 multidisco)"
+  "HINT_VCD_FIRST_DISC": "Mostra apenas o Disco 1 de um jogo PS1 de múltiplos discos nas listas de dispositivos (estilo POPSLoader). Oculta arquivos nomeados (Disc 2), (CD 2), etc. Todos os discos permanecem no cartão para troca dentro do jogo; os Favoritos não são filtrados."
+  "GAMES_DEVICE": "Dispositivo do Jogo"
+  "DEFAULT_CORE": "Núcleo de Carregamento Padrão"
+  "HINT_DEFAULT_CORE": "Núcleo padrão global para jogos cujo Loader Core por jogo está definido como Padrão. <OPL> é o núcleo nativo; o Neutrino encadeia o neutrino.elf externo. Uma escolha por jogo sempre substitui isto."
+  "VCD_SETTINGS": "Configurações VCD"
+  "FINANCIAL_SUPPORT": "Apoio Financeiro"

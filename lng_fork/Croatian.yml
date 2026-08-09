@@ -1,0 +1,229 @@
+translations:
+  AUTOSORT: Poredaj igre abecedno
+  RUMBLE: Vibracija kontrolera u izbornicima
+  HINT_RUMBLE: Kratka vibracija pri pomicanju pokazivača, potvrdi ili povratku -- treba DualShock u analognom načinu
+  FOLDER_NAV: Pregledavaj mape u popisu igara
+  HINT_FOLDER_NAV: Prikaži podmape CD/DVD-a kao stavke za pregled -- odaberi za otvaranje, odustani za povratak
+  SETTINGS_NO_HOME: Memorijska kartica nije pronađena -- postavke se ne mogu spremiti. OPL je pokrenut s mrežnog uređaja, čije postavke moraju biti na lokalnoj kartici.
+  ERROR_SAVING_SETTINGS_TO: Nije moguće zapisati postavke na %s (pogreška %d)
+  GENERAL_SETTINGS: Opće postavke
+  DEVICE_SETTINGS: Postavke uređaja
+  LAUNCH_PS2_DISC: Pokretanje PS2 diska
+  DISC_LAUNCH_ERR: Nema PS2 diska u pogonu.
+  DEFAULT: Zadano
+  HINT_MODE7: Samo Neutrino -- popravak igara koje prekoračuju IOP međuspremnik (-gc=7)
+  MODE7: Mode 7
+  ENABLEIMAGE: PS2RD Cheat Image
+  HINT_ENABLEIMAGE: Primijeni gotovu PS2RD .img zakrpu na svoju igru.
+  UDPBD_GAMES: UDPBD Games
+  MMCE: MMCE
+  MMCE_GAMES: MMCE Games
+  MMCEMODE: MMCE Način pokretanja
+  MMCE_PREFIX: MMCE Predputanja
+  MMCE_SLOT: MMCE Utor
+  MMCEIGR_SLOT: IGR Utor kartice za pokretanje
+  HINT_MMCEIGR_SLOT: Naredba za prelaz na bootcard šalje se odabranom utoru/utorima pri IGR
+  MMCE_ADVANCED: Napredno
+  MMCE_SETTINGS: MMCE Postavke
+  MMCE_SEMA: Metoda zaključavanja Sema reda
+  HINT_MMCE_SEMA: THFIFO može poboljšati kompatibilnost ali narušiti performanse
+  MMCE_WAIT_CYCLES: Ciklusi čekanja nakon /ACK low
+  HINT_MMCE_WAIT_CYCLES: Niže vrijednosti mogu poboljšati performanse ali uzrokovati nestabilnosti
+  MMCE_USE_ALARMS: Koristi alarme vremenskog ograničenja
+  HINT_MMCE_USE_ALARMS: ISKLJ. može pomoći performansama ali može uzrokovati zamrzavanje pri MMCE timeoutu
+  CORE_LOADER: Loader Core
+  NEUTRINO_BAD_FORMAT: Neutrino ne podržava ovaj format datoteke, pokretanje s jezgrom <OPL>
+  NEUTRINO_NOT_FOUND: Neutrino ELF nije pronađen, pokretanje s jezgrom <OPL>
+  UDPBD_NEEDS_STATIC_IP: UDPBD zahtijeva statičku PS2 IP adresu. Postavite je u mrežnoj konfiguraciji (DHCP je trenutno uključen).
+  NEUTRINO_SETTING_NA: Ova postavka se ne koristi s Neutrino jezgrom.
+  POPSTARTER_NOT_FOUND: Nedostaje POPSTARTER.ELF
+  POPSTARTER_SMB_MISSING: Nedostaju POPSTARTER SMB preduvjeti
+  WRITE_POPSTARTER_NET: Spremi POPSTARTER mrežnu konfiguraciju
+  HINT_WRITE_POPSTARTER_NET: Spremi ove IP + SMB vrijednosti i u POPSTARTER-ove IPCONFIG.DAT / SMBCONFIG.DAT na memorijskoj kartici (za VCD-over-SMB).
+  POPSTARTER_NET_ERR: Nije moguće zapisati POPSTARTER mrežnu konfiguraciju na memorijsku karticu.
+  VCD: VCD
+  VCD_ON: Prikazuju se VCD igre
+  VCD_OFF: Prikazuju se disk igre
+  NEUTRINO_ARGS: Neutrino Argumenti pokretanja
+  HINT_NEUTRINO_ARGS: Dodatne Neutrino zastavice, odvojene razmacima (npr. -mt=dvd). Globalno vrijedi za sve igre; po igri dodaje na vrh. Prefiks zastavice s $ onemogućuje je bez brisanja.
+  NEUTRINO_VIDEO: Neutrino Video
+  HINT_NEUTRINO_VIDEO: Prisili Neutrino GS izlazni video način (-gsm). Isklj. zadržava zadano igre.
+  NEUTRINO_PATH: Neutrino ELF Putanja
+  HINT_NEUTRINO_PATH: Puna putanja do neutrino.elf (npr. mc0:NEUTRINO/neutrino.elf). Prazno = automatsko otkrivanje na mc0/mc1.
+  POPSTARTER_PATH: POPSTARTER.ELF Putanja
+  HINT_POPSTARTER_PATH: Prilagođena POPSTARTER.ELF putanja; tiho se vraća na POPS mapu uređaja ako je prazna/nedostaje. Tipkovnica ograničena na 31 znak; dulje putanje putem settings_riptopl.cfg.
+  BDMA_SOURCE: BDMA Izvor
+  HINT_BDMA_SOURCE: Uređaj čija POPS mapa sadrži vaše BDMAssault upravljačke datoteke (usbd.irx.* / usbhdfsd.irx.*).
+  BDMA_MODE: BDMA Način
+  HINT_BDMA_MODE: exFAT upravljački program blok-uređaja koji POPSTARTER učitava. Promjenom se moduli kopiraju na karticu; FAT32 = nije potrebno (ugrađeni upravljački program).
+  BDMA_SRC_USB: USB
+  BDMA_SRC_MX4SIO: MX4SIO
+  BDMA_SRC_MMCE: MMCE
+  BDMA_SRC_HDD: Interni HDD
+  BDMA_MODE_FAT32: USB (FAT32)
+  BDMA_MODE_USBEXFAT: USB (exFAT)
+  BDMA_MODE_MX4SIO: MX4SIO (exFAT)
+  BDMA_MODE_MMCE: MMCE (exFAT)
+  BDMA_MODE_ATA: HDD (exFAT)
+  BDMA_ERR_SRC: BDMA datoteke modula nisu pronađene na izvornom uređaju.
+  BDMA_ERR_SPACE: Nema dovoljno prostora na memorijskoj kartici za BDMA module.
+  BDMA_ERR_IO: Greška pri zapisivanju BDMA modula na memorijsku karticu.
+  COVERFLOW_SETTINGS: Coverflow Postavke
+  COVERFLOW_COUNT: Broj naslovnica
+  COVERFLOW_SCALE: Razmjer središta
+  COVERFLOW_ANIM: Brzina animacije
+  COVERFLOW_DIM: Zatamni bočne naslovnice
+  NONE: Nijedno
+  SMALL: Malo
+  LARGE: Veliko
+  NORMAL: Normalno
+  FAV: Favoriti
+  FAVMODE: Favoriti Način pokretanja
+  FAV_HINT: Favorit
+  FAV_MSG: '%s nije dopušteno kroz izbornik Favorita.'
+  FAV_PERSISTENCE_MSG: '%s nije dopušteno dok je stavka označena kao favorit.'
+  NEUTRINO_DEVICE: Neutrino Uređaj
+  HINT_NEUTRINO_DEVICE: Uređaj koji sadrži neutrino.elf (u mapi NEUTRINO/ ili neutrino/). Auto pretražuje mc0 pa mc1.
+  NARGS_QB: Brzo pokretanje (-qb)
+  NARGS_CWD: Radni direktorij (-cwd)
+  NARGS_CFG: Konfiguracija (-cfg)
+  NARGS_ELF: Pokretački ELF (-elf)
+  NARGS_ATA0: ATA0 Slika (-ata0)
+  NARGS_ATA0ID: ATA0 ID (-ata0id)
+  NARGS_ATA1: ATA1 Slika (-ata1)
+  NARGS_EXTRA: Dodatni argumenti
+  NARGS_AUTO_NOTE: 'Auto: -bsd -dvd -gc -gsm -mc -dbc -logo'
+  ENABLE_ART_TAR: .tar arhiva omota
+  DISABLE_ALL: Onemogući sve
+  BOOT_LOADING_CONFIG: Učitavanje postavki...
+  BOOT_SCANNING_BDM: Pretraživanje USB / kartice / mrežnih pogona...
+  BOOT_SCANNING_NET: Pokretanje mreže...
+  BOOT_SCANNING_HDD: Pretraživanje HDD-a...
+  BOOT_READY: Spremno.
+  UDPFS_GAMES: "UDPFS igre"
+  UDPFSBD_GAMES: "UDPFSBD igre"
+  NET_PROTOCOL: "Mrežni protokol"
+  NET_NEEDS_NEUTRINO: "Mrežne (UDP) igre mogu se pokrenuti samo putem jezgre Neutrino. Provjerite je li neutrino.elf prisutan i podržava li se format."
+  VCD_NOT_ON_NET: "PS1 (.VCD) igre ne mogu se pokrenuti s mrežnog uređaja."
+  MX4SIO_PADEMU_WARN: "MX4SIO i emulacija kontrolera dijele sabirnicu SIO2 pa se igra možda neće pokrenuti."
+  HINT_OSD_SETTINGS_LNG: "Nametni prilagođeni jezik"
+  OSD_SETTINGS_TVASPECT: "Veličina slike"
+  FULL_SCREEN: "Cijeli zaslon"
+  OSD_SETTINGS_VMODE: "Videonačin"
+  SYSTEM_DEFAULT: "Zadano sustava"
+  HIGH: "Visoka"
+  LOW: "Niska"
+  XSENSITIVITY: "Osjetljivost analoga po osi X"
+  YSENSITIVITY: "Osjetljivost analoga po osi Y"
+  FILE_COUNT: "Pronađeno datoteka: %i"
+  CHEAT_SELECTION: "Odabir cheatova"
+  HDD_HINT: "Dopušten je samo jedan HDD; uključivanje zaključava APA ili GPT."
+  MMCE_GAMEID_NEUTRINO_SKIP: "MMCE GameID nije primijenjen -- neutrino.elf je na ovoj kartici (promjena bi izbacila Neutrino)."
+  POPSTARTER_DEVICE: "Uređaj za POPSTARTER.ELF"
+  HINT_POPSTARTER_DEVICE: "Uređaj s POPS/POPSTARTER.ELF za pokretanje PS1 VCD-a. Zadano = uređaj za pokretanje (cwd), zatim vlastiti uređaj VCD-a. Custom otkriva polje za slobodan unos putanje."
+  BDMA_APPLY: "Primijeni VCD BDMA pri pokretanju"
+  HINT_BDMA_APPLY: "Uklj.: prije pokretanja automatski postavlja na memorijsku karticu odgovarajući exFAT upravljački program pokrenutog VCD-a (preporučeno). Isklj.: upravljajte ručno pomoću izbornika BDMA Source/Mode ispod."
+  NETBOOT_RESTART: "Ponovno pokrenite OPL da biste primijenili promjenu protokola mrežnog pokretanja."
+  UDPFS_MODE: "UDPFS pristup"
+  "MENU": "Izbornik"
+  "APPS": "Aplikacije"
+  "DEBUG": "Boje za otklanjanje pogrešaka"
+  "COVERART": "Naslovnica"
+  "IP_ADDRESS_TYPE_DHCP": "DHCP"
+  "PORT": "Port"
+  "ADDR_TYPE_IP": "IP"
+  "ADDR_TYPE_NETBIOS": "NetBIOS"
+  "ENABLE_WRITE": "Operacije pisanja"
+  "MODE1": "Način 1"
+  "MODE2": "Način 2"
+  "MODE3": "Način 3"
+  "MODE4": "Način 4"
+  "MODE5": "Način 5"
+  "MODE6": "Način 6"
+  "ENABLEGSM": "GSM birač"
+  "OVERSCAN": "Overscan"
+  "ENABLECHEAT": "PS2RD engine za varanje"
+  "PADEMU_ENABLE": "Emulator kontrolera"
+  "DS34USB_MODE": "DualShock3/4 USB"
+  "PADEMU_PORT": "Emulacija"
+  "PADEMU_VIB": "Vibracija"
+  "PADEMU_WORKAROUND": "Lažni DS3 zaobilazni način"
+  "SFX": "Zvučni efekti"
+  "BOOT_SND": "Zvuk pri pokretanju"
+  "ENABLE_NOTIFICATIONS": "Obavijesti"
+  "OPTIONS": "Opcije"
+  "GLOBAL_SETTINGS": "Globalno"
+  "INFO_GENRE": "Žanr"
+  "INFO_RELEASE": "Izdanje"
+  "INFO_DESCRIPTION": "Opis"
+  "BLOCKDEVICE_SETTINGS": "Blok uređaji"
+  "CONTROLLER_SETTINGS": "Postavke kontrolera"
+  "HINT_BDM_START": "Uključi/isključi upravitelj blok uređaja."
+  "HINT_BLOCK_DEVICES": "Uključi/isključi blok uređaje (npr. USB)."
+  "USB_GAMES": "USB igre"
+  "ILINK_GAMES": "iLink igre"
+  "MX4SIO_GAMES": "MX4SIO igre"
+  "PADMACROCONFIG": "Konfiguriraj PADMACRO"
+  "PADMACRO_SETTINGS": "Postavke makronaredbi kontrolera"
+  "PADMACRO_ENABLE": "Makronaredbe kontrolera"
+  "PADMACRO_SLOWDOWN": "Usporavanje analoga:"
+  "HINT_PADMACRO_SLOWDOWN_AXIS": "Smanji domet analogne palice kad je tipka pritisnuta"
+  "LEFT_ANALOG": "Lijeva palica"
+  "RIGHT_ANALOG": "Desna palica"
+  "PADMACRO_INVERT_AXIS": "Obrni os analoga:"
+  "HINT_PADMACRO_INVERT_AXIS": "Obrni os analogne palice"
+  "TURBO_SPEED": "Brzina turbo tipke"
+  "HINT_TURBO_SPEED": "Koliko brzo pritiskati tipku dok je turbo aktivan"
+  "ACT_WHILE_PRESSED": "Dok je tipka pritisnuta"
+  "ACT_TOGGLED": "Uključi/isključi tipkom"
+  "LANGUAGE_JAPANESE": "JAPANSKI"
+  "LANGUAGE_ENGLISH": "ENGLESKI"
+  "LANGUAGE_FRENCH": "FRANCUSKI"
+  "LANGUAGE_SPANISH": "ŠPANJOLSKI"
+  "LANGUAGE_GERMAN": "NJEMAČKI"
+  "LANGUAGE_ITALIAN": "TALIJANSKI"
+  "LANGUAGE_DUTCH": "NIZOZEMSKI"
+  "LANGUAGE_PORTUGUESE": "PORTUGALSKI"
+  "LANGUAGE_RUSSIAN": "RUSKI"
+  "LANGUAGE_KOREAN": "KOREJSKI"
+  "LANGUAGE_TRAD_CHINESE": "TRADICIONALNI KINESKI"
+  "LANGUAGE_SIMPL_CHINESE": "POJEDNOSTAVLJENI KINESKI"
+  "OSD_SETTINGS": "OSD postavke"
+  "OSD_SETTINGS_LNG": "OSD jezik"
+  "ENABLE_LNG": "Promijeni jezik"
+  "BGM": "Pozadinska glazba"
+  "BGM_VOLUME": "Glasnoća pozadinske glazbe"
+  "DEF_BGM_PATH": "Zadana glazba teme"
+  "DEF_BGM_PATH_HINT": "Postavi putanju za reprodukciju glazbe interne teme."
+  "BOOT_SCANNING_MC": "Pretraživanje memorijskih kartica..."
+  "BOOT_LOADING_DRIVERS": "Učitavanje upravljačkih programa pohrane..."
+  "BOOT_LOADING_USB": "Učitavanje USB upravljačkog programa pohrane..."
+  "BOOT_ARMING_MMCE": "Priprema MMCE ID-a igre..."
+  "BOOT_LOADING_SOUNDS": "Učitavanje zvukova teme..."
+  "BOOT_BUILDING_MENU": "Izrada izbornika..."
+  "NET_UDPFS_TAB_HINT": "UDPFS uključen -- otvori novu UDPFS karticu i pritisni Potvrdi za spajanje. PC strana pokreće udpfsd -fsroot <games folder>."
+  "NET_UDPBD_TAB_HINT": "Mrežni blok-uređaj uključen -- njegova kartica pojavljuje se kad PC poslužitelj odgovori (udpfsd -bdpath za UDPFS Image, udpbd-server za UDPBD)."
+  "NEUTRINO_VMC_MISSING": "VMC datoteka za igru nije pronađena -- pokrećem bez nje (igra koristi svoju stvarnu karticu)."
+  "NEUTRINO_DEV_UNSUPPORTED": "Neutrino ne može pokrenuti s ovog uređaja -- pokretanje prekinuto."
+  "NEUTRINO_TOML_SYNC_FAILED": "Neutrino mrežna konfiguracija (bsd toml) nedostaje ili se ne može zapisati -- pokretanje prekinuto, provjeri neutrino mapu."
+  "NEUTRINO_TOO_FRAGMENTED": "Previše fragmentirano za Neutrino (%d fragmenata, ograničenje %d uklj. VMC-e) -- umjesto toga pokušavam s OPL jezgrom."
+  "NEUTRINO_TOO_FRAGMENTED_NET": "Previše fragmentirano za Neutrino (%d fragmenata, ograničenje %d uklj. VMC-e) -- defragmentiraj na PC-u; pokretanje prekinuto."
+  "NEUTRINO_GSM_COMP": "Neutrino GSM kompatibilnost"
+  "HINT_NEUTRINO_GSM_COMP": "Ispravak zamjene polja za igre koje se tresu ili trgaju pod prisilnim Neutrino Video načinom. Potreban je postavljen Neutrino Video način."
+  "NARGS_DBC": "Boje za otklanjanje pogrešaka (-dbc)"
+  "NARGS_LOGO": "PS2 logo (-logo)"
+  "VMC_SLOT1_DISABLE": "Onemogući VMC 1 (zadrži karticu)"
+  "VMC_SLOT2_DISABLE": "Onemogući VMC 2 (zadrži karticu)"
+  "HINT_VMC_SLOT_DISABLE": "Pokreni bez VMC-a ovog utora, a da mu kartica ostane konfigurirana. Samo Neutrino pokretanja; igra tada koristi stvarnu karticu u tom utoru."
+  "NEUTRINO_BSDFS": "Neutrino datotečni sustav"
+  "HINT_NEUTRINO_BSDFS": "Prisili Neutrinov datotečni sustav blok-uređaja (-bsdfs). Auto = zadano po uređaju. hdl/bd su stručne opcije; upari ih s odgovarajućim -dvd= u argumentima pokretanja ako oblik automatske putanje ne odgovara."
+  "PLASCOLOR": "Boja miješanja plazme"
+  "VCD_HIDE_GAMEID": "Sakrij PS1 ID igre (VCD popis)"
+  "HINT_VCD_HIDE_GAMEID": "Samo kozmetički -- sakrij vodeći prefiks ID-a igre (npr. SLUS_005.51.) iz naziva u PS1/VCD popisima. Nazivi bez ID-a prikazuju se kakvi jesu. Ne mijenja pokretanje, naslovnicu ni favorite."
+  "VCD_FIRST_DISC": "Samo prvi disk (višediskovni PS1)"
+  "HINT_VCD_FIRST_DISC": "Prikaži samo disk 1 PS1 igre s više diskova u popisima uređaja (POPSLoader stil). Skriva datoteke nazvane (Disc 2), (CD 2) itd. Svi diskovi ostaju na kartici za zamjenu tijekom igre; Favoriti se ne filtriraju."
+  "GAMES_DEVICE": "Uređaj igre"
+  "DEFAULT_CORE": "Zadana jezgra učitavača"
+  "HINT_DEFAULT_CORE": "Globalno zadano jezgro za igre čije je pojedinačno Loader Core postavljeno na Default. <OPL> je izvorno jezgro; Neutrino povezuje vanjski neutrino.elf. Odabir po igri uvijek nadjačava ovo."
+  "VCD_SETTINGS": "VCD postavke"
+  "FINANCIAL_SUPPORT": "Financijska podrška"

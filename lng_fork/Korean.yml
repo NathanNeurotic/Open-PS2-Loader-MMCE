@@ -1,0 +1,229 @@
+translations:
+  AUTOSORT: 게임 가나다순 정렬
+  RUMBLE: 메뉴에서 컨트롤러 진동
+  HINT_RUMBLE: 커서 이동, 확인 또는 취소 시 짧게 진동 -- 아날로그 모드의 듀얼쇼크 필요
+  FOLDER_NAV: 게임 목록에서 폴더 탐색
+  HINT_FOLDER_NAV: CD/DVD의 하위 폴더를 탐색 가능한 항목으로 표시, 선택하면 열고 취소하면 뒤로
+  SETTINGS_NO_HOME: 메모리 카드가 없어 설정을 저장할 수 없습니다. OPL이 네트워크 장치에서 부팅되었으며, 설정은 로컬 카드에 저장되어야 합니다.
+  ERROR_SAVING_SETTINGS_TO: "%s에 설정을 저장할 수 없습니다 (오류 %d)"
+  GENERAL_SETTINGS: 일반 설정
+  DEVICE_SETTINGS: 장치 설정
+  LAUNCH_PS2_DISC: PS2 디스크 실행
+  DISC_LAUNCH_ERR: 드라이브에 PS2 디스크가 없습니다.
+  DEFAULT: 기본값
+  HINT_MODE7: Neutrino 전용 -- IOP 버퍼 오버런 게임 수정 (-gc=7)
+  MODE7: Mode 7
+  ENABLEIMAGE: PS2RD 치트 이미지
+  HINT_ENABLEIMAGE: 게임에 미리 빌드된 PS2RD .img 패치를 적용합니다.
+  UDPBD_GAMES: UDPBD Games
+  MMCE: MMCE
+  MMCE_GAMES: MMCE 게임
+  MMCEMODE: MMCE 시작 모드
+  MMCE_PREFIX: MMCE 접두 경로
+  MMCE_SLOT: MMCE 슬롯
+  MMCEIGR_SLOT: IGR 부트카드 슬롯
+  HINT_MMCEIGR_SLOT: IGR 시 선택된 슬롯으로 부트카드 전환 명령이 전송됩니다
+  MMCE_ADVANCED: 고급
+  MMCE_SETTINGS: MMCE 설정
+  MMCE_SEMA: 잠금 세마 큐잉 방식
+  HINT_MMCE_SEMA: THFIFO는 호환성에 도움이 될 수 있지만 성능이 저하될 수 있습니다
+  MMCE_WAIT_CYCLES: /ACK 로우 후 대기 사이클
+  HINT_MMCE_WAIT_CYCLES: 낮은 값은 성능을 향상시킬 수 있지만 불안정을 초래할 수 있습니다
+  MMCE_USE_ALARMS: 타임아웃 알람 사용
+  HINT_MMCE_USE_ALARMS: OFF는 성능에 도움이 될 수 있지만 MMCE 타임아웃 시 프리즈를 유발할 수 있습니다
+  CORE_LOADER: 로더 코어
+  NEUTRINO_BAD_FORMAT: Neutrino는 이 파일 형식을 지원하지 않아 <OPL> 코어로 실행합니다
+  NEUTRINO_NOT_FOUND: Neutrino ELF를 찾을 수 없어 <OPL> 코어로 실행합니다
+  UDPBD_NEEDS_STATIC_IP: UDPBD는 고정 PS2 IP가 필요합니다. 네트워크 설정에서 지정하세요 (현재 DHCP 사용 중).
+  NEUTRINO_SETTING_NA: 이 설정은 Neutrino 코어에서 사용되지 않습니다.
+  POPSTARTER_NOT_FOUND: POPSTARTER.ELF 파일이 없습니다
+  POPSTARTER_SMB_MISSING: POPSTARTER SMB 요구 파일이 없습니다
+  WRITE_POPSTARTER_NET: POPSTARTER 네트워크 설정 저장
+  HINT_WRITE_POPSTARTER_NET: IP + SMB 공유 값을 메모리 카드의 POPSTARTER용 IPCONFIG.DAT / SMBCONFIG.DAT에도 저장합니다 (SMB 경유 VCD용).
+  POPSTARTER_NET_ERR: 메모리 카드에 POPSTARTER 네트워크 설정을 쓸 수 없습니다.
+  VCD: VCD
+  VCD_ON: VCD 게임 표시 중
+  VCD_OFF: 디스크 게임 표시 중
+  NEUTRINO_ARGS: Neutrino 실행 인수
+  HINT_NEUTRINO_ARGS: '추가 Neutrino 플래그, 공백으로 구분 (예: -mt=dvd). 전역은 모든 게임에 적용; 게임별은 추가됩니다. 플래그 앞에 $를 붙이면 삭제 없이 비활성화됩니다.'
+  NEUTRINO_VIDEO: Neutrino 비디오
+  HINT_NEUTRINO_VIDEO: Neutrino의 GS 출력 비디오 모드를 강제 설정합니다 (-gsm). Off는 게임 기본값을 유지합니다.
+  NEUTRINO_PATH: Neutrino ELF 경로
+  HINT_NEUTRINO_PATH: 'neutrino.elf의 전체 경로 (예: mc0:NEUTRINO/neutrino.elf). 비워두면 mc0/mc1에서 자동 감지합니다.'
+  POPSTARTER_PATH: POPSTARTER.ELF 경로
+  HINT_POPSTARTER_PATH: 사용자 지정 POPSTARTER.ELF 경로; 비어 있거나 없으면 장치 POPS 폴더로 자동 대체됩니다. 키보드 입력 31자 제한; 긴 경로는 settings_riptopl.cfg를 통해 설정하세요.
+  BDMA_SOURCE: BDMA 소스
+  HINT_BDMA_SOURCE: BDMAssault 드라이버 파일 (usbd.irx.* / usbhdfsd.irx.*)이 있는 POPS 폴더의 장치를 선택합니다.
+  BDMA_MODE: BDMA 모드
+  HINT_BDMA_MODE: POPSTARTER가 로드하는 exFAT 블록 장치 드라이버. 변경 시 모듈이 카드에 복사됩니다; FAT32 = 없음 (내장 드라이버).
+  BDMA_SRC_USB: USB
+  BDMA_SRC_MX4SIO: MX4SIO
+  BDMA_SRC_MMCE: MMCE
+  BDMA_SRC_HDD: 내장 HDD
+  BDMA_MODE_FAT32: USB (FAT32)
+  BDMA_MODE_USBEXFAT: USB (exFAT)
+  BDMA_MODE_MX4SIO: MX4SIO (exFAT)
+  BDMA_MODE_MMCE: MMCE (exFAT)
+  BDMA_MODE_ATA: HDD (exFAT)
+  BDMA_ERR_SRC: 소스 장치에서 BDMA 모듈 파일을 찾을 수 없습니다.
+  BDMA_ERR_SPACE: 메모리 카드에 BDMA 모듈을 저장할 공간이 부족합니다.
+  BDMA_ERR_IO: 메모리 카드에 BDMA 모듈을 쓰는 중 오류가 발생했습니다.
+  COVERFLOW_SETTINGS: Coverflow 설정
+  COVERFLOW_COUNT: 커버 개수
+  COVERFLOW_SCALE: 중앙 크기
+  COVERFLOW_ANIM: 애니메이션 속도
+  COVERFLOW_DIM: 측면 커버 어둡게
+  NONE: 없음
+  SMALL: 작게
+  LARGE: 크게
+  NORMAL: 보통
+  FAV: 즐겨찾기
+  FAVMODE: 즐겨찾기 시작 모드
+  FAV_HINT: 즐겨찾기
+  FAV_MSG: '%s은(는) 즐겨찾기 메뉴에서 허용되지 않습니다.'
+  FAV_PERSISTENCE_MSG: '%s은(는) 즐겨찾기로 표시된 항목에서 허용되지 않습니다.'
+  NEUTRINO_DEVICE: Neutrino 장치
+  HINT_NEUTRINO_DEVICE: neutrino.elf이 있는 장치 (NEUTRINO/ 또는 neutrino/ 폴더). 자동은 mc0 후 mc1을 순서대로 검색합니다.
+  NARGS_QB: 빠른 부팅 (-qb)
+  NARGS_CWD: 작업 디렉터리 (-cwd)
+  NARGS_CFG: 설정 파일 (-cfg)
+  NARGS_ELF: 부팅 ELF (-elf)
+  NARGS_ATA0: ATA0 이미지 (-ata0)
+  NARGS_ATA0ID: ATA0 ID (-ata0id)
+  NARGS_ATA1: ATA1 이미지 (-ata1)
+  NARGS_EXTRA: 추가 인수
+  NARGS_AUTO_NOTE: 'Auto: -bsd -dvd -gc -gsm -mc -dbc -logo'
+  ENABLE_ART_TAR: 커버 아트 .tar 아카이브
+  DISABLE_ALL: 모두 비활성화
+  BOOT_LOADING_CONFIG: 설정 불러오는 중...
+  BOOT_SCANNING_BDM: USB / 카드 / 네트워크 드라이브 검색 중...
+  BOOT_SCANNING_NET: 네트워크 시작 중...
+  BOOT_SCANNING_HDD: HDD 검색 중...
+  BOOT_READY: 준비됨.
+  UDPFS_GAMES: "UDPFS 게임"
+  UDPFSBD_GAMES: "UDPFSBD 게임"
+  NET_PROTOCOL: "네트워크 프로토콜"
+  NET_NEEDS_NEUTRINO: "네트워크(UDP) 게임은 Neutrino 코어로만 부팅할 수 있습니다. neutrino.elf가 있고 형식이 지원되는지 확인하세요."
+  VCD_NOT_ON_NET: "PS1(.VCD) 게임은 네트워크 장치로 실행할 수 없습니다."
+  MX4SIO_PADEMU_WARN: "MX4SIO와 패드 에뮬레이션은 SIO2 버스를 공유하므로 게임이 부팅되지 않을 수 있습니다."
+  HINT_OSD_SETTINGS_LNG: "사용자 지정 언어 설정을 강제 적용"
+  OSD_SETTINGS_TVASPECT: "화면 크기"
+  FULL_SCREEN: "전체 화면"
+  OSD_SETTINGS_VMODE: "비디오 모드"
+  SYSTEM_DEFAULT: "시스템 기본값"
+  HIGH: "높음"
+  LOW: "낮음"
+  XSENSITIVITY: "아날로그 X축 감도"
+  YSENSITIVITY: "아날로그 Y축 감도"
+  FILE_COUNT: "찾은 파일: %i"
+  CHEAT_SELECTION: "치트 선택"
+  HDD_HINT: "HDD는 하나만 허용됩니다. 활성화하면 APA 또는 GPT로 고정됩니다."
+  MMCE_GAMEID_NEUTRINO_SKIP: "MMCE GameID 적용 안 됨 -- 이 카드에 neutrino.elf가 있습니다(전환하면 Neutrino가 언로드됨)."
+  POPSTARTER_DEVICE: "POPSTARTER.ELF 장치"
+  HINT_POPSTARTER_DEVICE: "PS1 VCD 실행을 위해 POPS/POPSTARTER.ELF를 담고 있는 장치. 기본값 = 부팅 장치(cwd) 다음 VCD 자체 장치. 사용자 지정을 선택하면 자유 입력 경로가 표시됩니다."
+  BDMA_APPLY: "실행 시 VCD BDMA 적용"
+  HINT_BDMA_APPLY: "켜기: 부팅 전에 실행하는 VCD에 맞는 exFAT 드라이버를 메모리 카드에 자동 장착합니다(권장). 끄기: 아래 BDMA 소스/모드 선택기로 직접 관리합니다."
+  NETBOOT_RESTART: "네트워크 부팅 프로토콜 변경을 적용하려면 OPL을 다시 시작하세요."
+  UDPFS_MODE: "UDPFS 액세스"
+  "MENU": "메뉴"
+  "APPS": "앱"
+  "DEBUG": "디버그 색상"
+  "COVERART": "커버 아트"
+  "IP_ADDRESS_TYPE_DHCP": "DHCP"
+  "PORT": "Port"
+  "ADDR_TYPE_IP": "IP"
+  "ADDR_TYPE_NETBIOS": "NetBIOS"
+  "ENABLE_WRITE": "쓰기 작업"
+  "MODE1": "모드 1"
+  "MODE2": "모드 2"
+  "MODE3": "모드 3"
+  "MODE4": "모드 4"
+  "MODE5": "모드 5"
+  "MODE6": "모드 6"
+  "ENABLEGSM": "GSM 선택기"
+  "OVERSCAN": "오버스캔"
+  "ENABLECHEAT": "PS2RD 치트 엔진"
+  "PADEMU_ENABLE": "패드 에뮬레이터"
+  "DS34USB_MODE": "DualShock3/4 USB"
+  "PADEMU_PORT": "에뮬레이션"
+  "PADEMU_VIB": "진동"
+  "PADEMU_WORKAROUND": "가짜 DS3 우회"
+  "SFX": "음향 효과"
+  "BOOT_SND": "부팅 사운드"
+  "ENABLE_NOTIFICATIONS": "알림"
+  "OPTIONS": "옵션"
+  "GLOBAL_SETTINGS": "전체"
+  "INFO_GENRE": "장르"
+  "INFO_RELEASE": "출시"
+  "INFO_DESCRIPTION": "설명"
+  "BLOCKDEVICE_SETTINGS": "블록 장치"
+  "CONTROLLER_SETTINGS": "컨트롤러 설정"
+  "HINT_BDM_START": "블록 장치 관리자를 켜거나 끕니다."
+  "HINT_BLOCK_DEVICES": "블록 장치(예: USB)를 켜거나 끕니다."
+  "USB_GAMES": "USB 게임"
+  "ILINK_GAMES": "iLink 게임"
+  "MX4SIO_GAMES": "MX4SIO 게임"
+  "PADMACROCONFIG": "PADMACRO 구성"
+  "PADMACRO_SETTINGS": "패드 매크로 설정"
+  "PADMACRO_ENABLE": "패드 매크로"
+  "PADMACRO_SLOWDOWN": "아날로그 감속:"
+  "HINT_PADMACRO_SLOWDOWN_AXIS": "버튼을 누르면 아날로그 스틱의 범위를 줄입니다"
+  "LEFT_ANALOG": "왼쪽 스틱"
+  "RIGHT_ANALOG": "오른쪽 스틱"
+  "PADMACRO_INVERT_AXIS": "아날로그 축 반전:"
+  "HINT_PADMACRO_INVERT_AXIS": "아날로그 스틱 축을 반전합니다"
+  "TURBO_SPEED": "터보 버튼 속도"
+  "HINT_TURBO_SPEED": "터보가 활성화된 동안 버튼을 누르는 속도"
+  "ACT_WHILE_PRESSED": "버튼을 누르는 동안"
+  "ACT_TOGGLED": "버튼으로 전환"
+  "LANGUAGE_JAPANESE": "일본어"
+  "LANGUAGE_ENGLISH": "영어"
+  "LANGUAGE_FRENCH": "프랑스어"
+  "LANGUAGE_SPANISH": "스페인어"
+  "LANGUAGE_GERMAN": "독일어"
+  "LANGUAGE_ITALIAN": "이탈리아어"
+  "LANGUAGE_DUTCH": "네덜란드어"
+  "LANGUAGE_PORTUGUESE": "포르투갈어"
+  "LANGUAGE_RUSSIAN": "러시아어"
+  "LANGUAGE_KOREAN": "한국어"
+  "LANGUAGE_TRAD_CHINESE": "번체 중국어"
+  "LANGUAGE_SIMPL_CHINESE": "간체 중국어"
+  "OSD_SETTINGS": "OSD 설정"
+  "OSD_SETTINGS_LNG": "OSD 언어"
+  "ENABLE_LNG": "언어 변경"
+  "BGM": "배경 음악"
+  "BGM_VOLUME": "배경 음악 볼륨"
+  "DEF_BGM_PATH": "기본 테마 음악"
+  "DEF_BGM_PATH_HINT": "내부 테마의 스트리밍 음악 경로를 설정합니다."
+  "BOOT_SCANNING_MC": "메모리 카드 검색 중..."
+  "BOOT_LOADING_DRIVERS": "저장 장치 드라이버 로드 중..."
+  "BOOT_LOADING_USB": "USB 저장 장치 드라이버 로드 중..."
+  "BOOT_ARMING_MMCE": "MMCE 게임 ID 준비 중..."
+  "BOOT_LOADING_SOUNDS": "테마 사운드 로드 중..."
+  "BOOT_BUILDING_MENU": "메뉴 구성 중..."
+  "NET_UDPFS_TAB_HINT": "UDPFS 켜짐 -- 새 UDPFS 탭을 열고 확인을 눌러 연결하세요. PC 측에서는 udpfsd -fsroot <games folder> 를 실행합니다."
+  "NET_UDPBD_TAB_HINT": "네트워크 블록 기기 켜짐 -- PC 서버가 응답하면 해당 탭이 나타납니다(UDPFS Image의 경우 udpfsd -bdpath, UDPBD의 경우 udpbd-server)."
+  "NEUTRINO_VMC_MISSING": "게임별 VMC 파일을 찾을 수 없습니다 -- 이를 사용하지 않고 실행합니다(게임은 실제 카드를 사용)."
+  "NEUTRINO_DEV_UNSUPPORTED": "Neutrino는 이 장치에서 실행할 수 없습니다 -- 실행이 중단되었습니다."
+  "NEUTRINO_TOML_SYNC_FAILED": "Neutrino 네트워크 구성(bsd toml)이 없거나 쓸 수 없습니다 -- 실행이 중단되었습니다. neutrino 폴더를 확인하세요."
+  "NEUTRINO_TOO_FRAGMENTED": "Neutrino에 사용하기에 조각이 너무 많습니다(조각 %d개, VMC 포함 한도 %d개) -- 대신 OPL 코어를 시도합니다."
+  "NEUTRINO_TOO_FRAGMENTED_NET": "Neutrino에 사용하기에 조각이 너무 많습니다(조각 %d개, VMC 포함 한도 %d개) -- PC에서 조각 모음을 하세요. 실행이 중단되었습니다."
+  "NEUTRINO_GSM_COMP": "Neutrino GSM 호환성"
+  "HINT_NEUTRINO_GSM_COMP": "강제된 Neutrino 비디오 모드에서 흔들리거나 찢어지는 게임을 위한 필드 반전 수정입니다. Neutrino 비디오 모드가 설정되어 있어야 합니다."
+  "NARGS_DBC": "디버그 색상 (-dbc)"
+  "NARGS_LOGO": "PS2 로고 (-logo)"
+  "VMC_SLOT1_DISABLE": "VMC 1 비활성화 (카드 유지)"
+  "VMC_SLOT2_DISABLE": "VMC 2 비활성화 (카드 유지)"
+  "HINT_VMC_SLOT_DISABLE": "이 슬롯의 카드를 구성해 둔 채로 해당 슬롯의 VMC 없이 실행합니다. Neutrino 실행에만 해당되며, 게임은 해당 슬롯의 실제 카드를 사용합니다."
+  "NEUTRINO_BSDFS": "Neutrino 파일 시스템"
+  "HINT_NEUTRINO_BSDFS": "Neutrino의 블록 기기 파일 시스템(-bsdfs)을 강제합니다. Auto = 기기별 기본값. hdl/bd는 전문가용 옵션이며, 자동 경로 형태가 맞지 않으면 실행 인수에 일치하는 -dvd= 와 함께 사용하세요."
+  "PLASCOLOR": "플라즈마 혼합 색상"
+  "VCD_HIDE_GAMEID": "PS1 게임 ID 숨기기 (VCD 목록)"
+  "HINT_VCD_HIDE_GAMEID": "외형상 효과만 있음 -- PS1/VCD 목록 이름에서 앞부분의 게임 ID 접두사(예: SLUS_005.51.)를 숨깁니다. ID가 없는 이름은 그대로 표시됩니다. 실행, 커버 아트, 즐겨찾기는 변경되지 않습니다."
+  "VCD_FIRST_DISC": "첫 번째 디스크만 (멀티 디스크 PS1)"
+  "HINT_VCD_FIRST_DISC": "기기 목록에 멀티 디스크 PS1 게임의 Disc 1만 표시합니다(POPSLoader 방식). (Disc 2), (CD 2) 등으로 명명된 파일을 숨깁니다. 모든 디스크는 인게임 교체를 위해 카드에 그대로 유지되며, 즐겨찾기는 필터링되지 않습니다."
+  "GAMES_DEVICE": "게임 장치"
+  "DEFAULT_CORE": "기본 로더 코어"
+  "HINT_DEFAULT_CORE": "게임별 로더 코어가 Default로 설정된 게임에 사용할 전역 기본 코어입니다. <OPL>은 네이티브 코어이고, Neutrino는 외부 neutrino.elf 를 체인합니다. 게임별 선택은 항상 이 설정을 재정의합니다."
+  "VCD_SETTINGS": "VCD 설정"
+  "FINANCIAL_SUPPORT": "재정 지원"

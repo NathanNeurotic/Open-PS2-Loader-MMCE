@@ -1,0 +1,229 @@
+translations:
+  AUTOSORT: Játékok rendezése ábécésorrendben
+  RUMBLE: Kontroller rezgése a menükben
+  HINT_RUMBLE: Rövid rezgés a kurzor mozgatásakor, megerősítéskor vagy visszalépéskor - DualShock szükséges analóg módban
+  FOLDER_NAV: Mappák böngészése a játéklistában
+  HINT_FOLDER_NAV: A CD/DVD almappáit böngészhető elemekként mutatja; kiválasztás megnyit, mégse visszalép
+  SETTINGS_NO_HOME: Nincs memóriakártya - a beállítások nem menthetők. Az OPL hálózati eszközről indult, amelynek beállításait helyi kártyán kell tárolni.
+  ERROR_SAVING_SETTINGS_TO: A beállítások mentése a(z) %s helyre sikertelen (hiba %d)
+  GENERAL_SETTINGS: Általános beállítások
+  DEVICE_SETTINGS: Eszközbeállítások
+  LAUNCH_PS2_DISC: PS2 lemez indítása
+  DISC_LAUNCH_ERR: Nincs PS2 lemez a meghajtóban.
+  DEFAULT: Alapértelmezett
+  HINT_MODE7: Csak Neutrino -- javítja az IOP puffertúlcsordulást okozó játékokat (-gc=7)
+  MODE7: 7. mód
+  ENABLEIMAGE: PS2RD Cheat Image
+  HINT_ENABLEIMAGE: Előre elkészített PS2RD .img javítás alkalmazása a játékra.
+  UDPBD_GAMES: UDPBD Games
+  MMCE: MMCE
+  MMCE_GAMES: MMCE Games
+  MMCEMODE: MMCE indítási mód
+  MMCE_PREFIX: MMCE előtag elérési út
+  MMCE_SLOT: MMCE foglalat
+  MMCEIGR_SLOT: IGR rendszerkártya foglalat(ok)
+  HINT_MMCEIGR_SLOT: A rendszerkártya-váltás parancs a kiválasztott foglalat(ok)ra kerül elküldésre IGR-kor
+  MMCE_ADVANCED: Speciális
+  MMCE_SETTINGS: MMCE beállítások
+  MMCE_SEMA: Szemafor sorba állítási módszer zárolása
+  HINT_MMCE_SEMA: A THFIFO javíthatja a kompatibilitást, de ronthatja a teljesítményt
+  MMCE_WAIT_CYCLES: Várakozási ciklusok /ACK alacsony után
+  HINT_MMCE_WAIT_CYCLES: Az alacsonyabb értékek javíthatják a teljesítményt, de instabilitást okozhatnak
+  MMCE_USE_ALARMS: Időtúllépési riasztások használata
+  HINT_MMCE_USE_ALARMS: A KI beállítás javíthatja a teljesítményt, de MMCE időtúllépés esetén lefagyást okozhat
+  CORE_LOADER: Betöltő mag
+  NEUTRINO_BAD_FORMAT: A Neutrino nem támogatja ezt a fájlformátumot, indítás <OPL> maggal
+  NEUTRINO_NOT_FOUND: A Neutrino ELF nem található, indítás <OPL> maggal
+  UDPBD_NEEDS_STATIC_IP: Az UDPBD statikus PS2 IP-t igényel. Állítsd be a Hálózati konfigurációban (a DHCP jelenleg be van kapcsolva).
+  NEUTRINO_SETTING_NA: Ez a beállítás nem használható a Neutrino maggal.
+  POPSTARTER_NOT_FOUND: Hiányzó POPSTARTER.ELF
+  POPSTARTER_SMB_MISSING: Hiányzó POPSTARTER SMB követelmények
+  WRITE_POPSTARTER_NET: POPSTARTER hálózati konfiguráció írása
+  HINT_WRITE_POPSTARTER_NET: Az IP + SMB megosztási értékek mentése a POPSTARTER saját IPCONFIG.DAT / SMBCONFIG.DAT fájljaiba a memóriakártyán (SMB-n keresztüli VCD-hez).
+  POPSTARTER_NET_ERR: Nem sikerült a POPSTARTER hálózati konfigurációt a memóriakártyára írni.
+  VCD: VCD
+  VCD_ON: VCD játékok megjelenítése
+  VCD_OFF: Lemezes játékok megjelenítése
+  NEUTRINO_ARGS: Neutrino indítási argumentumok
+  HINT_NEUTRINO_ARGS: 'Extra Neutrino jelzők, szóközzel elválasztva (pl. -mt=dvd). A globális minden játékra vonatkozik; a játékonkénti hozzáadódik. Egy jelző elé írj $ jelet a letiltásához törlés nélkül.'
+  NEUTRINO_VIDEO: Neutrino videó
+  HINT_NEUTRINO_VIDEO: A Neutrino GS kimeneti videómódjának kényszerítése (-gsm). Ki = a játék alapértelmezettje marad.
+  NEUTRINO_PATH: Neutrino ELF elérési út
+  HINT_NEUTRINO_PATH: 'Teljes elérési út a neutrino.elf fájlhoz (pl. mc0:NEUTRINO/neutrino.elf). Üresen = automatikus keresés mc0/mc1-en.'
+  POPSTARTER_PATH: POPSTARTER.ELF elérési út
+  HINT_POPSTARTER_PATH: Egyéni POPSTARTER.ELF elérési út; üresen/hiányzóan az eszköz POPS mappájára vált vissza. A billentyűzet 31 karakterre korlátoz; hosszabb elérési utak a settings_riptopl.cfg-n keresztül adhatók meg.
+  BDMA_SOURCE: BDMA forrás
+  HINT_BDMA_SOURCE: Az az eszköz, amelynek POPS mappájában találhatók a BDMAssault illesztőprogram fájlok (usbd.irx.* / usbhdfsd.irx.*).
+  BDMA_MODE: BDMA mód
+  HINT_BDMA_MODE: exFAT blokkeszköz-illesztőprogram, amelyet a POPSTARTER betölt. A módosítás a modulokat a kártyára másolja; FAT32 = nincs (beépített illesztőprogram).
+  BDMA_SRC_USB: USB
+  BDMA_SRC_MX4SIO: MX4SIO
+  BDMA_SRC_MMCE: MMCE
+  BDMA_SRC_HDD: Belső HDD
+  BDMA_MODE_FAT32: USB (FAT32)
+  BDMA_MODE_USBEXFAT: USB (exFAT)
+  BDMA_MODE_MX4SIO: MX4SIO (exFAT)
+  BDMA_MODE_MMCE: MMCE (exFAT)
+  BDMA_MODE_ATA: HDD (exFAT)
+  BDMA_ERR_SRC: A BDMA modulfájlok nem találhatók a forráseszközön.
+  BDMA_ERR_SPACE: Nincs elegendő hely a memóriakártyán a BDMA modulokhoz.
+  BDMA_ERR_IO: Hiba a BDMA modulok memóriakártyára írása közben.
+  COVERFLOW_SETTINGS: Coverflow beállítások
+  COVERFLOW_COUNT: Borítók száma
+  COVERFLOW_SCALE: Középső méretezés
+  COVERFLOW_ANIM: Animáció sebessége
+  COVERFLOW_DIM: Oldalsó borítók halványítása
+  NONE: Egyik sem
+  SMALL: Kicsi
+  LARGE: Nagy
+  NORMAL: Normál
+  FAV: Kedvencek
+  FAVMODE: Kedvencek indítási mód
+  FAV_HINT: Kedvenc
+  FAV_MSG: '%s nem érhető el a Kedvencek menün keresztül.'
+  FAV_PERSISTENCE_MSG: '%s nem engedélyezett, amíg az elem kedvencként van jelölve.'
+  NEUTRINO_DEVICE: Neutrino eszköz
+  HINT_NEUTRINO_DEVICE: A neutrino.elf fájlt tartalmazó eszköz (NEUTRINO/ vagy neutrino/ mappában). Az Auto először mc0-t, majd mc1-et keres.
+  NARGS_QB: Gyors indítás (-qb)
+  NARGS_CWD: Munkakönyvtár (-cwd)
+  NARGS_CFG: Konfiguráció (-cfg)
+  NARGS_ELF: Rendszertöltő ELF (-elf)
+  NARGS_ATA0: ATA0 kép (-ata0)
+  NARGS_ATA0ID: ATA0 azonosító (-ata0id)
+  NARGS_ATA1: ATA1 kép (-ata1)
+  NARGS_EXTRA: Extra argumentumok
+  NARGS_AUTO_NOTE: 'Auto: -bsd -dvd -gc -gsm -mc -dbc -logo'
+  ENABLE_ART_TAR: Borító .tar archívum
+  DISABLE_ALL: Összes letiltása
+  BOOT_LOADING_CONFIG: Beállítások betöltése...
+  BOOT_SCANNING_BDM: USB / kártya / hálózati meghajtók keresése...
+  BOOT_SCANNING_NET: Hálózat indítása...
+  BOOT_SCANNING_HDD: HDD keresése...
+  BOOT_READY: Kész.
+  UDPFS_GAMES: "UDPFS játékok"
+  UDPFSBD_GAMES: "UDPFSBD játékok"
+  NET_PROTOCOL: "Hálózati protokoll"
+  NET_NEEDS_NEUTRINO: "A hálózati (UDP) játékok csak a Neutrino magon keresztül indíthatók. Ellenőrizze, hogy a neutrino.elf megvan-e és a formátum támogatott-e."
+  VCD_NOT_ON_NET: "A PS1 (.VCD) játékok nem indíthatók hálózati eszközről."
+  MX4SIO_PADEMU_WARN: "Az MX4SIO és a kontroller-emuláció közös SIO2 buszt használ, így a játék nem biztos, hogy elindul."
+  HINT_OSD_SETTINGS_LNG: "Egyéni nyelv kényszerítése"
+  OSD_SETTINGS_TVASPECT: "Képméret"
+  FULL_SCREEN: "Teljes képernyő"
+  OSD_SETTINGS_VMODE: "Videómód"
+  SYSTEM_DEFAULT: "Rendszer alapértelmezés"
+  HIGH: "Magas"
+  LOW: "Alacsony"
+  XSENSITIVITY: "Analóg X-tengely érzékenysége"
+  YSENSITIVITY: "Analóg Y-tengely érzékenysége"
+  FILE_COUNT: "Talált fájlok: %i"
+  CHEAT_SELECTION: "Csalások kiválasztása"
+  HDD_HINT: "Csak egy HDD engedélyezett; a bekapcsolás rögzíti az APA-t vagy a GPT-t."
+  MMCE_GAMEID_NEUTRINO_SKIP: "MMCE GameID nem alkalmazva -- a neutrino.elf ezen a kártyán van (a váltás kikapcsolná a Neutrinót)."
+  POPSTARTER_DEVICE: "POPSTARTER.ELF eszköz"
+  HINT_POPSTARTER_DEVICE: "A POPS/POPSTARTER.ELF fájlt tároló eszköz PS1 VCD indításához. Alapértelmezett = indító eszköz (cwd), majd a VCD saját eszköze. A Custom szabad szövegű útvonalmezőt jelenít meg."
+  BDMA_APPLY: "VCD BDMA alkalmazása indításkor"
+  HINT_BDMA_APPLY: "Be: indítás előtt automatikusan felteszi a memóriakártyára az elindított VCD megfelelő exFAT illesztőprogramját (ajánlott). Ki: kezelje kézzel az alábbi BDMA Source/Mode választókkal."
+  NETBOOT_RESTART: "Indítsa újra az OPL-t a hálózati indítási protokoll módosításának alkalmazásához."
+  UDPFS_MODE: "UDPFS-hozzáférés"
+  "MENU": "Menü"
+  "APPS": "Alkalmazások"
+  "DEBUG": "Hibakereső színek"
+  "COVERART": "Borítókép"
+  "IP_ADDRESS_TYPE_DHCP": "DHCP"
+  "PORT": "Port"
+  "ADDR_TYPE_IP": "IP"
+  "ADDR_TYPE_NETBIOS": "NetBIOS"
+  "ENABLE_WRITE": "Írási műveletek"
+  "MODE1": "1. mód"
+  "MODE2": "2. mód"
+  "MODE3": "3. mód"
+  "MODE4": "4. mód"
+  "MODE5": "5. mód"
+  "MODE6": "6. mód"
+  "ENABLEGSM": "GSM választó"
+  "OVERSCAN": "Overscan"
+  "ENABLECHEAT": "PS2RD csalómotor"
+  "PADEMU_ENABLE": "Kontroller emulátor"
+  "DS34USB_MODE": "DualShock3/4 USB"
+  "PADEMU_PORT": "Emuláció"
+  "PADEMU_VIB": "Rezgés"
+  "PADEMU_WORKAROUND": "Hamis DS3 megoldás"
+  "SFX": "Hangeffektek"
+  "BOOT_SND": "Indítási hang"
+  "ENABLE_NOTIFICATIONS": "Értesítések"
+  "OPTIONS": "Beállítások"
+  "GLOBAL_SETTINGS": "Globális"
+  "INFO_GENRE": "Műfaj"
+  "INFO_RELEASE": "Megjelenés"
+  "INFO_DESCRIPTION": "Leírás"
+  "BLOCKDEVICE_SETTINGS": "Blokkeszközök"
+  "CONTROLLER_SETTINGS": "Kontroller beállítások"
+  "HINT_BDM_START": "A Block Device Manager be- és kikapcsolása."
+  "HINT_BLOCK_DEVICES": "Blokkeszközök be- és kikapcsolása (pl. USB)."
+  "USB_GAMES": "USB játékok"
+  "ILINK_GAMES": "iLink játékok"
+  "MX4SIO_GAMES": "MX4SIO játékok"
+  "PADMACROCONFIG": "PADMACRO beállítása"
+  "PADMACRO_SETTINGS": "Pad makró beállítások"
+  "PADMACRO_ENABLE": "Pad makrók"
+  "PADMACRO_SLOWDOWN": "Analóg lassítás:"
+  "HINT_PADMACRO_SLOWDOWN_AXIS": "Az analóg kar tartományának csökkentése gombnyomásra"
+  "LEFT_ANALOG": "Bal kar"
+  "RIGHT_ANALOG": "Jobb kar"
+  "PADMACRO_INVERT_AXIS": "Analóg tengely fordítása:"
+  "HINT_PADMACRO_INVERT_AXIS": "Analóg kar tengelyének fordítása"
+  "TURBO_SPEED": "Turbógomb sebessége"
+  "HINT_TURBO_SPEED": "Milyen gyorsan nyomja a gombot, ha a turbó aktív"
+  "ACT_WHILE_PRESSED": "Gomb lenyomva tartva"
+  "ACT_TOGGLED": "Gombbal kapcsolva"
+  "LANGUAGE_JAPANESE": "JAPÁN"
+  "LANGUAGE_ENGLISH": "ANGOL"
+  "LANGUAGE_FRENCH": "FRANCIA"
+  "LANGUAGE_SPANISH": "SPANYOL"
+  "LANGUAGE_GERMAN": "NÉMET"
+  "LANGUAGE_ITALIAN": "OLASZ"
+  "LANGUAGE_DUTCH": "HOLLAND"
+  "LANGUAGE_PORTUGUESE": "PORTUGÁL"
+  "LANGUAGE_RUSSIAN": "OROSZ"
+  "LANGUAGE_KOREAN": "KOREAI"
+  "LANGUAGE_TRAD_CHINESE": "HAGYOMÁNYOS KÍNAI"
+  "LANGUAGE_SIMPL_CHINESE": "EGYSZERŰSÍTETT KÍNAI"
+  "OSD_SETTINGS": "OSD beállítások"
+  "OSD_SETTINGS_LNG": "OSD nyelve"
+  "ENABLE_LNG": "Nyelv megváltoztatása"
+  "BGM": "Háttérzene"
+  "BGM_VOLUME": "Háttérzene hangereje"
+  "DEF_BGM_PATH": "Alapértelmezett témazene"
+  "DEF_BGM_PATH_HINT": "Adja meg a belső témához streamelt zene elérési útját."
+  "BOOT_SCANNING_MC": "Memóriakártyák vizsgálata..."
+  "BOOT_LOADING_DRIVERS": "Tárolóillesztők betöltése..."
+  "BOOT_LOADING_USB": "USB tárolóillesztő betöltése..."
+  "BOOT_ARMING_MMCE": "MMCE játék-azonosító élesítése..."
+  "BOOT_LOADING_SOUNDS": "Témahangok betöltése..."
+  "BOOT_BUILDING_MENU": "Menü felépítése..."
+  "NET_UDPFS_TAB_HINT": "UDPFS bekapcsolva -- nyisd meg az új UDPFS fület, és nyomd meg a Megerősítést a csatlakozáshoz. A PC oldalon az udpfsd -fsroot <games folder> fut."
+  "NET_UDPBD_TAB_HINT": "A hálózati blokkeszköz bekapcsolva -- a füle megjelenik, amint a PC-szerver válaszol (udpfsd -bdpath az UDPFS Image-hez, udpbd-server az UDPBD-hez)."
+  "NEUTRINO_VMC_MISSING": "A játékonkénti VMC fájl nem található -- indítás nélküle (a játék a valódi kártyáját használja)."
+  "NEUTRINO_DEV_UNSUPPORTED": "A Neutrino nem tud indulni erről az eszközről -- indítás megszakítva."
+  "NEUTRINO_TOML_SYNC_FAILED": "A Neutrino hálózati konfigurációja (bsd toml) hiányzik vagy nem írható -- az indítás megszakítva, ellenőrizd a neutrino mappát."
+  "NEUTRINO_TOO_FRAGMENTED": "Túl töredezett a Neutrinóhoz (%d töredék, korlát %d a VMC-kkel együtt) -- helyette az OPL mag megpróbálása."
+  "NEUTRINO_TOO_FRAGMENTED_NET": "Túl töredezett a Neutrinóhoz (%d töredék, korlát %d a VMC-kkel együtt) -- töredezettségmentesítsd a PC-n; az indítás megszakítva."
+  "NEUTRINO_GSM_COMP": "Neutrino GSM kompatibilitás"
+  "HINT_NEUTRINO_GSM_COMP": "Mezőváltó javítás azokhoz a játékokhoz, amelyek remegnek vagy szakadoznak egy kényszerített Neutrino Videó mód alatt. Beállított Neutrino Videó módot igényel."
+  "NARGS_DBC": "Hibakereső színek (-dbc)"
+  "NARGS_LOGO": "PS2 logó (-logo)"
+  "VMC_SLOT1_DISABLE": "VMC 1 letiltása (kártya megtartása)"
+  "VMC_SLOT2_DISABLE": "VMC 2 letiltása (kártya megtartása)"
+  "HINT_VMC_SLOT_DISABLE": "Indítás e nyílás VMC-je nélkül, miközben a kártyája konfigurálva marad. Csak Neutrino indításnál; a játék ekkor az adott nyílásban lévő valódi kártyát használja."
+  "NEUTRINO_BSDFS": "Neutrino fájlrendszer"
+  "HINT_NEUTRINO_BSDFS": "A Neutrino blokkeszköz-fájlrendszerének kényszerítése (-bsdfs). Auto = eszközönkénti alapértelmezés. A hdl/bd szakértői beállítások; párosítsd őket egy megfelelő -dvd= értékkel az indítási argumentumokban, ha az automatikus útvonal alakja nem illik."
+  "PLASCOLOR": "Plazma keverési szín"
+  "VCD_HIDE_GAMEID": "PS1 játék-azonosító elrejtése (VCD lista)"
+  "HINT_VCD_HIDE_GAMEID": "Csak kozmetikai -- elrejti a bevezető játék-azonosító előtagot (pl. SLUS_005.51.) a PS1/VCD listanevekből. Az azonosító nélküli nevek változatlanul jelennek meg. Nem változtatja meg az indítást, a borítót vagy a kedvenceket."
+  "VCD_FIRST_DISC": "Csak első lemez (több lemezes PS1)"
+  "HINT_VCD_FIRST_DISC": "Az eszközlistákban csak egy több lemezes PS1 játék 1. lemezét mutatja (POPSLoader stílus). Elrejti a (Disc 2), (CD 2) stb. nevű fájlokat. Minden lemez a kártyán marad a játékon belüli cseréhez; a Kedvencek nincsenek szűrve."
+  "GAMES_DEVICE": "Játék eszköze"
+  "DEFAULT_CORE": "Alapértelmezett betöltő mag"
+  "HINT_DEFAULT_CORE": "Globális alapértelmezett mag azokhoz a játékokhoz, amelyeknél a játékonkénti Betöltő Mag Alapértelmezettre van állítva. Az <OPL> a natív mag; a Neutrino a külső neutrino.elf fájlt láncolja. A játékonkénti választás mindig felülírja ezt."
+  "VCD_SETTINGS": "VCD beállítások"
+  "FINANCIAL_SUPPORT": "Anyagi támogatás"

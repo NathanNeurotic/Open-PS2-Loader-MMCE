@@ -1,0 +1,229 @@
+translations:
+  AUTOSORT: Oyunları Alfabetik Sırala
+  RUMBLE: Menülerde Kumanda Titreşimi
+  HINT_RUMBLE: İmleci taşırken, onaylarken veya geri dönerken kısa titreşim -- analog moddaki bir DualShock gerekir
+  FOLDER_NAV: Oyun Listesinde Klasörlere Göz At
+  HINT_FOLDER_NAV: CD/DVD alt klasörlerini gezilebilir öğeler olarak göster; açmak için seç, geri dönmek için iptal et
+  SETTINGS_NO_HOME: Hafıza kartı bulunamadı -- ayarlar kaydedilemez. OPL bir ağ aygıtından başlatıldı, ayarları yerel bir kartta durmalı.
+  ERROR_SAVING_SETTINGS_TO: Ayarlar %s konumuna yazılamadı (hata %d)
+  GENERAL_SETTINGS: Genel Ayarlar
+  DEVICE_SETTINGS: Cihaz Ayarları
+  LAUNCH_PS2_DISC: PS2 Diski Başlat
+  DISC_LAUNCH_ERR: Sürücüde PS2 diski yok.
+  DEFAULT: Varsayılan
+  HINT_MODE7: Yalnızca Neutrino -- IOP arabelleğini aşan oyunları düzeltir (-gc=7)
+  MODE7: Mode 7
+  ENABLEIMAGE: PS2RD Hile Görüntüsü
+  HINT_ENABLEIMAGE: Oyununuza önceden derlenmiş bir PS2RD .img yaması uygulayın.
+  UDPBD_GAMES: UDPBD Oyunları
+  MMCE: MMCE
+  MMCE_GAMES: MMCE Oyunları
+  MMCEMODE: MMCE Başlangıç Modu
+  MMCE_PREFIX: MMCE Önek Yolu
+  MMCE_SLOT: MMCE Yuvası
+  MMCEIGR_SLOT: IGR Önyükleme Kartı Yuvası
+  HINT_MMCEIGR_SLOT: IGR'de seçili yuvalara önyükleme kartı komutu gönderilir
+  MMCE_ADVANCED: Gelişmiş
+  MMCE_SETTINGS: MMCE Ayarları
+  MMCE_SEMA: Kilit Sema Sıralama Yöntemi
+  HINT_MMCE_SEMA: THFIFO uyumluluğu artırabilir ancak performansı düşürebilir
+  MMCE_WAIT_CYCLES: /ACK düşüşünden sonra bekleme döngüleri
+  HINT_MMCE_WAIT_CYCLES: Düşük değerler performansı artırabilir ancak kararsızlığa yol açabilir
+  MMCE_USE_ALARMS: Zaman aşımı alarmlarını kullan
+  HINT_MMCE_USE_ALARMS: KAPALI performansı artırabilir ancak MMCE zaman aşımları donmalara neden olabilir
+  CORE_LOADER: Yükleyici Çekirdeği
+  NEUTRINO_BAD_FORMAT: Neutrino bu dosya biçimini desteklemiyor, <OPL> çekirdeğiyle başlatılıyor
+  NEUTRINO_NOT_FOUND: Neutrino ELF bulunamadı, <OPL> çekirdeğiyle başlatılıyor
+  UDPBD_NEEDS_STATIC_IP: UDPBD sabit bir PS2 IP adresi gerektirir. Ağ Ayarlarından belirleyin (DHCP şu an açık).
+  NEUTRINO_SETTING_NA: Bu ayar Neutrino çekirdeğiyle kullanılmaz.
+  POPSTARTER_NOT_FOUND: POPSTARTER.ELF eksik
+  POPSTARTER_SMB_MISSING: POPSTARTER SMB gereksinimleri eksik
+  WRITE_POPSTARTER_NET: POPSTARTER Ağ Yapılandırmasını Yaz
+  HINT_WRITE_POPSTARTER_NET: Bu IP + SMB paylaşım değerlerini hafıza kartındaki POPSTARTER'ın IPCONFIG.DAT / SMBCONFIG.DAT dosyalarına da kaydet (SMB üzerinden VCD için).
+  POPSTARTER_NET_ERR: POPSTARTER ağ yapılandırması hafıza kartına yazılamadı.
+  VCD: VCD
+  VCD_ON: VCD oyunları gösteriliyor
+  VCD_OFF: Disk oyunları gösteriliyor
+  NEUTRINO_ARGS: Neutrino Başlatma Parametreleri
+  HINT_NEUTRINO_ARGS: 'Ekstra Neutrino bayrakları, boşlukla ayrılmış (ör. -mt=dvd). Global tüm oyunlara uygulanır; oyun başına üstüne eklenir. Bir bayrağı silmeden devre dışı bırakmak için $ öneki ekleyin.'
+  NEUTRINO_VIDEO: Neutrino Video
+  HINT_NEUTRINO_VIDEO: "Neutrino'nun GS çıkış video modunu zorla (-gsm). Kapalı = oyunun varsayılanını kullan."
+  NEUTRINO_PATH: Neutrino ELF Yolu
+  HINT_NEUTRINO_PATH: neutrino.elf için tam yol (ör. mc0:NEUTRINO/neutrino.elf). Boş = mc0/mc1 üzerinde otomatik algıla.
+  POPSTARTER_PATH: POPSTARTER.ELF Yolu
+  HINT_POPSTARTER_PATH: Özel POPSTARTER.ELF yolu; boş/eksikse cihazın POPS klasörüne geri döner. Klavye 31 karakterle sınırlıdır; daha uzun yollar için settings_riptopl.cfg kullanın.
+  BDMA_SOURCE: BDMA Kaynağı
+  HINT_BDMA_SOURCE: BDMAssault sürücü dosyalarını (usbd.irx.* / usbhdfsd.irx.*) barındıran POPS klasörünün bulunduğu cihaz.
+  BDMA_MODE: BDMA Modu
+  HINT_BDMA_MODE: POPSTARTER'ın yüklediği exFAT blok aygıtı sürücüsü. Değiştirmek modülleri karta kopyalar; FAT32 = yok (yerleşik sürücü).
+  BDMA_SRC_USB: USB
+  BDMA_SRC_MX4SIO: MX4SIO
+  BDMA_SRC_MMCE: MMCE
+  BDMA_SRC_HDD: Dahili HDD
+  BDMA_MODE_FAT32: USB (FAT32)
+  BDMA_MODE_USBEXFAT: USB (exFAT)
+  BDMA_MODE_MX4SIO: MX4SIO (exFAT)
+  BDMA_MODE_MMCE: MMCE (exFAT)
+  BDMA_MODE_ATA: HDD (exFAT)
+  BDMA_ERR_SRC: BDMA modül dosyaları kaynak cihazda bulunamadı.
+  BDMA_ERR_SPACE: Hafıza kartında BDMA modülleri için yeterli alan yok.
+  BDMA_ERR_IO: BDMA modülleri hafıza kartına yazılırken hata oluştu.
+  COVERFLOW_SETTINGS: Coverflow Ayarları
+  COVERFLOW_COUNT: Kapak Sayısı
+  COVERFLOW_SCALE: Merkez Ölçeği
+  COVERFLOW_ANIM: Animasyon Hızı
+  COVERFLOW_DIM: Yan Kapakları Karart
+  NONE: Yok
+  SMALL: Küçük
+  LARGE: Büyük
+  NORMAL: Normal
+  FAV: Favoriler
+  FAVMODE: Favoriler Başlangıç Modu
+  FAV_HINT: Favori
+  FAV_MSG: '%s Favoriler Menüsünden erişilemiyor.'
+  FAV_PERSISTENCE_MSG: '%s, öğe favori olarak işaretliyken kullanılamaz.'
+  NEUTRINO_DEVICE: Neutrino Cihazı
+  HINT_NEUTRINO_DEVICE: neutrino.elf dosyasını barındıran cihaz (NEUTRINO/ veya neutrino/ klasöründe). Otomatik olarak önce mc0, sonra mc1 taranır.
+  NARGS_QB: Hızlı Başlatma (-qb)
+  NARGS_CWD: Çalışma Dizini (-cwd)
+  NARGS_CFG: Yapılandırma (-cfg)
+  NARGS_ELF: Önyükleme ELF (-elf)
+  NARGS_ATA0: ATA0 Görüntüsü (-ata0)
+  NARGS_ATA0ID: ATA0 ID (-ata0id)
+  NARGS_ATA1: ATA1 Görüntüsü (-ata1)
+  NARGS_EXTRA: Ekstra Parametreler
+  NARGS_AUTO_NOTE: 'Otomatik: -bsd -dvd -gc -gsm -mc -dbc -logo'
+  ENABLE_ART_TAR: Kapak resmi .tar arşivi
+  DISABLE_ALL: Tümünü Devre Dışı Bırak
+  BOOT_LOADING_CONFIG: Ayarlar yükleniyor...
+  BOOT_SCANNING_BDM: USB / kart / ağ sürücüleri taranıyor...
+  BOOT_SCANNING_NET: Ağ başlatılıyor...
+  BOOT_SCANNING_HDD: HDD taranıyor...
+  BOOT_READY: Hazır.
+  UDPFS_GAMES: "UDPFS Oyunları"
+  UDPFSBD_GAMES: "UDPFSBD Oyunları"
+  NET_PROTOCOL: "Ağ Protokolü"
+  NET_NEEDS_NEUTRINO: "Ağ (UDP) oyunları yalnızca Neutrino çekirdeğiyle başlatılabilir. neutrino.elf'in mevcut olduğunu ve biçimin desteklendiğini doğrulayın."
+  VCD_NOT_ON_NET: "PS1 (.VCD) oyunları ağ aygıtı üzerinden başlatılamaz."
+  MX4SIO_PADEMU_WARN: "MX4SIO ile kol emülasyonu SIO2 veri yolunu paylaşır ve oyun başlatılamayabilir."
+  HINT_OSD_SETTINGS_LNG: "Özel bir dil yapılandırması zorla"
+  OSD_SETTINGS_TVASPECT: "Ekran Boyutu"
+  FULL_SCREEN: "Tam Ekran"
+  OSD_SETTINGS_VMODE: "Video Modu"
+  SYSTEM_DEFAULT: "Sistem Varsayılanı"
+  HIGH: "Yüksek"
+  LOW: "Düşük"
+  XSENSITIVITY: "Analog X Ekseni Hassasiyeti"
+  YSENSITIVITY: "Analog Y Ekseni Hassasiyeti"
+  FILE_COUNT: "Bulunan dosyalar: %i"
+  CHEAT_SELECTION: "Hile Seçimi"
+  HDD_HINT: "Yalnızca bir HDD'ye izin verilir; etkinleştirmek APA veya GPT'yi kilitler."
+  MMCE_GAMEID_NEUTRINO_SKIP: "MMCE GameID uygulanmadı -- neutrino.elf bu kartta (değiştirmek Neutrino'yu bellekten kaldırır)."
+  POPSTARTER_DEVICE: "POPSTARTER.ELF Aygıtı"
+  HINT_POPSTARTER_DEVICE: "PS1 VCD başlatmaları için POPS/POPSTARTER.ELF içeren aygıt. Varsayılan = önyükleme aygıtı (cwd), ardından VCD'nin kendi aygıtı. Özel, serbest metin yolu gösterir."
+  BDMA_APPLY: "Başlatmada VCD BDMA Uygula"
+  HINT_BDMA_APPLY: "Açık: başlatılan VCD'ye uygun exFAT sürücüsünü önyüklemeden önce hafıza kartına otomatik yerleştir (önerilir). Kapalı: aşağıdaki BDMA Kaynak/Mod seçicileriyle kendiniz yönetin."
+  NETBOOT_RESTART: "Ağ önyükleme protokolü değişikliğini uygulamak için OPL'yi yeniden başlatın."
+  UDPFS_MODE: "UDPFS Erişimi"
+  "MENU": "Menü"
+  "APPS": "Uygulamalar"
+  "DEBUG": "Hata Ayıklama Renkleri"
+  "COVERART": "Kapak Resmi"
+  "IP_ADDRESS_TYPE_DHCP": "DHCP"
+  "PORT": "Port"
+  "ADDR_TYPE_IP": "IP"
+  "ADDR_TYPE_NETBIOS": "NetBIOS"
+  "ENABLE_WRITE": "Yazma İşlemleri"
+  "MODE1": "Mod 1"
+  "MODE2": "Mod 2"
+  "MODE3": "Mod 3"
+  "MODE4": "Mod 4"
+  "MODE5": "Mod 5"
+  "MODE6": "Mod 6"
+  "ENABLEGSM": "GSM Seçici"
+  "OVERSCAN": "Overscan"
+  "ENABLECHEAT": "PS2RD Hile Motoru"
+  "PADEMU_ENABLE": "Kol Emülatörü"
+  "DS34USB_MODE": "DualShock3/4 USB"
+  "PADEMU_PORT": "Emülasyon"
+  "PADEMU_VIB": "Titreşim"
+  "PADEMU_WORKAROUND": "Sahte DS3 Geçici Çözümü"
+  "SFX": "Ses Efektleri"
+  "BOOT_SND": "Açılış Sesi"
+  "ENABLE_NOTIFICATIONS": "Bildirimler"
+  "OPTIONS": "Seçenekler"
+  "GLOBAL_SETTINGS": "Genel"
+  "INFO_GENRE": "Tür"
+  "INFO_RELEASE": "Çıkış"
+  "INFO_DESCRIPTION": "Açıklama"
+  "BLOCKDEVICE_SETTINGS": "Blok Aygıtlar"
+  "CONTROLLER_SETTINGS": "Kumanda Ayarları"
+  "HINT_BDM_START": "Blok Aygıt Yöneticisini aç/kapat."
+  "HINT_BLOCK_DEVICES": "Blok Aygıtları aç/kapat (ör. USB)."
+  "USB_GAMES": "USB Oyunları"
+  "ILINK_GAMES": "iLink Oyunları"
+  "MX4SIO_GAMES": "MX4SIO Oyunları"
+  "PADMACROCONFIG": "PADMACRO Yapılandır"
+  "PADMACRO_SETTINGS": "Kol makro Ayarları"
+  "PADMACRO_ENABLE": "Kol makroları"
+  "PADMACRO_SLOWDOWN": "Analog yavaşlatma:"
+  "HINT_PADMACRO_SLOWDOWN_AXIS": "Düğmeye basıldığında analog çubuğun hareket aralığını azalt"
+  "LEFT_ANALOG": "Sol çubuk"
+  "RIGHT_ANALOG": "Sağ çubuk"
+  "PADMACRO_INVERT_AXIS": "Analog eksen ters çevirme:"
+  "HINT_PADMACRO_INVERT_AXIS": "Analog çubuk eksenini ters çevir"
+  "TURBO_SPEED": "Turbo düğme hızı"
+  "HINT_TURBO_SPEED": "Turbo etkinken düğmeye ne kadar hızlı basılacağı"
+  "ACT_WHILE_PRESSED": "Düğmeye basılıyken"
+  "ACT_TOGGLED": "Düğme ile açılıp kapanır"
+  "LANGUAGE_JAPANESE": "JAPONCA"
+  "LANGUAGE_ENGLISH": "İNGİLİZCE"
+  "LANGUAGE_FRENCH": "FRANSIZCA"
+  "LANGUAGE_SPANISH": "İSPANYOLCA"
+  "LANGUAGE_GERMAN": "ALMANCA"
+  "LANGUAGE_ITALIAN": "İTALYANCA"
+  "LANGUAGE_DUTCH": "FELEMENKÇE"
+  "LANGUAGE_PORTUGUESE": "PORTEKİZCE"
+  "LANGUAGE_RUSSIAN": "RUSÇA"
+  "LANGUAGE_KOREAN": "KORECE"
+  "LANGUAGE_TRAD_CHINESE": "GELENEKSEL ÇİNCE"
+  "LANGUAGE_SIMPL_CHINESE": "BASİTLEŞTİRİLMİŞ ÇİNCE"
+  "OSD_SETTINGS": "OSD ayarları"
+  "OSD_SETTINGS_LNG": "OSD Dili"
+  "ENABLE_LNG": "Dili değiştir"
+  "BGM": "Arka Plan Müziği"
+  "BGM_VOLUME": "Arka Plan Müziği Sesi"
+  "DEF_BGM_PATH": "Varsayılan Tema Müziği"
+  "DEF_BGM_PATH_HINT": "Dahili tema için akış müziği yolunu ayarla."
+  "BOOT_SCANNING_MC": "Hafıza kartları taranıyor..."
+  "BOOT_LOADING_DRIVERS": "Depolama sürücüleri yükleniyor..."
+  "BOOT_LOADING_USB": "USB depolama sürücüsü yükleniyor..."
+  "BOOT_ARMING_MMCE": "MMCE oyun kimliği hazırlanıyor..."
+  "BOOT_LOADING_SOUNDS": "Tema sesleri yükleniyor..."
+  "BOOT_BUILDING_MENU": "Menü oluşturuluyor..."
+  "NET_UDPFS_TAB_HINT": "UDPFS açık -- yeni UDPFS sekmesini aç ve bağlanmak için Onayla'ya bas. PC tarafında udpfsd -fsroot <games folder> çalışır."
+  "NET_UDPBD_TAB_HINT": "Ağ blok aygıtı açık -- PC sunucusu yanıt verdiğinde sekmesi görünür (UDPFS Image için udpfsd -bdpath, UDPBD için udpbd-server)."
+  "NEUTRINO_VMC_MISSING": "Oyuna özel VMC dosyası bulunamadı -- onsuz başlatılıyor (oyun gerçek kartını kullanır)."
+  "NEUTRINO_DEV_UNSUPPORTED": "Neutrino bu aygıttan başlatılamıyor -- başlatma iptal edildi."
+  "NEUTRINO_TOML_SYNC_FAILED": "Neutrino ağ yapılandırması (bsd toml) eksik veya yazılamıyor -- başlatma iptal edildi, neutrino klasörünü kontrol edin."
+  "NEUTRINO_TOO_FRAGMENTED": "Neutrino için fazla parçalanmış (%d parça, sınır %d VMC'ler dahil) -- bunun yerine OPL çekirdeği deneniyor."
+  "NEUTRINO_TOO_FRAGMENTED_NET": "Neutrino için fazla parçalanmış (%d parça, sınır %d VMC'ler dahil) -- PC'de birleştirin; başlatma iptal edildi."
+  "NEUTRINO_GSM_COMP": "Neutrino GSM Uyumluluğu"
+  "HINT_NEUTRINO_GSM_COMP": "Zorlanmış bir Neutrino Video modu altında titreyen veya yırtılan oyunlar için alan çevirme düzeltmesi. Ayarlanmış bir Neutrino Video modu gerektirir."
+  "NARGS_DBC": "Hata Ayıklama Renkleri (-dbc)"
+  "NARGS_LOGO": "PS2 Logosu (-logo)"
+  "VMC_SLOT1_DISABLE": "VMC 1'i devre dışı bırak (kartı koru)"
+  "VMC_SLOT2_DISABLE": "VMC 2'yi devre dışı bırak (kartı koru)"
+  "HINT_VMC_SLOT_DISABLE": "Bu yuvanın kartı yapılandırılmış kalırken bu yuvanın VMC'si olmadan başlat. Yalnızca Neutrino başlatmaları; oyun daha sonra o yuvadaki gerçek kartı kullanır."
+  "NEUTRINO_BSDFS": "Neutrino Dosya Sistemi"
+  "HINT_NEUTRINO_BSDFS": "Neutrino'nun blok aygıt dosya sistemini zorla (-bsdfs). Auto = aygıta özgü varsayılan. hdl/bd uzman seçenekleridir; otomatik yol yapısı uymuyorsa bunları başlatma argümanlarındaki eşleşen bir -dvd= ile birlikte kullanın."
+  "PLASCOLOR": "Plazma Karışım Rengi"
+  "VCD_HIDE_GAMEID": "PS1 Oyun Kimliğini Gizle (VCD listesi)"
+  "HINT_VCD_HIDE_GAMEID": "Yalnızca görsel -- PS1/VCD liste adlarından baştaki oyun kimliği önekini (örn. SLUS_005.51.) gizle. Kimliği olmayan adlar olduğu gibi gösterilir. Başlatmayı, kapak resmini veya favorileri değiştirmez."
+  "VCD_FIRST_DISC": "Yalnızca ilk disk (çok diskli PS1)"
+  "HINT_VCD_FIRST_DISC": "Cihaz listelerinde çok diskli bir PS1 oyununun yalnızca Disk 1'ini göster (POPSLoader tarzı). (Disc 2), (CD 2) vb. adlı dosyaları gizler. Oyun içi disk değiştirme için tüm diskler kartta kalır; Favoriler filtrelenmez."
+  "GAMES_DEVICE": "Oyunun Aygıtı"
+  "DEFAULT_CORE": "Varsayılan Yükleyici Çekirdeği"
+  "HINT_DEFAULT_CORE": "Oyuna özel Yükleyici Çekirdeği Default olarak ayarlanmış oyunlar için genel varsayılan çekirdek. <OPL> yerel çekirdektir; Neutrino harici neutrino.elf'i zincirler. Oyuna özel bir seçim bunu her zaman geçersiz kılar."
+  "VCD_SETTINGS": "VCD Ayarları"
+  "FINANCIAL_SUPPORT": "Mali Destek"

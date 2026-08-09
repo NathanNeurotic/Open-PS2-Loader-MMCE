@@ -1,0 +1,229 @@
+translations:
+  AUTOSORT: مرتب‌سازی بازی‌ها به ترتیب الفبا
+  RUMBLE: لرزش دسته در منوها
+  HINT_RUMBLE: لرزش کوتاه هنگام جابه‌جایی مکان‌نما، تأیید یا بازگشت -- به دوال‌شاک در حالت آنالوگ نیاز دارد
+  FOLDER_NAV: مرور پوشه‌ها در فهرست بازی‌ها
+  HINT_FOLDER_NAV: نمایش زیرپوشه‌های CD/DVD به‌صورت ورودی‌های قابل‌مرور، برای باز کردن انتخاب و برای بازگشت لغو کنید
+  SETTINGS_NO_HOME: کارت حافظه‌ای یافت نشد -- تنظیمات قابل ذخیره نیست. OPL از یک دستگاه شبکه بوت شده که تنظیماتش باید روی یک کارت محلی باشد.
+  ERROR_SAVING_SETTINGS_TO: نوشتن تنظیمات در %s ممکن نشد (خطای %d)
+  GENERAL_SETTINGS: تنظیمات کلی
+  DEVICE_SETTINGS: تنظیمات دستگاه
+  LAUNCH_PS2_DISC: اجرای دیسک PS2
+  DISC_LAUNCH_ERR: دیسک PS2 در درایو نیست.
+  DEFAULT: پیش‌فرض
+  HINT_MODE7: فقط Neutrino -- رفع مشکل بازی‌هایی که بافر IOP را پر می‌کنند (-gc=7)
+  MODE7: Mode 7
+  ENABLEIMAGE: تصویر چیت PS2RD
+  HINT_ENABLEIMAGE: اعمال پچ پیش‌ساخته PS2RD .img روی بازی.
+  UDPBD_GAMES: UDPBD Games
+  MMCE: MMCE
+  MMCE_GAMES: MMCE Games
+  MMCEMODE: حالت شروع MMCE
+  MMCE_PREFIX: مسیر پیشوند MMCE
+  MMCE_SLOT: اسلات MMCE
+  MMCEIGR_SLOT: اسلات(های) کارت بوت IGR
+  HINT_MMCEIGR_SLOT: دستور سوییچ به کارت بوت در IGR به اسلات(های) انتخاب‌شده ارسال می‌شود
+  MMCE_ADVANCED: پیشرفته
+  MMCE_SETTINGS: تنظیمات MMCE
+  MMCE_SEMA: روش صف‌بندی قفل Sema
+  HINT_MMCE_SEMA: THFIFO ممکن است سازگاری را بهبود دهد اما عملکرد را کاهش دهد
+  MMCE_WAIT_CYCLES: چرخه‌های انتظار پس از پایین آمدن /ACK
+  HINT_MMCE_WAIT_CYCLES: مقادیر کمتر ممکن است عملکرد را بهبود دهند اما ناپایداری ایجاد کنند
+  MMCE_USE_ALARMS: استفاده از آلارم‌های تایم‌اوت
+  HINT_MMCE_USE_ALARMS: خاموش ممکن است عملکرد را بهبود دهد اما تایم‌اوت MMCE می‌تواند باعث فریز شود
+  CORE_LOADER: هسته لودر
+  NEUTRINO_BAD_FORMAT: Neutrino از این فرمت فایل پشتیبانی نمی‌کند، اجرا با هسته <OPL>
+  NEUTRINO_NOT_FOUND: Neutrino ELF پیدا نشد، اجرا با هسته <OPL>
+  UDPBD_NEEDS_STATIC_IP: UDPBD نیاز به IP ثابت PS2 دارد. در تنظیمات شبکه تنظیم کنید (DHCP در حال حاضر روشن است).
+  NEUTRINO_SETTING_NA: این تنظیم با هسته Neutrino استفاده نمی‌شود.
+  POPSTARTER_NOT_FOUND: POPSTARTER.ELF پیدا نشد
+  POPSTARTER_SMB_MISSING: پیش‌نیازهای SMB برای POPSTARTER موجود نیست
+  WRITE_POPSTARTER_NET: نوشتن تنظیمات شبکه POPSTARTER
+  HINT_WRITE_POPSTARTER_NET: 'مقادیر IP + SMB را در IPCONFIG.DAT / SMBCONFIG.DAT مربوط به POPSTARTER روی کارت حافظه ذخیره کنید (برای VCD از طریق SMB).'
+  POPSTARTER_NET_ERR: نوشتن تنظیمات شبکه POPSTARTER روی کارت حافظه ناموفق بود.
+  VCD: VCD
+  VCD_ON: نمایش بازی‌های VCD
+  VCD_OFF: نمایش بازی‌های دیسک
+  NEUTRINO_ARGS: آرگومان‌های اجرای Neutrino
+  HINT_NEUTRINO_ARGS: فلگ‌های اضافی Neutrino، جداشده با فاصله (مثلاً -mt=dvd). کلی روی همه بازی‌ها اعمال می‌شود؛ هر بازی می‌تواند فلگ اضافه کند. پیشوند $ فلگ را بدون حذف غیرفعال می‌کند.
+  NEUTRINO_VIDEO: ویدیوی Neutrino
+  HINT_NEUTRINO_VIDEO: تعیین اجباری حالت ویدیوی خروجی GS در Neutrino (-gsm). خاموش = حالت پیش‌فرض بازی.
+  NEUTRINO_PATH: مسیر Neutrino ELF
+  HINT_NEUTRINO_PATH: مسیر کامل به neutrino.elf (مثلاً mc0:NEUTRINO/neutrino.elf). خالی = تشخیص خودکار روی mc0/mc1.
+  POPSTARTER_PATH: 'مسیر POPSTARTER.ELF'
+  HINT_POPSTARTER_PATH: مسیر سفارشی POPSTARTER.ELF؛ در صورت خالی/نبودن به پوشه POPS دستگاه برمی‌گردد. صفحه‌کلید حداکثر ۳۱ کاراکتر؛ مسیرهای طولانی‌تر از طریق settings_riptopl.cfg.
+  BDMA_SOURCE: منبع BDMA
+  HINT_BDMA_SOURCE: دستگاهی که پوشه POPS آن فایل‌های درایور BDMAssault را دارد (usbd.irx.* / usbhdfsd.irx.*).
+  BDMA_MODE: حالت BDMA
+  HINT_BDMA_MODE: درایور بلاک‌دیوایس exFAT که POPSTARTER بارگذاری می‌کند. تغییر آن ماژول‌ها را به کارت کپی می‌کند؛ FAT32 = بدون ماژول (درایور داخلی).
+  BDMA_SRC_USB: USB
+  BDMA_SRC_MX4SIO: MX4SIO
+  BDMA_SRC_MMCE: MMCE
+  BDMA_SRC_HDD: هارد داخلی
+  BDMA_MODE_FAT32: USB (FAT32)
+  BDMA_MODE_USBEXFAT: USB (exFAT)
+  BDMA_MODE_MX4SIO: MX4SIO (exFAT)
+  BDMA_MODE_MMCE: MMCE (exFAT)
+  BDMA_MODE_ATA: HDD (exFAT)
+  BDMA_ERR_SRC: فایل‌های ماژول BDMA روی دستگاه منبع پیدا نشد.
+  BDMA_ERR_SPACE: فضای کافی روی کارت حافظه برای ماژول‌های BDMA وجود ندارد.
+  BDMA_ERR_IO: خطا در نوشتن ماژول‌های BDMA روی کارت حافظه.
+  COVERFLOW_SETTINGS: تنظیمات Coverflow
+  COVERFLOW_COUNT: تعداد کاور
+  COVERFLOW_SCALE: مقیاس مرکز
+  COVERFLOW_ANIM: سرعت انیمیشن
+  COVERFLOW_DIM: کم‌نور کردن کاورهای کناری
+  NONE: هیچ‌کدام
+  SMALL: کوچک
+  LARGE: بزرگ
+  NORMAL: معمولی
+  FAV: علاقه‌مندی‌ها
+  FAVMODE: حالت شروع علاقه‌مندی‌ها
+  FAV_HINT: علاقه‌مندی
+  FAV_MSG: '%s از طریق منوی علاقه‌مندی‌ها مجاز نیست.'
+  FAV_PERSISTENCE_MSG: '%s در حالی که آیتم به عنوان علاقه‌مندی علامت‌گذاری شده، مجاز نیست.'
+  NEUTRINO_DEVICE: دستگاه Neutrino
+  HINT_NEUTRINO_DEVICE: دستگاهی که neutrino.elf را در پوشه NEUTRINO/ یا neutrino/ نگه می‌دارد. Auto ابتدا mc0 سپس mc1 را اسکن می‌کند.
+  NARGS_QB: راه‌اندازی سریع (-qb)
+  NARGS_CWD: پوشه کاری (-cwd)
+  NARGS_CFG: پیکربندی (-cfg)
+  NARGS_ELF: ELF بوت (-elf)
+  NARGS_ATA0: تصویر ATA0 (-ata0)
+  NARGS_ATA0ID: شناسه ATA0 (-ata0id)
+  NARGS_ATA1: تصویر ATA1 (-ata1)
+  NARGS_EXTRA: آرگومان‌های اضافی
+  NARGS_AUTO_NOTE: 'Auto: -bsd -dvd -gc -gsm -mc -dbc -logo'
+  ENABLE_ART_TAR: آرشیو .tar جلد
+  DISABLE_ALL: غیرفعال کردن همه
+  BOOT_LOADING_CONFIG: در حال بارگذاری تنظیمات...
+  BOOT_SCANNING_BDM: در حال اسکن درایوهای USB / کارت / شبکه...
+  BOOT_SCANNING_NET: در حال راه‌اندازی شبکه...
+  BOOT_SCANNING_HDD: در حال اسکن HDD...
+  BOOT_READY: آماده.
+  UDPFS_GAMES: "بازی‌های UDPFS"
+  UDPFSBD_GAMES: "بازی‌های UDPFSBD"
+  NET_PROTOCOL: "پروتکل شبکه"
+  NET_NEEDS_NEUTRINO: "بازی‌های شبکه (UDP) فقط از طریق هستهٔ Neutrino اجرا می‌شوند. مطمئن شوید neutrino.elf موجود است و قالب پشتیبانی می‌شود."
+  VCD_NOT_ON_NET: "بازی‌های PS1 (.VCD) را نمی‌توان روی دستگاه شبکه اجرا کرد."
+  MX4SIO_PADEMU_WARN: "MX4SIO و شبیه‌سازی دسته از گذرگاه SIO2 مشترک استفاده می‌کنند و ممکن است بازی اجرا نشود."
+  HINT_OSD_SETTINGS_LNG: "اعمال پیکربندی زبان سفارشی"
+  OSD_SETTINGS_TVASPECT: "اندازهٔ صفحه"
+  FULL_SCREEN: "تمام‌صفحه"
+  OSD_SETTINGS_VMODE: "حالت ویدیو"
+  SYSTEM_DEFAULT: "پیش‌فرض سیستم"
+  HIGH: "زیاد"
+  LOW: "کم"
+  XSENSITIVITY: "حساسیت محور X آنالوگ"
+  YSENSITIVITY: "حساسیت محور Y آنالوگ"
+  FILE_COUNT: "فایل‌های یافت‌شده: %i"
+  CHEAT_SELECTION: "انتخاب تقلب"
+  HDD_HINT: "فقط یک HDD مجاز است؛ فعال‌سازی، APA یا GPT را قفل می‌کند."
+  MMCE_GAMEID_NEUTRINO_SKIP: "MMCE GameID اعمال نشد -- فایل neutrino.elf روی این کارت است (تعویض آن Neutrino را از حافظه خارج می‌کند)."
+  POPSTARTER_DEVICE: "دستگاه POPSTARTER.ELF"
+  HINT_POPSTARTER_DEVICE: "دستگاه دارای POPS/POPSTARTER.ELF برای اجرای PS1 VCD. پیش‌فرض = دستگاه بوت (cwd) سپس دستگاه خودِ VCD. سفارشی یک مسیر متنی آزاد نمایش می‌دهد."
+  BDMA_APPLY: "اعمال VCD BDMA هنگام اجرا"
+  HINT_BDMA_APPLY: "روشن: تجهیز خودکار درایور exFAT متناظرِ VCD اجراشده روی کارت حافظه پیش از بوت (توصیه‌شده). خاموش: خودتان با انتخابگرهای Source/Mode مربوط به BDMA در زیر آن را مدیریت کنید."
+  NETBOOT_RESTART: "برای اعمال تغییر پروتکل بوت شبکه، OPL را دوباره راه‌اندازی کنید."
+  UDPFS_MODE: "دسترسی UDPFS"
+  "MENU": "منو"
+  "APPS": "برنامه‌ها"
+  "DEBUG": "رنگ‌های اشکال‌زدایی"
+  "COVERART": "تصویر جلد"
+  "IP_ADDRESS_TYPE_DHCP": "DHCP"
+  "PORT": "Port"
+  "ADDR_TYPE_IP": "IP"
+  "ADDR_TYPE_NETBIOS": "NetBIOS"
+  "ENABLE_WRITE": "عملیات نوشتن"
+  "MODE1": "حالت ۱"
+  "MODE2": "حالت ۲"
+  "MODE3": "حالت ۳"
+  "MODE4": "حالت ۴"
+  "MODE5": "حالت ۵"
+  "MODE6": "حالت ۶"
+  "ENABLEGSM": "انتخابگر GSM"
+  "OVERSCAN": "اسکن بیش از حد"
+  "ENABLECHEAT": "موتور تقلب PS2RD"
+  "PADEMU_ENABLE": "شبیه‌ساز دسته"
+  "DS34USB_MODE": "DualShock3/4 USB"
+  "PADEMU_PORT": "شبیه‌سازی"
+  "PADEMU_VIB": "لرزش"
+  "PADEMU_WORKAROUND": "راه‌حل جایگزین DS3 جعلی"
+  "SFX": "جلوه‌های صوتی"
+  "BOOT_SND": "صدای راه‌اندازی"
+  "ENABLE_NOTIFICATIONS": "اعلان‌ها"
+  "OPTIONS": "گزینه‌ها"
+  "GLOBAL_SETTINGS": "سراسری"
+  "INFO_GENRE": "ژانر"
+  "INFO_RELEASE": "انتشار"
+  "INFO_DESCRIPTION": "توضیحات"
+  "BLOCKDEVICE_SETTINGS": "دستگاه‌های بلوکی"
+  "CONTROLLER_SETTINGS": "تنظیمات دسته"
+  "HINT_BDM_START": "روشن/خاموش کردن مدیر دستگاه بلوکی (BDM)."
+  "HINT_BLOCK_DEVICES": "روشن/خاموش کردن دستگاه‌های بلوکی (مثلاً USB)."
+  "USB_GAMES": "بازی‌های USB"
+  "ILINK_GAMES": "بازی‌های iLink"
+  "MX4SIO_GAMES": "بازی‌های MX4SIO"
+  "PADMACROCONFIG": "پیکربندی PADMACRO"
+  "PADMACRO_SETTINGS": "تنظیمات ماکروی دسته"
+  "PADMACRO_ENABLE": "ماکروهای دسته"
+  "PADMACRO_SLOWDOWN": "کند کردن آنالوگ:"
+  "HINT_PADMACRO_SLOWDOWN_AXIS": "کاهش دامنه دسته آنالوگ هنگام فشردن دکمه"
+  "LEFT_ANALOG": "دسته چپ"
+  "RIGHT_ANALOG": "دسته راست"
+  "PADMACRO_INVERT_AXIS": "وارونه‌سازی محور آنالوگ:"
+  "HINT_PADMACRO_INVERT_AXIS": "وارونه‌سازی محور دسته آنالوگ"
+  "TURBO_SPEED": "سرعت دکمه توربو"
+  "HINT_TURBO_SPEED": "سرعت فشردن دکمه هنگام فعال بودن توربو"
+  "ACT_WHILE_PRESSED": "هنگام فشردن دکمه"
+  "ACT_TOGGLED": "با دکمه تغییر وضعیت می‌دهد"
+  "LANGUAGE_JAPANESE": "ژاپنی"
+  "LANGUAGE_ENGLISH": "انگلیسی"
+  "LANGUAGE_FRENCH": "فرانسوی"
+  "LANGUAGE_SPANISH": "اسپانیایی"
+  "LANGUAGE_GERMAN": "آلمانی"
+  "LANGUAGE_ITALIAN": "ایتالیایی"
+  "LANGUAGE_DUTCH": "هلندی"
+  "LANGUAGE_PORTUGUESE": "پرتغالی"
+  "LANGUAGE_RUSSIAN": "روسی"
+  "LANGUAGE_KOREAN": "کره‌ای"
+  "LANGUAGE_TRAD_CHINESE": "چینی سنتی"
+  "LANGUAGE_SIMPL_CHINESE": "چینی ساده‌شده"
+  "OSD_SETTINGS": "تنظیمات OSD"
+  "OSD_SETTINGS_LNG": "زبان OSD"
+  "ENABLE_LNG": "تغییر زبان"
+  "BGM": "موسیقی پس‌زمینه"
+  "BGM_VOLUME": "بلندی موسیقی پس‌زمینه"
+  "DEF_BGM_PATH": "موسیقی پیش‌فرض قالب"
+  "DEF_BGM_PATH_HINT": "تنظیم مسیر پخش موسیقی برای قالب داخلی."
+  "BOOT_SCANNING_MC": "در حال اسکن کارت‌های حافظه..."
+  "BOOT_LOADING_DRIVERS": "در حال بارگذاری درایورهای ذخیره‌سازی..."
+  "BOOT_LOADING_USB": "در حال بارگذاری درایور ذخیره‌سازی USB..."
+  "BOOT_ARMING_MMCE": "در حال آماده‌سازی شناسه بازی MMCE..."
+  "BOOT_LOADING_SOUNDS": "در حال بارگذاری صداهای قالب..."
+  "BOOT_BUILDING_MENU": "در حال ساخت منو..."
+  "NET_UDPFS_TAB_HINT": "UDPFS روشن است -- زبانه جدید UDPFS را باز کن و Confirm را برای اتصال فشار بده. سمت PC، udpfsd -fsroot <games folder> را اجرا می‌کند."
+  "NET_UDPBD_TAB_HINT": "دستگاه بلوکی شبکه روشن است -- زبانه آن پس از پاسخ‌دادن سرور PC ظاهر می‌شود (udpfsd -bdpath برای UDPFS Image، udpbd-server برای UDPBD)."
+  "NEUTRINO_VMC_MISSING": "فایل VMC مخصوص بازی یافت نشد -- بدون آن اجرا می‌شود (بازی از کارت واقعی خود استفاده می‌کند)."
+  "NEUTRINO_DEV_UNSUPPORTED": "Neutrino نمی‌تواند از این دستگاه اجرا شود -- اجرا لغو شد."
+  "NEUTRINO_TOML_SYNC_FAILED": "پیکربندی شبکه Neutrino (bsd toml) وجود ندارد یا قابل نوشتن نیست -- اجرا لغو شد، پوشه neutrino را بررسی کن."
+  "NEUTRINO_TOO_FRAGMENTED": "برای Neutrino بیش از حد قطعه‌قطعه است (%d قطعه، محدودیت %d شامل VMCها) -- به جای آن هسته OPL امتحان می‌شود."
+  "NEUTRINO_TOO_FRAGMENTED_NET": "برای Neutrino بیش از حد قطعه‌قطعه است (%d قطعه، محدودیت %d شامل VMCها) -- روی PC یکپارچه‌سازی (defragment) کن؛ اجرا لغو شد."
+  "NEUTRINO_GSM_COMP": "سازگاری GSM با Neutrino"
+  "HINT_NEUTRINO_GSM_COMP": "رفع مشکل با جابه‌جایی فیلد (field-flipping) برای بازی‌هایی که زیر یک حالت Neutrino Video اجباری می‌لرزند یا پارگی تصویر دارند. نیازمند تنظیم یک حالت Neutrino Video است."
+  "NARGS_DBC": "رنگ‌های اشکال‌زدایی (-dbc)"
+  "NARGS_LOGO": "لوگوی PS2 (-logo)"
+  "VMC_SLOT1_DISABLE": "غیرفعال کردن VMC 1 (حفظ کارت)"
+  "VMC_SLOT2_DISABLE": "غیرفعال کردن VMC 2 (حفظ کارت)"
+  "HINT_VMC_SLOT_DISABLE": "بدون VMC این اسلات اجرا کن در حالی که کارت آن پیکربندی‌شده باقی می‌ماند. فقط برای اجراهای Neutrino؛ سپس بازی از کارت واقعی در آن اسلات استفاده می‌کند."
+  "NEUTRINO_BSDFS": "سیستم‌فایل Neutrino"
+  "HINT_NEUTRINO_BSDFS": "سیستم‌فایل دستگاه بلوکی Neutrino را اجباری کن (-bsdfs). Auto = پیش‌فرض هر دستگاه. hdl/bd گزینه‌های تخصصی هستند؛ اگر شکل مسیر خودکار مناسب نبود، آن‌ها را با یک -dvd= متناظر در آرگومان‌های اجرا همراه کن."
+  "PLASCOLOR": "رنگ ترکیب پلاسما"
+  "VCD_HIDE_GAMEID": "پنهان کردن شناسه بازی PS1 (فهرست VCD)"
+  "HINT_VCD_HIDE_GAMEID": "فقط ظاهری -- پیشوند شناسه بازی ابتدایی (مثلاً SLUS_005.51.) را از نام‌های فهرست PS1/VCD پنهان کن. نام‌های بدون شناسه همان‌طور که هستند نشان داده می‌شوند. اجرا، تصویر جلد یا موارد دلخواه را تغییر نمی‌دهد."
+  "VCD_FIRST_DISC": "فقط دیسک اول (PS1 چنددیسکی)"
+  "HINT_VCD_FIRST_DISC": "فقط دیسک ۱ یک بازی چنددیسکی PS1 را در فهرست دستگاه‌ها نشان بده (به سبک POPSLoader). فایل‌هایی با نام (Disc 2)، (CD 2) و مانند آن را پنهان می‌کند. همه دیسک‌ها برای تعویض درون‌بازی روی کارت باقی می‌مانند؛ موارد دلخواه (Favourites) فیلتر نمی‌شوند."
+  "GAMES_DEVICE": "دستگاه بازی"
+  "DEFAULT_CORE": "هسته لودر پیش‌فرض"
+  "HINT_DEFAULT_CORE": "هسته پیش‌فرض سراسری برای بازی‌هایی که Loader Core مخصوص هر بازی آن‌ها روی Default تنظیم شده است. <OPL> هسته بومی است؛ Neutrino فایل خارجی neutrino.elf را زنجیره می‌کند. انتخاب مخصوص هر بازی همیشه این را بازنویسی می‌کند."
+  "VCD_SETTINGS": "تنظیمات VCD"
+  "FINANCIAL_SUPPORT": "حمایت مالی"

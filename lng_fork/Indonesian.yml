@@ -1,0 +1,229 @@
+translations:
+  AUTOSORT: Urutkan Game Menurut Abjad
+  RUMBLE: Getaran Kontroler di Menu
+  HINT_RUMBLE: Getaran singkat saat menggerakkan kursor, mengonfirmasi, atau kembali - perlu DualShock dalam mode analog
+  FOLDER_NAV: Jelajahi Folder di Daftar Game
+  HINT_FOLDER_NAV: Tampilkan subfolder CD/DVD sebagai entri yang dapat dijelajahi; pilih untuk membuka, batal untuk kembali
+  SETTINGS_NO_HOME: Kartu memori tidak ditemukan - pengaturan tidak dapat disimpan. OPL di-boot dari perangkat jaringan, yang pengaturannya harus tersimpan di kartu lokal.
+  ERROR_SAVING_SETTINGS_TO: Gagal menulis pengaturan ke %s (kesalahan %d)
+  GENERAL_SETTINGS: Pengaturan Umum
+  DEVICE_SETTINGS: Pengaturan Perangkat
+  LAUNCH_PS2_DISC: Jalankan Disc PS2
+  DISC_LAUNCH_ERR: Tidak ada disc PS2 di drive.
+  DEFAULT: Default
+  HINT_MODE7: Hanya Neutrino -- perbaiki game yang melampaui buffer IOP (-gc=7)
+  MODE7: Mode 7
+  ENABLEIMAGE: PS2RD Cheat Image
+  HINT_ENABLEIMAGE: Terapkan patch PS2RD .img yang sudah dibuat ke game Anda.
+  UDPBD_GAMES: UDPBD Games
+  MMCE: MMCE
+  MMCE_GAMES: MMCE Games
+  MMCEMODE: Mode Mulai MMCE
+  MMCE_PREFIX: Path Prefix MMCE
+  MMCE_SLOT: Slot MMCE
+  MMCEIGR_SLOT: Slot Bootcard IGR
+  HINT_MMCEIGR_SLOT: Perintah beralih ke bootcard akan dikirim ke slot yang dipilih saat IGR
+  MMCE_ADVANCED: Lanjutan
+  MMCE_SETTINGS: Pengaturan MMCE
+  MMCE_SEMA: Metode Antrian Kunci Sema
+  HINT_MMCE_SEMA: THFIFO dapat membantu kompatibilitas tetapi menurunkan performa
+  MMCE_WAIT_CYCLES: Siklus tunggu setelah /ACK rendah
+  HINT_MMCE_WAIT_CYCLES: Nilai lebih rendah dapat meningkatkan performa tetapi menyebabkan ketidakstabilan
+  MMCE_USE_ALARMS: Gunakan alarm timeout
+  HINT_MMCE_USE_ALARMS: OFF dapat membantu performa tetapi dapat menyebabkan timeout MMCE berujung freeze
+  CORE_LOADER: Loader Core
+  NEUTRINO_BAD_FORMAT: Neutrino tidak mendukung format file ini, menjalankan dengan core <OPL>
+  NEUTRINO_NOT_FOUND: ELF Neutrino tidak ditemukan, menjalankan dengan core <OPL>
+  UDPBD_NEEDS_STATIC_IP: UDPBD membutuhkan IP PS2 statis. Atur di Konfigurasi Jaringan (DHCP sedang aktif).
+  NEUTRINO_SETTING_NA: Pengaturan ini tidak digunakan dengan core Neutrino.
+  POPSTARTER_NOT_FOUND: POPSTARTER.ELF tidak ditemukan
+  POPSTARTER_SMB_MISSING: Persyaratan SMB POPSTARTER tidak terpenuhi
+  WRITE_POPSTARTER_NET: Tulis Konfigurasi Jaringan POPSTARTER
+  HINT_WRITE_POPSTARTER_NET: Simpan juga nilai IP + SMB share ini ke IPCONFIG.DAT / SMBCONFIG.DAT milik POPSTARTER di kartu memori (untuk VCD lewat SMB).
+  POPSTARTER_NET_ERR: Gagal menulis konfigurasi jaringan POPSTARTER ke kartu memori.
+  VCD: VCD
+  VCD_ON: Menampilkan game VCD
+  VCD_OFF: Menampilkan game disc
+  NEUTRINO_ARGS: Argumen Launch Neutrino
+  HINT_NEUTRINO_ARGS: 'Flag Neutrino tambahan, dipisah spasi (misal -mt=dvd). Global berlaku untuk semua game; per-game ditambahkan di atasnya. Awali flag dengan $ untuk menonaktifkan tanpa menghapus.'
+  NEUTRINO_VIDEO: Video Neutrino
+  HINT_NEUTRINO_VIDEO: Paksa mode video output GS Neutrino (-gsm). Off mempertahankan default game.
+  NEUTRINO_PATH: Path ELF Neutrino
+  HINT_NEUTRINO_PATH: Path lengkap ke neutrino.elf (misal mc0:NEUTRINO/neutrino.elf). Kosong = deteksi otomatis di mc0/mc1.
+  POPSTARTER_PATH: Path POPSTARTER.ELF
+  HINT_POPSTARTER_PATH: Path POPSTARTER.ELF kustom; otomatis kembali ke folder POPS perangkat jika kosong/tidak ada. Keyboard maks 31 karakter; path lebih panjang via settings_riptopl.cfg.
+  BDMA_SOURCE: Sumber BDMA
+  HINT_BDMA_SOURCE: Perangkat yang folder POPS-nya menyimpan file driver BDMAssault (usbd.irx.* / usbhdfsd.irx.*).
+  BDMA_MODE: Mode BDMA
+  HINT_BDMA_MODE: Driver blok-perangkat exFAT yang dimuat POPSTARTER. Mengubahnya menyalin modul ke kartu; FAT32 = tidak ada (driver bawaan).
+  BDMA_SRC_USB: USB
+  BDMA_SRC_MX4SIO: MX4SIO
+  BDMA_SRC_MMCE: MMCE
+  BDMA_SRC_HDD: HDD Internal
+  BDMA_MODE_FAT32: USB (FAT32)
+  BDMA_MODE_USBEXFAT: USB (exFAT)
+  BDMA_MODE_MX4SIO: MX4SIO (exFAT)
+  BDMA_MODE_MMCE: MMCE (exFAT)
+  BDMA_MODE_ATA: HDD (exFAT)
+  BDMA_ERR_SRC: File modul BDMA tidak ditemukan di perangkat sumber.
+  BDMA_ERR_SPACE: Ruang kartu memori tidak cukup untuk modul BDMA.
+  BDMA_ERR_IO: Kesalahan saat menulis modul BDMA ke kartu memori.
+  COVERFLOW_SETTINGS: Pengaturan Coverflow
+  COVERFLOW_COUNT: Jumlah Cover
+  COVERFLOW_SCALE: Skala Tengah
+  COVERFLOW_ANIM: Kecepatan Animasi
+  COVERFLOW_DIM: Redupkan Cover Samping
+  NONE: Tidak Ada
+  SMALL: Kecil
+  LARGE: Besar
+  NORMAL: Normal
+  FAV: Favorit
+  FAVMODE: Mode Mulai Favorit
+  FAV_HINT: Favorit
+  FAV_MSG: '%s tidak diizinkan melalui Menu Favorit.'
+  FAV_PERSISTENCE_MSG: '%s tidak diizinkan selama item ditandai sebagai favorit.'
+  NEUTRINO_DEVICE: Perangkat Neutrino
+  HINT_NEUTRINO_DEVICE: Perangkat yang menyimpan neutrino.elf (di folder NEUTRINO/ atau neutrino/). Auto memindai mc0 lalu mc1.
+  NARGS_QB: Quick Boot (-qb)
+  NARGS_CWD: Direktori Kerja (-cwd)
+  NARGS_CFG: Config (-cfg)
+  NARGS_ELF: Boot ELF (-elf)
+  NARGS_ATA0: Image ATA0 (-ata0)
+  NARGS_ATA0ID: ATA0 ID (-ata0id)
+  NARGS_ATA1: Image ATA1 (-ata1)
+  NARGS_EXTRA: Argumen Tambahan
+  NARGS_AUTO_NOTE: 'Auto: -bsd -dvd -gc -gsm -mc -dbc -logo'
+  ENABLE_ART_TAR: Arsip .tar sampul
+  DISABLE_ALL: Nonaktifkan Semua
+  BOOT_LOADING_CONFIG: Memuat pengaturan...
+  BOOT_SCANNING_BDM: Memindai drive USB / kartu / jaringan...
+  BOOT_SCANNING_NET: Memulai jaringan...
+  BOOT_SCANNING_HDD: Memindai HDD...
+  BOOT_READY: Siap.
+  UDPFS_GAMES: "Game UDPFS"
+  UDPFSBD_GAMES: "Game UDPFSBD"
+  NET_PROTOCOL: "Protokol Jaringan"
+  NET_NEEDS_NEUTRINO: "Game jaringan (UDP) hanya bisa di-boot lewat core Neutrino. Pastikan neutrino.elf tersedia dan formatnya didukung."
+  VCD_NOT_ON_NET: "Game PS1 (.VCD) tidak bisa dijalankan lewat perangkat jaringan."
+  MX4SIO_PADEMU_WARN: "MX4SIO dan emulasi pad berbagi bus SIO2 dan game mungkin gagal di-boot."
+  HINT_OSD_SETTINGS_LNG: "Paksa konfigurasi bahasa kustom"
+  OSD_SETTINGS_TVASPECT: "Ukuran Layar"
+  FULL_SCREEN: "Layar Penuh"
+  OSD_SETTINGS_VMODE: "Mode Video"
+  SYSTEM_DEFAULT: "Bawaan Sistem"
+  HIGH: "Tinggi"
+  LOW: "Rendah"
+  XSENSITIVITY: "Sensitivitas Sumbu-X Analog"
+  YSENSITIVITY: "Sensitivitas Sumbu-Y Analog"
+  FILE_COUNT: "File ditemukan: %i"
+  CHEAT_SELECTION: "Pilihan Cheat"
+  HDD_HINT: "Hanya satu HDD yang diizinkan, mengaktifkan akan mengunci APA atau GPT."
+  MMCE_GAMEID_NEUTRINO_SKIP: "MMCE GameID tidak diterapkan -- neutrino.elf ada di kartu ini (menggantinya akan membongkar Neutrino)."
+  POPSTARTER_DEVICE: "Perangkat POPSTARTER.ELF"
+  HINT_POPSTARTER_DEVICE: "Perangkat yang menyimpan POPS/POPSTARTER.ELF untuk peluncuran VCD PS1. Default = perangkat boot (cwd) lalu perangkat VCD itu sendiri. Kustom menampilkan jalur teks bebas."
+  BDMA_APPLY: "Terapkan VCD BDMA saat Peluncuran"
+  HINT_BDMA_APPLY: "Aktif: otomatis pasang driver exFAT yang cocok dengan VCD yang diluncurkan ke kartu memori sebelum boot (disarankan). Nonaktif: kelola sendiri dengan pemilih Sumber/Mode BDMA di bawah."
+  NETBOOT_RESTART: "Mulai ulang OPL untuk menerapkan perubahan protokol boot jaringan."
+  UDPFS_MODE: "Akses UDPFS"
+  "MENU": "Menu"
+  "APPS": "Aplikasi"
+  "DEBUG": "Warna Debug"
+  "COVERART": "Gambar Sampul"
+  "IP_ADDRESS_TYPE_DHCP": "DHCP"
+  "PORT": "Port"
+  "ADDR_TYPE_IP": "IP"
+  "ADDR_TYPE_NETBIOS": "NetBIOS"
+  "ENABLE_WRITE": "Operasi Tulis"
+  "MODE1": "Mode 1"
+  "MODE2": "Mode 2"
+  "MODE3": "Mode 3"
+  "MODE4": "Mode 4"
+  "MODE5": "Mode 5"
+  "MODE6": "Mode 6"
+  "ENABLEGSM": "Pemilih GSM"
+  "OVERSCAN": "Overscan"
+  "ENABLECHEAT": "Mesin Cheat PS2RD"
+  "PADEMU_ENABLE": "Emulator Pad"
+  "DS34USB_MODE": "DualShock3/4 USB"
+  "PADEMU_PORT": "Emulasi"
+  "PADEMU_VIB": "Getaran"
+  "PADEMU_WORKAROUND": "Solusi Palsu DS3"
+  "SFX": "Efek Suara"
+  "BOOT_SND": "Suara Boot"
+  "ENABLE_NOTIFICATIONS": "Notifikasi"
+  "OPTIONS": "Opsi"
+  "GLOBAL_SETTINGS": "Global"
+  "INFO_GENRE": "Genre"
+  "INFO_RELEASE": "Rilis"
+  "INFO_DESCRIPTION": "Deskripsi"
+  "BLOCKDEVICE_SETTINGS": "Perangkat Blok"
+  "CONTROLLER_SETTINGS": "Pengaturan Kontroler"
+  "HINT_BDM_START": "Aktif/nonaktifkan Block Device Manager."
+  "HINT_BLOCK_DEVICES": "Aktif/nonaktifkan Perangkat Blok (mis. USB)."
+  "USB_GAMES": "Game USB"
+  "ILINK_GAMES": "Game iLink"
+  "MX4SIO_GAMES": "Game MX4SIO"
+  "PADMACROCONFIG": "Konfigurasi PADMACRO"
+  "PADMACRO_SETTINGS": "Pengaturan Makro Pad"
+  "PADMACRO_ENABLE": "Makro pad"
+  "PADMACRO_SLOWDOWN": "Perlambatan analog:"
+  "HINT_PADMACRO_SLOWDOWN_AXIS": "Kurangi jangkauan stik analog saat tombol ditekan"
+  "LEFT_ANALOG": "Stik kiri"
+  "RIGHT_ANALOG": "Stik kanan"
+  "PADMACRO_INVERT_AXIS": "Balik sumbu analog:"
+  "HINT_PADMACRO_INVERT_AXIS": "Balik sumbu stik analog"
+  "TURBO_SPEED": "Kecepatan tombol turbo"
+  "HINT_TURBO_SPEED": "Seberapa cepat menekan tombol saat turbo aktif"
+  "ACT_WHILE_PRESSED": "Saat tombol ditekan"
+  "ACT_TOGGLED": "Diaktifkan oleh tombol"
+  "LANGUAGE_JAPANESE": "JEPANG"
+  "LANGUAGE_ENGLISH": "INGGRIS"
+  "LANGUAGE_FRENCH": "PRANCIS"
+  "LANGUAGE_SPANISH": "SPANYOL"
+  "LANGUAGE_GERMAN": "JERMAN"
+  "LANGUAGE_ITALIAN": "ITALIA"
+  "LANGUAGE_DUTCH": "BELANDA"
+  "LANGUAGE_PORTUGUESE": "PORTUGIS"
+  "LANGUAGE_RUSSIAN": "RUSIA"
+  "LANGUAGE_KOREAN": "KOREA"
+  "LANGUAGE_TRAD_CHINESE": "TIONGHOA TRADISIONAL"
+  "LANGUAGE_SIMPL_CHINESE": "TIONGHOA SEDERHANA"
+  "OSD_SETTINGS": "Pengaturan OSD"
+  "OSD_SETTINGS_LNG": "Bahasa OSD"
+  "ENABLE_LNG": "Ubah bahasa"
+  "BGM": "Musik Latar"
+  "BGM_VOLUME": "Volume Musik Latar"
+  "DEF_BGM_PATH": "Musik Tema Bawaan"
+  "DEF_BGM_PATH_HINT": "Tetapkan jalur untuk memutar musik tema internal."
+  "BOOT_SCANNING_MC": "Memindai memory card..."
+  "BOOT_LOADING_DRIVERS": "Memuat driver penyimpanan..."
+  "BOOT_LOADING_USB": "Memuat driver penyimpanan USB..."
+  "BOOT_ARMING_MMCE": "Menyiapkan game-ID MMCE..."
+  "BOOT_LOADING_SOUNDS": "Memuat suara tema..."
+  "BOOT_BUILDING_MENU": "Membangun menu..."
+  "NET_UDPFS_TAB_HINT": "UDPFS aktif -- buka tab UDPFS baru dan tekan Confirm untuk terhubung. Sisi PC menjalankan udpfsd -fsroot <games folder>."
+  "NET_UDPBD_TAB_HINT": "Network block device aktif -- tab-nya muncul begitu server PC merespons (udpfsd -bdpath untuk UDPFS Image, udpbd-server untuk UDPBD)."
+  "NEUTRINO_VMC_MISSING": "File VMC per-game tidak ditemukan -- meluncurkan tanpanya (game menggunakan kartu aslinya)."
+  "NEUTRINO_DEV_UNSUPPORTED": "Neutrino tidak dapat meluncur dari perangkat ini -- peluncuran dibatalkan."
+  "NEUTRINO_TOML_SYNC_FAILED": "Konfigurasi jaringan Neutrino (bsd toml) hilang atau tidak dapat ditulis -- peluncuran dibatalkan, periksa folder neutrino."
+  "NEUTRINO_TOO_FRAGMENTED": "Terlalu terfragmentasi untuk Neutrino (%d fragmen, batas %d termasuk VMC) -- mencoba core OPL sebagai gantinya."
+  "NEUTRINO_TOO_FRAGMENTED_NET": "Terlalu terfragmentasi untuk Neutrino (%d fragmen, batas %d termasuk VMC) -- defragmentasi di PC; peluncuran dibatalkan."
+  "NEUTRINO_GSM_COMP": "Kompatibilitas GSM Neutrino"
+  "HINT_NEUTRINO_GSM_COMP": "Perbaikan field-flipping untuk game yang bergetar atau robek di bawah mode Neutrino Video yang dipaksakan. Membutuhkan mode Neutrino Video yang diatur."
+  "NARGS_DBC": "Warna Debug (-dbc)"
+  "NARGS_LOGO": "Logo PS2 (-logo)"
+  "VMC_SLOT1_DISABLE": "Nonaktifkan VMC 1 (simpan kartu)"
+  "VMC_SLOT2_DISABLE": "Nonaktifkan VMC 2 (simpan kartu)"
+  "HINT_VMC_SLOT_DISABLE": "Luncurkan tanpa VMC slot ini sambil tetap mempertahankan konfigurasi kartunya. Hanya untuk peluncuran Neutrino; game kemudian menggunakan kartu asli di slot itu."
+  "NEUTRINO_BSDFS": "Sistem File Neutrino"
+  "HINT_NEUTRINO_BSDFS": "Paksa filesystem block-device milik Neutrino (-bsdfs). Auto = default per perangkat. hdl/bd adalah opsi lanjutan; pasangkan dengan -dvd= yang cocok di argumen peluncuran jika bentuk jalur auto tidak sesuai."
+  "PLASCOLOR": "Warna Campuran Plasma"
+  "VCD_HIDE_GAMEID": "Sembunyikan Game ID PS1 (daftar VCD)"
+  "HINT_VCD_HIDE_GAMEID": "Kosmetik saja -- sembunyikan prefiks game-ID di depan (mis. SLUS_005.51.) dari nama daftar PS1/VCD. Nama tanpa ID ditampilkan apa adanya. Tidak mengubah peluncuran, cover art, atau favourites."
+  "VCD_FIRST_DISC": "Hanya disc pertama (PS1 multi-disc)"
+  "HINT_VCD_FIRST_DISC": "Tampilkan hanya Disc 1 dari game PS1 multi-disc di daftar perangkat (gaya POPSLoader). Menyembunyikan file bernama (Disc 2), (CD 2), dll. Semua disc tetap ada di kartu untuk pergantian dalam game; Favourites tidak difilter."
+  "GAMES_DEVICE": "Perangkat Game"
+  "DEFAULT_CORE": "Loader Core Bawaan"
+  "HINT_DEFAULT_CORE": "Core default global untuk game yang Loader Core per-game-nya diatur ke Default. <OPL> adalah core native; Neutrino merantai neutrino.elf eksternal. Pilihan per-game selalu menimpa pengaturan ini."
+  "VCD_SETTINGS": "Pengaturan VCD"
+  "FINANCIAL_SUPPORT": "Dukungan Finansial"
