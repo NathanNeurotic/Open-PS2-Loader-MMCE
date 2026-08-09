@@ -4,6 +4,13 @@
 #include "include/config.h"
 #include "include/dia.h"
 
+// dia.h defines struct UIItem, but dia.h -> opl.h -> menusys.h is a real include CYCLE: when a .c
+// includes dia.h FIRST, dia.h's guard is already set by the time menusys.h is re-entered, so the
+// struct definition has not been reached yet and gameMenuLoadConfig's prototype below sees an
+// incomplete type ("declared inside parameter list will not be visible outside"). Forward-declare
+// it so the prototype refers to the SAME type either way.
+struct UIItem;
+
 /// a single submenu item
 typedef struct submenu_item
 {
