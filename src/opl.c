@@ -1223,6 +1223,38 @@ static int tryAlternateDevice(int types)
     return 0;
 }
 
+// Shared reader for the Neutrino-launch globals (args / custom path / -elf switch / global default
+// core / device TYPE incl. the legacy device-INDEX migration). Factored out so the interactive
+// _loadConfig and the autolaunch miniInit can never drift: the argv/autolaunch path previously read
+// NONE of these, so a keyless "Default" game autolaunched with a stale AUTO device and empty global
+// args, silently diverging from an interactive launch of the same game.
+static void configReadNeutrinoGlobals(config_set_t *configOPL)
+{
+    configGetStrCopy(configOPL, CONFIG_OPL_NEUTRINO_ARGS, gNeutrinoArgs, sizeof(gNeutrinoArgs));
+    configGetStrCopy(configOPL, CONFIG_OPL_NEUTRINO_PATH, gNeutrinoPath, sizeof(gNeutrinoPath));
+    configGetInt(configOPL, CONFIG_OPL_NEUTRINO_ELF_ARG, &gNeutrinoElfArg);
+    // Global default Loader Core (0=<OPL>, 1=Neutrino). Absent in legacy configs -> keep the reset
+    // default (0/<OPL>), so existing installs behave exactly as before this key existed.
+    configGetInt(configOPL, CONFIG_OPL_DEFAULT_CORE, &gDefaultCoreLoader);
+    configGetInt(configOPL, CONFIG_OPL_NEUTRINO_VIDEO, &gNeutrinoVideoDefault);
+    if (gNeutrinoVideoDefault < 0 || gNeutrinoVideoDefault > 5)
+        gNeutrinoVideoDefault = 0; // sanitize (indexes system.c gsmVideoTokens at the launch legs)
+    configGetInt(configOPL, CONFIG_OPL_NEUTRINO_GSMCOMP, &gNeutrinoGsmCompDefault);
+    if (gNeutrinoGsmCompDefault < 0 || gNeutrinoGsmCompDefault > 3)
+        gNeutrinoGsmCompDefault = 0;
+    // Neutrino Device: prefer the new device-TYPE key; if absent (config predates the picker
+    // change), migrate the legacy device-INDEX value.
+    if (!configGetInt(configOPL, CONFIG_OPL_NEUTRINO_DEVTYPE, &gNeutrinoDevice)) {
+        int legacyDev = 0;
+        if (configGetInt(configOPL, CONFIG_OPL_NEUTRINO_DEVICE, &legacyDev)) {
+            if (legacyDev == 1 || legacyDev == 2)
+                gNeutrinoDevice = NEUTRINO_DEV_MC;
+            else
+                gNeutrinoDevice = NEUTRINO_DEV_AUTO;
+        }
+    }
+}
+
 static void _loadConfig()
 {
     int value, themeID = -1, langID = -1;
@@ -1318,27 +1350,7 @@ static void _loadConfig()
             configGetInt(configOPL, CONFIG_OPL_BDMA_APPLY, &gBdmaApplyOnLaunch);
             configGetInt(configOPL, CONFIG_OPL_VCD_HIDE_GAMEID, &gVcdHideGameId);
             configGetInt(configOPL, CONFIG_OPL_VCD_FIRST_DISC_ONLY, &gVcdFirstDiscOnly);
-            configGetStrCopy(configOPL, CONFIG_OPL_NEUTRINO_ARGS, gNeutrinoArgs, sizeof(gNeutrinoArgs));
-            configGetStrCopy(configOPL, CONFIG_OPL_NEUTRINO_PATH, gNeutrinoPath, sizeof(gNeutrinoPath));
-            configGetInt(configOPL, CONFIG_OPL_NEUTRINO_ELF_ARG, &gNeutrinoElfArg);
-            configGetInt(configOPL, CONFIG_OPL_DEFAULT_CORE, &gDefaultCoreLoader);
-            configGetInt(configOPL, CONFIG_OPL_NEUTRINO_VIDEO, &gNeutrinoVideoDefault);
-            if (gNeutrinoVideoDefault < 0 || gNeutrinoVideoDefault > 5)
-                gNeutrinoVideoDefault = 0; // sanitize (indexes system.c gsmVideoTokens at the launch legs)
-            configGetInt(configOPL, CONFIG_OPL_NEUTRINO_GSMCOMP, &gNeutrinoGsmCompDefault);
-            if (gNeutrinoGsmCompDefault < 0 || gNeutrinoGsmCompDefault > 3)
-                gNeutrinoGsmCompDefault = 0;
-            // Neutrino Device: prefer the new device-TYPE key; if absent (config predates the
-            // picker change), migrate the legacy device-INDEX value.
-            if (!configGetInt(configOPL, CONFIG_OPL_NEUTRINO_DEVTYPE, &gNeutrinoDevice)) {
-                int legacyDev = 0;
-                if (configGetInt(configOPL, CONFIG_OPL_NEUTRINO_DEVICE, &legacyDev)) {
-                    if (legacyDev == 1 || legacyDev == 2)
-                        gNeutrinoDevice = NEUTRINO_DEV_MC;
-                    else
-                        gNeutrinoDevice = NEUTRINO_DEV_AUTO;
-                }
-            }
+            configReadNeutrinoGlobals(configOPL); // shared with miniInit's autolaunch path
             configGetInt(configOPL, CONFIG_OPL_ENABLE_BGART, &gEnableBGArt);
             configGetInt(configOPL, CONFIG_OPL_ENABLE_ART_TAR, &gEnableArtTar);
             configGetInt(configOPL, CONFIG_OPL_ART_DELAY, &gArtDelay);
@@ -2609,6 +2621,11 @@ static void miniInit(int mode)
             configGetInt(configOPL, CONFIG_OPL_PS2LOGO, &gPS2Logo);
             configGetStrCopy(configOPL, CONFIG_OPL_EXIT_PATH, gExitPath, sizeof(gExitPath));
             configGetInt(configOPL, CONFIG_OPL_HDD_SPINDOWN, &gHDDSpindown);
+            // Honor ALL the Neutrino-launch globals on the autolaunch/argv path exactly like the
+            // interactive _loadConfig -- not just the default core. An autolaunched keyless "Default"
+            // game must resolve the SAME neutrino.elf (device pick / custom path) with the SAME global
+            // args as an interactive launch, or it silently boots a different/stale core without flags.
+            configReadNeutrinoGlobals(configOPL);
             if (mode == BDM_MODE) {
                 configGetStrCopy(configOPL, CONFIG_OPL_BDM_PREFIX, gBDMPrefix, sizeof(gBDMPrefix));
                 configGetInt(configOPL, CONFIG_OPL_BDM_CACHE, &bdmCacheSize);
