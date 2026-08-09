@@ -376,6 +376,37 @@ static void sfxEnqueue(int channel, int id)
 
     // Two producers on different priorities: claim the slot atomically.
     DIntr();
+
+    // Coalesce repeats of the LONG confirm/cancel samples (hardware report: the open/close chirp
+    // trails the button by a growing margin when the user mashes it).
+    //
+    // Measured from the ADPCM headers with this file's own sfxCalculateSoundDuration():
+    //     cursor  3528 samples =  80 ms      confirm 37376 samples = 847 ms
+    //     cancel 23040 samples = 522 ms
+    // and BOTH the focus-gain and focus-loss paths in dia.c play SFX_CONFIRM -- so opening and
+    // closing an option each fire a 847 ms sample on ONE channel. Mash it and up to 7 stack in the
+    // ring and replay serially long after the last press, because the staleness drop below is
+    // gated on SFX_CURSOR only. One pending entry per id is all that can ever be HEARD anyway:
+    // retriggering a channel replaces the sample already playing on it, so the extra copies only
+    // ever bought latency.
+    //
+    // If the ring is EMPTY there is nothing to match, so an isolated press is never dropped -- only
+    // a repeat that arrives while an identical sound is still pending. We do NOT touch the queued
+    // entry (no ticks refresh): producers must never mutate a slot, because the consumer copies its
+    // three fields and advances sfxQTail OUTSIDE this interrupt guard. Same sample either way.
+    //
+    // SFX_CURSOR is deliberately NOT coalesced: it is 80 ms, it already has the staleness drop, and
+    // it is the scroll path -- the #340 surface this whole rebuild exists to protect.
+    if (id == SFX_CONFIRM || id == SFX_CANCEL) {
+        int i;
+        for (i = sfxQTail; i != sfxQHead; i = (i + 1) % SFX_QUEUE_LEN) {
+            if (sfxQueue[i].id == id) {
+                EIntr();
+                return; // identical sound already pending: this repeat would only add latency
+            }
+        }
+    }
+
     int next = (sfxQHead + 1) % SFX_QUEUE_LEN;
     if (next == sfxQTail) {
         EIntr();
