@@ -89,7 +89,11 @@ int usb_probe(int devId)
         return 0;
     }
 
-    if (device->idVendor == DS34_VID && (device->idProduct == DS3_PID || device->idProduct == DS4_PID || device->idProduct == DS4_PID_SLIM))
+    if (device->idVendor == DS34_VID && (device->idProduct == DS3_PID || device->idProduct == DS4_PID || device->idProduct == DS4_PID_SLIM
+#ifdef DS5_ENABLE
+                                         || device->idProduct == DS5_PID
+#endif
+                                         ))
         return 1;
 
     return 0;
@@ -130,6 +134,11 @@ int usb_connect(int devId)
     if (device->idProduct == DS3_PID) {
         ds34pad[pad].type = DS3;
         epCount = interface->bNumEndpoints - 1;
+#ifdef DS5_ENABLE
+    } else if (device->idProduct == DS5_PID) {
+        ds34pad[pad].type = DS5;
+        epCount = 20;
+#endif
     } else {
         ds34pad[pad].type = DS4;
         epCount = 20; // ds4 v2 returns interface->bNumEndpoints as 0
@@ -238,7 +247,7 @@ static void usb_config_set(int result, int count, void *arg)
         DelayThread(10000);
         led[0] = led_patterns[pad][1];
         led[3] = 0;
-    } else if (ds34pad[pad].type == DS4) {
+    } else if (ds34pad[pad].type == DS4 || ds34pad[pad].type == DS5) {
         led[0] = rgbled_patterns[pad][1][0];
         led[1] = rgbled_patterns[pad][1][1];
         led[2] = rgbled_patterns[pad][1][2];
@@ -402,6 +411,115 @@ static void readReport(u8 *data, int pad)
             else
                 ds34pad[pad].oldled[3] = 0;
         }
+#ifdef DS5_ENABLE
+        else if (ds34pad[pad].type == DS5) {
+            struct ds5report *report;
+            u8 up = 0, down = 0, left = 0, right = 0;
+            u8 battery_level;
+            u8 power_state;
+
+            // DS5 reports come directly at data[0], no offset needed (differs from DS3)
+            report = (struct ds5report *)data;
+
+            switch (report->Dpad) {
+                case 0:
+                    up = 1;
+                    break;
+                case 1:
+                    up = 1;
+                    right = 1;
+                    break;
+                case 2:
+                    right = 1;
+                    break;
+                case 3:
+                    down = 1;
+                    right = 1;
+                    break;
+                case 4:
+                    down = 1;
+                    break;
+                case 5:
+                    down = 1;
+                    left = 1;
+                    break;
+                case 6:
+                    left = 1;
+                    break;
+                case 7:
+                    up = 1;
+                    left = 1;
+                    break;
+                case 8:
+                    up = 0;
+                    down = 0;
+                    left = 0;
+                    right = 0;
+                    break;
+            }
+
+            if (report->TPad) {
+                if (!report->nFinger1Active) {
+                    if (report->Finger1X < 960)
+                        report->Create = 1;
+                    else
+                        report->Option = 1;
+                }
+
+                if (!report->nFinger2Active) {
+                    if (report->Finger2X < 960)
+                        report->Create = 1;
+                    else
+                        report->Option = 1;
+                }
+            }
+
+            ds34pad[pad].data[0] = ~(report->Create | report->L3 << 1 | report->R3 << 2 | report->Option << 3 | up << 4 | right << 5 | down << 6 | left << 7);
+            ds34pad[pad].data[1] = ~(report->L2 | report->R2 << 1 | report->L1 << 2 | report->R1 << 3 | report->Triangle << 4 | report->Circle << 5 | report->Cross << 6 | report->Square << 7);
+
+            ds34pad[pad].data[2] = report->RightStickX; // rx
+            ds34pad[pad].data[3] = report->RightStickY; // ry
+            ds34pad[pad].data[4] = report->LeftStickX;  // lx
+            ds34pad[pad].data[5] = report->LeftStickY;  // ly
+
+            ds34pad[pad].data[6] = right * 255; // right
+            ds34pad[pad].data[7] = left * 255;  // left
+            ds34pad[pad].data[8] = up * 255;    // up
+            ds34pad[pad].data[9] = down * 255;  // down
+
+            ds34pad[pad].data[10] = report->Triangle * 255; // triangle
+            ds34pad[pad].data[11] = report->Circle * 255;   // circle
+            ds34pad[pad].data[12] = report->Cross * 255;    // cross
+            ds34pad[pad].data[13] = report->Square * 255;   // square
+
+            ds34pad[pad].data[14] = report->L1 * 255;   // L1
+            ds34pad[pad].data[15] = report->R1 * 255;   // R1
+            ds34pad[pad].data[16] = report->PressureL2; // L2
+            ds34pad[pad].data[17] = report->PressureR2; // R2
+
+            // FIXED: Properly extract 4-bit battery and power fields
+            battery_level = report->Battery & 0x0F; // Battery is 4 bits (0-15)
+            power_state = report->Power & 0x0F;     // Power is 4 bits (0-15)
+
+            if (report->PSButton) { // display battery level
+                // Scale 4-bit battery (0-15) to 8-bit (0-255)
+                ds34pad[pad].oldled[0] = (battery_level * 255) / 15;
+                ds34pad[pad].oldled[1] = 0;
+                ds34pad[pad].oldled[2] = 0;
+            } else {
+                ds34pad[pad].oldled[0] = rgbled_patterns[pad][1][0];
+                ds34pad[pad].oldled[1] = rgbled_patterns[pad][1][1];
+                ds34pad[pad].oldled[2] = rgbled_patterns[pad][1][2];
+            }
+
+            // FIXED: Proper power state check for DS5 (0xB is charging on DS4, DS5 uses different encoding)
+            // For DS5: Power 0x0-0xA = discharging, 0xB = charging
+            if ((power_state == 0xB) || (power_state == 0xA && report->Usb_plugged))
+                ds34pad[pad].oldled[3] = 1;
+            else
+                ds34pad[pad].oldled[3] = 0;
+        }
+#endif
     }
 }
 
@@ -448,6 +566,26 @@ static int LEDRumble(u8 *led, u8 lrum, u8 rrum, int pad)
         }
 
         ret = UsbInterruptTransfer(ds34pad[pad].outEndp, usb_buf, 32, usb_cmd_cb, (void *)pad);
+#ifdef DS5_ENABLE
+    } else if (ds34pad[pad].type == DS5) {
+        usb_buf[0] = 0x02; // ReportID
+        usb_buf[1] = 0x03; // EnableRumbleEmulation & RumbleUseRumbleNotHaptics
+        usb_buf[2] = 0x17;
+
+        usb_buf[3] = rrum; // light weight (right motor)
+        usb_buf[4] = lrum; // heavy weight (left motor)
+
+        usb_buf[39] = 0x07; // AllowLightBrightnessChange & AllowColorLightFadeAnimation & EnableImprovedRumbleEmulation
+        usb_buf[42] = 0x80; // LightFadeAnimation
+        usb_buf[43] = 0xFF; // LightBrightness (max brightness)
+        usb_buf[44] = 0x04; // PlayerLight (player 1)
+
+        usb_buf[45] = led[0]; // r
+        usb_buf[46] = led[1]; // g
+        usb_buf[47] = led[2]; // b
+
+        ret = UsbInterruptTransfer(ds34pad[pad].outEndp, usb_buf, 48, usb_cmd_cb, (void *)pad);
+#endif
     }
 
     ds34pad[pad].oldled[0] = led[0];
@@ -585,7 +723,25 @@ int ds34usb_get_bdaddr(u8 *data, int port)
             DPRINTF("DS34USB: ds3usb_get_bdaddr usb transfer error %d\n", ret);
             ret = 0;
         }
-    } else {
+    }
+#ifdef DS5_ENABLE
+    else if (ds34pad[port].type == DS5) {
+        ret = UsbControlTransfer(ds34pad[port].controlEndp, REQ_USB_IN, USB_REQ_GET_REPORT, (HID_USB_GET_REPORT_FEATURE << 8) | 0x09, 0, 8, usb_buf, usb_cmd_cb, (void *)port);
+
+        if (ret == USB_RC_OK) {
+            TransferWait(ds34pad[port].cmd_sema);
+
+            for (i = 0; i < 6; i++)
+                data[5 - i] = usb_buf[2 + i];
+
+            ret = 1;
+        } else {
+            DPRINTF("DS34USB: ds5usb_get_bdaddr usb transfer error %d\n", ret);
+            ret = 0;
+        }
+    }
+#endif
+    else {
         ret = UsbControlTransfer(ds34pad[port].controlEndp, REQ_USB_IN, USB_REQ_GET_REPORT, (HID_USB_GET_REPORT_FEATURE << 8) | 0x12, 0, 16, usb_buf, usb_cmd_cb, (void *)port);
 
         if (ret == USB_RC_OK) {
