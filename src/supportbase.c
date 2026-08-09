@@ -912,6 +912,18 @@ void sbRename(base_game_info_t **list, const char *prefix, const char *sep, int 
     }
 }
 
+// When 0 (the default, used while scrolling the game list) sbPopulateConfig skips the
+// per-game size stat -- over SMB a fresh stat() of an ISO can cost several seconds, and the
+// main page only needs the metadata-derived badges (#DiscType/#Media/#Format), never #Size.
+// The info screen flips this on via menuRequestInfoSize() so #Size still resolves on demand;
+// game->sizeMB is cached after the first resolve, so later scrolls show the size for free.
+static int sbConfigStatSize = 0;
+
+void sbSetConfigStatSize(int enable)
+{
+    sbConfigStatSize = enable;
+}
+
 config_set_t *sbPopulateConfig(base_game_info_t *game, const char *prefix, const char *sep)
 {
     char path[256];
@@ -921,17 +933,32 @@ config_set_t *sbPopulateConfig(base_game_info_t *game, const char *prefix, const
     config_set_t *config = configAlloc(0, NULL, path);
     configRead(config); // Does not matter if the config file could be loaded or not.
 
-    // Get game size if not already set
-    if (game->sizeMB == 0) {
+    // Get game size if not already set (deferred off the scroll path; see sbConfigStatSize). A .VCD (PS1) has
+    // no meaningful ISO size and its file lives in POPS/, not CD/DVD/, so statting the CD/DVD path always
+    // misses, leaves sizeMB at 0, never caches, and re-probes the shared MMCE bus on every info entry (#120).
+    // Hard-stop it by EXTENSION here (not mutable view state) so a .VCD can never reach the ISO stat path,
+    // even during the L3 view-toggle window (game->sizeMB stays 0 -> "0 MiB" is still written below).
+    const int isVcd = !strcasecmp(game->extension, ".VCD");
+
+    // Folder browsing: prepend the current subpath so the stat resolves a game that lives inside a
+    // subfolder. sbBrowseSub is "" at the device root, collapsing subseg away. Without this a
+    // folder-nav game stats a path that does not exist and silently reports 0 MiB.
+    char subseg[FOLDER_SUB_MAX + 2];
+    if (sbBrowseSub[0] != '\0')
+        snprintf(subseg, sizeof(subseg), "%s%s", sbBrowseSub, sep);
+    else
+        subseg[0] = '\0';
+
+    if (sbConfigStatSize && !isVcd && game->sizeMB == 0) {
         char gamepath[256];
 
         if (game->format == GAME_FORMAT_ISO) {
-            snprintf(gamepath, sizeof(gamepath), "%s%s%s%s%s%s", prefix, sep, game->media == SCECdPS2CD ? "CD" : "DVD", sep, game->name, game->extension);
+            snprintf(gamepath, sizeof(gamepath), "%s%s%s%s%s%s%s", prefix, sep, game->media == SCECdPS2CD ? "CD" : "DVD", sep, subseg, game->name, game->extension);
 
             if (stat(gamepath, &st) == 0)
                 game->sizeMB = st.st_size >> 20;
         } else if (game->format == GAME_FORMAT_OLD_ISO) {
-            snprintf(gamepath, sizeof(gamepath), "%s%s%s%s%s.%s%s", prefix, sep, game->media == SCECdPS2CD ? "CD" : "DVD", sep, game->startup, game->name, game->extension);
+            snprintf(gamepath, sizeof(gamepath), "%s%s%s%s%s%s.%s%s", prefix, sep, game->media == SCECdPS2CD ? "CD" : "DVD", sep, subseg, game->startup, game->name, game->extension);
 
             if (stat(gamepath, &st) == 0)
                 game->sizeMB = st.st_size >> 20;
