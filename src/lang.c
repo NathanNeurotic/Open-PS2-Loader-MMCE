@@ -5,6 +5,7 @@
 #include "include/ioman.h"
 #include "include/themes.h"
 #include "include/sound.h"
+#include "include/gui.h" // guiLock/guiUnlock -- serialize the language name-list rebuild
 
 static int guiLangID = 0;
 static char **lang_strs = internalEnglish;
@@ -156,7 +157,13 @@ int lngAddLanguages(char *path, const char *separator, int mode)
 
     result = listDir(path, separator, MAX_LANGUAGE_FILES - nLanguages, &lngReadEntry);
     nLanguages += result;
+    // Serialize the name-list free+swap against the GUI's readers (see thmRebuildGuiNames, which is
+    // already locked this way in themes.c): this runs on the IO worker for device-triggered language
+    // discovery, and guiShowUIConfig hands the very same list to its dialog. The lock is a
+    // not-ready no-op during pre-GUI init.
+    guiLock();
     lngRebuildLangNames();
+    guiUnlock();
 
     const char *temp;
     if (configGetStr(configGetByType(CONFIG_OPL), "language_text", &temp)) {
