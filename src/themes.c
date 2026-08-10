@@ -706,7 +706,17 @@ static mutable_image_t *initMutableImage(const char *themePath, config_set_t *th
         configGetStr(themeConfig, elemProp, &cachePattern);
         snprintf(elemProp, sizeof(elemProp), "%s_count", name);
         configGetInt(themeConfig, elemProp, &cacheCount);
-        if (cachePattern != NULL && strcmp(cachePattern, "COV") == 0 && cacheCount < 2)
+        // Floor EVERY per-game art cache at 2 slots, not just COV.
+        //
+        // A one-slot cache has no redundancy at all: the single slot is claimed, and if that one load
+        // fails for any transient reason the art type shows nothing until something else evicts it.
+        // COV was floored at 2 long ago for exactly this reason -- but BG, SCR and SCR2 are created
+        // with count 1 (the Background/GameImage defaults), which is why a tester with a .tar-only
+        // setup saw covers appear while backgrounds and screenshots stayed blank: covers had ten
+        // slots to absorb a hiccup and the others had one each.
+        // Cheap: an image_cache_t slot is a small struct, and the texture itself is only allocated
+        // when a load actually succeeds.
+        if (cachePattern != NULL && cacheCount < 2)
             cacheCount = 2;
         LOG("THEMES MutableImage %s: type: %s using cache pattern: %s count: %d\n", name, elementsType[type], cachePattern, cacheCount);
     }
