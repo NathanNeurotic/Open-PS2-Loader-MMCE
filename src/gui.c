@@ -1762,9 +1762,6 @@ void guiShowDisplayConfig(void)
         , "HDTV 1920x1080i @60Hz 16bit (HIRES)"
         , "PAL 640x256p @50Hz 24bit"
         , "NTSC 640x224p @60Hz 24bit"
-        // Appended LAST to keep every stored $VMode index pointing at the same mode. Index 14 must
-        // stay 1:1 with rm_mode_table[] (renderman.c), which carries the same warning.
-        , "HDTV 1920x1080p @60Hz 16bit (EXPERIMENTAL)"
         , NULL};
     // clang-format on
     int previousVMode;
@@ -2622,7 +2619,16 @@ void guiIntroLoop(void)
             sfxPlay(SFX_BOOT);
             // Calculate transition delay
             tFadeStart = clock();
-            tFadeDelay = (clock_t)(sfxGetSoundDuration(SFX_BOOT) - fadeDuration) * (CLOCKS_PER_SEC / 1000);
+            // CLAMP AT ZERO. sfxGetSoundDuration returns 0 when audsrv failed to initialise, and a
+            // custom theme's boot sound can legitimately be shorter than the fade -- either way this
+            // subtraction goes negative, and clock_t is UNSIGNED LONG, so the cast turns ~-1163 into
+            // ~4.29 billion and the wait below becomes ~71 minutes on the boot splash with no exit.
+            // The absolute-deadline form this replaced was accidentally immune (a deadline in the
+            // past reads as already elapsed); converting it to the elapsed form is what exposed it.
+            int fadeDelayMs = sfxGetSoundDuration(SFX_BOOT) - fadeDuration;
+            if (fadeDelayMs < 0)
+                fadeDelayMs = 0;
+            tFadeDelay = (clock_t)fadeDelayMs * (CLOCKS_PER_SEC / 1000);
             tFadeArmed = 1;
         }
 
