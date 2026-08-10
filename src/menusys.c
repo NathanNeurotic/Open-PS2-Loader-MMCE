@@ -709,7 +709,7 @@ static void swap(submenu_list_t *a, submenu_list_t *b)
 }
 
 // Sorts the given submenu by comparing the on-screen titles
-void submenuSort(submenu_list_t **submenu)
+void submenuSort(submenu_list_t **submenu, int mode)
 {
     // a simple bubblesort
     // *submenu = mergeSort(*submenu);
@@ -729,8 +729,8 @@ void submenuSort(submenu_list_t **submenu)
         while (tip->next) {
             submenu_list_t *nxt = tip->next;
 
-            char *txt1 = submenuItemGetText(&tip->item);
-            char *txt2 = submenuItemGetText(&nxt->item);
+            const char *txt1 = vcdDisplayName(mode, submenuItemGetText(&tip->item));
+            const char *txt2 = vcdDisplayName(mode, submenuItemGetText(&nxt->item));
 
             // Folder browsing: folders group ahead of games; within each group sort by title.
             int cmp;

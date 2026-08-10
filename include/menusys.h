@@ -116,7 +116,7 @@ submenu_list_t *submenuAppendItem(submenu_list_t **submenu, int icon_id, char *t
 submenu_list_t *submenuFindItemByIdAndText(submenu_list_t *submenu, int id, const char *text);
 void submenuRemoveItem(submenu_list_t **submenu, int id);
 void submenuDestroy(submenu_list_t **submenu);
-void submenuSort(submenu_list_t **submenu);
+void submenuSort(submenu_list_t **submenu, int mode);
 
 char *submenuItemGetText(submenu_item_t *it);
 char *menuItemGetText(menu_item_t *it);
