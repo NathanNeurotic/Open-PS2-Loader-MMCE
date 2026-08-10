@@ -842,6 +842,22 @@ int oplScanApps(int (*callback)(const char *path, config_set_t *appConfig, void 
         listSupport = list_support[i].support;
         if ((listSupport != NULL) && (listSupport->enabled) && (listSupport->itemGetPrefix != NULL)) {
             char *prefix = listSupport->itemGetPrefix(listSupport);
+            /*
+              #253: never scan a DEVICE-LESS prefix.
+
+              An enabled-but-unmounted slot (a BDM index with nothing plugged in, ETH with no
+              share) returns an EMPTY prefix. "%sAPPS" then yields the bare relative path "APPS",
+              which the PS2 resolves against the CWD -- OPL's own boot folder. When OPL boots from
+              a device root (PixeliGer's case: USB), that is the SAME directory the real mass0:
+              prefix already scanned, so every app was discovered twice and appeared twice in the
+              list.
+
+              It also explains why dedup did not help: the two hits arrive with different path
+              strings ("mass0:APPS/..." vs "APPS/..."), so they are legitimately distinct entries
+              as far as the dedup key is concerned.
+            */
+            if (prefix == NULL || prefix[0] == '\0')
+                continue;
             snprintf(appsPath, sizeof(appsPath), "%sAPPS", prefix);
             count += scanApps(callback, arg, appsPath, 0);
         }
@@ -1763,7 +1779,10 @@ static void _loadConfig()
 
     lscret = result;
     lscstatus = 0;
-    showCfgPopup = 1;
+    // Only claim "Config loaded from ..." when a config file was actually READ. The toast used to
+    // fire unconditionally, so with no config anywhere it still announced a device -- on hardware
+    // that read as "it loaded MY settings from mass0:" when nothing of the sort happened.
+    showCfgPopup = (result & CONFIG_OPL) ? 1 : 0;
 }
 
 static int trySaveConfigBDM(int types)
@@ -1811,10 +1830,16 @@ static int trySaveConfigMC(int types)
 
 static int trySaveAlternateDevice(int types)
 {
-    char pwd[8];
+    // Big enough for a real device prefix and ZEROED first: getcwd() into a bare char[8] left the
+    // buffer as stack garbage when it failed (this function is only reachable when the boot
+    // identity could not be determined -- exactly when getcwd is most likely to fail), and the
+    // strncmp probes below then read uninitialised bytes. A "mass"-shaped garbage match steered
+    // the save at a device that was never the cwd.
+    char pwd[16] = {0};
     int value;
 
-    getcwd(pwd, sizeof(pwd));
+    if (getcwd(pwd, sizeof(pwd)) == NULL)
+        pwd[0] = '\0';
 
     // First, try the device that OPL booted from.
     if (!strncmp(pwd, "mass", 4) && (pwd[4] == ':' || pwd[5] == ':')) {
@@ -1987,7 +2012,7 @@ static void _saveConfig()
     // sprouted an unwanted folder on every save, and rewriting the notification to the mc?:
     // wildcard made the "Settings saved to %s" toast name the wrong place (fork gates this
     // identically; FifthFox HW 2026-07-16 is the incident this comment block cites elsewhere).
-    if (gBootDir[0] == ' ' && !strncmp(path, "mc", 2)) {
+    if (gBootDir[0] == '\0' && !strncmp(path, "mc", 2)) {
         checkMCFolder();
         configPrepareNotifications(gBaseMCDir);
     }
@@ -2012,14 +2037,35 @@ static void _saveConfig()
     }
 
     lscret = configWriteChecked(lscstatus);
+    // Boot-device save retry: BDM slot numbering can change between the boot-time resolve and this
+    // save (a hotplug add/remove renumbers massN:). Re-resolve against the SAME boot device once --
+    // pinned to its known BDM type -- and retry. Never a different device: if the boot device is
+    // truly gone the save fails visibly. (This is gBootDirBdmType's second consumer, the one the
+    // comment in bdmsupport.c has been promising.)
+    if (lscret <= 0 && gBootDir[0] != '\0' && gBootDirBdmType != BDM_TYPE_UNKNOWN) {
+        char before[sizeof(gBootDir)];
+        snprintf(before, sizeof(before), "%s", gBootDir);
+        if (bdmResolveBootDir(gBootDir, sizeof(gBootDir), gBootElfName, &gBootDirBdmType) > 0 &&
+            strcmp(before, gBootDir) != 0) {
+            LOG("BOOT re-resolved boot dir for save: %s -> %s\n", before, gBootDir);
+            configSetMove(gBootDir); // keep the pending values; re-point the files to the new slot
+            lscret = configWriteChecked(lscstatus);
+        }
+    }
     // <= 0, not == 0: configWriteChecked can only return 0 or a positive sum today, but the guard
     // costs nothing and a negative would otherwise read as success here.
     // The alternate-device hunt is ONLY for the legacy no-boot-identity case: with a known boot
     // dir, settings live there (or at the custom path) and a failed write must FAIL VISIBLY -- the
     // save-to-CWD doctrine. Scattering them onto whichever other device answers is how settings
     // ended up on mass0: on a memory-card boot.
-    if (lscret <= 0 && gBootDir[0] == ' ')
-        lscret = trySaveAlternateDevice(lscstatus);
+    if (gBootDir[0] == '\0') {
+        if (lscret <= 0)
+            lscret = trySaveAlternateDevice(lscstatus);
+        // Record where discovery landed so the NEXT boot skips the hunt (the redirect is a
+        // legacy-discovery aid; with a known boot dir the custom-path block above owns it).
+        if (lscret > 0)
+            writeConfigPathRedirect(configGetDir());
+    }
     lscstatus = 0;
 }
 
@@ -2935,12 +2981,34 @@ static void deferredInit(void)
 
     // inform GUI main init part is over
     struct gui_update_t *id = guiOpCreate(GUI_INIT_DONE);
-    guiDeferUpdate(id);
-
-    if (list_support[gDefaultDevice].support) {
-        id = guiOpCreate(GUI_OP_SELECT_MENU);
-        id->menu.menu = &list_support[gDefaultDevice].menuItem;
+    if (id)
         guiDeferUpdate(id);
+
+    // Boot onto the configured Default Menu -- but if that mode has no registered support (its
+    // device never initialised, or the config named a mode this build defers), fall through to a
+    // registered one, mirroring applyConfig's clamp. Only when NOTHING is registered is there no
+    // main screen worth selecting and the start menu stays -- previously ANY unregistered pick
+    // silently parked every boot on the start menu with no explanation.
+    int bootMode = gDefaultDevice;
+    if (list_support[bootMode].support == NULL) {
+        if (list_support[APP_MODE].support != NULL)
+            bootMode = APP_MODE;
+        else {
+            bootMode = -1;
+            for (int i = 0; i < MODE_COUNT; i++) {
+                if (list_support[i].support != NULL) {
+                    bootMode = i;
+                    break;
+                }
+            }
+        }
+    }
+    if (bootMode >= 0 && list_support[bootMode].support) {
+        id = guiOpCreate(GUI_OP_SELECT_MENU);
+        if (id) {
+            id->menu.menu = &list_support[bootMode].menuItem;
+            guiDeferUpdate(id);
+        }
     }
 }
 
