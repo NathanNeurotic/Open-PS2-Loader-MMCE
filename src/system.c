@@ -173,8 +173,12 @@ void sysShutdownDev9(void)
 
         if (dev9InitCount == 0) { /* Switch off DEV9 once nothing needs it. */
             if (dev9Loaded) {
-                while (fileXioDevctl("dev9x:", DDIOC_OFF, NULL, 0, NULL, 0) < 0) {
-                };
+                // Bounded: an IOP whose dev9x never acknowledges (dying interface, wedged driver)
+                // must not spin the power-off forever -- this runs on shutdown paths.
+                int retry = 100;
+                while (retry-- > 0 && fileXioDevctl("dev9x:", DDIOC_OFF, NULL, 0, NULL, 0) < 0) {
+                    ;
+                }
             }
         }
     }
@@ -206,7 +210,11 @@ void sysReset(int modload_mask)
 #endif
 #endif
 
+    // The IOP was just rebooted: its DEV9 modules and refcount are gone, so reset both
+    // bookkeeping vars together. Leaving dev9InitCount stale inflates the refcount across
+    // resets, so sysShutdownDev9() would never power DEV9 off again.
     dev9Initialized = 0;
+    dev9InitCount = 0;
     while (!SifIopSync())
         ;
 
@@ -322,7 +330,9 @@ static unsigned int crctab[0x400];
 
 unsigned int USBA_crc32(const char *string)
 {
-    int crc, table, count, byte;
+    int crc, table, count;
+    unsigned char byte; // MUST be unsigned: a signed char sign-extends bytes >= 0x80 and the XOR
+                        // below then produces a negative crctab index (OOB read)
 
     for (table = 0; table < 256; table++) {
         crc = table << 24;
@@ -585,7 +595,7 @@ static unsigned int addIopPatch(const char *mode_str, const char *startup, irxpt
     for (i = 0; iop_patch_list[i].game != NULL; i++) {
         p = &iop_patch_list[i];
 
-        if (!strcmp(p->game, startup) && (p->mode[0] == '\0' || !strcmp(p->mode, startup))) {
+        if (!strcmp(p->game, startup) && (p->mode[0] == '\0' || !strcmp(p->mode, mode_str))) { // was strcmp(p->mode, startup): a mode-specific patch row could never match
             tab->info = (*(p->module_size)) | SET_OPL_MOD_ID(OPL_MODULE_ID_IOP_PATCH);
             tab->ptr = (void *)p->module;
             return 1;
@@ -649,7 +659,14 @@ static unsigned int sendIrxKernelRAM(const char *startup, const char *mode_str, 
     size_ioprp_image = size_IOPRP_img + size_cdvdman_irx + size_cdvdfsv_irx + size_eesync_irx + 256;
     LOG("IOPRP image size calculated: %d\n", size_ioprp_image);
     ioprp_image = malloc(size_ioprp_image);
-    size_ioprp_image = patch_IOPRP_image(ioprp_image, cdvdman_irx, size_cdvdman_irx);
+    if (ioprp_image == NULL) {
+        // Avoid patch_IOPRP_image writing through a NULL pointer; an OOM here fails the launch
+        // regardless.
+        LOG("IOPRP image allocation failed (%d bytes)\n", size_ioprp_image);
+        size_ioprp_image = 0;
+    } else {
+        size_ioprp_image = patch_IOPRP_image(ioprp_image, cdvdman_irx, size_cdvdman_irx);
+    }
     LOG("IOPRP image size actual:     %d\n", size_ioprp_image);
 
     modcount = 0;

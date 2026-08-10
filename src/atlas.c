@@ -104,6 +104,15 @@ atlas_t *atlasNew(size_t width, size_t height, u8 psm)
     atlas->surface.VramClut = 0;
     atlas->surface.ClutStorageMode = GS_CLUT_STORAGE_CSM1;
 
+    // Bail out on OOM rather than dereferencing a NULL allocation tree or memset-ing through a
+    // NULL surface buffer (allocFree tolerates NULL; verified).
+    if (atlas->allocation == NULL || atlas->surface.Mem == NULL) {
+        allocFree(atlas->allocation);
+        free(atlas->surface.Mem);
+        free(atlas);
+        return NULL;
+    }
+
     // zero out the atlas surface
     memset(atlas->surface.Mem, 0x0, txtsize);
 

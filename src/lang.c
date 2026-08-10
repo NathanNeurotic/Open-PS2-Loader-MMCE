@@ -210,8 +210,14 @@ int lngSetGuiValue(int langID)
                     return 1;
                 }
             }
+            /* Free the previously-loaded foreign lang_strs before switching to
+               internalEnglish. guiLangID is still non-zero here so lngFreeFromFile's
+               guard correctly allows the free; nValidEntries still holds the old
+               file-entry count so the per-entry loop is correctly bounded. */
+            lngFreeFromFile(lang_strs);
             lang_strs = internalEnglish;
             guiLangID = 0;
+            nValidEntries = LANG_STR_COUNT;
             // lang switched back to internalEnglish, reload default font
             fntLoadDefault(NULL);
             thmSetGuiValue(thmGetGuiValue(), 1);

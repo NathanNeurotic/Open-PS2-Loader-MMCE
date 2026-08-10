@@ -19,9 +19,10 @@
 #include "include/system.h"
 #include "include/ioman.h"
 #include "include/sound.h"
-#include "include/favsupport.h" // gFAVStartMode -- the Favourites tab counts as "something to show"
-#include "include/vcdsupport.h" // vcdViewActive() -- VCD launches never use Neutrino
-#include "include/bdmsupport.h" // bdmSupportIsUDPBD() -- UDPBD games are Neutrino-only
+#include "include/favsupport.h"   // gFAVStartMode -- the Favourites tab counts as "something to show"
+#include "include/folderbrowse.h" // menuFolderResetLeaving -- leave a device page at its folder root
+#include "include/vcdsupport.h"   // vcdViewActive() -- VCD launches never use Neutrino
+#include "include/bdmsupport.h"   // bdmSupportIsUDPBD() -- UDPBD games are Neutrino-only
 #include <assert.h>
 
 enum MENU_IDs {
@@ -755,6 +756,25 @@ void submenuSort(submenu_list_t **submenu, int mode)
     *submenu = head;
 }
 
+// Folder browsing: return the device page we are leaving to its folder root, so a device is never
+// parked inside a subfolder while off-screen. This keeps folder navigation a per-visit affair and
+// guarantees the Favourites tab / last-played always resolve against a device's root list. It also
+// frees the single shared breadcrumb buffer for the next device by restoring the device-name title.
+static void menuFolderResetLeaving(struct menu_list *leaving)
+{
+    if (leaving == NULL || leaving->item == NULL || leaving->item->userdata == NULL)
+        return;
+    item_list_t *support = (item_list_t *)leaving->item->userdata;
+    if (!folderModeSupported(support->mode) || folderDepth(support->mode) == 0)
+        return;
+    folderReset(support->mode);
+    leaving->item->text = NULL;
+    leaving->item->text_id = support->itemTextId(support); // restore the device name (was the breadcrumb)
+    // Queue the rebuild now (folderReset marked the mode dirty) so the device is back at its root list
+    // promptly -- the Favourites tab / last-played resolve against that root, not the subfolder we left.
+    ioPutRequest(IO_MENU_UPDATE_DEFFERED, &support->mode);
+}
+
 static void menuNextH()
 {
     struct menu_list *next = selected_item->next;
@@ -763,6 +783,7 @@ static void menuNextH()
 
     // If we found a valid menu transition to it.
     if (next != NULL) {
+        menuFolderResetLeaving(selected_item);
         selected_item = next;
         itemConfigId = -1;
         sfxPlay(SFX_CURSOR);
@@ -776,6 +797,7 @@ static void menuPrevH()
         prev = prev->prev;
 
     if (prev != NULL) {
+        menuFolderResetLeaving(selected_item);
         selected_item = prev;
         itemConfigId = -1;
         sfxPlay(SFX_CURSOR);
