@@ -62,17 +62,25 @@ int ioRegisterHandler(int type, io_request_handler_t handler)
 {
     WaitSema(gProcSemaId);
 
-    if (handler == NULL)
+    // Every early return below must release gProcSemaId, otherwise a registration
+    // failure leaves the semaphore held and deadlocks the entire I/O subsystem.
+    if (handler == NULL) {
+        SignalSema(gProcSemaId);
         return IO_ERR_INVALID_HANDLER;
+    }
 
-    if (gHandlerCount >= MAX_IO_HANDLERS)
+    if (gHandlerCount >= MAX_IO_HANDLERS) {
+        SignalSema(gProcSemaId);
         return IO_ERR_TOO_MANY_HANDLERS;
+    }
 
     int i;
 
     for (i = 0; i < gHandlerCount; ++i) {
-        if (gRequestHandlers[i].type == type)
+        if (gRequestHandlers[i].type == type) {
+            SignalSema(gProcSemaId);
             return IO_ERR_DUPLICIT_HANDLER;
+        }
     }
 
     gRequestHandlers[gHandlerCount].type = type;
@@ -215,17 +223,20 @@ int ioPutRequest(int type, void *data)
 
     // We don't have to lock the tip of the queue...
     // If it exists, it won't be touched, if it does not exist, it is not being processed
-    struct io_request_t *req = gReqEnd;
-
+    // Allocate FIRST and bail cleanly on OOM (fork parity): the old shape malloc'd straight into
+    // gReqList/gReqEnd->next and then dereferenced the result, so an allocation failure was a NULL
+    // write plus a corrupted queue tail -- with the semaphore held.
+    struct io_request_t *req = (struct io_request_t *)malloc(sizeof(struct io_request_t));
     if (!req) {
-        gReqList = (struct io_request_t *)malloc(sizeof(struct io_request_t));
-        req = gReqList;
-        gReqEnd = gReqList;
-    } else {
-        req->next = (struct io_request_t *)malloc(sizeof(struct io_request_t));
-        req = req->next;
-        gReqEnd = req;
+        SignalSema(gEndSemaId);
+        return IO_ERR_TOO_MANY_REQUESTS;
     }
+
+    if (!gReqEnd)
+        gReqList = req;
+    else
+        gReqEnd->next = req;
+    gReqEnd = req;
 
     req->next = NULL;
     req->type = type;

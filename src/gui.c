@@ -1978,6 +1978,11 @@ int guiDeferUpdate(struct gui_update_t *op)
     WaitSema(gSemaId);
 
     struct gui_update_list_t *up = (struct gui_update_list_t *)malloc(sizeof(struct gui_update_list_t));
+    if (!up) {
+        /* OOM: release the semaphore so future callers are not permanently locked out */
+        SignalSema(gSemaId);
+        return -1;
+    }
     up->item = op;
     up->next = NULL;
 
