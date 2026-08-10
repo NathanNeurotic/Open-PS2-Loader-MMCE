@@ -54,7 +54,12 @@ static int showPartPopup = 0;
 static int showThmPopup;
 static int showLngPopup;
 
-static clock_t popupTimer;
+// Notification popup: START tick + how long to hold, NOT an absolute deadline. clock() is a
+// 32-bit microsecond counter, so it wraps every ~71.6 minutes; `clock() >= start + duration`
+// silently becomes false-for-71-minutes whenever the sum crosses the wrap. The (clock() - start)
+// ELAPSED form is correct across one wrap by ordinary unsigned arithmetic.
+static clock_t popupStart;
+static int popupArmed;
 
 // Boot-splash status line: set via guiSetBootStatus(), drawn under the logo by
 // guiRenderGreeting(). Both on the MAIN thread, so gBootStatus needs no locking.
@@ -280,7 +285,7 @@ static void guiResetNotifications(void)
 {
     showThmPopup = 0;
     showLngPopup = 0;
-    popupTimer = 0;
+    popupArmed = 0;
 }
 
 static void guiRenderNotifications(char *string, int y)
@@ -301,8 +306,9 @@ static void guiShowNotifications(void)
     int yadd = 35;
 
     if (showPartPopup || showThmPopup || showLngPopup || showCfgPopup || showNetDhcpPopup) {
-        if (!popupTimer) {
-            popupTimer = clock() + 5000 * (CLOCKS_PER_SEC / 1000);
+        if (!popupArmed) {
+            popupStart = clock();
+            popupArmed = 1;
             sfxPlay(SFX_MESSAGE);
         }
 
@@ -349,7 +355,7 @@ static void guiShowNotifications(void)
             y += yadd;
         }
 
-        if (clock() >= popupTimer) {
+        if ((clock() - popupStart) >= (clock_t)5000 * (CLOCKS_PER_SEC / 1000)) {
             guiResetNotifications();
             showPartPopup = 0;
             showCfgPopup = 0;
@@ -2590,7 +2596,13 @@ void guiIntroLoop(void)
     int greetingAlpha = 0x80;
     const int fadeFrameCount = 0x80 / 2;
     const int fadeDuration = (fadeFrameCount * 1000) / 55; // Average between 50 and 60 fps
-    clock_t tFadeDelayEnd = 0;
+    // Elapsed, not an absolute deadline: this comparison is the ONLY exit from the loop below,
+    // so a clock() wrap between arming and testing it parks OPL on the boot splash for up to
+    // ~71 minutes with no timeout and no escape. clock() is not reset when OPL is re-launched
+    // from a game, so a console that has been on for a while rolls this dice on every boot.
+    clock_t tFadeStart = 0;
+    clock_t tFadeDelay = 0;
+    int tFadeArmed = 0;
 
     while (!endIntro) {
         guiStartFrame();
@@ -2602,14 +2614,16 @@ void guiIntroLoop(void)
             guiRenderGreeting(greetingAlpha);
 
         // Initialize boot sound
-        if (gInitComplete && !tFadeDelayEnd && gEnableBootSND) {
+        if (gInitComplete && !tFadeArmed && gEnableBootSND) {
             // Start playing sound
             sfxPlay(SFX_BOOT);
             // Calculate transition delay
-            tFadeDelayEnd = clock() + (sfxGetSoundDuration(SFX_BOOT) - fadeDuration) * (CLOCKS_PER_SEC / 1000);
+            tFadeStart = clock();
+            tFadeDelay = (clock_t)(sfxGetSoundDuration(SFX_BOOT) - fadeDuration) * (CLOCKS_PER_SEC / 1000);
+            tFadeArmed = 1;
         }
 
-        if (gInitComplete && clock() >= tFadeDelayEnd)
+        if (gInitComplete && (clock() - tFadeStart) >= tFadeDelay)
             greetingAlpha -= 2;
 
         if (greetingAlpha <= 0)
@@ -3116,12 +3130,15 @@ void guiWarning(const char *text, int count)
 
 int guiConfirmVideoMode(void)
 {
-    clock_t timeEnd;
+    // Elapsed form. This auto-revert is the ONLY thing that rescues a user whose new video mode
+    // does not sync -- there is nothing on screen to read and nothing to aim at. A deadline that
+    // straddles the clock() wrap would leave them there.
+    clock_t timeStart;
     int terminate = 0;
 
     sfxPlay(SFX_MESSAGE);
 
-    timeEnd = clock() + OPL_VMODE_CHANGE_CONFIRMATION_TIMEOUT_MS * (CLOCKS_PER_SEC / 1000);
+    timeStart = clock();
     while (!terminate) {
         guiStartFrame();
 
@@ -3133,7 +3150,7 @@ int guiConfirmVideoMode(void)
             terminate = 2;
 
         // If the user fails to respond within the timeout period, deem it as a cancel operation.
-        if (clock() > timeEnd)
+        if ((clock() - timeStart) >= (clock_t)OPL_VMODE_CHANGE_CONFIRMATION_TIMEOUT_MS * (CLOCKS_PER_SEC / 1000))
             terminate = 1;
 
         guiShow();
