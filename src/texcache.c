@@ -107,9 +107,10 @@ static void cacheLoadImage(void *data)
     if (result < 0)
         result = handler->itemGetImage(handler, req->cache->prefix, req->cache->isPrefixRelative, req->value, req->cache->suffix, texture, GS_PSM_CT24);
 
-    if (result < 0)
+    if (result < 0) {
         req->entry->lastUsed = 0;
-    else
+        cacheMemoFail(req->value, req->cache->suffix);
+    } else
         req->entry->lastUsed = guiFrameId;
 
     req->entry->qr = NULL;
@@ -186,8 +187,55 @@ void cacheDestroyCache(image_cache_t *cache)
     free(cache);
 }
 
+#define FAIL_MEMO_SIZE 256
+
+typedef struct {
+    char key[64];
+} fail_memo_entry_t;
+
+static fail_memo_entry_t s_failMemo[FAIL_MEMO_SIZE];
+
+static u32 hashFailKey(const char *str)
+{
+    u32 hash = 5381;
+    int c;
+    while ((c = *str++))
+        hash = ((hash << 5) + hash) + c;
+    return hash % FAIL_MEMO_SIZE;
+}
+
+static void cacheMemoFail(const char *value, const char *suffix)
+{
+    char key[64];
+    if (snprintf(key, sizeof(key), "%s_%s", value, suffix ? suffix : "") >= (int)sizeof(key))
+        return;
+
+    u32 idx = hashFailKey(key);
+    snprintf(s_failMemo[idx].key, sizeof(s_failMemo[idx].key), "%s", key);
+}
+
+static int cacheIsFailMemo(const char *value, const char *suffix)
+{
+    char key[64];
+    if (snprintf(key, sizeof(key), "%s_%s", value, suffix ? suffix : "") >= (int)sizeof(key))
+        return 0;
+
+    u32 idx = hashFailKey(key);
+    return (strcmp(s_failMemo[idx].key, key) == 0);
+}
+
+void cacheInvalidateFailMemo(void)
+{
+    memset(s_failMemo, 0, sizeof(s_failMemo));
+}
+
 GSTEXTURE *cacheGetTexture(image_cache_t *cache, item_list_t *list, int *cacheId, int *UID, char *value)
 {
+    if (cacheIsFailMemo(value, cache->suffix)) {
+        *cacheId = -2;
+        return NULL;
+    }
+
     if (*cacheId == -2) {
         return NULL;
     } else if (*cacheId != -1) {

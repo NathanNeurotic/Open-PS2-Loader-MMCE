@@ -2023,6 +2023,7 @@ void applyConfig(int themeID, int langID, int skipDeviceRefresh)
     // NOTE(rebuild): the fork pairs this with cacheInvalidateFailMemo(), which the rebuild's
     // official-derived texcache does not have. Only the .tar half applies here.
     tarInvalidate(TAR_KIND_ART);
+    cacheInvalidateFailMemo();
 
     // The bound is FAV_MODE, not APP_MODE. The Game Sources picker offers six entries and the last
     // of them is Favourites (guiShowDeviceConfig deviceNames[], byte-identical to the fork), so an

@@ -56,6 +56,7 @@ image_cache_t *cacheInitCache(int userId, const char *prefix, int isPrefixRelati
 void cacheDestroyCache(image_cache_t *cache);
 
 GSTEXTURE *cacheGetTexture(image_cache_t *cache, item_list_t *list, int *cacheId, int *UID, char *value);
+void cacheInvalidateFailMemo(void);
 
 // STUB (rebuild): drain/abort hooks for the fork's THREADED art cache. This rebuild runs the
 // official SYNCHRONOUS cache -- nothing is ever pending or in-flight -- so "drained" is always
