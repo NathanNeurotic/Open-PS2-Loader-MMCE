@@ -2010,7 +2010,22 @@ void applyConfig(int themeID, int langID, int skipDeviceRefresh)
     // official-derived texcache does not have. Only the .tar half applies here.
     tarInvalidate(TAR_KIND_ART);
 
-    if (gDefaultDevice < 0 || gDefaultDevice > APP_MODE)
+    // The bound is FAV_MODE, not APP_MODE. The Game Sources picker offers six entries and the last
+    // of them is Favourites (guiShowDeviceConfig deviceNames[], byte-identical to the fork), so an
+    // APP_MODE bound silently rewrote the two choices ABOVE it -- Favourites and MMCE -- back to
+    // Apps, on every applyConfig AND every boot. Picking "Favourites" as the startup page snapped
+    // the row back to Apps before the value was ever written to the config: the whole feature was
+    // dead with its picker entry, its enum value and its config key all present. Data half without
+    // the code half, again.
+    if (gDefaultDevice < 0 || gDefaultDevice > FAV_MODE)
+        gDefaultDevice = APP_MODE;
+    // Favourites is a valid startup page only while the FAV tab is enabled; otherwise a stale
+    // choice would boot into a hidden tab with no way back to a visible one.
+    if (gDefaultDevice == FAV_MODE && !gFAVStartMode)
+        gDefaultDevice = APP_MODE;
+    // MMCE is checklist item 1 and its support module is a stub here, so it has no page to land on.
+    // The fork falls back TO MMCE_MODE; that target is wrong for this tree until item 1 lands.
+    if (gDefaultDevice == MMCE_MODE)
         gDefaultDevice = APP_MODE;
 
     guiUpdateScrollSpeed();
