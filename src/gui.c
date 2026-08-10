@@ -1762,6 +1762,9 @@ void guiShowDisplayConfig(void)
         , "HDTV 1920x1080i @60Hz 16bit (HIRES)"
         , "PAL 640x256p @50Hz 24bit"
         , "NTSC 640x224p @60Hz 24bit"
+        // Appended LAST to keep every stored $VMode index pointing at the same mode. Index 14 must
+        // stay 1:1 with rm_mode_table[] (renderman.c), which carries the same warning.
+        , "HDTV 1920x1080p @60Hz 16bit (EXPERIMENTAL)"
         , NULL};
     // clang-format on
     int previousVMode;
