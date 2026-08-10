@@ -2670,8 +2670,11 @@ void guiMainLoop(void)
     while (!gTerminate) {
         guiStartFrame();
 
-        // Read the pad states to prepare for input processing in the screen handler
-        guiReadPads();
+        // Read the pad states to prepare for input processing in the screen handler.
+        // Pause polling during transition frames (screenHandlerTarget != NULL) so button presses
+        // made during screen fades are not swallowed before input handling resumes.
+        if (!screenHandlerTarget)
+            guiReadPads();
 
         // handle inputs and render screen
         guiShow();

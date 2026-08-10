@@ -291,7 +291,8 @@ void moduleUpdateMenuInternal(opl_io_module_t *mod, int themeChanged, int langCh
         if (gTheme->infoElems.first)
             menuAddHint(&mod->menuItem, _STR_INFO, SQUARE_ICON);
 
-        if (!(mod->support->flags & MODE_FLAG_NO_COMPAT) || gEnableWrite)
+        unsigned char flags = (mod->support->mode == FAV_MODE) ? favGetFlags(mod->support) : mod->support->flags;
+        if (!(flags & MODE_FLAG_NO_COMPAT) || gEnableWrite)
             menuAddHint(&mod->menuItem, _STR_OPTIONS, TRIANGLE_ICON);
 
         menuAddHint(&mod->menuItem, _STR_REFRESH, SELECT_ICON);
@@ -373,6 +374,11 @@ static void itemExecRefresh(struct menu_item *curMenu)
     item_list_t *support = curMenu->userdata;
 
     if (support && support->enabled) {
+        if (support->mode == FAV_MODE) {
+            favRebuildList();
+        } else if (vcdViewActive(support->mode)) {
+            vcdMarkDirty(support->mode);
+        }
         ioPutRequest(IO_MENU_UPDATE_DEFFERED, &support->mode);
         sfxPlay(SFX_CONFIRM);
     }
@@ -504,7 +510,9 @@ static void itemExecTriangle(struct menu_item *curMenu)
     item_list_t *support = curMenu->userdata;
 
     if (support) {
-        if (!(support->flags & MODE_FLAG_NO_COMPAT)) {
+        unsigned char flags = (support->mode == FAV_MODE) ? favGetFlags(support) : support->flags;
+
+        if (!(flags & MODE_FLAG_NO_COMPAT)) {
             if (menuCheckParentalLock() == 0) {
                 menuInitGameMenu();
                 guiSwitchScreen(GUI_SCREEN_GAME_MENU);
@@ -2000,6 +2008,8 @@ static void _saveConfig()
 
 void applyConfig(int themeID, int langID, int skipDeviceRefresh)
 {
+    padRumbleFlush(); // ensure any active motor pulse is flushed before mode teardown/re-init
+
     // A deliberate settings apply may make new art available, so clear the .tar "no archive
     // anywhere" latch and let it be probed once more. That latch (tar.c s_inactive[]) is write-once
     // and process-wide with no self-clearing path, so without this a user who boots with the loader
