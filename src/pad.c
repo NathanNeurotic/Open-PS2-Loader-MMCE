@@ -10,6 +10,7 @@
 #include <libpad.h>
 #include <timer.h>
 #include <time.h>
+#include <delaythread.h> // DelayThread -- the bounded pad waits yield instead of spinning
 
 #ifdef PADEMU
 #include <libds34bt.h>
@@ -39,6 +40,7 @@ struct pad_data_t
     char actAlign[6];
     int actuators;
     int actAligned; // padSetActAlign confirmed; see padRumbleRealign()
+    int needsInit;  // reconnect-edge re-init pending; runs once the idle gate opens (see readPad)
 };
 
 /// current time in miliseconds (last update time)
@@ -75,17 +77,46 @@ static const int keyToPad[17] = {
     PAD_R2,
     PAD_L2};
 
+static int isPadReadyState(int state)
+{
+    return (state == PAD_STATE_STABLE) || (state == PAD_STATE_FINDCTP1);
+}
+
+// Pad commands are asynchronous. Keep every wait BOUNDED so a transient SIO2/pad error cannot hang
+// the GUI thread (fork #271/#272 hardening). The upstream form spun forever with no exit for
+// PAD_STATE_ERROR and no yield -- padGetState is an EE-local read of the DMA'd buffer, so the loop
+// neither blocks nor sleeps. Loading mx4sio_bd contends with freepad on the shared SIO2 bus, the
+// pad drops to an error/reconnect state under that traffic, and the renderer thread then spun in
+// here for good: a full hard freeze of the menu with the plasma stopped -- reproduced on hardware
+// by enabling BDM HDD + USB + MX4SIO in one visit. Bounded, the same event is a logged <=25 ms
+// hiccup and the pad recovers on a later poll.
+#define PAD_WAIT_POLLS   25
+#define PAD_WAIT_POLL_US 1000
+
+// Milliseconds without any registered input before a reconnect-edge initializePad() may run
+// (#271/#272). The init is a few hundred ms of polled waits on the GUI thread, and its trigger --
+// freepad dropping the pad under SIO2 contention -- fires exactly while the user is navigating.
+// Maintained in readPads(); resets on any pressed button. A wrap-garbage time_since_last sample
+// only ever makes the counter LARGER (more idle), which opens the gate early -- benign.
+#define PAD_SELF_HEAL_IDLE_MS 1000
+static u32 padIdleMs = 0;
+
 /*
  * waitPadReady()
  */
 static int waitPadReady(struct pad_data_t *pad)
 {
-    int state;
+    int state = PAD_STATE_DISCONN;
+    int polls;
 
-    // busy wait for the pad to get ready
-    do {
+    for (polls = 0; polls < PAD_WAIT_POLLS; polls++) {
         state = padGetState(pad->port, pad->slot);
-    } while ((state != PAD_STATE_STABLE) && (state != PAD_STATE_FINDCTP1) && (state != PAD_STATE_DISCONN));
+        if (isPadReadyState(state) || (state == PAD_STATE_DISCONN))
+            return state;
+        DelayThread(PAD_WAIT_POLL_US);
+    }
+
+    LOG("PAD pad %d,%d ready wait timed out in state %d\n", pad->port, pad->slot, state);
 
     return state;
 };
@@ -276,14 +307,25 @@ static int readPad(struct pad_data_t *pad)
     oldState = pad->state;
     newState = padGetState(pad->port, pad->slot);
     updatePadState(pad, newState);
-    if ((oldState == PAD_STATE_DISCONN) && ((pad->state == PAD_STATE_STABLE) || (pad->state == PAD_STATE_FINDCTP1))) {
-        // Pad just connected.
+    if ((oldState == PAD_STATE_DISCONN) && isPadReadyState(pad->state)) {
+        // Pad just connected. DEFER the re-init behind the idle gate below rather than running it
+        // inline: reconnect edges are DRIVEN by the read errors that cluster under SIO2 load
+        // (loading mx4sio_bd, MMCE traffic), so ungated this fired precisely while the user was
+        // navigating, spending the init's polled waits ON THE GUI THREAD mid-input (#271/#272).
+        // A not-yet-initialised pad still reads every d-pad press in digital mode, so deferring
+        // costs nothing the user can feel; a genuinely fresh plug-in is idle by definition and
+        // initialises on the next frame.
         LOG("PAD pad %d,%d connected\n", pad->port, pad->slot);
-        initializePad(pad);
+        pad->needsInit = 1;
     }
     // The pad may transit from any state to disconnected. So check only for the disconnected state.
     else if ((oldState != PAD_STATE_DISCONN) && (pad->state == PAD_STATE_DISCONN)) {
         LOG("PAD pad %d,%d disconnected\n", pad->port, pad->slot);
+    }
+
+    if (pad->needsInit && isPadReadyState(pad->state) && padIdleMs >= PAD_SELF_HEAL_IDLE_MS) {
+        pad->needsInit = 0;
+        initializePad(pad);
     }
 
     if ((pad->state == PAD_STATE_STABLE) || (pad->state == PAD_STATE_FINDCTP1)) {
@@ -509,6 +551,12 @@ int readPads()
     for (i = 0; i < pad_count; ++i) {
         rslt |= readPad(&pad_data[i]);
     }
+
+    // Idle clock for the reconnect-edge self-heal gate (see PAD_SELF_HEAL_IDLE_MS).
+    if (paddata)
+        padIdleMs = 0;
+    else
+        padIdleMs += time_since_last;
 
     // Rumble decay + re-send. Unsigned elapsed in RAW ticks -- see the note above padActSet().
     // The re-send is not redundant: freepad drops padSetActDirect outside TASK_UPDATE_PAD and still
