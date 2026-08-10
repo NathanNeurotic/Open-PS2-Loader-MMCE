@@ -23,7 +23,7 @@ static u8 hires = 0;
 static u8 guiWakeupCount;
 static int vsync_id = -1;
 
-#define NUM_RM_VMODES 14
+#define NUM_RM_VMODES 15
 #define RM_VMODE_AUTO 0
 
 // RM Vmode -> GS Vmode conversion table
@@ -62,6 +62,27 @@ static struct rm_mode rm_mode_table[NUM_RM_VMODES] = {
     // 24 bit color mode for older systems (non-interlaced, low resolution)
     {GS_MODE_PAL,        16,  640,  256,  1, 4, GS_NONINTERLACED, GS_FRAME, RM_ARATIO_4_3,  8, 15}, // PAL@50Hz
     {GS_MODE_NTSC,       16,  640,  224,  1, 4, GS_NONINTERLACED, GS_FRAME, RM_ARATIO_4_3,  7, 15}, // NTSC@60Hz
+    // 1080p for the OPL MENU ITSELF (issue #163). EXPERIMENTAL.
+    //
+    // APPENDED LAST, never inserted: $VMode is a stored RAW INDEX, so a mid-list insert would
+    // silently remap every existing saved config onto a different mode.
+    //
+    // It is the 1080i row above with the interlace turned OFF, and that is the whole trick. The GS
+    // has no native 1080p, but the ROM's SetGsCrt takes interlace as a separate argument from the
+    // mode, so asking it for GS_MODE_DTV_1080I NON-interlaced gets a real, ROM-programmed 1080-line
+    // progressive raster with no custom register writes at all. That matters here: the multi-pass
+    // hires renderer rewrites DISPLAY every vblank, so anything we patched in by hand would be
+    // overwritten a frame later. GSM needs its own synthetic 0x54 mode for games only because it
+    // hooks SetGsCrt and must tell "the game asked for 1080i" apart from "we are synthesising
+    // 1080p" -- a mode WE select for our own screen has no such ambiguity. The GSM 1080p row's
+    // DISPLAY/SYNCV are byte-identical to its 1080i row (gsm.c), which is the evidence that
+    // interlace really is the only delta.
+    //
+    // Unlike the 1080i row this does NOT get Height/=2 in rmSetMode (that halving only applies to
+    // INTERLACED+FRAME), so the buffer really is 1080 lines. 1920x1080 at 16bit will not fit in
+    // 4MB of VRAM twice over, which is why passes stays 3: the hires path renders and DMAs one
+    // ~360-line band at a time rather than allocating the whole frame.
+    {GS_MODE_DTV_1080I,  31, 1920, 1080,  3, 1, GS_NONINTERLACED, GS_FRAME, RM_ARATIO_16_9, 1,  1}, // HDTV1080P@60Hz
 };
 // clang-format on
 
