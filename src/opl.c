@@ -1309,12 +1309,9 @@ static int prepareCustomSettingsPath(char *path, int pathLen)
 
 static int tryAlternateDevice(int types)
 {
-    char pwd[8];
     char redirectPath[64];
     int value;
     DIR *dir;
-
-    getcwd(pwd, sizeof(pwd));
 
     // The user's Custom Settings Path, if one was set, takes precedence over every discovery probe
     // below -- it is an explicit instruction, not a guess.
@@ -1327,46 +1324,34 @@ static int tryAlternateDevice(int types)
             if (value & CONFIG_OPL)
                 return value;
         } else {
-            // Named a BDM device that never mounted. Fall through to discovery so this boot still
-            // has settings, but do NOT rewrite the redirect -- the user's choice stands, and the
-            // next boot (card reinserted) picks it up again.
-            LOG("CONFIG custom settings path %s did not mount; using discovery this boot\n", redirectPath);
+            // Named a BDM device that never mounted.
+            LOG("CONFIG custom settings path %s did not mount\n", redirectPath);
         }
     }
 
-    // First, try the device that OPL booted from.
-    if (!strncmp(pwd, "mass", 4) && (pwd[4] == ':' || pwd[5] == ':')) {
-        if ((value = checkLoadConfigBDM(types)) != 0)
-            return value;
-    } else if (!strncmp(pwd, "hdd", 3) && (pwd[3] == ':' || pwd[4] == ':')) {
-        if ((value = checkLoadConfigHDD(types)) != 0)
-            return value;
+    // If OPL was booted from a valid CWD/boot directory (gBootDir is set, e.g. "mc0:/OPL" or "mc0:"),
+    // settings are strictly homed to gBootDir. Never probe alternate devices (mass0:/hdd0:) or hijack
+    // the save location away from CWD/Memory Card.
+    if (gBootDir[0] != '\0') {
+        configPrepareNotifications(gBootDir);
+        showCfgPopup = 0;
+        return 0;
     }
 
-    // Config was not found on the boot device. Check all supported devices.
-    //  Check USB device
-    if ((value = checkLoadConfigBDM(types)) != 0)
-        return value;
-    // Check HDD
-    if ((value = checkLoadConfigHDD(types)) != 0)
-        return value;
-
-    // At this point, the user has no loadable config files on any supported device, so try to find a device to save on.
-    // We don't want to get users into alternate mode for their very first launch of OPL (i.e no config file at all, but still want to save on MC)
-    // Check for a memory card inserted.
+    // Bare ELF launch without boot directory context: try Memory Card first.
     if (sysCheckMC() >= 0) {
         configPrepareNotifications(gBaseMCDir);
         showCfgPopup = 0;
         return 0;
     }
-    // No memory cards? Try a USB device...
+
+    // No memory card? Check mass0: or HDD as last resort for bare launches...
     dir = opendir("mass0:");
     if (dir != NULL) {
         closedir(dir);
         configEnd();
         configInit("mass0:");
     } else {
-        // No? Check if the save location on the HDD is available.
         dir = opendir(gHDDPrefix);
         if (dir != NULL) {
             closedir(dir);
