@@ -42,23 +42,38 @@ static int artTarLoadImage(const char *value, const char *suffix, GSTEXTURE *tex
     void *buffer;
     int result;
 
-    if (snprintf(name, sizeof(name), "%s_%s.png", value, suffix) >= (int)sizeof(name))
+    // EVERY failure below returns -1, and the caller then falls through to the loose-file lookup --
+    // which on a .tar-ONLY setup finds nothing and shows no art, with nothing logged to say why.
+    // A tester reported exactly that shape (covers from the archive, backgrounds and screenshots
+    // blank) and there was no way to tell which of these four branches fired. Each one now says so.
+    // Backgrounds and screenshots are several times the size of a cover, so the malloc is the branch
+    // most likely to be the culprit -- and it was the most silent.
+    if (snprintf(name, sizeof(name), "%s_%s.png", value, suffix) >= (int)sizeof(name)) {
+        LOG("ART TAR: key too long for %s_%s.png (max %d)\n", value, suffix, (int)sizeof(name) - 1);
         return -1;
+    }
 
     entry = tarFind(TAR_KIND_ART, name);
-    if (entry == NULL)
+    if (entry == NULL) {
+        LOG("ART TAR: '%s' not in the archive index\n", name);
         return -1;
+    }
 
     buffer = malloc(entry->rawSize);
-    if (buffer == NULL)
+    if (buffer == NULL) {
+        LOG("ART TAR: out of memory for '%s' (%u bytes)\n", name, entry->rawSize);
         return -1;
+    }
 
     if (tarRead(TAR_KIND_ART, entry, buffer, entry->rawSize) != entry->rawSize) {
+        LOG("ART TAR: short read for '%s' (%u bytes expected)\n", name, entry->rawSize);
         free(buffer);
         return -1;
     }
 
     result = texLoadFromMemory(texture, buffer, entry->rawSize);
+    if (result < 0)
+        LOG("ART TAR: '%s' found (%u bytes) but PNG decode failed (%d)\n", name, entry->rawSize, result);
     free(buffer);
     return result;
 }
