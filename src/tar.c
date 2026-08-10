@@ -478,6 +478,33 @@ TarEntryBase *tarFind(TarKind kind, const char *filename)
     return NULL;
 }
 
+TarEntryBase *tarFindPrefix(TarKind kind, const char *prefix)
+{
+    if (s_inactive[kind])
+        return NULL;
+
+    if (!s_index[kind] || s_count[kind] == 0)
+        if (tarLoadFromAnyDevice(kind) < 0)
+            return NULL;
+
+    size_t prefixLen = strlen(prefix);
+    u32 entrySize = gTarInfo[kind].entrySize;
+    char *base = (char *)s_index[kind];
+
+    for (u32 i = 0; i < s_count[kind]; i++) {
+        char *entry = base + entrySize * i;
+        char *fname = entry + sizeof(TarEntryBase);
+
+        const char *baseFname = strrchr(fname, '/');
+        baseFname = baseFname ? baseFname + 1 : fname;
+
+        if (strncasecmp(baseFname, prefix, prefixLen) == 0)
+            return (TarEntryBase *)entry;
+    }
+
+    return NULL;
+}
+
 u32 tarRead(TarKind kind, const TarEntryBase *entry, void *dst, u32 dstSize)
 {
     if (s_inactive[kind])

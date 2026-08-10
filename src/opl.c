@@ -1199,6 +1199,8 @@ static int checkLoadConfigBDM(int types)
             gEnableBdmHDD = 1;
             configSetInt(configOPL, CONFIG_OPL_ENABLE_BDMHDD, gEnableBdmHDD);
         }
+        if (gBootDir[0] != '\0')
+            configSetMove(gBootDir);
         return value;
     }
 
@@ -1227,6 +1229,8 @@ static int checkLoadConfigHDD(int types)
         value = configReadMulti(types);
         config_set_t *configOPL = configGetByType(CONFIG_OPL);
         configSetInt(configOPL, CONFIG_OPL_HDD_MODE, START_MODE_AUTO);
+        if (gBootDir[0] != '\0')
+            configSetMove(gBootDir);
         return value;
     }
 

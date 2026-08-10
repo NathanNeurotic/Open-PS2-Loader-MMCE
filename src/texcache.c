@@ -37,23 +37,18 @@ typedef struct
 //   DEFAULT PATH: gEnableArtTar ships 0, so none of the above is reachable unless the user opts in.
 static int artTarLoadImage(const char *value, const char *suffix, GSTEXTURE *texture)
 {
-    char name[64];
+    char prefix[64];
     TarEntryBase *entry = NULL;
     void *buffer;
     int result;
-    static const char *extensions[] = {".png", ".jpg", ".PNG", ".JPG", ".jpeg", ".JPEG", NULL};
 
-    for (int i = 0; extensions[i] != NULL; i++) {
-        if (snprintf(name, sizeof(name), "%s_%s%s", value, suffix, extensions[i]) >= (int)sizeof(name))
-            continue;
+    if (snprintf(prefix, sizeof(prefix), "%s_%s.", value, suffix) >= (int)sizeof(prefix))
+        return -1;
 
-        entry = tarFind(TAR_KIND_ART, name);
-        if (entry != NULL)
-            break;
-    }
+    entry = tarFindPrefix(TAR_KIND_ART, prefix);
 
     if (entry == NULL) {
-        LOG("ART TAR: '%s_%s' (png/jpg) not in the archive index\n", value, suffix);
+        LOG("ART TAR: '%s_%s' not in the archive index\n", value, suffix);
         return -1;
     }
 
