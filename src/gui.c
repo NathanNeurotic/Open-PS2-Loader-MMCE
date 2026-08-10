@@ -2843,6 +2843,13 @@ int guiMsgBox(const char *text, int addAccept, struct UIItem *ui)
 
 void guiHandleDeferedIO(int *ptr, const char *message, int type, void *data, int timeoutMs)
 {
+    // Neither of these loops calls readPads(), so the rumble decay is frozen for the whole wait.
+    // The IOP LATCHES the actuator state, so a pulse armed by the SFX_CONFIRM that started this
+    // save keeps the motor spinning for the entire blocking operation -- seconds, at full level.
+    // GUI thread only: every libpad call in pad.c is, and applyConfig() is NOT a safe home for
+    // this because _loadConfig() reaches it from the IO worker.
+    padRumbleFlush();
+
     // A rejected request never runs, so nothing will ever clear *ptr -- without this the loop below
     // would spin forever on a queue-full/failed put. Clear it here so the caller falls into its
     // normal failure path instead of hanging.
@@ -2877,6 +2884,13 @@ void guiHandleDeferedIO(int *ptr, const char *message, int type, void *data, int
 
 void guiGameHandleDeferedIO(int *ptr, struct UIItem *ui, int type, void *data)
 {
+    // Neither of these loops calls readPads(), so the rumble decay is frozen for the whole wait.
+    // The IOP LATCHES the actuator state, so a pulse armed by the SFX_CONFIRM that started this
+    // save keeps the motor spinning for the entire blocking operation -- seconds, at full level.
+    // GUI thread only: every libpad call in pad.c is, and applyConfig() is NOT a safe home for
+    // this because _loadConfig() reaches it from the IO worker.
+    padRumbleFlush();
+
     // A rejected request never runs, so nothing will ever clear *ptr and the loop below spins
     // forever. The sibling guiHandleDeferedIO already checks this; this one did not.
     if (ioPutRequest(type, data) != IO_OK) {

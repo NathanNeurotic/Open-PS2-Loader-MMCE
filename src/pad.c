@@ -38,6 +38,7 @@ struct pad_data_t
 
     char actAlign[6];
     int actuators;
+    int actAligned; // padSetActAlign confirmed; see padRumbleRealign()
 };
 
 /// current time in miliseconds (last update time)
@@ -100,7 +101,10 @@ static int initializePad(struct pad_data_t *pad)
     // Cleared up front because every path below can return before padInfoAct() is reached. Without
     // this, unplugging a DualShock and plugging a digital pad into the same port would leave the
     // old actuator count behind, and the rumble engine would drive engines that are not there.
+    // actAligned goes with it: freepad resets its alignment to 0xFF on padPortOpen, so a stale 1
+    // here would suppress the realign retry and every send would drive actuator index 0xFF.
     pad->actuators = 0;
+    pad->actAligned = 0;
 
     // is there any device connected to that port?
     if (waitPadReady(pad) == PAD_STATE_DISCONN) {
@@ -182,6 +186,7 @@ static int initializePad(struct pad_data_t *pad)
 
         waitPadReady(pad);
         tmp = padSetActAlign(pad->port, pad->slot, pad->actAlign);
+        pad->actAligned = (tmp != 0);
         LOG("PAD padSetActAlign: %d\n", tmp);
     } else {
         LOG("PAD Did not find any actuators.\n");
@@ -356,9 +361,47 @@ This is why the feature needs none of the pad-clock rework it was originally blo
 static u32 rumbleStartTicks = 0;
 static u32 rumbleDurTicks = 0;
 static int rumbleActive = 0;
+static int rumbleLarge = 0;
 
 // Longest pulse we will ever hold a motor on for. Menu feedback, not a sustained buzz.
 #define RUMBLE_MAX_MS 500
+
+/* THE TWO THINGS THAT MAKE THIS SILENT ON REAL HARDWARE, both properties of freepad.irx -- which is
+   what we ship as padman (Makefile: asm/padman.c is built from $(PS2SDK)/iop/irx/freepad.irx):
+
+   1. freepad DROPS padSetActDirect unless its current task is TASK_UPDATE_PAD, and it still returns
+      1 when it does. Sending once per pulse means one unlucky frame eats the whole pulse. So the
+      command is RE-SENT every frame for the pulse's life. Do NOT "optimise" this back to send-once.
+
+   2. freepad fills its actuator alignment with 0xFF on padPortOpen, and padSetActAlign is the only
+      thing that overwrites it. padSetActDirect latches the bytes and returns 1 WITHOUT consulting
+      the alignment -- so if padSetActAlign never ran, every send reports success and drives actuator
+      index 0xFF, i.e. nothing at all. initializePad() has five bail-outs above padSetActAlign, so
+      this is reachable; padRumbleRealign() below retries it.
+
+   Neither shows up in a log or a return value. Both were found the expensive way. */
+
+// Alignment confirmed for this pad. Tracked so it can be RETRIED -- never used to veto a send: an
+// earlier fork revision gated sends on this and on a padInfoAct count, and any single init hiccup
+// then killed rumble silently for the whole session.
+static void padRumbleRealign(struct pad_data_t *pad)
+{
+    if (pad->actAligned || pad->actuators == 0)
+        return;
+
+    pad->actAlign[0] = 0; // small engine -> byte 0 of padSetActDirect
+    pad->actAlign[1] = 1; // big engine   -> byte 1
+    pad->actAlign[2] = 0xff;
+    pad->actAlign[3] = 0xff;
+    pad->actAlign[4] = 0xff;
+    pad->actAlign[5] = 0xff;
+
+    // No waitPadRequestComplete(): that blocks the GUI thread for up to ~150 ms, and this sits on
+    // the path readPads() drives. A refused request just retries on the next pulse -- pulses are
+    // user-driven and seconds apart, so an unbounded lazy retry costs nothing.
+    if (padSetActAlign(pad->port, pad->slot, pad->actAlign))
+        pad->actAligned = 1;
+}
 
 static void padActSet(struct pad_data_t *pad, int small, int large)
 {
@@ -367,11 +410,13 @@ static void padActSet(struct pad_data_t *pad, int small, int large)
     if (pad->actuators == 0)
         return;
 
+    padRumbleRealign(pad);
+
     memset(act, 0, sizeof(act));
     act[0] = small ? 1 : 0;        // small engine: on/off only
     act[1] = (char)(large & 0xff); // large engine: 0..255
-    // Fire-and-forget: padSetActDirect queues a SIO2 request and returns. Deliberately NOT preceded
-    // by waitPadReady() -- that is a busy wait, and this runs on the GUI thread.
+    // Fire-and-forget: padSetActDirect latches six bytes on the IOP and returns. Deliberately NOT
+    // preceded by waitPadReady() -- that is a busy wait, and this runs on the GUI thread.
     padSetActDirect(pad->port, pad->slot, act);
 }
 
@@ -388,6 +433,11 @@ void padRumbleFlush(void)
 
     rumbleActive = 0;
     rumbleDurTicks = 0;
+    rumbleLarge = 0;
+    // Sent twice: the IOP LATCHES the actuator state, so a dropped "off" leaves the motor spinning
+    // with nothing left to stop it. The "on" gets a re-send every frame; the "off" gets no frames.
+    for (i = 0; i < pad_count; ++i)
+        padActSet(&pad_data[i], 0, 0);
     for (i = 0; i < pad_count; ++i)
         padActSet(&pad_data[i], 0, 0);
 }
@@ -413,6 +463,7 @@ void padRumble(int durationMs, int large)
     rumbleStartTicks = cpu_ticks();
     rumbleDurTicks = (u32)durationMs * CLOCKS_PER_MILISEC;
     rumbleActive = 1;
+    rumbleLarge = large;
 
     for (i = 0; i < pad_count; ++i)
         padActSet(&pad_data[i], 1, large);
@@ -436,9 +487,17 @@ int readPads()
         rslt |= readPad(&pad_data[i]);
     }
 
-    // Rumble decay. Unsigned elapsed in RAW ticks -- see the note above padActSet().
-    if (rumbleActive && (u32)(cpu_ticks() - rumbleStartTicks) >= rumbleDurTicks)
-        padRumbleFlush();
+    // Rumble decay + re-send. Unsigned elapsed in RAW ticks -- see the note above padActSet().
+    // The re-send is not redundant: freepad drops padSetActDirect outside TASK_UPDATE_PAD and still
+    // reports success, so a pulse sent only once can be silently swallowed whole.
+    if (rumbleActive) {
+        if ((u32)(cpu_ticks() - rumbleStartTicks) >= rumbleDurTicks) {
+            padRumbleFlush();
+        } else {
+            for (i = 0; i < pad_count; ++i)
+                padActSet(&pad_data[i], 1, rumbleLarge);
+        }
+    }
 
     for (i = 0; i < 16; ++i) {
         if (getKeyPressed(i + 1))
