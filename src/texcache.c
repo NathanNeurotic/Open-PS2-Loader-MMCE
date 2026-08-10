@@ -231,6 +231,9 @@ void cacheInvalidateFailMemo(void)
 
 GSTEXTURE *cacheGetTexture(image_cache_t *cache, item_list_t *list, int *cacheId, int *UID, char *value)
 {
+    if (cache == NULL || list == NULL || cacheId == NULL || UID == NULL || value == NULL || value[0] == '\0')
+        return NULL;
+
     if (cacheIsFailMemo(value, cache->suffix)) {
         *cacheId = -2;
         return NULL;

@@ -805,15 +805,27 @@ static GSTEXTURE *getGameImageTexture(image_cache_t *cache, void *support, struc
     // Folder browsing: a folder row has no cover art (and no startup key). Never route it through the
     // cover cache -- an empty key would thrash the cache and paint the empty case frame. Applies to
     // every consumer: the list decorator, the big cover panel and the coverflow carousel.
-    if (item != NULL && item->isFolder)
+    if (item == NULL || item->isFolder)
+        return NULL;
+
+    if (cache == NULL || cache->userId < 0 || item->cache_id == NULL || item->cache_uid == NULL)
+        return NULL;
+
+    if (gTheme == NULL || cache->userId >= gTheme->gameCacheCount)
         return NULL;
 
     if (gEnableArt) {
-        if (cache != NULL && cache->suffix != NULL && strcmp(cache->suffix, "BG") == 0 && !gEnableBGArt)
+        if (cache->suffix != NULL && strcmp(cache->suffix, "BG") == 0 && !gEnableBGArt)
             return NULL;
 
         item_list_t *list = (item_list_t *)support;
+        if (list == NULL || list->itemGetStartup == NULL)
+            return NULL;
+
         char *startup = list->itemGetStartup(list, item->id);
+        if (startup == NULL || startup[0] == '\0')
+            return NULL;
+
         return cacheGetTexture(cache, list, &item->cache_id[cache->userId], &item->cache_uid[cache->userId], startup);
     }
 
@@ -1723,12 +1735,14 @@ static void initItemsList(const char *themePath, config_set_t *themeConfig, them
 
 static void drawItemText(struct menu_list *menu, struct submenu_list *item, config_set_t *config, struct theme_element *elem)
 {
-    if (item) {
+    if (menu != NULL && menu->item != NULL && item != NULL) {
         item_list_t *support = menu->item->userdata;
-        // In a VCD view itemGetStartup returns the (full) VCD name, so this is the name caption some
-        // CoverFlow/custom themes use instead of an ItemsList. Apply the same display-only game-ID
-        // hide (no-op for non-VCD views, where this shows the real startup/game-ID). Cosmetic only.
-        fntRenderString(elem->font, elem->posX, elem->posY, elem->aligned, 0, 0, vcdDisplayName(support->mode, support->itemGetStartup(support, item->item.id)), elem->color);
+        if (support != NULL && support->itemGetStartup != NULL) {
+            char *startup = support->itemGetStartup(support, item->item.id);
+            if (startup != NULL) {
+                fntRenderString(elem->font, elem->posX, elem->posY, elem->aligned, 0, 0, vcdDisplayName(support->mode, startup), elem->color);
+            }
+        }
     }
 }
 

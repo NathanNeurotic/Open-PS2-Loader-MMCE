@@ -501,6 +501,8 @@ static void fntRenderGlyph(fnt_glyph_cache_entry_t *glyph, int pen_x, int pen_y)
 #ifndef __RTL
 int fntRenderString(int id, int x, int y, short aligned, size_t width, size_t height, const char *string, u64 colour)
 {
+    if (string == NULL)
+        return 0;
     // wait for font lock to unlock
     WaitSema(gFontSemaId);
     font_t *font = &fonts[id];
@@ -791,6 +793,8 @@ void fntFitString(int id, char *string, size_t width)
 
 int fntCalcDimensions(int id, const char *str)
 {
+    if (str == NULL)
+        return 0;
     int w = 0;
 
     WaitSema(gFontSemaId);
