@@ -1966,8 +1966,6 @@ int bdmResolveBootDir(char *bootDir, int bootDirSize, const char *elfName, int *
 
         if (matchSlot >= 0) {
             *ioBdmType = matchType;
-            if (matchType == BDM_TYPE_ATA)
-                gEnableBdmHDD = 1;
             bdmRewriteBootDir(bootDir, bootDirSize, matchSlot, tail);
             return 1;
         }
@@ -1975,8 +1973,6 @@ int bdmResolveBootDir(char *bootDir, int bootDirSize, const char *elfName, int *
         if ((GetTimerSystemTime() - start) / (kBUSCLK / 1000) > budgetMs) {
             if (fallbackSlot >= 0) {
                 *ioBdmType = fallbackType;
-                if (fallbackType == BDM_TYPE_ATA)
-                    gEnableBdmHDD = 1;
                 bdmRewriteBootDir(bootDir, bootDirSize, fallbackSlot, tail);
                 return 1;
             }
