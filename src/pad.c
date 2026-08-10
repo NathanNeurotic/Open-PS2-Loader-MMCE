@@ -97,6 +97,11 @@ static int initializePad(struct pad_data_t *pad)
 
     LOG("PAD initializing pad %d,%d\n", pad->port, pad->slot);
 
+    // Cleared up front because every path below can return before padInfoAct() is reached. Without
+    // this, unplugging a DualShock and plugging a digital pad into the same port would leave the
+    // old actuator count behind, and the rumble engine would drive engines that are not there.
+    pad->actuators = 0;
+
     // is there any device connected to that port?
     if (waitPadReady(pad) == PAD_STATE_DISCONN) {
         LOG("PAD pad %d,%d not connected.\n", pad->port, pad->slot);
@@ -339,6 +344,80 @@ static int getKeyDelay(int id, int repeat)
     return delay;
 }
 
+/*--    Menu rumble    ------------------------------------------------------------------------------
+Opt-in (gEnableRumble). The pulse is timed against RAW cpu_ticks() elapsed since it started, and
+NOT against time_since_last below -- that value is the difference of two ALREADY divided cpu_ticks()
+readings, so it goes wild once every ~29.1 s when the 32-bit tick counter wraps. On a decrementing
+"milliseconds left" counter a single bad sample adds ~29 s to the pulse: a motor latched on. An
+elapsed comparison in raw ticks is correct across one wrap by ordinary unsigned arithmetic, and a
+pulse is capped below at a fraction of a second, so one wrap is the most that can occur inside it.
+This is why the feature needs none of the pad-clock rework it was originally blocked on.
+----------------------------------------------------------------------------------------------------*/
+static u32 rumbleStartTicks = 0;
+static u32 rumbleDurTicks = 0;
+static int rumbleActive = 0;
+
+// Longest pulse we will ever hold a motor on for. Menu feedback, not a sustained buzz.
+#define RUMBLE_MAX_MS 500
+
+static void padActSet(struct pad_data_t *pad, int small, int large)
+{
+    char act[6];
+
+    if (pad->actuators == 0)
+        return;
+
+    memset(act, 0, sizeof(act));
+    act[0] = small ? 1 : 0;        // small engine: on/off only
+    act[1] = (char)(large & 0xff); // large engine: 0..255
+    // Fire-and-forget: padSetActDirect queues a SIO2 request and returns. Deliberately NOT preceded
+    // by waitPadReady() -- that is a busy wait, and this runs on the GUI thread.
+    padSetActDirect(pad->port, pad->slot, act);
+}
+
+/** Stops any pulse in flight, on every pad.
+ * The decay only runs from readPads(), so anything that can block the GUI thread for longer than a
+ * pulse has to stop the motor on the way in or it buzzes for the whole operation.
+ */
+void padRumbleFlush(void)
+{
+    int i;
+
+    if (!rumbleActive)
+        return;
+
+    rumbleActive = 0;
+    rumbleDurTicks = 0;
+    for (i = 0; i < pad_count; ++i)
+        padActSet(&pad_data[i], 0, 0);
+}
+
+/** Starts a rumble pulse on every connected pad that has actuators.
+ * @param durationMs pulse length, clamped to RUMBLE_MAX_MS
+ * @param large      large (variable-speed) engine strength, 0..255; the small engine runs for the
+ *                   whole pulse regardless, since it is the one that gives a crisp click
+ */
+void padRumble(int durationMs, int large)
+{
+    int i;
+
+    if (durationMs <= 0)
+        return;
+    if (durationMs > RUMBLE_MAX_MS)
+        durationMs = RUMBLE_MAX_MS;
+    if (large < 0)
+        large = 0;
+    if (large > 255)
+        large = 255;
+
+    rumbleStartTicks = cpu_ticks();
+    rumbleDurTicks = (u32)durationMs * CLOCKS_PER_MILISEC;
+    rumbleActive = 1;
+
+    for (i = 0; i < pad_count; ++i)
+        padActSet(&pad_data[i], 1, large);
+}
+
 /** polling method. Call every frame. */
 int readPads()
 {
@@ -356,6 +435,10 @@ int readPads()
     for (i = 0; i < pad_count; ++i) {
         rslt |= readPad(&pad_data[i]);
     }
+
+    // Rumble decay. Unsigned elapsed in RAW ticks -- see the note above padActSet().
+    if (rumbleActive && (u32)(cpu_ticks() - rumbleStartTicks) >= rumbleDurTicks)
+        padRumbleFlush();
 
     for (i = 0; i < 16; ++i) {
         if (getKeyPressed(i + 1))
@@ -473,6 +556,10 @@ static void unloadPad(struct pad_data_t *pad)
 void unloadPads()
 {
     int i;
+
+    // Last chance to stop a motor. Closing the port does not clear the actuators, and OPL is on its
+    // way out here -- a pulse still in flight would keep buzzing into whatever we hand off to.
+    padRumbleFlush();
 
     for (i = 0; i < pad_count; ++i)
         unloadPad(&pad_data[i]);

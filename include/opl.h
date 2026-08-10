@@ -228,6 +228,7 @@ extern int gSelectButton;
 extern int gHDDGameListCache;
 
 extern int gEnableSFX;
+extern int gEnableRumble;
 extern int gEnableBootSND;
 extern int gEnableBGM;
 extern int gSFXVolume;

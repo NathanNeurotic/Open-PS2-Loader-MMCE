@@ -201,6 +201,7 @@ int gOverscan;
 int gSelectButton;
 int gHDDGameListCache;
 int gEnableSFX;
+int gEnableRumble;
 int gEnableBootSND;
 int gEnableBGM;
 int gSFXVolume;
@@ -1685,6 +1686,7 @@ static void _loadConfig()
             if (gNetworkProtocol == NET_PROTO_SMB)
                 gETHStartMode = gNetStartMode;
             configGetInt(configOPL, CONFIG_OPL_SFX, &gEnableSFX);
+            configGetInt(configOPL, CONFIG_OPL_RUMBLE, &gEnableRumble);
             configGetInt(configOPL, CONFIG_OPL_BOOT_SND, &gEnableBootSND);
             configGetInt(configOPL, CONFIG_OPL_BGM, &gEnableBGM);
             configGetInt(configOPL, CONFIG_OPL_SFX_VOLUME, &gSFXVolume);
@@ -1923,6 +1925,7 @@ static void _saveConfig()
         configSetInt(configOPL, CONFIG_OPL_NETWORK_PROTOCOL, gNetworkProtocol);
         configSetInt(configOPL, CONFIG_OPL_NET_START_MODE, gNetStartMode);
         configSetInt(configOPL, CONFIG_OPL_SFX, gEnableSFX);
+        configSetInt(configOPL, CONFIG_OPL_RUMBLE, gEnableRumble);
         configSetInt(configOPL, CONFIG_OPL_BOOT_SND, gEnableBootSND);
         configSetInt(configOPL, CONFIG_OPL_BGM, gEnableBGM);
         configSetInt(configOPL, CONFIG_OPL_SFX_VOLUME, gSFXVolume);
@@ -2722,7 +2725,8 @@ static void setDefaults(void)
     gEnableNotifications = 1;
     gEnableArt = 1;
     gWideScreen = 1;
-    gEnableSFX = 1; // safe now: sfxPlay dispatches asynchronously (#340)
+    gEnableSFX = 1;    // safe now: sfxPlay dispatches asynchronously (#340)
+    gEnableRumble = 0; // opt-in: haptics are a taste thing, and a worn motor is loud
     gEnableBootSND = 1;
     gEnableBGM = 1; // inert without a bgm.ogg on the card
     gSFXVolume = 80;

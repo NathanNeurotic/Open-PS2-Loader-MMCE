@@ -45,4 +45,13 @@ void padStoreSettings(int *buffer);
 /** Restore's the button delay from specified integer array (has to have 16 items) */
 void padRestoreSettings(int *buffer);
 
+/** Starts a menu rumble pulse on every connected pad that has actuators.
+ * @param durationMs pulse length in ms (clamped internally)
+ * @param large large-engine strength 0..255; the small engine runs for the whole pulse */
+void padRumble(int durationMs, int large);
+
+/** Stops any rumble pulse in flight. Call before blocking the GUI thread -- the decay only runs
+ * from readPads(), so a pulse started just before a blocking read would outlast it. */
+void padRumbleFlush(void);
+
 #endif
