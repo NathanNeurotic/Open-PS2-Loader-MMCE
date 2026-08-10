@@ -1051,8 +1051,15 @@ void menuDeferredUpdate(void *data)
         updateMenuFromGameList(mod);
 
         // If other modes have been updated, then the apps list should be updated too.
-        if (mod->support->mode != APP_MODE)
+        // Exclude FAV: a FAV rebuild marking apps dirty would re-trigger the FAV resync below
+        // (an apps refresh calls loadFavourites), looping forever once favNeedsUpdate fires.
+        if (mod->support->mode != APP_MODE && mod->support->mode != FAV_MODE)
             shouldAppsUpdate = 1;
+
+        // A source-list refresh may expose newly-loaded items to validate favourites
+        // against. Re-sync the FAV tab (cheap/idempotent; skipped when FAV is disabled).
+        if (gFAVStartMode && mod->support->mode != FAV_MODE)
+            loadFavourites();
     }
 }
 

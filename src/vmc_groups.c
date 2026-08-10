@@ -1150,12 +1150,12 @@ static const char *titles_XEBP_100_72[] = {
     "SLPM_625.25",
     "SLKA_150.45",
     "SLPM_626.38"};
-static const size_t count_XEBP_100_72 = sizeof(titles_XEBP_100_71) / sizeof(titles_XEBP_100_72[0]);
+static const size_t count_XEBP_100_72 = sizeof(titles_XEBP_100_72) / sizeof(titles_XEBP_100_72[0]); // was sizeof(titles_XEBP_100_71): copy-paste numerator overstated the count and walked past the array
 
 static const char *titles_XEBP_100_73[] = {
     "SLPM_651.76",
     "SLPM_652.06"};
-static const size_t count_XEBP_100_73 = sizeof(titles_XEBP_100_71) / sizeof(titles_XEBP_100_73[0]);
+static const size_t count_XEBP_100_73 = sizeof(titles_XEBP_100_73) / sizeof(titles_XEBP_100_73[0]); // was sizeof(titles_XEBP_100_71): copy-paste numerator overstated the count and walked past the array
 
 static const char *titles_XEBP_100_74[] = {
     "SLUS_206.36",
@@ -1169,7 +1169,7 @@ static const char *titles_XEBP_100_74[] = {
     "SLES_535.27",
     "SLED_536.27",
     "SLES_536.26"};
-static const size_t count_XEBP_100_74 = sizeof(titles_XEBP_100_71) / sizeof(titles_XEBP_100_74[0]);
+static const size_t count_XEBP_100_74 = sizeof(titles_XEBP_100_74) / sizeof(titles_XEBP_100_74[0]); // was sizeof(titles_XEBP_100_71): copy-paste numerator overstated the count and walked past the array
 
 static const char *titles_XEBP_100_75[] = {
     "SLUS_205.65",
@@ -1177,7 +1177,7 @@ static const char *titles_XEBP_100_75[] = {
     "SLES_523.25",
     "SLUS_209.73",
     "SLES_530.39"};
-static const size_t count_XEBP_100_75 = sizeof(titles_XEBP_100_71) / sizeof(titles_XEBP_100_75[0]);
+static const size_t count_XEBP_100_75 = sizeof(titles_XEBP_100_75) / sizeof(titles_XEBP_100_75[0]); // was sizeof(titles_XEBP_100_71): copy-paste numerator overstated the count and walked past the array
 
 static const char *titles_XEBP_000_01[] = {
     "SLES_820.36",
