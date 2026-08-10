@@ -469,11 +469,34 @@ void padRumble(int durationMs, int large)
         padActSet(&pad_data[i], 1, large);
 }
 
+/* Screen-transition edge freeze. During the fade the main loop polls pads but dispatches no input,
+ * so every key-on edge that fires inside the fade is consumed unseen: a button pressed during the
+ * ~26-frame transition simply vanished, and one HELD across it never registered on the destination
+ * (its edge was already burned). Freezing the key-on BASELINE for the fade's duration fixes the
+ * held case -- the destination's first dispatched frame still sees old=0 for that button -- while
+ * seeding the baseline from the transition-TRIGGERING sample on entry keeps that button from
+ * replaying on the destination. A tap pressed and released entirely inside the fade remains
+ * intentionally ignored. Polling itself continues (rumble timing, pad state, reconnects).
+ * NOT a poll pause: pausing readPads() outright was tried and latches the pre-transition sample,
+ * which re-triggers handlers in a loop on arrival. */
+static int edgeBaselineFrozen = 0;
+
+void padFreezeEdgeBaseline(int freeze)
+{
+    int next = freeze ? 1 : 0;
+
+    if (next && !edgeBaselineFrozen)
+        oldpaddata = paddata; // seed with the triggering sample so it cannot replay
+
+    edgeBaselineFrozen = next;
+}
+
 /** polling method. Call every frame. */
 int readPads()
 {
     int i;
-    oldpaddata = paddata;
+    if (!edgeBaselineFrozen)
+        oldpaddata = paddata;
     paddata = 0;
 
     // in ms.
