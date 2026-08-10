@@ -2698,14 +2698,19 @@ int gDeinitTerminal = 0;
 // NBD preflight already passes a bound for exactly this reason; the exit and launch paths never got
 // one. Abandoning a pending art read here is safe: every one of these callers is on its way to an
 // IOP reset, and the art request only ever writes into its own cache entry.
-#define TEARDOWN_IO_DRAIN_TICKS 1000
+// Two budgets, keyed off gDeinitTerminal (fork parity). EXIT can afford to abandon quickly -- the
+// console is going away. A LAUNCH gets ~10 s: a healthy slow device drains well under that, but a
+// wedged art read must not freeze the loading screen forever, and a straggler request cannot
+// survive the handoff target's own IOP reset anyway (ee_core / Neutrino / POPSTARTER all reset it).
+#define EXIT_IO_DRAIN_TICKS   1000
+#define LAUNCH_IO_DRAIN_TICKS 10000
 
 void deinitEx(int exception, int modeSelected, int modeSelected2)
 {
     gDeinitTerminal = (modeSelected == IO_MODE_SELECTED_ALL || modeSelected == IO_MODE_SELECTED_NONE);
 
     // block all io ops, wait for the ones still running to finish (BOUNDED -- see the note above)
-    ioBlockOpsTimed(1, TEARDOWN_IO_DRAIN_TICKS);
+    ioBlockOpsTimed(1, gDeinitTerminal ? EXIT_IO_DRAIN_TICKS : LAUNCH_IO_DRAIN_TICKS);
     guiExecDeferredOps();
 
 #ifdef PADEMU
@@ -2736,7 +2741,7 @@ void deinit(int exception, int modeSelected)
     gDeinitTerminal = (modeSelected == IO_MODE_SELECTED_ALL || modeSelected == IO_MODE_SELECTED_NONE);
 
     // block all io ops, wait for the ones still running to finish (BOUNDED -- see the note above)
-    ioBlockOpsTimed(1, TEARDOWN_IO_DRAIN_TICKS);
+    ioBlockOpsTimed(1, gDeinitTerminal ? EXIT_IO_DRAIN_TICKS : LAUNCH_IO_DRAIN_TICKS);
     guiExecDeferredOps();
 
 #ifdef PADEMU
@@ -2824,8 +2829,11 @@ static void setDefaults(void)
     ps2_dns[2] = 1;
     ps2_dns[3] = 1;
     gPCPort = 1111; // RiptOPL default SMB port (was 445): matches the bundled PC server tooling
-    gPCShareName[0] = '\0';
-    gPCUserName[0] = '\0';
+    // Fork's opinionated first-boot defaults: the overwhelmingly common SMB setup is a share named
+    // "games" with guest access, so a fresh install can connect after typing only the host IP.
+    // A loaded config still overwrites both.
+    strcpy(gPCShareName, "games");
+    strcpy(gPCUserName, "guest");
     gPCPassword[0] = '\0';
     gNetworkStartup = ERROR_ETH_NOT_STARTED;
     gHDDSpindown = 20;
@@ -3104,7 +3112,8 @@ static void miniInit(int mode)
 
 void miniDeinit(config_set_t *configSet)
 {
-    ioBlockOpsTimed(1, TEARDOWN_IO_DRAIN_TICKS);
+    // Autolaunch teardown is always a LAUNCH: the game is about to take over.
+    ioBlockOpsTimed(1, LAUNCH_IO_DRAIN_TICKS);
 #ifdef PADEMU
     ds34usb_reset();
     ds34bt_reset();
@@ -3372,6 +3381,17 @@ int main(int argc, char *argv[])
     ioPutRequest(IO_CUSTOM_SIMPLEACTION, &deferredInit);
 
     guiIntroLoop();
+
+    // No writable config home? Say so NOW, not after the user has changed settings and lost them.
+    // The '?' only survives configGetDir() when the home fell all the way back to the "mc?:OPL"
+    // default AND checkMC() found no card to substitute into it -- i.e. no boot identity, no custom
+    // path, no discovery hit, and no local card. Reported from the field as "settings don't save,
+    // but they claim to load", which is exactly what silence looks like from the outside.
+    // A toast, not a modal: a standing property of the setup, not an error the user just caused,
+    // and it must not gate a boot that otherwise works fine.
+    if (strchr(configGetDir(), '?') != NULL)
+        guiWarning(_l(_STR_SETTINGS_NO_HOME), 6);
+
     guiMainLoop();
 
     return 0;

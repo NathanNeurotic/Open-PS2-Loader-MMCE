@@ -445,7 +445,7 @@ gui_strings:
 - label: HINT_PS2LOGO
   string: Displayed for a valid disc logo matching the console's region.
 - label: PADEMUCONFIG
-  string: Configure PADEMU
+  string: Controller Emulation
 - label: PADEMU_SETTINGS
   string: Pad Emulator Settings
 - label: PADEMU_ENABLE
@@ -607,7 +607,7 @@ gui_strings:
 - label: MX4SIO_GAMES
   string: MX4SIO Games
 - label: PADMACROCONFIG
-  string: Configure PADMACRO
+  string: Controller Macros
 - label: PADMACRO_SETTINGS
   string: Pad Macro Settings
 - label: PADMACRO_ENABLE
@@ -1046,3 +1046,5 @@ gui_strings:
   string: GSM Defaults (All Games)
 - label: ERR_DEVICE_BUSY_TIMEOUT
   string: "Device busy: the settings write never started. Try again once loading finishes."
+- label: SETTINGS_NO_HOME
+  string: No memory card found -- settings cannot be saved. OPL was booted from a network device, whose settings must live on a local card.

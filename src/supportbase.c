@@ -68,6 +68,10 @@ int isValidIsoName(char *name, int *pNameLen)
 
     // Minimum is 17 char, GameID (11) + "." (1) + filename (1 min.) + ".iso" (4)
     int size = strlen(name);
+    // Guard against short directory entries (e.g. "." / "..") before indexing
+    // name[size - 4], which would otherwise underflow the buffer.
+    if (size < 5)
+        return 0;
     if (strcasecmp(&name[size - 4], ".iso") == 0 || strcasecmp(&name[size - 4], ".zso") == 0) {
         if ((size >= 17) && (name[4] == '_') && (name[8] == '.') && (name[11] == '.')) {
             *pNameLen = size - 16;
