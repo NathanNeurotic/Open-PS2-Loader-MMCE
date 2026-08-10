@@ -296,15 +296,31 @@ GSTEXTURE *cacheGetTexture(image_cache_t *cache, item_list_t *list, int *cacheId
         return NULL;
 
     cache_entry_t *currEntry, *oldestEntry = NULL;
-    int i, rtime = guiFrameId;
+    int i, rtime = guiFrameId, inFlight = 0;
 
     for (i = 0; i < cache->count; i++) {
         currEntry = &cache->content[i];
-        if ((!currEntry->qr) && (currEntry->lastUsed < rtime)) {
+        if (currEntry->qr)
+            inFlight++;
+        else if (currEntry->lastUsed < rtime) {
             oldestEntry = currEntry;
             rtime = currEntry->lastUsed;
             *cacheId = i;
         }
+    }
+
+    // ONE IN FLIGHT for the small (floored) caches. Their hardware-validated form had a single
+    // slot, which made "at most one load in flight" a structural property: scrolling past ten
+    // games never queued ten backgrounds. The rebuild-71 redundancy slot silently removed that --
+    // a passed-by game's BG could claim the second slot mid-scroll, and the settled game's
+    // background then waited out that STALE load (the largest art item there is) before its own
+    // started. Refusing the claim while a sibling load is in flight restores the old pipeline
+    // semantics while keeping the redundancy slot for its failure-recovery purpose. Multi-slot
+    // cover caches (10/20 slots) are deliberately untouched: they always had several in flight,
+    // and that behaviour is hardware-validated as-is.
+    if (oldestEntry && cache->count <= 2 && inFlight > 0) {
+        *cacheId = -1; // nothing claimed; the next frame simply asks again
+        return NULL;
     }
 
     // BACKPRESSURE, lock-free (see gArtQueuedCount above). Art is the one request type that is
@@ -343,10 +359,18 @@ GSTEXTURE *cacheGetTexture(image_cache_t *cache, item_list_t *list, int *cacheId
         // type outright, while a 10-slot cover cache just loses one of ten and shrugs it off.
         // Roll the slot back instead, leaving it free for the next frame to retry.
         // (Third instance of this discarded-return shape; see rebuild-38 and rebuild-43.)
+        // DIntr bracket: the ++ is a read-modify-write on the GUI thread, and the HIGHER-priority
+        // io worker's decrement can preempt it mid-RMW, losing the worker's update -- an
+        // upward-only drift (adversarially quantified at ~one event per hours of browsing, and
+        // self-healing, but the bracket costs nothing and sound.c already sets the idiom).
+        DIntr();
         gArtQueuedCount++;
+        EIntr();
         if (ioPutRequest(IO_CACHE_LOAD_ART, req) != IO_OK) {
+            DIntr();
             if (gArtQueuedCount > 0)
                 gArtQueuedCount--; // the request never entered the queue
+            EIntr();
             // Reuse the module's own definition of an empty slot rather than hand-setting fields
             // (cacheClearItem leaves lastUsed = -1, UID = 0). freeTxt = 0: the texture was already
             // released by the cacheClearItem(.., 1) above, and the entry has held nothing since.
