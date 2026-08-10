@@ -54,19 +54,19 @@ static int artTarLoadImage(const char *value, const char *suffix, GSTEXTURE *tex
 
     buffer = malloc(entry->rawSize);
     if (buffer == NULL) {
-        LOG("ART TAR: out of memory for '%s' (%u bytes)\n", name, entry->rawSize);
+        LOG("ART TAR: out of memory for '%s' (%u bytes)\n", prefix, entry->rawSize);
         return -1;
     }
 
     if (tarRead(TAR_KIND_ART, entry, buffer, entry->rawSize) != entry->rawSize) {
-        LOG("ART TAR: short read for '%s' (%u bytes expected)\n", name, entry->rawSize);
+        LOG("ART TAR: short read for '%s' (%u bytes expected)\n", prefix, entry->rawSize);
         free(buffer);
         return -1;
     }
 
     result = texLoadFromMemory(texture, buffer, entry->rawSize);
     if (result < 0)
-        LOG("ART TAR: '%s' found (%u bytes) but PNG decode failed (%d)\n", name, entry->rawSize, result);
+        LOG("ART TAR: '%s' found (%u bytes) but PNG decode failed (%d)\n", prefix, entry->rawSize, result);
     free(buffer);
     return result;
 }
@@ -77,9 +77,74 @@ static int artTarLoadImage(const char *value, const char *suffix, GSTEXTURE *tex
 // rare, so this doubles as the art cap without a per-type counter.
 #define ART_MAX_QUEUE_DEPTH 4
 
+// Missing-art memo (single-slot hash, keyed startup_suffix): a load that FAILED once is not
+// re-probed every delay period -- on a device with sparse art the old retry loop re-open()ed the
+// same absent files forever (#120-adjacent churn). One bucket per hash: a collision merely evicts
+// an older miss, never blocks a hit. Cleared on applyConfig and on every list rebuild
+// (updateMenuFromGameList), which are exactly the moments new art can have appeared.
+// Cross-thread by design (worker writes, GUI reads): slots are fixed-size and always
+// NUL-terminated, so a torn read can only mis-answer one frame, never fault.
+#define FAIL_MEMO_SIZE 256
+
+typedef struct
+{
+    char key[64];
+} fail_memo_entry_t;
+
+static fail_memo_entry_t s_failMemo[FAIL_MEMO_SIZE];
+
+static u32 hashFailKey(const char *str)
+{
+    u32 hash = 5381;
+    int c;
+    while ((c = *str++))
+        hash = ((hash << 5) + hash) + c;
+    return hash % FAIL_MEMO_SIZE;
+}
+
+static void cacheMemoFail(const char *value, const char *suffix)
+{
+    char key[64];
+    if (snprintf(key, sizeof(key), "%s_%s", value, suffix ? suffix : "") >= (int)sizeof(key))
+        return;
+
+    u32 idx = hashFailKey(key);
+    snprintf(s_failMemo[idx].key, sizeof(s_failMemo[idx].key), "%s", key);
+}
+
+static int cacheIsFailMemo(const char *value, const char *suffix)
+{
+    char key[64];
+    if (snprintf(key, sizeof(key), "%s_%s", value, suffix ? suffix : "") >= (int)sizeof(key))
+        return 0;
+
+    u32 idx = hashFailKey(key);
+    return (strcmp(s_failMemo[idx].key, key) == 0);
+}
+
+void cacheInvalidateFailMemo(void)
+{
+    memset(s_failMemo, 0, sizeof(s_failMemo));
+}
+
+// Art requests currently sitting in the ioman queue. LOCK-FREE on purpose, and that is the whole
+// story of this counter: the first backpressure gate here called ioGetPendingRequestCount(), whose
+// WaitSema(gProcSemaId) blocks until the worker finishes draining the ENTIRE queue -- the worker
+// holds that sema across the whole BATCH, not per request. Called from cacheGetTexture on the GUI
+// thread, that froze the menu for as long as any art was in flight: the hardware 'everything
+// turns to chit' / black-screen-after-save reports. A plain volatile int the producer increments
+// and the handler decrements needs no lock; a lost update skews the gate by one for a frame, and
+// the gate self-heals by resetting when the queue is observed empty.
+static volatile int gArtQueuedCount = 0;
+
 // Io handled action...
 static void cacheLoadImage(void *data)
 {
+    // Balance the enqueue-side increment FIRST: this handler runs exactly once per queued request,
+    // including every early-out below.
+    if (gArtQueuedCount > 0)
+        gArtQueuedCount--;
+
     load_image_request_t *req = data;
 
     // Safeguards...
@@ -187,48 +252,6 @@ void cacheDestroyCache(image_cache_t *cache)
     free(cache);
 }
 
-#define FAIL_MEMO_SIZE 256
-
-typedef struct {
-    char key[64];
-} fail_memo_entry_t;
-
-static fail_memo_entry_t s_failMemo[FAIL_MEMO_SIZE];
-
-static u32 hashFailKey(const char *str)
-{
-    u32 hash = 5381;
-    int c;
-    while ((c = *str++))
-        hash = ((hash << 5) + hash) + c;
-    return hash % FAIL_MEMO_SIZE;
-}
-
-static void cacheMemoFail(const char *value, const char *suffix)
-{
-    char key[64];
-    if (snprintf(key, sizeof(key), "%s_%s", value, suffix ? suffix : "") >= (int)sizeof(key))
-        return;
-
-    u32 idx = hashFailKey(key);
-    snprintf(s_failMemo[idx].key, sizeof(s_failMemo[idx].key), "%s", key);
-}
-
-static int cacheIsFailMemo(const char *value, const char *suffix)
-{
-    char key[64];
-    if (snprintf(key, sizeof(key), "%s_%s", value, suffix ? suffix : "") >= (int)sizeof(key))
-        return 0;
-
-    u32 idx = hashFailKey(key);
-    return (strcmp(s_failMemo[idx].key, key) == 0);
-}
-
-void cacheInvalidateFailMemo(void)
-{
-    memset(s_failMemo, 0, sizeof(s_failMemo));
-}
-
 GSTEXTURE *cacheGetTexture(image_cache_t *cache, item_list_t *list, int *cacheId, int *UID, char *value)
 {
     if (cache == NULL || list == NULL || cacheId == NULL || UID == NULL || value == NULL || value[0] == '\0')
@@ -274,6 +297,19 @@ GSTEXTURE *cacheGetTexture(image_cache_t *cache, item_list_t *list, int *cacheId
         }
     }
 
+    // BACKPRESSURE, lock-free (see gArtQueuedCount above). Art is the one request type that is
+    // free to drop: the slot is never claimed, and the next frame simply asks again. Refusing to
+    // deepen an already-deep queue keeps the config save, the deferred menu rebuild and device
+    // init from starving behind hundreds of queued art reads on a slow device.
+    if (oldestEntry && gArtQueuedCount >= ART_MAX_QUEUE_DEPTH) {
+        if (!ioHasPendingRequests())
+            gArtQueuedCount = 0; // drift self-heal: queue is empty, the counter must be too
+        else {
+            *cacheId = -1;
+            return NULL;
+        }
+    }
+
     if (oldestEntry) {
         load_image_request_t *req = malloc(sizeof(load_image_request_t) + strlen(value) + 1);
         req->cache = cache;
@@ -297,7 +333,10 @@ GSTEXTURE *cacheGetTexture(image_cache_t *cache, item_list_t *list, int *cacheId
         // type outright, while a 10-slot cover cache just loses one of ten and shrugs it off.
         // Roll the slot back instead, leaving it free for the next frame to retry.
         // (Third instance of this discarded-return shape; see rebuild-38 and rebuild-43.)
+        gArtQueuedCount++;
         if (ioPutRequest(IO_CACHE_LOAD_ART, req) != IO_OK) {
+            if (gArtQueuedCount > 0)
+                gArtQueuedCount--; // the request never entered the queue
             // Reuse the module's own definition of an empty slot rather than hand-setting fields
             // (cacheClearItem leaves lastUsed = -1, UID = 0). freeTxt = 0: the texture was already
             // released by the cacheClearItem(.., 1) above, and the entry has held nothing since.

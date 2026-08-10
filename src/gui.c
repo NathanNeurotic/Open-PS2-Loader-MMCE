@@ -772,6 +772,8 @@ reshow_ui:
     // (#172, "really intense ... after changing the resolution"). Deliberately HERE and not at the top
     // of applyConfig(): applyConfig is ALSO reached off the GUI thread, from _loadConfig() on the IO
     // worker (opl.c: guiHandleDeferedIO with IO_CUSTOM_SIMPLEACTION), and every libpad call in pad.c
+    // is GUI-thread-only. This call site is the GUI thread, always.
+    padRumbleFlush();
 
     if (ret) {
         diaGetInt(diaUIConfig, UICFG_LANG, &langID);
@@ -1797,6 +1799,9 @@ reshow_display:
         diaGetInt(diaDisplayConfig, UICFG_OVERSCAN, &gOverscan);
         diaGetInt(diaDisplayConfig, CFG_APPLYGAMEID, &gApplyGameID);
 
+        // Same #172 contract as _guiShowUIConfig above: play out the confirm bump before the GS
+        // teardown/rebuild below, on the GUI thread -- never inside applyConfig itself.
+        padRumbleFlush();
         applyConfig(-1, -1, 1);
     }
 
@@ -2040,14 +2045,13 @@ static void guiHandleOp(struct gui_update_t *item)
             item->menu.menu->last = NULL; // coverflow wrap tail
             break;
 
-        case GUI_OP_SORT:
-            {
-                int mode = -1;
-                item_list_t *list = (item_list_t *)item->menu.menu->userdata;
-                if (list != NULL)
-                    mode = list->mode;
-                submenuSort(item->menu.subMenu, mode);
-            }
+        case GUI_OP_SORT: {
+            int mode = -1;
+            item_list_t *list = (item_list_t *)item->menu.menu->userdata;
+            if (list != NULL)
+                mode = list->mode;
+            submenuSort(item->menu.subMenu, mode);
+        }
             item->menu.menu->submenu = *item->menu.subMenu;
 
             { // recompute the coverflow wrap tail after the sort reorders the list

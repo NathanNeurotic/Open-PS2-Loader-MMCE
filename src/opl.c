@@ -335,6 +335,11 @@ static void itemExecSelect(struct menu_item *curMenu)
 {
     item_list_t *support = curMenu->userdata;
     sfxPlay(SFX_CONFIRM);
+    // That confirm just armed a rumble pulse, and everything below blocks the GUI thread without
+    // polling readPads() -- config load, GameID hold, the whole itemLaunch chain. The IOP LATCHES
+    // the actuator, so without this the motor buzzes through the entire loading screen. GUI-thread
+    // call site, which is the only kind pad.c allows.
+    padRumbleFlush();
 
     if (support) {
         if (support->enabled) {
@@ -374,12 +379,13 @@ static void itemExecRefresh(struct menu_item *curMenu)
     item_list_t *support = curMenu->userdata;
 
     if (support && support->enabled) {
-        if (support->mode == FAV_MODE) {
-            favRebuildList();
-        } else if (vcdViewActive(support->mode)) {
-            vcdMarkDirty(support->mode);
-        }
-        ioPutRequest(IO_MENU_UPDATE_DEFFERED, &support->mode);
+        // Fork shape verbatim. FAV has no device to rescan: loadFavourites() re-reads
+        // favourites.bin and schedules its own rebuild. Everything else posts the deferred
+        // update and lets the device's own NeedsUpdate logic decide what a refresh means.
+        if (support->mode == FAV_MODE)
+            loadFavourites();
+        else
+            ioPutRequest(IO_MENU_UPDATE_DEFFERED, &support->mode);
         sfxPlay(SFX_CONFIRM);
     }
 }
@@ -933,6 +939,11 @@ static void updateMenuFromGameList(opl_io_module_t *mdl)
     guiExecDeferredOps();
     clearMenuGameList(mdl);
 
+    // A rebuilt list is the natural retry point for art that failed earlier (files added, device
+    // remounted): clear the miss memo so the fresh rows probe once more. Runs on the IO worker;
+    // the GUI-side reader tolerates a mid-memset read (fixed-size, always NUL-terminated slots).
+    cacheInvalidateFailMemo();
+
     const char *temp = NULL;
     if (gRememberLastPlayed)
         configGetStr(configGetByType(CONFIG_LAST), "last_played", &temp);
@@ -1199,8 +1210,6 @@ static int checkLoadConfigBDM(int types)
             gEnableBdmHDD = 1;
             configSetInt(configOPL, CONFIG_OPL_ENABLE_BDMHDD, gEnableBdmHDD);
         }
-        if (gBootDir[0] != '\0')
-            configSetMove(gBootDir);
         return value;
     }
 
@@ -1229,8 +1238,6 @@ static int checkLoadConfigHDD(int types)
         value = configReadMulti(types);
         config_set_t *configOPL = configGetByType(CONFIG_OPL);
         configSetInt(configOPL, CONFIG_OPL_HDD_MODE, START_MODE_AUTO);
-        if (gBootDir[0] != '\0')
-            configSetMove(gBootDir);
         return value;
     }
 
@@ -1694,6 +1701,18 @@ static void _loadConfig()
             configGetInt(configOPL, CONFIG_OPL_BGM_VOLUME, &gBGMVolume);
             configGetStrCopy(configOPL, CONFIG_OPL_DEFAULT_BGM_PATH, gDefaultBGMPath, sizeof(gDefaultBGMPath));
         }
+
+        // Boot-device reconcile: OPL just booted from an internal exFAT (BDM-ATA) HDD -- the resolve
+        // step force-loaded the ATA stack to read this very config -- yet the config says that HDD's
+        // page is disabled, so the device OPL booted from would have no tab and the next save would
+        // persist it off again. Runs whether or not a config file was found, AFTER the read so the
+        // file cannot overwrite it, and persists so the state stops being contradictory. (The fork
+        // reconciles here identically; setting the flag inside bdmResolveBootDir instead is
+        // ineffective, because it runs before this read.)
+        if (gBootDirBdmType == BDM_TYPE_ATA && !gEnableBdmHDD) {
+            gEnableBdmHDD = 1;
+            configSetInt(configGetByType(CONFIG_OPL), CONFIG_OPL_ENABLE_BDMHDD, gEnableBdmHDD);
+        }
     }
 
     if (lscstatus & CONFIG_NETWORK) {
@@ -1963,7 +1982,12 @@ static void _saveConfig()
     }
 
     char *path = configGetDir();
-    if (!strncmp(path, "mc", 2)) {
+    // Only for the legacy no-boot-identity case. With a known boot dir the config home IS the boot
+    // dir (or the custom path below); stamping mc?:OPL/ + icons here on an appdir-on-MC boot
+    // sprouted an unwanted folder on every save, and rewriting the notification to the mc?:
+    // wildcard made the "Settings saved to %s" toast name the wrong place (fork gates this
+    // identically; FifthFox HW 2026-07-16 is the incident this comment block cites elsewhere).
+    if (gBootDir[0] == ' ' && !strncmp(path, "mc", 2)) {
         checkMCFolder();
         configPrepareNotifications(gBaseMCDir);
     }
@@ -1990,15 +2014,20 @@ static void _saveConfig()
     lscret = configWriteChecked(lscstatus);
     // <= 0, not == 0: configWriteChecked can only return 0 or a positive sum today, but the guard
     // costs nothing and a negative would otherwise read as success here.
-    if (lscret <= 0)
+    // The alternate-device hunt is ONLY for the legacy no-boot-identity case: with a known boot
+    // dir, settings live there (or at the custom path) and a failed write must FAIL VISIBLY -- the
+    // save-to-CWD doctrine. Scattering them onto whichever other device answers is how settings
+    // ended up on mass0: on a memory-card boot.
+    if (lscret <= 0 && gBootDir[0] == ' ')
         lscret = trySaveAlternateDevice(lscstatus);
     lscstatus = 0;
 }
 
 void applyConfig(int themeID, int langID, int skipDeviceRefresh)
 {
-    padRumbleFlush(); // ensure any active motor pulse is flushed before mode teardown/re-init
-
+    // NO padRumbleFlush() here, deliberately: _loadConfig() reaches applyConfig from the IO
+    // worker, and every libpad call in pad.c is GUI-thread-only (see guiHandleDeferedIO's note).
+    // The GUI-thread callers that need a flush do it themselves before calling in.
     // A deliberate settings apply may make new art available, so clear the .tar "no archive
     // anywhere" latch and let it be probed once more. That latch (tar.c s_inactive[]) is write-once
     // and process-wide with no self-clearing path, so without this a user who boots with the loader
