@@ -38,24 +38,22 @@ typedef struct
 static int artTarLoadImage(const char *value, const char *suffix, GSTEXTURE *texture)
 {
     char name[64];
-    TarEntryBase *entry;
+    TarEntryBase *entry = NULL;
     void *buffer;
     int result;
+    static const char *extensions[] = {".png", ".jpg", ".PNG", ".JPG", ".jpeg", ".JPEG", NULL};
 
-    // EVERY failure below returns -1, and the caller then falls through to the loose-file lookup --
-    // which on a .tar-ONLY setup finds nothing and shows no art, with nothing logged to say why.
-    // A tester reported exactly that shape (covers from the archive, backgrounds and screenshots
-    // blank) and there was no way to tell which of these four branches fired. Each one now says so.
-    // Backgrounds and screenshots are several times the size of a cover, so the malloc is the branch
-    // most likely to be the culprit -- and it was the most silent.
-    if (snprintf(name, sizeof(name), "%s_%s.png", value, suffix) >= (int)sizeof(name)) {
-        LOG("ART TAR: key too long for %s_%s.png (max %d)\n", value, suffix, (int)sizeof(name) - 1);
-        return -1;
+    for (int i = 0; extensions[i] != NULL; i++) {
+        if (snprintf(name, sizeof(name), "%s_%s%s", value, suffix, extensions[i]) >= (int)sizeof(name))
+            continue;
+
+        entry = tarFind(TAR_KIND_ART, name);
+        if (entry != NULL)
+            break;
     }
 
-    entry = tarFind(TAR_KIND_ART, name);
     if (entry == NULL) {
-        LOG("ART TAR: '%s' not in the archive index\n", name);
+        LOG("ART TAR: '%s_%s' (png/jpg) not in the archive index\n", value, suffix);
         return -1;
     }
 

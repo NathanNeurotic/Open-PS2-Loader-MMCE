@@ -2041,7 +2041,13 @@ static void guiHandleOp(struct gui_update_t *item)
             break;
 
         case GUI_OP_SORT:
-            submenuSort(item->menu.subMenu);
+            {
+                int mode = -1;
+                item_list_t *list = (item_list_t *)item->menu.menu->userdata;
+                if (list != NULL)
+                    mode = list->mode;
+                submenuSort(item->menu.subMenu, mode);
+            }
             item->menu.menu->submenu = *item->menu.subMenu;
 
             { // recompute the coverflow wrap tail after the sort reorders the list
