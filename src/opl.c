@@ -2930,11 +2930,22 @@ static void miniInit(int mode)
     if (mode == BDM_MODE) {
         bdmInitSemaphore();
 
-        // Force load iLink & mx4sio modules.. we aren't using the gui so this is fine.
+        // Force load all BDM modules.. we aren't using the gui so this is fine.
+        // gEnableUSB belongs in this list and was the one missing from it. Unlike the others it is a
+        // FORK INVENTION -- upstream loads USBMASS_BD unconditionally and has no such flag -- so the
+        // opt-in default of 0 that setDefaults() applies a few lines earlier (and which the GUI
+        // normally overrides from the saved config) had nothing to override it here: configReadMulti
+        // runs AFTER bdmLoadModules(). bdmLoadBlockDeviceModules gates the USB load on the flag, so
+        // an argv autolaunch from a USB stick loaded no USB block driver at all.
+        gEnableUSB = 1;
         gEnableILK = 1; // iLink will break pcsx2 however.
         gEnableMX4SIO = 1;
         gEnableBdmHDD = 1;
         bdmLoadModules();
+
+        // Autolaunch reads its per-game config from the boot dir too -- resolve a launch-identity or
+        // not-yet-mounted massN: boot dir before the configReadMulti below, same as the full boot path.
+        resolveBootDirToMass();
 
     } else if (mode == HDD_MODE) {
         hddLoadModules();
@@ -2993,9 +3004,16 @@ static void autoLaunchHDDGame(char *argv[])
     miniInit(HDD_MODE);
 
     gAutoLaunchGame = malloc(sizeof(hdl_game_info_t));
+    if (gAutoLaunchGame == NULL) {
+        miniDeinit(NULL);
+        return;
+    }
     memset(gAutoLaunchGame, 0, sizeof(hdl_game_info_t));
 
-    snprintf(gAutoLaunchGame->startup, sizeof(gAutoLaunchGame->startup), argv[1]);
+    // "%s", argv[1] -- NOT argv[1] as the format string. These come from another program's argv
+    // (a launcher/shortcut), so a name containing a % sequence made snprintf walk a nonexistent
+    // varargs list. Same below for argv[2] in the BDM twin.
+    snprintf(gAutoLaunchGame->startup, sizeof(gAutoLaunchGame->startup), "%s", argv[1]);
     gAutoLaunchGame->start_sector = strtoul(argv[2], NULL, 0);
     snprintf(gOPLPart, sizeof(gOPLPart), "hdd0:%s", argv[3]);
 
@@ -3014,10 +3032,27 @@ static void autoLaunchBDMGame(char *argv[])
     miniInit(BDM_MODE);
 
     gAutoLaunchBDMGame = malloc(sizeof(base_game_info_t));
+    if (gAutoLaunchBDMGame == NULL) {
+        miniDeinit(NULL);
+        return;
+    }
     memset(gAutoLaunchBDMGame, 0, sizeof(base_game_info_t));
 
-    int nameLen;
+    // nameLen MUST be initialised and the return MUST be checked. isValidIsoName (supportbase.c)
+    // returns 0 WITHOUT writing *pNameLen for anything that is not *.iso/*.zso -- so an unchecked
+    // call left nameLen holding stack garbage, which then became the length argument of the two
+    // strncpy calls below and the index of the NUL store after them. Any launcher handing OPL a
+    // name it does not recognise wrote an arbitrary distance past a 0x100-byte heap allocation.
+    int nameLen = 0;
     int format = isValidIsoName(argv[1], &nameLen);
+    // Reject unsupported / over-long filenames. Clamping nameLen instead would desync the
+    // extension offset from the real suffix position, so bail rather than repair.
+    if (format <= 0 || nameLen < 0 || nameLen > ISO_GAME_NAME_MAX) {
+        free(gAutoLaunchBDMGame);
+        gAutoLaunchBDMGame = NULL;
+        miniDeinit(NULL);
+        return;
+    }
     if (format == GAME_FORMAT_OLD_ISO) {
         strncpy(gAutoLaunchBDMGame->name, &argv[1][GAME_STARTUP_MAX], nameLen);
         gAutoLaunchBDMGame->name[nameLen] = '\0';
@@ -3030,7 +3065,7 @@ static void autoLaunchBDMGame(char *argv[])
         gAutoLaunchBDMGame->extension[sizeof(gAutoLaunchBDMGame->extension) - 1] = '\0';
     }
 
-    snprintf(gAutoLaunchBDMGame->startup, sizeof(gAutoLaunchBDMGame->startup), argv[2]);
+    snprintf(gAutoLaunchBDMGame->startup, sizeof(gAutoLaunchBDMGame->startup), "%s", argv[2]);
 
     if (strcasecmp("DVD", argv[3]) == 0)
         gAutoLaunchBDMGame->media = SCECdPS2DVD;
@@ -3041,28 +3076,55 @@ static void autoLaunchBDMGame(char *argv[])
     gAutoLaunchBDMGame->parts = 1; // ul not supported.
 
     gAutoLaunchDeviceData = malloc(sizeof(bdm_device_data_t));
+    if (gAutoLaunchDeviceData == NULL) {
+        free(gAutoLaunchBDMGame);
+        gAutoLaunchBDMGame = NULL;
+        miniDeinit(NULL);
+        return;
+    }
     memset(gAutoLaunchDeviceData, 0, sizeof(bdm_device_data_t));
+    // memset leaves these at 0, and 0 is a VALID BDM_TYPE / a valid UDMA mode -- so an autolaunch
+    // that never identifies the device would claim a concrete type instead of "unknown".
+    gAutoLaunchDeviceData->bdmDeviceType = BDM_TYPE_UNKNOWN;
+    gAutoLaunchDeviceData->bdmHddIsLBA48 = -1;
+    gAutoLaunchDeviceData->ataHighestUDMAMode = -1;
 
-    char apaDevicePrefix[8] = {0};
+    char apaDevicePrefix[BDM_DEVICE_ROOT_MAX] = {0};
+    // The driver name and device index MUST be recorded together with the slot they came from.
+    // Reading them straight into gAutoLaunchDeviceData meant every probed slot overwrote them, so
+    // after the loop they described the LAST slot opened while apaDevicePrefix still named the
+    // first -- the config path and the device identity disagreed whenever more than one mass
+    // device was present.
+    int selectedMassSlot = -1;
     delay(8);
-    snprintf(apaDevicePrefix, sizeof(apaDevicePrefix), "mass0:");
     // Loop through mass0: to mass4:
     for (int i = 0; i <= 4; i++) {
-        snprintf(path, sizeof(path), "mass%d:", i);
+        snprintf(path, sizeof(path), "mass%d:/", i);
         int dir = fileXioDopen(path);
 
         if (dir >= 0) {
-            fileXioIoctl2(dir, USBMASS_IOCTL_GET_DRIVERNAME, NULL, 0, &gAutoLaunchDeviceData->bdmDriver, sizeof(gAutoLaunchDeviceData->bdmDriver) - 1);
-            fileXioIoctl2(dir, USBMASS_IOCTL_GET_DEVICE_NUMBER, NULL, 0, &gAutoLaunchDeviceData->massDeviceIndex, sizeof(gAutoLaunchDeviceData->massDeviceIndex));
+            char detectedDriver[sizeof(gAutoLaunchDeviceData->bdmDriver)] = {0};
+            int detectedDeviceIndex = -1;
 
-            if (!strcmp(gAutoLaunchDeviceData->bdmDriver, "ata") && strlen(gAutoLaunchDeviceData->bdmDriver) == 3) {
-                bdmResolveLBA_UDMA(gAutoLaunchDeviceData);
+            fileXioIoctl2(dir, USBMASS_IOCTL_GET_DRIVERNAME, NULL, 0, detectedDriver, sizeof(detectedDriver) - 1);
+            fileXioIoctl2(dir, USBMASS_IOCTL_GET_DEVICE_NUMBER, NULL, 0, &detectedDeviceIndex, sizeof(detectedDeviceIndex));
+            fileXioDclose(dir);
+
+            if (selectedMassSlot < 0) {
+                selectedMassSlot = i;
+                snprintf(gAutoLaunchDeviceData->bdmDriver, sizeof(gAutoLaunchDeviceData->bdmDriver), "%s", detectedDriver);
+                gAutoLaunchDeviceData->massDeviceIndex = detectedDeviceIndex;
                 snprintf(apaDevicePrefix, sizeof(apaDevicePrefix), "mass%d:", i);
-                fileXioDclose(dir);
-                break; // Exit the loop if "ata" device is found
             }
 
-            fileXioDclose(dir);
+            if (!strcmp(detectedDriver, "ata") && strlen(detectedDriver) == 3) {
+                selectedMassSlot = i;
+                snprintf(gAutoLaunchDeviceData->bdmDriver, sizeof(gAutoLaunchDeviceData->bdmDriver), "%s", detectedDriver);
+                gAutoLaunchDeviceData->massDeviceIndex = detectedDeviceIndex;
+                bdmResolveLBA_UDMA(gAutoLaunchDeviceData); // fills bdmHddIsLBA48 / ataHighestUDMAMode
+                snprintf(apaDevicePrefix, sizeof(apaDevicePrefix), "mass%d:", i);
+                break; // Exit the loop if "ata" device is found
+            }
         } else {
             // Retry for mass0: only
             if (i == 0) {
@@ -3074,6 +3136,15 @@ static void autoLaunchBDMGame(char *argv[])
         }
         delay(6);
     }
+
+    // No mass device answered at all: keep the historical mass0: guess rather than an empty prefix,
+    // which would build a rootless config path.
+    if (selectedMassSlot < 0)
+        snprintf(apaDevicePrefix, sizeof(apaDevicePrefix), "mass0:");
+
+    // bdmDeviceRoot was never written on this path, so the launch legs that resolve paths through
+    // it saw an empty string.
+    snprintf(gAutoLaunchDeviceData->bdmDeviceRoot, sizeof(gAutoLaunchDeviceData->bdmDeviceRoot), "%s", apaDevicePrefix);
 
     if (gBDMPrefix[0] != '\0') {
         snprintf(path, sizeof(path), "%s%s/CFG/%s.cfg", apaDevicePrefix, gBDMPrefix, gAutoLaunchBDMGame->startup);
