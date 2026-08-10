@@ -45,6 +45,11 @@ void padStoreSettings(int *buffer);
 /** Restore's the button delay from specified integer array (has to have 16 items) */
 void padRestoreSettings(int *buffer);
 
+/** During a screen transition, seed and freeze the key-on baseline with the triggering sample.
+ * This prevents the trigger from replaying on the destination while preserving a different button
+ * that is still held when the destination appears. */
+void padFreezeEdgeBaseline(int freeze);
+
 /** Starts a menu rumble pulse on every connected pad that has actuators.
  * @param durationMs pulse length in ms (clamped internally)
  * @param large large-engine strength 0..255; the small engine runs for the whole pulse */

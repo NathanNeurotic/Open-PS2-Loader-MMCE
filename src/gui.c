@@ -2571,6 +2571,11 @@ static void guiDrawOverlays()
 
 static void guiReadPads()
 {
+    // A transition polls without dispatching input. Freeze against the triggering sample so that
+    // button cannot replay on the destination, while a different button held through the fade can
+    // still register there (see padFreezeEdgeBaseline in pad.c -- deliberately NOT a poll pause).
+    padFreezeEdgeBaseline(screenHandlerTarget != NULL);
+
     if (readPads())
         guiInactiveFrames = 0;
     else
