@@ -13,6 +13,7 @@
 #include "include/opl.h"
 #include "include/ioman.h"
 #include "include/themes.h"
+#include "include/pad.h" // padRumble -- menu rumble rides the SFX events
 
 // Silence unused variable warnings from vorbisfile.h
 static ov_callbacks OV_CALLBACKS_NOCLOSE __attribute__((unused));
@@ -420,8 +421,45 @@ static void sfxEnqueue(int channel, int id)
     SignalSema(sfxDispatchSema);
 }
 
+// Menu rumble rides the SFX events: one hook covers every call site in the GUI, and the events are
+// already the ones worth feeding back on.
+//
+// SFX_CURSOR is deliberately NOT in this table. It fires on every single cursor step, so haptics
+// there would be a continuous buzz while scrolling -- and, more to the point, it would put a SIO2
+// request on the GUI thread inside the one path #340 is about. The discrete events below fire at
+// human speed and cannot pile up.
+//
+// SFX_BOOT and the SFX_BD_* device events are also left out: nobody is holding the pad yet at boot,
+// and a drive appearing is not something the user did.
+static void sfxRumble(int id)
+{
+    if (!gEnableRumble)
+        return;
+
+    switch (id) {
+        case SFX_CONFIRM:
+            padRumble(120, 160);
+            break;
+        case SFX_CANCEL:
+            padRumble(90, 96);
+            break;
+        case SFX_MESSAGE:
+            padRumble(120, 160);
+            break;
+        case SFX_TRANSITION:
+            padRumble(150, 200);
+            break;
+        default:
+            break;
+    }
+}
+
 void sfxPlay(int id)
 {
+    // ABOVE the audio gates on purpose: someone running with sound off should still get the haptics
+    // they asked for, and rumble does not need audsrv.
+    sfxRumble(id);
+
     if (!audio_initialized) {
         LOG("SFX: %s: ERROR: not initialized!\n", __FUNCTION__);
         return;

@@ -1916,22 +1916,16 @@ void guiShowControllerConfig(void)
     diaSetInt(diaControllerConfig, CFG_SELECTBUTTON, gSelectButton == KEY_CIRCLE ? 0 : 1);
     diaSetInt(diaControllerConfig, CFG_XSENSITIVITY, gXSensitivity);
     diaSetInt(diaControllerConfig, CFG_YSENSITIVITY, gYSensitivity);
-    // NOTE(rebuild): Menu Rumble returns with checklist item 43 -- show its row greyed at Off until
-    // then. The row, its config key (CONFIG_OPL_RUMBLE) and its labels were all pre-staged by the
-    // settings-layout step, but gEnableRumble and the whole padRumble* engine are absent, so the
-    // toggle was rendering as an interactive control wired to nothing.
-    // Greyed rather than hidden ON PURPOSE: diaSetVisible targets the CONTROL id, and the caption is
-    // a separate {UI_LABEL, 0, ...} row, so hiding leaves an orphan label with nothing beside it
-    // (the defect rebuild-17 had to clean up on the Artwork page). Greying keeps the pair together,
-    // matching the MMCE Start Mode row.
-    diaSetInt(diaControllerConfig, CFG_RUMBLE, 0);
-    diaSetEnabled(diaControllerConfig, CFG_RUMBLE, 0);
+    diaSetInt(diaControllerConfig, CFG_RUMBLE, gEnableRumble);
 
     int result = diaExecuteDialog(diaControllerConfig, -1, 1, NULL);
     if (result) {
         diaGetInt(diaControllerConfig, UICFG_SCROLL, &gScrollSpeed);
         diaGetInt(diaControllerConfig, CFG_XSENSITIVITY, &gXSensitivity);
         diaGetInt(diaControllerConfig, CFG_YSENSITIVITY, &gYSensitivity);
+        diaGetInt(diaControllerConfig, CFG_RUMBLE, &gEnableRumble);
+        if (!gEnableRumble)
+            padRumbleFlush(); // turned off mid-pulse -> do not leave a motor running
 
         if (diaGetInt(diaControllerConfig, CFG_SELECTBUTTON, &value))
             gSelectButton = value == 0 ? KEY_CIRCLE : KEY_CROSS;
