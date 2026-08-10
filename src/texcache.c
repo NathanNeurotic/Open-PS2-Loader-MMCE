@@ -257,10 +257,12 @@ GSTEXTURE *cacheGetTexture(image_cache_t *cache, item_list_t *list, int *cacheId
     if (cache == NULL || list == NULL || cacheId == NULL || UID == NULL || value == NULL || value[0] == '\0')
         return NULL;
 
-    if (cacheIsFailMemo(value, cache->suffix)) {
-        *cacheId = -2;
-        return NULL;
-    }
+    // NO memo lookup here. This function runs for EVERY art element on screen EVERY frame --
+    // including covers that are already loaded and rendering -- and the memo check costs a
+    // snprintf + hash + strcmp. Placed here it taxed every cached frame (dozens of format-string
+    // calls per frame on a 294 MHz CPU); the fast path below must stay a couple of integer
+    // compares, exactly what the hardware-validated builds did. The memo is consulted at the
+    // ENQUEUE decision instead -- the only place it saves anything real (an IO attempt).
 
     if (*cacheId == -2) {
         return NULL;
@@ -283,6 +285,14 @@ GSTEXTURE *cacheGetTexture(image_cache_t *cache, item_list_t *list, int *cacheId
 
     // under the cache pre-delay (to avoid filling cache while moving around)
     if (guiInactiveFrames < list->delay)
+        return NULL;
+
+    // Known-missing art: skip the slot claim and the IO attempt entirely. Reached only for rows
+    // with no live cache entry, after the idle delay -- i.e. exactly where the old code would have
+    // issued a doomed open(); the memo is strictly cheaper than the IO it replaces. The row's
+    // cacheId stays -1, so once the memo is cleared (applyConfig / list rebuild) it retries
+    // naturally.
+    if (cacheIsFailMemo(value, cache->suffix))
         return NULL;
 
     cache_entry_t *currEntry, *oldestEntry = NULL;
