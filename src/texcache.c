@@ -63,6 +63,12 @@ static int artTarLoadImage(const char *value, const char *suffix, GSTEXTURE *tex
     return result;
 }
 
+// Most art requests the queue may hold before new ones are refused. Deliberately small: art is
+// re-requested every frame the item stays visible, so a refusal costs one frame of latency on that
+// tile, while a deep queue costs the USER seconds on the next thing they do. Non-art requests are
+// rare, so this doubles as the art cap without a per-type counter.
+#define ART_MAX_QUEUE_DEPTH 4
+
 // Io handled action...
 static void cacheLoadImage(void *data)
 {
@@ -207,6 +213,23 @@ GSTEXTURE *cacheGetTexture(image_cache_t *cache, item_list_t *list, int *cacheId
             rtime = currEntry->lastUsed;
             *cacheId = i;
         }
+    }
+
+    // BACKPRESSURE. Cover art is the only unbounded producer on the single ioman FIFO -- one request
+    // per visible row, refilled on every scroll -- and that FIFO also carries the config save, the
+    // deferred menu rebuild (the L3 VCD view switch among them) and device init. The worker runs
+    // requests strictly one at a time, so on a slow device (network shares especially) a scroll can
+    // park hundreds of art reads ahead of whatever the user does next: the save then blows through
+    // its 30 s bound and reports a failure that never happened, the view toggle appears to do
+    // nothing, and deinit's drain on exit waits behind all of it.
+    //
+    // Art is the one request type that is FREE TO DROP: the slot rolls back to empty below and the
+    // next frame simply asks again. So refuse to deepen an already-deep queue and let the
+    // interactive work through. Non-art requests are rare and short, which is what makes a plain
+    // depth test an effective art cap without needing a per-type counter.
+    if (oldestEntry && ioGetPendingRequestCount() >= ART_MAX_QUEUE_DEPTH) {
+        *cacheId = -1; // nothing queued, nothing to roll back: the slot was never claimed
+        return NULL;
     }
 
     if (oldestEntry) {

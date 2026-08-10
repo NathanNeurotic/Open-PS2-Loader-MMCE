@@ -2594,12 +2594,21 @@ int gDeinitTerminal = 0;
 // deinitEx: deinit for the Neutrino keep-IOP handoff -- spares TWO modes' mounts (the game
 // device AND the device holding neutrino.elf), since Neutrino reads its -cwd config/modules
 // and the ISO through OPL's live mounts before performing its own IOP reset.
+// Bound for the teardown drains below. ioBlockOps() waits UNBOUNDED, which is correct only if the
+// queue is guaranteed to finish -- and it is not: cover art is queued one request per visible row on
+// the same single-threaded FIFO, so on a slow device (a network share especially) "Exit to Browser"
+// or a game launch sat waiting for hundreds of art reads with nothing on screen to explain it. The
+// NBD preflight already passes a bound for exactly this reason; the exit and launch paths never got
+// one. Abandoning a pending art read here is safe: every one of these callers is on its way to an
+// IOP reset, and the art request only ever writes into its own cache entry.
+#define TEARDOWN_IO_DRAIN_TICKS 1000
+
 void deinitEx(int exception, int modeSelected, int modeSelected2)
 {
     gDeinitTerminal = (modeSelected == IO_MODE_SELECTED_ALL || modeSelected == IO_MODE_SELECTED_NONE);
 
-    // block all io ops, wait for the ones still running to finish
-    ioBlockOps(1);
+    // block all io ops, wait for the ones still running to finish (BOUNDED -- see the note above)
+    ioBlockOpsTimed(1, TEARDOWN_IO_DRAIN_TICKS);
     guiExecDeferredOps();
 
 #ifdef PADEMU
@@ -2629,8 +2638,8 @@ void deinit(int exception, int modeSelected)
 {
     gDeinitTerminal = (modeSelected == IO_MODE_SELECTED_ALL || modeSelected == IO_MODE_SELECTED_NONE);
 
-    // block all io ops, wait for the ones still running to finish
-    ioBlockOps(1);
+    // block all io ops, wait for the ones still running to finish (BOUNDED -- see the note above)
+    ioBlockOpsTimed(1, TEARDOWN_IO_DRAIN_TICKS);
     guiExecDeferredOps();
 
 #ifdef PADEMU
@@ -2965,7 +2974,7 @@ static void miniInit(int mode)
 
 void miniDeinit(config_set_t *configSet)
 {
-    ioBlockOps(1);
+    ioBlockOpsTimed(1, TEARDOWN_IO_DRAIN_TICKS);
 #ifdef PADEMU
     ds34usb_reset();
     ds34bt_reset();
