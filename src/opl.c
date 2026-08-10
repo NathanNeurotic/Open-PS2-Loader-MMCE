@@ -1363,6 +1363,26 @@ static int tryAlternateDevice(int types)
     // settings are strictly homed to gBootDir. Never probe alternate devices (mass0:/hdd0:) or hijack
     // the save location away from CWD/Memory Card.
     if (gBootDir[0] != '\0') {
+        // LEGACY READ-ONLY FALLBACK. Every build before the CWD doctrine -- ours and official alike
+        // -- homed settings at mc?:OPL, so every existing install's config lives THERE, not beside
+        // the ELF. Without this, upgrading silently reset every user to defaults (reported from
+        // hardware as "it didn't read my settings" and "everything is slow like it used to be" --
+        // stock art delay and scroll speed are literally the old feel). The user's setup did not
+        // change; we moved where we look, so we keep looking in the old place too.
+        //
+        // READ ONLY, and only the mc?:OPL home -- never other devices (that hijack is what the
+        // strict homing exists to prevent). The home is moved straight back to the boot dir, so
+        // the very first save writes the config BESIDE THE ELF and this fallback goes quiet for
+        // good: read-old, write-new, self-migrating. The load toast names the boot device rather
+        // than the card on the one boot that reads legacy -- the save-location toast telling the
+        // truth matters more, and after the first save the two agree anyway.
+        if (sysCheckMC() >= 0) {
+            configSetMove(NULL); // point the config files at the legacy mc?:OPL home
+            value = configReadMulti(types);
+            configSetMove(gBootDir); // home (and notifications) back on the boot dir: saves self-migrate
+            if (value & CONFIG_OPL)
+                return value;
+        }
         configPrepareNotifications(gBootDir);
         showCfgPopup = 0;
         return 0;
