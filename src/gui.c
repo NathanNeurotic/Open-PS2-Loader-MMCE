@@ -2372,14 +2372,26 @@ void guiDrawBGPlasma()
     if (ymax > PLASMA_H)
         ymax = PLASMA_H;
 
+    // plasma_blend_color (parity-audit #15): the gradient's LOW end, historically hardcoded black
+    // (the old expression fper*curbgColor>>8 lerps black->bgColor). Lerp blend->bgColor instead;
+    // the default black collapses to the exact old bytes (all terms non-negative there, and /256 of
+    // a non-negative int is exactly >>8). Signed intermediates: the delta goes negative when the
+    // blend is brighter than the tint -- divide instead of shifting (right-shift of a negative int
+    // is implementation-defined); the result stays in [0,255] without clamping (fper<=256,
+    // |delta|<=255: endpoints land exactly on blend / curbgColor). Every OTHER half of this feature
+    // -- the Colors-page picker, the theme key, the default, the struct field -- was already here;
+    // this loop was the one consumer that never read it, so the picker stored a colour the plasma
+    // never used.
+    const unsigned char *blend = gTheme->plasBlendColor;
+
     for (y = pery; y < ymax; y++) {
         for (x = 0; x < PLASMA_W; x++) {
             u32 fper = guiCalcPerlin((float)(2 * x) / PLASMA_W, (float)(2 * y) / PLASMA_H, perz) * 0x80 + 0x80;
 
             *buf = GS_SETREG_RGBA(
-                (u32)(fper * curbgColor[0]) >> 8,
-                (u32)(fper * curbgColor[1]) >> 8,
-                (u32)(fper * curbgColor[2]) >> 8,
+                (u32)(blend[0] + (((int)fper * ((int)curbgColor[0] - (int)blend[0])) / 256)),
+                (u32)(blend[1] + (((int)fper * ((int)curbgColor[1] - (int)blend[1])) / 256)),
+                (u32)(blend[2] + (((int)fper * ((int)curbgColor[2] - (int)blend[2])) / 256)),
                 0x80);
 
             ++buf;
