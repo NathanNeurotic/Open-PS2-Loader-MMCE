@@ -228,23 +228,6 @@ GSTEXTURE *cacheGetTexture(image_cache_t *cache, item_list_t *list, int *cacheId
         }
     }
 
-    // BACKPRESSURE. Cover art is the only unbounded producer on the single ioman FIFO -- one request
-    // per visible row, refilled on every scroll -- and that FIFO also carries the config save, the
-    // deferred menu rebuild (the L3 VCD view switch among them) and device init. The worker runs
-    // requests strictly one at a time, so on a slow device (network shares especially) a scroll can
-    // park hundreds of art reads ahead of whatever the user does next: the save then blows through
-    // its 30 s bound and reports a failure that never happened, the view toggle appears to do
-    // nothing, and deinit's drain on exit waits behind all of it.
-    //
-    // Art is the one request type that is FREE TO DROP: the slot rolls back to empty below and the
-    // next frame simply asks again. So refuse to deepen an already-deep queue and let the
-    // interactive work through. Non-art requests are rare and short, which is what makes a plain
-    // depth test an effective art cap without needing a per-type counter.
-    if (oldestEntry && ioGetPendingRequestCount() >= ART_MAX_QUEUE_DEPTH) {
-        *cacheId = -1; // nothing queued, nothing to roll back: the slot was never claimed
-        return NULL;
-    }
-
     if (oldestEntry) {
         load_image_request_t *req = malloc(sizeof(load_image_request_t) + strlen(value) + 1);
         req->cache = cache;
