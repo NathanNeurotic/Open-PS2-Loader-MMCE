@@ -1044,3 +1044,5 @@ gui_strings:
   string: Per Game + Global
 - label: GSM_DEFAULTS
   string: GSM Defaults (All Games)
+- label: ERR_DEVICE_BUSY_TIMEOUT
+  string: "Device busy: the settings write never started. Try again once loading finishes."

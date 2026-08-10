@@ -6,6 +6,7 @@
 
 #include "include/opl.h"
 #include "include/gui.h"
+#include "include/diag.h" // gLastDeferredTimedOut -- a bounded wait that expired means the handler never ran
 #include "include/renderman.h"
 #include "include/menusys.h"
 #include "include/fntsys.h"
@@ -2895,10 +2896,14 @@ void guiHandleDeferedIO(int *ptr, const char *message, int type, void *data, int
     // is single-wrap-safe, unlike an absolute clock()+limit deadline.
     clock_t startTick = clock();
     clock_t limitTicks = (clock_t)timeoutMs * (CLOCKS_PER_SEC / 1000);
+    gLastDeferredTimedOut = 0;
     while (*ptr) {
         if (timeoutMs > 0 && (clock() - startTick) >= limitTicks) {
             LOG("guiHandleDeferedIO: deferred IO unfinished after %d ms; storage stuck, abandoning wait\n", timeoutMs);
             *ptr = 0;
+            // The handler never ran. Callers must not report a device error against their target
+            // path on the strength of this -- nothing touched it.
+            gLastDeferredTimedOut = 1;
             break;
         }
         guiRenderTextScreen(message);

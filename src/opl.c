@@ -183,6 +183,9 @@ int gArtDelay;                           // inactivity frames before art loads; 
 int gEnableFolderNav;                    // folder browsing in game lists (item 34)
 unsigned char gDefaultPlasBlendColor[3]; // plasma gradient low end; black = historical look
 volatile int gLastSaveErrno = 0;
+// Set by guiHandleDeferedIO when it abandons a bounded wait: the request never ran, so any
+// error the caller would otherwise report against the target path is meaningless.
+volatile int gLastDeferredTimedOut = 0;
 int gEnableMX4SIO;
 int gEnableBdmHDD;
 int gEnableUDPBD;
@@ -2073,6 +2076,11 @@ int saveConfig(int types, int showUI)
     char notification[128];
     lscstatus = types;
     lscret = 0;
+    // Reset before the attempt. gLastSaveErrno is only ever ASSIGNED at the three real failure sites
+    // in configWrite, never cleared -- so a stale value from an earlier save could be reported for a
+    // later one, and (worse) a save that never reached configWrite at all reported whatever was left,
+    // usually the 0 that produced the nonsensical "(error 0)".
+    gLastSaveErrno = 0;
 
     guiHandleDeferedIO(&lscstatus, _l(_STR_SAVING_SETTINGS), IO_CUSTOM_SIMPLEACTION, &_saveConfig, OPL_DEFERRED_IO_TIMEOUT_MS);
 
@@ -2084,7 +2092,15 @@ int saveConfig(int types, int showUI)
 
             guiMsgBox(notification, 0, NULL);
         } else {
-            snprintf(notification, sizeof(notification), _l(_STR_ERROR_SAVING_SETTINGS_TO), configGetDir(), gLastSaveErrno);
+            // Distinguish "the write failed" from "the write never ran". guiHandleDeferedIO abandons
+            // its wait after OPL_DEFERRED_IO_TIMEOUT_MS and clears the status WITHOUT _saveConfig
+            // having executed -- the IO worker is single-threaded and shared with cover-art loads, so
+            // a queue full of slow art can starve the save past the bound. In that case nothing ever
+            // touched the config, so reporting a write error against the config path is a lie.
+            if (gLastDeferredTimedOut)
+                snprintf(notification, sizeof(notification), "%s", _l(_STR_ERR_DEVICE_BUSY_TIMEOUT));
+            else
+                snprintf(notification, sizeof(notification), _l(_STR_ERROR_SAVING_SETTINGS_TO), configGetDir(), gLastSaveErrno);
             guiMsgBox(notification, 0, NULL);
         }
     }
@@ -2762,7 +2778,12 @@ static void setDefaults(void)
     gBdmaApplyOnLaunch = 1; // auto-equip on launch by default
     gVcdHideGameId = 1;     // hide the PS1 game-ID prefix by default (display-only)
     gVcdFirstDiscOnly = 1;  // hide discs 2+ of multi-disc PS1 sets by default (POPSLoader parity)
-    gBootDir[0] = '\0';
+    // gBootDir is deliberately NOT reset here. main() resolves it (setBootDir, from argv[0] with a
+    // getcwd fallback) BEFORE calling init(), and init() calls setDefaults() -- so clearing it here
+    // erased the boot identity a few lines before configInit() needs it, on EVERY boot. That made
+    // resolveBootDirToMass() early-return at its `gBootDir[0] == '\0'` guard every time, and homed
+    // every config set on the mc?:OPL default regardless of what OPL actually booted from.
+    // setBootDir() already zeroes the buffer at its own entry, so nothing needs a reset here.
     gEnableBGArt = 1; // fork parity; gEnableArt is 1 above, so this is live
     gEnableArtTar = 0;
     gArtDelay = 8; // official-like settle (the fork's aggressive 2-frame default is a gate-D decision, item 45)
@@ -2808,7 +2829,7 @@ static void init(void)
 
     padInit(0);
     int padStatus = 0;
-    configInit(NULL);
+    configInit(gBootDir[0] ? gBootDir : NULL); // settings live in the boot dir (cwd), not a fixed MC default
 
     rmInit();
     lngInit();
@@ -2892,7 +2913,7 @@ static void miniInit(int mode)
     int ret;
 
     setDefaults();
-    configInit(NULL);
+    configInit(gBootDir[0] ? gBootDir : NULL); // settings live in the boot dir (cwd)
 
     ioInit();
     LOG_ENABLE();
