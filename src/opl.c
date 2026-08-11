@@ -1101,8 +1101,15 @@ static void menuUpdateHook()
     if (ioHasPendingRequests())
         return;
 
-    // NOTE(rebuild): the fork also yields to pending cover-art work here (cacheHasPendingArt);
-    // that gate returns with the art-cache rework (item 45).
+    // Yield to cover art still on its way. The rescans below enqueue one device probe per BDM page
+    // onto the SAME single IO worker the art loads use, so without this gate a settle puts a batch
+    // of probes AHEAD of the covers the user is looking at -- and since the gate opens again on the
+    // next idle window, every scroll-and-stop cycle adds another batch and the art falls further
+    // behind (hardware: ~15 s to fill after a few cycles). Device detection loses nothing: this
+    // only defers a periodic rescan by the length of the art queue, and a real hotplug still comes
+    // through BdmGeneration below once art is idle. Matches the fork.
+    if (cacheHasPendingArt())
+        return;
 
     // Steady-state probes additionally require REAL idleness (see the define): a tap gap passes the
     // short gate above, and a probe fired into it contends with the pads on SIO2 and eats the next

@@ -137,6 +137,22 @@ void cacheInvalidateFailMemo(void)
 // the gate self-heals by resetting when the queue is observed empty.
 static volatile int gArtQueuedCount = 0;
 
+// The load the worker is executing RIGHT NOW, which gArtQueuedCount can no longer see: the counter
+// above is decremented on entry to cacheLoadImage (it balances the enqueue, once per request), so
+// between that decrement and the end of the decode "queued" reads zero while the device is very
+// much busy. Single writer (the IO worker), read by the GUI thread in cacheHasPendingArt.
+static volatile int gArtActiveCount = 0;
+
+// Is any cover art queued or being read/decoded? Used by menuUpdateHook to keep background device
+// rescans OUT of the shared IO queue while art is still arriving -- without it, a settle enqueues a
+// batch of per-device probes that the worker serializes AHEAD of the covers the user is waiting on,
+// so the art keeps falling further behind on every scroll-and-stop cycle. Lock-free by the same
+// argument as gArtQueuedCount: a torn read mis-answers one frame and self-corrects on the next.
+int cacheHasPendingArt(void)
+{
+    return (gArtQueuedCount > 0) || (gArtActiveCount > 0);
+}
+
 // Io handled action...
 static void cacheLoadImage(void *data)
 {
@@ -159,7 +175,12 @@ static void cacheLoadImage(void *data)
     if (req->cacheUID != req->entry->UID)
         return;
 
-    // seems okay. we can proceed
+    // seems okay. we can proceed. From here to the qr release below this request owns a device
+    // read + PNG decode: count it ACTIVE so the background-rescan gate keeps seeing "art pending".
+    // Every exit path between here and the decrement must go through the end of this function --
+    // the early-outs above are all before the increment on purpose.
+    gArtActiveCount++;
+
     GSTEXTURE *texture = &req->entry->texture;
     texFree(texture);
 
@@ -179,6 +200,9 @@ static void cacheLoadImage(void *data)
         req->entry->lastUsed = guiFrameId;
 
     req->entry->qr = NULL;
+
+    if (gArtActiveCount > 0)
+        gArtActiveCount--;
 
     free(req);
 }

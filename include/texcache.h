@@ -58,6 +58,12 @@ void cacheDestroyCache(image_cache_t *cache);
 GSTEXTURE *cacheGetTexture(image_cache_t *cache, item_list_t *list, int *cacheId, int *UID, char *value);
 void cacheInvalidateFailMemo(void);
 
+/** Nonzero while any cover art is queued for, or currently being, read+decoded by the IO worker.
+ * menuUpdateHook uses it to keep background device rescans out of the shared queue until the art
+ * the user is waiting on has arrived.
+ */
+int cacheHasPendingArt(void);
+
 // STUB (rebuild): drain/abort hooks for the fork's THREADED art cache. This rebuild runs the
 // official SYNCHRONOUS cache -- nothing is ever pending or in-flight -- so "drained" is always
 // exactly true. If a threaded cache ever returns (checklist item 45 territory), these must
