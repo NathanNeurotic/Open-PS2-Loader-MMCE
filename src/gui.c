@@ -62,6 +62,11 @@ static int showLngPopup;
 static clock_t popupStart;
 static int popupArmed;
 
+// How far ABOVE the vertical centre the boot logo (static splash and animated frames alike) sits.
+// The version line follows it, so the whole boot block moves together; the status line stays
+// anchored near the bottom edge.
+#define BOOT_LOGO_RISE 100
+
 // Boot-splash status line: set via guiSetBootStatus(), drawn under the logo by
 // guiRenderGreeting(). Both on the MAIN thread, so gBootStatus needs no locking.
 static char gBootStatus[64] = {0};
@@ -2160,10 +2165,19 @@ static void guiRenderGreeting(int alpha)
     if (gTheme->logoFrameCount >= 1)
         logoTex = LOGO0_PICTURE + (guiFrameId >> 1) % gTheme->logoFrameCount;
 
+    // Sit the logo above centre rather than dead centre: the version + status lines hang below it,
+    // so a centred logo pushes that block low and reads bottom-heavy. Clamped so a tall logo (or a
+    // short theme height) can never ride off the top of the screen.
+    int logoCenterY = (gTheme->usedHeight >> 1) - BOOT_LOGO_RISE;
+
     GSTEXTURE *logo = thmGetTexture(logoTex);
     if (logo) {
+        int drawY = logoCenterY;
+        if (drawY < (int)(logo->Height >> 1))
+            drawY = logo->Height >> 1;
+
         mycolor = GS_SETREG_RGBA(0x80, 0x80, 0x80, alpha);
-        rmDrawPixmap(logo, screenWidth >> 1, gTheme->usedHeight >> 1, ALIGN_CENTER, logo->Width, logo->Height, SCALING_RATIO, mycolor, 0);
+        rmDrawPixmap(logo, screenWidth >> 1, drawY, ALIGN_CENTER, logo->Width, logo->Height, SCALING_RATIO, mycolor, 0);
     }
 
     // Boot info: the RiptOPL version + a live status line, faded with the splash.
@@ -2171,7 +2185,7 @@ static void guiRenderGreeting(int alpha)
     u64 infoColor = GS_SETREG_RGBA(0x80, 0x80, 0x80, alpha);
     char verLine[48];
     snprintf(verLine, sizeof(verLine), "RiptOPL %s", OPL_VERSION);
-    fntRenderString(gTheme->fonts[0], screenWidth >> 1, (gTheme->usedHeight >> 1) + 80, ALIGN_CENTER, 0, 0, verLine, infoColor);
+    fntRenderString(gTheme->fonts[0], screenWidth >> 1, logoCenterY + 80, ALIGN_CENTER, 0, 0, verLine, infoColor);
     // Prefer an IO-thread boot-step label (the localizer) over the main-thread scan/Ready line,
     // so a wedged step names itself. gBootStickyLabel is a single atomic pointer to a static string.
     const char *bootLine = gBootStickyLabel;
