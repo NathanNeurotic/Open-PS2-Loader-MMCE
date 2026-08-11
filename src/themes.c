@@ -28,6 +28,15 @@
 // neighbours fit together; at the size themes actually ship (140x200 in that capture) a decoded
 // cover is well under 100 KB, so this trades ~1 MB of EE RAM for not re-reading USB.
 #define COVER_CACHE_SLOTS            20
+// How many rows either side of the SELECTED row may be warmed. Measured: the warm loop asked for
+// every visible row -- 18 on the shipped theme -- where uOPL asks for exactly one (its
+// decorator-less list branch requests nothing at all; only the cover panel does). At 73 ms per load
+// that is 1314 ms of device time per page turn against uOPL's 73 ms, and the hardware HUD's D109 is
+// almost exactly six page turns x 18. Warming still earns its keep -- landing on a neighbour should
+// not wait for a read -- but it only has to cover where the cursor can plausibly go next, not the
+// whole page. Measured from the SELECTED row, not from the top of the page, because menusys scrolls
+// by whole pages: from pagestart the budget would be spent on the far end of the new page.
+#define COVER_WARM_RADIUS            2
 // Extra idle frames a per-game BACKGROUND waits beyond the art delay before it may be requested, so
 // the cover always reaches the IO queue first (see drawGameImage). Half a second at 60 Hz: long
 // enough that a cover request is queued and usually finished, short enough that a background still
@@ -1698,6 +1707,22 @@ static void drawItemsList(struct menu_list *menu, struct submenu_list *item, con
             int left;
         } warmBudget[2] = {{NULL, 0}, {NULL, 0}};
 
+        // Where the selection sits on this page (pointer walk, no I/O) so warming can be centred on
+        // the cursor rather than on whatever happens to be drawn first.
+        int selIndex = -1;
+        {
+            submenu_list_t *scan = menu->item->pagestart;
+            int idx = 0;
+            while (scan != NULL && idx < itemsList->displayedItems) {
+                if (scan == item) {
+                    selIndex = idx;
+                    break;
+                }
+                scan = scan->next;
+                idx++;
+            }
+        }
+
         submenu_list_t *ps = menu->item->pagestart;
         int others = 0;
         u64 color;
@@ -1754,10 +1779,11 @@ static void drawItemsList(struct menu_list *menu, struct submenu_list *item, con
                                 warmBudget[b].cache = rowImg->cache;
                                 warmBudget[b].left = rowImg->cache->count - 1; // selected's reserved slot
                             }
-                            // Budget only -- one sweep of the cache, as uOPL warms it. No idle gate
-                            // and no cursor radius: both existed to protect the visible cover from a
-                            // capped queue, and the cap is gone.
-                            if (warmBudget[b].left > 0) {
+                            int dist = (others - 1) - selIndex;
+                            if (dist < 0)
+                                dist = -dist;
+
+                            if (warmBudget[b].left > 0 && (selIndex < 0 || dist <= COVER_WARM_RADIUS)) {
                                 warmBudget[b].left--;
                                 getGameImageTexture(rowImg->cache, list, &ps->item);
                             }
