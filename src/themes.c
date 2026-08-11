@@ -1135,7 +1135,12 @@ static void drawCoverFlow(struct menu_list *menu, struct submenu_list *item, con
     if (covers[centerIdx]) {
         mutable_image_t *centerImg = (mutable_image_t *)thmGetElemForItem(menu, covers[centerIdx], elem)->extended;
         if (centerImg)
-            getGameImageTexture(centerImg->cache, sourceList, &covers[centerIdx]->item);
+            // PRIORITY, for the same reason the list's cover panel is: submitting first only wins
+            // the race on a frame where the queue has room. The depth cap refuses by ARRIVAL, so
+            // with neighbours already in flight from earlier frames the centre cover -- the one the
+            // user is looking at -- was turned away and re-asked next frame, behind the same
+            // backlog. Coverflow was left out when the list draw path got this treatment.
+            getGameImageTextureEx(centerImg->cache, sourceList, &covers[centerIdx]->item, 1);
     }
 
     /*
@@ -1184,7 +1189,11 @@ static void drawCoverFlow(struct menu_list *menu, struct submenu_list *item, con
                 cfWarm[b].cache = wimg->cache;
                 cfWarm[b].left = wimg->cache->count - 1; // selected's slot stays reserved
             }
-            if (cfWarm[b].left > 0) {
+            // Only speculate while the art path is idle -- the same gate the list's warm loop got in
+            // rebuild-98, which Coverflow never received. Up to cache->count-1 lookahead requests per
+            // frame otherwise fill the queue with guesses, and the centre cover (a certainty) waits
+            // behind them on exactly the device where waiting hurts.
+            if (cfWarm[b].left > 0 && !cacheHasPendingArt()) {
                 cfWarm[b].left--;
                 getGameImageTexture(wimg->cache, sourceList, &next->item);
             }

@@ -421,6 +421,31 @@ static void texReadFileFunction(png_structp pngPtr, png_bytep data, png_size_t l
     }
 }
 
+// FatFs result codes as they reach the EE. ps2sdk's bdmfs_fatfs fs_open returns the NEGATED FatFs
+// FRESULT rather than an errno (iop/fs/bdmfs_fatfs/src/fs_driver.c: `ret = -ret;`), and the EE glue
+// then does errno = -res (ee/libcglue/src/glue.c __transform_errno). So on a BDM/USB volume a
+// missing file arrives as errno 4 and a missing directory as errno 5 -- NOT ENOENT, which that
+// driver can never produce. The numbers collide with EINTR/EIO, which is why they are only read
+// this way for mass* paths, where the mapping is the block driver's rather than newlib's.
+#define FATFS_ERR_NO_FILE 4
+#define FATFS_ERR_NO_PATH 5
+
+// Does a failed staged open mean "the art is not there" (memoise it) or "this attempt failed"
+// (worth another try)? Getting this wrong in EITHER direction is expensive: brand a present cover
+// absent and it never loads again this session; brand an absent one transient and the cache retries
+// it for as long as the row is on screen -- which, with most games having no art at all, is most of
+// the library, and pins the IO worker that navigation also needs.
+static int texStagedOpenIsAbsence(const char *filePath, int err)
+{
+    if (err == ENOENT)
+        return 1; // MMCE with the patched mmceman, and anything else with a faithful errno
+
+    if (filePath != NULL && !strncmp(filePath, "mass", 4))
+        return err == FATFS_ERR_NO_FILE || err == FATFS_ERR_NO_PATH;
+
+    return 0;
+}
+
 static int texShouldUseMemoryReader(const char *filePath)
 {
     // #296 baseline restore: stage BDM USB/MX4SIO art ("massN:" and the bare "mass:") whole-file
@@ -708,7 +733,7 @@ static int texLoadAll(GSTEXTURE *texture, const char *filePath, int texId, const
                 // re-probe -- never a permanent failure. The generic loose-file
                 // branch below keeps its unconditional ERR_BAD_FILE (HDD/ETH semantics unchanged).
                 LOG("texLoadAll: staged art open failed: %s (errno %d)\n", filePath, errno);
-                return (errno == ENOENT) ? ERR_BAD_FILE : ERR_FILE_IO;
+                return texStagedOpenIsAbsence(filePath, errno) ? ERR_BAD_FILE : ERR_FILE_IO;
             }
 
             // mmceman's short-read==EOF guarantee (see the staging function) is MMCE-only; BDM

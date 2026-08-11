@@ -124,7 +124,13 @@ static int cacheMemoFailEx(const char *value, const char *suffix, int permanent)
 
     if (strcmp(slot->key, key) != 0) {
         snprintf(slot->key, sizeof(slot->key), "%s", key);
-        slot->misses = 0; // a different key owned this bucket; start its count fresh
+        // Start a STOLEN bucket at 1, not 0. Buckets are single-slot, so two keys that hash
+        // together take turns evicting each other -- and resetting to 0 on every steal meant
+        // neither ever reached the budget, so neither was ever blocked and both retried forever.
+        // That is the exact storm the budget exists to prevent, reappearing whenever two failing
+        // covers collide (256 buckets against a viewport of rows: not rare). Starting at 1 makes a
+        // colliding pair converge on the block instead of resetting each other indefinitely.
+        slot->misses = 1;
     }
 
     if (permanent)
