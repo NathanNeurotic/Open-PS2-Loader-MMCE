@@ -75,7 +75,14 @@ static int artTarLoadImage(const char *value, const char *suffix, GSTEXTURE *tex
 // re-requested every frame the item stays visible, so a refusal costs one frame of latency on that
 // tile, while a deep queue costs the USER seconds on the next thing they do. Non-art requests are
 // rare, so this doubles as the art cap without a per-type counter.
-#define ART_MAX_QUEUE_DEPTH 4
+//
+// Why 2 and not 4: a queued request is only abandoned when its cache SLOT is recycled
+// (cacheLoadImage's cacheUID check), and the cover cache has 10 slots -- so after moving around,
+// the worker still decodes covers for rows the user has already left before it reaches the row
+// they are on. Every queued-but-stale entry is one full PNG open+read+decode of head start the
+// visible tile has to wait out. The depth is the only cheap bound on that: art re-requests itself
+// on the next frame, so refusing costs a frame, while admitting costs a decode.
+#define ART_MAX_QUEUE_DEPTH 2
 
 // Missing-art memo (single-slot hash, keyed startup_suffix): a load that FAILED once is not
 // re-probed every delay period -- on a device with sparse art the old retry loop re-open()ed the
