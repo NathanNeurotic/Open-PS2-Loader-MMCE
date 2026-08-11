@@ -1630,6 +1630,28 @@ static void drawItemsList(struct menu_list *menu, struct submenu_list *item, con
             int left;
         } warmBudget[2] = {{NULL, 0}, {NULL, 0}};
 
+        // Where the selection sits on this page, so warming can prefer the rows the user is about
+        // to move ONTO. Without this the warm loop below simply takes rows in DRAW order starting
+        // at pagestart, i.e. it spends the whole frame budget on the TOP of the viewport -- with
+        // the cursor near the bottom those are the covers being scrolled AWAY from, and the
+        // selected row's own request then queues behind up to a full budget of them (art enqueue
+        // is capped, so it is refused outright while they are in flight). That is the "cover takes
+        // many seconds to appear after moving around" report: not throughput, just the wrong rows.
+        // A pointer walk over at most displayedItems entries, no I/O.
+        int selIndex = -1;
+        {
+            submenu_list_t *scan = menu->item->pagestart;
+            int idx = 0;
+            while (scan != NULL && idx < itemsList->displayedItems) {
+                if (scan == item) {
+                    selIndex = idx;
+                    break;
+                }
+                scan = scan->next;
+                idx++;
+            }
+        }
+
         submenu_list_t *ps = menu->item->pagestart;
         int others = 0;
         u64 color;
@@ -1681,7 +1703,18 @@ static void drawItemsList(struct menu_list *menu, struct submenu_list *item, con
                                 warmBudget[b].cache = rowImg->cache;
                                 warmBudget[b].left = rowImg->cache->count - 1; // selected's reserved slot
                             }
-                            if (warmBudget[b].left > 0) {
+                            // Only warm the neighbourhood of the cursor. The radius is half the
+                            // budget, so a full sweep of it still fits the cache without evicting
+                            // anything it just loaded, and every request spent here is one the user
+                            // plausibly reaches next -- which is the entire point of warming (#296).
+                            // A viewport taller than the cache (16 rows, 10 slots) otherwise fills
+                            // the budget with far rows before ever reaching the cursor's own.
+                            int radius = warmBudget[b].left >> 1;
+                            int dist = (others - 1) - selIndex;
+                            if (dist < 0)
+                                dist = -dist;
+
+                            if (warmBudget[b].left > 0 && (selIndex < 0 || dist <= radius)) {
                                 warmBudget[b].left--;
                                 getGameImageTexture(rowImg->cache, list, &ps->item);
                             }
