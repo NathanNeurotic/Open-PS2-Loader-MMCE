@@ -2592,9 +2592,14 @@ static void guiDrawOverlays()
     // forever. Cheap enough to leave in: four integer reads and one string, only when debug is on.
     if (gEnableDebug) {
         int q = 0, a = 0, r = 0, d = 0;
-        char artdbg[64];
+        int lastMs = 0, okMs = 0, w = 0, h = 0;
+        char artdbg[96];
         cacheDebugCounters(&q, &a, &r, &d);
-        snprintf(artdbg, sizeof(artdbg), "ART Q%d A%d R%d D%d", q, a, r, d);
+        cacheDebugLastLoad(&lastMs, &okMs, &w, &h);
+        // ms = the last load, ok = the last SUCCESSFUL one with its decoded size. One cover at a few
+        // hundred ms means the pipeline is fine and the wait is how many images we ask for; one at
+        // seconds means the cost is inside a single read on this device.
+        snprintf(artdbg, sizeof(artdbg), "ART Q%d A%d R%d D%d  %dms ok%dms %dx%d", q, a, r, d, lastMs, okMs, w, h);
         fntRenderString(gTheme->fonts[0], 8, screenHeight - 24, ALIGN_NONE, 0, 0, artdbg, GS_SETREG_RGBA(255, 255, 0, 128));
     }
 }

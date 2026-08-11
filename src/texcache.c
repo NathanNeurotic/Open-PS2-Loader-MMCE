@@ -193,6 +193,13 @@ static volatile int gArtActiveCount = 0;
 // gate turned away, gArtDone counts loads that finished -- together they say whether the pipeline is
 // moving or wedged, which is not something a still image of the menu can tell you.
 static volatile int gArtRefused = 0;
+// Last art load's wall-clock cost in ms, and the last SUCCESSFUL one with its decoded dimensions.
+// Written by the IO worker, read by the GUI thread for the debug HUD -- plain ints, a torn read
+// mis-prints one frame and nothing else depends on them.
+static volatile int gArtLastMs = 0;
+static volatile int gArtLastOkMs = 0;
+static volatile int gArtLastWidth = 0;
+static volatile int gArtLastHeight = 0;
 static volatile int gArtDone = 0;
 
 void cacheDebugCounters(int *queued, int *active, int *refused, int *done)
@@ -205,6 +212,18 @@ void cacheDebugCounters(int *queued, int *active, int *refused, int *done)
         *refused = gArtRefused;
     if (done)
         *done = gArtDone;
+}
+
+void cacheDebugLastLoad(int *lastMs, int *lastOkMs, int *width, int *height)
+{
+    if (lastMs)
+        *lastMs = gArtLastMs;
+    if (lastOkMs)
+        *lastOkMs = gArtLastOkMs;
+    if (width)
+        *width = gArtLastWidth;
+    if (height)
+        *height = gArtLastHeight;
 }
 
 // Is any cover art queued or being read/decoded? Used by menuUpdateHook to keep background device
@@ -301,12 +320,27 @@ static void cacheLoadImage(void *data)
 
     int result = -1;
 
+    // Time the load itself -- open, read off the device, decode -- with nothing else in the window.
+    // This is the number that separates the two remaining explanations for slow art, which no amount
+    // of reading the source can settle: if ONE cover costs a few hundred ms then the pipeline is
+    // fine and the wait is the number of images we ask for, and if it costs seconds then the cost is
+    // inside a single read on that device and the queue was never the story.
+    clock_t loadStart = clock();
+
     if (gEnableArtTar)
         result = artTarLoadImage(req->value, req->cache->suffix, texture);
 
     // Fall through to the per-file lookup whenever the archive is off, absent, or lacks this key.
     if (result < 0)
         result = handler->itemGetImage(handler, req->cache->prefix, req->cache->isPrefixRelative, req->value, req->cache->suffix, texture, GS_PSM_CT24);
+
+    // clock() is microseconds here; the elapsed form is single-wrap safe.
+    gArtLastMs = (int)((clock() - loadStart) / 1000);
+    if (result >= 0) {
+        gArtLastOkMs = gArtLastMs;
+        gArtLastWidth = (int)texture->Width;
+        gArtLastHeight = (int)texture->Height;
+    }
 
     if (result < 0) {
         // "This art does not exist" and "this ATTEMPT failed" are different things, and only the

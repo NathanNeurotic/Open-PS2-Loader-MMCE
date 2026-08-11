@@ -73,6 +73,12 @@ GSTEXTURE *cacheLookupTexture(image_cache_t *cache, int *cacheId, int *UID);
  */
 void cacheDebugCounters(int *queued, int *active, int *refused, int *done);
 
+/** Debug HUD: cost in ms of the last art load and of the last SUCCESSFUL one, plus that image's
+ * decoded pixel dimensions. Separates "one load is slow" from "we ask for too many". Any argument
+ * may be NULL.
+ */
+void cacheDebugLastLoad(int *lastMs, int *lastOkMs, int *width, int *height);
+
 /** May speculative art (viewport warming, far-row thumbnails, the Coverflow lookahead) be issued
  * now? Looser than cacheHasPendingArt(): it allows prefetch while a few loads are already in
  * flight, so the device stays busy instead of prefetch running one image at a time.
