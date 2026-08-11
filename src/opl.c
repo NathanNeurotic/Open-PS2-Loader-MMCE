@@ -119,6 +119,11 @@ static unsigned int frameCounter;
 // Per-mode background-rescan throttle (Fix B): the every-frame (updateDelay==0) device rescans
 // enumerate the SIO2/mass bus; space them by a minimum wall-clock interval so they don't run
 // unthrottled. A real device change bypasses the throttle via bdmGetGeneration().
+// A BDM slot that has never held a device is probed this many times less often than one that has.
+// Its probe is only a missed-event net; a present device keeps the full cadence so removal is still
+// noticed promptly.
+#define BDM_EMPTY_SLOT_PROBE_RATIO 8
+
 static clock_t lastBgRescan[MODE_COUNT];
 static unsigned int lastSeenBdmGeneration;
 
@@ -1149,14 +1154,24 @@ static void menuUpdateHook()
                 // it fires precisely BECAUSE a device changed, the scan populates a page the
                 // user is waiting on, and a plugged device should be noticed in the
                 // next tap gap rather than after a second of stillness (#271).
-                // NOTE(rebuild-116): rebuild-96 skipped never-connected slots here, probing only one
-                // per tick on a rotation, on the reasoning that attach is event-driven and the
-                // periodic probe is just a net for a missed event. Reverted: hardware showed a
-                // device REMOVAL going unnoticed (no disconnect sound, the page stayed) and then the
-                // whole BDM stack vanishing after a Device Settings apply. Whether or not the
-                // rotation was the cause, it thinned exactly the polling that reconciles device
-                // presence, it was a pure optimisation with no measured benefit, and detection is
-                // worth more than the probes it saved. Probe every enabled slot again.
+                // Slots that HAVE a device are probed every tick -- that poll is what notices a
+                // removal, and thinning it (rebuild-96) is how a disconnect went unseen and the BDM
+                // stack later vanished. Slots that have NEVER held a device are probed far less
+                // often, because that probe is only a net for a missed attach event (attach is
+                // event-driven via bdmEventHandler, and a generation bump bypasses this gate
+                // entirely).
+                //
+                // Why it matters, measured: the hardware HUD showed "Q12 A0" -- twelve cover loads
+                // queued and NONE executing, i.e. the single IO worker was inside something else
+                // while the art waited. That something is this batch: eight fileXioDopen round
+                // trips per tick on a rig with one stick, seven of them for slots that have been
+                // empty since boot. It is also the most plausible source of the spurious
+                // "device replugged" the user sees while simply navigating, since those probes poke
+                // the USB stack for devices that are not there.
+                if (!genChanged && mode >= BDM_MODE && mode <= BDM_MODE_LAST && !bdmSlotEverConnected(mode) &&
+                    (frameCounter % (MENU_GENERAL_UPDATE_DELAY * BDM_EMPTY_SLOT_PROBE_RATIO)) != 0)
+                    continue;
+
                 if (genChanged || (longIdle && (now - lastBgRescan[mode]) >= MENU_BG_RESCAN_MIN_INTERVAL_TICKS)) {
                     // Stamp the throttle only on an accepted request, so a rejected one retries on
                     // the next tick instead of being silently skipped for a full interval.
