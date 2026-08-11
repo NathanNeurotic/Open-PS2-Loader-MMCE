@@ -546,7 +546,12 @@ GSTEXTURE *cacheGetTextureEx(image_cache_t *cache, item_list_t *list, int *cache
         DIntr();
         gArtQueuedCount++;
         EIntr();
-        if (ioPutRequest(IO_CACHE_LOAD_ART, req) != IO_OK) {
+        // A priority request runs NEXT, not last. Letting it past the depth cap only got it into
+        // the queue; the queue is FIFO, so it still waited out every prefetched neighbour already
+        // sitting in it -- each one a full read plus PNG decode off the game device. That is why
+        // the highlighted cover could take many seconds here while official OPL, which requests
+        // nothing but that one cover, shows it almost immediately.
+        if ((priority ? ioPutRequestNext(IO_CACHE_LOAD_ART, req) : ioPutRequest(IO_CACHE_LOAD_ART, req)) != IO_OK) {
             DIntr();
             if (gArtQueuedCount > 0)
                 gArtQueuedCount--; // the request never entered the queue

@@ -29,6 +29,12 @@ int ioRegisterHandler(int type, io_request_handler_t handler);
  * @note The data are not freed! */
 int ioPutRequest(int type, void *data);
 
+/** As ioPutRequest, but the request is spliced in to run NEXT (immediately after whatever is
+ * already executing) instead of at the back of the queue. For work the user is visibly waiting on,
+ * where FIFO position -- not queue admission -- is what decides how long they wait.
+ */
+int ioPutRequestNext(int type, void *data);
+
 /** removes all requests of a given type from the queue
  * @param type the type of the requests to remove
  * @return the count of the requests removed */

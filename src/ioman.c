@@ -210,6 +210,55 @@ void ioInit(void)
     StartThread(gIOThreadId, NULL);
 }
 
+// Queue a request to run NEXT rather than last. For work the user is waiting on directly -- today
+// only the cover of the highlighted game -- where being served in arrival order means waiting out
+// every speculative prefetch already queued, each of which is a full read+decode on the game
+// device. Admitting such a request past a depth cap does nothing on its own: the queue is FIFO, so
+// position, not admission, is what makes it arrive quickly.
+//
+// It is inserted AFTER the head, not at it, and that is deliberate rather than an approximation:
+// the worker processes gReqList's head WITHOUT holding gEndSemaId and then advances with
+// `gReqList = req->next`, so a node pushed in front of a head that is already executing would be
+// skipped and leaked by that assignment. Splicing in behind the head makes the worker's own
+// advance pick this request up next, and the in-flight one is not interruptible anyway.
+int ioPutRequestNext(int type, void *data)
+{
+    if (isIOBlocked)
+        return IO_ERR_IO_BLOCKED;
+
+    if (!ioGetHandler(type))
+        return IO_ERR_INVALID_HANDLER;
+
+    WaitSema(gEndSemaId);
+
+    struct io_request_t *req = (struct io_request_t *)malloc(sizeof(struct io_request_t));
+    if (!req) {
+        SignalSema(gEndSemaId);
+        return IO_ERR_TOO_MANY_REQUESTS;
+    }
+
+    req->type = type;
+    req->data = data;
+
+    if (!gReqList) {
+        // Empty queue: this IS the head, and the tail.
+        req->next = NULL;
+        gReqList = req;
+        gReqEnd = req;
+    } else {
+        struct io_request_t *head = gReqList; // valid: the worker only frees it under this sema
+        req->next = head->next;
+        head->next = req;
+        if (gReqEnd == head)
+            gReqEnd = req;
+    }
+
+    SignalSema(gEndSemaId);
+
+    WakeupThread(gIOThreadId);
+    return IO_OK;
+}
+
 int ioPutRequest(int type, void *data)
 {
     if (isIOBlocked)
