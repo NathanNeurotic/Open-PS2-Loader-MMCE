@@ -75,7 +75,16 @@ static int artTarLoadImage(const char *value, const char *suffix, GSTEXTURE *tex
 // re-requested every frame the item stays visible, so a refusal costs one frame of latency on that
 // tile, while a deep queue costs the USER seconds on the next thing they do. Non-art requests are
 // rare, so this doubles as the art cap without a per-type counter.
-#define ART_MAX_QUEUE_DEPTH 4
+#define ART_MAX_QUEUE_DEPTH 8
+
+// How many loads may already be in flight and still allow SPECULATIVE work (viewport warming,
+// far-row thumbnails, the Coverflow lookahead). Deliberately NOT zero: requiring a fully idle path
+// serialises prefetch to one image at a time, which is slower than the hardware-approved
+// rebuild-66 behaviour -- that build had no art throttle of ANY kind (no cap, no memo) and simply
+// let every visible row enqueue, which is exactly why its art fills faster than ours. Keep a margin
+// below the cap instead: speculation keeps the device busy, and the cover the user is looking at is
+// a priority request that bypasses the cap anyway.
+#define ART_PREFETCH_MAX_IN_FLIGHT 4
 
 // Missing-art memo (single-slot hash, keyed startup_suffix): a load that FAILED once is not
 // re-probed every delay period -- on a device with sparse art the old retry loop re-open()ed the
@@ -206,6 +215,14 @@ void cacheDebugCounters(int *queued, int *active, int *refused, int *done)
 int cacheHasPendingArt(void)
 {
     return (gArtQueuedCount > 0) || (gArtActiveCount > 0);
+}
+
+// May speculative art work be issued right now? Used by the prefetch paths, which want the device
+// kept busy but must not crowd out the visible cover. cacheHasPendingArt() stays the STRICT test,
+// used where yielding entirely is right (background device rescans in menuUpdateHook).
+int cacheMayPrefetchArt(void)
+{
+    return (gArtQueuedCount + gArtActiveCount) < ART_PREFETCH_MAX_IN_FLIGHT;
 }
 
 GSTEXTURE *cacheGetTexture(image_cache_t *cache, item_list_t *list, int *cacheId, int *UID, char *value)

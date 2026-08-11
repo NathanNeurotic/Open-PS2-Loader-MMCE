@@ -1193,7 +1193,7 @@ static void drawCoverFlow(struct menu_list *menu, struct submenu_list *item, con
             // rebuild-98, which Coverflow never received. Up to cache->count-1 lookahead requests per
             // frame otherwise fill the queue with guesses, and the centre cover (a certainty) waits
             // behind them on exactly the device where waiting hurts.
-            if (cfWarm[b].left > 0 && !cacheHasPendingArt()) {
+            if (cfWarm[b].left > 0 && cacheMayPrefetchArt()) {
                 cfWarm[b].left--;
                 getGameImageTexture(wimg->cache, sourceList, &next->item);
             }
@@ -1728,7 +1728,7 @@ static void drawItemsList(struct menu_list *menu, struct submenu_list *item, con
                     if (dist < 0)
                         dist = -dist;
 
-                    if (selIndex < 0 || dist <= DECORATOR_NEAR_ROWS || !cacheHasPendingArt())
+                    if (selIndex < 0 || dist <= DECORATOR_NEAR_ROWS || cacheMayPrefetchArt())
                         itemIconTex = getGameImageTexture(itemsList->decoratorImage->cache, menu->item->userdata, &ps->item);
                     else
                         itemIconTex = getGameImageCached(itemsList->decoratorImage->cache, &ps->item);
@@ -1778,7 +1778,7 @@ static void drawItemsList(struct menu_list *menu, struct submenu_list *item, con
                             // viewport still fills, on a slow USB stick prefetch simply stands
                             // aside until the cover being looked at has arrived, then resumes one
                             // row at a time.
-                            if (warmBudget[b].left > 0 && (selIndex < 0 || dist <= radius) && !cacheHasPendingArt()) {
+                            if (warmBudget[b].left > 0 && (selIndex < 0 || dist <= radius) && cacheMayPrefetchArt()) {
                                 warmBudget[b].left--;
                                 getGameImageTexture(rowImg->cache, list, &ps->item);
                             }
