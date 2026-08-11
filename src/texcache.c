@@ -164,16 +164,32 @@ static void cacheLoadImage(void *data)
     load_image_request_t *req = data;
 
     // Safeguards...
-    if (!req || !req->entry || !req->cache)
+    if (!req)
         return;
+
+    // Every early-out below must FREE the request. It is a single allocation (the struct with its
+    // value string appended), owned solely by this handler once ioPutRequest accepted it, and the
+    // entry's qr back-pointer is cleared by cacheClearItem -- so nothing else can reach it and
+    // returning without free() simply loses the memory.
+    if (!req->entry || !req->cache) {
+        free(req);
+        return;
+    }
 
     item_list_t *handler = req->list;
-    if (!handler)
+    if (!handler) {
+        free(req);
         return;
+    }
 
-    // the cache entry was already reused!
-    if (req->cacheUID != req->entry->UID)
+    // The cache entry was already reused (or cleared: cacheClearItem zeroes UID and nulls qr, which
+    // is what a list rebuild or theme switch does to every slot). This request is now orphaned --
+    // and it is NOT a rare path: background rescans rebuild lists while the user browses, so every
+    // rebuild used to leak one of these per art load still in flight.
+    if (req->cacheUID != req->entry->UID) {
+        free(req);
         return;
+    }
 
     // seems okay. we can proceed. From here to the qr release below this request owns a device
     // read + PNG decode: count it ACTIVE so the background-rescan gate keeps seeing "art pending".
