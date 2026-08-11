@@ -466,6 +466,35 @@ static int texStageExternalFileIntoMemory(int fd, void **buffer, u32 *stagedSize
     if (buffer == NULL || stagedSize == NULL)
         return ERR_FILE_IO;
 
+    // FAST PATH -- what official OPL does, and what the loop below cannot do on MMCE. If the device
+    // can report a size, take it: allocate exactly that and read it in ONE call. The chunked loop
+    // costs several read() round trips per cover plus a realloc-and-copy every time the doubling
+    // buffer grows, and on USB those round trips are the expensive part. shortReadIsEof marks the
+    // MMCE arm, whose driver does not support SEEK_END (returning <= 0) -- it keeps the loop, which
+    // is the reason the loop exists at all. Any device that answers the seek gets the cheap path,
+    // and one that answers with something implausible falls through to the loop untouched.
+    if (!shortReadIsEof) {
+        int size = lseek(fd, 0, SEEK_END);
+        if (lseek(fd, 0, SEEK_SET) == 0 && size > 0 && size <= TEX_STAGE_MAX_SIZE) {
+            fileBuffer = (unsigned char *)malloc(size);
+            if (fileBuffer != NULL) {
+                int got = read(fd, fileBuffer, size);
+                if (got == size) {
+                    *buffer = fileBuffer;
+                    *stagedSize = (u32)size;
+                    return 0;
+                }
+                // Short or failed read: fall back to the loop rather than guess. Rewind first, or
+                // the retry would resume mid-file and stage a truncated PNG.
+                free(fileBuffer);
+                if (lseek(fd, 0, SEEK_SET) != 0)
+                    return ERR_FILE_IO;
+            }
+        } else if (lseek(fd, 0, SEEK_SET) != 0) {
+            return ERR_FILE_IO; // could not get back to the start; the loop below would read garbage
+        }
+    }
+
     // Do NOT size the file with lseek(SEEK_END) first: the MMCE newlib device (mmceman) does not
     // support SEEK_END, so it returned <= 0 and EVERY MMCE cover failed here with ERR_BAD_FILE (ISO
     // and VCD alike) while USB -- which streamed via read() only -- worked. Grow a heap buffer as we
