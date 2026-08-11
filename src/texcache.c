@@ -85,6 +85,10 @@ void cacheInvalidateFailMemo(void)
     // cache_id anyway.
 }
 
+// Minimum frames of no input before any art may be requested, regardless of the Art Delay
+// setting. See the gate in cacheGetTexture for why this floor exists.
+#define ART_MIN_SETTLE_FRAMES 3
+
 // Art requests currently sitting in the ioman queue. LOCK-FREE on purpose, and that is the whole
 // story of this counter: the first backpressure gate here called ioGetPendingRequestCount(), whose
 // WaitSema(gProcSemaId) blocks until the worker finishes draining the ENTIRE queue -- the worker
@@ -360,8 +364,25 @@ GSTEXTURE *cacheGetTexture(image_cache_t *cache, item_list_t *list, int *cacheId
         *cacheId = -1;
     }
 
-    // under the cache pre-delay (to avoid filling cache while moving around)
-    if (guiInactiveFrames < list->delay)
+    // Under the cache pre-delay (to avoid filling cache while moving around) -- with a FLOOR that
+    // the user's Art Delay setting cannot lower past.
+    //
+    // Why a floor exists at all: the IO worker is priority 30 and the GUI/pad thread is 31, so the
+    // worker PREEMPTS rendering and input whenever it is runnable. The device read mostly blocks
+    // (the GUI runs happily through it) but the PNG decode is pure CPU -- tens of ms of it -- and
+    // during that the menu stops sampling the pad. With Art Delay 0 this predicate is
+    // `guiInactiveFrames < 0`, never true, so covers are requested WHILE a direction is held: every
+    // decode eats frames, the held-repeat then catches up in one step, and scrolling gains a
+    // rhythmic lurch -- one per decode. Reported from hardware as "pressing at the same pace, every
+    // so many clicks it jumps", and absent from both uOPL and rebuild-66, neither of which requests
+    // art mid-scroll.
+    //
+    // A couple of frames is below the threshold of noticing for someone who set the delay to 0 to
+    // make art appear promptly, and it is enough to keep decodes out of an active scroll.
+    int artDelay = list->delay;
+    if (artDelay < ART_MIN_SETTLE_FRAMES)
+        artDelay = ART_MIN_SETTLE_FRAMES;
+    if (guiInactiveFrames < artDelay)
         return NULL;
 
 
