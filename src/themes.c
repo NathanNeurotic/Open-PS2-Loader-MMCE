@@ -16,13 +16,18 @@
 #include <time.h>
 #include <math.h>
 
-#define MENU_POS_V             50
-#define HINT_HEIGHT            32
-#define DECORATOR_SIZE         20
+#define MENU_POS_V                   50
+#define HINT_HEIGHT                  32
+#define DECORATOR_SIZE               20
 // How many rows either side of the cursor may request a per-row thumbnail while art is still in
 // flight. Rows further out wait for an idle art path, so the neighbourhood the user is moving
 // through fills first instead of the list filling top-down regardless of where they are.
-#define DECORATOR_NEAR_ROWS    3
+#define DECORATOR_NEAR_ROWS          3
+// Extra idle frames a per-game BACKGROUND waits beyond the art delay before it may be requested, so
+// the cover always reaches the IO queue first (see drawGameImage). Half a second at 60 Hz: long
+// enough that a cover request is queued and usually finished, short enough that a background still
+// arrives while the user is reading the row.
+#define BG_REQUEST_EXTRA_IDLE_FRAMES 30
 // Cache slots per AttributeImage element. An AttributeImage is NOT a per-game image -- it is a small FIXED
 // SET of glyphs keyed by the attribute's value, so the cache only ever needs to hold that attribute's whole
 // value set to be thrash-free. Our built-in attributes are tiny (#Format = ISO/ZSO/VCD/UL/ELF/HDL = 6,
@@ -31,7 +36,7 @@
 // 32 covers any realistic custom attribute with headroom. Genuinely cheap -- cacheInitCache allocates only
 // `count` empty cache_entry_t structs (no texture memory until a glyph is actually loaded into a slot), so
 // 32 slots is ~2-3 KB of EE RAM and a #DiscType cache still only ever HOLDS its 3.
-#define ATTR_IMAGE_CACHE_SLOTS 32
+#define ATTR_IMAGE_CACHE_SLOTS       32
 
 extern const char conf_theme_OPL_cfg;
 extern u16 size_conf_theme_OPL_cfg;
@@ -878,14 +883,32 @@ static void drawGameImage(struct menu_list *menu, struct submenu_list *item, con
         if (gameImage == NULL)
             return;
 
-        // PRIORITY for the highlighted game's own art -- but NOT for a per-game BACKGROUND. This
-        // same function draws both, and backgrounds are drawn FIRST (painter's order) and are by far
-        // the largest image on screen: a full-screen PNG against a cover. Marking the background
-        // priority therefore put the slowest load at the front of the queue and the cover behind it,
-        // which is visible on hardware as backgrounds appearing before covers. The cover is the
-        // thing the user is looking for; the background is scenery and can arrive whenever.
-        int artPriority = (drawElem->type != ELEM_TYPE_BACKGROUND);
-        GSTEXTURE *texture = getGameImageTextureEx(gameImage->cache, menu->item->userdata, &item->item, artPriority);
+        // A per-game BACKGROUND must never be REQUESTED before the cover. This function draws both,
+        // and the theme's Background element is the FIRST in the list (painter's order), so on the
+        // settle frame its request reached the empty queue first and became the executing head --
+        // and the head cannot be jumped by any amount of priority, because the worker is already
+        // inside it. A full-screen PNG is ~5x the pixels of a cover, so the cover the user is
+        // actually waiting for sat behind the better part of a second of somebody else's scenery.
+        // That is the whole gap to official OPL, whose built-in theme has no per-game background on
+        // the main page at all (it uses a static image), and it explains why a device with no _BG
+        // art in its set feels fine while one with a full art set does not.
+        //
+        // So hold the background back: request it only once the cover has had its turn -- an extra
+        // idle margin beyond the art delay AND an idle art path. Until then draw whatever is already
+        // cached, which keeps a background that IS loaded on screen instead of flickering to the
+        // default. Nothing is lost but the order.
+        int isBackground = (drawElem->type == ELEM_TYPE_BACKGROUND);
+        GSTEXTURE *texture;
+
+        if (isBackground) {
+            if (guiInactiveFrames >= (list != NULL ? list->delay : 0) + BG_REQUEST_EXTRA_IDLE_FRAMES && cacheMayPrefetchArt())
+                texture = getGameImageTextureEx(gameImage->cache, menu->item->userdata, &item->item, 0);
+            else
+                texture = getGameImageCached(gameImage->cache, &item->item);
+        } else {
+            // PRIORITY: the highlighted game's own cover, the one image the user is looking for.
+            texture = getGameImageTextureEx(gameImage->cache, menu->item->userdata, &item->item, 1);
+        }
 
         if (!texture || !texture->Mem) {
             // #2: on the Favourites page a COVER element with no real art must not draw the embedded
