@@ -153,6 +153,31 @@ int cacheHasPendingArt(void)
     return (gArtQueuedCount > 0) || (gArtActiveCount > 0);
 }
 
+GSTEXTURE *cacheGetTexture(image_cache_t *cache, item_list_t *list, int *cacheId, int *UID, char *value)
+{
+    return cacheGetTextureEx(cache, list, cacheId, UID, value, 0);
+}
+
+// LOOKUP ONLY: hand back this item's texture if its slot is still live, and never claim a slot,
+// never queue a load, never touch the fail memo. For a caller that wants to keep DRAWING art it
+// already has while deliberately not asking for more -- without this, "don't request" also means
+// "don't draw", and a row that already had its thumbnail would drop back to the placeholder.
+GSTEXTURE *cacheLookupTexture(image_cache_t *cache, int *cacheId, int *UID)
+{
+    if (cache == NULL || cacheId == NULL || UID == NULL)
+        return NULL;
+
+    if (*cacheId < 0 || *cacheId >= cache->count)
+        return NULL;
+
+    cache_entry_t *entry = &cache->content[*cacheId];
+    if (entry->UID != *UID || entry->qr != NULL || entry->lastUsed == 0 || entry->texture.Mem == NULL)
+        return NULL;
+
+    entry->lastUsed = guiFrameId; // still on screen: keep it away from the eviction scan
+    return &entry->texture;
+}
+
 // Io handled action...
 static void cacheLoadImage(void *data)
 {
@@ -292,7 +317,8 @@ void cacheDestroyCache(image_cache_t *cache)
     free(cache);
 }
 
-GSTEXTURE *cacheGetTexture(image_cache_t *cache, item_list_t *list, int *cacheId, int *UID, char *value)
+// priority != 0 means "this is on screen right now, not a guess" -- see the backpressure gate below.
+GSTEXTURE *cacheGetTextureEx(image_cache_t *cache, item_list_t *list, int *cacheId, int *UID, char *value, int priority)
 {
     if (cache == NULL || list == NULL || cacheId == NULL || UID == NULL || value == NULL || value[0] == '\0')
         return NULL;
@@ -367,7 +393,12 @@ GSTEXTURE *cacheGetTexture(image_cache_t *cache, item_list_t *list, int *cacheId
     // free to drop: the slot is never claimed, and the next frame simply asks again. Refusing to
     // deepen an already-deep queue keeps the config save, the deferred menu rebuild and device
     // init from starving behind hundreds of queued art reads on a slow device.
-    if (oldestEntry && gArtQueuedCount >= ART_MAX_QUEUE_DEPTH) {
+    // PRIORITY bypasses the cap. The art the user is LOOKING AT (the selected row's cover) is not
+    // speculative: refusing it means the one image on screen that matters waits for a queue full of
+    // guesses about neighbouring rows to drain first -- on a slow device, seconds of staring at a
+    // placeholder while the machine reads covers nobody asked for. There is at most one such
+    // request per row change, so the cap still bounds the queue in every practical sense.
+    if (oldestEntry && !priority && gArtQueuedCount >= ART_MAX_QUEUE_DEPTH) {
         if (!ioHasPendingRequests())
             gArtQueuedCount = 0; // drift self-heal: queue is empty, the counter must be too
         else {

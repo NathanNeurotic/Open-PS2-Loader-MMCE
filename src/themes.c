@@ -19,6 +19,10 @@
 #define MENU_POS_V             50
 #define HINT_HEIGHT            32
 #define DECORATOR_SIZE         20
+// How many rows either side of the cursor may request a per-row thumbnail while art is still in
+// flight. Rows further out wait for an idle art path, so the neighbourhood the user is moving
+// through fills first instead of the list filling top-down regardless of where they are.
+#define DECORATOR_NEAR_ROWS    3
 // Cache slots per AttributeImage element. An AttributeImage is NOT a per-game image -- it is a small FIXED
 // SET of glyphs keyed by the attribute's value, so the cache only ever needs to hold that attribute's whole
 // value set to be thrash-free. Our built-in attributes are tiny (#Format = ISO/ZSO/VCD/UL/ELF/HDL = 6,
@@ -800,7 +804,9 @@ static void initStaticImage(const char *themePath, config_set_t *themeConfig, th
 
 // GameImage ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-static GSTEXTURE *getGameImageTexture(image_cache_t *cache, void *support, struct submenu_item *item)
+// priority != 0: this image is being DRAWN this frame (the selected row's cover, the carousel's
+// centre), so it must not be refused by the art queue's depth cap in favour of prefetch.
+static GSTEXTURE *getGameImageTextureEx(image_cache_t *cache, void *support, struct submenu_item *item, int priority)
 {
     // Folder browsing: a folder row has no cover art (and no startup key). Never route it through the
     // cover cache -- an empty key would thrash the cache and paint the empty case frame. Applies to
@@ -826,10 +832,32 @@ static GSTEXTURE *getGameImageTexture(image_cache_t *cache, void *support, struc
         if (startup == NULL || startup[0] == '\0')
             return NULL;
 
-        return cacheGetTexture(cache, list, &item->cache_id[cache->userId], &item->cache_uid[cache->userId], startup);
+        return cacheGetTextureEx(cache, list, &item->cache_id[cache->userId], &item->cache_uid[cache->userId], startup, priority);
     }
 
     return NULL;
+}
+
+static GSTEXTURE *getGameImageTexture(image_cache_t *cache, void *support, struct submenu_item *item)
+{
+    return getGameImageTextureEx(cache, support, item, 0);
+}
+
+// Draw-what-we-have companion to the above: same eligibility checks, but it only ever returns art
+// that is ALREADY loaded -- no slot claim, no queued read. Used by rows that are deliberately not
+// requesting this frame so they keep showing their thumbnail instead of flicking to the placeholder.
+static GSTEXTURE *getGameImageCached(image_cache_t *cache, struct submenu_item *item)
+{
+    if (item == NULL || item->isFolder || !gEnableArt)
+        return NULL;
+
+    if (cache == NULL || cache->userId < 0 || item->cache_id == NULL || item->cache_uid == NULL)
+        return NULL;
+
+    if (gTheme == NULL || cache->userId >= gTheme->gameCacheCount)
+        return NULL;
+
+    return cacheLookupTexture(cache, &item->cache_id[cache->userId], &item->cache_uid[cache->userId]);
 }
 
 // Favourites element redirection (defined in the Coverflow section below; used by both draw
@@ -850,7 +878,9 @@ static void drawGameImage(struct menu_list *menu, struct submenu_list *item, con
         if (gameImage == NULL)
             return;
 
-        GSTEXTURE *texture = getGameImageTexture(gameImage->cache, menu->item->userdata, &item->item);
+        // PRIORITY: this is the cover panel for the highlighted game -- the one image the user is
+        // actually looking at. It must never be refused in favour of queued prefetch.
+        GSTEXTURE *texture = getGameImageTextureEx(gameImage->cache, menu->item->userdata, &item->item, 1);
 
         if (!texture || !texture->Mem) {
             // #2: on the Favourites page a COVER element with no real art must not draw the embedded
@@ -1608,7 +1638,7 @@ static void drawItemsList(struct menu_list *menu, struct submenu_list *item, con
         // ahead of the selection. Submit the selected row first; its loop lookup
         // reuses the same value-keyed cache entry.
         if (itemsList->decoratorImage != NULL && !item->item.isFolder)
-            getGameImageTexture(itemsList->decoratorImage->cache, menu->item->userdata, &item->item);
+            getGameImageTextureEx(itemsList->decoratorImage->cache, menu->item->userdata, &item->item, 1);
         else if (itemsList->coverElem != NULL && !item->item.isFolder) {
             // No decorator: the plain List only ever demanded the selected cover (via the
             // separately drawn COV element), so artwork arrived one highlight at a time
@@ -1677,8 +1707,23 @@ static void drawItemsList(struct menu_list *menu, struct submenu_list *item, con
 
                 if (ps->item.isFolder) {
                     itemIconTex = NULL; // folders never carry a cover
-                } else
-                    itemIconTex = getGameImageTexture(itemsList->decoratorImage->cache, menu->item->userdata, &ps->item);
+                } else {
+                    // Per-row thumbnails: every visible row wants one, so on a slow device they
+                    // compete for the same capped queue and fill in whatever order the rows happen
+                    // to be drawn -- top-down, regardless of where the cursor is. Ask for the rows
+                    // NEAREST the cursor while art is in flight, and let the rest join once the
+                    // path goes idle: the neighbourhood the user is moving through fills first,
+                    // and the far rows still fill, just with the spare capacity rather than ahead
+                    // of the near ones. selIndex < 0 (selection not on this page) asks for all.
+                    int dist = (others - 1) - selIndex;
+                    if (dist < 0)
+                        dist = -dist;
+
+                    if (selIndex < 0 || dist <= DECORATOR_NEAR_ROWS || !cacheHasPendingArt())
+                        itemIconTex = getGameImageTexture(itemsList->decoratorImage->cache, menu->item->userdata, &ps->item);
+                    else
+                        itemIconTex = getGameImageCached(itemsList->decoratorImage->cache, &ps->item);
+                }
 
                 if (itemIconTex && itemIconTex->Mem)
                     rmDrawPixmap(itemIconTex, posX, posY, elem->aligned, DECORATOR_SIZE, DECORATOR_SIZE, elem->scaled, gDefaultCol, 0);

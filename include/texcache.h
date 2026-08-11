@@ -56,6 +56,17 @@ image_cache_t *cacheInitCache(int userId, const char *prefix, int isPrefixRelati
 void cacheDestroyCache(image_cache_t *cache);
 
 GSTEXTURE *cacheGetTexture(image_cache_t *cache, item_list_t *list, int *cacheId, int *UID, char *value);
+
+/** As cacheGetTexture, but priority != 0 marks the request as art that is ON SCREEN NOW rather
+ * than speculative, letting it past the queue-depth cap so the image the user is looking at never
+ * waits for a queue of prefetched neighbours to drain.
+ */
+GSTEXTURE *cacheGetTextureEx(image_cache_t *cache, item_list_t *list, int *cacheId, int *UID, char *value, int priority);
+
+/** Lookup only: returns this item's texture if its cache slot is still live, and never claims a
+ * slot or queues a load. For drawing art already held while deliberately not requesting more.
+ */
+GSTEXTURE *cacheLookupTexture(image_cache_t *cache, int *cacheId, int *UID);
 void cacheInvalidateFailMemo(void);
 
 /** Nonzero while any cover art is queued for, or currently being, read+decoded by the IO worker.
