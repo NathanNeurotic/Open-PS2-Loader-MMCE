@@ -10,6 +10,11 @@ void checkMCFolder(void);
  * it, wherever the save home actually is. No-op off mc, and never rewrites an icon already there.
  */
 void checkMCSaveIcons(const char *cfgFilePath);
+
+/** As checkMCSaveIcons, for a folder that already exists (the POPSTARTER folder). Writes the
+ * icon.sys + .icn PAIR -- icon.sys names the .icn, so neither is any use alone. No-op off mc.
+ */
+void checkMCSaveIconsDir(const char *dir);
 int openFile(char *path, int mode);
 void *readFile(char *path, int align, int *size);
 int listDir(char *path, const char *separator, int maxElem,
