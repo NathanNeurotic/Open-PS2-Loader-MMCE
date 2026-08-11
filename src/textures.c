@@ -421,29 +421,29 @@ static void texReadFileFunction(png_structp pngPtr, png_bytep data, png_size_t l
     }
 }
 
-// FatFs result codes as they reach the EE. ps2sdk's bdmfs_fatfs fs_open returns the NEGATED FatFs
-// FRESULT rather than an errno (iop/fs/bdmfs_fatfs/src/fs_driver.c: `ret = -ret;`), and the EE glue
-// then does errno = -res (ee/libcglue/src/glue.c __transform_errno). So on a BDM/USB volume a
-// missing file arrives as errno 4 and a missing directory as errno 5 -- NOT ENOENT, which that
-// driver can never produce. The numbers collide with EINTR/EIO, which is why they are only read
-// this way for mass* paths, where the mapping is the block driver's rather than newlib's.
-#define FATFS_ERR_NO_FILE 4
-#define FATFS_ERR_NO_PATH 5
-
-// Does a failed staged open mean "the art is not there" (memoise it) or "this attempt failed"
-// (worth another try)? Getting this wrong in EITHER direction is expensive: brand a present cover
-// absent and it never loads again this session; brand an absent one transient and the cache retries
-// it for as long as the row is on screen -- which, with most games having no art at all, is most of
-// the library, and pins the IO worker that navigation also needs.
+// Does a failed staged open mean "the art is not there" (stop asking) or "this attempt failed"
+// (worth another try)?
+//
+// MMCE is the only device where the question has a trustworthy answer. mmceman used to return one
+// bare -1 for six different failures -- fd-pool exhausted, three packet timeouts, a garbled reply,
+// AND the card's genuine not-found -- so a contention storm branded every browsed game's art
+// nonexistent for the session; its paired patch makes ENOENT mean specifically not-found, which is
+// what the transient lane was built for.
+//
+// BDM/USB gets no such guarantee and never did. ps2sdk's bdmfs_fatfs returns the NEGATED FatFs
+// result rather than an errno (fs_driver.c: `ret = -ret;`), so the value that reaches errno is a
+// FatFs code wearing an errno's clothes -- reading it as ENOENT, EINTR or anything else is
+// guesswork about a mapping neither side promises. Do what the hardware-approved rebuild-66 did on
+// EVERY device: a failed open means no art. The asymmetry of being wrong decides it -- calling
+// present art absent costs one placeholder until the next list rebuild clears the memo, while
+// calling absent art transient costs repeated reads of a file that does not exist, on the very
+// device the user is browsing, for most of a library (most games ship no cover at all).
 static int texStagedOpenIsAbsence(const char *filePath, int err)
 {
-    if (err == ENOENT)
-        return 1; // MMCE with the patched mmceman, and anything else with a faithful errno
+    if (filePath != NULL && !strncmp(filePath, "mmce", 4))
+        return err == ENOENT;
 
-    if (filePath != NULL && !strncmp(filePath, "mass", 4))
-        return err == FATFS_ERR_NO_FILE || err == FATFS_ERR_NO_PATH;
-
-    return 0;
+    return 1;
 }
 
 static int texShouldUseMemoryReader(const char *filePath)
