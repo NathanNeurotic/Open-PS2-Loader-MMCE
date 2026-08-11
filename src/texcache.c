@@ -149,11 +149,6 @@ int cacheHasPendingArt(void)
 }
 
 
-GSTEXTURE *cacheGetTexture(image_cache_t *cache, item_list_t *list, int *cacheId, int *UID, char *value)
-{
-    return cacheGetTextureEx(cache, list, cacheId, UID, value, 0);
-}
-
 // LOOKUP ONLY: hand back this item's texture if its slot is still live, and never claim a slot,
 // never queue a load, never touch the fail memo. For a caller that wants to keep DRAWING art it
 // already has while deliberately not asking for more -- without this, "don't request" also means
@@ -334,8 +329,7 @@ void cacheDestroyCache(image_cache_t *cache)
     free(cache);
 }
 
-// priority != 0 means "this is on screen right now, not a guess" -- see the backpressure gate below.
-GSTEXTURE *cacheGetTextureEx(image_cache_t *cache, item_list_t *list, int *cacheId, int *UID, char *value, int priority)
+GSTEXTURE *cacheGetTexture(image_cache_t *cache, item_list_t *list, int *cacheId, int *UID, char *value)
 {
     if (cache == NULL || list == NULL || cacheId == NULL || UID == NULL || value == NULL || value[0] == '\0')
         return NULL;
@@ -352,17 +346,9 @@ GSTEXTURE *cacheGetTextureEx(image_cache_t *cache, item_list_t *list, int *cache
     } else if (*cacheId != -1) {
         cache_entry_t *entry = &cache->content[*cacheId];
         if (entry->UID == *UID) {
-            if (entry->qr) {
-                // Already loading -- but if the caller is the image the user is LOOKING at, where it
-                // sits in the queue decides how long they wait. Prefetch means this cover was very
-                // likely queued minutes-of-scrolling ago as a speculative neighbour, and because a
-                // request already exists we issue no new one, so the priority path below never runs
-                // and the visible cover silently keeps the prefetch's place at the BACK of the
-                // queue. Promote the existing request instead of adding another.
-                if (priority)
-                    ioPromoteRequest(entry->qr);
+            if (entry->qr)
                 return NULL;
-            } else if (entry->lastUsed == 0) {
+            else if (entry->lastUsed == 0) {
                 *cacheId = -2;
                 return NULL;
             } else {
@@ -433,12 +419,7 @@ GSTEXTURE *cacheGetTextureEx(image_cache_t *cache, item_list_t *list, int *cache
         DIntr();
         gArtQueuedCount++;
         EIntr();
-        // A priority request runs NEXT, not last. Letting it past the depth cap only got it into
-        // the queue; the queue is FIFO, so it still waited out every prefetched neighbour already
-        // sitting in it -- each one a full read plus PNG decode off the game device. That is why
-        // the highlighted cover could take many seconds here while official OPL, which requests
-        // nothing but that one cover, shows it almost immediately.
-        if ((priority ? ioPutRequestNext(IO_CACHE_LOAD_ART, req) : ioPutRequest(IO_CACHE_LOAD_ART, req)) != IO_OK) {
+        if (ioPutRequest(IO_CACHE_LOAD_ART, req) != IO_OK) {
             DIntr();
             if (gArtQueuedCount > 0)
                 gArtQueuedCount--; // the request never entered the queue
