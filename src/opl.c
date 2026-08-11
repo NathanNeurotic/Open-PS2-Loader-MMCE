@@ -121,6 +121,9 @@ static unsigned int frameCounter;
 // unthrottled. A real device change bypasses the throttle via bdmGetGeneration().
 static clock_t lastBgRescan[MODE_COUNT];
 static unsigned int lastSeenBdmGeneration;
+// Rotation cursor over the BDM slots that have never had a device: only this one is probed per
+// background tick (see menuUpdateHook).
+static int bdmIdleProbeSlot = BDM_MODE;
 
 static char errorMessage[256];
 
@@ -1149,6 +1152,19 @@ static void menuUpdateHook()
                 // it fires precisely BECAUSE a device changed, the scan populates a page the
                 // user is waiting on, and a plugged device should be noticed in the
                 // next tap gap rather than after a second of stillness (#271).
+                // An enabled BDM slot that has NEVER had a device still costs a full fileXioDopen
+                // EE<->IOP round trip every rescan, and MAX_BDM_DEVICES is 8 -- so a one-stick rig
+                // spends 7 of its 8 probes asking about slots that have been empty since boot,
+                // forever, on the same worker the cover art needs. Attach is EVENT-driven
+                // (bdmEventHandler bumps the generation, which takes the genChanged path above and
+                // probes everything at once), so the periodic probe of an empty slot is purely a
+                // net for a missed event -- keep the net, but rotate it: one empty slot per tick
+                // instead of all of them. Worst-case detection for a missed event becomes
+                // BDM_MODE_COUNT ticks rather than one.
+                if (!genChanged && mode >= BDM_MODE && mode <= BDM_MODE_LAST &&
+                    !bdmSlotEverConnected(mode) && mode != bdmIdleProbeSlot)
+                    continue;
+
                 if (genChanged || (longIdle && (now - lastBgRescan[mode]) >= MENU_BG_RESCAN_MIN_INTERVAL_TICKS)) {
                     // Stamp the throttle only on an accepted request, so a rejected one retries on
                     // the next tick instead of being silently skipped for a full interval.
@@ -1162,6 +1178,10 @@ static void menuUpdateHook()
         }
         if (genConsumed)
             lastSeenBdmGeneration = gen;
+
+        // Advance the empty-slot rotation once per tick, so every never-connected slot still gets
+        // its periodic look, just not all of them in the same burst.
+        bdmIdleProbeSlot = (bdmIdleProbeSlot >= BDM_MODE_LAST) ? BDM_MODE : (bdmIdleProbeSlot + 1);
     }
 }
 

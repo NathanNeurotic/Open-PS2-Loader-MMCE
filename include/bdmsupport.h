@@ -113,4 +113,10 @@ int bdmEffectiveStartMode(void);
 // Current BDM device-change generation (bumped on hotplug / Device-Settings apply). The menu hook
 // reads this to bypass its background SIO2 rescan throttle when a real device change occurs.
 unsigned int bdmGetGeneration(void);
+
+/** Nonzero if this BDM slot has had a device on it at some point this session (its prefix is
+ * populated). Slots that have never connected are probed on a slow rotation instead of on every
+ * background rescan -- attach is event-driven, so the periodic probe is only a missed-event net.
+ */
+int bdmSlotEverConnected(int mode);
 #endif

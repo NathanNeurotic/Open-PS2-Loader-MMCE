@@ -322,6 +322,19 @@ unsigned int bdmGetGeneration(void)
     return BdmGeneration;
 }
 
+// Has this BDM slot EVER had a device on it? bdmUpdateDeviceData's connect pass is the only thing
+// that fills bdmPrefix, so an empty prefix means no device has ever been seen in this slot this
+// session. The menu hook uses it to stop paying a full fileXioDopen round-trip per empty slot on
+// every background rescan -- on a one-stick rig that is 7 of the 8 probes, forever.
+int bdmSlotEverConnected(int mode)
+{
+    if (mode < BDM_MODE || mode > BDM_MODE_LAST)
+        return 0;
+
+    bdm_device_data_t *pDeviceData = (bdm_device_data_t *)bdmDeviceList[mode - BDM_MODE].priv;
+    return pDeviceData != NULL && pDeviceData->bdmPrefix[0] != '\0';
+}
+
 static int bdmShouldQueueModuleLoad(void)
 {
     if (gEnableUSB && !iUSBModLoaded)
