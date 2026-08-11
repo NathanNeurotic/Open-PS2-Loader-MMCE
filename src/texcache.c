@@ -86,9 +86,17 @@ static int artTarLoadImage(const char *value, const char *suffix, GSTEXTURE *tex
 // NUL-terminated, so a torn read can only mis-answer one frame, never fault.
 #define FAIL_MEMO_SIZE 256
 
+// misses counts ATTEMPTS that failed transiently. A transient failure (contended-bus read error,
+// staging OOM) deserves another try -- but only a few. Retrying forever is worse than giving up
+// too early: the request is re-made every frame the row is on screen and idle, so a cover that
+// cannot load pins the single IO worker permanently and starves the per-game config load and the
+// device rescans behind it, which the user feels as navigation going bad. Bounded here instead.
+#define ART_TRANSIENT_RETRIES 2
+
 typedef struct
 {
     char key[64];
+    unsigned char misses;
 } fail_memo_entry_t;
 
 static fail_memo_entry_t s_failMemo[FAIL_MEMO_SIZE];
@@ -102,14 +110,34 @@ static u32 hashFailKey(const char *str)
     return hash % FAIL_MEMO_SIZE;
 }
 
-static void cacheMemoFail(const char *value, const char *suffix)
+// permanent != 0: this art is genuinely absent or undecodable -- stop asking. permanent == 0: the
+// attempt failed but the file is there; count it, and only stop asking once the retry budget is
+// spent. Returns nonzero if the key is now blocked.
+static int cacheMemoFailEx(const char *value, const char *suffix, int permanent)
 {
     char key[64];
     if (snprintf(key, sizeof(key), "%s_%s", value, suffix ? suffix : "") >= (int)sizeof(key))
-        return;
+        return 0;
 
     u32 idx = hashFailKey(key);
-    snprintf(s_failMemo[idx].key, sizeof(s_failMemo[idx].key), "%s", key);
+    fail_memo_entry_t *slot = &s_failMemo[idx];
+
+    if (strcmp(slot->key, key) != 0) {
+        snprintf(slot->key, sizeof(slot->key), "%s", key);
+        slot->misses = 0; // a different key owned this bucket; start its count fresh
+    }
+
+    if (permanent)
+        slot->misses = ART_TRANSIENT_RETRIES;
+    else if (slot->misses < ART_TRANSIENT_RETRIES)
+        slot->misses++;
+
+    return slot->misses >= ART_TRANSIENT_RETRIES;
+}
+
+static void cacheMemoFail(const char *value, const char *suffix)
+{
+    cacheMemoFailEx(value, suffix, 1);
 }
 
 static int cacheIsFailMemo(const char *value, const char *suffix)
@@ -119,7 +147,10 @@ static int cacheIsFailMemo(const char *value, const char *suffix)
         return 0;
 
     u32 idx = hashFailKey(key);
-    return (strcmp(s_failMemo[idx].key, key) == 0);
+    // Blocked only once the retry budget is spent: a key with misses below it is still worth one
+    // more attempt, which is what makes a transient failure recoverable without making a permanent
+    // one loop forever.
+    return (strcmp(s_failMemo[idx].key, key) == 0 && s_failMemo[idx].misses >= ART_TRANSIENT_RETRIES);
 }
 
 void cacheInvalidateFailMemo(void)
@@ -273,9 +304,19 @@ static void cacheLoadImage(void *data)
         // slot and asks again. Deterministic failures (absent file, undecodable PNG, bad depth)
         // still memo, because retrying those forever would be the opposite mistake.
         if (result == ERR_FILE_IO || result == ERR_LOAD_ABORTED) {
-            LOG("ART transient failure (%d) on %s_%s -- releasing the slot to retry\n",
-                result, req->value, req->cache->suffix ? req->cache->suffix : "");
-            cacheClearItem(req->entry, 1);
+            // Bounded: count the miss, and only release the slot for another attempt while the
+            // budget lasts. Unbounded retries are their OWN bug -- the row re-requests every idle
+            // frame, so one unloadable cover keeps the single IO worker permanently busy and the
+            // per-game config load and device rescans queue behind it, which reads as navigation
+            // getting worse. Once the budget is spent the key is blocked exactly like a genuine
+            // absence, and a list rebuild or applyConfig clears the memo and gives it a fresh start.
+            int blocked = cacheMemoFailEx(req->value, req->cache->suffix, 0);
+            LOG("ART transient failure (%d) on %s_%s -- %s\n", result, req->value,
+                req->cache->suffix ? req->cache->suffix : "", blocked ? "retry budget spent, parking it" : "releasing the slot to retry");
+            if (blocked)
+                req->entry->lastUsed = 0; // park the row, same as a genuine miss
+            else
+                cacheClearItem(req->entry, 1);
         } else {
             req->entry->lastUsed = 0;
             cacheMemoFail(req->value, req->cache->suffix);
