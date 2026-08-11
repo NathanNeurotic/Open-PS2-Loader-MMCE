@@ -4,6 +4,12 @@
 int getmcID(void);
 int getFileSize(int fd);
 void checkMCFolder(void);
+
+/** Stamp the browser save icon (opl.icn + icon.sys) into the folder of the given config file, when
+ * that file lives on a PS2 memory card. Pass the config file's own path -- the icons land beside
+ * it, wherever the save home actually is. No-op off mc, and never rewrites an icon already there.
+ */
+void checkMCSaveIcons(const char *cfgFilePath);
 int openFile(char *path, int mode);
 void *readFile(char *path, int align, int *size);
 int listDir(char *path, const char *separator, int maxElem,

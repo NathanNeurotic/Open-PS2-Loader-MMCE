@@ -2091,6 +2091,19 @@ static void _saveConfig()
     }
 
     lscret = configWriteChecked(lscstatus);
+
+    // Save icons for EVERY memory-card save home, not just the legacy mc?:OPL/ one. The block above
+    // only stamps icons when there is no boot identity, so an appdir-on-MC boot (settings beside the
+    // ELF) saved fine but left the folder showing as "Corrupted Data" in the PS2/PS3 browser. Keyed
+    // on the config file's OWN path, after the custom-path re-home and the write, so the icons land
+    // in the folder the settings actually went to -- which is what made the old mc?:OPL/ assumption
+    // unsafe to run unconditionally. Off mc this is a no-op.
+    if (lscret > 0) {
+        config_set_t *oplCfg = configGetByType(CONFIG_OPL);
+        if (oplCfg != NULL)
+            checkMCSaveIcons(oplCfg->filename);
+    }
+
     // Boot-device save retry: BDM slot numbering can change between the boot-time resolve and this
     // save (a hotplug add/remove renumbers massN:). Re-resolve against the SAME boot device once --
     // pinned to its known BDM type -- and retry. Never a different device: if the boot device is

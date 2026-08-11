@@ -99,6 +99,65 @@ static int checkMC()
     return mcID;
 }
 
+// Write one browser-save file into an existing folder if it is not already there. Never truncates
+// an existing one: the icon is static, and rewriting it would be a pointless card write on a device
+// whose writes we are otherwise being careful about.
+static void writeIconFile(const char *dir, const char *name, const void *data, unsigned int len)
+{
+    char path[128];
+    int fd;
+
+    // dir may or may not carry a trailing slash ("mc0:OPL/" vs "mc0:/APPS/RIPTOPL").
+    size_t dlen = strlen(dir);
+    const char *sep = (dlen > 0 && (dir[dlen - 1] == '/' || dir[dlen - 1] == ':')) ? "" : "/";
+    if (snprintf(path, sizeof(path), "%s%s%s", dir, sep, name) >= (int)sizeof(path))
+        return;
+
+    fd = open(path, O_RDONLY);
+    if (fd >= 0) {
+        close(fd);
+        return; // already present
+    }
+
+    fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+    if (fd >= 0) {
+        write(fd, data, len);
+        close(fd);
+    }
+}
+
+// Give the folder settings ACTUALLY get saved into the browser save icon (opl.icn + icon.sys), so
+// the PS2/PS3 Memory Card Manager shows it properly instead of "Corrupted Data" (#353).
+//
+// Takes the config FILE path and uses its own directory, rather than assuming mc?:OPL/. That
+// assumption is why the icon stamping had to be gated to the legacy no-boot-identity case in the
+// first place: on an appdir-on-MC boot the settings live beside the ELF, so stamping mc?:OPL/
+// sprouted a second, empty OPL folder on the card on every save (FifthFox, 2026-07-16). Aiming at
+// the real folder makes the gate unnecessary -- every mc save home gets its icon, and no save home
+// gets someone else's.
+void checkMCSaveIcons(const char *cfgFilePath)
+{
+    char dir[128];
+
+    if (cfgFilePath == NULL || strncmp(cfgFilePath, "mc", 2) != 0 || cfgFilePath[2] == 'm')
+        return; // not a memory card ("mmce" is a different device entirely)
+
+    const char *slash = strrchr(cfgFilePath, '/');
+    if (slash == NULL) {
+        // "mc0:settings.cfg" -- the card root, which owns no save folder to decorate.
+        return;
+    }
+
+    int n = (int)(slash - cfgFilePath);
+    if (n <= 0 || n >= (int)sizeof(dir))
+        return;
+    memcpy(dir, cfgFilePath, n);
+    dir[n] = '\0';
+
+    writeIconFile(dir, "opl.icn", icon_icn, size_icon_icn);
+    writeIconFile(dir, "icon.sys", icon_sys, size_icon_sys);
+}
+
 // Ensure mc?:OPL/ exists and contains browser save icon (opl.icn + icon.sys) so PS2/PS3
 // Memory Card Manager displays the save folder with a valid icon instead of 'Corrupted Data' (#353).
 void checkMCFolder(void)
