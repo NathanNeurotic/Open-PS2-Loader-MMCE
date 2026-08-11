@@ -878,9 +878,14 @@ static void drawGameImage(struct menu_list *menu, struct submenu_list *item, con
         if (gameImage == NULL)
             return;
 
-        // PRIORITY: this is the cover panel for the highlighted game -- the one image the user is
-        // actually looking at. It must never be refused in favour of queued prefetch.
-        GSTEXTURE *texture = getGameImageTextureEx(gameImage->cache, menu->item->userdata, &item->item, 1);
+        // PRIORITY for the highlighted game's own art -- but NOT for a per-game BACKGROUND. This
+        // same function draws both, and backgrounds are drawn FIRST (painter's order) and are by far
+        // the largest image on screen: a full-screen PNG against a cover. Marking the background
+        // priority therefore put the slowest load at the front of the queue and the cover behind it,
+        // which is visible on hardware as backgrounds appearing before covers. The cover is the
+        // thing the user is looking for; the background is scenery and can arrive whenever.
+        int artPriority = (drawElem->type != ELEM_TYPE_BACKGROUND);
+        GSTEXTURE *texture = getGameImageTextureEx(gameImage->cache, menu->item->userdata, &item->item, artPriority);
 
         if (!texture || !texture->Mem) {
             // #2: on the Favourites page a COVER element with no real art must not draw the embedded
