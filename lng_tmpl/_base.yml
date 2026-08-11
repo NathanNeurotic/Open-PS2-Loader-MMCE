@@ -1048,3 +1048,5 @@ gui_strings:
   string: "Device busy: the settings write never started. Try again once loading finishes."
 - label: SETTINGS_NO_HOME
   string: No memory card found -- settings cannot be saved. OPL was booted from a network device, whose settings must live on a local card.
+- label: BDMA_EQUIPPING
+  string: Preparing PS1 driver on memory card...

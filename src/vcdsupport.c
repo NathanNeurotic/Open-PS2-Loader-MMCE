@@ -1124,6 +1124,14 @@ void vcdEnsureBdmaForLaunch(int source, int mode)
         return;
     }
 
+    // Say what is happening. Everything above this point is a cheap decision that ends in "nothing
+    // to do"; from here the launch can spend real time -- probing source devices (which may force-
+    // load a transport and wait for a mount), copying two driver files, and writing the marker to
+    // the card. Silence through that reads as a hung launch, and left the user unable to tell
+    // whether the card had been written at all. One frame, no delay added: if this line appears the
+    // card is being prepared, and if it never appears nothing needed equipping.
+    guiRenderTextScreen(_l(_STR_BDMA_EQUIPPING));
+
     int er = vcdEquipBdma(source, mode, diag, sizeof(diag));
     if (er == 0)
         return;
@@ -1159,6 +1167,8 @@ void vcdApplyUsbModeForLaunch(int mode)
             vcdBdmaSuffix[mode]);
         return;
     }
+
+    guiRenderTextScreen(_l(_STR_BDMA_EQUIPPING)); // same reasoning as vcdEnsureBdmaForLaunch above
 
     int er = vcdEquipBdma(VCD_BDMA_SRC_USB, mode, diag, sizeof(diag));
     if (er == 0)
