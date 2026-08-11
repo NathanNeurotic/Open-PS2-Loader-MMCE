@@ -259,6 +259,51 @@ int ioPutRequestNext(int type, void *data)
     return IO_OK;
 }
 
+// Move an ALREADY QUEUED request to run next. The case this exists for: art is prefetched, so by
+// the time the user lands on a game its cover is usually already sitting in the queue as a
+// speculative neighbour -- and the cache, seeing a load in flight for that entry, issues no new
+// request at all. The visible cover therefore inherits the prefetch's place at the BACK of the
+// queue and ioPutRequestNext never gets a say. Promoting the existing node is the only way to fix
+// that without cancelling and re-issuing work already paid for.
+//
+// The head is never moved or reordered: it may be executing right now (the worker processes it
+// without holding this sema), and it is not interruptible in any case. Returns nonzero if the
+// request was found in the queue.
+int ioPromoteRequest(void *data)
+{
+    int found = 0;
+
+    WaitSema(gEndSemaId);
+
+    struct io_request_t *head = gReqList;
+    if (head != NULL && head->data != data) {
+        struct io_request_t *prev = head;
+        struct io_request_t *cur = head->next;
+
+        while (cur != NULL && cur->data != data) {
+            prev = cur;
+            cur = cur->next;
+        }
+
+        if (cur != NULL) {
+            found = 1;
+            if (prev != head) { // already directly behind the head -> nothing to move
+                prev->next = cur->next;
+                if (gReqEnd == cur)
+                    gReqEnd = prev;
+                cur->next = head->next;
+                head->next = cur;
+            }
+        }
+    } else if (head != NULL) {
+        found = 1; // it IS the head: already the next thing to finish
+    }
+
+    SignalSema(gEndSemaId);
+
+    return found;
+}
+
 int ioPutRequest(int type, void *data)
 {
     if (isIOBlocked)

@@ -35,6 +35,12 @@ int ioPutRequest(int type, void *data);
  */
 int ioPutRequestNext(int type, void *data);
 
+/** Move an already-queued request (identified by its data pointer) to run next. For work that was
+ * queued speculatively and has since become the thing the user is waiting on. Never moves the
+ * queue head, which may already be executing. Returns nonzero if the request was found.
+ */
+int ioPromoteRequest(void *data);
+
 /** removes all requests of a given type from the queue
  * @param type the type of the requests to remove
  * @return the count of the requests removed */

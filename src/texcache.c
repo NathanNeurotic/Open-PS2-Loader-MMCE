@@ -443,9 +443,17 @@ GSTEXTURE *cacheGetTextureEx(image_cache_t *cache, item_list_t *list, int *cache
     } else if (*cacheId != -1) {
         cache_entry_t *entry = &cache->content[*cacheId];
         if (entry->UID == *UID) {
-            if (entry->qr)
+            if (entry->qr) {
+                // Already loading -- but if the caller is the image the user is LOOKING at, where it
+                // sits in the queue decides how long they wait. Prefetch means this cover was very
+                // likely queued minutes-of-scrolling ago as a speculative neighbour, and because a
+                // request already exists we issue no new one, so the priority path below never runs
+                // and the visible cover silently keeps the prefetch's place at the BACK of the
+                // queue. Promote the existing request instead of adding another.
+                if (priority)
+                    ioPromoteRequest(entry->qr);
                 return NULL;
-            else if (entry->lastUsed == 0) {
+            } else if (entry->lastUsed == 0) {
                 *cacheId = -2;
                 return NULL;
             } else {
