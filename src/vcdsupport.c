@@ -350,7 +350,31 @@ int vcdResolvePopstarter(const char *devPrefix, char *out, int outSize)
         // A TYPE was chosen but its device has no POPSTARTER.ELF -> fall through to Default.
     }
 
-    // DEFAULT (or any miss above): the boot device (cwd) first, then the VCD's own device.
+    // DEFAULT (or any miss above): the VCD's OWN device first, then the boot device (cwd).
+    //
+    // This order is POPSLoader's, and it is deliberate there: its resolver takes the game device's
+    // own POPS/POPSTARTER.ELF ahead of the sidecar beside the loader, so that a per-device build
+    // can be used without being forced on anyone. We had those two tiers swapped.
+    //
+    // Why it matters beyond tidiness: POPSTARTER's IGR behaviour lives INSIDE the binary that gets
+    // executed -- config byte $424 selects the exit method, and the ELF loader that chains to
+    // mc0:/BOOT/BOOT.ELF on reset is POPSTARTER's own. On a console where the boot device and the
+    // game device each carry a POPS/POPSTARTER.ELF, this fork would run the boot device's copy
+    // while POPSLoader runs the game device's -- two different binaries, two different IGR
+    // behaviours, on the same console with the same card. Matching the reference implementation
+    // removes that as a variable.
+    //
+    // The explicit tiers above (POPS_DEV_CUSTOM, POPS_DEV_GAME and the device-TYPE picker) are
+    // untouched, so anyone who wants the boot-device copy can still name it.
+    if (devPrefix != NULL) {
+        snprintf(out, outSize, "%s%s%cPOPSTARTER.ELF", devPrefix, POPS_FOLDER, vcdSep(devPrefix));
+        int fd = open(out, O_RDONLY);
+        if (fd >= 0) {
+            close(fd);
+            return 1;
+        }
+    }
+
     if (gBootDir[0] != '\0') {
         size_t bl = strlen(gBootDir);
         const char *joiner = (gBootDir[bl - 1] == '/') ? "" : "/"; // gBootDir ends in ':' or a folder name
@@ -362,14 +386,7 @@ int vcdResolvePopstarter(const char *devPrefix, char *out, int outSize)
         }
     }
 
-    if (devPrefix == NULL)
-        return 0;
-    snprintf(out, outSize, "%s%s%cPOPSTARTER.ELF", devPrefix, POPS_FOLDER, vcdSep(devPrefix));
-    int fd = open(out, O_RDONLY);
-    if (fd < 0)
-        return 0;
-    close(fd);
-    return 1;
+    return 0;
 }
 
 void vcdBuildSelector(const char *devPrefix, const char *prefix, const char *name, char *out, int outSize)
