@@ -1148,9 +1148,24 @@ int configWrite(config_set_t *configSet)
         // ("configuration appeared WIPED"); the old code cleared modified + returned success
         // regardless. PS2 filesystems lack reliable atomic rename (see system.c sysSyncNeutrinoIp), so
         // snapshot the current on-disk bytes first and restore them if the save fails for ANY reason.
+        // PS2 MEMORY CARD: write exactly the way upstream OPL always has -- ONE open, write, close --
+        // and skip the snapshot/verify/restore machinery below.
+        //
+        // Hardware (#340 session): the first save to a card SUCCEEDS and every save after it fails
+        // with "could not write settings to mc0: (error 24)"; the VCD BDMA marker write to the card
+        // fails the same way. 24 is EMFILE. What separates the first save from the rest is exactly
+        // this block: the snapshot READ only opens anything when the file ALREADY EXISTS. Upstream
+        // performs a single open here and has done so reliably for years, so the extra opens are the
+        // new variable, and the card's driver keeps a far smaller descriptor table than a block
+        // device. The wipe this machinery defends against (#184 -- O_TRUNC empties a good file, then
+        // a flaky device fails the flush) was reported on a wedged HDD/MMCE, not on a memory card,
+        // and a failed card write still reports honestly and keeps modified=1 for a retry.
+        // "mmce" does not match: its second character is 'm', not 'c'.
+        const int singleOpenDevice = (strncmp(configSet->filename, "mc", 2) == 0);
+
         char *original = NULL;
         int originalLen = 0;
-        int rfd = openFile(configSet->filename, O_RDONLY);
+        int rfd = singleOpenDevice ? -1 : openFile(configSet->filename, O_RDONLY);
         if (rfd >= 0) {
             int sz = getFileSize(rfd);
             if (sz > 0 && sz <= CONFIG_MAX_RESTORE_BYTES) {
@@ -1168,6 +1183,11 @@ int configWrite(config_set_t *configSet)
         }
 
         int ok = 0;
+        // Clear errno before EACH stage that can set gLastSaveErrno. Without this the reported code
+        // can be a leftover from an unrelated earlier call -- a failure path that never sets errno
+        // then "reports" whatever was lying around, which is how a save failure can name a
+        // misleading cause (the stale-errno trap flagged in the #340 handoff).
+        errno = 0;
         file_buffer_t *fileBuffer = openFileBuffer(configSet->filename, O_WRONLY | O_CREAT | O_TRUNC, 0, 4096);
         if (fileBuffer) {
             char line[512];
@@ -1207,9 +1227,12 @@ int configWrite(config_set_t *configSet)
                 }
             }
 
+            errno = 0; // fresh, so a close failure reports its OWN code (see the note above)
             ok = (closeFileBuffer(fileBuffer) == 0);
-            if (!ok)
+            if (!ok) {
                 gLastSaveErrno = errno;
+                LOG("CONFIG write to %s: FLUSH/CLOSE stage failed, errno %d\n", configSet->filename, gLastSaveErrno);
+            }
 
             // EVIDENCE OVER STATUS CODES (#245, temporal bisect): on some MMCE clone firmware the
             // write can LAND while the close reply is junk/timed out -- and honoring that status
@@ -1226,7 +1249,7 @@ int configWrite(config_set_t *configSet)
             // cache -- proving nothing about the platter. There, honest failure + retry is the safe
             // behavior. MMCE is cacheless (the read round-trips to the card), which is what makes the
             // rescue's evidence real on the device this targets.
-            if (!ok && intended != NULL && strncmp(configSet->filename, "pfs", 3) != 0) {
+            if (!ok && intended != NULL && !singleOpenDevice && strncmp(configSet->filename, "pfs", 3) != 0) {
                 int vfd = openFile(configSet->filename, O_RDONLY);
                 if (vfd >= 0) {
                     int vsz = getFileSize(vfd);
@@ -1251,6 +1274,7 @@ int configWrite(config_set_t *configSet)
         } else {
             gLastSaveErrno = errno;
             // captured HERE before the restore-path opens below clobber it
+            LOG("CONFIG write to %s: OPEN stage failed, errno %d\n", configSet->filename, gLastSaveErrno);
         }
 
         if (!ok) {
