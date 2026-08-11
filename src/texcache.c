@@ -71,106 +71,18 @@ static int artTarLoadImage(const char *value, const char *suffix, GSTEXTURE *tex
     return result;
 }
 
-// Most art requests the queue may hold before new ones are refused. Deliberately small: art is
-// re-requested every frame the item stays visible, so a refusal costs one frame of latency on that
-// tile, while a deep queue costs the USER seconds on the next thing they do. Non-art requests are
-// rare, so this doubles as the art cap without a per-type counter.
-#define ART_MAX_QUEUE_DEPTH 8
 
-// How many loads may already be in flight and still allow SPECULATIVE work (viewport warming,
-// far-row thumbnails, the Coverflow lookahead). Deliberately NOT zero: requiring a fully idle path
-// serialises prefetch to one image at a time, which is slower than the hardware-approved
-// rebuild-66 behaviour -- that build had no art throttle of ANY kind (no cap, no memo) and simply
-// let every visible row enqueue, which is exactly why its art fills faster than ours. Keep a margin
-// below the cap instead: speculation keeps the device busy, and the cover the user is looking at is
-// a priority request that bypasses the cap anyway.
-#define ART_PREFETCH_MAX_IN_FLIGHT 4
 
-// Missing-art memo (single-slot hash, keyed startup_suffix): a load that FAILED once is not
-// re-probed every delay period -- on a device with sparse art the old retry loop re-open()ed the
-// same absent files forever (#120-adjacent churn). One bucket per hash: a collision merely evicts
-// an older miss, never blocks a hit. Cleared on applyConfig and on every list rebuild
-// (updateMenuFromGameList), which are exactly the moments new art can have appeared.
-// Cross-thread by design (worker writes, GUI reads): slots are fixed-size and always
-// NUL-terminated, so a torn read can only mis-answer one frame, never fault.
-#define FAIL_MEMO_SIZE 256
-
-// misses counts ATTEMPTS that failed transiently. A transient failure (contended-bus read error,
-// staging OOM) deserves another try -- but only a few. Retrying forever is worse than giving up
-// too early: the request is re-made every frame the row is on screen and idle, so a cover that
-// cannot load pins the single IO worker permanently and starves the per-game config load and the
-// device rescans behind it, which the user feels as navigation going bad. Bounded here instead.
-#define ART_TRANSIENT_RETRIES 2
-
-typedef struct
-{
-    char key[64];
-    unsigned char misses;
-} fail_memo_entry_t;
-
-static fail_memo_entry_t s_failMemo[FAIL_MEMO_SIZE];
-
-static u32 hashFailKey(const char *str)
-{
-    u32 hash = 5381;
-    int c;
-    while ((c = *str++))
-        hash = ((hash << 5) + hash) + c;
-    return hash % FAIL_MEMO_SIZE;
-}
-
-// permanent != 0: this art is genuinely absent or undecodable -- stop asking. permanent == 0: the
-// attempt failed but the file is there; count it, and only stop asking once the retry budget is
-// spent. Returns nonzero if the key is now blocked.
-static int cacheMemoFailEx(const char *value, const char *suffix, int permanent)
-{
-    char key[64];
-    if (snprintf(key, sizeof(key), "%s_%s", value, suffix ? suffix : "") >= (int)sizeof(key))
-        return 0;
-
-    u32 idx = hashFailKey(key);
-    fail_memo_entry_t *slot = &s_failMemo[idx];
-
-    if (strcmp(slot->key, key) != 0) {
-        snprintf(slot->key, sizeof(slot->key), "%s", key);
-        // Start a STOLEN bucket at 1, not 0. Buckets are single-slot, so two keys that hash
-        // together take turns evicting each other -- and resetting to 0 on every steal meant
-        // neither ever reached the budget, so neither was ever blocked and both retried forever.
-        // That is the exact storm the budget exists to prevent, reappearing whenever two failing
-        // covers collide (256 buckets against a viewport of rows: not rare). Starting at 1 makes a
-        // colliding pair converge on the block instead of resetting each other indefinitely.
-        slot->misses = 1;
-    }
-
-    if (permanent)
-        slot->misses = ART_TRANSIENT_RETRIES;
-    else if (slot->misses < ART_TRANSIENT_RETRIES)
-        slot->misses++;
-
-    return slot->misses >= ART_TRANSIENT_RETRIES;
-}
-
-static void cacheMemoFail(const char *value, const char *suffix)
-{
-    cacheMemoFailEx(value, suffix, 1);
-}
-
-static int cacheIsFailMemo(const char *value, const char *suffix)
-{
-    char key[64];
-    if (snprintf(key, sizeof(key), "%s_%s", value, suffix ? suffix : "") >= (int)sizeof(key))
-        return 0;
-
-    u32 idx = hashFailKey(key);
-    // Blocked only once the retry budget is spent: a key with misses below it is still worth one
-    // more attempt, which is what makes a transient failure recoverable without making a permanent
-    // one loop forever.
-    return (strcmp(s_failMemo[idx].key, key) == 0 && s_failMemo[idx].misses >= ART_TRANSIENT_RETRIES);
-}
-
+// NO FAIL MEMO. uOPL and rebuild-66 have none: a load that fails parks its ROW (lastUsed = 0 ->
+// cacheId -2 in cacheGetTextureEx) and is not asked again until a list rebuild, which is the same
+// protection one layer down and without a hash table to get wrong. Ours added a retry budget on top
+// to soften a mis-detected absence; absence is detected correctly now (rebuild-108), and the retry
+// lane was how the IO worker got pinned (rebuild-103/105). Subtracted.
 void cacheInvalidateFailMemo(void)
 {
-    memset(s_failMemo, 0, sizeof(s_failMemo));
+    // Kept as a no-op so the callers that mark "new art may have appeared" (applyConfig, every list
+    // rebuild) need no change: rows re-ask naturally, because a rebuild gives every item a fresh
+    // cache_id anyway.
 }
 
 // Art requests currently sitting in the ioman queue. LOCK-FREE on purpose, and that is the whole
@@ -236,13 +148,6 @@ int cacheHasPendingArt(void)
     return (gArtQueuedCount > 0) || (gArtActiveCount > 0);
 }
 
-// May speculative art work be issued right now? Used by the prefetch paths, which want the device
-// kept busy but must not crowd out the visible cover. cacheHasPendingArt() stays the STRICT test,
-// used where yielding entirely is right (background device rescans in menuUpdateHook).
-int cacheMayPrefetchArt(void)
-{
-    return (gArtQueuedCount + gArtActiveCount) < ART_PREFETCH_MAX_IN_FLIGHT;
-}
 
 GSTEXTURE *cacheGetTexture(image_cache_t *cache, item_list_t *list, int *cacheId, int *UID, char *value)
 {
@@ -342,42 +247,12 @@ static void cacheLoadImage(void *data)
         gArtLastHeight = (int)texture->Height;
     }
 
+    // uOPL/rebuild-66 shape: a failed load parks the row (lastUsed = 0 -> cacheGetTextureEx moves it
+    // to the -2 "asked and answered" state) and it is not asked again until a list rebuild. No memo,
+    // no retry budget -- both existed to soften a mis-detected absence, and absence is detected
+    // correctly now (rebuild-108). Retrying was also how the IO worker got pinned (rebuild-103/105).
     if (result < 0) {
-        // "This art does not exist" and "this ATTEMPT failed" are different things, and only the
-        // first is worth remembering. textures.h says so explicitly: ERR_FILE_IO means the file
-        // OPENED but its bytes could not be staged (a read() error on a contended bus, or a failed
-        // staging allocation), and ERR_LOAD_ABORTED likewise leaves a perfectly good file on the
-        // device. Treating those like absence did TWO permanent things -- memoised the key so the
-        // request is never even enqueued again, and set lastUsed = 0, which sends the row to the
-        // cacheId -2 "give up for good" state in cacheGetTextureEx.
-        //
-        // Those failures cluster exactly when several covers are loading at once on a slow USB bus,
-        // i.e. while browsing, so every hiccup permanently blanked one more game's cover and the
-        // library visibly LOST art the longer the user moved around -- in every view, since they all
-        // share this cache. Only applyConfig or a list rebuild ever cleared it.
-        //
-        // Release the slot instead: cacheClearItem frees any partial texture, drops qr and zeroes
-        // the UID, so the row's stale cacheId no longer matches and the next frame simply claims a
-        // slot and asks again. Deterministic failures (absent file, undecodable PNG, bad depth)
-        // still memo, because retrying those forever would be the opposite mistake.
-        if (result == ERR_FILE_IO || result == ERR_LOAD_ABORTED) {
-            // Bounded: count the miss, and only release the slot for another attempt while the
-            // budget lasts. Unbounded retries are their OWN bug -- the row re-requests every idle
-            // frame, so one unloadable cover keeps the single IO worker permanently busy and the
-            // per-game config load and device rescans queue behind it, which reads as navigation
-            // getting worse. Once the budget is spent the key is blocked exactly like a genuine
-            // absence, and a list rebuild or applyConfig clears the memo and gives it a fresh start.
-            int blocked = cacheMemoFailEx(req->value, req->cache->suffix, 0);
-            LOG("ART transient failure (%d) on %s_%s -- %s\n", result, req->value,
-                req->cache->suffix ? req->cache->suffix : "", blocked ? "retry budget spent, parking it" : "releasing the slot to retry");
-            if (blocked)
-                req->entry->lastUsed = 0; // park the row, same as a genuine miss
-            else
-                cacheClearItem(req->entry, 1);
-        } else {
-            req->entry->lastUsed = 0;
-            cacheMemoFail(req->value, req->cache->suffix);
-        }
+        req->entry->lastUsed = 0;
     } else
         req->entry->lastUsed = guiFrameId;
 
@@ -503,61 +378,31 @@ GSTEXTURE *cacheGetTextureEx(image_cache_t *cache, item_list_t *list, int *cache
     if (guiInactiveFrames < list->delay)
         return NULL;
 
-    // Known-missing art: skip the slot claim and the IO attempt entirely. Reached only for rows
-    // with no live cache entry, after the idle delay -- i.e. exactly where the old code would have
-    // issued a doomed open(); the memo is strictly cheaper than the IO it replaces. The row's
-    // cacheId stays -1, so once the memo is cleared (applyConfig / list rebuild) it retries
-    // naturally.
-    if (cacheIsFailMemo(value, cache->suffix))
-        return NULL;
 
     cache_entry_t *currEntry, *oldestEntry = NULL;
-    int i, rtime = guiFrameId, inFlight = 0;
+    int i, rtime = guiFrameId;
 
     for (i = 0; i < cache->count; i++) {
         currEntry = &cache->content[i];
-        if (currEntry->qr)
-            inFlight++;
-        else if (currEntry->lastUsed < rtime) {
+        if (!currEntry->qr && currEntry->lastUsed < rtime) {
             oldestEntry = currEntry;
             rtime = currEntry->lastUsed;
             *cacheId = i;
         }
     }
 
-    // ONE IN FLIGHT for the small (floored) caches. Their hardware-validated form had a single
-    // slot, which made "at most one load in flight" a structural property: scrolling past ten
-    // games never queued ten backgrounds. The rebuild-71 redundancy slot silently removed that --
-    // a passed-by game's BG could claim the second slot mid-scroll, and the settled game's
-    // background then waited out that STALE load (the largest art item there is) before its own
-    // started. Refusing the claim while a sibling load is in flight restores the old pipeline
-    // semantics while keeping the redundancy slot for its failure-recovery purpose. Multi-slot
-    // cover caches (10/20 slots) are deliberately untouched: they always had several in flight,
-    // and that behaviour is hardware-validated as-is.
-    if (oldestEntry && cache->count <= 2 && inFlight > 0) {
-        *cacheId = -1; // nothing claimed; the next frame simply asks again
-        return NULL;
-    }
 
     // BACKPRESSURE, lock-free (see gArtQueuedCount above). Art is the one request type that is
     // free to drop: the slot is never claimed, and the next frame simply asks again. Refusing to
     // deepen an already-deep queue keeps the config save, the deferred menu rebuild and device
     // init from starving behind hundreds of queued art reads on a slow device.
-    // PRIORITY bypasses the cap. The art the user is LOOKING AT (the selected row's cover) is not
-    // speculative: refusing it means the one image on screen that matters waits for a queue full of
-    // guesses about neighbouring rows to drain first -- on a slow device, seconds of staring at a
-    // placeholder while the machine reads covers nobody asked for. There is at most one such
-    // request per row change, so the cap still bounds the queue in every practical sense.
-    if (oldestEntry && !priority && gArtQueuedCount >= ART_MAX_QUEUE_DEPTH) {
-        if (!ioHasPendingRequests())
-            gArtQueuedCount = 0; // drift self-heal: queue is empty, the counter must be too
-        else {
-            gArtRefused++;
-            *cacheId = -1;
-            return NULL;
-        }
-    }
-
+    // NO QUEUE-DEPTH CAP, and no in-flight gate. uOPL and rebuild-66 -- the two builds hardware
+    // agrees are fast -- both enqueue every visible miss unconditionally, with no throttle of any
+    // kind, and this fork's art was the only one that was slow. The cap was added to stop art
+    // burying a config save; that is now handled where it belongs (the visible cover is a priority
+    // request that runs next, and background device rescans yield to pending art), so the throttle
+    // was pure latency. Refusing a request also cost more than it saved: a refusal resets the row's
+    // cacheId and the whole claim is redone next frame.
     if (oldestEntry) {
         load_image_request_t *req = malloc(sizeof(load_image_request_t) + strlen(value) + 1);
         req->cache = cache;

@@ -19,10 +19,6 @@
 #define MENU_POS_V                   50
 #define HINT_HEIGHT                  32
 #define DECORATOR_SIZE               20
-// How many rows either side of the cursor may request a per-row thumbnail while art is still in
-// flight. Rows further out wait for an idle art path, so the neighbourhood the user is moving
-// through fills first instead of the list filling top-down regardless of where they are.
-#define DECORATOR_NEAR_ROWS          3
 // Extra idle frames a per-game BACKGROUND waits beyond the art delay before it may be requested, so
 // the cover always reaches the IO queue first (see drawGameImage). Half a second at 60 Hz: long
 // enough that a cover request is queued and usually finished, short enough that a background still
@@ -901,7 +897,7 @@ static void drawGameImage(struct menu_list *menu, struct submenu_list *item, con
         GSTEXTURE *texture;
 
         if (isBackground) {
-            if (guiInactiveFrames >= (list != NULL ? list->delay : 0) + BG_REQUEST_EXTRA_IDLE_FRAMES && cacheMayPrefetchArt())
+            if (guiInactiveFrames >= (list != NULL ? list->delay : 0) + BG_REQUEST_EXTRA_IDLE_FRAMES && !cacheHasPendingArt())
                 texture = getGameImageTextureEx(gameImage->cache, menu->item->userdata, &item->item, 0);
             else
                 texture = getGameImageCached(gameImage->cache, &item->item);
@@ -1217,11 +1213,7 @@ static void drawCoverFlow(struct menu_list *menu, struct submenu_list *item, con
                 cfWarm[b].cache = wimg->cache;
                 cfWarm[b].left = wimg->cache->count - 1; // selected's slot stays reserved
             }
-            // Only speculate while the art path is idle -- the same gate the list's warm loop got in
-            // rebuild-98, which Coverflow never received. Up to cache->count-1 lookahead requests per
-            // frame otherwise fill the queue with guesses, and the centre cover (a certainty) waits
-            // behind them on exactly the device where waiting hurts.
-            if (cfWarm[b].left > 0 && cacheMayPrefetchArt()) {
+            if (cfWarm[b].left > 0) {
                 cfWarm[b].left--;
                 getGameImageTexture(wimg->cache, sourceList, &next->item);
             }
@@ -1697,28 +1689,6 @@ static void drawItemsList(struct menu_list *menu, struct submenu_list *item, con
             int left;
         } warmBudget[2] = {{NULL, 0}, {NULL, 0}};
 
-        // Where the selection sits on this page, so warming can prefer the rows the user is about
-        // to move ONTO. Without this the warm loop below simply takes rows in DRAW order starting
-        // at pagestart, i.e. it spends the whole frame budget on the TOP of the viewport -- with
-        // the cursor near the bottom those are the covers being scrolled AWAY from, and the
-        // selected row's own request then queues behind up to a full budget of them (art enqueue
-        // is capped, so it is refused outright while they are in flight). That is the "cover takes
-        // many seconds to appear after moving around" report: not throughput, just the wrong rows.
-        // A pointer walk over at most displayedItems entries, no I/O.
-        int selIndex = -1;
-        {
-            submenu_list_t *scan = menu->item->pagestart;
-            int idx = 0;
-            while (scan != NULL && idx < itemsList->displayedItems) {
-                if (scan == item) {
-                    selIndex = idx;
-                    break;
-                }
-                scan = scan->next;
-                idx++;
-            }
-        }
-
         submenu_list_t *ps = menu->item->pagestart;
         int others = 0;
         u64 color;
@@ -1745,21 +1715,11 @@ static void drawItemsList(struct menu_list *menu, struct submenu_list *item, con
                 if (ps->item.isFolder) {
                     itemIconTex = NULL; // folders never carry a cover
                 } else {
-                    // Per-row thumbnails: every visible row wants one, so on a slow device they
-                    // compete for the same capped queue and fill in whatever order the rows happen
-                    // to be drawn -- top-down, regardless of where the cursor is. Ask for the rows
-                    // NEAREST the cursor while art is in flight, and let the rest join once the
-                    // path goes idle: the neighbourhood the user is moving through fills first,
-                    // and the far rows still fill, just with the spare capacity rather than ahead
-                    // of the near ones. selIndex < 0 (selection not on this page) asks for all.
-                    int dist = (others - 1) - selIndex;
-                    if (dist < 0)
-                        dist = -dist;
-
-                    if (selIndex < 0 || dist <= DECORATOR_NEAR_ROWS || cacheMayPrefetchArt())
-                        itemIconTex = getGameImageTexture(itemsList->decoratorImage->cache, menu->item->userdata, &ps->item);
-                    else
-                        itemIconTex = getGameImageCached(itemsList->decoratorImage->cache, &ps->item);
+                    // Every visible row asks for its thumbnail, exactly as uOPL does. The
+                    // cursor-distance gate that used to live here only mattered while requests were
+                    // being refused by a queue cap; with no cap the order they arrive in is the
+                    // order the worker takes them, and the selected row is submitted first anyway.
+                    itemIconTex = getGameImageTexture(itemsList->decoratorImage->cache, menu->item->userdata, &ps->item);
                 }
 
                 if (itemIconTex && itemIconTex->Mem)
@@ -1785,28 +1745,10 @@ static void drawItemsList(struct menu_list *menu, struct submenu_list *item, con
                                 warmBudget[b].cache = rowImg->cache;
                                 warmBudget[b].left = rowImg->cache->count - 1; // selected's reserved slot
                             }
-                            // Only warm the neighbourhood of the cursor. The radius is half the
-                            // budget, so a full sweep of it still fits the cache without evicting
-                            // anything it just loaded, and every request spent here is one the user
-                            // plausibly reaches next -- which is the entire point of warming (#296).
-                            // A viewport taller than the cache (16 rows, 10 slots) otherwise fills
-                            // the budget with far rows before ever reaching the cursor's own.
-                            int radius = warmBudget[b].left >> 1;
-                            int dist = (others - 1) - selIndex;
-                            if (dist < 0)
-                                dist = -dist;
-
-                            // OPPORTUNISTIC: only warm while nothing else is being read/decoded.
-                            // Warming is a guess about where the user goes next; the SELECTED
-                            // cover (requested above, before this loop) is a certainty, and on a
-                            // slow device a guess in flight is a certainty delayed -- the enqueue
-                            // is capped, so speculative rows can take the slots the real one
-                            // needs. Gating on an idle art path makes prefetch cost nothing it
-                            // cannot afford: on fast media the queue drains between frames and the
-                            // viewport still fills, on a slow USB stick prefetch simply stands
-                            // aside until the cover being looked at has arrived, then resumes one
-                            // row at a time.
-                            if (warmBudget[b].left > 0 && (selIndex < 0 || dist <= radius) && cacheMayPrefetchArt()) {
+                            // Budget only -- one sweep of the cache, as uOPL warms it. No idle gate
+                            // and no cursor radius: both existed to protect the visible cover from a
+                            // capped queue, and the cap is gone.
+                            if (warmBudget[b].left > 0) {
                                 warmBudget[b].left--;
                                 getGameImageTexture(rowImg->cache, list, &ps->item);
                             }
