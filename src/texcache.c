@@ -196,6 +196,8 @@ GSTEXTURE *cacheLookupTexture(image_cache_t *cache, int *cacheId, int *UID)
     return &entry->texture;
 }
 
+static void cacheClearItem(cache_entry_t *item, int freeTxt); // released below on a transient failure
+
 // Io handled action...
 static void cacheLoadImage(void *data)
 {
@@ -253,8 +255,31 @@ static void cacheLoadImage(void *data)
         result = handler->itemGetImage(handler, req->cache->prefix, req->cache->isPrefixRelative, req->value, req->cache->suffix, texture, GS_PSM_CT24);
 
     if (result < 0) {
-        req->entry->lastUsed = 0;
-        cacheMemoFail(req->value, req->cache->suffix);
+        // "This art does not exist" and "this ATTEMPT failed" are different things, and only the
+        // first is worth remembering. textures.h says so explicitly: ERR_FILE_IO means the file
+        // OPENED but its bytes could not be staged (a read() error on a contended bus, or a failed
+        // staging allocation), and ERR_LOAD_ABORTED likewise leaves a perfectly good file on the
+        // device. Treating those like absence did TWO permanent things -- memoised the key so the
+        // request is never even enqueued again, and set lastUsed = 0, which sends the row to the
+        // cacheId -2 "give up for good" state in cacheGetTextureEx.
+        //
+        // Those failures cluster exactly when several covers are loading at once on a slow USB bus,
+        // i.e. while browsing, so every hiccup permanently blanked one more game's cover and the
+        // library visibly LOST art the longer the user moved around -- in every view, since they all
+        // share this cache. Only applyConfig or a list rebuild ever cleared it.
+        //
+        // Release the slot instead: cacheClearItem frees any partial texture, drops qr and zeroes
+        // the UID, so the row's stale cacheId no longer matches and the next frame simply claims a
+        // slot and asks again. Deterministic failures (absent file, undecodable PNG, bad depth)
+        // still memo, because retrying those forever would be the opposite mistake.
+        if (result == ERR_FILE_IO || result == ERR_LOAD_ABORTED) {
+            LOG("ART transient failure (%d) on %s_%s -- releasing the slot to retry\n",
+                result, req->value, req->cache->suffix ? req->cache->suffix : "");
+            cacheClearItem(req->entry, 1);
+        } else {
+            req->entry->lastUsed = 0;
+            cacheMemoFail(req->value, req->cache->suffix);
+        }
     } else
         req->entry->lastUsed = guiFrameId;
 
