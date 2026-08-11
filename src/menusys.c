@@ -177,6 +177,12 @@ static void menuDeleteGame(submenu_list_t **submenu)
         guiMsgBox("NULL Support object. Please report", 0, NULL);
 }
 
+// Waited-on load (the DIALOG path: menuLoadConfig / gameMenuLoadConfig). Deliberately keeps the
+// original shape -- the read runs UNDER menuSemaId -- because a caller is blocked in
+// guiHandleDeferedIO on actionStatus and will hand whatever this publishes straight to
+// itemLaunch()/guiGameLoadConfig(), neither of which tolerates a NULL config_set_t. Publishing
+// unconditionally is what makes that safe, and the caller already shows a "loading settings"
+// overlay, so the brief freeze here is by design and pre-existing.
 static void _menuLoadConfig()
 {
     WaitSema(menuSemaId);
@@ -186,6 +192,50 @@ static void _menuLoadConfig()
     }
     actionStatus = 0;
     SignalSema(menuSemaId);
+}
+
+// Browse-time load (the SETTLE path: menuRenderElements -> _menuRequestConfig each frame). NOBODY
+// waits on this one -- actionStatus is already 0 on that path -- so it can afford to do the read
+// OUTSIDE menuSemaId, which is the whole point: menuRenderElements takes that sema every frame,
+// and itemGetConfig is a per-game CFG open/read on the game's device, so holding it across the read
+// froze rendering and input for the entire read every time the cursor settled on a row (visible on
+// a slow USB stick with art off; worse with art on, when the same device is also serving covers).
+// Snapshot under the sema, read outside it, re-check and publish under it again -- the same shape
+// as _menuResolveInfoSize below.
+static void _menuLoadConfigAsync()
+{
+    item_list_t *list = NULL;
+    config_set_t *loadedConfig = NULL;
+    int configId = -1;
+
+    WaitSema(menuSemaId);
+    if (itemConfig == NULL && selected_item != NULL && selected_item->item != NULL && itemConfigId >= 0) {
+        list = selected_item->item->userdata;
+        configId = itemConfigId;
+    }
+    SignalSema(menuSemaId);
+
+    // Nothing wanted (already cached, or the id was invalidated while this request sat in the
+    // queue). Deliberately does NOT touch actionStatus: this variant is only ever queued when no
+    // waiter exists, and a dialog that armed one in the meantime queues its own _menuLoadConfig.
+    if (list == NULL)
+        return;
+
+    loadedConfig = list->itemGetConfig(list, configId);
+
+    // Publish only if this is still exactly what the menu wants. The id alone is NOT enough: ids are
+    // per-list indices, so a tab switch mid-read yields the same number from a different device --
+    // re-check the owning list too, or device A's per-game config lands on device B's row.
+    WaitSema(menuSemaId);
+    if (loadedConfig != NULL && itemConfig == NULL && itemConfigId == configId &&
+        selected_item != NULL && selected_item->item != NULL && selected_item->item->userdata == list) {
+        itemConfig = loadedConfig;
+        loadedConfig = NULL;
+    }
+    SignalSema(menuSemaId);
+
+    if (loadedConfig != NULL)
+        configFree(loadedConfig); // lost the race -- drop it, never publish another row's config
 }
 
 // Opening the info screen needs #Size, which the scroll-time config load deliberately skips
@@ -268,8 +318,13 @@ static void _menuSaveConfig()
 static void _menuRequestConfig()
 {
     int shouldQueueLoad = 0;
+    int waiterPending;
 
     WaitSema(menuSemaId);
+    // Which load variant to queue. A waiter (dialog path) needs the publish-unconditionally
+    // in-sema load; the browse/settle path has none and gets the async one that keeps the sema
+    // free across the device read. Read under the sema with everything else it decides on.
+    waiterPending = (actionStatus != 0);
     if (selected_item == NULL || selected_item->item == NULL || selected_item->item->current == NULL) {
         // The list can be rebuilt out from under us between the GUI's check and this callback.
         actionStatus = 0;
@@ -291,8 +346,8 @@ static void _menuRequestConfig()
 
     SignalSema(menuSemaId);
 
-    // Queue OUTSIDE the sema: _menuLoadConfig takes it too.
-    if (shouldQueueLoad && ioPutRequest(IO_CUSTOM_SIMPLEACTION, &_menuLoadConfig) != IO_OK) {
+    // Queue OUTSIDE the sema: both load variants take it too.
+    if (shouldQueueLoad && ioPutRequest(IO_CUSTOM_SIMPLEACTION, waiterPending ? (void *)&_menuLoadConfig : (void *)&_menuLoadConfigAsync) != IO_OK) {
         WaitSema(menuSemaId);
         if (itemConfig == NULL)
             itemConfigId = -1; // let the next pass retry rather than caching a row that never loaded
