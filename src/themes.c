@@ -1714,7 +1714,17 @@ static void drawItemsList(struct menu_list *menu, struct submenu_list *item, con
                             if (dist < 0)
                                 dist = -dist;
 
-                            if (warmBudget[b].left > 0 && (selIndex < 0 || dist <= radius)) {
+                            // OPPORTUNISTIC: only warm while nothing else is being read/decoded.
+                            // Warming is a guess about where the user goes next; the SELECTED
+                            // cover (requested above, before this loop) is a certainty, and on a
+                            // slow device a guess in flight is a certainty delayed -- the enqueue
+                            // is capped, so speculative rows can take the slots the real one
+                            // needs. Gating on an idle art path makes prefetch cost nothing it
+                            // cannot afford: on fast media the queue drains between frames and the
+                            // viewport still fills, on a slow USB stick prefetch simply stands
+                            // aside until the cover being looked at has arrived, then resumes one
+                            // row at a time.
+                            if (warmBudget[b].left > 0 && (selIndex < 0 || dist <= radius) && !cacheHasPendingArt()) {
                                 warmBudget[b].left--;
                                 getGameImageTexture(rowImg->cache, list, &ps->item);
                             }
