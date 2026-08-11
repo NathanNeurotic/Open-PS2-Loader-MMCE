@@ -143,6 +143,24 @@ static volatile int gArtQueuedCount = 0;
 // much busy. Single writer (the IO worker), read by the GUI thread in cacheHasPendingArt.
 static volatile int gArtActiveCount = 0;
 
+// Diagnostics only (drawn by the debug HUD in gui.c). gArtRefused counts requests the backpressure
+// gate turned away, gArtDone counts loads that finished -- together they say whether the pipeline is
+// moving or wedged, which is not something a still image of the menu can tell you.
+static volatile int gArtRefused = 0;
+static volatile int gArtDone = 0;
+
+void cacheDebugCounters(int *queued, int *active, int *refused, int *done)
+{
+    if (queued)
+        *queued = gArtQueuedCount;
+    if (active)
+        *active = gArtActiveCount;
+    if (refused)
+        *refused = gArtRefused;
+    if (done)
+        *done = gArtDone;
+}
+
 // Is any cover art queued or being read/decoded? Used by menuUpdateHook to keep background device
 // rescans OUT of the shared IO queue while art is still arriving -- without it, a settle enqueues a
 // batch of per-device probes that the worker serializes AHEAD of the covers the user is waiting on,
@@ -244,6 +262,7 @@ static void cacheLoadImage(void *data)
 
     if (gArtActiveCount > 0)
         gArtActiveCount--;
+    gArtDone++;
 
     free(req);
 }
@@ -402,6 +421,7 @@ GSTEXTURE *cacheGetTextureEx(image_cache_t *cache, item_list_t *list, int *cache
         if (!ioHasPendingRequests())
             gArtQueuedCount = 0; // drift self-heal: queue is empty, the counter must be too
         else {
+            gArtRefused++;
             *cacheId = -1;
             return NULL;
         }

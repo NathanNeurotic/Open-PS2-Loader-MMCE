@@ -67,6 +67,11 @@ GSTEXTURE *cacheGetTextureEx(image_cache_t *cache, item_list_t *list, int *cache
  * slot or queues a load. For drawing art already held while deliberately not requesting more.
  */
 GSTEXTURE *cacheLookupTexture(image_cache_t *cache, int *cacheId, int *UID);
+
+/** Diagnostics for the debug HUD: art requests queued, being read/decoded right now, turned away by
+ * the depth cap (cumulative), and completed (cumulative). Any argument may be NULL.
+ */
+void cacheDebugCounters(int *queued, int *active, int *refused, int *done);
 void cacheInvalidateFailMemo(void);
 
 /** Nonzero while any cover art is queued for, or currently being, read+decoded by the IO worker.

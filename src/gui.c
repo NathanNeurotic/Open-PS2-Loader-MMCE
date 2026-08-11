@@ -2583,9 +2583,20 @@ static void guiDrawOverlays()
         }
     }
 
-    // BLURT output
-    // if (gEnableDebug)
-    //     fntRenderString(gTheme->fonts[0], 0, screenHeight - 24, ALIGN_NONE, 0, 0, blurttext, GS_SETREG_RGBA(255, 255, 0, 128));
+    // Art pipeline HUD (Settings -> Advanced -> Debug). Q = requests queued, A = being read/decoded
+    // right now, R = turned away by the depth cap, D = completed. What it is for: "art stops after a
+    // few covers" has two very different causes that look identical on screen. If D keeps climbing
+    // the pipeline is working and simply slow. If D stops while R climbs, requests are being made
+    // and refused -- and if Q stays pinned at the cap with A at 0 and nothing completing, the
+    // in-flight counter has drifted above the real number in flight and is refusing everything
+    // forever. Cheap enough to leave in: four integer reads and one string, only when debug is on.
+    if (gEnableDebug) {
+        int q = 0, a = 0, r = 0, d = 0;
+        char artdbg[64];
+        cacheDebugCounters(&q, &a, &r, &d);
+        snprintf(artdbg, sizeof(artdbg), "ART Q%d A%d R%d D%d", q, a, r, d);
+        fntRenderString(gTheme->fonts[0], 8, screenHeight - 24, ALIGN_NONE, 0, 0, artdbg, GS_SETREG_RGBA(255, 255, 0, 128));
+    }
 }
 
 static void guiReadPads()
