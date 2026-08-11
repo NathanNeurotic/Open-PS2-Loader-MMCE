@@ -19,6 +19,15 @@
 #define MENU_POS_V                   50
 #define HINT_HEIGHT                  32
 #define DECORATOR_SIZE               20
+// Cover cache depth. Hardware (debug HUD, art delay 0, one USB device, BG off): 73 ms per cover
+// load -- the load path is fine -- but D climbing past 100 COMPLETED loads in a single browse, far
+// more covers than the library shows. That is the same files being read again and again: the
+// viewport plus the warm loop demand more distinct covers than the cache holds, so every move
+// evicts one that is about to be asked for again and the device never goes quiet. That re-reading
+// is the "drag" that survived removing the throttles. Sized so the visible set and its warmed
+// neighbours fit together; at the size themes actually ship (140x200 in that capture) a decoded
+// cover is well under 100 KB, so this trades ~1 MB of EE RAM for not re-reading USB.
+#define COVER_CACHE_SLOTS            20
 // Extra idle frames a per-game BACKGROUND waits beyond the art delay before it may be requested, so
 // the cover always reaches the IO queue first (see drawGameImage). Half a second at 60 Hz: long
 // enough that a cover request is queued and usually finished, short enough that a background still
@@ -1328,7 +1337,7 @@ static void drawCoverFlow(struct menu_list *menu, struct submenu_list *item, con
 
 static void initCoverflow(const char *themePath, config_set_t *themeConfig, theme_t *theme, theme_element_t *elem, const char *name)
 {
-    mutable_image_t *mutableImage = initMutableImage(themePath, themeConfig, theme, name, elem->type, "COV", 10, NULL, NULL);
+    mutable_image_t *mutableImage = initMutableImage(themePath, themeConfig, theme, name, elem->type, "COV", COVER_CACHE_SLOTS, NULL, NULL);
     elem->extended = mutableImage;
     elem->endElem = &endMutableImage;
 
@@ -2316,7 +2325,7 @@ static int addGUIElem(const char *themePath, config_set_t *themeConfig, theme_t 
                 initGameImage(themePath, themeConfig, theme, elem, name, "ICO", 20, NULL, NULL);
             } else if (!strcmp(elementsType[ELEM_TYPE_ITEM_COVER], type)) {
                 elem = initBasic(themePath, themeConfig, theme, name, ELEM_TYPE_GAME_IMAGE, 0, 0, ALIGN_CENTER, DIM_UNDEF, DIM_UNDEF, SCALING_RATIO, gDefaultCol, theme->fonts[0]);
-                initGameImage(themePath, themeConfig, theme, elem, name, "COV", 10, NULL, NULL);
+                initGameImage(themePath, themeConfig, theme, elem, name, "COV", COVER_CACHE_SLOTS, NULL, NULL);
             } else if (!strcmp(elementsType[ELEM_TYPE_ITEM_TEXT], type)) {
                 elem = initBasic(themePath, themeConfig, theme, name, ELEM_TYPE_ITEM_TEXT, 0, 0, ALIGN_CENTER, DIM_UNDEF, DIM_UNDEF, SCALING_RATIO, theme->textColor, theme->fonts[0]);
                 elem->drawElem = &drawItemText;
