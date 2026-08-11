@@ -40,7 +40,7 @@ struct pad_data_t
     char actAlign[6];
     int actuators;
     int actAligned; // padSetActAlign confirmed; see padRumbleRealign()
-    int needsInit;  // reconnect-edge re-init pending; runs once the idle gate opens (see readPad)
+    int needsInit;  // reconnect-edge re-init pending; runs once the verified-idle gate opens (see readPads)
 };
 
 /// current time in miliseconds (last update time)
@@ -93,12 +93,21 @@ static int isPadReadyState(int state)
 #define PAD_WAIT_POLLS   25
 #define PAD_WAIT_POLL_US 1000
 
-// Milliseconds without any registered input before a reconnect-edge initializePad() may run
-// (#271/#272). The init is a few hundred ms of polled waits on the GUI thread, and its trigger --
-// freepad dropping the pad under SIO2 contention -- fires exactly while the user is navigating.
-// Maintained in readPads(); resets on any pressed button. A wrap-garbage time_since_last sample
-// only ever makes the counter LARGER (more idle), which opens the gate early -- benign.
-#define PAD_SELF_HEAL_IDLE_MS 1000
+// Milliseconds of continuously VERIFIED idle -- clean, zero-input polls -- before a reconnect-edge
+// initializePad() may run (#271/#272). The init is a few hundred ms of polled waits on the GUI
+// thread, and its trigger -- freepad dropping the pad under IOP/SIO2 load -- fires exactly while
+// the user is navigating. CRITICAL: failed reads and state transitions are UNKNOWN, never evidence
+// of idleness. readPads() zeroes paddata every poll and only a successful read repopulates it, so
+// an idle clock fed by bare `paddata == 0` counts the very read starvation that flapped the pad as
+// a quiet user -- the init then fires over the user's next press, its own pad-bus traffic causes
+// more misses, and the loop self-sustains as a ~1 s cadence of 300-900 ms input blackouts (the USB
+// "one move per second" hardware report; master's f0b039a6/fcb00dd8 measured the same shape). The
+// gate therefore advances only on polls where every attempted read succeeded (readPad's pollClean),
+// and an inter-poll gap above PAD_IDLE_MAX_CLEAN_GAP_MS breaks the run: gap time is unobserved, and
+// this also swallows the once-per-~29 s time_since_last wrap sample, which previously opened the
+// gate in a single step.
+#define PAD_SELF_HEAL_IDLE_MS     1000
+#define PAD_IDLE_MAX_CLEAN_GAP_MS 100
 static u32 padIdleMs = 0;
 
 /*
@@ -298,7 +307,11 @@ static u32 readLeftJoy(struct pad_data_t *pad, u32 pdata)
     return padData;
 }
 
-static int readPad(struct pad_data_t *pad)
+// pollClean is the self-heal gate's evidence stream (see PAD_SELF_HEAL_IDLE_MS): cleared when this
+// pad's tracked state changed this poll, or when its ATTEMPTED native read failed to deliver a
+// sample. A port sitting stably disconnected attempts no read and stays clean, so an unused
+// controller slot can never hold the gate shut.
+static int readPad(struct pad_data_t *pad, int *pollClean)
 {
     int rcode = 0, oldState, newState, ret, padsRead;
     u32 newpdata = 0;
@@ -308,13 +321,14 @@ static int readPad(struct pad_data_t *pad)
     newState = padGetState(pad->port, pad->slot);
     updatePadState(pad, newState);
     if ((oldState == PAD_STATE_DISCONN) && isPadReadyState(pad->state)) {
-        // Pad just connected. DEFER the re-init behind the idle gate below rather than running it
-        // inline: reconnect edges are DRIVEN by the read errors that cluster under SIO2 load
-        // (loading mx4sio_bd, MMCE traffic), so ungated this fired precisely while the user was
-        // navigating, spending the init's polled waits ON THE GUI THREAD mid-input (#271/#272).
-        // A not-yet-initialised pad still reads every d-pad press in digital mode, so deferring
-        // costs nothing the user can feel; a genuinely fresh plug-in is idle by definition and
-        // initialises on the next frame.
+        // Pad just connected. DEFER the re-init behind the verified-idle gate in readPads() rather
+        // than running it inline: reconnect edges are DRIVEN by the read errors that cluster under
+        // IOP/SIO2 load (loading mx4sio_bd, MMCE traffic, USB bulk reads), so ungated this fired
+        // precisely while the user was navigating, spending the init's polled waits ON THE GUI
+        // THREAD mid-input (#271/#272). A not-yet-initialised pad still reads every d-pad press in
+        // digital mode, so deferring costs little the user can feel; a genuinely fresh plug-in
+        // initialises after the next verified-quiet second (analog/rumble return then, not on the
+        // edge poll itself -- the edge is a state transition, which restarts the quiet clock).
         LOG("PAD pad %d,%d connected\n", pad->port, pad->slot);
         pad->needsInit = 1;
     }
@@ -323,10 +337,9 @@ static int readPad(struct pad_data_t *pad)
         LOG("PAD pad %d,%d disconnected\n", pad->port, pad->slot);
     }
 
-    if (pad->needsInit && isPadReadyState(pad->state) && padIdleMs >= PAD_SELF_HEAL_IDLE_MS) {
-        pad->needsInit = 0;
-        initializePad(pad);
-    }
+    // A tracked-state transition proves nothing about the user: the gate must restart its count.
+    if (oldState != pad->state)
+        *pollClean = 0;
 
     if ((pad->state == PAD_STATE_STABLE) || (pad->state == PAD_STATE_FINDCTP1)) {
         // pad is connected. Read pad button information.
@@ -335,6 +348,12 @@ static int readPad(struct pad_data_t *pad)
         if (ret != 0) {
             newpdata = 0xffff ^ pad->buttons.btns;
             padsRead++;
+        } else {
+            // An attempted read that FAILED is unknown, never idle -- these misses are exactly what
+            // clusters with the reconnect flaps under IOP load. Native-only on purpose: the init
+            // this gates is native-pad setup, and a native miss must mark the poll unclean even
+            // when a ds34 source below delivers a valid sample.
+            *pollClean = 0;
         }
     }
 
@@ -537,6 +556,8 @@ void padFreezeEdgeBaseline(int freeze)
 int readPads()
 {
     int i;
+    int pollClean = 1;
+
     if (!edgeBaselineFrozen)
         oldpaddata = paddata;
     paddata = 0;
@@ -549,14 +570,31 @@ int readPads()
     int rslt = 0;
 
     for (i = 0; i < pad_count; ++i) {
-        rslt |= readPad(&pad_data[i]);
+        rslt |= readPad(&pad_data[i], &pollClean);
     }
 
-    // Idle clock for the reconnect-edge self-heal gate (see PAD_SELF_HEAL_IDLE_MS).
-    if (paddata)
+    // Idle clock for the reconnect-edge self-heal gate (see PAD_SELF_HEAL_IDLE_MS). Only a clean,
+    // zero-input, gap-free poll counts: misses and transitions are unknown, and an inter-poll gap
+    // above the bound is unobserved time that must not be credited as a quiet user.
+    if (!pollClean || paddata || time_since_last > PAD_IDLE_MAX_CLEAN_GAP_MS)
         padIdleMs = 0;
-    else
+    else if (padIdleMs < PAD_SELF_HEAL_IDLE_MS)
         padIdleMs += time_since_last;
+
+    // Deferred reconnect re-init, decided AFTER this poll's samples -- the old shape decided before
+    // them, so the press arriving with this very poll could not veto the init that then ate it.
+    // One init per verified-quiet run: the reset makes the next pending pad re-earn a full quiet
+    // second, so multiple reconnects cannot stack their bounded waits into one long blackout.
+    if (pollClean && !paddata && padIdleMs >= PAD_SELF_HEAL_IDLE_MS) {
+        for (i = 0; i < pad_count; ++i) {
+            if (pad_data[i].needsInit && isPadReadyState(pad_data[i].state)) {
+                pad_data[i].needsInit = 0;
+                padIdleMs = 0;
+                initializePad(&pad_data[i]);
+                break;
+            }
+        }
+    }
 
     // Rumble decay + re-send. Unsigned elapsed in RAW ticks -- see the note above padActSet().
     // The re-send is not redundant: freepad drops padSetActDirect outside TASK_UPDATE_PAD and still
@@ -724,6 +762,11 @@ int startPads()
     // scan for pads that exist... at least one has to be present
     pad_count = 0;
 
+    // Fresh pad session -- boot, and again after the NBD server's IOP reset re-enters here
+    // in-process. Stale idle credit or a stale deferred-init flag from the previous session must
+    // not queue work against the new one (startPad() below runs initializePad() itself).
+    padIdleMs = 0;
+
     int maxports = padGetPortMax();
 
     int port; // 0 -> Connector 1, 1 -> Connector 2
@@ -739,6 +782,7 @@ int startPads()
             cpad->port = port;
             cpad->slot = slot;
             cpad->state = PAD_STATE_DISCONN;
+            cpad->needsInit = 0;
 
             if (startPad(cpad))
                 ++pad_count;
