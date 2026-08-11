@@ -396,6 +396,28 @@ static void sfxEnqueue(int channel, int id)
     // The backlog problem that motivated it is handled where it belongs -- at DISPATCH, by the
     // staleness test, which now covers these ids too (see sfxDispatchThread).
 
+    // ...with ONE exception, and the reasoning above is exactly why it is safe: SFX_CURSOR is not a
+    // press, it is a side effect of movement. Holding a direction fires it every step, so a queue
+    // full of cursor ticks is a queue of sounds that describe where the cursor USED to be -- and
+    // each one that survives to dispatch is another audsrv RPC to the same IOP the game device is
+    // being read through. A cursor tick is worth playing NOW or not at all. So when one is already
+    // pending, refresh its timestamp instead of adding another: the user still hears a tick for the
+    // movement they just made (the pending entry plays, and it is no longer stale), and the ring
+    // never fills with obsolete ones. CONFIRM/CANCEL keep their every-press guarantee untouched --
+    // they are deliberate presses, and silencing an alternate one was the hardware fault that
+    // removed blanket coalescing in the first place.
+    if (id == SFX_CURSOR) {
+        int scan = sfxQTail;
+        while (scan != sfxQHead) {
+            if (sfxQueue[scan].id == SFX_CURSOR) {
+                sfxQueue[scan].ticks = cpu_ticks(); // keep it fresh; do not queue a second one
+                EIntr();
+                return;
+            }
+            scan = (scan + 1) % SFX_QUEUE_LEN;
+        }
+    }
+
     int next = (sfxQHead + 1) % SFX_QUEUE_LEN;
     if (next == sfxQTail) {
         EIntr();
