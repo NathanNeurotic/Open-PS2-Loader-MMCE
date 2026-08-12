@@ -42,6 +42,14 @@ int ioGetPendingRequestCount(void);
 /** returns nonzero if there are any pending io requests */
 int ioHasPendingRequests(void);
 
+/** DIAGNOSTIC. Per-IO_*-type queue counters for the debug HUD. ioHasPendingRequests() is what raises
+ * the busy overlay, but it only says "the queue is not empty" -- these say WHICH type is sitting in
+ * it, and whether the running total is still climbing (something re-queueing itself every frame) or
+ * frozen (one request that never finishes). Unsynchronised reads, display only.
+ */
+int ioGetPending(int type);
+unsigned int ioGetTotal(int type);
+
 /** returns nonzero if the io thread is running */
 int ioIsRunning(void);
 

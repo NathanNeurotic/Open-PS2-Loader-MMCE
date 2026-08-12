@@ -2671,7 +2671,8 @@ static void guiDrawOverlays()
     if (gEnableDebug) {
         int q = 0, a = 0, r = 0, d = 0;
         int lastMs = 0, okMs = 0, w = 0, h = 0;
-        char artdbg[96];
+        char artdbg[160]; // 96 truncated the IO counters off the end -- snprintf is safe, but silently
+                          // dropping the field you added to diagnose something is its own trap.
         cacheDebugCounters(&q, &a, &r, &d);
         cacheDebugLastLoad(&lastMs, &okMs, &w, &h);
         // ms = the last load, ok = the last SUCCESSFUL one with its decoded size. One cover at a few
@@ -2688,9 +2689,17 @@ static void guiDrawOverlays()
         // NR = longest run of polls freepad could not be read at all; MT = longest run of polls that
         // read fine but were EMPTY. A press spans 4-6 frames, so a RUN >= 4 in either column is a
         // swallowed press -- and which column it lands in decides where the fault lives.
-        snprintf(artdbg, sizeof(artdbg), "Q%d A%d D%d %dms  F%u/%u OV%u  NR%u MT%u",
+        // IO = what is actually in the shared ioman queue, which is the ONLY thing that raises the
+        // busy overlay. Three pending counts (Simple / Menu-rescan / Art) then their running totals.
+        // Read it this way: pending stuck non-zero with the totals FROZEN means one request that
+        // never finishes; pending small but a total CLIMBING while the spinner sits there means
+        // something is re-queueing itself and the queue is never observed empty. Those are different
+        // bugs and nothing in the source distinguishes them.
+        snprintf(artdbg, sizeof(artdbg), "Q%d A%d D%d %dms  F%u/%u OV%u  NR%u MT%u  IO %d/%d/%d T%u/%u/%u",
                  q, a, d, lastMs, (unsigned)(fLast / 1000), (unsigned)(fWorst / 1000), (unsigned)fOver,
-                 (unsigned)padNR, (unsigned)padEmpty);
+                 (unsigned)padNR, (unsigned)padEmpty,
+                 ioGetPending(IO_CUSTOM_SIMPLEACTION), ioGetPending(IO_MENU_UPDATE_DEFFERED), ioGetPending(IO_CACHE_LOAD_ART),
+                 ioGetTotal(IO_CUSTOM_SIMPLEACTION), ioGetTotal(IO_MENU_UPDATE_DEFFERED), ioGetTotal(IO_CACHE_LOAD_ART));
         fntRenderString(gTheme->fonts[0], 8, screenHeight - 24, ALIGN_NONE, 0, 0, artdbg, GS_SETREG_RGBA(255, 255, 0, 128));
     }
 }

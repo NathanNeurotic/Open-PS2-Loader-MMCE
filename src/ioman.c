@@ -58,6 +58,29 @@ static ee_sema_t gQueueSema;
 static int isIOBlocked = 0;
 static int isIORunning = 0;
 
+// DIAGNOSTIC ONLY. The busy overlay is driven by ioHasPendingRequests(), i.e. purely by this queue
+// being non-empty -- so a spinner that never fades means something in here genuinely is not
+// completing. Reading the source cannot say WHICH of the four request types that is, and cannot
+// tell apart the two very different causes: ONE slow request that never finishes, versus something
+// re-queueing itself every frame so the queue is never observed empty. So count both. `pending`
+// answers the first; `total` still climbing while the spinner sits still answers the second.
+//
+// Plain ints on purpose: written under gEndSemaId, which both the enqueue and the worker's unlink
+// already hold, and read unsynchronised from the GUI thread for display -- exactly like the gArt*
+// counters the HUD already shows. The GUI thread must NEVER take an ioman semaphore.
+static int gIoPending[IO_REQ_TYPE_COUNT];
+static unsigned int gIoTotal[IO_REQ_TYPE_COUNT];
+
+int ioGetPending(int type)
+{
+    return (type > 0 && type < IO_REQ_TYPE_COUNT) ? gIoPending[type] : 0;
+}
+
+unsigned int ioGetTotal(int type)
+{
+    return (type > 0 && type < IO_REQ_TYPE_COUNT) ? gIoTotal[type] : 0;
+}
+
 int ioRegisterHandler(int type, io_request_handler_t handler)
 {
     WaitSema(gProcSemaId);
@@ -141,6 +164,9 @@ static void ioWorkerThread(void *arg)
 
             // lock the queue tip as well now
             WaitSema(gEndSemaId);
+
+            if (req->type > 0 && req->type < IO_REQ_TYPE_COUNT && gIoPending[req->type] > 0)
+                gIoPending[req->type]--;
 
             // can't be sure if the request was
             gReqList = req->next;
@@ -257,6 +283,11 @@ int ioPutRequest(int type, void *data)
     req->next = NULL;
     req->type = type;
     req->data = data;
+
+    if (type > 0 && type < IO_REQ_TYPE_COUNT) {
+        gIoPending[type]++;
+        gIoTotal[type]++;
+    }
 
     SignalSema(gEndSemaId);
 
