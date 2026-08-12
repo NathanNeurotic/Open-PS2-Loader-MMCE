@@ -335,6 +335,7 @@ void cacheDestroyCache(image_cache_t *cache)
 
 GSTEXTURE *cacheGetTexture(image_cache_t *cache, item_list_t *list, int *cacheId, int *UID, char *value)
 {
+    int i, rtime;
     if (cache == NULL || list == NULL || cacheId == NULL || UID == NULL || value == NULL || value[0] == '\0')
         return NULL;
 
@@ -387,7 +388,7 @@ GSTEXTURE *cacheGetTexture(image_cache_t *cache, item_list_t *list, int *cacheId
 
 
     cache_entry_t *currEntry, *oldestEntry = NULL;
-    int i, rtime = guiFrameId;
+    rtime = guiFrameId;
 
     for (i = 0; i < cache->count; i++) {
         currEntry = &cache->content[i];

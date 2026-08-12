@@ -16,6 +16,12 @@ typedef struct
     int lastUsed;
 
     int UID;
+
+    // The value this slot was loaded FOR (a game's startup id, or a VCD's filename). The cache used
+    // to be addressable only by (slot index, UID), which are handed out per request -- so a row that
+    // lost its ids could never find art it already had, even sitting decoded in the very next slot.
+    // Every list rebuild resets those ids, which is why a rebuild threw the whole viewport away.
+    char key[64];
 } cache_entry_t;
 
 
