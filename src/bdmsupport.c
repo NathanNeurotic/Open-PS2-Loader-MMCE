@@ -2070,6 +2070,19 @@ int bdmResolveBootDir(char *bootDir, int bootDirSize, const char *elfName, int *
     int filterType = isMass ? knownType : bdmDetermineDeviceType(stem);
     if (!isMass && filterType == BDM_TYPE_UNKNOWN)
         return 0; // mc/mmce/host/pfs/hdd/cdrom/... -- not a BDM boot path, leave it alone
+    // Reachable ONLY for a TYPED "udp0:" boot token, and never for the massN: form -- worth stating
+    // because the massN: form is the one a UDPBD launcher actually hands over, so this reads like the
+    // guard for it and is not. When isMass, filterType IS knownType, and resolveBootDirToMass zeroes
+    // gBootDirBdmType to BDM_TYPE_UNKNOWN on the line immediately before every boot-path call; so on
+    // that path this comparison cannot hold. It still earns its place on the _saveConfig re-resolve,
+    // which passes the already-classified type back in.
+    //
+    // The consequence is deliberate and not fixable here: a UDPBD/UDPFS-BD boot arriving as
+    // "massN:/OPL" is byte-identical to a USB one, its only evidence being the "udp" driver token,
+    // which needs the udpbd stack, which needs the static IP out of the config being sought. It
+    // therefore falls through to the ordinary massN: scan and simply never mounts. Adding a UDPBD rung
+    // to the escalation ladder would slow EVERY untyped massN: boot -- i.e. every ordinary USB boot --
+    // to buy that one case nothing, since the IP is still unknown.
     if (filterType == BDM_TYPE_UDPBD) {
         *ioBdmType = filterType; // keep the classification so a later save retry stays pinned to it
         return -1;               // network block device: no local mount to resolve at config-load time

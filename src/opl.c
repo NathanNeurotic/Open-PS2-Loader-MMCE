@@ -48,6 +48,10 @@
 int configGetStat(config_set_t *configSet, iox_stat_t *stat);
 
 #include <unistd.h>
+#include <sys/stat.h> // mkdir() -- create mc?:/OPL before mirroring the settings-path redirect.
+                      // Explicit rather than transitive on purpose: this tree builds WITHOUT -Wall,
+                      // so an implicitly declared mkdir would compile silently and only go wrong at
+                      // runtime. bdmsupport.c includes it for the same reason.
 #ifdef PADEMU
 #include <libds34bt.h>
 #include <libds34usb.h>
@@ -1298,16 +1302,48 @@ static int checkLoadConfigHDD(int types)
     return 0;
 }
 
+// The boot device's filesystem cannot exist until AFTER the config has been read, because bringing
+// its transport up needs values THAT LIVE IN THAT CONFIG -- the PS2's static IP for every network
+// transport, plus server/share/user/password for SMB. That is a real bootstrap cycle, unlike a BDM
+// boot where loading a driver needs no configuration at all.
+//
+// Set from the boot TOKEN by resolveBootDirToMass(). Deliberately NOT named "is a network boot":
+// UDPBD and UDPFS-BD are BLOCK devices that mount as massN: exactly like USB, and their "udp" driver
+// token is unreadable until the transport is up -- so those boots are indistinguishable from a local
+// one here and correctly leave this at 0. See the classification branch for what that costs.
+static int gBootHomeDeferred = 0;
+
 // When this function is called, the current device for loading/saving config is the memory card.
 // "Custom Settings Path" bootstrap.
 //
 // THE CHICKEN-AND-EGG: the user's chosen path is stored in CONFIG_OPL_CUSTOM_SETTINGS_PATH, which
 // lives INSIDE the config file that path points at. At boot we cannot read the setting without
 // already knowing it. So the path is ALSO mirrored to a tiny plain-text "config.path" file in the
-// CWD -- the one location that is readable before any device driver is up, because it is where OPL
-// was launched from. Boot reads the redirect; the setting inside the config is what the GUI edits
-// and what keeps the two in sync on save.
+// CWD -- readable before any device driver is up, because it is where OPL was launched from. Boot
+// reads the redirect; the setting inside the config is what the GUI edits and what keeps the two in
+// sync on save.
+//
+// ⚠ THAT PREMISE HAS ONE EXCEPTION, and it is the whole reason for the mc mirror below: on a NETWORK
+// boot the CWD *is* the share, and mounting the share needs the static IP (and for SMB the server,
+// share, user and password) out of the very config this redirect exists to locate. So there the CWD
+// copy is unreadable at exactly the moment it is needed, and a custom settings path set by a network
+// booter was silently lost on the next boot.
 static const char *configPathRedirectFile = "config.path";
+
+// Absolute mc-side location for that mirror. A memory card is the only store that needs NO
+// configuration to reach -- mcman is loaded by sysReset before anything else, no network, no
+// transport flags, no ordering. Composed from sysCheckMC() so it names the slot that actually holds
+// a card. Returns 0 when there is none.
+static int mcConfigPathRedirect(char *out, int outLen)
+{
+    int slot = sysCheckMC();
+
+    if (slot < 0)
+        return 0;
+
+    snprintf(out, outLen, "mc%d:/OPL/%s", slot, configPathRedirectFile);
+    return 1;
+}
 
 static int readConfigPathRedirect(char *outPath, int outPathLen)
 {
@@ -1315,8 +1351,20 @@ static int readConfigPathRedirect(char *outPath, int outPathLen)
     int len;
 
     fd = open((char *)configPathRedirectFile, O_RDONLY);
-    if (fd < 0)
-        return 0;
+    if (fd < 0) {
+        char mcPath[64];
+
+        // Fall back to the card mirror ONLY for a boot whose own folder cannot be read yet. Gating on
+        // gBootHomeDeferred rather than just "the CWD copy is missing" keeps every local boot on
+        // exactly its previous behaviour: a stale mirror left over from some earlier setup must never
+        // get to redirect a boot whose own CWD copy is simply absent.
+        if (!gBootHomeDeferred || !mcConfigPathRedirect(mcPath, sizeof(mcPath)))
+            return 0;
+
+        fd = open(mcPath, O_RDONLY);
+        if (fd < 0)
+            return 0;
+    }
 
     len = read(fd, outPath, outPathLen - 1);
     close(fd);
@@ -1338,6 +1386,40 @@ static void writeConfigPathRedirect(const char *path)
         write(fd, path, strlen(path));
         write(fd, "\n", 1);
         close(fd);
+    }
+
+    // Mirror to the memory card, and ONLY for a boot that will not be able to read the copy above
+    // next time. Two gates stack to make this the narrowest write it can be: gBootHomeDeferred means
+    // the CWD is a network share, and this function's only caller that can reach it is the custom-path
+    // block in _saveConfig, which fires solely when gCustomSettingsPath is non-empty -- i.e. when the
+    // user typed a destination themselves. The other caller needs gBootDir empty, which a deferred
+    // boot never is.
+    //
+    // So no card is ever touched on a normal boot, and none is touched on a network boot either
+    // unless the user has explicitly named a settings path that would otherwise be forgotten. That is
+    // the line this codebase keeps re-learning: never home settings on a card nobody named
+    // (FifthFox, HW 2026-07-16). A pointer the user asked for is not that.
+    if (gBootHomeDeferred) {
+        char mcPath[64];
+
+        if (mcConfigPathRedirect(mcPath, sizeof(mcPath))) {
+            fd = open(mcPath, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+            if (fd < 0) {
+                // The OPL folder may not exist on this card yet -- create it and retry once.
+                char mcDir[64];
+                snprintf(mcDir, sizeof(mcDir), "mc%d:/OPL", sysCheckMC());
+                mkdir(mcDir, 0777);
+                fd = open(mcPath, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+            }
+            if (fd >= 0) {
+                write(fd, path, strlen(path));
+                write(fd, "\n", 1);
+                close(fd);
+                LOG("CONFIG mirrored settings path to %s\n", mcPath);
+            } else {
+                LOG("CONFIG could not mirror settings path to %s\n", mcPath);
+            }
+        }
     }
 }
 
@@ -1368,16 +1450,6 @@ static int prepareCustomSettingsPath(char *path, int pathLen)
     return bdmResolveBootDir(path, pathLen, "", &bdmType);
 }
 
-// The boot device's filesystem cannot exist until AFTER the config has been read, because bringing
-// its transport up needs values THAT LIVE IN THAT CONFIG -- the PS2's static IP for every network
-// transport, plus server/share/user/password for SMB. That is a real bootstrap cycle, unlike a BDM
-// boot where loading a driver needs no configuration at all.
-//
-// Set from the boot TOKEN by resolveBootDirToMass(). Deliberately NOT named "is a network boot":
-// UDPBD and UDPFS-BD are BLOCK devices that mount as massN: exactly like USB, and their "udp" driver
-// token is unreadable until the transport is up -- so those boots are indistinguishable from a local
-// one here and correctly leave this at 0. See the classification branch for what that costs.
-static int gBootHomeDeferred = 0;
 
 static int tryAlternateDevice(int types)
 {
