@@ -434,10 +434,19 @@ static void sfxEnqueue(int channel, int id)
 // Menu rumble rides the SFX events: one hook covers every call site in the GUI, and the events are
 // already the ones worth feeding back on.
 //
-// SFX_CURSOR is deliberately NOT in this table. It fires on every single cursor step, so haptics
-// there would be a continuous buzz while scrolling -- and, more to the point, it would put a SIO2
-// request on the GUI thread inside the one path #340 is about. The discrete events below fire at
-// human speed and cannot pile up.
+// SFX_CURSOR IS the menu rumble -- the fork's own note reads "menu rumble mirrors the cursor tick".
+// Moving through the menu thumping is what a user means by "vibration"; without it the feature reads
+// as broken, which is exactly how it was reported ("vibration doesn't work... it worked fine on our
+// fork").
+//
+// It was left out of this table on the theory that a per-step actuator write would add SIO2 traffic
+// to the very navigation path #340 was about. That premise was wrong twice over: padSetActDirect is
+// a SIF RPC that latches six bytes on the IOP and adds ZERO SIO2 traffic (the fork's own analysis),
+// and #340 turned out to be an SD-card driver left resident on SIO2 by the boot resolver
+// (rebuild-135) -- nothing to do with rumble.
+//
+// SFX_BOOT and the SFX_BD_* device events stay out: nobody is holding the pad at boot, and a drive
+// appearing is not something the user did.
 //
 // SFX_BOOT and the SFX_BD_* device events are also left out: nobody is holding the pad yet at boot,
 // and a drive appearing is not something the user did.
@@ -447,14 +456,16 @@ static void sfxRumble(int id)
         return;
 
     switch (id) {
+        // The fork's tuned values, byte for byte: a 240 ms nav thump at 0x50 -- long enough for the
+        // ERM to actually reach amplitude, which a shorter pulse never does -- and a firmer, shorter
+        // 110 ms bump at 0x60 for a decision, so confirming feels more definite than scrolling.
+        case SFX_CURSOR:
+            padRumble(240, 0x50);
+            break;
         case SFX_CONFIRM:
-            padRumble(120, 160);
-            break;
         case SFX_CANCEL:
-            padRumble(90, 96);
-            break;
         case SFX_MESSAGE:
-            padRumble(120, 160);
+            padRumble(110, 0x60);
             break;
         case SFX_TRANSITION:
             padRumble(150, 200);
