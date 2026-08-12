@@ -1187,6 +1187,24 @@ void menuHandleInputMenu()
 #endif
                 saveConfig(CONFIG_OPL | CONFIG_NETWORK | CONFIG_GAME, 1);
                 menuSetParentalLockCheckState(1); // Re-enable parental lock check.
+
+                // SMB, UDPFS and UDPBD share the one SMAP NIC and cannot coexist -- each loader
+                // refuses to start while either of the others is resident, and each loads its IOP
+                // chain once per boot with no unload path. So once a stack is up, choosing a different
+                // protocol changes the CONFIG and nothing else: the NIC keeps running whatever it
+                // started with, for the rest of the session.
+                //
+                // The choice has just been written, which makes this the first moment it is safe to
+                // act on. Offer to leave OPL so the user can start it again on the protocol they
+                // picked. Doing this from the picker instead would have torn OPL down before Save
+                // Changes ever ran and thrown the choice away -- those dialogs only touch RAM.
+                //
+                // sysExecExit is the Exit menu item's own path (deinit + exit), deliberately not a new
+                // one: OPL has no in-place relaunch, and inventing an ELF-reload + IOP-reset path
+                // underneath a settings screen would be a brand-new way to reach a black screen.
+                // Declining costs nothing -- the saved protocol applies at the user's next launch.
+                if (guiNetProtocolNeedsRestart() && guiMsgBox(_l(_STR_NETBOOT_RESTART), 1, NULL))
+                    sysExecExit();
             }
         } else if (id == MENU_EXIT) {
             if (guiMsgBox(_l(_STR_CONFIRMATION_EXIT), 1, NULL))

@@ -150,6 +150,21 @@ void guiShowNeutrinoArgsConfig(char *argsBuf, int bufSize);
 void guiShowAudioConfig();
 void guiShowControllerConfig();
 void guiShowNetConfig();
+
+// The network protocol the NIC is ACTUALLY running right now, as a NET_PROTO_* value, derived from
+// which IOP stack is resident -- NET_PROTO_OFF when none is. gNetworkProtocol is only ever written
+// from the config file, the legacy derivation or the picker, so it records what the user WANTS and
+// never what is live; this is the other half of that pair. SMB, UDPFS and UDPBD are mutually
+// exclusive on the single SMAP NIC and each loads its chain once per boot (the load latch is never
+// cleared), so the two can disagree for the whole rest of the session after a switch.
+int guiGetResidentNetProtocol(void);
+
+// 1 when a network stack is resident and the saved protocol is NOT the one running -- i.e. the
+// user's choice cannot take effect until OPL is restarted. Asked from the SAVE path, never from the
+// picker: the settings dialogs only touch RAM and Save Changes is a separate menu action, so acting
+// at picker time would tear OPL down before the change was ever written to disk.
+int guiNetProtocolNeedsRestart(void);
+
 void guiShowVcdConfig(void); // POPStarter settings hub (device/path/RetroGEM; chains BDMA/List/Net sub-pages)
 // One-shot POPSTARTER USB driver pick (FAT32 vs exFAT), shown on EVERY USB VCD launch
 // (maintainer directive 2026-08-01: the user picks per launch, never a sticky default).

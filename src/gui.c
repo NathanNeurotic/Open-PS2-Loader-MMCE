@@ -611,6 +611,37 @@ void guiShowConfig()
 
 // Game Sources page: device start modes, the default device, and the block-device enables
 // (inlined; the separate Block Devices sub-dialog is gone).
+// What the NIC is ACTUALLY running, as opposed to what the config asks for. The three transports are
+// mutually exclusive on the single SMAP NIC -- each of the three loaders refuses to start while either
+// of the others is resident (bdmsupport.c's UDPBD gate, ethsupport.c's SMB gate, udpfssupport.c's
+// UDPFS gate) -- so at most one of these can answer, and the order below is only for definiteness.
+int guiGetResidentNetProtocol(void)
+{
+    if (ethGetModulesLoaded())
+        return NET_PROTO_SMB;
+    if (udpfsGetModulesLoaded())
+        return NET_PROTO_UDPFS;
+    if (bdmIsUDPBDLoaded())
+        return (bdmGetLoadedNetProtocol() == NET_BOOT_UDPFS) ? NET_PROTO_UDPFSBD : NET_PROTO_UDPBD;
+
+    return NET_PROTO_OFF;
+}
+
+// Does the saved choice disagree with what is live? Nothing is resident -> the next start is free to
+// be anything, so there is nothing to restart FOR. This is deliberately a comparison against the
+// RESIDENT protocol rather than against the protocol the picker happened to open with: a user who
+// switches away and back within one session ends up agreeing with the NIC again, and must not then be
+// nagged to restart for a change that is no longer a change.
+int guiNetProtocolNeedsRestart(void)
+{
+    int resident = guiGetResidentNetProtocol();
+
+    if (resident == NET_PROTO_OFF)
+        return 0;
+
+    return gNetworkProtocol != resident;
+}
+
 void guiShowDeviceConfig(void)
 {
     const char *deviceNames[] = {_l(_STR_BDM_GAMES), _l(_STR_NET_GAMES), _l(_STR_HDD_GAMES), _l(_STR_APPS), _l(_STR_MMCE), _l(_STR_FAV), NULL};
@@ -689,11 +720,12 @@ void guiShowDeviceConfig(void)
         }
 
         // Each network transport loads its IOP module chain once per boot (the load latch is not
-        // cleared live). If any network stack is already up and the Start toggle changed the active
-        // protocol, the switch takes effect only after a restart -- say so instead of silently
-        // doing nothing.
-        if (gNetworkProtocol != netProtocolWas &&
-            (bdmIsUDPBDLoaded() || ethGetModulesLoaded() || udpfsGetModulesLoaded()))
+        // cleared live). If a stack is already up and the Start toggle changed the protocol away from
+        // the one actually running, the switch takes effect only after a restart -- say so instead of
+        // silently doing nothing. The OFFER to restart deliberately lives on the SAVE path and not
+        // here: this dialog only touches RAM, and Save Changes is a separate menu action, so acting
+        // on it now would tear OPL down before the choice was ever written to disk.
+        if (gNetworkProtocol != netProtocolWas && guiNetProtocolNeedsRestart())
             guiMsgBox(_l(_STR_NETBOOT_RESTART), 0, NULL);
 
         // A BDM tab can be latched hidden (bdmNeedsUpdate short-circuits until the device generation
@@ -1048,10 +1080,11 @@ void guiShowNetConfig(void)
         }
 
         // Each network transport loads its IOP module chain once per boot (the load latch is not cleared
-        // live). If any network stack is already up and the user changed protocol, the switch takes effect
-        // only after a restart -- say so instead of silently doing nothing.
-        if (gNetworkProtocol != netProtocolWas &&
-            (bdmIsUDPBDLoaded() || ethGetModulesLoaded() || udpfsGetModulesLoaded()))
+        // live). If a stack is already up and the user picked a protocol other than the one actually
+        // running, the switch takes effect only after a restart -- say so instead of silently doing
+        // nothing. The OFFER to restart lives on the SAVE path (see guiNetProtocolNeedsRestart), since
+        // this dialog only touches RAM and Save Changes is a separate menu action.
+        if (gNetworkProtocol != netProtocolWas && guiNetProtocolNeedsRestart())
             guiMsgBox(_l(_STR_NETBOOT_RESTART), 0, NULL);
 
         if (result == NETCFG_RECONNECT && gNetworkStartup < ERROR_ETH_SMB_CONN)
