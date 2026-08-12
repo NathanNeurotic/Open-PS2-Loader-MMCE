@@ -2259,7 +2259,20 @@ static void _saveConfig()
     // sprouted an unwanted folder on every save, and rewriting the notification to the mc?:
     // wildcard made the "Settings saved to %s" toast name the wrong place (fork gates this
     // identically; FifthFox HW 2026-07-16 is the incident this comment block cites elsewhere).
-    if (gBootDir[0] == '\0' && !strncmp(path, "mc", 2)) {
+    //
+    // ...and for a NETWORK boot, whose home is a card for exactly the same reason: it has no boot
+    // identity it can WRITE at boot time either. rebuild-143 moved that home onto the card and did
+    // not move the folder creation with it, so the per-file O_CREAT below opened into a directory
+    // that does not exist and every save failed with ENOENT -- reported as "could not write settings
+    // to mc0: (error 2)". The boot dir is NON-empty on that path, so the original gate never fired.
+    //
+    // This is not the FifthFox case, and the second half of the condition is what proves it: the
+    // folder is only ever created when the config home ALREADY IS a card. On a deferred boot it is
+    // one solely because tryAlternateDevice put it there, and only after sysCheckMC() found a card
+    // that was already serving this config. The incident being guarded against is a home that fell
+    // back to mc?:OPL BY ACCIDENT on a device that had a perfectly good home of its own; a network
+    // boot has no such home, which is exactly what _STR_SETTINGS_NO_HOME has always told the user.
+    if ((gBootDir[0] == '\0' || gBootHomeDeferred) && !strncmp(path, "mc", 2)) {
         checkMCFolder();
         configPrepareNotifications(gBaseMCDir);
     }
