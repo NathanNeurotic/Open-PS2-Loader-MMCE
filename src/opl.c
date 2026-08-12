@@ -415,6 +415,15 @@ static void itemExecToggleView(struct menu_item *curMenu)
     // back to root on a view toggle (the deferred rebuild below restores the plain device title).
     folderReset(support->mode);
     vcdToggleView(support->mode);
+
+    // Every cover already queued belongs to the view being discarded, and none of them will be
+    // cancelled on their own: the loader's per-row cancellation keys on a row having scrolled away,
+    // and here nothing scrolls -- the old rows keep being drawn until the rebuild below lands, so
+    // their stamps stay fresh. They are FIFO ahead of that rebuild and art shares the single ioman
+    // worker with it, so without this the device has to serve every cover of the OLD list before the
+    // NEW one can even be built. That is why the page took so long to become correct.
+    cacheDropQueuedArt();
+
     sfxPlay(SFX_CONFIRM);
     guiWarning(vcdViewActive(support->mode) ? _l(_STR_VCD_ON) : _l(_STR_VCD_OFF), 2);
     ioPutRequest(IO_MENU_UPDATE_DEFFERED, &support->mode);

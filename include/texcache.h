@@ -123,6 +123,19 @@ static inline void cacheCancelPendingImageLoads(void)
 {
 }
 
+// Abandon every cover ALREADY QUEUED, because the view they belong to is being thrown away.
+//
+// Distinct from the per-row cancellation inside the loader, which keys on a row having scrolled away
+// (its lastUsed stamp going stale). A view toggle discards every row at once WITHOUT any of them
+// scrolling, so the stamps stay fresh and not one of those covers is cancelled -- they sit FIFO
+// ahead of the list rebuild on the single shared IO worker, and the page cannot become correct until
+// the device has served every cover for the view being discarded.
+//
+// Re-armable, unlike cacheShutdownArtLoads() below: this is a normal in-session event. Cheap, and
+// safe from the GUI thread -- it takes no lock and touches one counter. Each dropped request
+// releases its cache slot properly on the way out.
+void cacheDropQueuedArt(void);
+
 // Stop servicing queued cover art for the rest of the process. TEARDOWN ONLY.
 //
 // Not an optimisation -- a launch-latency fix. ioBlockOpsTimed waits for the WHOLE ioman queue to

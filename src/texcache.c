@@ -14,6 +14,9 @@ typedef struct
     item_list_t *list;
     // only for comparison if the deferred action is still valid
     int cacheUID;
+    // Art epoch this request was queued in; a mismatch means the whole VIEW it belonged to is gone.
+    // See cacheDropQueuedArt().
+    unsigned int epoch;
     char *value;
 } load_image_request_t;
 
@@ -185,6 +188,24 @@ static void cacheClearItem(cache_entry_t *item, int freeTxt); // released below 
 // first theme load of every boot.
 static int gCacheLoadsCancelled = 0;
 
+// Art epoch. Bumped when the ENTIRE view a queue of covers belongs to is discarded, which the
+// per-row cancellation below cannot detect on its own.
+//
+// That cancellation drops a request whose row has scrolled away, keyed on entry->lastUsed going
+// stale. On an L3 ISO<->VCD toggle nothing scrolls: the old rows keep being drawn (which is why the
+// previous view's titles sit there looking stale) so every stamp keeps refreshing, and not one of
+// those now-pointless covers is cancelled. They are FIFO ahead of the IO_MENU_UPDATE_DEFFERED that
+// rebuilds the list, and art shares the single ioman worker with that rebuild -- so the page cannot
+// become correct until every cover for the view being thrown away has been read off the device
+// first. That is the whole "slow to be correct" symptom, and it is why the fork feels faster here:
+// its art runs on a dedicated thread and never sits in front of the rebuild.
+static unsigned int gArtEpoch = 0;
+
+void cacheDropQueuedArt(void)
+{
+    gArtEpoch++;
+}
+
 void cacheShutdownArtLoads(void)
 {
     gCacheLoadsCancelled = 1;
@@ -260,6 +281,18 @@ static void cacheLoadImage(void *data)
     // first; they cannot stop the stale reads existing.
     if ((u32)(guiFrameId - req->entry->lastUsed) > ART_CANCEL_STALE_FRAMES) {
         cacheClearItem(req->entry, 1); // frees any partial texture, drops qr, frees the slot
+        free(req);
+        return;
+    }
+
+    // WHOLE-VIEW cancellation, which the stamp test above cannot see. A view toggle discards every
+    // row at once WITHOUT any of them scrolling away, so their stamps stay fresh and each pointless
+    // cover would still be read. Same release as the stale case -- cacheClearItem drops qr and frees
+    // the slot, which is load-bearing: a slot left with qr set is invisible to both the read path and
+    // the eviction scan for the rest of the session, so freeing the request alone would quietly kill
+    // every cache slot the discarded view was using.
+    if (req->epoch != gArtEpoch) {
+        cacheClearItem(req->entry, 1);
         free(req);
         return;
     }
@@ -473,6 +506,7 @@ GSTEXTURE *cacheGetTexture(image_cache_t *cache, item_list_t *list, int *cacheId
         req->value = (char *)req + sizeof(load_image_request_t);
         strcpy(req->value, value);
         req->cacheUID = cache->nextUID;
+        req->epoch = gArtEpoch; // the view this cover belongs to; see cacheDropQueuedArt()
 
         cacheClearItem(oldestEntry, 1);
         oldestEntry->qr = req;
