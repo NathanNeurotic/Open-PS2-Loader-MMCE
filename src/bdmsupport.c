@@ -1708,7 +1708,7 @@ int bdmUpdateDeviceData(item_list_t *itemList)
     // So: if this slot already knows what it is and has published a list, a reappearance restores
     // the page and nothing else. Nothing about the device changed, so there is nothing to re-read.
     if (dir >= 0 && visible == 0 &&
-        pDeviceData->bdmDeviceRoot[0] != ' ' && pDeviceData->bdmDriver[0] != ' ' &&
+        pDeviceData->bdmDeviceRoot[0] != '\0' && pDeviceData->bdmDriver[0] != '\0' &&
         pDeviceData->bdmDeviceType != BDM_TYPE_UNKNOWN && pDeviceData->bdmULSizePrev != -2) {
         if (itemList->owner != NULL)
             ((opl_io_module_t *)itemList->owner)->menuItem.visible = 1;
