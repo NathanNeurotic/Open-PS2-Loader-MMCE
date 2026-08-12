@@ -1656,10 +1656,21 @@ int bdmUpdateDeviceData(item_list_t *itemList)
         fileXioDclose(dir);
         return 1;
     } else if (dir < 0 && visible == 1) {
-        // Device open failed while the page is showing. For a network-backed device (UDPBD/UDPFS) one
-        // missed poll is usually a transient stall, not a real removal -- debounce so the tab doesn't
-        // flicker away on a blip. Local devices (USB/SDC/ATA) hide on the first miss = a real unplug.
-        int hideThreshold = (pDeviceData->bdmDeviceType == BDM_TYPE_UDPBD) ? BDM_NET_HIDE_MISSES : 1;
+        // Device open failed while the page is showing. ONE missed poll is not evidence of removal
+        // on ANY transport, so every transport debounces now.
+        //
+        // Local devices used to hide on the FIRST miss, reasoning that a local Dopen only fails if
+        // the device is gone. Hardware disagrees: the reporter saw "the USB acted like it was
+        // replugged" twice in a session having touched nothing, and this branch is literally that --
+        // one failed Dopen hides the tab and plays the disconnect sound, then the next successful
+        // poll takes the visible == 0 path above, plays the connect sound, recreates folders,
+        // rescans THM/LNG and runs a FULL sbReadList. That rebuild is what the debug HUD caught as
+        // "Q19 A0": every row is reborn with cache_id -1, so the whole viewport's art is discarded
+        // and re-read behind a multi-second scan.
+        //
+        // A real unplug still hides one poll later (about a second) -- a far better trade than
+        // turning a single transient miss into a full device rescan.
+        int hideThreshold = (pDeviceData->bdmDeviceType == BDM_TYPE_UDPBD) ? BDM_NET_HIDE_MISSES : 2;
         if (++pDeviceData->bdmMissCount < hideThreshold) {
             LOG("bdmUpdateDeviceData: device %d miss %d/%d (debounce, keeping page)\n", itemList->mode, pDeviceData->bdmMissCount, hideThreshold);
             return 0; // within the grace window -- keep the page, re-poll next cycle
