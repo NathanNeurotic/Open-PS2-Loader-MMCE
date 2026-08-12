@@ -47,6 +47,30 @@ struct pad_data_t
 static u32 curtime = 0;
 static u32 time_since_last = 0;
 
+// PAD FAULT DISCRIMINATOR (debug HUD). A press is 60-100 ms, i.e. 4-6 frames, so losing one means
+// the pad buffer was empty across that WHOLE span -- a single bad frame cannot do it. Two very
+// different faults produce that, and we already compute the evidence every frame and discard it:
+//
+//   padRead() returned 0        -> freepad reported NOT READY. The sample never happened. That is
+//                                  SIO2 arbitration or the IOP's pad task running late, and it is
+//                                  worth building an instrumented freepad to chase.
+//   padRead() ok, paddata == 0  -> freepad reported READY and EMPTY. The sample WAS fresh and the
+//                                  button was not in it. No amount of code changes that; suspect the
+//                                  pad, cable, port or multitap.
+//
+// gPadMaxNotReadyRun is the longest consecutive run of the first; gPadReadyEmptyRun the longest run
+// of the second. Whichever climbs when a press goes missing names the half of the machine at fault.
+static u32 gPadNotReadyRun = 0, gPadMaxNotReadyRun = 0;
+static u32 gPadEmptyRun = 0, gPadMaxEmptyRun = 0;
+
+void padGetFaultCounters(u32 *maxNotReady, u32 *maxReadyEmpty)
+{
+    if (maxNotReady)
+        *maxNotReady = gPadMaxNotReadyRun;
+    if (maxReadyEmpty)
+        *maxReadyEmpty = gPadMaxEmptyRun;
+}
+
 static unsigned short pad_count;
 static struct pad_data_t pad_data[MAX_PADS];
 
@@ -376,6 +400,22 @@ static int readPad(struct pad_data_t *pad, int *pollClean)
         }
     }
 #endif
+    // DISCRIMINATOR (see the counters at the top of this file): a poll where nothing could be READ is
+    // a freepad-not-ready frame; a poll that read fine but carries no buttons is a fresh, EMPTY
+    // sample. Runs are what matter -- a press spans 4-6 frames, so only a RUN can swallow one.
+    if (padsRead == 0) {
+        gPadNotReadyRun++;
+        if (gPadNotReadyRun > gPadMaxNotReadyRun)
+            gPadMaxNotReadyRun = gPadNotReadyRun;
+    } else {
+        gPadNotReadyRun = 0;
+        if (newpdata == 0x0) {
+            gPadEmptyRun++;
+            if (gPadEmptyRun > gPadMaxEmptyRun)
+                gPadMaxEmptyRun = gPadEmptyRun;
+        } else
+            gPadEmptyRun = 0;
+    }
     if (padsRead > 0) {
         if (newpdata != 0x0) // something
             rcode = 1;

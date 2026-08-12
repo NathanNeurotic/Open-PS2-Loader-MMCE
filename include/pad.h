@@ -60,3 +60,9 @@ void padRumble(int durationMs, int large);
 void padRumbleFlush(void);
 
 #endif
+
+/** Debug HUD: longest run of polls where the pad could not be READ (freepad not ready -> SIO2 or
+ * IOP-side), and longest run of polls that read fine but carried no buttons (fresh, empty sample ->
+ * the press never reached freepad). Whichever grows when an input is lost names the fault's half.
+ */
+void padGetFaultCounters(u32 *maxNotReady, u32 *maxReadyEmpty);

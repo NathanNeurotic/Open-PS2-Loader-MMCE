@@ -2641,8 +2641,14 @@ static void guiDrawOverlays()
         // swallowed: OV climbing at that instant means the EE stalled (cause is EE-side); OV
         // standing still while the step is still lost means the EE polled on time and the
         // input died on the IOP.
-        snprintf(artdbg, sizeof(artdbg), "ART Q%d A%d R%d D%d %dms ok%dms  F%u/%u OV%u",
-                 q, a, r, d, lastMs, okMs, (unsigned)(fLast / 1000), (unsigned)(fWorst / 1000), (unsigned)fOver);
+        u32 padNR = 0, padEmpty = 0;
+        padGetFaultCounters(&padNR, &padEmpty);
+        // NR = longest run of polls freepad could not be read at all; MT = longest run of polls that
+        // read fine but were EMPTY. A press spans 4-6 frames, so a RUN >= 4 in either column is a
+        // swallowed press -- and which column it lands in decides where the fault lives.
+        snprintf(artdbg, sizeof(artdbg), "Q%d A%d D%d %dms  F%u/%u OV%u  NR%u MT%u",
+                 q, a, d, lastMs, (unsigned)(fLast / 1000), (unsigned)(fWorst / 1000), (unsigned)fOver,
+                 (unsigned)padNR, (unsigned)padEmpty);
         fntRenderString(gTheme->fonts[0], 8, screenHeight - 24, ALIGN_NONE, 0, 0, artdbg, GS_SETREG_RGBA(255, 255, 0, 128));
     }
 }
