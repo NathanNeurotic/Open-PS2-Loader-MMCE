@@ -89,6 +89,11 @@ void cacheInvalidateFailMemo(void)
 // setting. See the gate in cacheGetTexture for why this floor exists.
 #define ART_MIN_SETTLE_FRAMES 3
 
+// Frames a queued art request may go undrawn before the worker abandons it. Generous enough that a
+// brief hitch does not throw away a wanted load, short enough that a scroll's worth of superseded
+// covers never reaches the device.
+#define ART_CANCEL_STALE_FRAMES 20
+
 // Art requests currently sitting in the ioman queue. LOCK-FREE on purpose, and that is the whole
 // story of this counter: the first backpressure gate here called ioGetPendingRequestCount(), whose
 // WaitSema(gProcSemaId) blocks until the worker finishes draining the ENTIRE queue -- the worker
@@ -209,6 +214,23 @@ static void cacheLoadImage(void *data)
     // and it is NOT a rare path: background rescans rebuild lists while the user browses, so every
     // rebuild used to leak one of these per art load still in flight.
     if (req->cacheUID != req->entry->UID) {
+        free(req);
+        return;
+    }
+
+    // CANCELLATION. The queue is FIFO and a scroll enqueues a cover per row it passes, so by the
+    // time a request reaches the front the user has usually moved on -- and reading it anyway is
+    // both wasted device time and a PNG decode that preempts the priority-31 GUI/pad thread. Every
+    // frame a row is drawn while its load is pending, cacheGetTexture refreshes entry->lastUsed
+    // (above); a row that has scrolled away stops being drawn and its stamp goes stale. So a stale
+    // stamp means nobody is waiting for this image: drop it before it costs anything, and release
+    // the slot so the row that IS on screen can claim it.
+    //
+    // This is what "drop the old and immediately load the new" actually requires. Ordering fixes --
+    // running the visible cover next, promoting it in the queue -- only choose which stale read goes
+    // first; they cannot stop the stale reads existing.
+    if ((u32)(guiFrameId - req->entry->lastUsed) > ART_CANCEL_STALE_FRAMES) {
+        cacheClearItem(req->entry, 1); // frees any partial texture, drops qr, frees the slot
         free(req);
         return;
     }
@@ -351,9 +373,12 @@ GSTEXTURE *cacheGetTexture(image_cache_t *cache, item_list_t *list, int *cacheId
     } else if (*cacheId != -1) {
         cache_entry_t *entry = &cache->content[*cacheId];
         if (entry->UID == *UID) {
-            if (entry->qr)
+            if (entry->qr) {
+                // Still loading -- but mark it as still WANTED. This stamp is the only evidence the
+                // worker has that anyone is still looking at this row (see cacheLoadImage).
+                entry->lastUsed = guiFrameId;
                 return NULL;
-            else if (entry->lastUsed == 0) {
+            } else if (entry->lastUsed == 0) {
                 *cacheId = -2;
                 return NULL;
             } else {
