@@ -589,6 +589,23 @@ int readPads()
         for (i = 0; i < pad_count; ++i) {
             if (pad_data[i].needsInit && isPadReadyState(pad_data[i].state)) {
                 pad_data[i].needsInit = 0;
+
+                // ONLY re-initialise a pad that actually came back in the wrong MODE. A reconnect
+                // edge says the link flapped; it does not say the pad forgot it is a DualShock. If
+                // it is already in analog mode there is nothing to restore -- and running the init
+                // anyway spends a few hundred ms of polled waits ON THIS THREAD, the one that reads
+                // the pad, so it swallows the very input the user is giving.
+                //
+                // Hardware, and this is what sent me here: "clean, clean, clean, hold, one slot
+                // skipped, returns, repeats -- and it does not happen in 66". A periodic hold that
+                // eats exactly one input is this init; rebuild-66 has no deferred re-init at all,
+                // which is exactly why it does not do it. The mode read is EE-local and cheap; the
+                // init behind it is the expensive part, and now it runs only when it has something
+                // to fix.
+                if (padInfoMode(pad_data[i].port, pad_data[i].slot, PAD_MODECURID, 0) == PAD_TYPE_DUALSHOCK) {
+                    LOG("PAD port %d reconnect: already DualShock, skipping re-init\n", pad_data[i].port);
+                    break;
+                }
                 padIdleMs = 0;
                 initializePad(&pad_data[i]);
                 break;
