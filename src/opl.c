@@ -1368,6 +1368,17 @@ static int prepareCustomSettingsPath(char *path, int pathLen)
     return bdmResolveBootDir(path, pathLen, "", &bdmType);
 }
 
+// The boot device's filesystem cannot exist until AFTER the config has been read, because bringing
+// its transport up needs values THAT LIVE IN THAT CONFIG -- the PS2's static IP for every network
+// transport, plus server/share/user/password for SMB. That is a real bootstrap cycle, unlike a BDM
+// boot where loading a driver needs no configuration at all.
+//
+// Set from the boot TOKEN by resolveBootDirToMass(). Deliberately NOT named "is a network boot":
+// UDPBD and UDPFS-BD are BLOCK devices that mount as massN: exactly like USB, and their "udp" driver
+// token is unreadable until the transport is up -- so those boots are indistinguishable from a local
+// one here and correctly leave this at 0. See the classification branch for what that costs.
+static int gBootHomeDeferred = 0;
+
 static int tryAlternateDevice(int types)
 {
     char redirectPath[64];
@@ -1407,14 +1418,37 @@ static int tryAlternateDevice(int types)
         // good: read-old, write-new, self-migrating. The load toast names the boot device rather
         // than the card on the one boot that reads legacy -- the save-location toast telling the
         // truth matters more, and after the first save the two agree anyway.
+        int homeLeftOnCard = 0;
         if (sysCheckMC() >= 0) {
             configSetMove(NULL); // point the config files at the legacy mc?:OPL home
             value = configReadMulti(types);
-            configSetMove(gBootDir); // home (and notifications) back on the boot dir: saves self-migrate
+
+            // SELF-MIGRATION IS WRONG WHEN THE BOOT DEVICE CANNOT BE READ AT BOOT. The move-back
+            // below is what makes this fallback self-retiring on a BDM boot: read the old card copy
+            // once, write the next save beside the ELF, never look at the card again. On a network
+            // boot it does the opposite of what it promises -- the read above SUCCEEDS (the card is
+            // readable with no network at all), and then the home is moved onto a share that cannot
+            // be mounted until the config has already been read. The next save goes there, the next
+            // boot cannot see it, and the card copy it falls back to is now stale. That is precisely
+            // the "settings save but never load back" report from network booters.
+            //
+            // So for a deferred-home boot the card KEEPS the home: it is the only place that is both
+            // writable and readable at boot time, and configSetMove(NULL) has already pointed the
+            // notifications there too. Nothing new is written and no card is touched that was not
+            // already serving this config -- sysCheckMC() gated the whole branch.
+            if (gBootHomeDeferred)
+                homeLeftOnCard = 1;
+            else
+                configSetMove(gBootDir); // home (and notifications) back on the boot dir: saves self-migrate
+
             if (value & CONFIG_OPL)
                 return value;
         }
-        configPrepareNotifications(gBootDir);
+        // Only re-point at the boot dir if the home is actually still there. When the card kept it
+        // above, saying "boot dir" would make the save-location toast name a device that is not the
+        // save location -- and a truthful toast is the entire point of this call.
+        if (!homeLeftOnCard)
+            configPrepareNotifications(gBootDir);
         showCfgPopup = 0;
         return 0;
     }
@@ -1485,6 +1519,7 @@ static char gBootElfName[64];
 // resolveBootDirToMass(); consumed by the _saveConfig re-resolve retry.
 static int gBootDirBdmType = BDM_TYPE_UNKNOWN;
 
+
 static void resolveBootDirToMass(void)
 {
     if (gBootDir[0] == '\0')
@@ -1515,6 +1550,33 @@ static void resolveBootDirToMass(void)
     // device stacks), so mmceN: is unreadable exactly when settings must load. Load it (idempotent)
     // and give the card a moment to register its filesystem. mmceN: IS the readable namespace, so no
     // prefix rewrite is needed.
+    // NETWORK BOOT. smb0: (ethsupport's ethBase) and udpfs: (udpfssupport's udpfsBase) are the two
+    // network filesystems OPL can be launched from, and neither can be mounted before the config is
+    // read: the transport needs the static IP -- and SMB the server, share, user and password --
+    // which is exactly what we are trying to read. Nothing to resolve, so leave the boot identity
+    // completely alone and just record WHY it is unreadable.
+    //
+    // Shaped like the mmce branch below (plain return, identity preserved), NOT like the hdd/cdrom
+    // branches above that blank gBootDir and re-home to configInit(NULL): blanking here would drop
+    // this boot into legacy discovery and hand the config home to a plain memory card the user never
+    // named, which is the FifthFox hazard those branches exist to avoid everywhere else.
+    //
+    // The flag's whole job is to let tryAlternateDevice tell "the device is down" apart from "there
+    // is no config", so it can stop self-migrating the home onto a device that can never be read at
+    // boot. Without it, that fallback reads the user's settings off the memory card correctly and
+    // then moves the home back onto the share -- so the next save lands somewhere the next boot
+    // cannot see, which is exactly the "my settings save but never load" report.
+    //
+    // NOT covered, and it cannot be: a UDPBD / UDPFS-BD boot arrives as "massN:/OPL", byte-identical
+    // to a USB one. Its only distinguishing evidence is the BDM driver token "udp", which needs the
+    // udpbd stack, which needs the static IP from the unreadable config. Those boots fall through to
+    // the ordinary massN: resolve, fail to mount, and keep gBootDir -- today's behaviour, unchanged.
+    if (!strncmp(gBootDir, "smb", 3) || !strncmp(gBootDir, "udpfs", 5)) {
+        LOG("BOOT network boot dir %s -> config home deferred (mc untouched)\n", gBootDir);
+        gBootHomeDeferred = 1;
+        return;
+    }
+
     if (!strncmp(gBootDir, "mmce", 4)) {
         // NOTE(rebuild): mmceLoadModules() is still the no-op stub here (MMCE is checklist items 1-3,
         // on WAIT), so the driver never loads and the opendir poll below always times out. That lands
