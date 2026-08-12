@@ -1786,6 +1786,22 @@ static void _loadConfig()
             gEnableBdmHDD = 1;
             configSetInt(configGetByType(CONFIG_OPL), CONFIG_OPL_ENABLE_BDMHDD, gEnableBdmHDD);
         }
+
+        // The same reconcile for MX4SIO, which rebuild-135 is what made necessary. Before 135 the
+        // resolver loaded mx4sio_bd in its FIRST pass, so an MX4SIO boot device was found by the cheap
+        // round like any USB stick. Now it can only be found by the ESCALATION round, which -- exactly
+        // like the ATA stack above -- force-loads the transport while ignoring every gEnable* flag,
+        // because those flags live in the config this resolve exists to make readable in the first
+        // place. That puts MX4SIO in the identical category as ATA and it needs the identical repair:
+        // otherwise a user who boots OPL off the SD card but whose config has MX4SIO off -- including
+        // anyone whose config could not be read at all, since setDefaults ships gEnableMX4SIO = 0 --
+        // gets no tab for the very device they booted from, and the next save persists that
+        // contradiction. No new SIO2 exposure: on this path mx4sio_bd is already resident, because it
+        // is what served the config.
+        if (gBootDirBdmType == BDM_TYPE_SDC && !gEnableMX4SIO) {
+            gEnableMX4SIO = 1;
+            configSetInt(configGetByType(CONFIG_OPL), CONFIG_OPL_ENABLE_MX4SIO, gEnableMX4SIO);
+        }
     }
 
     if (lscstatus & CONFIG_NETWORK) {
