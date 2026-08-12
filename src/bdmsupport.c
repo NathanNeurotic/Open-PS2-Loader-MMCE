@@ -1914,8 +1914,21 @@ int bdmResolveBootDir(char *bootDir, int bootDirSize, const char *elfName, int *
     if (filterType != BDM_TYPE_UNKNOWN) {
         bdmEnsureTransportLoaded(filterType);
     } else {
+        // USB ONLY at first pass; MX4SIO waits for the escalation below.
+        //
+        // mx4sio_bd is an SD-card driver on SIO2 -- THE PAD'S OWN BUS -- and once loaded it is
+        // resident for the session: mx4sioModLoaded latches and no unload path exists. Turning
+        // MX4SIO Off in settings afterwards cannot undo it, and this resolver ignores that flag by
+        // design. So every untyped massN: boot -- which is every ordinary USB boot -- has been
+        // running with an SD driver resident on the pad's bus.
+        //
+        // rebuild-66 never reaches this resolver at all (its setDefaults clears gBootDir before
+        // configInit), and uOPL has no resolver and loads MX4SIO only when the user enables it.
+        // Both are hardware-clean; this fork drops navigation inputs in every menu with the EE
+        // provably at 60 Hz. This is the only source-proven HEAD-only difference that touches SIO2.
+        //
+        // Deferring costs a USB booter nothing and an MX4SIO booter one extra scan round.
         bdmEnsureTransportLoaded(BDM_TYPE_USB);
-        bdmEnsureTransportLoaded(BDM_TYPE_SDC);
     }
     SignalSema(bdmLoadModuleLock);
 
@@ -1982,6 +1995,7 @@ int bdmResolveBootDir(char *bootDir, int bootDirSize, const char *elfName, int *
                 // escalation: the remaining transports, with extra budget for ATA spin-up.
                 escalated = 1;
                 WaitSema(bdmLoadModuleLock);
+                bdmEnsureTransportLoaded(BDM_TYPE_SDC); // MX4SIO, deferred from the first pass above
                 bdmEnsureTransportLoaded(BDM_TYPE_ILINK);
                 bdmEnsureTransportLoaded(BDM_TYPE_ATA);
                 SignalSema(bdmLoadModuleLock);
