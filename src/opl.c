@@ -1775,32 +1775,66 @@ static void _loadConfig()
             configGetStrCopy(configOPL, CONFIG_OPL_DEFAULT_BGM_PATH, gDefaultBGMPath, sizeof(gDefaultBGMPath));
         }
 
-        // Boot-device reconcile: OPL just booted from an internal exFAT (BDM-ATA) HDD -- the resolve
-        // step force-loaded the ATA stack to read this very config -- yet the config says that HDD's
-        // page is disabled, so the device OPL booted from would have no tab and the next save would
-        // persist it off again. Runs whether or not a config file was found, AFTER the read so the
-        // file cannot overwrite it, and persists so the state stops being contradictory. (The fork
-        // reconciles here identically; setting the flag inside bdmResolveBootDir instead is
-        // ineffective, because it runs before this read.)
-        if (gBootDirBdmType == BDM_TYPE_ATA && !gEnableBdmHDD) {
-            gEnableBdmHDD = 1;
-            configSetInt(configGetByType(CONFIG_OPL), CONFIG_OPL_ENABLE_BDMHDD, gEnableBdmHDD);
-        }
+        // BOOT-DEVICE RECONCILE. The device OPL is RUNNING FROM always has its transport enabled.
+        //
+        // This existed for ATA alone, and rebuild-137b bolted MX4SIO on beside it. Both were the same
+        // rule written twice, and writing it twice is what hid the fact that the two commonest
+        // transports had no rule at all. The reasoning was never ATA-specific: the resolve step
+        // force-loads whatever transport the boot prefix needs while IGNORING every gEnable* flag -- it
+        // has to, because those flags live in the config the resolve exists to make readable -- so the
+        // flag has to be repaired AFTER the read or the device OPL booted from has no tab, and the next
+        // save persists the contradiction.
+        //
+        // What that omission actually cost: setDefaults ships gEnableUSB = 0 ("opt-in, like the other
+        // BDM transports"), so a USB boot whose config is fresh, missing or unreadable came up with
+        // gEnableUSB still 0. bdmUpdateDeviceData's publish gate then reads
+        // bdmTransportEnabled(BDM_TYPE_USB) == 0 and WITHHOLDS the page -- no tab for the stick OPL is
+        // running from, on the most common setup there is. Same for iLink. The MX4SIO report is what
+        // exposed this, but it was never an MX4SIO bug.
+        //
+        // Runs whether or not a config file was found, AFTER the read so the file cannot overwrite it,
+        // and persists so the state stops being contradictory. Setting these inside bdmResolveBootDir
+        // instead is ineffective -- it runs before this read.
+        //
+        // Deliberately NOT touched here:
+        //   - gBDMStartMode. This grants the TRANSPORT, not a tab. Config IO reaches massN: directly
+        //     and does not need the device page, so "I boot from this stick but browse games on the
+        //     HDD only" stays a valid, respected choice. Forcing Auto would overrule it.
+        //   - BDM_TYPE_UDPBD. bdmResolveBootDir returns -1 for it without ever resolving (a network
+        //     block device has no local mount at config-load time), and gEnableUDPBD is NIC-exclusive
+        //     with the SMB/ETH stack -- forcing it on could tear down a working SMB session to serve a
+        //     boot device that was never resolved in the first place.
+        {
+            const char *bootDevKey = NULL;
+            int *bootDevFlag = NULL;
 
-        // The same reconcile for MX4SIO, which rebuild-135 is what made necessary. Before 135 the
-        // resolver loaded mx4sio_bd in its FIRST pass, so an MX4SIO boot device was found by the cheap
-        // round like any USB stick. Now it can only be found by the ESCALATION round, which -- exactly
-        // like the ATA stack above -- force-loads the transport while ignoring every gEnable* flag,
-        // because those flags live in the config this resolve exists to make readable in the first
-        // place. That puts MX4SIO in the identical category as ATA and it needs the identical repair:
-        // otherwise a user who boots OPL off the SD card but whose config has MX4SIO off -- including
-        // anyone whose config could not be read at all, since setDefaults ships gEnableMX4SIO = 0 --
-        // gets no tab for the very device they booted from, and the next save persists that
-        // contradiction. No new SIO2 exposure: on this path mx4sio_bd is already resident, because it
-        // is what served the config.
-        if (gBootDirBdmType == BDM_TYPE_SDC && !gEnableMX4SIO) {
-            gEnableMX4SIO = 1;
-            configSetInt(configGetByType(CONFIG_OPL), CONFIG_OPL_ENABLE_MX4SIO, gEnableMX4SIO);
+            switch (gBootDirBdmType) {
+                case BDM_TYPE_USB:
+                    bootDevKey = CONFIG_OPL_ENABLE_USB;
+                    bootDevFlag = &gEnableUSB;
+                    break;
+                case BDM_TYPE_ILINK:
+                    bootDevKey = CONFIG_OPL_ENABLE_ILINK;
+                    bootDevFlag = &gEnableILK;
+                    break;
+                case BDM_TYPE_SDC:
+                    bootDevKey = CONFIG_OPL_ENABLE_MX4SIO;
+                    bootDevFlag = &gEnableMX4SIO;
+                    break;
+                case BDM_TYPE_ATA:
+                    bootDevKey = CONFIG_OPL_ENABLE_BDMHDD;
+                    bootDevFlag = &gEnableBdmHDD;
+                    break;
+                default:
+                    break;
+            }
+
+            if (bootDevFlag != NULL && !*bootDevFlag) {
+                LOG("CONFIG boot device is BDM type %d but its transport was off -- enabling %s\n",
+                    gBootDirBdmType, bootDevKey);
+                *bootDevFlag = 1;
+                configSetInt(configGetByType(CONFIG_OPL), bootDevKey, *bootDevFlag);
+            }
         }
     }
 
