@@ -2821,12 +2821,25 @@ int gDeinitTerminal = 0;
 // console is going away. A LAUNCH gets ~10 s: a healthy slow device drains well under that, but a
 // wedged art read must not freeze the loading screen forever, and a straggler request cannot
 // survive the handoff target's own IOP reset anyway (ee_core / Neutrino / POPSTARTER all reset it).
-#define EXIT_IO_DRAIN_TICKS   1000
-#define LAUNCH_IO_DRAIN_TICKS 10000
+//
+// ⚠ THE UNITS ARE NOT MILLISECONDS. ioBlockOpsTimed spends one delay(1) per tick, and delay() is a
+// NOP spin of 0x01000000 iterations x 4 nops (util.c) -- about a QUARTER SECOND on a 294 MHz EE, not
+// a millisecond. The old values were written as if they were ms, so the "~10 s" launch budget above
+// was really on the order of forty MINUTES and the "1 s" exit budget several minutes. Neither was a
+// bound in any sense that mattered; a launch pressed with covers queued simply waited for all of
+// them. Values below are the ORIGINAL INTENT expressed in real ticks. If delay() is ever given a
+// real time base, convert these with it -- do not just scale the numbers again.
+#define EXIT_IO_DRAIN_TICKS   4  // ~1 s
+#define LAUNCH_IO_DRAIN_TICKS 40 // ~10 s, as the paragraph above always meant
 
 void deinitEx(int exception, int modeSelected, int modeSelected2)
 {
     gDeinitTerminal = (modeSelected == IO_MODE_SELECTED_ALL || modeSelected == IO_MODE_SELECTED_NONE);
+
+    // Give up on the covers still QUEUED before draining. The drain waits on the ioman LIST, and the
+    // worker keeps servicing it regardless of isIOBlocked, so without this the handoff pays for every
+    // queued cover to be read off the game device first -- for a menu guiEnd() is about to destroy.
+    cacheCancelPendingImageLoads();
 
     // block all io ops, wait for the ones still running to finish (BOUNDED -- see the note above)
     ioBlockOpsTimed(1, gDeinitTerminal ? EXIT_IO_DRAIN_TICKS : LAUNCH_IO_DRAIN_TICKS);
@@ -2858,6 +2871,11 @@ void deinitEx(int exception, int modeSelected, int modeSelected2)
 void deinit(int exception, int modeSelected)
 {
     gDeinitTerminal = (modeSelected == IO_MODE_SELECTED_ALL || modeSelected == IO_MODE_SELECTED_NONE);
+
+    // Give up on the covers still QUEUED before draining. The drain waits on the ioman LIST, and the
+    // worker keeps servicing it regardless of isIOBlocked, so without this the handoff pays for every
+    // queued cover to be read off the game device first -- for a menu guiEnd() is about to destroy.
+    cacheCancelPendingImageLoads();
 
     // block all io ops, wait for the ones still running to finish (BOUNDED -- see the note above)
     ioBlockOpsTimed(1, gDeinitTerminal ? EXIT_IO_DRAIN_TICKS : LAUNCH_IO_DRAIN_TICKS);

@@ -180,6 +180,14 @@ GSTEXTURE *cacheLookupTexture(image_cache_t *cache, int *cacheId, int *UID)
 
 static void cacheClearItem(cache_entry_t *item, int freeTxt); // released below on a transient failure
 
+// Set once, at teardown, by cacheCancelPendingImageLoads(). See texcache.h for the full reasoning.
+static int gCacheLoadsCancelled = 0;
+
+void cacheCancelPendingImageLoads(void)
+{
+    gCacheLoadsCancelled = 1;
+}
+
 // Io handled action...
 static void cacheLoadImage(void *data)
 {
@@ -193,6 +201,25 @@ static void cacheLoadImage(void *data)
     // Safeguards...
     if (!req)
         return;
+
+    // TEARDOWN. OPL is on its way out, and this cover is for a menu guiEnd() is about to destroy --
+    // reading it would spend a device access and a PNG decode on a texture nobody will ever draw.
+    // The queue still has to be WALKED, because ioBlockOpsTimed waits on the LIST and the worker
+    // keeps servicing it regardless of isIOBlocked; but walking it now costs a free() per entry
+    // instead of a read off the game device. That is the whole difference between a launch that
+    // hands off immediately and one that first pays for every cover the user scrolled past.
+    // Placed after the !req guard so the pointer is known good, before every other check so nothing
+    // can slip past it, and before the gArtActiveCount++ below like all the other early-outs.
+    //
+    // Leaves entry->qr pointing at the freed request, exactly as the UID-mismatch early-out below
+    // already does. Checked rather than assumed: qr is only ever ASSIGNED or NULL-TESTED (texcache.c
+    // 174, 301, 335, 397, 441, 470) and never dereferenced, so a stale one cannot fault -- at worst
+    // it makes a slot read as "still loading" to a GUI that is being torn down in the next breath.
+    // Clearing it here is not possible anyway: req->entry is not yet known non-NULL at this point.
+    if (gCacheLoadsCancelled) {
+        free(req);
+        return;
+    }
 
     // Every early-out below must FREE the request. It is a single allocation (the struct with its
     // value string appended), owned solely by this handler once ioPutRequest accepted it, and the

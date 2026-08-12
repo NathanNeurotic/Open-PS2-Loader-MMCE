@@ -93,10 +93,14 @@ void cacheInvalidateFailMemo(void);
  */
 int cacheHasPendingArt(void);
 
-// STUB (rebuild): drain/abort hooks for the fork's THREADED art cache. This rebuild runs the
-// official SYNCHRONOUS cache -- nothing is ever pending or in-flight -- so "drained" is always
-// exactly true. If a threaded cache ever returns (checklist item 45 territory), these must
-// become the real implementations again.
+// STUB (rebuild): the fork's THREADED art cache had its own worker to drain, which this rebuild does
+// not have. These two keep returning "drained" because there is no such thread here.
+//
+// ⚠ Their old comment claimed "nothing is ever pending or in-flight" and that was WRONG -- it is
+// contradicted three lines up by cacheHasPendingArt(). Art here is not synchronous: cacheLoadImage is
+// an IOMAN HANDLER and every cover is a queued request on the shared IO worker. Only the fork's
+// dedicated art THREAD is missing. That stale sentence is why the pending queue went unaccounted for
+// at teardown; do not restore it.
 static inline int cacheAbortMmceImageLoadsTimed(int waitTicks)
 {
     (void)waitTicks;
@@ -107,8 +111,17 @@ static inline int cacheCancelPendingImageLoadsTimed(int waitTicks)
     (void)waitTicks;
     return 1;
 }
-static inline void cacheCancelPendingImageLoads(void)
-{
-}
+
+// Give up on every cover still QUEUED, instead of reading it off the device first.
+//
+// Not an optimisation -- a launch-latency fix. ioBlockOpsTimed waits for the WHOLE ioman queue to
+// drain, and isIOBlocked only stops NEW requests being accepted; the worker keeps servicing
+// everything already queued. So a launch pressed while covers are in flight pays for every one of
+// them to be read off the game device before the IOP reset -- for a menu guiEnd() is about to
+// destroy. On a slow transport (MX4SIO's SD over SIO2) that IS the wait.
+//
+// Sticky by design: every deinit()/deinitEx() caller hands off to another ELF and never returns to a
+// live menu, so there is nothing to re-arm for.
+void cacheCancelPendingImageLoads(void);
 
 #endif
