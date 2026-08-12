@@ -1581,6 +1581,31 @@ int bdmUpdateDeviceData(item_list_t *itemList)
         pDeviceData->bdmMissCount = 0;
 
     // If we opened the device and the menu isn't visible (OR is visible but hasn't been initialized ex: manual device start) initialize device info.
+    // A device that went away and came RIGHT BACK, identity intact, is a stall -- not a new device.
+    // Tell them apart before doing anything drastic.
+    //
+    // Hardware (a second tester, whose art pipeline is provably IDLE at the moment of the fault --
+    // "ART Q0 A0 R0 D24, 3ms"): the menu hangs and, in his words, "it is like it unplugged and
+    // plugged in". It is exactly that: the presence Dopen fails for a poll or two, the page hides,
+    // and the recovery below treats the return as a FIRST sight of the device -- wiping the
+    // identity, re-running the driver ioctls, recreating folders, rescanning THM/LNG and forcing a
+    // full sbReadList of the entire library. THAT rebuild is the hang, and it also wipes every
+    // row's cache ids, which is why art dies alongside it. His empty art queue is what proves the
+    // fault lives here and not in the art path.
+    //
+    // So: if this slot already knows what it is and has published a list, a reappearance restores
+    // the page and nothing else. Nothing about the device changed, so there is nothing to re-read.
+    if (dir >= 0 && visible == 0 &&
+        pDeviceData->bdmDeviceRoot[0] != ' ' && pDeviceData->bdmDriver[0] != ' ' &&
+        pDeviceData->bdmDeviceType != BDM_TYPE_UNKNOWN && pDeviceData->bdmULSizePrev != -2) {
+        if (itemList->owner != NULL)
+            ((opl_io_module_t *)itemList->owner)->menuItem.visible = 1;
+        pDeviceData->bdmMissCount = 0;
+        LOG("bdmUpdateDeviceData: device %d reappeared intact -- restoring page, no rescan\n", itemList->mode);
+        fileXioDclose(dir);
+        return 0; // "nothing changed": no connect sound, no folder pass, no sbReadList
+    }
+
     if (dir >= 0 && (visible == 0 || pDeviceData->bdmDeviceRoot[0] == '\0' || pDeviceData->bdmDriver[0] == '\0' || pDeviceData->bdmDeviceType == BDM_TYPE_UNKNOWN)) {
         snprintf(pDeviceData->bdmDeviceRoot, sizeof(pDeviceData->bdmDeviceRoot), "mass%d:", itemList->mode);
         bdmBuildGamePrefix(pDeviceData->bdmPrefix, sizeof(pDeviceData->bdmPrefix), pDeviceData->bdmDeviceRoot);
