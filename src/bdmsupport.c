@@ -578,8 +578,32 @@ static int bdmNeedsUpdate(item_list_t *itemList)
     }
     pDeviceData->bdmDeviceTick = BdmGeneration;
 
-    if (bdmShouldQueueModuleLoad())
-        ioPutRequest(IO_CUSTOM_SIMPLEACTION, &bdmLoadBlockDeviceModules);
+    // ONE module-load attempt per device GENERATION, not one per rescan pass.
+    //
+    // bdmShouldQueueModuleLoad() is true while any ENABLED transport is not loaded, and
+    // bdmLoadBlockDeviceModules sets its loaded latch only on SUCCESS. So a transport that is enabled
+    // but cannot load -- BDM HDD with no drive, MX4SIO with no card, a stick that failed to attach --
+    // queued a fresh attempt on EVERY pass, forever. The background rescan driving those passes is
+    // gated on longIdle, i.e. it begins the moment the user stops moving, so the symptom is: settle
+    // on a game and the loading spinner never clears, because the ioman queue is never observed
+    // empty. Anything the user asks for then waits behind it -- which is why leaving the game-settings
+    // screen could take seconds.
+    //
+    // ATA made it expensive as well as endless: its failure arm deliberately clears
+    // hddModulesLoadCount so a later attempt is not poisoned (Vapor's report), so every pass re-ran
+    // sysInitDev9() plus the whole atad/xhdd load.
+    //
+    // Keying on BdmGeneration keeps that retryability exactly where it was wanted and removes it where
+    // it was not. The generation moves on a REAL device event -- bdmEventHandler's hotplug, or
+    // bdmForceDeviceRefresh() when Device Settings are applied -- so plugging the drive in, or
+    // toggling the transport, still gets an immediate retry. Sitting idle no longer buys one.
+    static unsigned int lastModuleLoadGen = (unsigned int)-1;
+    if (bdmShouldQueueModuleLoad() && lastModuleLoadGen != BdmGeneration) {
+        // Stamp only on an ACCEPTED request, so one rejected during a teardown block retries on the
+        // next pass instead of being silently skipped until the next hotplug.
+        if (ioPutRequest(IO_CUSTOM_SIMPLEACTION, &bdmLoadBlockDeviceModules) == IO_OK)
+            lastModuleLoadGen = BdmGeneration;
+    }
 
     // Check if the device has been connected or removed.
     result = bdmUpdateDeviceData(itemList);
