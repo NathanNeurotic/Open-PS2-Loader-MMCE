@@ -1060,6 +1060,57 @@ void bdmLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
     if (bdmTryNeutrinoLaunch(itemList, game, pDeviceData, configSet))
         return;
 
+    // NATIVE PATH ONLY, and it must be refused HERE if it cannot possibly finish.
+    //
+    // Everything below ends in the driver-token dispatch at the bottom of this function -- usb /
+    // sd+ilink / sdc+mx4sio / ata -- which has NO default branch, and which runs AFTER deinit() has
+    // torn the UI down. A device whose identity was never readable matches none of them: the launch
+    // then simply RETURNS into a deinit'd OPL, and the user is left staring at a black screen with a
+    // stuck loading icon until they reset the console. That is exactly what MX4SIO did after
+    // rebuild-135 deferred its transport load past the first device poll, and bdmUpdateDeviceData
+    // publishes such a slot quite happily: it fills bdmPrefix before the identity ioctl and treats an
+    // unclassifiable transport as "never force-hide", so the games list and browse fine.
+    //
+    // Neutrino already refuses the same case while the menu is still alive (sysNeutrinoPreflight's
+    // "unsupported device" stop); the native leg had no equivalent. The test is written as the exact
+    // negation of the dispatch chain rather than as a device-type check, so the two cannot drift apart.
+    //
+    // bdmEnumerateDevices now waits for an enabled MX4SIO to answer that ioctl before any page polls,
+    // so this should be unreachable. It is here to make "should" cost a message box instead of a dead
+    // console -- and it also closes the udp hole the Neutrino helper's own comment warns about.
+    if (!bdmDriverIsUSB(pDeviceData->bdmDriver) && !bdmDriverIsIlink(pDeviceData->bdmDriver) &&
+        !bdmDriverIsMx4sio(pDeviceData->bdmDriver) && !bdmDriverIsATA(pDeviceData->bdmDriver)) {
+        LOG("BDMSUPPORT launch aborted: device %d has no natively launchable driver token ('%s')\n",
+            itemList->mode, pDeviceData->bdmDriver);
+        if (gAutoLaunchBDMGame == NULL)
+            guiMsgBox(_l(_STR_ERR_FILE_INVALID), 0, NULL);
+        return;
+    }
+
+    // Same dead end, reached by the OTHER half of the identity pass. USBMASS_IOCTL_GET_DEVICE_NUMBER
+    // is allowed to fail on its own (bdmUpdateDeviceData only LOGs it and publishes anyway -- some USB
+    // drives genuinely do not answer it), which leaves massDeviceIndex at -1. Nothing ever retries it:
+    // the identity re-entry gate tests the root, the driver token and the device TYPE, but never the
+    // index, so a slot that missed only this ioctl is latched at -1 until the console is rebooted.
+    //
+    // A -1 index is not a cosmetic gap. bdmSetLaunchDeviceBinding assigns it to settings->bdDeviceId,
+    // which is a u32 (modules/iopcore/common/cdvd_config.h:82), so it reaches the IOP as 0xFFFFFFFF.
+    // The in-game matcher requires bd->devNr == bdDeviceId (modules/iopcore/cdvdman/device-bdm.c:57-59),
+    // no real device can ever equal that, so g_bd is never attached, bdm_io_sema is never signalled and
+    // the game blocks on it FOREVER: the same black screen with a stuck loading icon, except this one
+    // cannot self-heal at all.
+    //
+    // ATA is deliberately exempt: its cdvdman exposes one synthetic "ata" block device and binds by
+    // driver token alone (the USE_BDM_ATA branch in the same matcher), so an ATA launch is unharmed by
+    // a missing device number and must not be blocked here.
+    if (pDeviceData->massDeviceIndex < 0 && !bdmDriverIsATA(pDeviceData->bdmDriver)) {
+        LOG("BDMSUPPORT launch aborted: device %d ('%s') never reported a device number\n",
+            itemList->mode, pDeviceData->bdmDriver);
+        if (gAutoLaunchBDMGame == NULL)
+            guiMsgBox(_l(_STR_ERR_FILE_INVALID), 0, NULL);
+        return;
+    }
+
     char vmc_name[32], vmc_path[256], have_error = 0;
     int vmc_id, size_mcemu_irx = 0;
     bdm_vmc_infos_t bdm_vmc_infos;
@@ -1525,6 +1576,38 @@ void bdmEnumerateDevices()
 
     // Initialize the device list data if it hasn't been initialized yet.
     bdmInitDevicesData();
+
+    // MX4SIO must be loaded AND MOUNTED before anything asks a mass slot who it is.
+    //
+    // rebuild-135 took mx4sio_bd out of bdmResolveBootDir's first pass, and that must stay gone: it is
+    // an SD driver on SIO2 -- the pad's own bus -- and leaving it resident there swallowed navigation
+    // input in every menu (#340, hardware-confirmed). But the resolver was also the only place that
+    // ever loaded MX4SIO *synchronously*. It ran before the first config read, so the card was mounted
+    // long before any device page existed; without it the load rides the queued
+    // bdmLoadBlockDeviceModules below and now lands WHILE those pages are already polling.
+    //
+    // That window is not survivable, because a mass slot is published from bdmUpdateDeviceData the
+    // moment fileXioDopen("massN:/") answers -- which can be BEFORE the block device can answer
+    // USBMASS_IOCTL_GET_DRIVERNAME. The page then carries an empty driver token, and an empty token
+    // matches no branch of the launch dispatch at the bottom of bdmLaunchGame: that path deinit()s the
+    // UI and returns without ever reaching sysLaunchLoaderElf. That is precisely the black screen with
+    // the stuck loading icon MX4SIO users hit after 135, and the identity churn behind it is what
+    // starved their cover art.
+    //
+    // gEnableMX4SIO is knowable HERE and nowhere earlier: this runs from initAllSupport, i.e. from
+    // applyConfig at the tail of _loadConfig, AFTER configReadMulti -- whereas the resolver runs inside
+    // _loadConfig before that first read, which is exactly why the flag could not be honoured there.
+    // bdmEnsureSourceModules force-loads the transport and then waits for a device of that type to
+    // answer the identity ioctl (bdmGetDeviceRootByType), so returning from it means the slot CAN be
+    // asked who it is. It latches on mx4sioModLoaded, so the wait is paid at most once per session and
+    // a later settings-apply pass returns immediately.
+    //
+    // Both gates are load-bearing. The start-mode gate keeps an SD driver off SIO2 for anyone not
+    // browsing BDM games at all, and it is also what guarantees the bdm core is up: initSupport only
+    // reaches bdmInit -> bdmLoadModules when the start mode is not DISABLED, and mx4sio_bd cannot mount
+    // without bdm.irx + bdmfs_fatfs underneath it.
+    if (gEnableMX4SIO && bdmEffectiveStartMode() != START_MODE_DISABLED)
+        bdmEnsureSourceModules(BDM_TYPE_SDC, 2000);
 
     // Because bdmLoadModules is called before the config file is loaded bdmLoadBlockDeviceModules will not have loaded any
     // optional bdm modules. Now that the config file has been loaded try loading any optional modules that weren't previously loaded.
