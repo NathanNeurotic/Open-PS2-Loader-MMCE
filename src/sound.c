@@ -505,7 +505,25 @@ void sfxPlay(int id)
 /*--    Theme Background Music    -------------------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------------------------------------------------*/
 
-#define BGM_RING_BUFFER_COUNT 16
+// Ring DEPTH is the only defence this decoder has against being preempted, and 16 slots was not
+// enough (#364: "slight stutter every time I scroll through the game list one by one").
+//
+// The arithmetic: 4096-byte slots of 44.1 kHz 16-bit stereo = 176400 bytes/sec, so 16 slots is 64 KB
+// ~= 372 ms of audio. bgmIoThread does a BLOCKING ov_read off the theme's sound/bgm.ogg on the game
+// device, and both BGM threads run at 0x40/0x41 -- far below the ioman worker (30) and the GUI (31),
+// since on the EE a LOWER number wins. Scrolling queues a cover per row onto that same worker, so
+// each scroll step can hold the decoder off; any stall longer than the cushion is an audible gap,
+// and on a slow device one cover read comfortably exceeds 372 ms. That is also why the reporter
+// still heard it after re-encoding the music at a lower bitrate -- the cushion is measured in BYTES
+// of decoded PCM, so a smaller source file buys nothing.
+//
+// 48 slots = 192 KB ~= 1.11 s, for +128 KB of BSS. Both semaphores already take their max_count and
+// init_count from this constant, and rdPtr/wrPtr are unsigned char, so depth is the only knob to turn.
+//
+// ⛔ THE OTHER FIX IS FORBIDDEN: do NOT raise the BGM threads above the IO worker. That lets audio
+// preempt game-list IO, which is the #340 input-starvation path -- trading a music glitch for
+// swallowed controller input. Deepening the buffer costs memory and nothing else.
+#define BGM_RING_BUFFER_COUNT 48
 #define BGM_RING_BUFFER_SIZE  4096
 #define BGM_THREAD_BASE_PRIO  0x40
 #define BGM_THREAD_STACK_SIZE 0x1000
