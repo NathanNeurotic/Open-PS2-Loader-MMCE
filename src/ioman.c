@@ -203,7 +203,23 @@ void ioInit(void)
     gIOThread.gp_reg = &_gp;
     gIOThread.func = &ioWorkerThread;
     gIOThread.stack = thread_stack;
-    gIOThread.initial_priority = 30;
+    // BELOW the GUI/pad thread (31), not above it.
+    //
+    // At 30 this worker OUTRANKED the thread that renders and reads the controller, so any work it
+    // picked up -- a cover decode, a device probe, a list rebuild, even churning through a queue of
+    // superseded requests -- took the CPU away from input for as long as it ran. On hardware that is
+    // the navigation fault the reporter has chased all session: hold, a swallowed step, resume, and
+    // more recently "jumping instead of stalling" while the HUD showed seventeen art requests queued
+    // with none executing. Everything queued here is BACKGROUND work by definition -- it exists
+    // precisely so the menu does not have to wait for it -- so it has no business preempting the
+    // menu.
+    //
+    // Safe because the GUI never busy-waits on this thread: guiHandleDeferedIO pumps real frames and
+    // blocks on vsync each pass (guiShow), which yields the CPU, so the worker still runs during a
+    // wait. Blocking device I/O is unaffected -- a thread blocked in the IOP RPC consumes nothing at
+    // either priority. What changes is only who wins when both are runnable, and that should always
+    // be the one holding the user's input.
+    gIOThread.initial_priority = 32;
 
     isIORunning = 1;
     gIOThreadId = CreateThread(&gIOThread);
