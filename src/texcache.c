@@ -512,6 +512,39 @@ GSTEXTURE *cacheGetTexture(image_cache_t *cache, item_list_t *list, int *cacheId
         oldestEntry->qr = req;
         oldestEntry->UID = cache->nextUID;
 
+        // BORN WANTED. cacheClearItem one line above just wrote the module's "this slot is free"
+        // sentinel -- lastUsed = -1 -- and the cancellation in cacheLoadImage reads that SAME field
+        // as an AGE: (u32)(guiFrameId - lastUsed). For -1 that evaluates to guiFrameId + 1, so from
+        // frame 20 of every session onward a request reached the worker already counting as "20+
+        // frames since anyone looked at this row" and was thrown away BEFORE it touched the device.
+        // One field carrying two meanings; the cancellation added the reader and there had never
+        // been a writer here to match it.
+        //
+        // It only bites when the queue is EMPTY, which is why it read as an idle-only fault. The IO
+        // worker is priority 32 and the GUI 31, so it cannot preempt -- it runs in the vsync gap
+        // inside the frame that queued the request, before the requester gets another draw pass to
+        // refresh the stamp at the entry->qr branch in cacheGetTexture. Anything the worker was
+        // already busy with pushes the request past that frame boundary, the requester re-stamps it,
+        // and it survives. That is the whole reason art appeared during boot and device rescans and
+        // then stopped the moment the menu settled.
+        //
+        // HARDWARE, debug HUD, sitting IDLE on a coverflow list with covers visibly on screen: 25
+        // video frames apart the art total went 22269 -> 22293 -- one request per frame, forever --
+        // while D stayed 59 and A stayed 0. The drop sits above both gArtActiveCount++ and
+        // gArtDone++, so nothing counted and no device read was ever issued: 22269 requests, zero
+        // loads. Coverflow's covers survived only because the draw path touches each key more than
+        // once per frame; the perpetual loser was the per-game Background, which asks ONLY when
+        // !cacheHasPendingArt() and therefore asks only in the exact state that guarantees a
+        // same-frame drain -- and could not even park itself as "absent", because parking requires a
+        // load that actually ran.
+        //
+        // Stamping here makes the test measure what its own comment says it measures: frames since
+        // the row was last DRAWN. A row that scrolls away still stops stamping and its request still
+        // dies at 20 frames, so the cancellation keeps doing its job -- it just stops shooting every
+        // request the instant it is made. guiFrameId is >= 1 inside any drawn frame (guiStartFrame
+        // increments before anything draws), so this can never write the 0 that means "load failed".
+        oldestEntry->lastUsed = guiFrameId;
+
         *UID = cache->nextUID++;
 
         // A REFUSED request never runs, so nothing ever clears qr -- and qr is what marks this slot
