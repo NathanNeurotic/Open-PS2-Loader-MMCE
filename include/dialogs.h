@@ -101,6 +101,8 @@ enum UI_ITEMS {
     CFG_BDMASOURCE,
     CFG_LBL_BDMAMODE,
     CFG_BDMAMODE,
+    CFG_LBL_VCD_USB_BDMA,
+    CFG_VCD_USB_BDMA,        // USB VCD launches only: Ask every time (default) / pin exFAT / pin fat32
     CFG_VCD_HIDE_GAMEID,     // display-only: hide a leading PS1 game-ID prefix from the VCD list
     CFG_VCD_FIRST_DISC_ONLY, // #118: hide discs 2+ of a multi-disc PS1 set from the device VCD lists
 

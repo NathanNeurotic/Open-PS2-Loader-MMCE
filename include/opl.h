@@ -172,9 +172,19 @@ extern char gPopstarterPath[256];
 extern int gBdmaSource;        // BDMA SOURCE device family (VCD_BDMA_SRC_*); persisted in conf
 extern int gBdmaMode;          // BDMA MODE mirrored from the mc?:/POPSTARTER/ marker (VCD_BDMA_*)
 extern int gBdmaApplyOnLaunch; // auto-equip the launched VCD's matching exFAT driver before boot
-extern int gVcdHideGameId;     // display-only: hide a leading PS1 game-ID prefix from VCD lists
-extern int gVcdFirstDiscOnly;  // hide discs 2+ of multi-disc PS1 sets
-extern char gBootDir[256];     // boot directory (cwd) OPL launched from; "" if undeterminable
+// POPSTARTER's USB driver for PS1 (VCD) launches off a USB stick. The PS2 cannot detect whether a
+// stick is fat32 or exFAT, so the driver is chosen, not detected. ASK reproduces the original
+// behaviour exactly (prompt on every USB VCD launch, maintainer directive 2026-08-01); the two pinned
+// values skip the prompt. USB VCD launches ONLY -- MX4SIO/ATA VCDs equip by device type and never ask.
+enum VCD_USB_BDMA_MODE {
+    VCD_USB_BDMA_ASK = 0,
+    VCD_USB_BDMA_EXFAT = 1,
+    VCD_USB_BDMA_FAT32 = 2,
+};
+extern int gVcdUsbBdmaMode;
+extern int gVcdHideGameId;    // display-only: hide a leading PS1 game-ID prefix from VCD lists
+extern int gVcdFirstDiscOnly; // hide discs 2+ of multi-disc PS1 sets
+extern char gBootDir[256];    // boot directory (cwd) OPL launched from; "" if undeterminable
 extern int gEnableBGArt;
 extern int gEnableArtTar;    // .tar art packs (item 45); OFF until the Artwork UI returns
 extern int gArtDelay;        // frames of inactivity before art loads (item 45); safe official-like default until gate D

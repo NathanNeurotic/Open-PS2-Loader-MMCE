@@ -178,6 +178,7 @@ int gPopstarterRetroGemGameID = 1; // RetroGEM Game ID optical barcode for VCD l
 int gBdmaSource;                   // BDMA SOURCE device family (VCD_BDMA_SRC_*)
 int gBdmaMode;                     // BDMA MODE mirrored from the mc?:/POPSTARTER/ marker
 int gBdmaApplyOnLaunch;            // auto-equip the launched VCD's matching exFAT driver before boot
+int gVcdUsbBdmaMode;               // VCD_USB_BDMA_*: POPSTARTER USB driver for USB VCD launches
 int gVcdHideGameId;                // display-only: hide a leading PS1 game-ID prefix from VCD lists
 int gVcdFirstDiscOnly;             // hide discs 2+ of multi-disc PS1 sets
 char gBootDir[256];                // boot directory (cwd) OPL launched from; "" if undeterminable
@@ -1670,6 +1671,10 @@ static void _loadConfig()
                 gPopstarterRetroGemGameID = 1;
             configGetInt(configOPL, CONFIG_OPL_BDMA_SOURCE, &gBdmaSource);
             configGetInt(configOPL, CONFIG_OPL_BDMA_APPLY, &gBdmaApplyOnLaunch);
+            configGetInt(configOPL, CONFIG_OPL_VCD_USB_BDMA, &gVcdUsbBdmaMode);
+            // A hand-edited or future-written value must not index past the three enum labels.
+            if (gVcdUsbBdmaMode < VCD_USB_BDMA_ASK || gVcdUsbBdmaMode > VCD_USB_BDMA_FAT32)
+                gVcdUsbBdmaMode = VCD_USB_BDMA_ASK;
             configGetInt(configOPL, CONFIG_OPL_VCD_HIDE_GAMEID, &gVcdHideGameId);
             configGetInt(configOPL, CONFIG_OPL_VCD_FIRST_DISC_ONLY, &gVcdFirstDiscOnly);
             configReadNeutrinoGlobals(configOPL); // shared with miniInit's autolaunch path
@@ -2047,6 +2052,7 @@ static void _saveConfig()
         configSetInt(configOPL, CONFIG_OPL_POPSTARTER_RETROGEM_GAMEID, gPopstarterRetroGemGameID);
         configSetInt(configOPL, CONFIG_OPL_BDMA_SOURCE, gBdmaSource);
         configSetInt(configOPL, CONFIG_OPL_BDMA_APPLY, gBdmaApplyOnLaunch);
+        configSetInt(configOPL, CONFIG_OPL_VCD_USB_BDMA, gVcdUsbBdmaMode);
         configSetInt(configOPL, CONFIG_OPL_VCD_HIDE_GAMEID, gVcdHideGameId);
         configSetInt(configOPL, CONFIG_OPL_VCD_FIRST_DISC_ONLY, gVcdFirstDiscOnly);
         configSetStr(configOPL, CONFIG_OPL_NEUTRINO_ARGS, gNeutrinoArgs);
@@ -3002,9 +3008,10 @@ static void setDefaults(void)
     gPopstarterRetroGemGameID = 1;
     gBdmaSource = VCD_BDMA_SRC_USB;
     gBdmaMode = VCD_BDMA_FAT32;
-    gBdmaApplyOnLaunch = 1; // auto-equip on launch by default
-    gVcdHideGameId = 1;     // hide the PS1 game-ID prefix by default (display-only)
-    gVcdFirstDiscOnly = 1;  // hide discs 2+ of multi-disc PS1 sets by default (POPSLoader parity)
+    gBdmaApplyOnLaunch = 1;             // auto-equip on launch by default
+    gVcdUsbBdmaMode = VCD_USB_BDMA_ASK; // preserve the per-launch prompt as the shipped behaviour
+    gVcdHideGameId = 1;                 // hide the PS1 game-ID prefix by default (display-only)
+    gVcdFirstDiscOnly = 1;              // hide discs 2+ of multi-disc PS1 sets by default (POPSLoader parity)
     // gBootDir is deliberately NOT reset here. main() resolves it (setBootDir, from argv[0] with a
     // getcwd fallback) BEFORE calling init(), and init() calls setDefaults() -- so clearing it here
     // erased the boot identity a few lines before configInit() needs it, on EVERY boot. That made

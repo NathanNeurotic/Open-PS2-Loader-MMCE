@@ -416,6 +416,15 @@ struct UIItem diaBdmaConfig[] = {
     {UI_ENUM, CFG_BDMAMODE, 1, 1, _STR_HINT_BDMA_MODE, 0, 0, {.intvalue = {0, 0}}},
     {UI_BREAK},
 
+    // USB VCD launches only. The PS2 cannot tell a fat32 stick from an exFAT one, so POPSTARTER's USB
+    // driver has to be CHOSEN rather than detected; this row is what that choice defaults to. It sits
+    // OUTSIDE the "Apply on Launch" visibility group above on purpose -- it governs the per-launch USB
+    // prompt, not the manual SOURCE/MODE equip that those two rows drive.
+    {UI_LABEL, CFG_LBL_VCD_USB_BDMA, 1, 1, -1, -40, 0, {.label = {NULL, _STR_VCD_USB_BDMA}}},
+    {UI_SPACER},
+    {UI_ENUM, CFG_VCD_USB_BDMA, 1, 1, _STR_HINT_VCD_USB_BDMA, 0, 0, {.intvalue = {0, 0}}},
+    {UI_BREAK},
+
     // buttons
     {UI_OK, 0, 1, 1, -1, 0, 0, {.label = {NULL, _STR_OK}}},
     {UI_BREAK},

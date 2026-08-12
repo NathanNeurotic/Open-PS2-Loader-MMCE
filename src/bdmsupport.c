@@ -811,17 +811,33 @@ static void bdmLaunchVcd(item_list_t *itemList, const char *vcdName, config_set_
     // toasts its diagnostic in passing. iLink/UDPBD/unknown have no BDMA variant and are left as-is.
     switch (pDeviceData->bdmDeviceType) {
         case BDM_TYPE_USB: {
-            // USB is special: the PS2 cannot detect whether the stick is fat32 or exFAT formatted,
-            // so the user picks the POPSTARTER USB driver on EVERY USB VCD launch (maintainer
-            // directive 2026-08-01). fat32 = POPSTARTER's built-in USB stack (recommended for
-            // non-exFAT users); exFAT = the BDMAssault usbexfat pair. Back cancels the launch.
-            int usbMode = guiShowVcdUsbMode();
-            if (usbMode == VCDUSB_BTN_FAT32)
-                vcdApplyUsbModeForLaunch(VCD_BDMA_FAT32);
-            else if (usbMode == VCDUSB_BTN_EXFAT)
+            // USB is special: the PS2 cannot detect whether the stick is fat32 or exFAT formatted, so
+            // the POPSTARTER USB driver has to be CHOSEN rather than detected. fat32 = POPSTARTER's
+            // built-in USB stack (recommended for non-exFAT users); exFAT = the BDMAssault usbexfat
+            // pair.
+            //
+            // Asking on EVERY USB VCD launch was the original directive (2026-08-01) and remains the
+            // shipped default, because a wrong answer here is a failed boot rather than a wrong
+            // setting. It is now the ASK value of a three-way preference (BDMA Settings -> USB BDMA
+            // Driver) rather than the only behaviour: a user whose sticks are all one format was being
+            // asked a question with the same answer every single time.
+            //
+            // Back still cancels the LAUNCH, and only in ASK mode -- a pinned choice has no dialog to
+            // cancel, so those two legs go straight to the equip. USB VCDs only; the MX4SIO and ATA
+            // cases below equip by device type and have never asked.
+            if (gVcdUsbBdmaMode == VCD_USB_BDMA_EXFAT) {
                 vcdApplyUsbModeForLaunch(VCD_BDMA_USBEXFAT);
-            else
-                return; // dialog cancelled -- abort the launch, nothing equipped
+            } else if (gVcdUsbBdmaMode == VCD_USB_BDMA_FAT32) {
+                vcdApplyUsbModeForLaunch(VCD_BDMA_FAT32);
+            } else {
+                int usbMode = guiShowVcdUsbMode();
+                if (usbMode == VCDUSB_BTN_FAT32)
+                    vcdApplyUsbModeForLaunch(VCD_BDMA_FAT32);
+                else if (usbMode == VCDUSB_BTN_EXFAT)
+                    vcdApplyUsbModeForLaunch(VCD_BDMA_USBEXFAT);
+                else
+                    return; // dialog cancelled -- abort the launch, nothing equipped
+            }
             break;
         }
         case BDM_TYPE_SDC:

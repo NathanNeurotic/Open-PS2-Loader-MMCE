@@ -1189,11 +1189,16 @@ void guiShowBdmaConfig(void)
 {
     const char *bdmaSourceStrs[] = {_l(_STR_BDMA_SRC_USB), _l(_STR_BDMA_SRC_MX4SIO), _l(_STR_BDMA_SRC_MMCE), _l(_STR_BDMA_SRC_HDD), NULL};
     const char *bdmaModeStrs[] = {_l(_STR_BDMA_MODE_FAT32), _l(_STR_BDMA_MODE_USBEXFAT), _l(_STR_BDMA_MODE_MX4SIO), _l(_STR_BDMA_MODE_MMCE), _l(_STR_BDMA_MODE_ATA), NULL};
+    // Order matches enum VCD_USB_BDMA_MODE: Ask / exFAT / fat32. The two driver labels are the ones the
+    // per-launch prompt already uses, so the row and the dialog it replaces read identically.
+    const char *vcdUsbBdmaStrs[] = {_l(_STR_VCD_USB_BDMA_ASK), _l(_STR_VCD_USB_MODE_EXFAT), _l(_STR_VCD_USB_MODE_FAT32), NULL};
     gBdmaMode = vcdReadBdmaMode();
     diaSetEnum(diaBdmaConfig, CFG_BDMASOURCE, bdmaSourceStrs);
     diaSetEnum(diaBdmaConfig, CFG_BDMAMODE, bdmaModeStrs);
+    diaSetEnum(diaBdmaConfig, CFG_VCD_USB_BDMA, vcdUsbBdmaStrs);
     diaSetInt(diaBdmaConfig, CFG_BDMASOURCE, gBdmaSource);
     diaSetInt(diaBdmaConfig, CFG_BDMAMODE, gBdmaMode);
+    diaSetInt(diaBdmaConfig, CFG_VCD_USB_BDMA, gVcdUsbBdmaMode);
     diaSetInt(diaBdmaConfig, CFG_BDMA_APPLY, gBdmaApplyOnLaunch);
     // "VCD BDMA Apply on Launch" ON auto-equips, so hide the manual SOURCE/MODE pickers
     // (guiBdmaUpdater re-reveals them live when toggled off).
@@ -1205,6 +1210,10 @@ void guiShowBdmaConfig(void)
     int ret = diaExecuteDialog(diaBdmaConfig, -1, 1, &guiBdmaUpdater);
     if (ret) {
         diaGetInt(diaBdmaConfig, CFG_BDMA_APPLY, &gBdmaApplyOnLaunch);
+        // Read BEFORE the equip block below: that block can re-enter vcdEquipBdma and toast, and this
+        // row must be taken from the dialog regardless of how the equip turns out (it governs the
+        // per-launch USB prompt, not the card's equipped state).
+        diaGetInt(diaBdmaConfig, CFG_VCD_USB_BDMA, &gVcdUsbBdmaMode);
         {
             // Equip BDMA modules only when SOURCE or MODE actually changed (the equip copies files to
             // the memory card). vcdEquipBdma is free-space-gated + truncation-safe, so a failure never
