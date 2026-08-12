@@ -36,7 +36,22 @@
 // not wait for a read -- but it only has to cover where the cursor can plausibly go next, not the
 // whole page. Measured from the SELECTED row, not from the top of the page, because menusys scrolls
 // by whole pages: from pagestart the budget would be spent on the far end of the new page.
-#define COVER_WARM_RADIUS            2
+// 0 = no viewport warming: the selected row's cover is requested (before the row loop) and nothing
+// else, which is exactly what uOPL does and why uOPL does not do this.
+//
+// Measured on hardware at radius 2: "ART Q17 A1 R0 D42  71ms". Seventeen covers queued with one
+// loading -- we were REQUESTING faster than the device can serve. Five requests per settle against
+// ~71 ms a load is ~14 loads/second of capacity, and a user scrolling at a normal pace generates
+// more than that, so the queue grows without bound while they move. Two things follow, and both are
+// exactly what was reported: the cover for the row they are ON sits at the BACK of that queue so
+// art "gets fucked pretty quickly", and every decode that does run preempts the priority-31 GUI and
+// pad thread, eating frames until the held-repeat catches up in one lurch -- the rhythmic jump that
+// survived the settle floor, because the floor only stops requests DURING a press, not between them.
+//
+// Warming exists so that landing on a neighbour finds its cover already there (#296). That is a real
+// nicety on a fast device and a liability on USB, where it costs four extra reads for every one the
+// user asked for. The reference builds do not do it; neither do we now.
+#define COVER_WARM_RADIUS            0
 // Extra idle frames a per-game BACKGROUND waits beyond the art delay before it may be requested, so
 // the cover always reaches the IO queue first (see drawGameImage). Half a second at 60 Hz: long
 // enough that a cover request is queued and usually finished, short enough that a background still
