@@ -27,24 +27,47 @@ confirmation was still pending at handoff.
 
 Credit where due: found by ChatGPT Codex auditing the snapshots, not by me.
 
-## OPEN ITEM #1 — MX4SIO load-order regression (caused by rebuild-135)
+## ~~OPEN ITEM #1~~ — MX4SIO load-order regression: FIXED, hardware-pending (2026-08-12)
 
 Reported immediately after 135: **MX4SIO games list, but show no art, and launching hangs forever on
 the loading icon → black screen with a stuck icon.**
 
-Diagnosis (high confidence, not yet proven): device identity comes from an **ioctl on the mounted
-`massN:`** (`USBMASS_IOCTL_GET_DRIVERNAME` + device number, in `bdmUpdateDeviceData`,
-`src/bdmsupport.c`). `massN:` is only the filesystem; `usbN:`/`mx4sio0:` style names are block-device
-identities used for launch binding and are never readable as files. So identity is knowable only
-AFTER the transport is loaded and mounted. rebuild-135 moved the MX4SIO load later (now only when
-its page is enabled, via `bdmLoadBlockDeviceModules`, `src/bdmsupport.c:380`), so anything that asks
-the slot who it is before that mount completes gets an unidentified generic mass device →
-wrong/empty art prefix and a launch bound to the wrong device type.
+Branches, each CI-green on all three flavours, each on top of the last:
+`rebuild/step-137-mx4sio-order` (commits 137, 137b, 137c) → `rebuild/step-138-resolver-order` →
+`chore/bdmsupport-nul-eol`.
 
-**Do NOT fix by reverting 135** — that reintroduces the navigation bug. The fix is ordering: keep
-MX4SIO out of the *boot resolver*, but ensure that when `gEnableMX4SIO` is set the driver is loaded
-AND mounted before any identity query or launch. Complication: the resolver runs INSIDE `_loadConfig`
-*before* the first config read, so `gEnableMX4SIO` is not known at that point.
+**The art diagnosis written here originally was WRONG and is retracted.** Art never depended on
+identity: `bdmGetImage` reads only `bdmPrefix`, which `bdmUpdateDeviceData` builds from the slot
+number *before* either ioctl. The real chain is that a cover which fails once is **parked
+permanently** (`texcache.c:274` sets `lastUsed = 0`; `cacheGetTexture` turns that into
+`cacheId = -2`, "not asked again until a list rebuild") and a BDM list **rebuilds essentially never**.
+So every cover requested while the SD card was mounted-but-not-yet-servable is blank for the whole
+session. The root cause is still ordering — 135 removed MX4SIO's only synchronous, pre-config load,
+so its mount now races the device pages — but the sink is the art cache, not the identity.
+
+The launch hang has **two** independent sinks, both after `deinit()` has torn the UI down:
+- the native dispatch is a four-way if-chain on the driver token with **no final `else`**, so an empty
+  token never reaches `sysLaunchLoaderElf` and simply returns into a dead OPL;
+- a failed `GET_DEVICE_NUMBER` leaves `massDeviceIndex = -1`, which enters `settings->bdDeviceId` — a
+  **u32** (`cdvd_config.h:82`) — as `0xFFFFFFFF`. `bdm_matches_launch_device`
+  (`device-bdm.c:57-59`) can never match it, so `bdm_io_sema` is never signalled and the game blocks
+  forever. ATA is exempt: it binds by driver token alone. Nothing retries either ioctl — the identity
+  re-entry gate tests root/driver/type but **never the index**.
+
+**Do NOT fix by reverting 135** — that reintroduces the navigation bug. The fix is ordering, and the
+three traps it hides are all documented in the code now: it must run *before* `bdmInitDevicesData()`
+(that call is what queues the identity requests, and the wait yields to the prio-32 IO worker); it
+must gate on `== START_MODE_AUTO`, not `!= DISABLED` (`initSupport` only reaches `bdmInit` on the AUTO
+arm with `force_reinit == 0`, so under MANUAL there is no bdm core to mount against); and it must be
+latched to the boot pass, because `applyConfig(-1,-1,0)` is called from **11 settings dialogs on the
+GUI thread** and `bdmEnsureSourceModules` takes a lock the IO worker holds across a no-timeout load.
+
+138 then fixes two more 135 consequences in the resolver: the escalation is **tiered** (MX4SIO alone
+first, iLink + ATA only after) so an MX4SIO boot no longer drags in dev9/atad and no longer trips
+`_STR_HDD_NOT_CONNECTED_ERROR`, whose `setErrorMessageWithCode` **replaces `menuUpdateHook`** — the
+hook that schedules BDM rescans and yields to pending art; and the weak fallback is consumed **last**,
+after every transport has had its chance, so a second USB stick holding a same-named `/OPL` folder can
+no longer steal the boot device and suppress the MX4SIO load entirely.
 
 ## OPEN ITEM #2 — art on USB is "good enough" but not perfect
 
@@ -106,6 +129,18 @@ and the same URL with `OPL-PS2DEVPINNEDSDK.zip` and `OPL-OFFICIALSDK.zip`.
 Gotchas: `gh` needs `--repo NathanNeurotic/Open-PS2-Loader`. Never edit source with Python
 `open(...).write()` — it corrupted `src/bdmsupport.c` with NUL bytes once; use the Edit tool.
 
+**That NUL corruption cost this investigation real time and is now repaired on
+`chore/bdmsupport-nul-eol`.** Two raw NUL bytes sat inside the `'\0'` literals on the identity
+re-entry gate. GCC accepted them (value 0 — behaviour was always correct), but **grep and ripgrep
+classify a file containing a NUL as BINARY and print `Binary file … matches` instead of the matching
+lines**. Every plain grep over `src/` therefore silently omitted the contents of the most-searched
+file here, across all three audits — and it made one audit agent misread the literal as `' '` and
+report a guard bug that does not exist. If that branch is not merged yet, use `grep -a` / `rg --text`
+/ the Read tool on `src/bdmsupport.c` and trust nothing else. The same NUL is why the file was stored
+CRLF while every sibling is LF (git's binary heuristic only inspects the first 8000 bytes, so it
+diffed as text but escaped `* text=auto`), which is why repairing it produces a full-file diff and
+has to be its own commit at the tip of the stack.
+
 ## Reference trees for comparison
 
 `C:\Users\natha\Github\opl-audit-snapshot\` — `current/`, `rebuild66/`, `uopl/` (no git, safe for
@@ -120,3 +155,12 @@ from reasoning about likely causes. My confident theories were wrong repeatedly 
 a VRAM story that removed a visual feature, an invented difference in the tester's art sets, an
 unbounded retry that made navigation worse. The tester caught most of them. When stuck: get a number
 on screen, or diff against uOPL/66, and subtract rather than add.
+
+**Addendum (137/138): audit the fix, not just the bug.** The diff against uOPL found the mechanism
+quickly; the expensive mistakes were all in the *fix*. A shipped, CI-green rebuild-137 turned out to
+order nothing (the wait sat after the call that queues the identity requests, and it yields), to gate
+on the wrong start mode, and to put a blocking lock acquire on the GUI thread from eleven settings
+dialogs. None of that was visible from the bug — only from re-reading the patch as an adversary. Of
+14 adversarial checks run over the findings, 8 refuted claims from the same side that raised them,
+including two "dead end after `deinit()`" reports that turned out to have pre-`deinit` probes. Budget
+review effort for your own patch at least equal to what you spent finding the bug.
