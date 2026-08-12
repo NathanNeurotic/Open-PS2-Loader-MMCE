@@ -112,7 +112,18 @@ static inline int cacheCancelPendingImageLoadsTimed(int waitTicks)
     return 1;
 }
 
-// Give up on every cover still QUEUED, instead of reading it off the device first.
+// STUB, and it MUST STAY ONE. themes.c calls this on the first theme load (curT == NULL), which is
+// every boot -- at that point the cache is not even initialised and nothing can be queued, so the
+// fork's "drain now" semantics are a genuine no-op here.
+//
+// ⚠ rebuild-142 made this real AND sticky for the teardown case and killed cover art on every boot,
+// because that themes.c caller was never looked at. The teardown need is a DIFFERENT operation with
+// a different lifetime -- it is cacheShutdownArtLoads() below. Do not merge the two again.
+static inline void cacheCancelPendingImageLoads(void)
+{
+}
+
+// Stop servicing queued cover art for the rest of the process. TEARDOWN ONLY.
 //
 // Not an optimisation -- a launch-latency fix. ioBlockOpsTimed waits for the WHOLE ioman queue to
 // drain, and isIOBlocked only stops NEW requests being accepted; the worker keeps servicing
@@ -120,8 +131,9 @@ static inline int cacheCancelPendingImageLoadsTimed(int waitTicks)
 // them to be read off the game device before the IOP reset -- for a menu guiEnd() is about to
 // destroy. On a slow transport (MX4SIO's SD over SIO2) that IS the wait.
 //
-// Sticky by design: every deinit()/deinitEx() caller hands off to another ELF and never returns to a
-// live menu, so there is nothing to re-arm for.
-void cacheCancelPendingImageLoads(void);
+// One-way on purpose, and that is exactly why it needs its own name: the ONLY callers are deinit()
+// and deinitEx(), both of which hand off to another ELF and never return to a live menu. Anything
+// that DOES return to a live menu must not call this.
+void cacheShutdownArtLoads(void);
 
 #endif

@@ -180,10 +180,12 @@ GSTEXTURE *cacheLookupTexture(image_cache_t *cache, int *cacheId, int *UID)
 
 static void cacheClearItem(cache_entry_t *item, int freeTxt); // released below on a transient failure
 
-// Set once, at teardown, by cacheCancelPendingImageLoads(). See texcache.h for the full reasoning.
+// Set once, at teardown, by cacheShutdownArtLoads(). See texcache.h for the full reasoning -- and in
+// particular why this is NOT wired to cacheCancelPendingImageLoads(), which themes.c calls on the
+// first theme load of every boot.
 static int gCacheLoadsCancelled = 0;
 
-void cacheCancelPendingImageLoads(void)
+void cacheShutdownArtLoads(void)
 {
     gCacheLoadsCancelled = 1;
 }

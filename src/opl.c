@@ -2973,7 +2973,7 @@ void deinitEx(int exception, int modeSelected, int modeSelected2)
     // Give up on the covers still QUEUED before draining. The drain waits on the ioman LIST, and the
     // worker keeps servicing it regardless of isIOBlocked, so without this the handoff pays for every
     // queued cover to be read off the game device first -- for a menu guiEnd() is about to destroy.
-    cacheCancelPendingImageLoads();
+    cacheShutdownArtLoads();
 
     // block all io ops, wait for the ones still running to finish (BOUNDED -- see the note above)
     ioBlockOpsTimed(1, gDeinitTerminal ? EXIT_IO_DRAIN_TICKS : LAUNCH_IO_DRAIN_TICKS);
@@ -3009,7 +3009,7 @@ void deinit(int exception, int modeSelected)
     // Give up on the covers still QUEUED before draining. The drain waits on the ioman LIST, and the
     // worker keeps servicing it regardless of isIOBlocked, so without this the handoff pays for every
     // queued cover to be read off the game device first -- for a menu guiEnd() is about to destroy.
-    cacheCancelPendingImageLoads();
+    cacheShutdownArtLoads();
 
     // block all io ops, wait for the ones still running to finish (BOUNDED -- see the note above)
     ioBlockOpsTimed(1, gDeinitTerminal ? EXIT_IO_DRAIN_TICKS : LAUNCH_IO_DRAIN_TICKS);
