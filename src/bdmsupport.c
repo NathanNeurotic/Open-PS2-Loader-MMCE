@@ -2094,7 +2094,12 @@ int bdmResolveBootDir(char *bootDir, int bootDirSize, const char *elfName, int *
     SignalSema(bdmLoadModuleLock);
 
     u32 budgetMs = (filterType == BDM_TYPE_ATA) ? 10000 : 3000; // ATA = dev9 power-up + platter spin-up
-    int escalated = (filterType != BDM_TYPE_UNKNOWN);           // typed searches never escalate
+    // Escalation tier for an untyped massN: search: 0 = only USB is up, 1 = MX4SIO added, 2 = iLink +
+    // ATA added, i.e. everything. A TYPED search starts past the end -- its one transport was loaded up
+    // front and no other family can satisfy it -- which keeps its timeout path exactly as it was.
+    // Worst case for an untyped search is now 3000 + 3000 + 8000 = 14 s, inside the 30 s
+    // OPL_DEFERRED_IO_TIMEOUT_MS that bounds a post-boot reload (the boot call is not deferred at all).
+    int escalationTier = (filterType != BDM_TYPE_UNKNOWN) ? 2 : 0;
     // u64: GetTimerSystemTime() passes 2^32 bus ticks ~29 s after boot; a u32 start would make every
     // POST-BOOT resolve (the _saveConfig hotplug retry, a settings reload) compute a bogus huge elapsed
     // and give up after a single scan instead of waiting the budget out.
@@ -2145,23 +2150,49 @@ int bdmResolveBootDir(char *bootDir, int bootDirSize, const char *elfName, int *
         }
 
         if ((GetTimerSystemTime() - start) / (kBUSCLK / 1000) > budgetMs) {
-            if (fallbackSlot >= 0) {
-                *ioBdmType = fallbackType;
-                bdmRewriteBootDir(bootDir, bootDirSize, fallbackSlot, tail);
-                return 1;
-            }
-            if (!escalated) {
-                // Nothing cheap matched a massN: boot dir -- the boot device may be the internal exFAT
-                // HDD handed in massN: form (HDD-OSD launchers do this) or an iLink drive. One
-                // escalation: the remaining transports, with extra budget for ATA spin-up.
-                escalated = 1;
+            if (escalationTier == 0) {
+                // TIER 1 -- MX4SIO alone, and nothing else. rebuild-135 moved the SD driver out of the
+                // first pass because it lives on SIO2, the pad's bus; it did NOT stop being a cheap,
+                // silent, dev9-free load. Lumping it in with iLink and ATA meant every MX4SIO boot also
+                // dragged in ILINKMAN + IEEE1394_BD + dev9 + ps2atad + xhdd, which pre-135 it never
+                // touched -- and on the usual MX4SIO rig (no HDD) the ATA leg fails and posts
+                // _STR_HDD_NOT_CONNECTED_ERROR, whose setErrorMessageWithCode REPLACES the frame hook
+                // with a modal box. The hook it replaces is menuUpdateHook, i.e. the thing that
+                // schedules every BDM rescan and holds them back while covers are in flight. Splitting
+                // the tiers costs a plain USB boot nothing (it matches in the first pass and never gets
+                // here) and takes an MX4SIO boot straight from the SD load to its definitive ELF match.
+                escalationTier = 1;
                 WaitSema(bdmLoadModuleLock);
-                bdmEnsureTransportLoaded(BDM_TYPE_SDC); // MX4SIO, deferred from the first pass above
+                bdmEnsureTransportLoaded(BDM_TYPE_SDC);
+                SignalSema(bdmLoadModuleLock);
+                budgetMs += 3000;
+                continue;
+            }
+            if (escalationTier == 1) {
+                // TIER 2 -- the expensive ones. The boot device may still be the internal exFAT HDD
+                // handed in massN: form (HDD-OSD launchers do this) or an iLink drive; extra budget for
+                // dev9 power-up and platter spin-up.
+                escalationTier = 2;
+                WaitSema(bdmLoadModuleLock);
                 bdmEnsureTransportLoaded(BDM_TYPE_ILINK);
                 bdmEnsureTransportLoaded(BDM_TYPE_ATA);
                 SignalSema(bdmLoadModuleLock);
                 budgetMs += 8000;
                 continue;
+            }
+            // The weak fallback is now consumed LAST, after every transport has had its chance --
+            // it used to be tested above the escalation, which was harmless only while the first pass
+            // loaded MX4SIO too. Post-135 the first pass can see nothing but USB, so a USB stick that
+            // merely CONTAINS a folder with the boot dir's name (an /OPL you keep on a second stick)
+            // became the only candidate in sight, was latched here as fallbackSlot, and won -- the
+            // resolver returned it as the boot device and the escalation that would have revealed the
+            // real MX4SIO card never ran at all. That homed the config on the wrong device. Folder
+            // presence is a guess; a mounted transport holding the booted ELF is evidence, so the guess
+            // must not be allowed to pre-empt gathering the evidence.
+            if (fallbackSlot >= 0) {
+                *ioBdmType = fallbackType;
+                bdmRewriteBootDir(bootDir, bootDirSize, fallbackSlot, tail);
+                return 1;
             }
             *ioBdmType = filterType; // never mounted in time, but keep the classification: the caller
                                      // now KEEPS the boot dir, and _saveConfig's retry is gated on this
