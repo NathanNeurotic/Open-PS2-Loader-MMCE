@@ -225,9 +225,45 @@ void guiStartFrame(void)
     guiFrameId++;
 }
 
+// Frame-time watchdog for the debug HUD. It answers the one question nobody asked about the periodic
+// swallowed navigation step: DOES THE EE STALL AT ALL when it happens?
+//
+// Every theory this session assumed the menu thread stops for a moment. If it does, this catches the
+// overrun. If frames stay on vsync straight THROUGH a swallowed step, the EE polled the pad on time
+// and freepad had nothing to give it -- the input died on the IOP over SIO2, and no EE-side work
+// (thread priority, art queues, device probing) could ever have fixed it. Which would explain why
+// none of it has.
+static u32 gFrameLastUs = 0;
+static u32 gFrameWorstUs = 0;
+static u32 gFrameOverruns = 0; // frames longer than ~1.5 vsyncs
+
+u32 guiGetFrameWatchdog(u32 *worstUs, u32 *overruns)
+{
+    if (worstUs)
+        *worstUs = gFrameWorstUs;
+    if (overruns)
+        *overruns = gFrameOverruns;
+    return gFrameLastUs;
+}
+
 void guiEndFrame(void)
 {
     rmEndFrame();
+    static clock_t frameMark = 0;
+
+    // clock() is microseconds on the EE. Sampled after rmEndFrame (i.e. after the vsync wait) so
+    // this measures whole frames back to back.
+    clock_t nowUs = clock();
+    if (frameMark != 0) {
+        u32 elapsed = (u32)(nowUs - frameMark);
+        gFrameLastUs = elapsed;
+        if (elapsed > gFrameWorstUs)
+            gFrameWorstUs = elapsed;
+        if (elapsed > 25000)
+            gFrameOverruns++;
+    }
+    frameMark = nowUs;
+
 #ifdef __DEBUG
     // Measure time directly after vsync
     prevtime = curtime;
@@ -2599,7 +2635,14 @@ static void guiDrawOverlays()
         // ms = the last load, ok = the last SUCCESSFUL one with its decoded size. One cover at a few
         // hundred ms means the pipeline is fine and the wait is how many images we ask for; one at
         // seconds means the cost is inside a single read on this device.
-        snprintf(artdbg, sizeof(artdbg), "ART Q%d A%d R%d D%d  %dms ok%dms %dx%d", q, a, r, d, lastMs, okMs, w, h);
+        u32 fWorst = 0, fOver = 0;
+        u32 fLast = guiGetFrameWatchdog(&fWorst, &fOver);
+        // F<last frame ms>/<worst ms> OV<frames over ~1.5 vsyncs>. Read it AS a step is
+        // swallowed: OV climbing at that instant means the EE stalled (cause is EE-side); OV
+        // standing still while the step is still lost means the EE polled on time and the
+        // input died on the IOP.
+        snprintf(artdbg, sizeof(artdbg), "ART Q%d A%d R%d D%d %dms ok%dms  F%u/%u OV%u",
+                 q, a, r, d, lastMs, okMs, (unsigned)(fLast / 1000), (unsigned)(fWorst / 1000), (unsigned)fOver);
         fntRenderString(gTheme->fonts[0], 8, screenHeight - 24, ALIGN_NONE, 0, 0, artdbg, GS_SETREG_RGBA(255, 255, 0, 128));
     }
 }
