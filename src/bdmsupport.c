@@ -1574,9 +1574,6 @@ void bdmEnumerateDevices()
 {
     LOG("bdmEnumerateDevices\n");
 
-    // Initialize the device list data if it hasn't been initialized yet.
-    bdmInitDevicesData();
-
     // MX4SIO must be loaded AND MOUNTED before anything asks a mass slot who it is.
     //
     // rebuild-135 took mx4sio_bd out of bdmResolveBootDir's first pass, and that must stay gone: it is
@@ -1599,15 +1596,47 @@ void bdmEnumerateDevices()
     // _loadConfig before that first read, which is exactly why the flag could not be honoured there.
     // bdmEnsureSourceModules force-loads the transport and then waits for a device of that type to
     // answer the identity ioctl (bdmGetDeviceRootByType), so returning from it means the slot CAN be
-    // asked who it is. It latches on mx4sioModLoaded, so the wait is paid at most once per session and
-    // a later settings-apply pass returns immediately.
+    // asked who it is -- which is the whole invariant, and it is stronger than "the driver is loaded".
     //
-    // Both gates are load-bearing. The start-mode gate keeps an SD driver off SIO2 for anyone not
-    // browsing BDM games at all, and it is also what guarantees the bdm core is up: initSupport only
-    // reaches bdmInit -> bdmLoadModules when the start mode is not DISABLED, and mx4sio_bd cannot mount
-    // without bdm.irx + bdmfs_fatfs underneath it.
-    if (gEnableMX4SIO && bdmEffectiveStartMode() != START_MODE_DISABLED)
+    // Every clause below is narrower than it looks, and each one is load-bearing.
+    //
+    // BEFORE bdmInitDevicesData, not after. That call is what registers the pages, and registering one
+    // ends in ioPutRequest(IO_MENU_UPDATE_DEFFERED) per slot -- the requests that RUN the identity
+    // query. Waiting after them does not order anything: the wait yields (DelayThread), the IO worker
+    // sits at priority 32 and is scheduled during it, and it asks the slot who it is while we are still
+    // waiting for the mount. Running first is what makes the ordering real, and it is why bdmLoadModules
+    // has to be called here by hand -- the bdm core normally arrives via bdmInit, which has not run yet.
+    // It is idempotent (every one of the 8 bdmInit calls invokes it too).
+    //
+    // AUTO, not merely "not DISABLED". initSupport only reaches itemInit -> bdmInit -> bdmLoadModules on
+    // its `startMode == START_MODE_AUTO` arm, since bdmInitDevicesData passes force_reinit = 0. Under
+    // MANUAL there is no bdm core at boot at all -- on a memory-card boot the resolver returns before its
+    // own bdmLoadModules() too -- so mx4sio_bd would fail to link, mx4sioModLoaded would stay 0, and
+    // bdmEnsureSourceModules would burn its whole budget polling for a mount that cannot happen. MANUAL
+    // also means the user asked OPL not to touch block devices until they enter the tab, and putting an
+    // SD driver on the pad's bus anyway is the exact exposure rebuild-135 exists to remove.
+    //
+    // FIRST PASS ONLY, and the latch is set unconditionally so it can never be anything else. This
+    // function is reached from applyConfig, and applyConfig is called from a dozen settings dialogs ON
+    // THE GUI THREAD (gui.c) as well as from _loadConfig. bdmEnsureSourceModules opens with
+    // WaitSema(bdmLoadModuleLock), and the IO worker holds that same lock across
+    // bdmLoadBlockDeviceModules -- whose own comment records that it can wedge on a real drive with NO
+    // timeout. Letting a settings apply block the GUI thread behind that is the freeze shape this
+    // project has already paid for once. The latch pins the only blocking call to the boot pass, on the
+    // boot thread, behind the "Scanning BDM devices" splash the caller has just put up, which is the one
+    // place in OPL where a bounded storage wait is already the norm. Enabling MX4SIO later from Settings
+    // therefore keeps the ordinary asynchronous load below; the launch guards in bdmLaunchGame are what
+    // cover that path.
+    static int mx4sioBootMountChecked = 0;
+    int mx4sioFirstPass = !mx4sioBootMountChecked;
+    mx4sioBootMountChecked = 1;
+    if (mx4sioFirstPass && gEnableMX4SIO && bdmEffectiveStartMode() == START_MODE_AUTO) {
+        bdmLoadModules();
         bdmEnsureSourceModules(BDM_TYPE_SDC, 2000);
+    }
+
+    // Initialize the device list data if it hasn't been initialized yet.
+    bdmInitDevicesData();
 
     // Because bdmLoadModules is called before the config file is loaded bdmLoadBlockDeviceModules will not have loaded any
     // optional bdm modules. Now that the config file has been loaded try loading any optional modules that weren't previously loaded.
