@@ -18,7 +18,7 @@ Two lineages, both ours, and the distinction matters constantly:
 | name | branch | what it is |
 |---|---|---|
 | **"the fork"** | `origin/master` | The mature, shipped fork. Battle-tested. **Faster at art than the rebuild.** The reference to compare against. |
-| **"the rebuild"** | `rebuild/step-160-index-owner` (tip) | A from-scratch re-port, being hardened. **This is what you are working on.** |
+| **"the rebuild"** | `rebuild/step-164-eth-bounded-teardown` (tip) | A from-scratch re-port, being hardened. **This is what you are working on.** |
 
 `git show origin/master:src/FILE` reads the fork's copy of any file without checking it out. **Do
 this constantly** — most bugs this week were found by diffing the two.
@@ -28,12 +28,12 @@ Start work in your own worktree:
 ```bash
 cd C:/Users/natha/Github/Open-PS2-Loader
 git fetch origin
-git worktree add .claude/worktrees/<yourname> -b <yourname>/<topic> origin/rebuild/step-160-index-owner
+git worktree add .claude/worktrees/<yourname> -b <yourname>/<topic> origin/rebuild/step-164-eth-bounded-teardown
 cd .claude/worktrees/<yourname>
 ```
 
 Numbered "rebuild-NNN" steps are sequential branches `rebuild/step-NNN-<slug>`. The next one is
-**161**. Each is one focused change with a long explanatory commit message — **keep that convention,
+**166**. (164 and 165 both landed on the `step-164` branch -- the numbering is a log, not a rule.) Each is one focused change with a long explanatory commit message — **keep that convention,
 the commit messages are the project's real documentation.**
 
 ---
@@ -441,3 +441,46 @@ device:
 Worth one careful read of `cacheGetTexture` / `cacheLookupTexture` / `getGameImage` /
 `getGameImageCached` together, tracing one row from request to first frame drawn. No hardware needed
 to form the hypothesis; a HUD counter for "frames between publish and first draw" would confirm it.
+
+
+---
+
+## 13. Since the first handoff was written (all pushed, all CI-green)
+
+**rebuild-164** — backed 163's teardown reorder out completely (`opl.c` is byte-identical to 162
+again) and fixed #382 the narrow way instead: `ethDeinitModules` took an **unbounded** `WaitSema` on
+the teardown path, now bounded at ~3 s then it tears down anyway. Strictly safer than 163 — it
+removes an unbounded wait and adds none. **Untested on hardware.**
+
+**rebuild-165** — issue #380: PS1 rows now show the disc's real id.
+- The id is resolved **inside `vcdScanOpenDir`**, where the directory is the one that was actually
+  opened. ⚠ Do not move this "up a layer": `vcdScanDir` appends `POPS/` to a device root while
+  `vcdScanDirRoot` takes the directory directly (APA/PFS HDD). Anything above them must rebuild a
+  path and can only be right about one — my first attempt did exactly that and Nathan caught it.
+- Filename parse first (free), then `retrogemGetVcdGameID` reads the id out of the image. Same
+  resolver the RetroGEM barcode uses, so a game reports one id to both.
+- The disc read is fenced: only on filename-parse failure, memoized per session (hit and miss), and
+  budgeted at 8 discs per scan. Memo cleared on a device generation bump.
+- Also removed the `#System`/`#Media` badges from **coverflow's main page**. They were the only
+  config-consuming elements in that family, so `needsItemConfig` is now clear for it — browsing
+  coverflow issues **no per-row CFG read at all**. rebuild-155 built that gate; this is the first
+  build where our own theme passes through it.
+
+**CI is now FOUR flavours** (`flavours.yml`) and so is the **release pipeline**
+(`rolling-release.yml` — rehearsed via `workflow_dispatch`, all four build jobs green, publish
+correctly gated off non-master). Names: `PS2DEVPINNED`, `OFFICIALPINNED`, `PS2DEVROLLING`,
+`OFFICIALROLLING`. Every artifact carries `BUILD-MANIFEST.txt`. Issue-template update is **PR #463**
+against `master` (open, needs merging — GitHub reads templates from the default branch).
+
+⚠ **User-visible:** release package folders renamed (`APP_RIPTOPL-PS2DEVLATESTSDK` →
+`-PS2DEVROLLING`, etc). Say so in the release notes.
+
+### What to do first, in order
+
+1. **Get 164/165 tested.** Nothing since 162 has touched hardware. Specifically: exit from a UDPFS
+   boot (163's regression must be gone), an ETH game launch with BGM playing (#382), and the PS1 list
+   showing ids (#380 — ask miladera22-sketch, he is responsive and thorough).
+2. **Read `W<ms>@<simple>/<menu>/<bgm><h|m>`** from a VCD-page scroll. That field is the open
+   question of the whole session (section 5) and one photo answers it.
+3. **Merge PR #463** so bug reports can name a flavour that exists.
+4. Section 12's art-batching lead — needs no hardware, just a careful read of four functions.
