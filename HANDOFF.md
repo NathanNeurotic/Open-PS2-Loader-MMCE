@@ -923,3 +923,15 @@ every build of this line. REHEARSED via workflow_dispatch on the branch (run
 verified to contain RIPTOPL-OFFICIALROLLING-ds5.ELF / RIPTOPL-OFFICIALPINNED-ds5.ELF
 (downloaded and listed, not assumed from the log). DUALSENSE=1 builds fine in both
 official containers. Awaiting Nathan's go to ff rebuild/main and republish in place.
+
+**178 — the version string anchors to code, not HEAD.** Makefile REVISION/GIT_HASH were
+`git rev-list --count HEAD` / `rev-parse HEAD`: a docs- or CI-only publish printed a NEW
+version for byte-identical loader code, breaking the pinned reproducibility contract.
+Now `CODE_ANCHOR` = last commit touching anything the build can consume (tree minus an
+explicit exclusion list: .github/, HANDOFF.md, agent-file-drop/, frame_builds/, notes/,
+obj/, .claude/, .agents/, .codex*/ — errs toward inclusion, so a missed code path can
+never collide two binaries under one string). One-time consequence: the next publish's
+REVISION ticks DOWN (~2543 → ~2531) as the twelve bookkeeping commits stop counting; the
+hash now names the last CODE commit (95aabdc8). Tagged v* releases untouched. LOCAL
+container builds always printed `-dirty`+expr noise: a worktree's .git is a FILE whose
+gitdir pointer is host-absolute, dead inside the container — pre-existing, don't chase.
