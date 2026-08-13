@@ -54,6 +54,6 @@ void artIndexInvalidate(void);
 
 /* Debug HUD: directories currently held, and how many probes this has answered as "absent" without
  * touching the device. Either argument may be NULL. */
-void artIndexDebug(int *dirsHeld, unsigned int *absentAnswered);
+void artIndexDebug(int *dirsHeld, unsigned int *absentAnswered, unsigned int *sweepsFailed);
 
 #endif

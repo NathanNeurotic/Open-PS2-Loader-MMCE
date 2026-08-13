@@ -2719,11 +2719,11 @@ static void guiDrawOverlays()
         // touching the device. The second number is the whole point of the index: every one of those
         // is a directory walk that did not happen.
         int ixDirs = 0;
-        unsigned int ixAbsent = 0;
-        artIndexDebug(&ixDirs, &ixAbsent);
-        snprintf(artdbg, sizeof(artdbg), "Q%d A%d D%d X%d %dms(ok %dms %dx%d) O:%d/%d OE%u IX%d/%u KL%u  F%u/%u OV%u  NR%u MT%u  IO %d/%d T%u/%u",
+        unsigned int ixAbsent = 0, ixFailed = 0;
+        artIndexDebug(&ixDirs, &ixAbsent, &ixFailed);
+        snprintf(artdbg, sizeof(artdbg), "Q%d A%d D%d X%d %dms(ok %dms %dx%d) O:%d/%d OE%u IX%d/%u/%u KL%u  F%u/%u OV%u  NR%u MT%u  IO %d/%d T%u/%u",
                  q, a, d, cacheDebugDropped(), lastMs, okMs, w, h,
-                 gTexLastOpenMs, gTexLastMissOpenMs, gTexStagedOpenNonEnoent, ixDirs, ixAbsent, cacheDebugKeyTooLong(),
+                 gTexLastOpenMs, gTexLastMissOpenMs, gTexStagedOpenNonEnoent, ixDirs, ixAbsent, ixFailed, cacheDebugKeyTooLong(),
                  (unsigned)(fLast / 1000), (unsigned)(fWorst / 1000), (unsigned)fOver,
                  (unsigned)padNR, (unsigned)padEmpty,
                  ioGetPending(IO_CUSTOM_SIMPLEACTION), ioGetPending(IO_MENU_UPDATE_DEFFERED),

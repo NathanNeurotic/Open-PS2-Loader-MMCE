@@ -42,6 +42,12 @@ static art_index_dir_t gArtIndex[ART_INDEX_SLOTS];
 static int gArtIndexNext = 0; // round-robin replacement; see artIndexSlotFor
 static unsigned int gArtIndexAbsentAnswered = 0;
 
+// Sweeps that could not list their directory. THE FIELD THAT WOULD HAVE CAUGHT THIS MODULE BEING
+// INERT: on its first hardware run the HUD read IX0/0 -- no directories held, no absences answered --
+// which is indistinguishable from "no art has been requested yet". A failure count separates "not
+// used" from "tried and could not", and it is the difference between reading the number and guessing.
+static unsigned int gArtIndexSweepFailed = 0;
+
 // SINGLE-OWNER-THREAD CONFINEMENT, and it is not decoration.
 //
 // texDiscoverLoad is the choke point this hangs off, and it has callers on TWO threads: the art
@@ -148,10 +154,33 @@ static art_index_dir_t *artIndexBuild(const char *dir)
     slot->valid = 0;
     slot->count = 0;
 
+    // TWO PATH FORMS, because OPL builds art paths without a slash after the device token and not
+    // every driver accepts that for a DIRECTORY. bdmDeviceRoot is "mass0:" (bdmsupport.c, no trailing
+    // slash) and bdmGetImage appends "ART/<name>_COV", so the directory here is "mass0:ART" -- which
+    // opendir rejected, silently leaving this whole module inert. Hardware read IX0/0 on a build where
+    // a missing cover still cost 4395 ms in open() alone: the index was never built, for any
+    // directory, and nothing said so.
+    //
+    // Try the path as given, then the "mass0:/ART" form. Costs one extra failed opendir once per
+    // directory, only when the first form fails.
     DIR *d = opendir(dir);
+    if (d == NULL) {
+        const char *colon = strchr(dir, ':');
+        if (colon != NULL && colon[1] != '\0' && colon[1] != '/') {
+            char alt[ART_INDEX_DIR_MAX + 1];
+            int head = (int)(colon - dir) + 1;
+            if (snprintf(alt, sizeof(alt), "%.*s/%s", head, dir, colon + 1) < (int)sizeof(alt)) {
+                d = opendir(alt);
+                if (d != NULL)
+                    LOG("ARTINDEX: '%s' listed as '%s'\n", dir, alt);
+            }
+        }
+    }
+
     if (d == NULL) {
         // Could not list it -- a missing ART folder, or a device that went away. Not an error: the
         // slot stays invalid and every probe for this directory takes the ordinary path.
+        gArtIndexSweepFailed++;
         LOG("ARTINDEX: cannot list '%s' -- probes will use the device\n", dir);
         return slot;
     }
@@ -274,8 +303,11 @@ void artIndexInvalidate(void)
     }
 }
 
-void artIndexDebug(int *dirsHeld, unsigned int *absentAnswered)
+void artIndexDebug(int *dirsHeld, unsigned int *absentAnswered, unsigned int *sweepsFailed)
 {
+    if (sweepsFailed)
+        *sweepsFailed = gArtIndexSweepFailed;
+
     if (dirsHeld) {
         int i, n = 0;
         for (i = 0; i < ART_INDEX_SLOTS; i++) {
