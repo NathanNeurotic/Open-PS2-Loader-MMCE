@@ -690,19 +690,27 @@ jobs:
             printf 'Commit: %s/%s/commit/%s\n' "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_SHA"
             printf 'Built: %s UTC\n' "$(date -u '+%Y-%m-%d %H:%M')"
             printf 'Run: %s/%s/actions/runs/%s\n' "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID"
+            printf '\n'
+            # The new-lineage statement (parity goal, MMCE status, report rules, which flavour to
+            # download) lives in a TRACKED FILE so every rolling release carries it verbatim without
+            # being re-drafted -- edit the file, never a one-off release body. With set -eu, a
+            # missing file fails the publish loudly rather than shipping notes that mislead testers.
+            cat .github/rolling-release-notes-block.md
+            printf '\n'
             printf '\n## Get started -- which build should I download?\n'
-            printf 'Grab **RIPTOPL-*.zip** and extract it. It ships up to three loader folders that differ ONLY by\n'
+            printf 'Grab **RIPTOPL-*.zip** and extract it. It ships up to four loader folders that differ ONLY by\n'
             printf 'the SDK toolchain each was built with -- the RiptOPL code in every one is identical. Pick a folder\n'
             printf 'and copy its RIPTOPL.ELF to your launch method. Recommended in this order (by reliability):\n'
             printf '\n'
-            printf '  1. **APP_RIPTOPL-PS2DEVROLLING/** -- built on the ps2dev:latest toolchain (version ends\n'
-            printf '     "-PS2DEVROLLING"). This is the RECOMMENDED download: it uses the current SDK, with the\n'
-            printf '     stock drivers RiptOPL is developed and tested against.\n'
-            printf '  2. **APP_RIPTOPL-PS2DEVPINNED/** -- the SAME ps2dev SDK, pinned by digest to a day it\n'
-            printf '     was known good (version ends "-PS2DEVPINNED").\n'
-            printf '     The SAFE FALLBACK. Because #1 tracks a MOVING tag, it can occasionally regress on some\n'
-            printf '     consoles (see issue #102) -- if it black-screens at startup or the cursor does not\n'
-            printf '     respond, use this one and please say so in the report.\n'
+            printf '  1. **APP_RIPTOPL-PS2DEVPINNED/** -- the ps2dev SDK pinned by digest to a day it was known\n'
+            printf '     good (version ends "-PS2DEVPINNED"). This is the RECOMMENDED download: pinned builds are\n'
+            printf '     digest-locked and reproducible, so a report against one can be rebuilt and compared\n'
+            printf '     later. Name the flavour in your report (Settings -> About shows it).\n'
+            printf '  2. **APP_RIPTOPL-PS2DEVROLLING/** -- built on the ps2dev:latest toolchain (version ends\n'
+            printf '     "-PS2DEVROLLING"): the current SDK, with the stock drivers RiptOPL is developed and\n'
+            printf '     tested against. It tracks a MOVING tag, so it can occasionally regress on some consoles\n'
+            printf '     (see issue #102) -- use it to triage: a PS2DEVROLLING-only failure points at the SDK,\n'
+            printf '     a failure on both points at RiptOPL code.\n'
             if [ "$HAS_OFFICIALROLLING" = yes ]; then
               printf '  3. **APP_RIPTOPL-OFFICIALROLLING/** -- built in the EXACT container official OPL'"'"'s rolling\n'
               printf '     pre-release compiles in (ghcr.io/ps2homebrew/ps2homebrew:main; version ends\n'
