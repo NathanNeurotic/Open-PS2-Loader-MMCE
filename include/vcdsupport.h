@@ -50,6 +50,15 @@ void vcdNoteScanDir(const char *name, const char *dirPath);
 // CFG and the launch all key off the VCD filename.
 int vcdResolveDisplayId(const char *name, char *idOut, int idSize);
 
+// Render-thread half of the caption id (#380): returns the ALREADY-resolved id from the session
+// memo, 0 if not yet resolved. Never touches the device, never queues -- safe to call every frame.
+int vcdDisplayIdCached(const char *name, char *idOut, int idSize);
+
+// Ask for a settled VCD row's id to be resolved off-thread (one queued resolve per row per
+// session, memo-deduped, independent of the theme's config needs). Called per frame from the
+// menu render path; a cold memo with a request already in flight is a no-op.
+void vcdRequestDisplayId(const char *name);
+
 // Forget every remembered id and scan directory, so swapped media is not described by the previous
 // disc. Cheap: ids re-resolve lazily as rows are settled on.
 void vcdInvalidateGameIds(void);

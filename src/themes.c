@@ -1874,6 +1874,20 @@ static void drawItemText(struct menu_list *menu, struct submenu_list *item, conf
         if (support != NULL && support->itemGetStartup != NULL) {
             char *startup = support->itemGetStartup(support, item->item.id);
             if (startup != NULL) {
+                // VCD view (#380): the caption shows the resolved disc ID, not the title -- the same
+                // thing the PS2 page shows from this element (g->startup), and 11 chars cannot
+                // overflow into the cover art the way "SLUS_123.45.Final Fantasy VII" did. Memo-read
+                // ONLY (vcdDisplayIdCached): the id is resolved off the render thread
+                // (vcdRequestDisplayId, menusys.c), so a slow device never blocks here; until it
+                // lands, the filename's own id prefix is shown, then the title as before.
+                if (vcdViewActive(support->mode)) {
+                    char vcdId[VCD_ID_MAX];
+                    if (vcdDisplayIdCached(startup, vcdId, sizeof(vcdId)) ||
+                        vcdExtractGameId(startup, vcdId, sizeof(vcdId))) {
+                        fntRenderString(elem->font, elem->posX, elem->posY, elem->aligned, 0, 0, vcdId, elem->color);
+                        return;
+                    }
+                }
                 fntRenderString(elem->font, elem->posX, elem->posY, elem->aligned, 0, 0, vcdDisplayName(support->mode, startup), elem->color);
             }
         }

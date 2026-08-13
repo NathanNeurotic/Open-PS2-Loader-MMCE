@@ -15,6 +15,7 @@
 #include <unistd.h>
 #include <errno.h>    // errno/ENOENT in the vcdScanOpenDir absent-vs-contended split (#154)
 #include <sys/stat.h> // mkdir (POSIX, used like util.c / OSDHistory.c)
+#include <kernel.h>   // DIntr/EIntr -- the one-slot display-id resolve request (#380)
 
 #include "include/opl.h"         // pulls <dirent.h> (opendir/readdir/DIR) + strcasecmp, like supportbase.c
 #include "include/system.h"      // POPS_FOLDER
@@ -261,6 +262,91 @@ int vcdResolveDisplayId(const char *name, char *idOut, int idSize)
         return 1;
     }
     return 0;
+}
+
+// ---- Async display-id resolution for the caption (issue #380, step-170) -------------------------
+//
+// drawItemText (themes.c) renders the selected game's caption from itemGetStartup -- for a VCD
+// view that is the FILENAME, so long PS1 titles overflowed into the cover art (#380) while PS2
+// rows showed the short disc id from the very same element. The caption must show the id, but the
+// resolver does device IO and drawItemText runs on the render thread every frame, so the two
+// never meet directly:
+//
+//   menuRenderElements (settled row, GUI thread) -> vcdRequestDisplayId -> one-slot request
+//   -> ioman worker (IO_CUSTOM_SIMPLEACTION) -> vcdResolveDisplayId (the IO) -> the memo
+//   -> next frame's drawItemText -> vcdDisplayIdCached (memo only, NO IO) -> the id on screen.
+//
+// This is deliberately NOT the per-game config path: that path is gated on the theme having
+// config-consuming elements (rebuild-155's CFG-storm gate, menusys.c), which stays exactly as it
+// is -- and on the reporter's themes the VCD main page has none, so a resolve riding the config
+// path would never fire for him. One queued resolve per settled VCD row per session; the memo's
+// `asked` flag dedupes everything after, so merely holding a direction costs one strcmp walk per
+// frame and nothing else.
+
+// Memo-read half for the render thread: returns the id ONLY if it is already resolved. Never
+// touches the device, never queues anything -- a miss means "not yet", and the caller falls back.
+int vcdDisplayIdCached(const char *name, char *idOut, int idSize)
+{
+    if (name == NULL || idOut == NULL || idSize <= 0)
+        return 0;
+    idOut[0] = '\0';
+
+    vcd_id_memo_t *m = vcdIdMemoFind(name);
+    if (m == NULL || !m->asked || m->id[0] == '\0')
+        return 0;
+    snprintf(idOut, idSize, "%s", m->id);
+    return 1;
+}
+
+// One outstanding resolve request: the GUI writes it, the io worker reads and clears it. Both
+// bracket with DIntr/EIntr -- EE thread preemption requires an interrupt, so that is a complete
+// guard (same pattern as the SFX dispatch ring). A settle while one is in flight is dropped; the
+// next frame re-asks, so the row the user is ON is queued within a frame of the worker freeing.
+static char gVcdIdReqName[256];
+static volatile int gVcdIdReqPending = 0;
+
+static void vcdResolveQueuedDisplayId(void)
+{
+    char name[256];
+    char id[VCD_ID_MAX];
+
+    DIntr();
+    if (!gVcdIdReqPending) {
+        EIntr();
+        return;
+    }
+    snprintf(name, sizeof(name), "%s", gVcdIdReqName);
+    gVcdIdReqPending = 0;
+    EIntr();
+
+    // The resolver itself: opens the VCD and reads the id out of the image (memoized, one attempt
+    // per game per session). It runs HERE, on the ioman worker, so a slow device cannot stall the
+    // render thread -- the whole reason the caption does not call it directly.
+    vcdResolveDisplayId(name, id, sizeof(id));
+}
+
+void vcdRequestDisplayId(const char *name)
+{
+    if (name == NULL || name[0] == '\0')
+        return;
+
+    vcd_id_memo_t *m = vcdIdMemoFind(name);
+    if (m == NULL || m->asked)
+        return; // not a scanned VCD (folder row), or already resolved/attempted this session
+
+    if (strlen(name) >= sizeof(gVcdIdReqName))
+        return; // pathological basename: the resolver's own path buffer rejects it too -- leave the title
+
+    DIntr();
+    if (gVcdIdReqPending) {
+        EIntr();
+        return;
+    }
+    snprintf(gVcdIdReqName, sizeof(gVcdIdReqName), "%s", name);
+    gVcdIdReqPending = 1;
+    EIntr();
+
+    ioPutRequest(IO_CUSTOM_SIMPLEACTION, &vcdResolveQueuedDisplayId);
 }
 
 // dirPath is the directory that was just opened; fileName is what readdir returned (with ".VCD");
