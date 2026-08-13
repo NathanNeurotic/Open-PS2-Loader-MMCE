@@ -744,6 +744,20 @@ static int texLoadAll(GSTEXTURE *texture, const char *filePath, int texId, const
         readData = &memReader;
         readFunction = &texReadMemBoundedFunction;
     } else if (filePath) {
+        // DO NOT START ONE. The abort flag has real teeth only in the CHUNKED staging loop and the
+        // streaming PNG reader; the staged fast path below is one lseek and one read() of the whole
+        // file, a single un-interruptible IOP RPC, so once it is entered nothing can shorten it --
+        // and on a slow device that read has been measured at several seconds. That is what blows
+        // cacheEnd()'s join budget at teardown and leaves a thread inside a device the exit path is
+        // about to unmount.
+        //
+        // Checking here does not shorten a read already running, but it stops the NEXT one being
+        // issued the moment a cancel or a shutdown is latched -- which is the difference between a
+        // queue that stops instantly and one that keeps starting fresh multi-second reads while
+        // something waits for it to finish.
+        if (texLoadAbortRequested())
+            return ERR_LOAD_ABORTED;
+
         if (texShouldUseMemoryReader(filePath)) {
             errno = 0;
             fd = open(filePath, O_RDONLY, 0);

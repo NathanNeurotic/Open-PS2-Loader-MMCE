@@ -2963,6 +2963,13 @@ static void moduleCleanup(opl_io_module_t *mod, int exception, int modeSelected)
 // themselves, so skipping the power-off on launches leaks nothing).
 int gDeinitTerminal = 0;
 
+// Set by deinit/deinitEx when cacheEnd() gave up waiting for the art worker, i.e. a thread is still
+// inside a device read while the teardown proceeds. hddCleanUp reads it and skips the two operations
+// that would pull the ground out from under that thread -- unmounting pfs and PDIOC_CLOSEALL, which
+// closes EVERY pfs descriptor including the one the BGM decoder is streaming from. Leaving them is
+// free: every caller of deinit hands off to an ELF that resets the IOP anyway.
+int gArtAbandoned = 0;
+
 // deinitEx: deinit for the Neutrino keep-IOP handoff -- spares TWO modes' mounts (the game
 // device AND the device holding neutrino.elf), since Neutrino reads its -cwd config/modules
 // and the ISO through OPL's live mounts before performing its own IOP reset.
@@ -3003,10 +3010,17 @@ void deinitEx(int exception, int modeSelected, int modeSelected2)
     // device. Bounded, and a thread that will not come back is ABANDONED rather than
     // terminated -- killing one inside fileXio leaves the shared IOP RPC channel half-used for
     // every later caller, from any thread.
-    cacheEnd(gDeinitTerminal);
-
+    // ORDER: block+drain the io worker FIRST, then join art. Art left the ioman queue in rebuild-152,
+    // so nothing here needs art gone before the drain -- and doing it this way stops the two workers
+    // competing for the device during the join, which is the whole point of the join.
+    //
     // block all io ops, wait for the ones still running to finish (BOUNDED -- see the note above)
     ioBlockOpsTimed(1, gDeinitTerminal ? EXIT_IO_DRAIN_TICKS : LAUNCH_IO_DRAIN_TICKS);
+
+    // JOIN the art worker before anything unmounts a device under it. Its RESULT IS LOAD-BEARING and
+    // used to be thrown away: a 0 means a thread is still inside a device read, and the teardown
+    // below is about to unmount that device and close its descriptors.
+    gArtAbandoned = !cacheEnd(gDeinitTerminal);
     guiExecDeferredOps();
 
 #ifdef PADEMU
@@ -3047,10 +3061,17 @@ void deinit(int exception, int modeSelected)
     // device. Bounded, and a thread that will not come back is ABANDONED rather than
     // terminated -- killing one inside fileXio leaves the shared IOP RPC channel half-used for
     // every later caller, from any thread.
-    cacheEnd(gDeinitTerminal);
-
+    // ORDER: block+drain the io worker FIRST, then join art. Art left the ioman queue in rebuild-152,
+    // so nothing here needs art gone before the drain -- and doing it this way stops the two workers
+    // competing for the device during the join, which is the whole point of the join.
+    //
     // block all io ops, wait for the ones still running to finish (BOUNDED -- see the note above)
     ioBlockOpsTimed(1, gDeinitTerminal ? EXIT_IO_DRAIN_TICKS : LAUNCH_IO_DRAIN_TICKS);
+
+    // JOIN the art worker before anything unmounts a device under it. Its RESULT IS LOAD-BEARING and
+    // used to be thrown away: a 0 means a thread is still inside a device read, and the teardown
+    // below is about to unmount that device and close its descriptors.
+    gArtAbandoned = !cacheEnd(gDeinitTerminal);
     guiExecDeferredOps();
 
 #ifdef PADEMU

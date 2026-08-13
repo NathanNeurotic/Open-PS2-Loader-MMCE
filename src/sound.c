@@ -525,6 +525,10 @@ void sfxPlay(int id)
 // swallowed controller input. Deepening the buffer costs memory and nothing else.
 #define BGM_RING_BUFFER_COUNT 48
 #define BGM_RING_BUFFER_SIZE  4096
+
+// Slices bgmStop() will wait for each BGM thread to stop. One slice is the SetAlarm below, 200*16
+// h-blanks, ~200 ms -- so 16 is a little over 3 seconds each. A healthy stop takes one slice.
+#define BGM_STOP_WAIT_SLICES  16
 #define BGM_THREAD_BASE_PRIO  0x40
 #define BGM_THREAD_STACK_SIZE 0x1000
 
@@ -576,6 +580,18 @@ static void bgmIoThread(void *arg)
     bgmIoThreadRunning = 1;
     do {
         WaitSema(inSema);
+
+        // TERMINATE BEFORE DECODING, not after. Ours checked only at the BOTTOM of the do/while, so a
+        // thread woken during teardown ran one more full decode first -- and by then hddCleanUp has
+        // already closed every pfs descriptor with PDIOC_CLOSEALL (src/opl.c runs deinitAllSupport
+        // BEFORE audioEnd). ov_read on the dead fd returns 0, the ret==0 arm calls ov_pcm_seek and
+        // retries, decodeTotal never decreases, and the inner loop SPINS FOREVER. bgmIoThreadRunning
+        // then never clears and bgmStop's unbounded wait below never returns: the black-screen exit
+        // hang, reproducible only with ATA up because hddCleanUp is the only teardown in the tree
+        // that closes file descriptors. master has this guard; we never ported it.
+        if (terminateFlag || !gEnableBGM)
+            break;
+
         partsToRead = 1;
 
         while ((wrPtr + partsToRead < BGM_RING_BUFFER_COUNT) && (PollSema(inSema) == inSema))
@@ -592,9 +608,22 @@ static void bgmIoThread(void *arg)
                 LOG("BGM: I/O error while reading.\n");
                 terminateFlag = 1;
                 break;
-            } else if (ret == 0)
-                ov_pcm_seek(vorbisFile, 0);
+            } else if (ret == 0) {
+                // End of stream: loop the track. If the SEEK fails we cannot make progress -- the
+                // next ov_read returns 0 again and decodeTotal never falls, so this inner loop is
+                // unbounded. That is not hypothetical: a descriptor closed underneath us (pfs
+                // PDIOC_CLOSEALL during teardown) presents exactly as permanent EOF. Treat it as the
+                // I/O error it is.
+                if (ov_pcm_seek(vorbisFile, 0) != 0) {
+                    LOG("BGM: cannot rewind (descriptor lost?) -- stopping.\n");
+                    terminateFlag = 1;
+                    break;
+                }
+            }
         } while (decodeTotal > 0);
+
+        if (terminateFlag)
+            break;
 
         wrPtr = (wrPtr + partsToRead) % BGM_RING_BUFFER_COUNT;
         for (i = 0; i < partsToRead; i++)
@@ -604,6 +633,11 @@ static void bgmIoThread(void *arg)
 
     bgmIoThreadRunning = 0;
     terminateFlag = 1;
+    // Release the consumer too, not just the sleeper: bgmThread parks in SleepThread here (master's
+    // parks on outSema), so it needs the wakeup -- but if it is instead inside its PollSema drain it
+    // needs the count. Signalling a semaphore nothing is waiting on is harmless; bgmDeinit deletes
+    // both a moment later.
+    SignalSema(outSema);
     WakeupThread(bgmThreadID);
 }
 
@@ -769,16 +803,42 @@ void bgmStop(void)
     LOG("BGM: terminating threads...\n");
 
     terminateFlag = 1;
+
+    // WAKE THE PRODUCER, WHICH THIS NEVER DID. bgmIoThread parks in WaitSema(inSema), and a
+    // WakeupThread does not release a semaphore -- nor was it even aimed at that thread; bgmThreadID
+    // is the PLAYBACK thread. The only SignalSema(inSema) in the whole file is inside bgmThread's
+    // `while (PollSema(outSema))` drain, so once playback sees terminateFlag and exits, nothing can
+    // ever signal inSema again and the io thread is parked for good -- with the first wait below
+    // spinning on it forever.
+    //
+    // It survived because it is a RACE, and one the BGM stutter fix lost: with the ring at 48 buffers
+    // (was 16) the producer runs far enough ahead that "parked on inSema with nothing pending for
+    // playback to drain" became the normal steady state rather than a rare one.
+    SignalSema(inSema);
+    SignalSema(outSema);
     WakeupThread(bgmThreadID);
 
+    // BOUNDED. These were unbounded `while (running)` spins, i.e. the last step of the exit hang:
+    // whatever wedges the decoder also wedges the thread trying to shut it down, and the screen is
+    // already gone by the time audioEnd runs. A thread that will not stop is left alone rather than
+    // terminated (same rule as the art worker: never kill a thread that may hold an IOP RPC), and
+    // audsrv_quit below is what actually silences it. ~3 s is far past any healthy stop.
     threadId = GetThreadId();
-    while (bgmIoThreadRunning) {
+    int waits = BGM_STOP_WAIT_SLICES;
+    while (bgmIoThreadRunning && waits-- > 0) {
         SetAlarm(200 * 16, &bgmShutdownDelayCallback, (void *)threadId);
         SleepThread();
     }
-    while (bgmThreadRunning) {
+    waits = BGM_STOP_WAIT_SLICES;
+    while (bgmThreadRunning && waits-- > 0) {
         SetAlarm(200 * 16, &bgmShutdownDelayCallback, (void *)threadId);
         SleepThread();
+    }
+
+    if (bgmIoThreadRunning || bgmThreadRunning) {
+        LOG("BGM: threads did not stop (io=%d play=%d) -- abandoning\n",
+            (int)bgmIoThreadRunning, (int)bgmThreadRunning);
+        return; // do NOT bgmDeinit(): a live thread still holds these semaphores and the vorbis file
     }
 
     bgmDeinit();
@@ -831,7 +891,11 @@ void audioEnd(void)
         return;
     }
 
-    if (gEnableBGM && isBgmPlaying())
+    // Stop BGM if anything is still alive, not merely if it is still PLAYING. A settings toggle can
+    // leave the io thread self-exited (terminateFlag=1, bgmIsPlaying=0) with bgmDeinit never called,
+    // so the narrow predicate skipped bgmStop and ran audsrv_quit() underneath live threads. Master's
+    // predicate; both flags are already file-static volatiles here.
+    if (isBgmPlaying() || bgmIoThreadRunning || bgmThreadRunning)
         bgmStop();
 
     // Park the SFX dispatch thread: an audsrv RPC crossing audsrv_quit wedges it forever.

@@ -2699,8 +2699,14 @@ static void guiDrawOverlays()
         // in exactly one of the two -- so D and X both flat while covers keep being asked for is the
         // signature of a leak, and X racing while D crawls is the signature of over-cancelling.
         // That pair is how the born-stale bug was caught, and it is worth keeping legible.
-        snprintf(artdbg, sizeof(artdbg), "Q%d A%d D%d X%d %dms  F%u/%u OV%u  NR%u MT%u  IO %d/%d T%u/%u",
-                 q, a, d, cacheDebugDropped(), lastMs,
+        // ...and the last SUCCESSFUL load's cost WITH ITS DECODED PIXEL SIZE, which is the field that
+        // settles the open question about the VCD page. Covers there measured 4309, 6847, 8764 and
+        // 8813 ms against 55-81 ms for a PS2 cover on the same USB stick, and the two explanations --
+        // "PS1 box scans are simply enormous PNGs" and "something about that path is slow" -- are
+        // indistinguishable from a millisecond alone. WxH tells them apart in one glance: a
+        // 1000x1400 scan decoding for eight seconds is arithmetic, a 184x256 one is a bug.
+        snprintf(artdbg, sizeof(artdbg), "Q%d A%d D%d X%d %dms(ok %dms %dx%d)  F%u/%u OV%u  NR%u MT%u  IO %d/%d T%u/%u",
+                 q, a, d, cacheDebugDropped(), lastMs, okMs, w, h,
                  (unsigned)(fLast / 1000), (unsigned)(fWorst / 1000), (unsigned)fOver,
                  (unsigned)padNR, (unsigned)padEmpty,
                  ioGetPending(IO_CUSTOM_SIMPLEACTION), ioGetPending(IO_MENU_UPDATE_DEFFERED),

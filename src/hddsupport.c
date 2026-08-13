@@ -43,6 +43,12 @@ static unsigned char hddSupportErrToasted = 0;
 static char *hddPrefix = "pfs0:";
 static hdl_games_list_t hddGames;
 
+// How long the HDD VCD launch waits for the art worker to let go before it remounts pfs0: under it.
+// Milliseconds (cacheCancelPendingImageLoadsTimed sleeps via DelayThread(1000), NOT util.c's delay(),
+// whose "tick" is a ~0.25 s NOP spin). Generous because an un-abortable whole-file cover read on this
+// device has been measured at several seconds, and the alternative is remounting under a live reader.
+#define HDD_ART_QUIESCE_MS 2000
+
 // HDD VCD view: PS1 games gathered from pooled __.POPS[0-9]? partitions and one-game PP. / __.
 // partitions. hddVcdParts is index-parallel to hddVcdGames -- it records the full owning partition
 // label for the launch handoff.
@@ -236,6 +242,13 @@ int hddLoadModules(void)
             // our fork adds boot-time callers like bdmResolveBootDir's ATA escalation, seconds after
             // power-on). sysInitDev9/sysLoadModuleBuffer are safe to re-run; a later caller (e.g. the
             // HDD tab) now gets a real second attempt instead of a poisoned latch.
+            //
+            // Release the dev9 reference taken above before clearing the count, or the retry that this
+            // line exists to permit takes a SECOND one and never gives either back. dev9 is refcounted
+            // and shared with ETH/UDPBD, so an inflated count means a later teardown can never power
+            // dev9 down. The UDPBD arm in bdmsupport.c already pairs its init/shutdown this way; this
+            // arm did not, and rebuild-153's device-refresh bump made the retry more frequent.
+            sysShutdownDev9();
             hddModulesLoadCount = 0;
         } else {
             retStatus = HDD_LOADMODULES_STATUS_NOERROR;
@@ -753,8 +766,15 @@ static void hddDoLaunchVcd(item_list_t *itemList, const char *name, const char *
         snprintf(vcdSelector, sizeof(vcdSelector), "%s.ELF", name); // GAME.ELF (pooled-container VCD)
 
     // Resolve + keep pfs0: on the POPSTARTER.ELF partition. Quiesce art+IO first (this remounts pfs0:).
-    cacheAbortMmceImageLoadsTimed(0);
-    (void)cacheCancelPendingImageLoadsTimed(0);
+    //
+    // The budget used to be 0 on both, i.e. no wait at all -- harmless while these were `return 1`
+    // stubs, and not harmless now that they are real. There is exactly ONE pfs0: slot, so the remount
+    // below is destructive to any HDD art read still running; a zero budget quiesced nothing and just
+    // reported success. Note cacheAbortMmce* only covers SIO2 requests, so the second call (which
+    // covers ALL of them) is the one that matters here and its result is the one worth honouring.
+    cacheAbortMmceImageLoadsTimed(HDD_ART_QUIESCE_MS);
+    if (!cacheCancelPendingImageLoadsTimed(HDD_ART_QUIESCE_MS))
+        LOG("HDD VCD: art did not quiesce before the pfs0: remount\n");
     ioBlockOps(1);
     if (!hddResolveHddPopstarter(vcdElf, sizeof(vcdElf))) {
         ioBlockOps(0); // resolver already restored pfs0: to the OPL data partition on failure
@@ -1176,6 +1196,23 @@ static int hddGetIconId(item_list_t *itemList)
 static void hddCleanUp(item_list_t *itemList, int exception)
 {
     LOG("HDDSUPPORT CleanUp\n");
+
+    // A THREAD IS STILL READING. cacheEnd() could not join the art worker before this teardown began,
+    // so it is parked inside a device read right now. Unmounting pfs under it -- and above all
+    // PDIOC_CLOSEALL, which closes EVERY pfs descriptor in the process, the BGM decoder's included --
+    // is how a clean exit becomes a black-screen hang: the next read returns permanent EOF and the
+    // thread that owns it never comes back, so whoever waits for it waits forever.
+    //
+    // Skipping both costs nothing. Every path that reaches here hands off to an ELF that resets the
+    // IOP, which reclaims the mounts and the descriptors wholesale.
+    if (gArtAbandoned) {
+        LOG("HDDSUPPORT CleanUp: art worker abandoned mid-read -- leaving pfs mounted\n");
+        if (hddGameList.enabled) {
+            hddFreeHDLGamelist(&hddGames);
+            hddFreeVcdGameList();
+        }
+        return;
+    }
 
     if (hddGameList.enabled) {
         hddFreeHDLGamelist(&hddGames);

@@ -702,6 +702,31 @@ static void cacheLoadImage(load_image_request_t *req)
     if (sio2Bracket)
         ChangeThreadPriority(gArtThreadId, ART_THREAD_PRIORITY);
 
+    // ABANDONED WHILE WE WERE IN THE READ. cacheEnd() gave up waiting for this thread and deinit has
+    // carried on without us -- devices are being unmounted, supports torn down, the theme freed.
+    //
+    // gArtShutdownAbandoned was SET by cacheEnd and read by nobody: another flag with no consumer.
+    // The cache this request points into is protected (cacheDestroyCache leaks any cache with
+    // activeRequests outstanding, which is exactly this one), but nothing protects the rest, and
+    // there is no reason whatsoever to publish a cover into a menu that no longer exists. Take the
+    // only safe action available: drop everything on the floor and let the thread die.
+    //
+    // Deliberately NOT artReleaseRequest: that walks req->cache to decrement activeRequests, and
+    // leaving that count non-zero is what keeps the leak-instead-of-free branch armed.
+    if (gArtShutdownAbandoned) {
+        texFree(&staged);
+        DIntr();
+        if (gArtCurrentReq == req)
+            gArtCurrentReq = NULL;
+        if (gArtActiveCount > 0)
+            gArtActiveCount--;
+        EIntr();
+        gArtDropped++;
+        free(req);
+        gArtTerminate = 1;
+        return;
+    }
+
     // clock() is microseconds here; the elapsed form is single-wrap safe.
     gArtLastMs = (int)((clock() - loadStart) / 1000);
     if (result >= 0) {
