@@ -12,6 +12,7 @@
 #include "include/lang.h"
 #include "include/themes.h"
 #include "include/textures.h"
+#include "include/artindex.h"
 #include "include/pad.h"
 #include "include/texcache.h"
 #include "include/dia.h"
@@ -1170,8 +1171,10 @@ static void menuUpdateHook()
         // was re-probed over and over forever. That is the expensive direction: a lookup for a file
         // that is not there has to walk the whole directory before it can say so, and this build
         // measured art loads spanning 82 ms to 2922 ms with the decoded size held constant.
-        if (genChanged)
+        if (genChanged) {
             cacheInvalidateFailMemo();
+            artIndexInvalidate(); // the listing is only as current as the device it was read from
+        }
         // Consume the generation bump only if every hotplug-driven enqueue is ACCEPTED:
         // ioPutRequest can fail (queue blocked during teardown, allocation failure), and
         // committing lastSeenBdmGeneration up front would silently eat the one immediate-rescan
@@ -2384,6 +2387,7 @@ void applyConfig(int themeID, int langID, int skipDeviceRefresh)
     // official-derived texcache does not have. Only the .tar half applies here.
     tarInvalidate(TAR_KIND_ART);
     cacheInvalidateFailMemo();
+    artIndexInvalidate(); // a settings apply is the user's own "I changed something, look again"
 
     // The bound is FAV_MODE, not APP_MODE. The Game Sources picker offers six entries and the last
     // of them is Favourites (guiShowDeviceConfig deviceNames[], byte-identical to the fork), so an

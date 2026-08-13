@@ -1,5 +1,6 @@
 #include "include/opl.h"
 #include "include/textures.h"
+#include "include/artindex.h"
 #include "include/util.h"
 #include "include/ioman.h"
 #include <errno.h> // errno/ENOENT in the staging-arm open classifier (transitively via opl.h, but be explicit)
@@ -1001,6 +1002,18 @@ int texDiscoverLoad(GSTEXTURE *texture, const char *path, int texId)
         snprintf(filePath, sizeof(filePath), "%s%s.%s", path, internalDefault[texId].name, "png");
     else
         snprintf(filePath, sizeof(filePath), "%s.%s", path, "png");
+
+    // ASK RAM BEFORE ASKING THE DEVICE. This is the single choke point every loose-file texture goes
+    // through -- all six itemGetImage implementations, the VCD POPS fallback, and the theme loader --
+    // so one check here covers the lot, including the VCD path's TWO probes per cover (ART/ first,
+    // then the POPS folder), which is why that page was the slowest of all.
+    //
+    // Only ever skips work: artIndexMayExist returns 1 for anything it is not certain about, so the
+    // worst case is exactly the behaviour that was here before.
+    if (!artIndexMayExist(filePath)) {
+        LOG("texDiscoverLoad: '%s' absent per directory index (no device access)\n", filePath);
+        return ERR_BAD_FILE;
+    }
 
     result = texLoad(texture, filePath);
     return (result >= 0) ? 0 : result;

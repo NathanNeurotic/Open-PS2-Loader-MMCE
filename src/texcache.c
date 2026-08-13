@@ -1,5 +1,6 @@
 #include "include/opl.h"
 #include "include/texcache.h"
+#include "include/artindex.h"
 #include "include/textures.h"
 #include "include/ioman.h"
 #include "include/gui.h"
@@ -838,6 +839,10 @@ void cacheInit()
         gArtThreadId = -1;
         return;
     }
+
+    // The art worker owns the art-directory index: it is the only thread allowed to build or read
+    // it, which is what keeps that index lock-free (see artindex.c).
+    artIndexSetOwnerThread(gArtThreadId);
 
     gArtRunning = 1;
 }

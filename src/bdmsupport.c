@@ -887,45 +887,57 @@ static void bdmLaunchVcd(item_list_t *itemList, const char *vcdName, config_set_
     // unit-numbered mount -- POPSTARTER remounts under "mass:" after its own IOP reset (see the function).
     vcdBuildSelector(vcdPrefix, VCD_PREFIX_MASS, vcdName, vcdSelector, sizeof(vcdSelector));
 
+    // ASK FIRST. Nothing above this point has written to the card or put anything on screen, and
+    // nothing below it asks the user a question -- which is the ordering Nathan asked for: the
+    // fat32/exFAT decision comes before every visible and every expensive step, and the RetroGEM
+    // barcode is the very last thing that happens before the handoff.
+    //
+    // It used to sit after vcdInstallPopstarterMc, which populates mc?:/POPSTARTER and is the
+    // "Preparing PS1 driver on memory card..." step -- many seconds of card writes on hardware. So
+    // pressing Back at the dialog meant OPL had already spent all of that on a launch the user then
+    // cancelled, and the question arrived after the wait rather than before it.
+    //
+    // USB is special: the PS2 cannot detect whether the stick is fat32 or exFAT formatted, so the
+    // POPSTARTER USB driver has to be CHOSEN rather than detected. fat32 = POPSTARTER's built-in USB
+    // stack (recommended for non-exFAT users); exFAT = the BDMAssault usbexfat pair.
+    //
+    // Asking on EVERY USB VCD launch was the original directive (2026-08-01) and remains the shipped
+    // default, because a wrong answer here is a failed boot rather than a wrong setting. It is now the
+    // ASK value of a three-way preference (BDMA Settings -> USB BDMA Driver) rather than the only
+    // behaviour: a user whose sticks are all one format was being asked a question with the same
+    // answer every single time.
+    //
+    // Back still cancels the LAUNCH, and only in ASK mode -- a pinned choice has no dialog to cancel.
+    // USB VCDs only; the MX4SIO and ATA cases equip by device type and have never asked.
+    int usbBdmaVariant = -1;
+    if (pDeviceData->bdmDeviceType == BDM_TYPE_USB) {
+        if (gVcdUsbBdmaMode == VCD_USB_BDMA_EXFAT) {
+            usbBdmaVariant = VCD_BDMA_USBEXFAT;
+        } else if (gVcdUsbBdmaMode == VCD_USB_BDMA_FAT32) {
+            usbBdmaVariant = VCD_BDMA_FAT32;
+        } else {
+            int usbMode = guiShowVcdUsbMode();
+            if (usbMode == VCDUSB_BTN_FAT32)
+                usbBdmaVariant = VCD_BDMA_FAT32;
+            else if (usbMode == VCDUSB_BTN_EXFAT)
+                usbBdmaVariant = VCD_BDMA_USBEXFAT;
+            else
+                return; // dialog cancelled -- nothing written, nothing prepared, nothing displayed
+        }
+    }
+
     // Populate mc?:/POPSTARTER from this game's own direct POPS/ folder. Best effort: local VCD
     // launches keep their existing handoff behavior when optional files are absent or the card is full.
     (void)vcdInstallPopstarterMc(vcdPrefix);
 
     // Best-effort card prep: POPSTARTER reloads its block-device driver pair from the MC after its OWN
-    // IOP reset, so try to equip the device-matching BDMAssault variant first. NEVER a launch gate --
-    // the handoff below always proceeds (POPSTARTER owns everything past the exec); a failed equip just
-    // toasts its diagnostic in passing. iLink/UDPBD/unknown have no BDMA variant and are left as-is.
+    // IOP reset, so equip the device-matching BDMAssault variant. NEVER a launch gate -- the handoff
+    // below always proceeds (POPSTARTER owns everything past the exec); a failed equip just toasts its
+    // diagnostic in passing. iLink/UDPBD/unknown have no BDMA variant and are left as-is.
     switch (pDeviceData->bdmDeviceType) {
-        case BDM_TYPE_USB: {
-            // USB is special: the PS2 cannot detect whether the stick is fat32 or exFAT formatted, so
-            // the POPSTARTER USB driver has to be CHOSEN rather than detected. fat32 = POPSTARTER's
-            // built-in USB stack (recommended for non-exFAT users); exFAT = the BDMAssault usbexfat
-            // pair.
-            //
-            // Asking on EVERY USB VCD launch was the original directive (2026-08-01) and remains the
-            // shipped default, because a wrong answer here is a failed boot rather than a wrong
-            // setting. It is now the ASK value of a three-way preference (BDMA Settings -> USB BDMA
-            // Driver) rather than the only behaviour: a user whose sticks are all one format was being
-            // asked a question with the same answer every single time.
-            //
-            // Back still cancels the LAUNCH, and only in ASK mode -- a pinned choice has no dialog to
-            // cancel, so those two legs go straight to the equip. USB VCDs only; the MX4SIO and ATA
-            // cases below equip by device type and have never asked.
-            if (gVcdUsbBdmaMode == VCD_USB_BDMA_EXFAT) {
-                vcdApplyUsbModeForLaunch(VCD_BDMA_USBEXFAT);
-            } else if (gVcdUsbBdmaMode == VCD_USB_BDMA_FAT32) {
-                vcdApplyUsbModeForLaunch(VCD_BDMA_FAT32);
-            } else {
-                int usbMode = guiShowVcdUsbMode();
-                if (usbMode == VCDUSB_BTN_FAT32)
-                    vcdApplyUsbModeForLaunch(VCD_BDMA_FAT32);
-                else if (usbMode == VCDUSB_BTN_EXFAT)
-                    vcdApplyUsbModeForLaunch(VCD_BDMA_USBEXFAT);
-                else
-                    return; // dialog cancelled -- abort the launch, nothing equipped
-            }
+        case BDM_TYPE_USB:
+            vcdApplyUsbModeForLaunch(usbBdmaVariant); // decided above, before anything was written
             break;
-        }
         case BDM_TYPE_SDC:
             vcdEnsureBdmaForLaunch(VCD_BDMA_SRC_MX4SIO, VCD_BDMA_MX4SIO);
             break;

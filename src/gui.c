@@ -20,8 +20,9 @@
 #include "include/system.h"
 #include "include/ethsupport.h"
 #include "include/udpfssupport.h" // udpfsGetModulesLoaded() -- network-protocol restart-notice check
-#include "include/bdmsupport.h"   // bdmIsUDPBDLoaded() + bdmForceDeviceRefresh()
-#include "include/vcdsupport.h"   // POPStarter pages: BDMA equip, list options, POPS net config
+#include "include/artindex.h"
+#include "include/bdmsupport.h" // bdmIsUDPBDLoaded() + bdmForceDeviceRefresh()
+#include "include/vcdsupport.h" // POPStarter pages: BDMA equip, list options, POPS net config
 #include "include/compatupd.h"
 #include "include/pggsm.h"
 #include "include/cheatman.h"
@@ -2671,7 +2672,7 @@ static void guiDrawOverlays()
     if (gEnableDebug) {
         int q = 0, a = 0, r = 0, d = 0;
         int lastMs = 0, okMs = 0, w = 0, h = 0;
-        char artdbg[160]; // 96 truncated the IO counters off the end -- snprintf is safe, but silently
+        char artdbg[224]; // 96 truncated the IO counters off the end -- snprintf is safe, but silently
                           // dropping the field you added to diagnose something is its own trap.
         cacheDebugCounters(&q, &a, &r, &d);
         cacheDebugLastLoad(&lastMs, &okMs, &w, &h);
@@ -2714,9 +2715,15 @@ static void guiDrawOverlays()
         // milliseconds, the cost is the filesystem walking the whole directory to prove a file is not
         // there -- and an in-RAM index of the art folder becomes worth building. If both are small,
         // the seconds are in the transfer or in contention and the index would fix nothing.
-        snprintf(artdbg, sizeof(artdbg), "Q%d A%d D%d X%d %dms(ok %dms %dx%d) O:%d/%d OE%u  F%u/%u OV%u  NR%u MT%u  IO %d/%d T%u/%u",
+        // IX<dirs>/<absent> = art directories held in RAM, and probes answered "not there" without
+        // touching the device. The second number is the whole point of the index: every one of those
+        // is a directory walk that did not happen.
+        int ixDirs = 0;
+        unsigned int ixAbsent = 0;
+        artIndexDebug(&ixDirs, &ixAbsent);
+        snprintf(artdbg, sizeof(artdbg), "Q%d A%d D%d X%d %dms(ok %dms %dx%d) O:%d/%d OE%u IX%d/%u  F%u/%u OV%u  NR%u MT%u  IO %d/%d T%u/%u",
                  q, a, d, cacheDebugDropped(), lastMs, okMs, w, h,
-                 gTexLastOpenMs, gTexLastMissOpenMs, gTexStagedOpenNonEnoent,
+                 gTexLastOpenMs, gTexLastMissOpenMs, gTexStagedOpenNonEnoent, ixDirs, ixAbsent,
                  (unsigned)(fLast / 1000), (unsigned)(fWorst / 1000), (unsigned)fOver,
                  (unsigned)padNR, (unsigned)padEmpty,
                  ioGetPending(IO_CUSTOM_SIMPLEACTION), ioGetPending(IO_MENU_UPDATE_DEFFERED),
