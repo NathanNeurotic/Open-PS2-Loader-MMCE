@@ -847,3 +847,22 @@ re-queue an ioman request on every settle while selected (one in flight at a tim
 pending flag, but forever). OOM-gated, which is exactly when a request loop is least wanted.
 Fix: one condition at the queue source — `m->dir == NULL` now fails closed like `asked`.
 Recoverable: a later rescan re-points dir and re-arms the row. Commit 95aabdc8.
+
+**173 — rolling-release plumbing, staged NOT published** (branch
+`rebuild/step-173-rolling-release-notes`). Nathan is bringing testers in and wants the
+release pipeline live. The new-lineage statement (parity goal, MMCE awaiting
+reimplementation, old build still fine on Rolling Alpha/MEGA, reports tracked against the
+new lineage only, re-report fixed things, pinned-flavour guidance + Settings→About) now
+lives in `.github/rolling-release-notes-block.md`, cat'd into notes.md by the "Build
+release notes" step on every publish. Get-started order swapped to PINNED-first to match
+Nathan's ruling (was PS2DEVROLLING-first, which would have contradicted the block in the
+same release body). Publish gate untouched: still master/v*-tag only — the first real
+rolling publish needs Nathan's go AND the rebuild tip landing on master. What publish
+produces (for the go decision): creates tag `rolling` ("Rolling (master)", prerelease) on
+first master push — NO rolling tag exists yet, so nothing is overwritten; `rolling-alpha`
+and `pops-bundle` are separate tags, untouched. Subsequent master pushes update it in
+place (delete-all-assets + re-upload). MEGA: master-only + secrets (set), one immutable
+zip per run to /RiptOPL/Rolling/<ver>/run_<n>/, VARIANTS/DEBUG excluded, nothing ever
+overwritten on MEGA. Validation limit, stated plainly: the notes step is inside the gated
+publish job so it CANNOT be rehearsed from a branch — checked by YAML parse + local
+simulation of the exact printf/cat fragment only.
