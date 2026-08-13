@@ -1,7 +1,11 @@
 name: Rolling Release
 
-# Continuously publishes the current master build to a single "rolling" pre-release
-# so it can be pulled directly from GitHub at a stable URL as development progresses.
+# Continuously publishes the current build of the PUBLISHING BRANCH to a single "rolling"
+# pre-release so it can be pulled directly from GitHub at a stable URL as development
+# progresses. The publishing branch is `master` (after cutover) or `rebuild/main` (during
+# the rebuild): rebuild/main is the physical publish knob -- it is fast-forwarded to a
+# tested step-chain tip exactly when Nathan wants a rolling build to go out, never
+# automatically per step. See the NOTE(rebuild) on the publish-rolling gate below.
 #
 # Builds with TWO toolchains so a regression in either is visible from the rolling channel
 # (and a hardware failure can be triaged by WHICH flavours reproduce it). Each ships as its own
@@ -40,6 +44,7 @@ on:
   push:
     branches:
       - master
+      - rebuild/main
     tags:
       - 'v*'
   workflow_dispatch:
@@ -412,13 +417,13 @@ jobs:
     needs: [build-rolling-pinned, build-rolling-ps2dev-latest, build-rolling-officialsdk, build-rolling-official-pinned]
     # NOTE(rebuild): publish gate. Downstream this job has NO ref check -- anything that is not a
     # v* tag falls through to TAG="rolling" and cuts a PUBLIC prerelease (see the tag/title block
-    # below). That is correct on master, but the rebuild branch is not master yet, so the only way
-    # to exercise this pipeline before cutover -- workflow_dispatch from rebuild/main -- would
-    # publish a real release built from an unfinished tree. Gating here keeps the three build jobs
-    # (the part worth rehearsing) running on a dispatch and uploads their artifacts, while
-    # withholding only the publish. On master and on v* tags the condition is true, so shipping
-    # behaviour is byte-for-byte what the fork does today.
-    if: ${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v') }}
+    # below). The gate therefore names the branches allowed to publish: master (post-cutover) and
+    # rebuild/main (the rebuild-line publish knob -- fast-forwarded to a tested step tip only when
+    # a rolling build is meant to go out). Any OTHER ref -- a step branch, workflow_dispatch from
+    # one, a feature branch -- still runs the build jobs (the part worth rehearsing) and uploads
+    # their artifacts, while withholding only the publish. On master, rebuild/main and v* tags the
+    # condition is true, so shipping behaviour is byte-for-byte what the fork does today.
+    if: ${{ github.ref == 'refs/heads/master' || github.ref == 'refs/heads/rebuild/main' || startsWith(github.ref, 'refs/tags/v') }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -684,7 +689,7 @@ jobs:
             if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
               printf 'RiptOPL %s -- tagged release.\n\n' "$OPL_VERSION"
             else
-              printf 'RiptOPL -- rolling build of master (not a stable release).\n\n'
+              printf 'RiptOPL -- rolling build of the rebuild line (not a stable release).\n\n'
             fi
             printf 'Version: %s\n' "$OPL_VERSION"
             printf 'Commit: %s/%s/commit/%s\n' "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_SHA"
@@ -810,24 +815,25 @@ jobs:
             printf '```\n'
             cat rolling/SHA256SUMS.txt
             printf '```\n'
-            printf '\nUpdated on every push to master. This is the single rolling channel; stable builds are the v* tagged releases.\n'
+            printf '\nUpdated on every push to the publishing branch (rebuild/main during the rebuild, master after cutover). This is the single rolling channel; stable builds are the v* tagged releases.\n'
           } > notes.md
           echo "PS2DEVPINNED flavour present: $HAS_PS2DEVPINNED"
           cat notes.md
           echo "Assets to publish:"
           ls -la rolling
 
-      - name: Publish (rolling on master, curated release on a v* tag)
+      - name: Publish (rolling on the publishing branch, curated release on a v* tag)
         run: |
           set -eu
           # The ref decides the publish target: a v* tag cuts the curated per-version release
-          # (full, unless an -rc pre-release); master/dispatch updates the single rolling channel.
-          # Either path publishes the SAME staged asset set, so packaging can never diverge again.
+          # (full, unless an -rc pre-release); a publishing-branch push updates the single
+          # rolling channel. Either path publishes the SAME staged asset set, so packaging
+          # can never diverge again.
           if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
             TAG="${GITHUB_REF_NAME}"; TITLE="${GITHUB_REF_NAME}"; TARGET=""
             case "${GITHUB_REF}" in *-rc*) PREREL="--prerelease";; *) PREREL="";; esac
           else
-            TAG="rolling"; TITLE="Rolling (master)"; PREREL="--prerelease"; TARGET="--target $GITHUB_SHA"
+            TAG="rolling"; TITLE="Rolling"; PREREL="--prerelease"; TARGET="--target $GITHUB_SHA"
           fi
           if gh release view "$TAG" >/dev/null 2>&1; then
             echo "Updating existing release: $TAG"
@@ -848,14 +854,17 @@ jobs:
               $TARGET
           fi
 
-      # --- MEGA archival (master rolling builds only) -----------------------------------------
+      # --- MEGA archival (publishing-branch rolling builds only) -------------------------------
       # The GitHub 'rolling' release above keeps OVERWRITING the latest build. To keep a PERMANENT
-      # record, every master rolling build is ALSO archived to MEGA as ONE immutable, self-contained
+      # record, every rolling build is ALSO archived to MEGA as ONE immutable, self-contained
       # zip of the entire release payload. Runs AFTER Publish so the GitHub release is completely
       # unchanged and a MEGA hiccup can never block or alter it -- MEGA is purely additive. Gated to
-      # master + secrets present, so v* tag cuts and secret-less forks skip it cleanly.
+      # the publishing branches (master, rebuild/main) + secrets present, so v* tag cuts and
+      # secret-less forks skip it cleanly. rebuild/main included per Nathan 2026-08-13: the new
+      # lineage moves far faster than the old one ever did, so it needs the overwrite protection
+      # more, not less; per-run remote folders cannot collide.
       - name: Build all-in-one MEGA archive
-        if: github.ref == 'refs/heads/master' && env.USERNAME != '' && env.PASSWORD != ''
+        if: (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/rebuild/main') && env.USERNAME != '' && env.PASSWORD != ''
         run: |
           set -eu
           # Validate the payload BEFORE archiving so a broken publish fails loudly instead of pushing
@@ -911,7 +920,7 @@ jobs:
           sha256sum "mega-out/${ARCHIVE}" | tee "mega-out/${ARCHIVE}.sha256"
 
       - name: Upload the all-in-one archive to MEGA
-        if: github.ref == 'refs/heads/master' && env.USERNAME != '' && env.PASSWORD != ''
+        if: (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/rebuild/main') && env.USERNAME != '' && env.PASSWORD != ''
         # Pinned to a full commit SHA rather than @master: this third-party action runs with the
         # MEGA credentials, so freeze it to a reviewed snapshot instead of trusting whatever is on
         # its master branch at build time. bf698c6 == the action's v1.4.0 release == the master HEAD

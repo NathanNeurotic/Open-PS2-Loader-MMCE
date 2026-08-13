@@ -20,6 +20,18 @@ line engineered itself into a corner. It is **not yet at parity** with the build
 replaces — reaching at least the performance of the abandoned build comes before anything
 else. New features come after parity, not before.
 
+**This rolling build can be ahead of what has been verified on real hardware** — that is
+what a rolling channel is for: it exists so testing can happen. If you want the most
+trustworthy RiptOPL today, that is still the old build below.
+
+<!-- ONE-TIME NOTE, first new-lineage publish only: remove this paragraph (and this
+     comment) from the block after the first correct rolling publish has gone out. -->
+*A note on the rolling tag's history: before this publish, the `rolling` tag had been
+stuck on a June 2026 commit, so the "source at this tag" link on earlier rolling releases
+never matched the assets beside them. The downloadable builds were always built from the
+right commit — only the tag was stale. It has been recreated for this publish. If you
+ever built from that tag expecting to match a release, you didn't.*
+
 **MMCE is still awaiting reimplementation.** If your games are on MMCE, this build will
 not see them yet. This line stays in every release until MMCE lands, so nobody downloads
 expecting it.
