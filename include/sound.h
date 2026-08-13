@@ -30,4 +30,9 @@ int isBgmPlaying(void);
 void bgmMute(void);
 void bgmUnMute(void);
 
+/* Nonzero while the BGM decoder may be inside a device read. BGM bypasses ioman entirely and shares
+ * the one process-wide fileXio channel with art, so it is invisible to ioGetPending() -- which is
+ * why the art worst-open latch samples it separately. */
+extern volatile int gBgmInRead;
+
 #endif

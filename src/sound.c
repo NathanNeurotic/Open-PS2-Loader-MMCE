@@ -543,6 +543,9 @@ static volatile unsigned char rdPtr, wrPtr;
 static char bgmBuffer[BGM_RING_BUFFER_COUNT][BGM_RING_BUFFER_SIZE];
 static volatile unsigned char bgmThreadRunning, bgmIoThreadRunning;
 
+// Nonzero while bgmIoThread may be inside a device read. Read by the art worst-open latch.
+volatile int gBgmInRead = 0;
+
 static u8 bgmThreadStack[BGM_THREAD_STACK_SIZE] __attribute__((aligned(16)));
 static u8 bgmIoThreadStack[BGM_THREAD_STACK_SIZE] __attribute__((aligned(16)));
 
@@ -599,6 +602,11 @@ static void bgmIoThread(void *arg)
 
         decodeTotal = BGM_RING_BUFFER_SIZE;
         int bufferPtr = 0;
+        // The BGM decoder reads bgm.ogg through the SAME process-wide fileXio channel as art, and it
+        // does NOT go through ioman -- so it is invisible to the HUD's IO column and to every
+        // ioGetPending() sample. Sol's IOP audit flagged exactly that as the hole in rebuild-161's
+        // instrument. This flag closes it: set while this thread can be inside a device read.
+        gBgmInRead = 1;
         do {
             int ret = ov_read(vorbisFile, bgmBuffer[wrPtr] + bufferPtr, decodeTotal, 0, 2, 1, &bitStream);
             if (ret > 0) {
@@ -621,6 +629,7 @@ static void bgmIoThread(void *arg)
                 }
             }
         } while (decodeTotal > 0);
+        gBgmInRead = 0;
 
         if (terminateFlag)
             break;

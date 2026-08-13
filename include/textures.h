@@ -153,7 +153,7 @@ extern int gTexLastMissOpenMs;
 /* Debug HUD (W<ms>@<pending><m|h>): the WORST staged open() of the session, with the ioman queue
  * depth sampled AT that open and whether it was a miss. Answers the one question the last-value
  * fields cannot: is a multi-second open contending with the io worker, or alone on the device? */
-void texDebugWorstOpen(int *ms, int *pending, int *wasMiss);
+void texDebugWorstOpen(int *ms, int *pending, int *wasMiss, int *menu, int *bgm);
 void texSetLoadAbortFlag(volatile int *abortRequested);
 void texFree(GSTEXTURE *texture);
 

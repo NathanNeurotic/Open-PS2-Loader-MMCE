@@ -3,7 +3,8 @@
 #include "include/artindex.h"
 #include "include/util.h"
 #include "include/ioman.h"
-#include <errno.h> // errno/ENOENT in the staging-arm open classifier (transitively via opl.h, but be explicit)
+#include "include/sound.h" // gBgmInRead -- BGM bypasses ioman but shares the fileXio channel
+#include <errno.h>         // errno/ENOENT in the staging-arm open classifier (transitively via opl.h, but be explicit)
 #include <kernel.h>
 #include <png.h>
 
@@ -495,10 +496,16 @@ int gTexLastMissOpenMs = 0; // last staged open() that FAILED, i.e. a missing co
 //                                                the IOP driver, and that is where to look next
 static int gTexWorstOpenMs = 0;
 static int gTexWorstOpenPending = 0;
+static int gTexWorstOpenMenu = 0;
+static int gTexWorstOpenBgm = 0;
 static int gTexWorstOpenWasMiss = 0;
 
-void texDebugWorstOpen(int *ms, int *pending, int *wasMiss)
+void texDebugWorstOpen(int *ms, int *pending, int *wasMiss, int *menu, int *bgm)
 {
+    if (menu)
+        *menu = gTexWorstOpenMenu;
+    if (bgm)
+        *bgm = gTexWorstOpenBgm;
     if (ms)
         *ms = gTexWorstOpenMs;
     if (pending)
@@ -835,12 +842,16 @@ static int texLoadAll(GSTEXTURE *texture, const char *filePath, int texId, const
             // Sampled HERE, not when the HUD is drawn: this is the co-factor that makes the timing
             // below mean something. See the worst-open latch above.
             int pendAtOpen = ioGetPending(IO_CUSTOM_SIMPLEACTION);
+            int menuAtOpen = ioGetPending(IO_MENU_UPDATE_DEFFERED);
+            int bgmAtOpen = gBgmInRead;
             clock_t openStart = clock();
             fd = open(filePath, O_RDONLY, 0);
             gTexLastOpenMs = (int)((clock() - openStart) / 1000);
             if (gTexLastOpenMs > gTexWorstOpenMs) {
                 gTexWorstOpenMs = gTexLastOpenMs;
                 gTexWorstOpenPending = pendAtOpen;
+                gTexWorstOpenMenu = menuAtOpen;
+                gTexWorstOpenBgm = bgmAtOpen;
                 gTexWorstOpenWasMiss = (fd < 0);
             }
             if (fd < 0) {
