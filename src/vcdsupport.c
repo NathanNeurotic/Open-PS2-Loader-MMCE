@@ -387,8 +387,12 @@ void vcdRequestDisplayId(const char *name)
         return;
 
     vcd_id_memo_t *m = vcdIdMemoFind(name);
-    if (m == NULL || m->asked)
-        return; // not a scanned VCD (folder row), or already resolved/attempted this session
+    if (m == NULL || m->asked || m->dir == NULL)
+        return; // memo full / never scanned, already resolved/attempted this session, or the dir
+                // strdup OOM'd at scan time. ALL THREE fail closed: vcdResolveDisplayId returns
+                // before setting `asked` when dir is NULL, so without this guard every settle
+                // would re-queue a request that can never succeed -- the CFG-storm shape (#155)
+                // in miniature. Recoverable: a later rescan re-points dir and re-arms the row.
 
     if (strlen(name) >= sizeof(gVcdIdReqName))
         return; // pathological basename: the resolver's own path buffer rejects it too -- leave the title
