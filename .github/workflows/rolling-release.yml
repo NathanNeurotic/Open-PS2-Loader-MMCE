@@ -785,7 +785,7 @@ jobs:
             else
               printf -- '- (pinned %s PS2DEVPINNED build FAILED this run)\n' "$SDK_VER"
             fi
-            printf -- '- %s-PS2DEVROLLING.ELF: bare loader, ps2dev:latest toolchain (RECOMMENDED -- current SDK; see "Get started")\n' "$VERSIONED_BASE"
+            printf -- '- %s-PS2DEVROLLING.ELF: bare loader, ps2dev:latest toolchain (current SDK, MOVING tag; see "Get started")\n' "$VERSIONED_BASE"
             if [ "$HAS_OFFICIALROLLING" = yes ]; then
               printf -- '- %s-OFFICIALROLLING.ELF: bare loader, official OPL'"'"'s ps2homebrew:main container (toolchain A/B vs official)\n' "$VERSIONED_BASE"
             fi
