@@ -821,3 +821,15 @@ unconditionally when resolvable, matching the PS2 page; the title stays in the r
 **Tester state:** #382 retest asked (Vass327, OFFICIALROLLING on 31710438197 — comment posted).
 The #380 ask was HELD until 170 existed (167 could not have worked); miladera gets one ask with a
 build that can actually work.
+
+**171 — #380 follow-up, same day.** #382 CLOSED (Vass327 confirmed on 31710438197, second
+independent confirmation). PR #463 merged; master's release pipeline still emits the THREE old
+flavour names and IRX-MANIFEST (not BUILD-MANIFEST) — both populations are labelled in the merged
+template. Nathan corrected 170's priority: the disc is the authoritative id source, the filename
+a safety net. Explicit check (asked for, answered): nothing in the 170 path lets a parseable
+filename suppress the disc read — the queue hook, the request dedupe and the resolver carry no
+filename test; the parse exists only as a display fallback. The real defect was shape: the disc
+resolver can return `AAAA-NNNNN` while the filename fallback yields `AAAA_NNN.NN`, so the caption
+visibly changed shape when the disc read landed. 171 canonicalises to `AAAA_NNN.NN` (the PS2
+page's form) at the memo store; the barcode's own resolver is untouched. Amended description
+posted to miladera.
