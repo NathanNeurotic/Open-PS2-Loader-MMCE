@@ -149,6 +149,11 @@ extern unsigned int gTexStagedOpenNonEnoent;
 // FAILED. Separates "the directory walk for a missing file is the cost" from "the transfer is".
 extern int gTexLastOpenMs;
 extern int gTexLastMissOpenMs;
+
+/* Debug HUD (W<ms>@<pending><m|h>): the WORST staged open() of the session, with the ioman queue
+ * depth sampled AT that open and whether it was a miss. Answers the one question the last-value
+ * fields cannot: is a multi-second open contending with the io worker, or alone on the device? */
+void texDebugWorstOpen(int *ms, int *pending, int *wasMiss);
 void texSetLoadAbortFlag(volatile int *abortRequested);
 void texFree(GSTEXTURE *texture);
 

@@ -477,6 +477,36 @@ unsigned int gTexStagedOpenNonEnoent = 0;
 int gTexLastOpenMs = 0;     // last staged open(), hit or miss
 int gTexLastMissOpenMs = 0; // last staged open() that FAILED, i.e. a missing cover
 
+// WORST-CASE LATCH, and it exists because the two fields above cannot answer the question they were
+// added for.
+//
+// The open time is a LAST-VALUE global written mid-load, while the HUD samples the io queue depth
+// live when it formats the line -- up to a whole load later, on a different thread. So "the slow
+// opens happen while the worker is busy" was never actually evidenced; it was two unsynchronised
+// reads that happened to look correlated in a photograph. A 16-agent adversarial pass refuted every
+// proposed cause of the 2.7 s open partly on that basis.
+//
+// This records the queue depth AT THE INSTANT of the open, and keeps the worst open of the session
+// rather than the most recent. It survives to be photographed at leisure, and it splits the
+// remaining hypothesis space in half:
+//
+//   worst open multi-second WITH pending > 0  -> contention with the ioman worker is real
+//   worst open multi-second WITH pending == 0 -> contention is dead; the cost is in the device or
+//                                                the IOP driver, and that is where to look next
+static int gTexWorstOpenMs = 0;
+static int gTexWorstOpenPending = 0;
+static int gTexWorstOpenWasMiss = 0;
+
+void texDebugWorstOpen(int *ms, int *pending, int *wasMiss)
+{
+    if (ms)
+        *ms = gTexWorstOpenMs;
+    if (pending)
+        *pending = gTexWorstOpenPending;
+    if (wasMiss)
+        *wasMiss = gTexWorstOpenWasMiss;
+}
+
 static int texStagedOpenIsAbsence(const char *filePath, int err)
 {
     if (filePath != NULL && !strncmp(filePath, "mmce", 4))
@@ -802,9 +832,17 @@ static int texLoadAll(GSTEXTURE *texture, const char *filePath, int texId, const
 
         if (texShouldUseMemoryReader(filePath)) {
             errno = 0;
+            // Sampled HERE, not when the HUD is drawn: this is the co-factor that makes the timing
+            // below mean something. See the worst-open latch above.
+            int pendAtOpen = ioGetPending(IO_CUSTOM_SIMPLEACTION);
             clock_t openStart = clock();
             fd = open(filePath, O_RDONLY, 0);
             gTexLastOpenMs = (int)((clock() - openStart) / 1000);
+            if (gTexLastOpenMs > gTexWorstOpenMs) {
+                gTexWorstOpenMs = gTexLastOpenMs;
+                gTexWorstOpenPending = pendAtOpen;
+                gTexWorstOpenWasMiss = (fd < 0);
+            }
             if (fd < 0) {
                 gTexLastMissOpenMs = gTexLastOpenMs;
                 // Memoize as PERMANENTLY absent (ERR_BAD_FILE -> the fail-epoch memo) only on a real

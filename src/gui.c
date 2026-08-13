@@ -2720,10 +2720,12 @@ static void guiDrawOverlays()
         // is a directory walk that did not happen.
         int ixDirs = 0;
         unsigned int ixAbsent = 0, ixFailed = 0;
+        int wOpen = 0, wPend = 0, wMiss = 0;
+        texDebugWorstOpen(&wOpen, &wPend, &wMiss);
         artIndexDebug(&ixDirs, &ixAbsent, &ixFailed);
-        snprintf(artdbg, sizeof(artdbg), "Q%d A%d D%d X%d %dms(ok %dms %dx%d) O:%d/%d OE%u IX%d/%u/%u KL%u  F%u/%u OV%u  NR%u MT%u  IO %d/%d T%u/%u",
+        snprintf(artdbg, sizeof(artdbg), "Q%d A%d D%d X%d %dms(ok %dms %dx%d) O:%d/%d W%d@%d%c OE%u IX%d/%u/%u KL%u  F%u/%u OV%u  NR%u MT%u  IO %d/%d T%u/%u",
                  q, a, d, cacheDebugDropped(), lastMs, okMs, w, h,
-                 gTexLastOpenMs, gTexLastMissOpenMs, gTexStagedOpenNonEnoent, ixDirs, ixAbsent, ixFailed, cacheDebugKeyTooLong(),
+                 gTexLastOpenMs, gTexLastMissOpenMs, wOpen, wPend, wMiss ? 'm' : 'h', gTexStagedOpenNonEnoent, ixDirs, ixAbsent, ixFailed, cacheDebugKeyTooLong(),
                  (unsigned)(fLast / 1000), (unsigned)(fWorst / 1000), (unsigned)fOver,
                  (unsigned)padNR, (unsigned)padEmpty,
                  ioGetPending(IO_CUSTOM_SIMPLEACTION), ioGetPending(IO_MENU_UPDATE_DEFFERED),
