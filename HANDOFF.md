@@ -26,10 +26,12 @@ Nathan's side and his testers' side must look identical across a handover. These
 
 **BRANCHES.** Never commit to `master`, `rebuild/main`, or any existing `rebuild/step-*` branch.
 Every change goes on a NEW branch you create, `rebuild/step-NNN-<slug>`, branched from the current
-tip. **Next number: 169. Current tip: `rebuild/step-164-eth-bounded-teardown`.** One focused change
+tip. **Next number: 182. Current tip: `rebuild/step-181-handoff-refresh`.** One focused change
 per step, with a long explanatory commit message -- what changed, why, what evidence drove it, and
 what it does NOT fix. Those messages are this project's real documentation. Never force-push, never
-rewrite history, never merge to `master` without asking.
+rewrite history, never merge to `master` without asking. (`rebuild/main` moves only as the
+fast-forward publish knob, on Nathan's named tip — see §17; `checkpoint/2026-08-13-rolling-live`
+is a frozen reference, never to be committed on, force-pushed, or deleted.)
 
 **THE LOOP, unchanged:** build locally in `oplbuild92` -> run clang-format 12 on every touched
 `.c`/`.h` -> push the branch -> `gh workflow run flavours.yml --repo NathanNeurotic/Open-PS2-Loader
@@ -115,8 +117,22 @@ breaking something.
   it all.
 - **Artifact names changed** with the four-flavour switch. Links older than 2026-08-13 point at
   `OPL-PS2DEVLATESTSDK` / `OPL-PS2DEVPINNEDSDK` / `OPL-OFFICIALSDK`, which no longer exist. Do not
-  copy an old link block.
-- `PR #463` is open against `master` (issue-template flavour names) and needs merging.
+  copy an old link block. The mapping (verified against workflow history): OFFICIALSDK →
+  OFFICIALROLLING (same :main image), PS2DEVLATESTSDK → PS2DEVROLLING, PS2DEVPINNEDSDK →
+  PS2DEVPINNED but the pin MOVED (c64ae69c → 8fba50ec, not like-for-like). OFFICIALPINNED is a
+  2026-08-13 digest pin with no predecessor.
+- **Native Windows python cannot see MSYS `/tmp`.** `python` here is a Windows build: `open('/tmp/x')`
+  writes to `C:\tmp\x`, and bash then cannot find `/tmp/x`. `cd` into the target directory and use
+  RELATIVE paths for python file I/O, or pass bash the Windows path. Bit twice on release-body work.
+- **The build container cannot run git in this worktree.** A worktree's `.git` is a FILE whose
+  gitdir pointer is host-absolute (`C:\Users\...`), dead inside `oplbuild92` — so in-container
+  `make` prints the version as `-dirty` with `expr: syntax error` noise. PRE-EXISTING, not your
+  change: judge local builds by the ELF timestamp, and validate Makefile git logic in git bash,
+  never in the container.
+- **Pushing to `master` FIRES THE RELEASE PIPELINE.** rolling-release.yml triggers on push to
+  master (and v* tags, and rebuild/main). The PR #463 template merge accidentally published an
+  old-lineage rolling release this way (run 31724547932, deleted). Nothing goes to master until
+  Nathan orders the cutover — see §17.
 
 ## Build output
 
@@ -960,3 +976,121 @@ IS a build input, correctly not excluded), all four ds5 ELFs present and listed,
 four-flavour Get started, stale-tag paragraph gone (removed in 175 as designed), tag =
 0127499b, MEGA run_463. Claude's review loop caught 178 pre-publish; log it as the model
 for anything user-visible that can move backwards.
+
+---
+
+# 17. CURRENT STATE, 2026-08-13 (late) — SUPERSEDES §14
+
+§14's refuted list and HUD decoder stay valid; its "current state" (tip 164, nothing
+published) does not. This section is the state of the project now.
+
+## The rolling channel is LIVE
+
+- Release: https://github.com/NathanNeurotic/Open-PS2-Loader/releases/tag/rolling —
+  **v1.2.0-Beta-2553-95a138c** (run 31745407636, built from `0127499b`). A prerelease, NOT
+  Latest: `pops-bundle` keeps the Latest badge and `rolling-alpha` (final old-lineage
+  build, archived) sits undisturbed — the "old build is still fine to use" promise made
+  structural.
+- **How it publishes:** rolling-release.yml fires on push to `rebuild/main` (also master
+  and v* tags — master is the old lineage, DO NOT push it; see §0b). `rebuild/main` is the
+  PHYSICAL KNOB: Nathan names a step-chain tip, it is fast-forwarded (ff-only; verify
+  ancestry first), and the push is the publish. Four flavour builds (PS2DEVPINNED,
+  PS2DEVROLLING, OFFICIALPINNED, OFFICIALROLLING), each now WITH a DS5 loader
+  (`-ds5.ELF` ×4, step-177), then publish (update in place: delete assets, re-upload,
+  rewrite notes, and — since step-180 — RE-TARGET the tag), then MEGA archives one
+  immutable zip to `/RiptOPL/Rolling/<version>/run_<n>/` (VARIANTS/DEBUG excluded).
+- **The notes are carried, not drafted:** `.github/rolling-release-notes-block.md` is
+  cat'd into every body after the header (new-lineage statement: parity goal, MMCE
+  awaiting reimplementation, old build still fine, report rules, the OrbitOPL Toolbox
+  metadata section). The flavour guidance lives ONLY in the workflow's "Get started"
+  section (all four flavours, pinned-first, Settings → About names the running one).
+  Do not re-add it to the block — one home, one copy.
+- **Publish procedure (every time):** ff rebuild/main → push → watch the run to green →
+  INSPECT (prerelease flag, tag SHA == pushed SHA, notes rendered, four APP_RIPTOPL-*
+  folders in the package zip, four ds5 assets, the ACTUAL version value from the body,
+  MEGA upload line) → only then does Nathan announce. Never announce from an uninspected
+  publish. Step-180 (`rebuild/step-180-tag-follows-publish`) sits above the checkpoint
+  and enters the publish path on the next ff — it fixed the update path never
+  re-targeting the tag (found live: the second publish's tag was one tip behind its
+  assets, the June stale-tag disease recreated by the pipeline itself).
+
+## The version scheme — and why it is SPLIT
+
+`Makefile`: **REVISION** = `git rev-list --count HEAD + 2` — HEAD-derived, MONOTONIC. It
+is the ordinal testers compare ("am I up to date?"); it must never go backwards, and
+every report on file quotes a HEAD-derived count. **GIT_HASH** = `CODE_ANCHOR` short hash
+— the last commit touching anything the build can consume (tree minus an exclusion list
+of docs/CI/handoff/process paths; errs toward inclusion). The hash is the reproducibility
+contract: "check out what the tester ran" = checkout of the version's hash. Step-178
+anchored BOTH and review caught it before publish (run 31744839948 cancelled mid-build):
+an ordinal that can move backwards is worse than a number that ticks on bookkeeping.
+**Identity lives in the hash; ordinality lives in the count. Do not merge the roles again.**
+Consequence to know: a docs/CI-only republish prints a NEW number with the SAME hash —
+that is the scheme working, not a fault.
+
+## checkpoint/2026-08-13-rolling-live
+
+Frozen reference at `0127499b` (step-179 tip) — the commit the live rolling release was
+built from. **Never build on it, force-push it, or delete it.** Its only job is to be the
+known-good point to return to if a later agent breaks the chain. `rebuild/main` ALSO
+points there right now, but the roles differ: rebuild/main MOVES (publish knob); the
+checkpoint never does. Do not confuse them.
+
+## Where every issue stands
+
+- **#382 (ETH launch under BGM) — CLOSED, confirmed twice.** 163's original fix (Vass327)
+  and 167's `bgmQuiesce()` reimplementation (Vass327 again, run 31710438197,
+  OFFICIALROLLING — the continuation of his working flavour).
+- **#364 (menu SFX dropped unless ~5 s apart) — fix out, awaiting report.** 169: the stale
+  gate now covers CURSOR only; deliberate presses always play, even late. With zackcage6.
+  Read `SX`/`SP` in his report: **SP in the thousands = the audsrv RPC wedges (IOP-side);
+  SP small with SX/full climbing = dispatcher starved (CPU-side) — DIFFERENT fixes. Do not
+  pre-choose.** (169 also said plainly: if the RPC wedges, it makes it visible, not cured.)
+- **#380 (PS1 caption showed the title, not the ID) — fix out, awaiting report.** 170+171:
+  the caption shows the ID read OFF THE VCD (the same resolver the RetroGEM barcode uses,
+  so list and barcode agree), canonical `AAAA_NNN.NN` shape (owned SOLELY by
+  `vcdCanonDisplayId`, vcdsupport.c:227). A filename ID may show first and be REPLACED by
+  the disc ID a moment after settling — expected, the disc is authoritative. Filename is
+  fallback only. 172 made the request path fail closed (dir==NULL OOM case). With
+  miladera22-sketch.
+- **#388 (SMB art vanished permanently) — fix out, awaiting report.** 167: only a real
+  ENOENT parks a game as absent; every other failure retries (the fork's semantics). With
+  L10N37 on the 172 build, watching `TF` (~0 healthy; climbing with art recovering = share
+  flaking and the retry lane working). His "Network mode" report is NOT A BUG (Manual =
+  page only, Auto = device + page; nothing on screen says so) — Nathan ruled it out;
+  explained, dropped. Do not re-investigate. His MC0-config point is confirmed fixed.
+- **Vass327 needs nothing.**
+
+## OUTSTANDING TEST LIST — the single most actionable thing in this file
+
+**Nathan's console:**
+1. **The `W`/`TF` reading from a VCD scroll** — the CENTRAL open question (art batching,
+  §14/§3 decode the fields). Two full investigations died for want of this number.
+2. Exit from a UDPFS boot (163's regression must be gone).
+3. ATA exit re-confirmed — 167 changed teardown AGAIN (`bgmQuiesce`).
+4. Backgrounds rolling in **with BG art ON** (168's own-schedule load).
+5. Art batching and VCD page speed generally.
+6. The MX4SIO device page appearing after enabling it in Settings (156 — never tested).
+7. **Rumble — needs the DEBUG zip** (`RIPTOPL-DEBUG-*.zip` from the rolling release):
+   `LOG()` compiles out of release builds, and `PAD # of actuators` is the one-boot
+   confirmation (§15). Do NOT fix the obvious way — §15 says why.
+8. **Boot from the release ZIP** (the `RIPTOPL-*.zip` package), not a bare ELF — that
+   packaging path has never been installed by anyone.
+
+**Testers:** zackcage6 (#364, `SX`/`SP`), miladera22-sketch (#380), L10N37 (#388, `TF`).
+
+**Unassigned:** each of the four flavours actually BOOTING (CI green means it compiled —
+nothing more), and the four DS5 loaders, none of which has ever run.
+
+## The refuted list (§14) — TWO categories now
+
+**(a) Specific mechanisms disproven with code citations — DO NOT re-derive.** Each is
+cited line-by-line in §14/§12 and cost two 16-agent adversarial passes. They are dead
+ends, proven dead.
+
+**(b) The FRAMING of the art-batching question itself is fair game.** Both investigations
+assumed "a cover-vs-cover publish gap exists in one of the trees" and failed to find one;
+the intermittent-`open()`-stall suspicion (3–8 ms normal, 2730 ms occasional) holds only
+by elimination. If the question looks wrong to you, SAY SO — Nathan is bringing in fresh
+perspective deliberately. But bring evidence (the `W` reading above is built to provide
+it), not a re-derivation of (a).
