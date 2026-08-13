@@ -2689,17 +2689,22 @@ static void guiDrawOverlays()
         // NR = longest run of polls freepad could not be read at all; MT = longest run of polls that
         // read fine but were EMPTY. A press spans 4-6 frames, so a RUN >= 4 in either column is a
         // swallowed press -- and which column it lands in decides where the fault lives.
-        // IO = what is actually in the shared ioman queue, which is the ONLY thing that raises the
-        // busy overlay. Three pending counts (Simple / Menu-rescan / Art) then their running totals.
-        // Read it this way: pending stuck non-zero with the totals FROZEN means one request that
-        // never finishes; pending small but a total CLIMBING while the spinner sits there means
-        // something is re-queueing itself and the queue is never observed empty. Those are different
-        // bugs and nothing in the source distinguishes them.
-        snprintf(artdbg, sizeof(artdbg), "Q%d A%d D%d %dms  F%u/%u OV%u  NR%u MT%u  IO %d/%d/%d T%u/%u/%u",
-                 q, a, d, lastMs, (unsigned)(fLast / 1000), (unsigned)(fWorst / 1000), (unsigned)fOver,
+        // IO = the shared ioman queue, which is what raises the busy overlay. Two pending counts
+        // (Simple / Menu-rescan) then their running totals. ART IS NO LONGER IN IT -- covers have
+        // their own thread and their own queue now, so the old third column would have reported a
+        // permanent 0 and quietly stopped being a diagnostic.
+        //
+        // X is the art thread's DROPPED count: requests released without loading (cancelled,
+        // superseded, torn down). It is the complement of D -- every request the worker takes ends
+        // in exactly one of the two -- so D and X both flat while covers keep being asked for is the
+        // signature of a leak, and X racing while D crawls is the signature of over-cancelling.
+        // That pair is how the born-stale bug was caught, and it is worth keeping legible.
+        snprintf(artdbg, sizeof(artdbg), "Q%d A%d D%d X%d %dms  F%u/%u OV%u  NR%u MT%u  IO %d/%d T%u/%u",
+                 q, a, d, cacheDebugDropped(), lastMs,
+                 (unsigned)(fLast / 1000), (unsigned)(fWorst / 1000), (unsigned)fOver,
                  (unsigned)padNR, (unsigned)padEmpty,
-                 ioGetPending(IO_CUSTOM_SIMPLEACTION), ioGetPending(IO_MENU_UPDATE_DEFFERED), ioGetPending(IO_CACHE_LOAD_ART),
-                 ioGetTotal(IO_CUSTOM_SIMPLEACTION), ioGetTotal(IO_MENU_UPDATE_DEFFERED), ioGetTotal(IO_CACHE_LOAD_ART));
+                 ioGetPending(IO_CUSTOM_SIMPLEACTION), ioGetPending(IO_MENU_UPDATE_DEFFERED),
+                 ioGetTotal(IO_CUSTOM_SIMPLEACTION), ioGetTotal(IO_MENU_UPDATE_DEFFERED));
         fntRenderString(gTheme->fonts[0], 8, screenHeight - 24, ALIGN_NONE, 0, 0, artdbg, GS_SETREG_RGBA(255, 255, 0, 128));
     }
 }
@@ -2715,6 +2720,13 @@ static void guiReadPads()
         guiInactiveFrames = 0;
     else
         guiInactiveFrames++;
+
+    // Art thread's per-frame tick, and it must sit HERE, immediately after the poll: it samples the
+    // currently HELD direction so the worker can refuse to start an SIO2 cover mid-navigation, and
+    // that sample is only meaningful against a pad state read this frame. It also re-wakes a worker
+    // that has queued work but nothing running, which closes the lost-wakeup class outright.
+    // O(1), never blocks, and every call inside it is GUI-thread-only by design.
+    cacheTickArt();
 }
 
 // renders the screen and handles inputs. Also handles screen transitions between numerous

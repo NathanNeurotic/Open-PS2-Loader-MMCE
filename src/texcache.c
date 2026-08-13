@@ -6,9 +6,20 @@
 #include "include/util.h"
 #include "include/renderman.h"
 #include "include/tar.h"
+#include "include/pad.h"        // getKeyPressed -- the SIO2 nav gate, GUI thread only
+#include "include/bdmsupport.h" // bdmModeIsSIO2 -- is this cover on the pad's bus?
+#include "include/appsupport.h" // appGetArtMode -- APP rows are proxies for another device
+#include "include/favsupport.h" // favGetArtMode -- so are FAV rows
+#include <kernel.h>
+#include <delaythread.h> // DelayThread -- must be included explicitly, it is not pulled in by kernel.h
 
-typedef struct
+extern void *_gp;
+
+// Tagged, not anonymous, because the record now carries its OWN queue link: art no longer rides an
+// ioman request node, it rides this one.
+typedef struct load_image_request
 {
+    struct load_image_request *next; // art FIFO link, owned by whoever owns the request
     image_cache_t *cache;
     cache_entry_t *entry;
     item_list_t *list;
@@ -17,8 +28,58 @@ typedef struct
     // Art epoch this request was queued in; a mismatch means the whole VIEW it belonged to is gone.
     // See cacheDropQueuedArt().
     unsigned int epoch;
+    // Chunk-level abort, read by textures.c via texSetLoadAbortFlag. Lets a cancel interrupt a load
+    // that is ALREADY RUNNING, which neither the stale-stamp test nor the epoch test can do -- both
+    // only ever caught a request still sitting in the queue.
+    //
+    // ⚠ It cannot shorten an MX4SIO cover. texShouldUseMemoryReader sends every "mass*" path down
+    // the whole-file staging fast path: one lseek and one read() of the entire PNG, a single
+    // un-interruptible IOP RPC. The flag is only checked in the CHUNKED staging loop and inside the
+    // streaming PNG reader. For the device #340 is actually about, NOT ISSUING the read is the only
+    // lever -- which is what the SIO2 defer in artPop is for.
+    volatile int abortRequested;
+    // Resolved on the GUI THREAD at enqueue: does this cover ride SIO2, the controller's own bus?
+    // Not resolvable on the worker -- answering it reads the support's private device data, which a
+    // background rescan rewrites underneath. One byte, copied in, is immune.
+    unsigned char sio2;
     char *value;
 } load_image_request_t;
+
+// Art thread priority. LOWER NUMBER WINS on the EE. GUI/pad thread is 31 (opl.c), the shared io
+// worker 32 (ioman.c), sound 45. 64 puts art below every one of them: it can never take the CPU
+// from input, from a config save, from a list rebuild, or from audio. Same value the fork uses.
+#define ART_THREAD_PRIORITY 64
+
+// ...and lower still while reading anything on SIO2. EE priority does not speed up or slow down a
+// thread blocked in an IOP RPC, so this buys nothing on the device read itself -- what it protects
+// is the PNG DECODE that follows, which is tens of ms of pure EE work on the pad's own bus.
+#define ART_SIO2_LOAD_PRIORITY 90
+
+// Matches ioman's worker stack. The identical libpng decode runs on that stack today, so this is a
+// measured size rather than a guess. .bss only; it adds nothing to the ELF.
+#define ART_THREAD_STACK_SIZE (96 * 1024)
+
+// Teardown join budgets in MILLISECONDS -- the join sleeps via DelayThread(1000) = 1 ms, NOT via
+// util.c's delay(), whose "tick" is a ~0.25 s NOP spin (the units trap that made the old
+// LAUNCH_IO_DRAIN_TICKS "10 s" actually forty minutes).
+#define ART_JOIN_MS_LAUNCH      500
+#define ART_JOIN_MS_TERMINAL    1500
+#define ART_FOREGROUND_DRAIN_MS 500
+
+static int gArtThreadId = -1;
+static ee_thread_t gArtThread;
+static u8 gArtStack[ART_THREAD_STACK_SIZE] __attribute__((aligned(16)));
+
+static volatile int gArtRunning = 0;
+static volatile int gArtTerminate = 0;
+static volatile int gArtShutdownAbandoned = 0;
+static volatile int gArtNavActive = 0;
+
+static load_image_request_t *gArtReqList = NULL;
+static load_image_request_t *gArtReqEnd = NULL;
+static load_image_request_t *volatile gArtCurrentReq = NULL;
+
+static void cacheWakeArtWorker(void);
 
 // .tar art packs (checklist item 45). Tries "<value>_<suffix>.png" inside ART/art.tar before the
 // normal per-file lookup. Opt-in: gEnableArtTar ships 0, so with the toggle off this is a single
@@ -125,6 +186,10 @@ static volatile int gArtLastOkMs = 0;
 static volatile int gArtLastWidth = 0;
 static volatile int gArtLastHeight = 0;
 static volatile int gArtDone = 0;
+// Requests released WITHOUT loading -- cancelled, superseded, or dropped at teardown. The
+// complement of gArtDone: together they must account for every request artPop ever handed out, so a
+// climbing total with both of these flat is the signature of a request leak.
+static volatile int gArtDropped = 0;
 
 void cacheDebugCounters(int *queued, int *active, int *refused, int *done)
 {
@@ -136,6 +201,13 @@ void cacheDebugCounters(int *queued, int *active, int *refused, int *done)
         *refused = gArtRefused;
     if (done)
         *done = gArtDone;
+}
+
+// Requests released WITHOUT loading. The complement of gArtDone: every request artPop hands out ends
+// in exactly one of the two, so a climbing enqueue total with BOTH of these flat means a leak.
+int cacheDebugDropped(void)
+{
+    return gArtDropped;
 }
 
 void cacheDebugLastLoad(int *lastMs, int *lastOkMs, int *width, int *height)
@@ -204,33 +276,285 @@ static unsigned int gArtEpoch = 0;
 void cacheDropQueuedArt(void)
 {
     gArtEpoch++;
+    // Let the worker burn the now-dead requests immediately instead of at the next enqueue. Its job
+    // narrowed once art got its own thread -- covers no longer sit FIFO in front of the list rebuild
+    // at all, that half is structural now -- but it still stops the DEVICE READS for a view that no
+    // longer exists.
+    cacheWakeArtWorker();
+}
+
+// ---------------------------------------------------------------------------------------------
+// ART QUEUE. A private intrusive FIFO, guarded by a DIntr()/EIntr() bracket rather than a
+// semaphore.
+//
+// Why not a semaphore, given the fork uses one: the fork's GUI thread takes gArtSemaId on EVERY
+// cacheGetTexture call -- including plain cache hits -- and once more per frame in its pump, while
+// the worker can be holding that same semaphore having raised ITSELF to priority 90 for a slow
+// SIO2 read. That is an unbounded priority inversion on the render thread: the thread that reads
+// your controller blocks on a lock held by the lowest-priority thread in the system, for as long as
+// a cover takes. This codebase has already paid for one freeze of exactly that shape (the
+// GUI-thread-must-never-take-an-ioman-semaphore rule).
+//
+// The bracket has none of that. Every critical section below is a few pointer stores with no call
+// out to anything, so interrupts are off for a handful of instructions and no thread can ever block
+// another. The expensive parts -- the device read, the PNG decode, and every free() -- happen with
+// interrupts ENABLED, outside any section.
+//
+// RULE FOR CALLERS: never call these with interrupts already disabled; EIntr() enables
+// unconditionally and would re-enable early.
+// ---------------------------------------------------------------------------------------------
+
+static void cacheWakeArtWorker(void)
+{
+    if (gArtRunning && gArtThreadId >= 0)
+        WakeupThread(gArtThreadId);
+}
+
+static void artPush(load_image_request_t *req)
+{
+    req->next = NULL;
+
+    DIntr();
+    if (gArtReqEnd)
+        gArtReqEnd->next = req;
+    else
+        gArtReqList = req;
+    gArtReqEnd = req;
+    gArtQueuedCount++;
+    EIntr();
+}
+
+// Called ONLY by the worker.
+static load_image_request_t *artPop(void)
+{
+    load_image_request_t *req;
+
+    DIntr();
+    req = gArtReqList;
+    if (req) {
+        // SIO2 DEFER. The head of the queue is a cover on the controller's own bus and the user is
+        // holding a direction RIGHT NOW. Issuing that read is issue #340's exact mechanism: the SD
+        // transfer and the pad poll share SIO2, and on hardware that is a swallowed step. The
+        // enqueue-side idle gate cannot help here -- it only stops requests being MADE during
+        // navigation, and this one was made during a settle the user has since ended.
+        //
+        // Leave it queued. It costs nothing, and the next idle frame runs it. This is the ONLY
+        // lever that works for MX4SIO: the abort flag cannot shorten a cover on that device,
+        // because a "mass*" path takes the whole-file staging fast path in textures.c -- one
+        // lseek and one read() of the entire PNG, a single un-interruptible IOP RPC. Not issuing
+        // the read is the whole defence.
+        //
+        // Head-of-line blocking is accepted deliberately: a page is almost always one device, and
+        // a skip-scan would make this pop O(n) inside the interrupts-off bracket.
+        if (req->sio2 && gArtNavActive) {
+            EIntr();
+            return NULL;
+        }
+
+        gArtReqList = req->next;
+        if (!gArtReqList)
+            gArtReqEnd = NULL;
+        req->next = NULL;
+
+        if (gArtQueuedCount > 0)
+            gArtQueuedCount--;
+        // ACTIVE now means "owned by the worker", not "reading the device" -- a deliberate
+        // widening. cacheHasPendingArt() gates background rescans and the per-game background
+        // request, and it must stay true across a cancellation too, or a rescan slips in exactly
+        // while the art lane is churning.
+        gArtActiveCount++;
+        gArtCurrentReq = req;
+    }
+    EIntr();
+
+    return req;
+}
+
+// Take the WHOLE queue in one O(1) swap. The caller then walks and frees it with interrupts
+// ENABLED -- which is why no canceller ever holds a bracket across a free().
+static load_image_request_t *artDetachAll(void)
+{
+    load_image_request_t *list;
+
+    DIntr();
+    list = gArtReqList;
+    gArtReqList = NULL;
+    gArtReqEnd = NULL;
+    gArtQueuedCount = 0;
+    EIntr();
+
+    return list;
+}
+
+// Free a chain the caller has already detached, so nothing else can reach it. Releases each
+// request's cache SLOT so the row still on screen can claim it again next frame: a slot left with
+// qr set is invisible to BOTH the read path and the eviction scan for the rest of the session,
+// which is a failure this file has now recorded twice.
+//
+// freeTxt is 0 on purpose -- see the GS/VRAM note in cacheLoadImage.
+static void artFreeChain(load_image_request_t *chain)
+{
+    while (chain) {
+        load_image_request_t *next = chain->next;
+
+        if (chain->entry && chain->entry->qr == chain)
+            cacheClearItem(chain->entry, 0);
+        if (chain->cache && chain->cache->activeRequests > 0)
+            chain->cache->activeRequests--;
+
+        gArtDropped++;
+        free(chain);
+        chain = next;
+    }
+}
+
+// The worker's single exit path. artPop is the ONLY place that increments gArtActiveCount and
+// publishes gArtCurrentReq, so this is the ONLY place that undoes either: one increment, one
+// decrement, and no path in between can skip it.
+static void artReleaseRequest(load_image_request_t *req, int completed)
+{
+    DIntr();
+    if (gArtCurrentReq == req)
+        gArtCurrentReq = NULL;
+    if (gArtActiveCount > 0)
+        gArtActiveCount--;
+    EIntr();
+
+    if (req->cache && req->cache->activeRequests > 0)
+        req->cache->activeRequests--;
+
+    if (completed)
+        gArtDone++;
+    else
+        gArtDropped++;
+
+    free(req);
 }
 
 void cacheShutdownArtLoads(void)
 {
+    load_image_request_t *drop;
+
     gCacheLoadsCancelled = 1;
+
+    // The one request the worker already owns cannot be freed here -- it may be inside a device
+    // read. Flag it so textures.c can bail at its next chunk boundary where that is possible.
+    if (gArtCurrentReq)
+        gArtCurrentReq->abortRequested = 1;
+
+    drop = artDetachAll();
+    artFreeChain(drop);
+
+    cacheWakeArtWorker(); // so a sleeping worker leaves SleepThread and observes the latch
 }
 
-// Io handled action...
-static void cacheLoadImage(void *data)
+// Drop everything queued and wait, bounded, for the one in-flight request to let go.
+//
+// WAS A NO-OP STUB, which quietly disarmed every caller: the theme-switch guard (whose "keep the
+// current theme and retry" branch was therefore unreachable -- a real use-after-free, since thmFree
+// -> cacheDestroyCache frees content[] while queued requests still point into it), the apps list
+// rebuild, the pfs0: remount, and the LWNBD preflight. Arming them is part of the point of giving
+// art its own thread: with a worker running concurrently those races stop being theoretical.
+//
+// waitTicks is MILLISECONDS here -- the wait is DelayThread(1000), not util.c's delay(), whose
+// "tick" is a ~0.25 s NOP spin. Every existing call-site constant is sane read that way.
+int cacheCancelPendingImageLoadsTimed(int waitTicks)
 {
-    // Balance the enqueue-side increment FIRST: this handler runs exactly once per queued request,
-    // including every early-out below.
-    if (gArtQueuedCount > 0)
-        gArtQueuedCount--;
+    load_image_request_t *drop;
 
-    load_image_request_t *req = data;
+    if (!gArtRunning)
+        return 1;
 
+    if (gArtCurrentReq)
+        gArtCurrentReq->abortRequested = 1;
+
+    drop = artDetachAll();
+    artFreeChain(drop);
+    cacheWakeArtWorker();
+
+    while (waitTicks != 0) {
+        if (gArtQueuedCount == 0 && gArtActiveCount == 0)
+            return 1;
+        // DelayThread, not a spin: it puts THIS thread (GUI at 31, or the io worker at 32) to sleep,
+        // which is exactly what lets the priority-64 art thread run at all. No priority donation --
+        // the fork demotes its caller to 91 for the wait, and a wedged read then leaves the menu
+        // pinned there for the rest of the session.
+        DelayThread(1000);
+        if (waitTicks > 0)
+            waitTicks--;
+    }
+
+    return (gArtQueuedCount == 0 && gArtActiveCount == 0);
+}
+
+// The same operation restricted to SIO2 requests -- the ones sharing the pad's bus. The NAME is kept
+// because five call sites use it and because MMCE rejoins the predicate untouched when checklist
+// item 1 lands; today the SIO2 set is MX4SIO alone.
+//
+// Detach the whole queue, free the SIO2 ones, re-push the rest. Re-pushing lands them at the tail,
+// so a filtered drop can reorder art against anything enqueued concurrently. Accepted on purpose:
+// FIFO order among covers is a soft property -- the stale-stamp cancellation exists precisely
+// because order was never a guarantee -- and the alternative is an O(n) walk with interrupts off.
+int cacheAbortMmceImageLoadsTimed(int waitTicks)
+{
+    load_image_request_t *chain, *keepHead = NULL, *keepTail = NULL;
+
+    if (!gArtRunning)
+        return 1;
+
+    if (gArtCurrentReq && gArtCurrentReq->sio2)
+        gArtCurrentReq->abortRequested = 1;
+
+    chain = artDetachAll();
+    while (chain) {
+        load_image_request_t *next = chain->next;
+
+        chain->next = NULL;
+        if (chain->sio2) {
+            artFreeChain(chain);
+        } else {
+            if (keepTail)
+                keepTail->next = chain;
+            else
+                keepHead = chain;
+            keepTail = chain;
+        }
+        chain = next;
+    }
+    while (keepHead) {
+        load_image_request_t *next = keepHead->next;
+        artPush(keepHead);
+        keepHead = next;
+    }
+
+    cacheWakeArtWorker();
+
+    while (waitTicks != 0) {
+        if (!(gArtCurrentReq && gArtCurrentReq->sio2))
+            return 1;
+        DelayThread(1000);
+        if (waitTicks > 0)
+            waitTicks--;
+    }
+
+    return !(gArtCurrentReq && gArtCurrentReq->sio2);
+}
+
+// Runs on the ART THREAD, never on the GUI thread and no longer on the ioman worker. The request
+// arrives already unlinked and already counted ACTIVE by artPop, so every exit below goes through
+// artReleaseRequest exactly once.
+static void cacheLoadImage(load_image_request_t *req)
+{
     // Safeguards...
     if (!req)
         return;
 
     // TEARDOWN. OPL is on its way out, and this cover is for a menu guiEnd() is about to destroy --
     // reading it would spend a device access and a PNG decode on a texture nobody will ever draw.
-    // The queue still has to be WALKED, because ioBlockOpsTimed waits on the LIST and the worker
-    // keeps servicing it regardless of isIOBlocked; but walking it now costs a free() per entry
-    // instead of a read off the game device. That is the whole difference between a launch that
-    // hands off immediately and one that first pays for every cover the user scrolled past.
+    // The queue no longer sits in ioman's list, so ioBlockOpsTimed cannot see it at all;
+    // cacheShutdownArtLoads() empties it directly and this latch catches the one request the worker
+    // had already taken. That is the whole difference between a launch that hands off immediately
+    // and one that first pays for every cover the user scrolled past.
     // Placed after the !req guard so the pointer is known good, before every other check so nothing
     // can slip past it, and before the gArtActiveCount++ below like all the other early-outs.
     //
@@ -240,7 +564,7 @@ static void cacheLoadImage(void *data)
     // it makes a slot read as "still loading" to a GUI that is being torn down in the next breath.
     // Clearing it here is not possible anyway: req->entry is not yet known non-NULL at this point.
     if (gCacheLoadsCancelled) {
-        free(req);
+        artReleaseRequest(req, 0);
         return;
     }
 
@@ -249,13 +573,13 @@ static void cacheLoadImage(void *data)
     // entry's qr back-pointer is cleared by cacheClearItem -- so nothing else can reach it and
     // returning without free() simply loses the memory.
     if (!req->entry || !req->cache) {
-        free(req);
+        artReleaseRequest(req, 0);
         return;
     }
 
     item_list_t *handler = req->list;
     if (!handler) {
-        free(req);
+        artReleaseRequest(req, 0);
         return;
     }
 
@@ -264,7 +588,7 @@ static void cacheLoadImage(void *data)
     // and it is NOT a rare path: background rescans rebuild lists while the user browses, so every
     // rebuild used to leak one of these per art load still in flight.
     if (req->cacheUID != req->entry->UID) {
-        free(req);
+        artReleaseRequest(req, 0);
         return;
     }
 
@@ -280,8 +604,11 @@ static void cacheLoadImage(void *data)
     // running the visible cover next, promoting it in the queue -- only choose which stale read goes
     // first; they cannot stop the stale reads existing.
     if ((u32)(guiFrameId - req->entry->lastUsed) > ART_CANCEL_STALE_FRAMES) {
-        cacheClearItem(req->entry, 1); // frees any partial texture, drops qr, frees the slot
-        free(req);
+        // freeTxt 0, not 1: the entry holds NO texture during the in-flight window (the enqueue
+        // cleared it on the GUI thread) and rmUnloadTexture must never run off the GUI thread --
+        // see the GS/VRAM note at the staged decode below.
+        cacheClearItem(req->entry, 0);
+        artReleaseRequest(req, 0);
         return;
     }
 
@@ -292,19 +619,32 @@ static void cacheLoadImage(void *data)
     // the eviction scan for the rest of the session, so freeing the request alone would quietly kill
     // every cache slot the discarded view was using.
     if (req->epoch != gArtEpoch) {
-        cacheClearItem(req->entry, 1);
-        free(req);
+        cacheClearItem(req->entry, 0); // freeTxt 0: see the GS/VRAM note below
+        artReleaseRequest(req, 0);
         return;
     }
 
-    // seems okay. we can proceed. From here to the qr release below this request owns a device
-    // read + PNG decode: count it ACTIVE so the background-rescan gate keeps seeing "art pending".
-    // Every exit path between here and the decrement must go through the end of this function --
-    // the early-outs above are all before the increment on purpose.
-    gArtActiveCount++;
-
-    GSTEXTURE *texture = &req->entry->texture;
-    texFree(texture);
+    // ---- from here the request owns a device read + PNG decode ----
+    //
+    // STAGED TEXTURE. The decode lands in a GSTEXTURE this THREAD owns, and only a finished image is
+    // copied into the cache entry. Two things fall out of that and both are load-bearing:
+    //
+    //  1. GS/VRAM IS NEVER TOUCHED OFF THE GUI THREAD. cacheClearItem(item, 1) calls rmUnloadTexture
+    //     -> gsKit_TexManager_free, which mutates gsKit's VRAM allocator list while the GUI thread
+    //     may be inside gsKit_TexManager_bind on that same list. Today that call is REACHABLE from
+    //     the io worker and is saved only by an accident: the enqueue cleared the entry with
+    //     freeTxt=1 on the GUI thread first, so texture.Mem is NULL and the branch is skipped.
+    //     Staging makes it unreachable BY CONSTRUCTION -- the entry stays all-zeros for the whole
+    //     in-flight window, so the worker passes freeTxt=0 everywhere and cannot reach gsKit even if
+    //     a later edit gets it wrong.
+    //  2. A cancelled load frees its own pixels with plain texFree() and leaves the entry alone.
+    //
+    // The entry is exclusively ours for this window: while qr is set, cacheGetTexture returns NULL,
+    // cacheLookupTexture returns NULL, and the eviction scan skips the slot. Nothing on the GUI
+    // thread can read entry->texture until qr clears.
+    GSTEXTURE staged;
+    memset(&staged, 0, sizeof(staged));
+    staged.ClutStorageMode = GS_CLUT_STORAGE_CSM1;
 
     int result = -1;
 
@@ -315,47 +655,178 @@ static void cacheLoadImage(void *data)
     // inside a single read on that device and the queue was never the story.
     clock_t loadStart = clock();
 
+    // SIO2 PRIORITY BRACKET, around the load ONLY and restored before the publish. A thread still at
+    // 90 when it touches anything the GUI also touches is the inversion this design exists to avoid.
+    // EE priority neither speeds nor slows a thread blocked in an IOP RPC, so this buys nothing on
+    // the device read -- what it protects is the PNG DECODE, tens of ms of pure EE work happening
+    // while the pad is being polled over the very same bus.
+    int sio2Bracket = req->sio2;
+    if (sio2Bracket)
+        ChangeThreadPriority(gArtThreadId, ART_SIO2_LOAD_PRIORITY);
+
+    texSetLoadAbortFlag(&req->abortRequested);
+
     if (gEnableArtTar)
-        result = artTarLoadImage(req->value, req->cache->suffix, texture);
+        result = artTarLoadImage(req->value, req->cache->suffix, &staged);
 
     // Fall through to the per-file lookup whenever the archive is off, absent, or lacks this key.
     if (result < 0)
-        result = handler->itemGetImage(handler, req->cache->prefix, req->cache->isPrefixRelative, req->value, req->cache->suffix, texture, GS_PSM_CT24);
+        result = handler->itemGetImage(handler, req->cache->prefix, req->cache->isPrefixRelative, req->value, req->cache->suffix, &staged, GS_PSM_CT24);
+
+    texSetLoadAbortFlag(NULL);
+
+    if (sio2Bracket)
+        ChangeThreadPriority(gArtThreadId, ART_THREAD_PRIORITY);
 
     // clock() is microseconds here; the elapsed form is single-wrap safe.
     gArtLastMs = (int)((clock() - loadStart) / 1000);
     if (result >= 0) {
         gArtLastOkMs = gArtLastMs;
-        gArtLastWidth = (int)texture->Width;
-        gArtLastHeight = (int)texture->Height;
+        gArtLastWidth = (int)staged.Width;
+        gArtLastHeight = (int)staged.Height;
     }
 
-    // uOPL/rebuild-66 shape: a failed load parks the row (lastUsed = 0 -> cacheGetTextureEx moves it
-    // to the -2 "asked and answered" state) and it is not asked again until a list rebuild. No memo,
-    // no retry budget -- both existed to soften a mis-detected absence, and absence is detected
+    // PUBLISH. The order IS the handoff protocol: fill the entry first, clear qr LAST. qr going NULL
+    // is what tells the GUI thread the slot is readable, so every store it must see has to precede
+    // that one. Single-core EE, so a context switch is a full sync and ordering the stores is all
+    // that is required -- there is no barrier to add.
+    //
+    // uOPL/rebuild-66 shape on failure: park the row (lastUsed = 0 -> cacheGetTexture moves it to
+    // the -2 "asked and answered" state) and do not ask again until a list rebuild. No memo, no
+    // retry budget -- both existed to soften a mis-detected absence, and absence is detected
     // correctly now (rebuild-108). Retrying was also how the IO worker got pinned (rebuild-103/105).
-    if (result < 0) {
-        req->entry->lastUsed = 0;
-    } else
+    if (result >= 0) {
+        req->entry->texture = staged;
         req->entry->lastUsed = guiFrameId;
-
+    } else {
+        texFree(&staged); // our own pixels, never the entry's -- no gsKit contact on this thread
+        req->entry->lastUsed = 0;
+    }
     req->entry->qr = NULL;
 
-    if (gArtActiveCount > 0)
-        gArtActiveCount--;
-    gArtDone++;
+    artReleaseRequest(req, 1);
+}
 
-    free(req);
+// The art worker. Wake, drain, sleep -- the same shape as the io worker and the fork's, and it
+// leans on the same EE kernel guarantee both do: a WakeupThread landing while this thread is still
+// running accumulates, so the next SleepThread returns immediately. cacheTickArt() is a
+// belt-and-braces net on top of that.
+static void cacheArtWorkerThread(void *arg)
+{
+    (void)arg;
+
+    while (!gArtTerminate) {
+        SleepThread();
+
+        if (gArtTerminate)
+            break;
+
+        for (;;) {
+            load_image_request_t *req = artPop();
+
+            if (!req)
+                break; // queue empty, or its head is an SIO2 cover deferred while a direction is held
+
+            cacheLoadImage(req);
+
+            if (gArtTerminate)
+                break;
+        }
+    }
+
+    gArtRunning = 0;
+    ExitDeleteThread();
 }
 
 void cacheInit()
 {
-    ioRegisterHandler(IO_CACHE_LOAD_ART, &cacheLoadImage);
+    // No ioRegisterHandler any more. Art has left the shared queue entirely, and that IS the change:
+    // the deferred menu rebuild (IO_MENU_UPDATE_DEFFERED) and the config save
+    // (IO_CUSTOM_SIMPLEACTION) no longer queue BEHIND a page's worth of covers on one FIFO whose
+    // worker holds gProcSemaId across the whole batch. Reported from hardware as everything feeling
+    // "pop-in like": the list could not become correct until the device had served art for a view
+    // the user had already left.
+    if (gArtRunning)
+        return;
+
+    gArtTerminate = 0;
+    gArtShutdownAbandoned = 0;
+    gArtReqList = NULL;
+    gArtReqEnd = NULL;
+    gArtCurrentReq = NULL;
+    gArtQueuedCount = 0;
+    gArtActiveCount = 0;
+    gArtNavActive = 0;
+
+    gArtThread.attr = 0;
+    gArtThread.option = 0;
+    gArtThread.stack_size = ART_THREAD_STACK_SIZE;
+    gArtThread.gp_reg = &_gp;
+    gArtThread.func = &cacheArtWorkerThread;
+    gArtThread.stack = gArtStack;
+    gArtThread.initial_priority = ART_THREAD_PRIORITY;
+
+    gArtThreadId = CreateThread(&gArtThread);
+    if (gArtThreadId < 0) {
+        gArtThreadId = -1;
+        return; // gArtRunning stays 0 -> the enqueue refuses to claim slots, see cacheGetTexture
+    }
+
+    if (StartThread(gArtThreadId, NULL) < 0) {
+        DeleteThread(gArtThreadId);
+        gArtThreadId = -1;
+        return;
+    }
+
+    gArtRunning = 1;
 }
 
-void cacheEnd()
+// Once per video frame, from the GUI thread. Two jobs, both O(1), neither able to block.
+void cacheTickArt(void)
 {
-    // nothing to do... others have to destroy the cache via cacheDestroyCache
+    // (1) Sample held direction for the SIO2 defer in artPop. GUI thread only -- getKeyPressed is
+    // libpad, and every libpad call in this codebase is GUI-thread-only. getKeyPressed and not
+    // getKey: getKey would CONSUME the menu repeat before navigation ever sees it.
+    gArtNavActive = getKeyPressed(KEY_LEFT) || getKeyPressed(KEY_RIGHT) ||
+                    getKeyPressed(KEY_UP) || getKeyPressed(KEY_DOWN) ||
+                    getKeyPressed(KEY_L1) || getKeyPressed(KEY_R1);
+
+    // (2) Lost-wakeup net. Work queued and nothing running means the worker is asleep and a wakeup
+    // went missing -- one WakeupThread per frame costs nothing and makes the whole class of "art
+    // silently stopped forever" impossible. It also re-arms the queue the instant a held direction
+    // is released, without waiting for the next enqueue.
+    if (gArtRunning && gArtQueuedCount > 0 && gArtActiveCount == 0)
+        cacheWakeArtWorker();
+}
+
+int cacheEnd(int forceStop)
+{
+    int ms = forceStop ? ART_JOIN_MS_TERMINAL : ART_JOIN_MS_LAUNCH;
+
+    if (!gArtRunning)
+        return 1;
+
+    cacheShutdownArtLoads(); // idempotent: latch, abort the in-flight one, drop the queue, wake
+    gArtTerminate = 1;
+    cacheWakeArtWorker();
+
+    while (gArtRunning && ms-- > 0)
+        DelayThread(1000);
+
+    if (gArtRunning) {
+        // ABANDON, never TerminateThread. Killing a thread parked inside fileXio leaves the shared
+        // IOP RPC channel half-used, and every later fileXio call from ANY thread is then undefined.
+        // Every caller of this is on its way to an IOP reset or a power-off, so the leaked thread
+        // cannot outlive the handoff. We leak strictly less than the fork does -- there is no
+        // semaphore to reclaim, because this design has none.
+        gArtShutdownAbandoned = 1;
+        LOG("cacheEnd: art worker still running after %d ms -- abandoned, not terminated\n",
+            forceStop ? ART_JOIN_MS_TERMINAL : ART_JOIN_MS_LAUNCH);
+        return 0;
+    }
+
+    gArtThreadId = -1;
+    return 1;
 }
 
 static void cacheClearItem(cache_entry_t *item, int freeTxt)
@@ -395,6 +866,7 @@ image_cache_t *cacheInitCache(int userId, const char *prefix, int isPrefixRelati
     cache->suffix = (char *)malloc(length * sizeof(char));
     memcpy(cache->suffix, suffix, length);
     cache->nextUID = 1;
+    cache->activeRequests = 0;
     cache->content = (cache_entry_t *)malloc(count * sizeof(cache_entry_t));
 
     int i;
@@ -406,15 +878,81 @@ image_cache_t *cacheInitCache(int userId, const char *prefix, int isPrefixRelati
 
 void cacheDestroyCache(image_cache_t *cache)
 {
-    int i;
+    int i, ms = ART_FOREGROUND_DRAIN_MS;
+
+    if (cache == NULL)
+        return;
+
+    // Belt and braces on top of the drain the CALLER should have done. The dangerous caller is
+    // exactly one: endMutableImage via thmFree, i.e. a theme switch. The others destroy a fresh
+    // clone no request can ever have referenced.
+    //
+    // What a stray request would do if we just freed: dereference req->cache->suffix and ->prefix,
+    // and req->entry -- a pointer INTO the content[] array below. Worse, a cancellation early-out
+    // would then call cacheClearItem on whatever bytes now occupy the freed slot, i.e. free() a
+    // garbage pointer. Harmless while art shared the io worker; a live use-after-free with a worker
+    // running concurrently.
+    if (cache->activeRequests > 0) {
+        if (gArtCurrentReq && gArtCurrentReq->cache == cache)
+            gArtCurrentReq->abortRequested = 1;
+        cacheWakeArtWorker();
+
+        while (cache->activeRequests > 0 && ms-- > 0)
+            DelayThread(1000);
+    }
+
+    // LEAK RATHER THAN FREE. If the wait expired something still holds a pointer into this cache. A
+    // few KB of EE RAM on a path that only runs on a theme switch is cheap; a use-after-free in the
+    // art path is the entire class of bug this change exists to close.
+    if (cache->activeRequests > 0) {
+        LOG("cacheDestroyCache: %d art request(s) still reference this cache -- leaking it\n",
+            cache->activeRequests);
+        return;
+    }
+
     for (i = 0; i < cache->count; ++i) {
-        cacheClearItem(&cache->content[i], 1);
+        cacheClearItem(&cache->content[i], 1); // GUI thread: gsKit contact is correct here
     }
 
     free(cache->prefix);
     free(cache->suffix);
     free(cache->content);
     free(cache);
+}
+
+// Does this cover ride SIO2 -- the CONTROLLER'S OWN BUS? MX4SIO today; MMCE joins it the moment
+// checklist item 1 lands, which is why MMCE_MODE is already tested here.
+//
+// Resolved on the GUI THREAD at enqueue, never on the worker: answering it reaches into the
+// support's private device data, and a background rescan rewrites that underneath. One byte copied
+// into the request is immune to that.
+//
+// FAV and APP rows are PROXIES -- their art lives on whatever device the underlying entry came from,
+// not on the proxy tab -- so resolve through to the real mode first.
+static int cacheRequestIsSIO2(item_list_t *list, const char *value)
+{
+    int mode;
+
+    if (list == NULL)
+        return 0;
+
+    mode = list->mode;
+
+    if (mode == FAV_MODE && value != NULL) {
+        int src = favGetArtMode(value);
+        if (src >= 0)
+            mode = src;
+    }
+    if (mode == APP_MODE && value != NULL) {
+        int src = appGetArtMode(value);
+        if (src >= 0)
+            mode = src;
+    }
+
+    if (mode == MMCE_MODE)
+        return 1;
+
+    return bdmModeIsSIO2(mode);
 }
 
 GSTEXTURE *cacheGetTexture(image_cache_t *cache, item_list_t *list, int *cacheId, int *UID, char *value)
@@ -498,8 +1036,14 @@ GSTEXTURE *cacheGetTexture(image_cache_t *cache, item_list_t *list, int *cacheId
     // request that runs next, and background device rescans yield to pending art), so the throttle
     // was pure latency. Refusing a request also cost more than it saved: a refusal resets the row's
     // cacheId and the whole claim is redone next frame.
-    if (oldestEntry) {
+    // gArtRunning is part of the gate: if the worker never started, nothing would ever clear qr and
+    // the slot would be dead for the session. Better to draw no art than to poison the cache.
+    if (oldestEntry && gArtRunning) {
         load_image_request_t *req = malloc(sizeof(load_image_request_t) + strlen(value) + 1);
+        if (!req) {
+            *cacheId = -1; // nothing cleared yet at this point, so the slot is untouched
+            return NULL;
+        }
         req->cache = cache;
         req->entry = oldestEntry;
         req->list = list;
@@ -507,6 +1051,10 @@ GSTEXTURE *cacheGetTexture(image_cache_t *cache, item_list_t *list, int *cacheId
         strcpy(req->value, value);
         req->cacheUID = cache->nextUID;
         req->epoch = gArtEpoch; // the view this cover belongs to; see cacheDropQueuedArt()
+        req->abortRequested = 0;
+        req->next = NULL;
+        // Resolved HERE, on the GUI thread -- see cacheRequestIsSIO2 for why not on the worker.
+        req->sio2 = (unsigned char)cacheRequestIsSIO2(list, value);
 
         cacheClearItem(oldestEntry, 1);
         oldestEntry->qr = req;
@@ -547,33 +1095,18 @@ GSTEXTURE *cacheGetTexture(image_cache_t *cache, item_list_t *list, int *cacheId
 
         *UID = cache->nextUID++;
 
-        // A REFUSED request never runs, so nothing ever clears qr -- and qr is what marks this slot
-        // "load in flight". Left set, the entry is permanently invisible to BOTH the read path and
-        // the eviction scan above (which only considers entries with !qr), so the slot is dead for
-        // the rest of the session and its art never appears again. Backgrounds and screenshots are
-        // the visible casualties: their caches are ONE slot deep, so a single refusal kills the art
-        // type outright, while a 10-slot cover cache just loses one of ten and shrugs it off.
-        // Roll the slot back instead, leaving it free for the next frame to retry.
-        // (Third instance of this discarded-return shape; see rebuild-38 and rebuild-43.)
-        // DIntr bracket: the ++ is a read-modify-write on the GUI thread, and the HIGHER-priority
-        // io worker's decrement can preempt it mid-RMW, losing the worker's update -- an
-        // upward-only drift (adversarially quantified at ~one event per hours of browsing, and
-        // self-healing, but the bracket costs nothing and sound.c already sets the idiom).
-        DIntr();
-        gArtQueuedCount++;
-        EIntr();
-        if (ioPutRequest(IO_CACHE_LOAD_ART, req) != IO_OK) {
-            DIntr();
-            if (gArtQueuedCount > 0)
-                gArtQueuedCount--; // the request never entered the queue
-            EIntr();
-            // Reuse the module's own definition of an empty slot rather than hand-setting fields
-            // (cacheClearItem leaves lastUsed = -1, UID = 0). freeTxt = 0: the texture was already
-            // released by the cacheClearItem(.., 1) above, and the entry has held nothing since.
-            cacheClearItem(oldestEntry, 0);
-            *cacheId = -1; // the cache API's "no entry" sentinel, as used by themes.c
-            free(req);
-        }
+        // The cache now owns an in-flight reference. cacheDestroyCache waits on this rather than
+        // freeing content[] out from under a request that still points into it -- which a theme
+        // switch would otherwise do.
+        cache->activeRequests++;
+
+        // artPush takes its own DIntr bracket and does the gArtQueuedCount++ inside it. It cannot
+        // fail: no allocation, no queue cap. The old ioPutRequest-refused rollback is gone with
+        // ioPutRequest, and the reason it existed is now structural -- nothing can refuse a push, so
+        // no slot can be left with qr set and never cleared. (That failure killed 1-slot caches
+        // outright: backgrounds and screenshots vanished for the session. See rebuild-38/43.)
+        artPush(req);
+        cacheWakeArtWorker();
     }
 
     return NULL;

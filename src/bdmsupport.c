@@ -335,6 +335,27 @@ int bdmSlotEverConnected(int mode)
     return pDeviceData != NULL && pDeviceData->bdmPrefix[0] != '\0';
 }
 
+// Is this slot the MX4SIO card -- i.e. does its IO ride SIO2, the CONTROLLER'S OWN BUS?
+//
+// This is the one device where reading cover art actively costs the user input. mx4sio_bd shares
+// SIO2 with freepad; under that traffic the pad drops to a reconnect state and initializePad() then
+// runs six bounded waitPadReady calls ON THE GUI THREAD (src/pad.c:108-125). Hardware-confirmed
+// 2026-08-12: with MX4SIO enabled the debug HUD showed a 4966 ms frame and a 43-poll run where the
+// pad could not be read at all; with it disabled, clean. That is inherent to putting an SD driver on
+// the pad's bus and is NOT a defect we can fix -- so the art path treats it as a device to be
+// gentle with, rather than one to go faster on.
+//
+// Deliberately identity-based (bdmDeviceType), not slot-index based: which massN: slot MX4SIO lands
+// on depends on attach order and changes between boots.
+int bdmModeIsSIO2(int mode)
+{
+    if (mode < BDM_MODE || mode > BDM_MODE_LAST)
+        return 0;
+
+    bdm_device_data_t *pDeviceData = (bdm_device_data_t *)bdmDeviceList[mode - BDM_MODE].priv;
+    return pDeviceData != NULL && pDeviceData->bdmDeviceType == BDM_TYPE_SDC;
+}
+
 static int bdmShouldQueueModuleLoad(void)
 {
     if (gEnableUSB && !iUSBModLoaded)

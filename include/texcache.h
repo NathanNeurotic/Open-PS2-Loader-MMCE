@@ -43,15 +43,39 @@ typedef struct
 
     /// the cache entries itself
     cache_entry_t *content;
+
+    /// In-flight art requests holding a pointer INTO this cache's content[]. Incremented on the GUI
+    /// thread at enqueue, decremented on the art thread when the request is released.
+    ///
+    /// It exists because a theme switch frees caches out from under the art worker: thmFree ->
+    /// endMutableImage -> cacheDestroyCache free()s content[] while a queued request still holds
+    /// req->entry (a pointer INTO that array) plus req->cache->prefix and ->suffix. Before the art
+    /// thread that was survivable by accident; with a worker running concurrently it is a real
+    /// use-after-free, so cacheDestroyCache now waits on this and leaks rather than frees if the
+    /// wait expires.
+    volatile int activeRequests;
 } image_cache_t;
 
 /** Initializes the cache subsystem.
  */
 void cacheInit();
 
-/** Terminates the cache. Does nothing currently. Users of this code have to destroy caches via cacheDestroyCache
+/** Stops the art worker and releases its queue. Returns 1 if the worker joined, 0 if it was
+ * ABANDONED (still inside a device read after the budget). forceStop picks the longer budget.
+ *
+ * Abandoning is deliberate: a thread parked inside fileXio must never be TerminateThread'd -- that
+ * leaves the shared IOP RPC channel half-used and every later fileXio call from any thread is
+ * undefined. Every caller is on its way to an IOP reset or a power-off, so a leaked thread cannot
+ * outlive the handoff.
+ *
+ * Signature changed from `void cacheEnd()` when the art thread landed. Safe: it had ZERO callers.
  */
-void cacheEnd();
+int cacheEnd(int forceStop);
+
+/** Once per video frame, from the GUI thread (guiReadPads). Samples held direction for the SIO2
+ * defer, and re-wakes the worker if a queue is sitting with nothing running. O(1), never blocks.
+ */
+void cacheTickArt(void);
 
 /** Initializes a single cache
  */
@@ -73,6 +97,7 @@ GSTEXTURE *cacheLookupTexture(image_cache_t *cache, int *cacheId, int *UID);
  * the depth cap (cumulative), and completed (cumulative). Any argument may be NULL.
  */
 void cacheDebugCounters(int *queued, int *active, int *refused, int *done);
+int cacheDebugDropped(void);
 
 /** Debug HUD: cost in ms of the last art load and of the last SUCCESSFUL one, plus that image's
  * decoded pixel dimensions. Separates "one load is slow" from "we ask for too many". Any argument
@@ -93,24 +118,24 @@ void cacheInvalidateFailMemo(void);
  */
 int cacheHasPendingArt(void);
 
-// STUB (rebuild): the fork's THREADED art cache had its own worker to drain, which this rebuild does
-// not have. These two keep returning "drained" because there is no such thread here.
+// NO LONGER STUBS. Both were `static inline { return 1; }` for as long as art rode the shared IO
+// worker, which quietly disarmed FIVE call sites that were written expecting them to work:
+//   themes.c   -- the theme-switch guard, whose "keep the current theme, retry later" branch was
+//                 therefore UNREACHABLE. That is a live use-after-free: thmFree -> endMutableImage
+//                 -> cacheDestroyCache frees cache->content while queued requests still hold
+//                 req->entry, a pointer INTO that array, plus req->cache->prefix and ->suffix.
+//   appsupport -- appUpdateItemList frees appsList/appArtLookupTable underneath appGetImage.
+//   hddsupport -- a non-blocking "drop what is queued" before pfs0: remounts.
+//   opl.c      -- the LWNBD preflight.
+// Arming them is part of the point of giving art its own thread: with a worker running concurrently,
+// those races stop being theoretical.
 //
-// ⚠ Their old comment claimed "nothing is ever pending or in-flight" and that was WRONG -- it is
-// contradicted three lines up by cacheHasPendingArt(). Art here is not synchronous: cacheLoadImage is
-// an IOMAN HANDLER and every cover is a queued request on the shared IO worker. Only the fork's
-// dedicated art THREAD is missing. That stale sentence is why the pending queue went unaccounted for
-// at teardown; do not restore it.
-static inline int cacheAbortMmceImageLoadsTimed(int waitTicks)
-{
-    (void)waitTicks;
-    return 1;
-}
-static inline int cacheCancelPendingImageLoadsTimed(int waitTicks)
-{
-    (void)waitTicks;
-    return 1;
-}
+// waitTicks is MILLISECONDS at this tick size (the wait is DelayThread(1000), not util.c's delay(),
+// whose "tick" is a ~0.25 s NOP spin). The existing call-site constants are all sane read that way.
+//
+// Both return 1 when nothing is left outstanding, 0 if the budget expired.
+int cacheAbortMmceImageLoadsTimed(int waitTicks);
+int cacheCancelPendingImageLoadsTimed(int waitTicks);
 
 // STUB, and it MUST STAY ONE. themes.c calls this on the first theme load (curT == NULL), which is
 // every boot -- at that point the cache is not even initialised and nothing can be queued, so the

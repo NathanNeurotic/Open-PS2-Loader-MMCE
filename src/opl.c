@@ -2997,6 +2997,14 @@ void deinitEx(int exception, int modeSelected, int modeSelected2)
     // queued cover to be read off the game device first -- for a menu guiEnd() is about to destroy.
     cacheShutdownArtLoads();
 
+    // JOIN the art worker before anything unmounts a device under it. cacheShutdownArtLoads
+    // above only drops the QUEUE and flags the in-flight request; the thread itself may still
+    // be parked inside a device read, and deinitAllSupport below is about to unmount that
+    // device. Bounded, and a thread that will not come back is ABANDONED rather than
+    // terminated -- killing one inside fileXio leaves the shared IOP RPC channel half-used for
+    // every later caller, from any thread.
+    cacheEnd(gDeinitTerminal);
+
     // block all io ops, wait for the ones still running to finish (BOUNDED -- see the note above)
     ioBlockOpsTimed(1, gDeinitTerminal ? EXIT_IO_DRAIN_TICKS : LAUNCH_IO_DRAIN_TICKS);
     guiExecDeferredOps();
@@ -3032,6 +3040,14 @@ void deinit(int exception, int modeSelected)
     // worker keeps servicing it regardless of isIOBlocked, so without this the handoff pays for every
     // queued cover to be read off the game device first -- for a menu guiEnd() is about to destroy.
     cacheShutdownArtLoads();
+
+    // JOIN the art worker before anything unmounts a device under it. cacheShutdownArtLoads
+    // above only drops the QUEUE and flags the in-flight request; the thread itself may still
+    // be parked inside a device read, and deinitAllSupport below is about to unmount that
+    // device. Bounded, and a thread that will not come back is ABANDONED rather than
+    // terminated -- killing one inside fileXio leaves the shared IOP RPC channel half-used for
+    // every later caller, from any thread.
+    cacheEnd(gDeinitTerminal);
 
     // block all io ops, wait for the ones still running to finish (BOUNDED -- see the note above)
     ioBlockOpsTimed(1, gDeinitTerminal ? EXIT_IO_DRAIN_TICKS : LAUNCH_IO_DRAIN_TICKS);

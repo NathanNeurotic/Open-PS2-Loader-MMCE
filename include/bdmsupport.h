@@ -119,4 +119,17 @@ unsigned int bdmGetGeneration(void);
  * background rescan -- attach is event-driven, so the periodic probe is only a missed-event net.
  */
 int bdmSlotEverConnected(int mode);
+
+/** True when this BDM slot is the MX4SIO (SD-over-SIO2) device.
+ *
+ * SIO2 is the CONTROLLER'S OWN BUS. An art read here contends with pad polling, and that contention
+ * IS issue #340's mechanism -- inherent to the transport, not something we can code away
+ * (hardware-confirmed 2026-08-12: enabling MX4SIO alone reintroduces input skipping, via the chain
+ * documented at src/pad.c:108-125). texcache uses this to refuse to START such a read while a
+ * direction is held, and to drop the art thread's priority for the duration of one.
+ *
+ * Answer it on the GUI thread at enqueue time, never on the art worker: it reads the support's
+ * private bdm_device_data_t, which a background rescan rewrites.
+ */
+int bdmModeIsSIO2(int mode);
 #endif
