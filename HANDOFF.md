@@ -182,6 +182,14 @@ These are not general advice. Each one names a specific build that went out wron
 8. **Say when something is unproven.** Two 16-agent adversarial investigations this session ended
    with *nothing surviving refutation*. That is a real and useful result — it eliminated four
    hypotheses — and it is more valuable to Nathan than a confident guess would have been.
+9. **Never quote a version string you haven't read off a built artifact.** `git rev-list --count`
+   in a shallow/local worktree returns a partial local count (e.g. ~313) while CI unshallows to the
+   full 2555+ history. Quoting locally computed revisions causes false alarms or downgrades; always
+   read the actual `OPL_VERSION` string directly from CI build logs or packaged artifact filenames.
+10. **SDK structs have external readers in compiled SDK binaries.** When running dead-contract or
+    unused-field sweeps, distinguish internal OPL structs from SDK structs (`gsKit`, `ps2sdk`).
+    Fields like `GSTEXTURE.VramClut` may be initialized in OPL and consumed inside external
+    pre-compiled SDK functions (`gsKit_TexManager_bind`) with zero readers in OPL's source tree.
 
 # 1. Ground truth: repo, branches, where to work
 
