@@ -144,6 +144,11 @@ int texDiscoverLoad(GSTEXTURE *texture, const char *path, int texId);
 // Debug HUD (OE): staged-art opens that failed with errno != ENOENT on a non-MMCE device, i.e. covers
 // branded permanently absent on evidence that was not "no such file". See texStagedOpenIsAbsence.
 extern unsigned int gTexStagedOpenNonEnoent;
+
+// Debug HUD (O:<hit>/<miss>): cost in ms of the last staged art open() and of the last one that
+// FAILED. Separates "the directory walk for a missing file is the cost" from "the transfer is".
+extern int gTexLastOpenMs;
+extern int gTexLastMissOpenMs;
 void texSetLoadAbortFlag(volatile int *abortRequested);
 void texFree(GSTEXTURE *texture);
 

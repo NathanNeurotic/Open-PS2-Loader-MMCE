@@ -451,6 +451,20 @@ static void bdmLoadBlockDeviceModules(void)
 
     int modsNow = iUSBModLoaded + iLinkModLoaded + mx4sioModLoaded + hddModLoaded + udpbdModLoaded;
 
+    // BOOT PASS BUMPS NOTHING. On the first call every enabled transport loads for the first time, so
+    // the comparison below is guaranteed true -- and bdmInitDevicesData is about to publish all of
+    // them anyway. Bumping there bought nothing and cost a full immediate rescan of all eight slots
+    // plus, since rebuild-155, a wipe of the missing-art memo. Reported from hardware as OPL "doing
+    // the auto-hotplug thing" unprompted, on a console with MX4SIO switched off entirely -- i.e. the
+    // fix for the MX4SIO double-tap was firing for transports that had nothing to do with it.
+    //
+    // The case that actually needed the bump is a LATE load: the user enabling a transport in Device
+    // Settings, where the generation is bumped before the driver exists. Late passes are exactly the
+    // non-first ones.
+    static int moduleLoadFirstPassDone = 0;
+    int wasFirstPass = !moduleLoadFirstPassDone;
+    moduleLoadFirstPassDone = 1;
+
     SignalSema(bdmLoadModuleLock);
 
     // A DRIVER THAT ARRIVED LATE NEEDS ONE MORE LOOK, and without this it does not get one. Enabling
@@ -471,7 +485,7 @@ static void bdmLoadBlockDeviceModules(void)
     // Bumping on a load that actually SUCCEEDED closes the window for every transport, not just SDC.
     // Safe from this thread: bdmForceDeviceRefresh only increments the generation counter, and it is
     // called after SignalSema so it never runs under bdmLoadModuleLock.
-    if (modsNow != modsWere)
+    if (modsNow != modsWere && !wasFirstPass)
         bdmForceDeviceRefresh();
 }
 

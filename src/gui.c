@@ -2709,8 +2709,14 @@ static void guiDrawOverlays()
         // absent on evidence that was not the filesystem saying "no such file". Must stay 0; if it
         // climbs, transient bus errors are eating real art and texStagedOpenIsAbsence needs master's
         // ENOENT-only rule.
-        snprintf(artdbg, sizeof(artdbg), "Q%d A%d D%d X%d %dms(ok %dms %dx%d) OE%u  F%u/%u OV%u  NR%u MT%u  IO %d/%d T%u/%u",
-                 q, a, d, cacheDebugDropped(), lastMs, okMs, w, h, gTexStagedOpenNonEnoent,
+        // O:<hit>/<miss> = cost of the last staged art open() and of the last one that FAILED. THIS IS
+        // THE FIELD TO READ NOW. If a missing cover's open costs seconds while a successful one costs
+        // milliseconds, the cost is the filesystem walking the whole directory to prove a file is not
+        // there -- and an in-RAM index of the art folder becomes worth building. If both are small,
+        // the seconds are in the transfer or in contention and the index would fix nothing.
+        snprintf(artdbg, sizeof(artdbg), "Q%d A%d D%d X%d %dms(ok %dms %dx%d) O:%d/%d OE%u  F%u/%u OV%u  NR%u MT%u  IO %d/%d T%u/%u",
+                 q, a, d, cacheDebugDropped(), lastMs, okMs, w, h,
+                 gTexLastOpenMs, gTexLastMissOpenMs, gTexStagedOpenNonEnoent,
                  (unsigned)(fLast / 1000), (unsigned)(fWorst / 1000), (unsigned)fOver,
                  (unsigned)padNR, (unsigned)padEmpty,
                  ioGetPending(IO_CUSTOM_SIMPLEACTION), ioGetPending(IO_MENU_UPDATE_DEFFERED),

@@ -454,6 +454,28 @@ static void texReadFileFunction(png_structp pngPtr, png_bytep data, png_size_t l
 // should be left alone. If OE climbs, match master.
 unsigned int gTexStagedOpenNonEnoent = 0;
 
+// PHASE TIMING for the staged (mass*/mmce*) art path, in ms. Written by the art thread, read by the
+// debug HUD. These exist to settle one question that no amount of reading the source can:
+//
+//   Nathan, from hardware: "as soon as it hits a missing artwork, it basically hangs like hell."
+//
+// The whole-load number already proves the cost is NOT decode and NOT transfer -- a 512x725 cover
+// completes in 203 ms while a 140x200 one takes 2922 ms. By elimination that leaves open(), and the
+// mechanism would be the filesystem: FAT and exFAT both resolve a path by walking directory entries
+// linearly, so a lookup for a file that ISN'T THERE is the worst case by construction -- it cannot
+// answer until it has read the entire directory. A big ART/ folder makes every missing cover cost a
+// full sweep, and a present-but-late-in-the-directory cover nearly as much.
+//
+// If that is right, gTexLastMissOpenMs tracks the seconds and gTexLastOpenMs stays small on hits.
+// If instead a HIT's open is also slow, the directory theory is wrong and the cost is in the
+// transfer or in contention with the ioman worker for the one fileXio RPC channel.
+//
+// Proving this decides whether an in-RAM index of the art directory is worth building: it would turn
+// every miss from a full directory sweep into a hash lookup, and is worth real complexity ONLY if
+// the miss open is genuinely where the time goes.
+int gTexLastOpenMs = 0;     // last staged open(), hit or miss
+int gTexLastMissOpenMs = 0; // last staged open() that FAILED, i.e. a missing cover
+
 static int texStagedOpenIsAbsence(const char *filePath, int err)
 {
     if (filePath != NULL && !strncmp(filePath, "mmce", 4))
@@ -779,8 +801,11 @@ static int texLoadAll(GSTEXTURE *texture, const char *filePath, int texId, const
 
         if (texShouldUseMemoryReader(filePath)) {
             errno = 0;
+            clock_t openStart = clock();
             fd = open(filePath, O_RDONLY, 0);
+            gTexLastOpenMs = (int)((clock() - openStart) / 1000);
             if (fd < 0) {
+                gTexLastMissOpenMs = gTexLastOpenMs;
                 // Memoize as PERMANENTLY absent (ERR_BAD_FILE -> the fail-epoch memo) only on a real
                 // ENOENT. This is the MMCE/USB staging arm, and mmceman used to return ONE bare -1
                 // for six different open failures -- fd-pool exhausted, three packet timeouts, a
