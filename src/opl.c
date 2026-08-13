@@ -3036,24 +3036,6 @@ void deinitEx(int exception, int modeSelected, int modeSelected2)
     // so nothing here needs art gone before the drain -- and doing it this way stops the two workers
     // competing for the device during the join, which is the whole point of the join.
     //
-    // STOP THE MUSIC BEFORE DESTROYING WHAT IT IS STREAMING FROM. This used to happen inside
-    // audioEnd(), AFTER deinitAllSupport had already torn the device down -- which is backwards for
-    // any bgm.ogg that lives on the device being launched from, and that is the normal case: the
-    // music sits on the same USB stick, HDD or SMB share as the games.
-    //
-    // Issue #382 is this exact shape on the network: "when you have a bgm music and try to launch a
-    // game in eth mode it freezes". The ATA form of it was rebuild-154's black-screen exit hang,
-    // where hddCleanUp's PDIOC_CLOSEALL closed bgm.ogg's descriptor and the decoder then spun on
-    // permanent EOF. 154 bounded the waits and taught the decoder to give up, which is why the
-    // OFFICIALSDK build of 161 now works -- but bounding a wait only converts a hang into a delay.
-    // Ordering removes the race instead of surviving it: with the decoder already stopped and its
-    // file closed, no teardown step can pull a device out from under it, on ANY transport.
-    //
-    // Safe to call unconditionally: bgmStop returns immediately if audio was never initialised, and
-    // audioEnd's own guard (isBgmPlaying || bgmIoThreadRunning || bgmThreadRunning) then finds
-    // nothing alive and skips straight to audsrv_quit.
-    bgmStop();
-
     // block all io ops, wait for the ones still running to finish (BOUNDED -- see the note above)
     ioBlockOpsTimed(1, gDeinitTerminal ? EXIT_IO_DRAIN_TICKS : LAUNCH_IO_DRAIN_TICKS);
 
@@ -3105,24 +3087,6 @@ void deinit(int exception, int modeSelected)
     // so nothing here needs art gone before the drain -- and doing it this way stops the two workers
     // competing for the device during the join, which is the whole point of the join.
     //
-    // STOP THE MUSIC BEFORE DESTROYING WHAT IT IS STREAMING FROM. This used to happen inside
-    // audioEnd(), AFTER deinitAllSupport had already torn the device down -- which is backwards for
-    // any bgm.ogg that lives on the device being launched from, and that is the normal case: the
-    // music sits on the same USB stick, HDD or SMB share as the games.
-    //
-    // Issue #382 is this exact shape on the network: "when you have a bgm music and try to launch a
-    // game in eth mode it freezes". The ATA form of it was rebuild-154's black-screen exit hang,
-    // where hddCleanUp's PDIOC_CLOSEALL closed bgm.ogg's descriptor and the decoder then spun on
-    // permanent EOF. 154 bounded the waits and taught the decoder to give up, which is why the
-    // OFFICIALSDK build of 161 now works -- but bounding a wait only converts a hang into a delay.
-    // Ordering removes the race instead of surviving it: with the decoder already stopped and its
-    // file closed, no teardown step can pull a device out from under it, on ANY transport.
-    //
-    // Safe to call unconditionally: bgmStop returns immediately if audio was never initialised, and
-    // audioEnd's own guard (isBgmPlaying || bgmIoThreadRunning || bgmThreadRunning) then finds
-    // nothing alive and skips straight to audsrv_quit.
-    bgmStop();
-
     // block all io ops, wait for the ones still running to finish (BOUNDED -- see the note above)
     ioBlockOpsTimed(1, gDeinitTerminal ? EXIT_IO_DRAIN_TICKS : LAUNCH_IO_DRAIN_TICKS);
 

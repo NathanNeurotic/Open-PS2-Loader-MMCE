@@ -1,3 +1,4 @@
+#include <delaythread.h> // DelayThread -- bounded lock acquire in ethDeinitModules
 #include "include/opl.h"
 #include "include/lang.h"
 #include "include/gui.h"
@@ -336,11 +337,36 @@ static int ethLoadModules(void)
     return 0;
 }
 
+// Slices ethDeinitModules will wait for the init lock before giving up. One slice is 100 ms, so ~3 s
+// -- far past any healthy hand-off, and the ONLY unbounded blocker that was left on the teardown
+// path (found by the rebuild-154 exit-hang audit and parked then because it is not ATA-specific;
+// issue #382 is the not-ATA case).
+#define ETH_DEINIT_LOCK_SLICES 30
+
 void ethDeinitModules(void)
 {
     if (ethModulesLoaded) {
-        if (ethInitSemaID >= 0)
-            WaitSema(ethInitSemaID);
+        // BOUNDED ACQUIRE, was an unbounded WaitSema. deinit runs this while a game launch is in
+        // flight, and anything still holding this lock -- an in-progress SMB reconnect, a network
+        // read that will not return because the link is already going away -- used to stop the exit
+        // dead with the screen already torn down. That is the exact shape of rebuild-154's ATA hang,
+        // one transport over.
+        //
+        // Giving up is safe and is the whole point: every caller is on its way to an IOP reset that
+        // reclaims the network stack wholesale. A teardown that gives up beats one that hangs.
+        int lockHeld = 0;
+        if (ethInitSemaID >= 0) {
+            int slices = ETH_DEINIT_LOCK_SLICES;
+            while (slices-- > 0) {
+                if (PollSema(ethInitSemaID) == ethInitSemaID) {
+                    lockHeld = 1;
+                    break;
+                }
+                DelayThread(100000); // 100 ms
+            }
+            if (!lockHeld)
+                LOG("ETH: deinit could not take the init lock -- tearing down anyway\n");
+        }
 
         HttpDeinit();
         nbnsDeinit();
@@ -349,6 +375,8 @@ void ethDeinitModules(void)
         gNetworkStartup = ERROR_ETH_NOT_STARTED;
 
         if (ethInitSemaID >= 0) {
+            if (lockHeld)
+                SignalSema(ethInitSemaID);
             DeleteSema(ethInitSemaID);
             ethInitSemaID = -1;
         }
