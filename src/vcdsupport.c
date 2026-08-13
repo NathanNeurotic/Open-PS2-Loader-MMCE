@@ -218,6 +218,57 @@ void vcdInvalidateGameIds(void)
 
 // DISPLAY ONLY, and lazy. Returns 1 and writes the disc's own id, or 0 when there is none to show.
 //
+// The caption renders ONE id shape: AAAA_NNN.NN -- the PS2 page's form (g->startup) and the
+// filename parser's strict output. The disc resolver can legitimately hand back the SAME id as
+// "AAAA-NNNNN" (dash naming from partitions / some SYSTEM.CNF files survives retrogemCleanTitleID
+// verbatim for several input shapes); without this step the caption would visibly change shape when
+// the disc read landed (step-171). Display-layer only: the memo stores the canonical form, and the
+// RetroGEM launch/barcode path keeps its own resolver output -- it never reads the memo.
+static int vcdCanonDisplayId(const char *idIn, char *idOut, int idSize)
+{
+    char tmp[16] = {0}; // zeroed: short inputs must fail the shape checks, not read stack junk
+    int i;
+
+    if (idIn == NULL || idOut == NULL || idSize <= 11)
+        return 0;
+    idOut[0] = '\0';
+
+    snprintf(tmp, sizeof(tmp), "%s", idIn);
+
+    // Already canonical: 4 alnum, '_', 3 digits, '.', 2 digits -- the same strict shape
+    // vcdExtractGameId emits, so filename-fallback and disc-read render identically.
+    if (tmp[4] == '_' && tmp[8] == '.') {
+        for (i = 0; i < 4; i++)
+            if (!((tmp[i] >= 'A' && tmp[i] <= 'Z') || (tmp[i] >= 'a' && tmp[i] <= 'z') ||
+                  (tmp[i] >= '0' && tmp[i] <= '9')))
+                return 0;
+        for (i = 5; i <= 7; i++)
+            if (tmp[i] < '0' || tmp[i] > '9')
+                return 0;
+        if (tmp[9] < '0' || tmp[9] > '9' || tmp[10] < '0' || tmp[10] > '9')
+            return 0;
+        memcpy(idOut, tmp, 11);
+        idOut[11] = '\0';
+        return 1;
+    }
+
+    // Dash form AAAA-NNNNN (possibly with trailing junk from a verbatim copy): same letters and
+    // digits, re-rendered as AAAA_NNN.NN so the caption keeps one shape.
+    if (tmp[4] == '-') {
+        for (i = 0; i < 4; i++)
+            if (!((tmp[i] >= 'A' && tmp[i] <= 'Z') || (tmp[i] >= 'a' && tmp[i] <= 'z') ||
+                  (tmp[i] >= '0' && tmp[i] <= '9')))
+                return 0;
+        for (i = 5; i <= 9; i++)
+            if (tmp[i] < '0' || tmp[i] > '9')
+                return 0;
+        snprintf(idOut, idSize, "%.4s_%.3s.%.2s", tmp, tmp + 5, tmp + 8);
+        return 1;
+    }
+
+    return 0; // not a recognisable id shape: the caller keeps the resolver's string untouched
+}
+
 // Called from the per-game CONFIG path, which is where a value like this belongs: that path is
 // already asynchronous, already runs on the io worker, already fires once per SETTLED row, and since
 // rebuild-155 is gated on the theme actually having an element that displays it. So a theme that
@@ -257,8 +308,13 @@ int vcdResolveDisplayId(const char *name, char *idOut, int idSize)
     // The image is ground truth, and this is the SAME resolver the RetroGEM barcode uses at launch,
     // so a game reports one id to the theme and to the scanner.
     if (retrogemGetVcdGameID(vcdPath, discId, sizeof(discId)) && discId[0] != '\0') {
-        snprintf(m->id, sizeof(m->id), "%s", discId);
-        snprintf(idOut, idSize, "%s", discId);
+        // Canonicalise BEFORE the memo stores it: the caption renders one id shape whether this id
+        // came from the disc or from the filename fallback (step-171). The barcode's own launch
+        // resolver never reads the memo and is untouched.
+        char canon[RETROGEM_GAMEID_MAX];
+        const char *store = vcdCanonDisplayId(discId, canon, sizeof(canon)) ? canon : discId;
+        snprintf(m->id, sizeof(m->id), "%s", store);
+        snprintf(idOut, idSize, "%s", store);
         return 1;
     }
     return 0;
