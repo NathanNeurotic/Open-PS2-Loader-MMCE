@@ -71,14 +71,23 @@ DECI2_DEBUG ?= 0
 TTY_APPROACH ?= UDP
 
 # ======== DO NOT MODIFY VALUES AFTER THIS POINT! UNLESS YOU KNOW WHAT YOU ARE DOING ========
-# REVISION/GIT_HASH anchor to the last commit that touched anything the build can
-# consume -- NOT to HEAD. Pure bookkeeping commits (docs, CI, handoff/process files,
-# prebuilt drops) must not produce a "new" version of byte-identical code: the version
-# string is the reproducibility contract (a report names it, a build reproduces it), so
-# it may only move when the code does. The exclusion list errs toward caution -- anything
-# NOT named here still ticks the version, so a missed code path can never silently collide.
+# The two version inputs have different jobs, and step-178 proved they cannot share one
+# anchor:
+#   REVISION is the ORDINAL testers compare ("am I up to date?"). It must be monotonic --
+#   a newer build must never print a lower number, and every report on file quotes a
+#   HEAD-derived count. Code-anchoring it (step-178, caught in review before it
+#   published) made the number go BACKWARDS across publishes and broke comparability
+#   with every existing report. So REVISION stays HEAD-based: a republish of identical
+#   code prints a new NUMBER, which is mildly confusing at worst, never misleading.
+#   GIT_HASH carries the reproducibility contract instead: it anchors to CODE_ANCHOR,
+#   the last commit touching anything the build can consume (tree minus the exclusion
+#   list below). Bookkeeping commits (docs, CI, handoff/process files) do not move it,
+#   so the hash always names the exact code a tester ran -- "check out what the tester
+#   ran" is a checkout of this hash. The exclusion list errs toward caution: anything
+#   NOT named still moves the hash, so a missed code path can never silently collide
+#   two different binaries under one string.
 CODE_ANCHOR = $(shell git log -1 --format=%H -- . ':(exclude).github' ':(exclude)HANDOFF.md' ':(exclude)agent-file-drop' ':(exclude)frame_builds' ':(exclude)notes' ':(exclude)obj' ':(exclude).claude' ':(exclude).agents' ':(exclude).codex' ':(exclude).codex-tmp-nhddl' ':(exclude).codex-tmp-wle-r3z' 2>/dev/null)
-REVISION = $(shell expr $(shell git rev-list --count $(if $(CODE_ANCHOR),$(CODE_ANCHOR),HEAD)) + 2)
+REVISION = $(shell expr $(shell git rev-list --count HEAD) + 2)
 
 GIT_HASH = $(shell git rev-parse --short=7 $(if $(CODE_ANCHOR),$(CODE_ANCHOR),HEAD) 2>/dev/null)
 ifeq ($(shell git diff --quiet; echo $$?),1)
