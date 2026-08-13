@@ -256,6 +256,23 @@ void sfxGetPlayDiag(unsigned int *lastMs, unsigned int *maxMs)
         *maxMs = sfxMaxPlayMs;
 }
 
+// Silent-drop counters (#364). A dropped sound is invisible to the user and was invisible to every
+// instrument until now. stale = cursor ticks aged out at dispatch (climbs while scrolling under
+// load; harmless by design). full = ANY sound discarded because the 8-deep ring was saturated --
+// that is the path that eats deliberate presses. Read against SP (the per-RPC wall time above) the
+// pair splits the two possible causes of cut sound: big SP with flat SX says the IOP side is slow,
+// small SP with climbing SX/full says the dispatcher is being starved of CPU time.
+static unsigned int sfxDroppedStale = 0;
+static unsigned int sfxDroppedFull = 0;
+
+void sfxGetDropDiag(unsigned int *staleDrops, unsigned int *fullDrops)
+{
+    if (staleDrops)
+        *staleDrops = sfxDroppedStale;
+    if (fullDrops)
+        *fullDrops = sfxDroppedFull;
+}
+
 // ---- SFX dispatch thread (#340) -------------------------------------------------------------------
 // audsrv_ch_play_adpcm is a synchronous SIF RPC, and hardware photos measured a single cursor-tick
 // RPC blocking the GUI thread for 352 ms under IOP contention. Sounds are queued to a small
@@ -269,15 +286,21 @@ void sfxGetPlayDiag(unsigned int *lastMs, unsigned int *maxMs)
 // audioInit, which happens-before any producer (both producers gate on audio_initialized).
 // A full ring DROPS the sound -- a skipped tick beats a stalled menu. Concurrent audsrv RPCs
 // from a second thread are nothing new: bgmThread has always streamed alongside sfx.
-#define SFX_QUEUE_LEN        8
-// Entries older than this play no more: after an IOP stall clears, replaying the backlog of
-// stacked cursor ticks would chirp back-to-back.
-#define SFX_STALE_TICKS      (100 * SFX_CLOCKS_PER_MS)
-// Confirm (847 ms) and cancel (522 ms) are far longer than a cursor tick and are fired by deliberate
-// presses, not by scrolling, so they get a much looser bound: long enough that a real press always
-// sounds even when the dispatcher is briefly behind, short enough that a backlog which surfaces
-// after an IOP stall is still discarded instead of chirping long after the fact.
-#define SFX_STALE_TICKS_LONG (500 * SFX_CLOCKS_PER_MS)
+#define SFX_QUEUE_LEN   8
+// Entries older than this play no more -- CURSOR TICKS ONLY. A tick is a side effect of movement,
+// not a press: after an IOP stall clears, replaying the stacked backlog would chirp back-to-back
+// describing where the cursor USED to be, so an aged tick is still dropped.
+// Deliberate presses are NOT aged out. #364 (zackcage6, confirmed on run 31710438197): "the bgm/
+// sound effects of opening/closing or confirming/denying actions will be cut when there's no
+// window of cooldown (~5 seconds)". dia.c fires SFX_CONFIRM on BOTH focus-gain and focus-loss, so
+// a menu open/close is two CONFIRMs; whenever the dispatcher fell >500 ms behind (a slow audsrv
+// RPC under load, or a saturated ring ahead of it), the stale test silently ate real presses --
+// the exact fault the enqueue comment below calls worse than a late chirp. The fork has no queue
+// at all and every press sounds (synchronously: the menu waits on the RPC). We keep the queue
+// that fixed the measured 352 ms #340 menu stall, but stop discarding what the user asked for.
+// Drops are counted (sfxDroppedStale/sfxDroppedFull) and surfaced on the debug HUD as SX, next to
+// the RPC wall time SP, so the next report about cut sound comes with numbers attached.
+#define SFX_STALE_TICKS (100 * SFX_CLOCKS_PER_MS)
 static struct
 {
     int channel;
@@ -307,10 +330,12 @@ static void sfxDispatchThread(void *arg)
             // busy goes up BEFORE the gates: the quiescers set paused and then wait for
             // (empty && !busy), so an entry that passed the gates is always covered by busy.
             sfxDispatchBusy = 1;
-            u32 staleLimit = (id == SFX_CONFIRM || id == SFX_CANCEL) ? SFX_STALE_TICKS_LONG : SFX_STALE_TICKS;
-            int stale = (id == SFX_CURSOR || id == SFX_CONFIRM || id == SFX_CANCEL) &&
-                        (u32)(cpu_ticks() - ticks) > staleLimit;
+            // Only CURSOR ages out (see the define above). CONFIRM/CANCEL/TRANSITION/MESSAGE are
+            // deliberate presses and play even when the dispatcher fell behind (#364).
+            int stale = (id == SFX_CURSOR) && (u32)(cpu_ticks() - ticks) > SFX_STALE_TICKS;
             if (sfxDispatchPaused || !audio_initialized || stale) {
+                if (stale)
+                    sfxDroppedStale++;
                 sfxDispatchBusy = 0;
                 continue;
             }
@@ -393,8 +418,9 @@ static void sfxEnqueue(int channel, int id)
     // every other one. Reported from hardware as "I click open, it opens, I click close, it closes;
     // when I REOPEN it is completely silent, and when I reclose it sounds normally."
     // Dropping a sound the user asked for is a worse fault than a chirp arriving late.
-    // The backlog problem that motivated it is handled where it belongs -- at DISPATCH, by the
-    // staleness test, which now covers these ids too (see sfxDispatchThread).
+    // The backlog problem that motivated coalescing is handled where it belongs -- at DISPATCH --
+    // and ONLY for cursor ticks: aging CONFIRM/CANCEL out at dispatch was #364 (see the
+    // SFX_STALE_TICKS comment), so deliberate presses carry no stale limit at all.
 
     // ...with ONE exception, and the reasoning above is exactly why it is safe: SFX_CURSOR is not a
     // press, it is a side effect of movement. Holding a direction fires it every step, so a queue
@@ -420,8 +446,11 @@ static void sfxEnqueue(int channel, int id)
 
     int next = (sfxQHead + 1) % SFX_QUEUE_LEN;
     if (next == sfxQTail) {
+        // Ring full under IOP congestion: drop the sound, never the frame -- but COUNT it (#364),
+        // because this is the path that discards deliberate presses when the IOP wedges for seconds.
+        sfxDroppedFull++;
         EIntr();
-        return; // ring full under IOP congestion: drop the sound, never the frame
+        return;
     }
     sfxQueue[sfxQHead].channel = channel;
     sfxQueue[sfxQHead].id = id;

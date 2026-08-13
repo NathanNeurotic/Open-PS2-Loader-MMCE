@@ -23,6 +23,9 @@ int sfxGetSoundDuration(int id);
 void sfxPlay(int id);
 // Per-press audsrv RPC wall time (last / max, ms) -- measured on the dispatch thread.
 void sfxGetPlayDiag(unsigned int *lastMs, unsigned int *maxMs);
+// Silent SFX drops (last totals): stale = cursor ticks aged out at dispatch; full = sounds of any
+// id discarded because the dispatch ring was saturated. See the counters' comment in sound.c.
+void sfxGetDropDiag(unsigned int *staleDrops, unsigned int *fullDrops);
 
 void bgmStart(void);
 void bgmStop(void);

@@ -15,6 +15,7 @@
 #include "include/themes.h"
 #include "include/favsupport.h" // gFAVStartMode -- Favourites Start Mode row
 #include "include/pad.h"
+#include "include/sound.h" // sfxGetPlayDiag/sfxGetDropDiag -- SFX RPC cost + silent-drop counters for the debug HUD
 #include "include/util.h"
 #include "include/config.h"
 #include "include/system.h"
@@ -2723,9 +2724,18 @@ static void guiDrawOverlays()
         int wOpen = 0, wPend = 0, wMiss = 0, wMenu = 0, wBgm = 0;
         texDebugWorstOpen(&wOpen, &wPend, &wMiss, &wMenu, &wBgm);
         artIndexDebug(&ixDirs, &ixAbsent, &ixFailed);
-        snprintf(artdbg, sizeof(artdbg), "Q%d A%d D%d X%d %dms(ok %dms %dx%d) O:%d/%d W%d@%d/%d/%d%c OE%u IX%d/%u/%u KL%u TF%u  F%u/%u OV%u  NR%u MT%u  IO %d/%d T%u/%u",
+        // SX<stale>/<full> = SFX silently discarded: stale = cursor ticks aged out (harmless), full =
+        // ANY sound dropped by the saturated 8-deep ring -- the one that eats deliberate presses.
+        // SP<last>/<max> = per-press audsrv RPC wall ms, measured on the dispatch thread. The diag
+        // existed since #340 but NOTHING READ IT -- the classic half-landed instrument. Pair them
+        // for #364 ("effects cut without a ~5 s cooldown"): SP huge with SX flat = the IOP is slow;
+        // SP small with SX/full climbing = the dispatcher is starved of CPU.
+        unsigned int sxStale = 0, sxFull = 0, spLastMs = 0, spMaxMs = 0;
+        sfxGetDropDiag(&sxStale, &sxFull);
+        sfxGetPlayDiag(&spLastMs, &spMaxMs);
+        snprintf(artdbg, sizeof(artdbg), "Q%d A%d D%d X%d %dms(ok %dms %dx%d) O:%d/%d W%d@%d/%d/%d%c OE%u IX%d/%u/%u KL%u TF%u SX%u/%u SP%u/%u  F%u/%u OV%u  NR%u MT%u  IO %d/%d T%u/%u",
                  q, a, d, cacheDebugDropped(), lastMs, okMs, w, h,
-                 gTexLastOpenMs, gTexLastMissOpenMs, wOpen, wPend, wMenu, wBgm, wMiss ? 'm' : 'h', gTexStagedOpenNonEnoent, ixDirs, ixAbsent, ixFailed, cacheDebugKeyTooLong(), cacheDebugTransientFail(),
+                 gTexLastOpenMs, gTexLastMissOpenMs, wOpen, wPend, wMenu, wBgm, wMiss ? 'm' : 'h', gTexStagedOpenNonEnoent, ixDirs, ixAbsent, ixFailed, cacheDebugKeyTooLong(), cacheDebugTransientFail(), sxStale, sxFull, spLastMs, spMaxMs,
                  (unsigned)(fLast / 1000), (unsigned)(fWorst / 1000), (unsigned)fOver,
                  (unsigned)padNR, (unsigned)padEmpty,
                  ioGetPending(IO_CUSTOM_SIMPLEACTION), ioGetPending(IO_MENU_UPDATE_DEFFERED),
