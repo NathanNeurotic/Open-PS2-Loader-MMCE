@@ -119,8 +119,10 @@ Do not change any part of this. My testers rely on it looking identical.
 
 # Now read the handoff
 
-**`HANDOFF.md` is in the directory named at the top of this file. Start at section 0 (the working
-contract), then section 14 (current state), then read the whole thing.** It has the repo layout, the HUD decoder, the full fix history, the
+**`HANDOFF.md` is in the directory named at the top of this file. Read it in this order:**
+**§0 (the working contract) → §0b (environment traps — CRLF, shell quoting, NUL bytes, git and gh
+gotchas that each cost the previous agent real time) → §0c (process rules, each naming a build
+that shipped wrong) → §14 (current state) → then the whole file.** It has the repo layout, the HUD decoder, the full fix history, the
 standing traps, and — most importantly — an explicit list of hypotheses already **disproven with code
 citations**, so you do not spend a day re-deriving dead ends.
 

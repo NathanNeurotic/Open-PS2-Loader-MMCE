@@ -7,7 +7,167 @@ each cost a full day.
 
 ---
 
-## 1. Ground truth: repo, branches, where to work
+#---
+
+# 0. THE WORKING CONTRACT -- do not deviate from this
+
+**WORK IN THIS DIRECTORY:**
+`C:\Users\natha\Github\Open-PS2-Loader\.claude\worktrees\opl-issue-340-diagnosis-2cdb77`
+
+It is already on the tip branch, it holds this file, and **it is the one directory the build
+container is mounted to** (`oplbuild92` exposes it as `/src`). Do NOT `git worktree add` a fresh
+directory: the container would still build this one, so you would edit one tree and compile
+another and see no effect from your changes. Branch with `git checkout -b` INSIDE it. The main
+checkout at `C:/Users/natha/Github/Open-PS2-Loader` is on `rebuild/main` and does not even
+contain this file.
+
+
+Nathan's side and his testers' side must look identical across a handover. These are not suggestions.
+
+**BRANCHES.** Never commit to `master`, `rebuild/main`, or any existing `rebuild/step-*` branch.
+Every change goes on a NEW branch you create, `rebuild/step-NNN-<slug>`, branched from the current
+tip. **Next number: 169. Current tip: `rebuild/step-164-eth-bounded-teardown`.** One focused change
+per step, with a long explanatory commit message -- what changed, why, what evidence drove it, and
+what it does NOT fix. Those messages are this project's real documentation. Never force-push, never
+rewrite history, never merge to `master` without asking.
+
+**THE LOOP, unchanged:** build locally in `oplbuild92` -> run clang-format 12 on every touched
+`.c`/`.h` -> push the branch -> `gh workflow run flavours.yml --repo NathanNeurotic/Open-PS2-Loader
+--ref <branch>` -> **watch it to completion** -> only then hand over links. Never give Nathan a link
+from a run you have not seen go green on all four jobs. Always pass `--repo` or gh targets upstream
+and fails with "No commits between".
+
+**THE LINK FORMAT, verbatim, every time:**
+
+```
+## Test — run <runId> (`rebuild/step-NNN-<slug>`)
+
+**For testers:**
+- https://nightly.link/NathanNeurotic/Open-PS2-Loader/actions/runs/<runId>/OPL-PS2DEVPINNED.zip
+- https://nightly.link/NathanNeurotic/Open-PS2-Loader/actions/runs/<runId>/OPL-OFFICIALPINNED.zip
+
+**Early warning:**
+- https://nightly.link/NathanNeurotic/Open-PS2-Loader/actions/runs/<runId>/OPL-PS2DEVROLLING.zip
+- https://nightly.link/NathanNeurotic/Open-PS2-Loader/actions/runs/<runId>/OPL-OFFICIALROLLING.zip
+```
+
+PINNED goes to testers (digest-locked, reproducible, comparable weeks later). ROLLING is early
+warning: a rolling build breaking while its pinned twin does not is the toolchain, not us.
+
+**WITH EVERY BUILD:** say what to look for, name the HUD fields worth reading, and name the fallback
+build if it misbehaves. **Do not spam builds** -- stage on branches and let Nathan decide when a
+tester gets a link (his tester Zack asked for exactly this).
+
+---
+
+# 0b. ENVIRONMENT TRAPS — every one of these cost the previous agent real time
+
+None of this is guessable from the code. It is written down because each item was learned by
+breaking something.
+
+## Editing files
+
+- **Source files are CRLF.** `src/*.c`, `include/*.h`, the workflows — all of them. If you script an
+  edit in Python, read with `newline=''`, normalise to `\n` to do your matching, then **write the
+  CRLF back**. Get this wrong and git reports the entire file as changed, burying your actual diff
+  and making review impossible.
+- **`src/bdmsupport.c` contains literal NUL bytes.** grep/ripgrep call it binary and skip it. Use
+  `grep -a`, or read it directly. It is one of the largest and most important files in the tree — do
+  not conclude "no matches" from a silent grep.
+- **clang-format REFLOWS what you just wrote.** If you write a function, format, and then try to
+  patch it again with a string keyed on your original text, the match fails. Either patch before
+  formatting, or re-read the file and key on what is actually there now.
+- **The Edit tool refuses a file that changed since you read it** — and formatting counts as a
+  change. Re-read, then edit.
+
+## Shell quoting (this wasted the most time by far)
+
+- **Do not put long content in a bash heredoc.** A single apostrophe in prose (`the reporter's
+  library`) or a stray backtick will break `<<'PY'` and you get `unexpected EOF while looking for
+  matching`. It fails *after* partially running in some cases, leaving the tree half-edited.
+- **Write the script to a file and run it.** `Write` the Python to the scratchpad, then
+  `python <path>`. This is the reliable pattern; use it by default for anything longer than one line.
+- **`\n` inside a Python string that becomes C source turns into a REAL newline.** Writing
+  `LOG("...\n")` from Python produces a broken multi-line string literal and a compile error about
+  an unterminated macro argument. Build the escape explicitly, e.g. `chr(92) + 'n'`.
+- **Git paths get mangled by MSYS on Windows.** `git show "origin/master:.github/workflows/x.yml"`
+  becomes a backslash path and fails with "ambiguous argument". Export `MSYS_NO_PATHCONV=1` first, or
+  use `git grep <pattern> <ref> -- <path>` instead.
+
+## Git
+
+- **`git checkout -b` carries uncommitted changes with you, and `git commit` lands on whatever
+  branch you are currently on.** The previous agent committed a change onto the `step-162` branch and
+  *then* created `step-163` pointing at that same commit — so the local `162` label no longer matched
+  the artifact Nathan had been given. **Create the new branch BEFORE you commit, and check
+  `git rev-parse --abbrev-ref HEAD` before every commit.**
+- `git checkout -- '*.sh'` before committing: the build container strips CRLF from shell scripts and
+  they show up as spurious modifications.
+- Verify with `git status --short` that only the files you meant to touch are staged.
+
+## GitHub / gh
+
+- **Always `--repo NathanNeurotic/Open-PS2-Loader`.** Without it gh targets upstream ps2homebrew and
+  fails with "No commits between".
+- **Read the WHOLE issue thread, not the tail.** The previous agent read the last two comments of
+  #382, told Nathan to ask the tester which flavour he used, and was corrected — the tester had named
+  all three in the message just above. `gh issue view <n> --repo ... --json body,comments` and read
+  it all.
+- **Artifact names changed** with the four-flavour switch. Links older than 2026-08-13 point at
+  `OPL-PS2DEVLATESTSDK` / `OPL-PS2DEVPINNEDSDK` / `OPL-OFFICIALSDK`, which no longer exist. Do not
+  copy an old link block.
+- `PR #463` is open against `master` (issue-template flavour names) and needs merging.
+
+## Build output
+
+- **`expr: syntax error` lines are pre-existing noise** from the version-string makefile rules. They
+  appear on every successful build. Judge success by the ELF timestamp/size and by grepping for
+  `error:` specifically — not by "the output looked messy".
+- There is **no `-Wall`**. The compiler will not warn you about an unused result, a dead field, or a
+  contract you half-implemented.
+
+## Other people's files
+
+- `C:\Users\natha\Github\Open-PS2-Loader\agent-file-drop` is where Nathan drops files from
+  testers (currently two themes attached to issue #380 that correctly display PS1 game IDs). Check it
+  when he references an attachment.
+
+---
+
+# 0c. PROCESS RULES the previous agent learned by getting them wrong
+
+These are not general advice. Each one names a specific build that went out wrong.
+
+1. **Do not ship a fix aimed at a counter you have not read yet.** rebuild-158 enlarged a buffer to
+   fix the VCD page; the very next capture showed the counter for that condition reading **0**. The
+   fix was correct in principle and irrelevant in fact. If you have just added an instrument, wait
+   for the reading.
+2. **Turning a stub into a real function is an API change — audit every caller first.** rebuild-142
+   made `cacheCancelPendingImageLoads()` real and sticky; `themes.c` calls it on the first theme load
+   of every boot, so **all cover art died on every boot**. Nathan found it, not the compiler.
+3. **After adding an invalidation generation, grep every existing caller of the invalidator.**
+   rebuild-153 added a fail generation so missing art would stop being re-probed; an existing call in
+   `updateMenuFromGameList` bumped that generation on *every list rebuild*, silently undoing it.
+   Fixed only in 155.
+4. **Verify a value actually reaches the screen.** rebuild-165 and 166 resolved PS1 disc ids and were
+   **completely inert** — `sbPopulateConfig` re-derives the displayed value from the filename further
+   down. Two builds, no effect, discovered only by reading the consumer.
+5. **Every counter must distinguish "not used yet" from "broken."** `IX0/0` cost two build cycles
+   because a subsystem that never initialised looked identical to an idle one. `OE` could not see the
+   SMB bug it was built for, because it only incremented on a code path SMB never takes. When you add
+   a counter, ask what its zero means.
+6. **Diff the fork before theorising.** Three separate bugs this week were "master does X, we do
+   not," each found only after a tester hit it: the cache reunion, the per-row config gate, and the
+   transient-failure retry lane. `git show origin/master:src/FILE` is the cheapest debugging tool
+   available here.
+7. **Adapt, do not transplant.** A wholesale `texcache.c` swap was started and reverted: master's
+   file is missing eight symbols this tree calls, plus the MX4SIO/SIO2 protection that fixed #340.
+   Port the mechanism, not the file.
+8. **Say when something is unproven.** Two 16-agent adversarial investigations this session ended
+   with *nothing surviving refutation*. That is a real and useful result — it eliminated four
+   hypotheses — and it is more valuable to Nathan than a confident guess would have been.
+
+# 1. Ground truth: repo, branches, where to work
 
 Repo: `https://github.com/NathanNeurotic/Open-PS2-Loader`
 Local checkout: `C:\Users\natha\Github\Open-PS2-Loader` — sits on branch **`rebuild/main`**.
@@ -485,57 +645,6 @@ against `master` (open, needs merging — GitHub reads templates from the defaul
 3. **Merge PR #463** so bug reports can name a flavour that exists.
 4. Section 12's art-batching lead — needs no hardware, just a careful read of four functions.
 
-
----
-
-# 0. THE WORKING CONTRACT -- do not deviate from this
-
-**WORK IN THIS DIRECTORY:**
-`C:\Users\natha\Github\Open-PS2-Loader\.claude\worktrees\opl-issue-340-diagnosis-2cdb77`
-
-It is already on the tip branch, it holds this file, and **it is the one directory the build
-container is mounted to** (`oplbuild92` exposes it as `/src`). Do NOT `git worktree add` a fresh
-directory: the container would still build this one, so you would edit one tree and compile
-another and see no effect from your changes. Branch with `git checkout -b` INSIDE it. The main
-checkout at `C:/Users/natha/Github/Open-PS2-Loader` is on `rebuild/main` and does not even
-contain this file.
-
-
-Nathan's side and his testers' side must look identical across a handover. These are not suggestions.
-
-**BRANCHES.** Never commit to `master`, `rebuild/main`, or any existing `rebuild/step-*` branch.
-Every change goes on a NEW branch you create, `rebuild/step-NNN-<slug>`, branched from the current
-tip. **Next number: 169. Current tip: `rebuild/step-164-eth-bounded-teardown`.** One focused change
-per step, with a long explanatory commit message -- what changed, why, what evidence drove it, and
-what it does NOT fix. Those messages are this project's real documentation. Never force-push, never
-rewrite history, never merge to `master` without asking.
-
-**THE LOOP, unchanged:** build locally in `oplbuild92` -> run clang-format 12 on every touched
-`.c`/`.h` -> push the branch -> `gh workflow run flavours.yml --repo NathanNeurotic/Open-PS2-Loader
---ref <branch>` -> **watch it to completion** -> only then hand over links. Never give Nathan a link
-from a run you have not seen go green on all four jobs. Always pass `--repo` or gh targets upstream
-and fails with "No commits between".
-
-**THE LINK FORMAT, verbatim, every time:**
-
-```
-## Test — run <runId> (`rebuild/step-NNN-<slug>`)
-
-**For testers:**
-- https://nightly.link/NathanNeurotic/Open-PS2-Loader/actions/runs/<runId>/OPL-PS2DEVPINNED.zip
-- https://nightly.link/NathanNeurotic/Open-PS2-Loader/actions/runs/<runId>/OPL-OFFICIALPINNED.zip
-
-**Early warning:**
-- https://nightly.link/NathanNeurotic/Open-PS2-Loader/actions/runs/<runId>/OPL-PS2DEVROLLING.zip
-- https://nightly.link/NathanNeurotic/Open-PS2-Loader/actions/runs/<runId>/OPL-OFFICIALROLLING.zip
-```
-
-PINNED goes to testers (digest-locked, reproducible, comparable weeks later). ROLLING is early
-warning: a rolling build breaking while its pinned twin does not is the toolchain, not us.
-
-**WITH EVERY BUILD:** say what to look for, name the HUD fields worth reading, and name the fallback
-build if it misbehaves. **Do not spam builds** -- stage on branches and let Nathan decide when a
-tester gets a link (his tester Zack asked for exactly this).
 
 ---
 
