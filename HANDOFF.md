@@ -69,15 +69,26 @@ gh run watch <runId> --repo NathanNeurotic/Open-PS2-Loader --exit-status
 ⚠ **Always pass `--repo NathanNeurotic/Open-PS2-Loader`** — `gh` otherwise targets upstream and
 fails with "No commits between".
 
-Then hand Nathan three nightly.link URLs:
+Then hand Nathan the nightly.link URLs. **FOUR flavours as of 2026-08-13**, on two axes — which
+toolchain, and pinned vs rolling:
 
 ```
-https://nightly.link/NathanNeurotic/Open-PS2-Loader/actions/runs/<runId>/OPL-PS2DEVLATESTSDK.zip
-https://nightly.link/NathanNeurotic/Open-PS2-Loader/actions/runs/<runId>/OPL-PS2DEVPINNEDSDK.zip
-https://nightly.link/NathanNeurotic/Open-PS2-Loader/actions/runs/<runId>/OPL-OFFICIALSDK.zip
+https://nightly.link/NathanNeurotic/Open-PS2-Loader/actions/runs/<runId>/OPL-PS2DEVPINNED.zip
+https://nightly.link/NathanNeurotic/Open-PS2-Loader/actions/runs/<runId>/OPL-OFFICIALPINNED.zip
+https://nightly.link/NathanNeurotic/Open-PS2-Loader/actions/runs/<runId>/OPL-PS2DEVROLLING.zip
+https://nightly.link/NathanNeurotic/Open-PS2-Loader/actions/runs/<runId>/OPL-OFFICIALROLLING.zip
 ```
 
-**He always wants all three.** He tests on real hardware — a physical PS2 with a USB stick, an
+**PINNED is what testers should use** — digest-locked, reproducible, comparable across weeks. If a
+pinned build breaks, it is us. **ROLLING is early warning**: if a rolling build breaks while its
+pinned twin does not, that is upstream's bug, not ours — a distinction that could not be drawn
+before. Every artifact carries `BUILD-MANIFEST.txt` (flavour, image, digest, commit, compiler
+versions probed after the build) so a report identifies exactly what ran.
+
+⚠ The pins are a dated decision, not a snapshot to refresh casually: moving one invalidates
+comparability with every report gathered against it. Bump on purpose and expect to re-baseline.
+
+**He always wants all of them.** He tests on real hardware — a physical PS2 with a USB stick, an
 MX4SIO SD adapter, an internal ATA drive, and memory cards. There is no emulator path for the
 things being worked on.
 
