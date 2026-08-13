@@ -57,10 +57,17 @@ body:
     id: flavour
     attributes:
       label: Which build flavour?
-      description: Each release ships several ELF flavours built with different SDKs — it matters for triage
+      description: >-
+        Every build ships in four flavours. PINNED builds are digest-locked and reproducible, so a
+        report against one can be rebuilt and compared months later — please prefer them. ROLLING
+        builds track the toolchain and can change day to day. The flavour is in the ELF's version
+        string (Settings -> About) and in BUILD-MANIFEST.txt inside the zip.
       options:
-        - Main RIPTOPL zip (PS2DEVLATESTSDK)
-        - PS2DEVPINNEDSDK variant (fallback build)
+        - PS2DEVPINNED (ps2dev, digest-pinned — preferred for reports)
+        - OFFICIALPINNED (official OPL container, digest-pinned — preferred for reports)
+        - PS2DEVROLLING (ps2dev:latest — moving target)
+        - OFFICIALROLLING (ps2homebrew:main — moving target)
+        - An older build (PS2DEVLATESTSDK / PS2DEVPINNEDSDK / OFFICIALSDK)
         - Not sure
     validations:
       required: true
