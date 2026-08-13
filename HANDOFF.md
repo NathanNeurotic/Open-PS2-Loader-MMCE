@@ -911,3 +911,15 @@ paragraph removed, comment marks why it must not return). Live release body patc
 the identical restructure, rest byte-preserved. Branch `rebuild/step-176-notes-four-flavours`.
 MSYS trap logged: native Windows python cannot open MSYS /tmp absolute paths — cd there
 and use relative names.
+
+**177 — DS5 loaders for all four flavours** (branch `rebuild/step-177-ds5-all-flavours`).
+Nathan reviewing the live rolling release: "there should be a ds5 build for all 4
+flavours." The official jobs were "main ELF only" by a policy predating the four-flavour
+line (rolling-alpha had no OFFICIALSDK-ds5 either). Added the soft-fail DS5 step to both
+official jobs (OFFICIALROLLING-ds5, OFFICIALPINNED-ds5); rename + notes loops now cover
+all four SDKs. The 1080p ELF from rolling-alpha is NOT missing — GSM 1080p is ON in
+every build of this line. REHEARSED via workflow_dispatch on the branch (run
+31742808752): four builds green, publish correctly SKIPPED, and the official artifacts
+verified to contain RIPTOPL-OFFICIALROLLING-ds5.ELF / RIPTOPL-OFFICIALPINNED-ds5.ELF
+(downloaded and listed, not assumed from the log). DUALSENSE=1 builds fine in both
+official containers. Awaiting Nathan's go to ff rebuild/main and republish in place.
