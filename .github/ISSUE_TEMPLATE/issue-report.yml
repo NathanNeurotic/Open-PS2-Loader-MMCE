@@ -58,16 +58,19 @@ body:
     attributes:
       label: Which build flavour?
       description: >-
-        Every build ships in four flavours. PINNED builds are digest-locked and reproducible, so a
-        report against one can be rebuilt and compared months later — please prefer them. ROLLING
-        builds track the toolchain and can change day to day. The flavour is in the ELF's version
-        string (Settings -> About) and in BUILD-MANIFEST.txt inside the zip.
+        Every build is compiled with several toolchains and the flavour matters for triage. The
+        surest way to find yours: Settings -> About shows it at the end of the version string. RELEASE
+        downloads also carry IRX-MANIFEST-<flavour>.txt; test builds sent for a specific issue carry
+        BUILD-MANIFEST.txt with the exact toolchain digest. PINNED flavours are digest-locked and
+        reproducible, so a report against one can be rebuilt and compared later.
       options:
-        - PS2DEVPINNED (ps2dev, digest-pinned — preferred for reports)
-        - OFFICIALPINNED (official OPL container, digest-pinned — preferred for reports)
-        - PS2DEVROLLING (ps2dev:latest — moving target)
-        - OFFICIALROLLING (ps2homebrew:main — moving target)
-        - An older build (PS2DEVLATESTSDK / PS2DEVPINNEDSDK / OFFICIALSDK)
+        - PS2DEVLATESTSDK (release download — the main RIPTOPL zip)
+        - PS2DEVPINNEDSDK (release download — the pinned fallback build)
+        - OFFICIALSDK (release download — official OPL toolchain)
+        - PS2DEVPINNED (test build — ps2dev, digest-pinned)
+        - OFFICIALPINNED (test build — official OPL container, digest-pinned)
+        - PS2DEVROLLING (test build — ps2dev:latest, moving target)
+        - OFFICIALROLLING (test build — ps2homebrew:main, moving target)
         - Not sure
     validations:
       required: true
