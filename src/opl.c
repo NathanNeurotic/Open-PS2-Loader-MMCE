@@ -1173,7 +1173,8 @@ static void menuUpdateHook()
         // measured art loads spanning 82 ms to 2922 ms with the decoded size held constant.
         if (genChanged) {
             cacheInvalidateFailMemo();
-            artIndexInvalidate(); // the listing is only as current as the device it was read from
+            artIndexInvalidate();   // the listing is only as current as the device it was read from
+            vcdInvalidateGameIds(); // ...and neither is a PS1 disc id read off the old media
         }
         // Consume the generation bump only if every hotplug-driven enqueue is ACCEPTED:
         // ioPutRequest can fail (queue blocked during teardown, allocation failure), and

@@ -27,6 +27,10 @@
 typedef struct
 {
     char name[VCD_NAME_MAX]; // VCD basename WITHOUT ".VCD" (the POPSTARTER selector game name)
+    // PS1 disc id ("SLUS_123.45"), or empty when none could be determined. Resolved in the SCAN,
+    // where the directory is already the right one for both the POPS/ and APA-root layouts. Themes
+    // render it as #Startup; see vcdResolveScanId in vcdsupport.c. Empty falls back to the name.
+    char id[VCD_ID_MAX];
 } vcd_entry_t;
 
 // Scan "<devPrefix>POPS/" for *.VCD (case-insensitive). Returns the count; *outList is a malloc'd
@@ -39,6 +43,10 @@ int vcdScanDirRoot(const char *dirPath, vcd_entry_t **outList);
 // Extract a strict leading PS1 ID from "SXXX_NNN.NN.Title" for same-folder CFG/art fallback.
 // Returns 1 and writes the 11-character ID on success; otherwise returns 0 and writes an empty string.
 int vcdExtractGameId(const char *name, char *idOut, int idSize);
+
+// Forget every remembered PS1 disc id, so swapped media is not described by the previous disc's id.
+// Cheap: ids re-resolve a few per scan. See vcdResolveScanId in vcdsupport.c.
+void vcdInvalidateGameIds(void);
 
 // Build "<devPrefix>POPS/POPSTARTER.ELF" into out; returns 1 if that file exists, else 0.
 int vcdResolvePopstarter(const char *devPrefix, char *out, int outSize);

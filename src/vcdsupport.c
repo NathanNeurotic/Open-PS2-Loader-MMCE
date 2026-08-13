@@ -108,6 +108,120 @@ static int vcdEntryCmp(const void *a, const void *b)
 
 // Core scan: opendir `dirPath` and collect *.VCD basenames into a fresh vcd_entry_t list. POSIX dir
 // IO only (newlib-port rule). Shared by vcdScanDir (POPS subfolder) and vcdScanDirRoot (path as-is).
+// ---- PS1 disc-id resolution for the game list (issue #380) --------------------------------
+//
+// A theme shows the game id through an AttributeText bound to #Startup. A PS2 row has a real disc id
+// in game->startup; a VCD row had the whole FILENAME, so long PS1 titles overflowed into the cover
+// art. That is #380, and it reproduced on every theme the reporter tried -- because no theme can fix
+// a value the loader never supplied.
+//
+// The first attempt parsed the id out of the FILENAME. Free, and correct when a file is named
+// "SLUS_123.45.Title" -- and the reporter's library is not, which is why he still saw full titles on
+// the build meant to fix it. So when the name yields nothing, ask the DISC: retrogemGetVcdGameID
+// reads the id from inside the image (ISO 9660 / SYSTEM.CNF, then PVD, then partition and subpath
+// forms). It is the same resolver the RetroGEM barcode uses, so a game reports the SAME id here as
+// it does to the scanner -- which is the point, not a coincidence.
+//
+// RESOLVED HERE, IN THE SCAN, AND DELIBERATELY NOT ONE LAYER UP. There are two VCD layouts:
+// vcdScanDir appends "POPS" to a device root, and vcdScanDirRoot takes a directory DIRECTLY (the
+// APA/PFS HDD, e.g. "pfs1:/"). A resolver above them has to REBUILD a path, so it can only be right
+// about one of them -- it would have quietly produced a wrong path for HDD VCDs. Down here the
+// directory is the one that was actually opened and the filename is the one readdir just returned,
+// so the path is correct for both layouts by construction rather than by argument.
+//
+// The disc read is fenced three ways, because this runs on every list build:
+//   1. only reached when the free filename parse fails;
+//   2. every answer MEMOIZED for the session, hit AND miss, so a game is read at most once no matter
+//      how often a background rescan rebuilds the list;
+//   3. a per-scan budget caps how many discs one build may open, so a large badly-named library
+//      degrades to "some ids resolve, the rest show their filename" instead of stalling the list.
+//      The remainder resolve on later builds, a few at a time.
+#define VCD_ID_PROBE_BUDGET 8   // discs opened per scan
+#define VCD_ID_MEMO_MAX     512 // ids remembered for the session
+
+typedef struct vcd_id_memo
+{
+    struct vcd_id_memo *next;
+    char id[VCD_ID_MAX]; // empty = asked the disc, it had none -- worth remembering so we stop asking
+    char name[];         // flexible: VCD basenames may be long, most are far short of the cap
+} vcd_id_memo_t;
+
+static vcd_id_memo_t *gVcdIdMemo = NULL;
+static int gVcdIdMemoCount = 0;
+
+static const char *vcdIdMemoFind(const char *name)
+{
+    for (vcd_id_memo_t *m = gVcdIdMemo; m != NULL; m = m->next) {
+        if (!strcmp(m->name, name))
+            return m->id;
+    }
+    return NULL;
+}
+
+static void vcdIdMemoAdd(const char *name, const char *id)
+{
+    if (gVcdIdMemoCount >= VCD_ID_MEMO_MAX)
+        return; // full: later games re-probe within their budget -- slow, never wrong
+
+    size_t len = strlen(name);
+    vcd_id_memo_t *m = (vcd_id_memo_t *)malloc(sizeof(vcd_id_memo_t) + len + 1);
+    if (m == NULL)
+        return;
+    memcpy(m->name, name, len + 1);
+    snprintf(m->id, sizeof(m->id), "%s", id ? id : "");
+    m->next = gVcdIdMemo;
+    gVcdIdMemo = m;
+    gVcdIdMemoCount++;
+}
+
+void vcdInvalidateGameIds(void)
+{
+    vcd_id_memo_t *m = gVcdIdMemo;
+    gVcdIdMemo = NULL;
+    gVcdIdMemoCount = 0;
+    while (m != NULL) {
+        vcd_id_memo_t *next = m->next;
+        free(m);
+        m = next;
+    }
+}
+
+// dirPath is the directory that was just opened; fileName is what readdir returned (with ".VCD");
+// baseName is that name with the extension stripped. Writes the id, or an empty string when none.
+static void vcdResolveScanId(const char *dirPath, const char *fileName, const char *baseName,
+                             char *idOut, int idSize, int *budget)
+{
+    idOut[0] = '\0';
+
+    if (vcdExtractGameId(baseName, idOut, idSize) && idOut[0] != '\0')
+        return; // the name already carries it: free
+
+    const char *memo = vcdIdMemoFind(baseName);
+    if (memo != NULL) {
+        snprintf(idOut, idSize, "%s", memo);
+        return; // including a remembered "no id" -- do not open it again
+    }
+
+    if (budget == NULL || *budget <= 0)
+        return; // out of budget this scan; a later build resolves it
+
+    char vcdPath[256];
+    char discId[RETROGEM_GAMEID_MAX];
+    size_t dl = strlen(dirPath);
+    const char *sep = (dl > 0 && dirPath[dl - 1] == '/') ? "" : "/";
+
+    (*budget)--;
+    if (snprintf(vcdPath, sizeof(vcdPath), "%s%s%s", dirPath, sep, fileName) >= (int)sizeof(vcdPath))
+        return;
+
+    if (retrogemGetVcdGameID(vcdPath, discId, sizeof(discId)) && discId[0] != '\0') {
+        vcdIdMemoAdd(baseName, discId);
+        snprintf(idOut, idSize, "%s", discId);
+        return;
+    }
+    vcdIdMemoAdd(baseName, ""); // genuinely has none
+}
+
 static int vcdScanOpenDir(const char *dirPath, vcd_entry_t **outList)
 {
     errno = 0; // clear BEFORE opendir so the NULL branch reads THIS call's errno, not a stale one
@@ -144,6 +258,7 @@ static int vcdScanOpenDir(const char *dirPath, vcd_entry_t **outList)
     }
 
     int count = 0;
+    int idBudget = VCD_ID_PROBE_BUDGET;
     struct dirent *de;
     while (count < VCD_MAX_ITEMS && (de = readdir(dir)) != NULL) {
         int len = (int)strlen(de->d_name);
@@ -170,6 +285,8 @@ static int vcdScanOpenDir(const char *dirPath, vcd_entry_t **outList)
             baseLen = VCD_NAME_MAX - 1; // unreachable after the cap above; kept as a belt
         memcpy(list[count].name, de->d_name, baseLen);
         list[count].name[baseLen] = '\0';
+        vcdResolveScanId(dirPath, de->d_name, list[count].name,
+                         list[count].id, sizeof(list[count].id), &idBudget);
         count++;
     }
     closedir(dir);
@@ -533,7 +650,11 @@ int vcdFillGameList(const char *devPrefix, base_game_info_t **outGames)
             if (gVcdFirstDiscOnly && vcdIsHiddenDisc(vcds[i].name))
                 continue; // #118: hide discs 2+ of a multi-disc PS1 set (device lists only)
             snprintf(games[kept].name, sizeof(games[kept].name), "%s", vcds[i].name);
-            snprintf(games[kept].startup, sizeof(games[kept].startup), "%s", vcds[i].name);
+            // #Startup is what a theme renders as the game id. The resolved id when we have one,
+            // the filename when we do not -- which is the pre-#380 behaviour, so nothing regresses
+            // for a disc whose id cannot be determined at all.
+            snprintf(games[kept].startup, sizeof(games[kept].startup), "%s",
+                     vcds[i].id[0] != '\0' ? vcds[i].id : vcds[i].name);
             snprintf(games[kept].extension, sizeof(games[kept].extension), ".VCD");
             games[kept].parts = 1;
             games[kept].format = GAME_FORMAT_ISO; // harmless; the per-mode VCD flag gates the launch path
