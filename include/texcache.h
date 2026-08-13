@@ -31,7 +31,21 @@ typedef struct
     //
     // Empty means "no key": set only when the value FITS, so a match is always a whole-string match
     // and two long VCD filenames sharing a prefix can never trade covers.
-    char key[64];
+    //
+    // ⚠ SIZED FOR THE LONGEST THING THAT IS ACTUALLY KEYED, WHICH IS NOT A STARTUP ID. At 64 this
+    // silently excluded most of the VCD page: a PS2 row keys on a startup id ("SLUS_123.45", 11
+    // chars) and always fitted, but a PS1 row keys on the VCD BASENAME, which vcdsupport.h allows up
+    // to VCD_NAME_MAX (256) and which in practice looks like "Final Fantasy VII (Disc 1) [SCUS-94163]".
+    // Anything at or over the limit gets no key, and with no key it gets NONE of the reunion:
+    // no adopting art the cache already holds, no adopting an in-flight load, and -- the expensive
+    // one -- no adopting the "this file is absent" memo, so every missing PS1 cover was re-probed
+    // from the device on every single list rebuild.
+    //
+    // That is why the VCD page stayed slow while everything else got faster: rebuild-153's reunion
+    // and rebuild-155's absence memo both worked perfectly for ISO rows and were unreachable for PS1
+    // ones. 128 covers real PS1 filenames with room to spare; anything longer still falls back to the
+    // old behaviour, which is SLOW rather than WRONG -- an exact match or nothing, never a guess.
+    char key[128];
 
     // Which fail generation the "absent" park (lastUsed == 0) belongs to. cacheInvalidateFailMemo()
     // bumps the global; a memo from an older generation is ignored, so "new art may have appeared"
@@ -113,6 +127,10 @@ GSTEXTURE *cacheLookupTexture(image_cache_t *cache, int *cacheId, int *UID);
  */
 void cacheDebugCounters(int *queued, int *active, int *refused, int *done);
 int cacheDebugDropped(void);
+
+/** Debug HUD: rows whose value did not fit cache_entry_t.key, and which therefore get none of the
+ * reunion or the absence memo. Should be 0; see the field comment for what a non-zero value costs. */
+unsigned int cacheDebugKeyTooLong(void);
 
 /** Debug HUD: cost in ms of the last art load and of the last SUCCESSFUL one, plus that image's
  * decoded pixel dimensions. Separates "one load is slow" from "we ask for too many". Any argument

@@ -2721,9 +2721,9 @@ static void guiDrawOverlays()
         int ixDirs = 0;
         unsigned int ixAbsent = 0;
         artIndexDebug(&ixDirs, &ixAbsent);
-        snprintf(artdbg, sizeof(artdbg), "Q%d A%d D%d X%d %dms(ok %dms %dx%d) O:%d/%d OE%u IX%d/%u  F%u/%u OV%u  NR%u MT%u  IO %d/%d T%u/%u",
+        snprintf(artdbg, sizeof(artdbg), "Q%d A%d D%d X%d %dms(ok %dms %dx%d) O:%d/%d OE%u IX%d/%u KL%u  F%u/%u OV%u  NR%u MT%u  IO %d/%d T%u/%u",
                  q, a, d, cacheDebugDropped(), lastMs, okMs, w, h,
-                 gTexLastOpenMs, gTexLastMissOpenMs, gTexStagedOpenNonEnoent, ixDirs, ixAbsent,
+                 gTexLastOpenMs, gTexLastMissOpenMs, gTexStagedOpenNonEnoent, ixDirs, ixAbsent, cacheDebugKeyTooLong(),
                  (unsigned)(fLast / 1000), (unsigned)(fWorst / 1000), (unsigned)fOver,
                  (unsigned)padNR, (unsigned)padEmpty,
                  ioGetPending(IO_CUSTOM_SIMPLEACTION), ioGetPending(IO_MENU_UPDATE_DEFFERED),

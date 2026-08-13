@@ -207,6 +207,16 @@ static volatile int gArtDone = 0;
 // climbing total with both of these flat is the signature of a request leak.
 static volatile int gArtDropped = 0;
 
+// Rows whose value was too long to keep as a reunion key, i.e. rows getting NONE of the cache
+// reunion or the absence memo. Must be 0 in practice; anything else names a page that is still
+// paying the device for art it has already looked at. See cache_entry_t.key.
+static volatile unsigned int gArtKeyTooLong = 0;
+
+unsigned int cacheDebugKeyTooLong(void)
+{
+    return gArtKeyTooLong;
+}
+
 void cacheDebugCounters(int *queued, int *active, int *refused, int *done)
 {
     if (queued)
@@ -1232,6 +1242,8 @@ GSTEXTURE *cacheGetTexture(image_cache_t *cache, item_list_t *list, int *cacheId
             size_t keyLen = strlen(value);
             if (keyLen < sizeof(oldestEntry->key))
                 memcpy(oldestEntry->key, value, keyLen + 1);
+            else
+                gArtKeyTooLong++; // HUD: rows getting none of the reunion. See cache_entry_t.key.
         }
 
         // BORN WANTED. cacheClearItem one line above just wrote the module's "this slot is free"
