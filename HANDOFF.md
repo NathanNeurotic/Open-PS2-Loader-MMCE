@@ -316,3 +316,49 @@ rebuild-91; steps 92–160 are unmerged, and many of 92–136 were #340 probes r
 that merge needs triage rather than a straight fast-forward. There is also a
 `chore/bdmsupport-nul-eol-v2` branch (full-file renormalisation of those NUL bytes) that must be
 merged **last**, after everything else, or it will conflict with everything.
+
+
+---
+
+## 10. LIVE TESTER REPORT — issue #382, and the three flavours disagree
+
+`https://github.com/NathanNeurotic/Open-PS2-Loader/issues/382` — *"ETH Games wont start with bgm
+music"*. Tester **Vass327** tried all three flavours of **rebuild-161** and reported:
+
+| flavour | result |
+|---|---|
+| `OPL-OFFICIALSDK` | **works** |
+| `OPL-PS2DEVLATESTSDK` | game starts, then **black screen** |
+| `OPL-PS2DEVPINNEDSDK` | **same failure as before** |
+
+Three things follow, and none of them should be assumed away:
+
+1. **The SDK flavour changes behaviour.** Same source, three outcomes. Until now the three builds
+   have been treated as interchangeable and links handed out as a set. They are not interchangeable
+   for this bug. Any future report must name which flavour it came from — and Sol's audit adds a
+   caveat worth honouring: it verified **byte-identical storage IRXs only for the matching
+   *pinned* SDK build**, so the LATEST and OFFICIAL artifacts are *not* known to embed the same IOP
+   modules. Check the embedded manifest before assuming source parity means binary parity.
+2. **The symptom is BGM + a launch, i.e. the teardown path** — the same area as rebuild-154's
+   confirmed `bgmStop()` deadlock, which was fixed for the **ATA** arm (`hddCleanUp` closing bgm's
+   fd via `PDIOC_CLOSEALL`). 161 contains that fix and the ETH case still fails on two flavours, so
+   the ETH arm has its own cause.
+3. **Leading suspect, already flagged and never followed up.** The earlier exit-hang investigation
+   surfaced `ethCleanUp` → `ethDeinitModules` taking an **unbounded `WaitSema`** on the teardown
+   path (`src/ethsupport.c` — candidate sites at lines 239, 250, 343, 369). It was ranked low at the
+   time *because it is not ATA-specific* — which is exactly why it is now interesting, because #382
+   is not ATA. `origin/master` carries the same unbounded wait, so if master does not exhibit this,
+   the difference is in what OPL is doing *concurrently* at that moment, not in the wait itself.
+   The shape to look for is the one rebuild-154 established: a teardown step that blocks forever
+   because the thing it waits on was killed by an earlier teardown step.
+
+**Suggested first move:** give those waits a bounded acquire (`PollSema` with a tick budget, then
+log-and-skip), mirroring the pattern already used for `sysShutdownDev9`'s bounded `DDIOC_OFF` retry
+and for rebuild-154's bounded `bgmStop`. A teardown that gives up is always better than one that
+hangs, because every caller is on its way to an IOP reset that reclaims everything anyway. Then ask
+Vass327 to retest **naming the flavour**.
+
+⚠ Do not ship this as a guess. This session lost two builds to confident guesses (a dev9 theory on
+the exit hang, and a key-length fix aimed at a limit that was never exceeded). Both times the answer
+came from a counter or a HUD field, not from reading code. Bound the wait *and* add a counter that
+says whether the bound was ever hit.
