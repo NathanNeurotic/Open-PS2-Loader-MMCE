@@ -787,6 +787,16 @@ static void cacheArtWorkerThread(void *arg)
 {
     (void)arg;
 
+    // CLAIM THE ART INDEX FROM INSIDE THE THREAD, using the id this thread actually reports.
+    //
+    // It was previously registered as cacheInit's gArtThreadId -- the value CreateThread returned --
+    // and the index then compared that against GetThreadId() on every probe. Hardware says those two
+    // did not match: the HUD read IX0/0/0, dirs AND absences AND failed-sweeps all zero, meaning the
+    // owner check rejected every call and the sweep was never even attempted. Registering the id the
+    // thread reports about ITSELF cannot disagree with the id it reports later, so the whole question
+    // of whether those two id spaces are the same stops mattering.
+    artIndexSetOwnerThread(GetThreadId());
+
     while (!gArtTerminate) {
         SleepThread();
 
@@ -849,10 +859,6 @@ void cacheInit()
         gArtThreadId = -1;
         return;
     }
-
-    // The art worker owns the art-directory index: it is the only thread allowed to build or read
-    // it, which is what keeps that index lock-free (see artindex.c).
-    artIndexSetOwnerThread(gArtThreadId);
 
     gArtRunning = 1;
 }

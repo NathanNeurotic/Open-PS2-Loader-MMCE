@@ -48,6 +48,10 @@ static unsigned int gArtIndexAbsentAnswered = 0;
 // used" from "tried and could not", and it is the difference between reading the number and guessing.
 static unsigned int gArtIndexSweepFailed = 0;
 
+// Probes rejected because they did not come from the owner thread. Folded into the HUD next to the
+// failed-sweep count for the same reason: "inert" and "not yet used" must never read the same.
+static unsigned int gArtIndexWrongThread = 0;
+
 // SINGLE-OWNER-THREAD CONFINEMENT, and it is not decoration.
 //
 // texDiscoverLoad is the choke point this hangs off, and it has callers on TWO threads: the art
@@ -250,8 +254,10 @@ int artIndexMayExist(const char *fullPath)
         return 1;
 
     // Not the owner thread: never touch the slots at all. See gArtIndexOwnerThread.
-    if (gArtIndexOwnerThread < 0 || GetThreadId() != gArtIndexOwnerThread)
+    if (gArtIndexOwnerThread < 0 || GetThreadId() != gArtIndexOwnerThread) {
+        gArtIndexWrongThread++; // HUD: if this climbs, confinement is rejecting the art worker itself
         return 1;
+    }
 
     if (!artIndexSplit(fullPath, dir, sizeof(dir), &base))
         return 1; // cannot even name the directory: go and look
@@ -306,7 +312,7 @@ void artIndexInvalidate(void)
 void artIndexDebug(int *dirsHeld, unsigned int *absentAnswered, unsigned int *sweepsFailed)
 {
     if (sweepsFailed)
-        *sweepsFailed = gArtIndexSweepFailed;
+        *sweepsFailed = gArtIndexSweepFailed + gArtIndexWrongThread;
 
     if (dirsHeld) {
         int i, n = 0;
