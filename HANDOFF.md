@@ -488,6 +488,46 @@ against `master` (open, needs merging — GitHub reads templates from the defaul
 
 ---
 
+# 0. THE WORKING CONTRACT -- do not deviate from this
+
+Nathan's side and his testers' side must look identical across a handover. These are not suggestions.
+
+**BRANCHES.** Never commit to `master`, `rebuild/main`, or any existing `rebuild/step-*` branch.
+Every change goes on a NEW branch you create, `rebuild/step-NNN-<slug>`, branched from the current
+tip. **Next number: 169. Current tip: `rebuild/step-164-eth-bounded-teardown`.** One focused change
+per step, with a long explanatory commit message -- what changed, why, what evidence drove it, and
+what it does NOT fix. Those messages are this project's real documentation. Never force-push, never
+rewrite history, never merge to `master` without asking.
+
+**THE LOOP, unchanged:** build locally in `oplbuild92` -> run clang-format 12 on every touched
+`.c`/`.h` -> push the branch -> `gh workflow run flavours.yml --repo NathanNeurotic/Open-PS2-Loader
+--ref <branch>` -> **watch it to completion** -> only then hand over links. Never give Nathan a link
+from a run you have not seen go green on all four jobs. Always pass `--repo` or gh targets upstream
+and fails with "No commits between".
+
+**THE LINK FORMAT, verbatim, every time:**
+
+```
+## Test — run <runId> (`rebuild/step-NNN-<slug>`)
+
+**For testers:**
+- https://nightly.link/NathanNeurotic/Open-PS2-Loader/actions/runs/<runId>/OPL-PS2DEVPINNED.zip
+- https://nightly.link/NathanNeurotic/Open-PS2-Loader/actions/runs/<runId>/OPL-OFFICIALPINNED.zip
+
+**Early warning:**
+- https://nightly.link/NathanNeurotic/Open-PS2-Loader/actions/runs/<runId>/OPL-PS2DEVROLLING.zip
+- https://nightly.link/NathanNeurotic/Open-PS2-Loader/actions/runs/<runId>/OPL-OFFICIALROLLING.zip
+```
+
+PINNED goes to testers (digest-locked, reproducible, comparable weeks later). ROLLING is early
+warning: a rolling build breaking while its pinned twin does not is the toolchain, not us.
+
+**WITH EVERY BUILD:** say what to look for, name the HUD fields worth reading, and name the fallback
+build if it misbehaves. **Do not spam builds** -- stage on branches and let Nathan decide when a
+tester gets a link (his tester Zack asked for exactly this).
+
+---
+
 # 14. CURRENT STATE, 2026-08-13 (read this section first)
 
 **Tip branch: `rebuild/step-164-eth-bounded-teardown`. It contains rebuild-164 through 168.**
