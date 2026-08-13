@@ -1062,8 +1062,14 @@ config_set_t *sbPopulateConfig(base_game_info_t *game, const char *prefix, const
     // Identity and display are separate concerns; only display changes here.
     if (isVcd) {
         char vcdId[VCD_ID_MAX];
-        configSetStr(config, CONFIG_ITEM_STARTUP,
-                     vcdExtractGameId(game->name, vcdId, sizeof(vcdId)) ? vcdId : game->name);
+        // Ask the DISC first (lazy, memoized, config-path only -- see vcdResolveDisplayId), then the
+        // filename, then the filename raw. The image is ground truth and is what the RetroGEM
+        // barcode reads at launch, so the theme and the scanner agree about a game.
+        if (vcdResolveDisplayId(game->name, vcdId, sizeof(vcdId)) && vcdId[0] != '\0')
+            configSetStr(config, CONFIG_ITEM_STARTUP, vcdId);
+        else
+            configSetStr(config, CONFIG_ITEM_STARTUP,
+                         vcdExtractGameId(game->name, vcdId, sizeof(vcdId)) ? vcdId : game->name);
     } else {
         configSetStr(config, CONFIG_ITEM_STARTUP, game->startup);
     }

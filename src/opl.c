@@ -3037,6 +3037,13 @@ void deinitEx(int exception, int modeSelected, int modeSelected2)
     // so nothing here needs art gone before the drain -- and doing it this way stops the two workers
     // competing for the device during the join, which is the whole point of the join.
     //
+    // Stop the music BEFORE anything tears down the device it is streaming from -- bgm.ogg normally
+    // lives on the same stick, HDD or share as the games. Issue #382 is that race on the network.
+    // Signal only: the thread JOIN stays in audioEnd() where it has always been. rebuild-163 moved
+    // the whole blocking bgmStop() here and froze exit from a UDPFS boot; the order was right, the
+    // wait was not.
+    bgmQuiesce();
+
     // block all io ops, wait for the ones still running to finish (BOUNDED -- see the note above)
     ioBlockOpsTimed(1, gDeinitTerminal ? EXIT_IO_DRAIN_TICKS : LAUNCH_IO_DRAIN_TICKS);
 
@@ -3088,6 +3095,13 @@ void deinit(int exception, int modeSelected)
     // so nothing here needs art gone before the drain -- and doing it this way stops the two workers
     // competing for the device during the join, which is the whole point of the join.
     //
+    // Stop the music BEFORE anything tears down the device it is streaming from -- bgm.ogg normally
+    // lives on the same stick, HDD or share as the games. Issue #382 is that race on the network.
+    // Signal only: the thread JOIN stays in audioEnd() where it has always been. rebuild-163 moved
+    // the whole blocking bgmStop() here and froze exit from a UDPFS boot; the order was right, the
+    // wait was not.
+    bgmQuiesce();
+
     // block all io ops, wait for the ones still running to finish (BOUNDED -- see the note above)
     ioBlockOpsTimed(1, gDeinitTerminal ? EXIT_IO_DRAIN_TICKS : LAUNCH_IO_DRAIN_TICKS);
 

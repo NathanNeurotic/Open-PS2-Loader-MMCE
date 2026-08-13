@@ -800,6 +800,33 @@ void bgmStart(void)
     }
 }
 
+// Tell the BGM threads to stop and return IMMEDIATELY. No join, no wait, no bgmDeinit.
+//
+// This exists because of two hardware reports that pull in opposite directions. rebuild-163 moved
+// the full bgmStop() to the top of deinit so the music would stop before the device it streams from
+// is destroyed -- Vass327 confirmed that fixed issue #382 on all three flavours. Nathan then found
+// it froze his exit from a UDPFS boot, so 164 backed the whole thing out, which also gave up a
+// confirmed fix.
+//
+// The ORDER was right; the WAIT was the problem. bgmStop's join sleeps on SetAlarm/SleepThread, and
+// doing that at the very top of deinit put a multi-second blocking wait on a path that had never
+// blocked there before. So: signal here, join later. The decoder stops touching the device
+// immediately, which is all issue #382 needs, and the actual thread join stays where it always was,
+// in audioEnd(), after the device teardown -- exactly where it has always been safe.
+void bgmQuiesce(void)
+{
+    if (!audio_initialized)
+        return;
+
+    terminateFlag = 1;
+
+    // Both semaphores, because the io thread parks on inSema and a WakeupThread cannot release one
+    // -- the deadlock rebuild-154 fixed. Signalling one nothing waits on is harmless.
+    SignalSema(inSema);
+    SignalSema(outSema);
+    WakeupThread(bgmThreadID);
+}
+
 void bgmStop(void)
 {
     int threadId;

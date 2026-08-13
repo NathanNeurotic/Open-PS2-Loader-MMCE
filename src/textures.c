@@ -516,13 +516,30 @@ void texDebugWorstOpen(int *ms, int *pending, int *wasMiss, int *menu, int *bgm)
 
 static int texStagedOpenIsAbsence(const char *filePath, int err)
 {
-    if (filePath != NULL && !strncmp(filePath, "mmce", 4))
-        return err == ENOENT;
+    (void)filePath;
 
+    // ONLY A REAL "no such file" MEANS ABSENT. Anything else is transient and must be retried.
+    //
+    // This used to return 1 unconditionally for every non-MMCE device, so ANY open failure --
+    // a contended bus, a network blip, an SMB share mid-reconnect -- branded that cover permanently
+    // missing. It was survivable while the memo was thrown away on the next list rebuild. rebuild-155
+    // made the memo persist until a device generation bump, and that turned a momentary failure into
+    // a cover that never comes back.
+    //
+    // Reported by L10N37 on issue #388, over SMB, and his description is exactly this: art worked
+    // when he first connected, then "it dropping artwork altogether for a bunch of games",
+    // reconnecting did not fix it, and two reboots ended with no artwork at all. He also notes it is
+    // absent from the older builds -- correct, because the memo did not survive a rebuild there.
+    // My regression, and the counter I added to catch it could not see it: OE only ever incremented
+    // on the staged arm (mmce/mass), and SMB does not take that arm.
+    //
+    // The trade I was worried about when I left this alone -- if errno is not faithful, a genuine
+    // miss retries forever and browsing gets slow -- is the RIGHT way round to be wrong. Slow art is
+    // a complaint; art that silently never returns is a broken loader.
     if (err != ENOENT)
         gTexStagedOpenNonEnoent++;
 
-    return 1;
+    return err == ENOENT;
 }
 
 static int texShouldUseMemoryReader(const char *filePath)
@@ -895,13 +912,20 @@ static int texLoadAll(GSTEXTURE *texture, const char *filePath, int texId, const
             readData = &memReader;
             readFunction = &texReadMemBoundedFunction;
         } else {
+            errno = 0;
             fd = open(filePath, O_RDONLY, 0);
             if (fd < 0) {
                 // Diagnostic (debug builds only): make a stale/mis-keyed ART folder self-evident.
                 // The "no art on HDD" report is usually content -- grep this path to compare the active
                 // PS2 startup or VCD filename/ID key with the files on the current OPL data mount.
-                LOG("texLoadAll: art file not found: %s\n", filePath);
-                return ERR_BAD_FILE;
+                LOG("texLoadAll: art file not found: %s (errno %d)\n", filePath, errno);
+                // SAME RULE AS THE STAGED ARM, and THIS is the arm that matters for issue #388:
+                // texShouldUseMemoryReader only claims mmce*/mass*, so every SMB, ETH and pfs cover
+                // comes through here. The unconditional ERR_BAD_FILE that used to be on this line is
+                // what let one network blip brand a cover permanently absent -- survivable until
+                // rebuild-155 made that verdict outlive a list rebuild, after which it never came
+                // back. Only a real ENOENT is absence; anything else is transient and re-probes.
+                return texStagedOpenIsAbsence(filePath, errno) ? ERR_BAD_FILE : ERR_FILE_IO;
             }
 
             memset(&fileReader, 0, sizeof(fileReader));

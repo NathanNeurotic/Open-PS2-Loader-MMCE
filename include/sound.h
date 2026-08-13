@@ -26,6 +26,10 @@ void sfxGetPlayDiag(unsigned int *lastMs, unsigned int *maxMs);
 
 void bgmStart(void);
 void bgmStop(void);
+// Signal the BGM threads to stop WITHOUT waiting for them. For deinit, so the decoder stops reading
+// the device before that device is torn down, without putting a blocking join at the top of the
+// exit path. See the comment on the definition -- this is rebuild-163's fix minus its freeze.
+void bgmQuiesce(void);
 int isBgmPlaying(void);
 void bgmMute(void);
 void bgmUnMute(void);

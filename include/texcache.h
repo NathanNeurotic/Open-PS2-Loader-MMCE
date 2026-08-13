@@ -132,6 +132,10 @@ int cacheDebugDropped(void);
  * reunion or the absence memo. Should be 0; see the field comment for what a non-zero value costs. */
 unsigned int cacheDebugKeyTooLong(void);
 
+/** Debug HUD: art loads that failed transiently and were retried rather than parked as absent.
+ * Non-zero means a device is misbehaving but the art is self-healing -- which is the point. */
+unsigned int cacheDebugTransientFail(void);
+
 /** Debug HUD: cost in ms of the last art load and of the last SUCCESSFUL one, plus that image's
  * decoded pixel dimensions. Separates "one load is slow" from "we ask for too many". Any argument
  * may be NULL.

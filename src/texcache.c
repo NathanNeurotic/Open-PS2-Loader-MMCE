@@ -212,6 +212,16 @@ static volatile int gArtDropped = 0;
 // paying the device for art it has already looked at. See cache_entry_t.key.
 static volatile unsigned int gArtKeyTooLong = 0;
 
+// Art loads that failed TRANSIENTLY (not ERR_BAD_FILE) and were re-queued rather than parked as
+// absent. Should be ~0 on a healthy device; a climbing count on SMB is the bus/share misbehaving,
+// and the covers self-heal instead of vanishing for the session. See the branch in cacheLoadImage.
+static volatile unsigned int gArtTransientFail = 0;
+
+unsigned int cacheDebugTransientFail(void)
+{
+    return gArtTransientFail;
+}
+
 unsigned int cacheDebugKeyTooLong(void)
 {
     return gArtKeyTooLong;
@@ -766,6 +776,29 @@ static void cacheLoadImage(load_image_request_t *req)
         // the user moved on -- and with the fail generation that memo now OUTLIVES a list rebuild.
         // Clear the slot instead: no memo, no key, and the row re-requests when it is next drawn.
         if (req->abortRequested) {
+            cacheClearItem(req->entry, 0);
+            artReleaseRequest(req, 0);
+            return;
+        }
+
+        // TRANSIENT vs ABSENT, and this distinction is the whole of issue #388's art half.
+        //
+        // Every failure used to park the row as "this file does not exist". textures.c already
+        // separates the two -- ERR_BAD_FILE for a real ENOENT, ERR_FILE_IO for a contended bus or a
+        // share mid-reconnect -- and this function threw that away by testing only `result < 0`.
+        // master does not: it parks only on ERR_BAD_FILE and gives anything else a retry.
+        //
+        // L10N37 on SMB: art worked on connect, then "dropping artwork altogether for a bunch of
+        // games", reconnecting did not fix it, two reboots ended with none at all. A network blip
+        // marked those covers missing and rebuild-155 made that verdict outlive the list rebuild
+        // that used to wipe it. Nathan: SMB art is instant on the fork -- correct, because the fork
+        // retries.
+        //
+        // A transient failure clears the slot instead of parking it, so the row asks again on its
+        // next draw. It cannot spin hot: the request still has to pass the settle gate and the
+        // serial worker, and a device that is genuinely gone fails its list scan too.
+        if (result != ERR_BAD_FILE) {
+            gArtTransientFail++;
             cacheClearItem(req->entry, 0);
             artReleaseRequest(req, 0);
             return;
