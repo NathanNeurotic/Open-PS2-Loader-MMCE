@@ -5,8 +5,11 @@
   rolling release then carries it without being re-drafted. Do NOT paste a copy into an
   individual release body — that fork would drift from this one.
 
-  This block is the new-lineage statement. It stays until parity with the pre-rebuild
-  build is declared; when that happens, remove the block AND the cat that reads it.
+  This block is the new-lineage statement. The transition beats (parity, old-build
+  pointer, re-reporting rules) stay until parity with the pre-rebuild build is declared;
+  when that happens, remove those beats AND the cat that reads this file. The "Setting
+  up cover art and game metadata" section is evergreen -- keep it (here or moved back
+  into the workflow) even after the transition beats go.
   Keep the voice: warm, direct, no corporate padding. Plain Markdown — no liquid/templating.
 -->
 
@@ -14,27 +17,42 @@
 
 This build is a **new lineage**. RiptOPL was rebuilt from official OPL after the previous
 line engineered itself into a corner. It is **not yet at parity** with the build it
-replaces — the goal before anything else is reaching at least the performance of the
-abandoned build. New features come after parity, not before.
+replaces — reaching at least the performance of the abandoned build comes before anything
+else. New features come after parity, not before.
 
 **MMCE is still awaiting reimplementation.** If your games are on MMCE, this build will
 not see them yet. This line stays in every release until MMCE lands, so nobody downloads
 expecting it.
 
 **The old build is still available and still fine to use.** The final release of that
-lineage is on the releases page (*Rolling Alpha*), and the archive is on MEGA. If you are
-happy on it, stay on it — it is not going anywhere.
+lineage is on the releases page (*Rolling Alpha*) for exactly this reason, and the archive
+is on MEGA. If you are happy on it, stay on it — it is not going anywhere.
 
 **Bug reports are now tracked only against this new lineage.** I will assume any report
 refers to it unless you tell me otherwise. Reports filed during the transition are treated
 as still-open and need re-verification against this build.
 
 **Re-report anything you have seen fixed before.** Regressions are possible and every
-setup is different — an unreported one can sit unfixed indefinitely. A duplicate report
-costs nothing; a silent one costs everyone.
+setup is unique — an unreported one can sit unfixed indefinitely. A duplicate report costs
+nothing; a silent one costs everyone.
 
 **Every report is genuinely valued.** This does not improve without them: the last two
 weeks of fixes came almost entirely from tester reports, not from reading code.
+
+## Setting up cover art and game metadata
+
+The easiest way to get art and metadata right is **OrbitOPL Toolbox** — open
+**OrbitOPL-Toolbox.url** from the package, or visit
+https://github.com/Luden02/OrbitOPL-Toolbox. It is a cross-platform (Windows / macOS /
+Linux) desktop app for managing an OPL library — import games from disc images, fetch
+cover art and screenshots, compress ISOs to ZSO, edit per-game settings, manage virtual
+memory cards — and, the part that matters here: **it writes the ART folder and per-game
+configs in exactly the layout RiptOPL looks for.** Most "looks wrong on my setup" reports
+come down to files not being named the way the loader looks for them, and Toolbox gets
+the naming right for you.
+
+OrbitOPL Toolbox is third-party and independently maintained — **please report Toolbox
+issues to its own repository, not here.**
 
 **Which one to download:** prefer a **PINNED** flavour — `APP_RIPTOPL-PS2DEVPINNED` or
 `APP_RIPTOPL-OFFICIALPINNED` in the package zip. Pinned builds are digest-locked and

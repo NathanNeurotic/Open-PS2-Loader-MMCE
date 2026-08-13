@@ -741,12 +741,11 @@ jobs:
             printf 'package, or visit https://github.com/NathanNeurotic/PS2-Servers, for the maintained\n'
             printf 'UDPFS / SMBv1 / UDPBD all-in-one launcher. Follow its protocol-specific setup and\n'
             printf 'match RiptOPL network settings to the server you start.\n'
-            printf '\n## PC library manager\n'
-            printf 'Open **OrbitOPL-Toolbox.url** from the package, or visit\n'
-            printf 'https://github.com/Luden02/OrbitOPL-Toolbox -- a cross-platform (Windows / macOS / Linux)\n'
-            printf 'desktop app for managing an OPL library: import games from disc images, fetch cover art and\n'
-            printf 'screenshots, compress ISOs to ZSO, edit per-game settings, and manage virtual memory cards.\n'
-            printf 'Third-party and independently maintained; RiptOPL only links it.\n'
+            # NOTE: the cover-art / metadata section ("Setting up cover art and game metadata",
+            # recommending OrbitOPL Toolbox) lives in the reusable notes block
+            # (.github/rolling-release-notes-block.md), cat'd in above -- it replaced the inline
+            # "PC library manager" section that used to sit here, so the recommendation is edited
+            # in ONE place and every rolling release carries it unchanged.
             printf '\n## In this build\n'
             printf -- '- External Neutrino core option: per-game core selector + global/per-game launch args\n'
             printf -- '- Coverflow cover-art render mode (default theme)\n'
