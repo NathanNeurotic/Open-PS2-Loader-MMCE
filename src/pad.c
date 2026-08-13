@@ -74,6 +74,18 @@ void padGetFaultCounters(u32 *maxNotReady, u32 *maxReadyEmpty)
 static unsigned short pad_count;
 static struct pad_data_t pad_data[MAX_PADS];
 
+void padGetActuatorDiag(int *act0, int *aligned0, int *act1, int *aligned1)
+{
+    if (act0)
+        *act0 = pad_data[0].actuators;
+    if (aligned0)
+        *aligned0 = pad_data[0].actAligned;
+    if (act1)
+        *act1 = pad_data[1].actuators;
+    if (aligned1)
+        *aligned1 = pad_data[1].actAligned;
+}
+
 // gathered pad data
 static u32 paddata;
 static u32 oldpaddata;

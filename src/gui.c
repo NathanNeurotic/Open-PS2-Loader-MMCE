@@ -2733,11 +2733,17 @@ static void guiDrawOverlays()
         unsigned int sxStale = 0, sxFull = 0, spLastMs = 0, spMaxMs = 0;
         sfxGetDropDiag(&sxStale, &sxFull);
         sfxGetPlayDiag(&spLastMs, &spMaxMs);
-        snprintf(artdbg, sizeof(artdbg), "Q%d A%d D%d X%d %dms(ok %dms %dx%d) O:%d/%d W%d@%d/%d/%d%c OE%u IX%d/%u/%u KL%u TF%u SX%u/%u SP%u/%u  F%u/%u OV%u  NR%u MT%u  IO %d/%d T%u/%u",
+        int padAct0 = 0, padAln0 = 0, padAct1 = 0, padAln1 = 0;
+        padGetActuatorDiag(&padAct0, &padAln0, &padAct1, &padAln1);
+        char actBuf[16];
+        snprintf(actBuf, sizeof(actBuf), "ACT%d%s/%d%s",
+                 padAct0, (padAct0 > 0 ? (padAln0 ? "a" : "u") : ""),
+                 padAct1, (padAct1 > 0 ? (padAln1 ? "a" : "u") : ""));
+        snprintf(artdbg, sizeof(artdbg), "Q%d A%d D%d X%d %dms(ok %dms %dx%d) O:%d/%d W%d@%d/%d/%d%c OE%u IX%d/%u/%u KL%u TF%u SX%u/%u SP%u/%u  F%u/%u OV%u  NR%u MT%u %s  IO %d/%d T%u/%u",
                  q, a, d, cacheDebugDropped(), lastMs, okMs, w, h,
                  gTexLastOpenMs, gTexLastMissOpenMs, wOpen, wPend, wMenu, wBgm, wMiss ? 'm' : 'h', gTexStagedOpenNonEnoent, ixDirs, ixAbsent, ixFailed, cacheDebugKeyTooLong(), cacheDebugTransientFail(), sxStale, sxFull, spLastMs, spMaxMs,
                  (unsigned)(fLast / 1000), (unsigned)(fWorst / 1000), (unsigned)fOver,
-                 (unsigned)padNR, (unsigned)padEmpty,
+                 (unsigned)padNR, (unsigned)padEmpty, actBuf,
                  ioGetPending(IO_CUSTOM_SIMPLEACTION), ioGetPending(IO_MENU_UPDATE_DEFFERED),
                  ioGetTotal(IO_CUSTOM_SIMPLEACTION), ioGetTotal(IO_MENU_UPDATE_DEFFERED));
         fntRenderString(gTheme->fonts[0], 8, screenHeight - 24, ALIGN_NONE, 0, 0, artdbg, GS_SETREG_RGBA(255, 255, 0, 128));

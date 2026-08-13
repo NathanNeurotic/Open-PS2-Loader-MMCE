@@ -838,7 +838,7 @@ static void initStaticImage(const char *themePath, config_set_t *themeConfig, th
 
 // GameImage ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-static GSTEXTURE *getGameImageTexture(image_cache_t *cache, void *support, struct submenu_item *item)
+static GSTEXTURE *getGameImageTextureEx(image_cache_t *cache, void *support, struct submenu_item *item, int isPriority)
 {
     // Folder browsing: a folder row has no cover art (and no startup key). Never route it through the
     // cover cache -- an empty key would thrash the cache and paint the empty case frame. Applies to
@@ -864,10 +864,15 @@ static GSTEXTURE *getGameImageTexture(image_cache_t *cache, void *support, struc
         if (startup == NULL || startup[0] == '\0')
             return NULL;
 
-        return cacheGetTexture(cache, list, &item->cache_id[cache->userId], &item->cache_uid[cache->userId], startup);
+        return cacheGetTextureEx(cache, list, &item->cache_id[cache->userId], &item->cache_uid[cache->userId], startup, isPriority);
     }
 
     return NULL;
+}
+
+static GSTEXTURE *getGameImageTexture(image_cache_t *cache, void *support, struct submenu_item *item)
+{
+    return getGameImageTextureEx(cache, support, item, 0);
 }
 
 // Draw-what-we-have companion to the above: same eligibility checks, but it only ever returns art
@@ -953,7 +958,7 @@ static void drawGameImage(struct menu_list *menu, struct submenu_list *item, con
                 texture = getGameImageCached(gameImage->cache, &item->item);
         } else {
             // PRIORITY: the highlighted game's own cover, the one image the user is looking for.
-            texture = getGameImageTexture(gameImage->cache, menu->item->userdata, &item->item);
+            texture = getGameImageTextureEx(gameImage->cache, menu->item->userdata, &item->item, 1);
         }
 
         if (!texture || !texture->Mem) {
@@ -1214,7 +1219,7 @@ static void drawCoverFlow(struct menu_list *menu, struct submenu_list *item, con
             // with neighbours already in flight from earlier frames the centre cover -- the one the
             // user is looking at -- was turned away and re-asked next frame, behind the same
             // backlog. Coverflow was left out when the list draw path got this treatment.
-            getGameImageTexture(centerImg->cache, sourceList, &covers[centerIdx]->item);
+            getGameImageTextureEx(centerImg->cache, sourceList, &covers[centerIdx]->item, 1);
     }
 
     /*
@@ -1717,7 +1722,7 @@ static void drawItemsList(struct menu_list *menu, struct submenu_list *item, con
         // ahead of the selection. Submit the selected row first; its loop lookup
         // reuses the same value-keyed cache entry.
         if (itemsList->decoratorImage != NULL && !item->item.isFolder)
-            getGameImageTexture(itemsList->decoratorImage->cache, menu->item->userdata, &item->item);
+            getGameImageTextureEx(itemsList->decoratorImage->cache, menu->item->userdata, &item->item, 1);
         else if (itemsList->coverElem != NULL && !item->item.isFolder) {
             // No decorator: the plain List only ever demanded the selected cover (via the
             // separately drawn COV element), so artwork arrived one highlight at a time
@@ -1725,7 +1730,7 @@ static void drawItemsList(struct menu_list *menu, struct submenu_list *item, con
             // thmGetElemForItem keeps Favourites game/APP routing intact.
             mutable_image_t *selImg = (mutable_image_t *)thmGetElemForItem(menu, item, itemsList->coverElem)->extended;
             if (selImg != NULL && selImg->cache != NULL)
-                getGameImageTexture(selImg->cache, menu->item->userdata, &item->item);
+                getGameImageTextureEx(selImg->cache, menu->item->userdata, &item->item, 1);
         }
 
         // Budget viewport warming PER RESOLVED CACHE, minus one slot kept for the

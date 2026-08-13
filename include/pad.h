@@ -59,10 +59,13 @@ void padRumble(int durationMs, int large);
  * from readPads(), so a pulse started just before a blocking read would outlast it. */
 void padRumbleFlush(void);
 
-#endif
-
 /** Debug HUD: longest run of polls where the pad could not be READ (freepad not ready -> SIO2 or
  * IOP-side), and longest run of polls that read fine but carried no buttons (fresh, empty sample ->
  * the press never reached freepad). Whichever grows when an input is lost names the fault's half.
  */
 void padGetFaultCounters(u32 *maxNotReady, u32 *maxReadyEmpty);
+
+/** Debug HUD: reports detected actuators and alignment status for pad 0 and pad 1. */
+void padGetActuatorDiag(int *act0, int *aligned0, int *act1, int *aligned1);
+
+#endif

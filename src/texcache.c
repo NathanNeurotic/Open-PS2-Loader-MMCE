@@ -360,6 +360,43 @@ static void artPush(load_image_request_t *req)
     EIntr();
 }
 
+static void artPushFront(load_image_request_t *req)
+{
+    DIntr();
+    req->next = gArtReqList;
+    gArtReqList = req;
+    if (!gArtReqEnd)
+        gArtReqEnd = req;
+    gArtQueuedCount++;
+    EIntr();
+}
+
+static void artPromote(load_image_request_t *req)
+{
+    if (req == NULL)
+        return;
+
+    DIntr();
+    // Guard against promoting a request the worker is ALREADY executing, or one that is already at the head.
+    // Checked inside the DIntr bracket to prevent a race with artPop().
+    if (gArtCurrentReq != req && gArtReqList != NULL && gArtReqList != req) {
+        load_image_request_t *prev = gArtReqList;
+        while (prev->next != NULL && prev->next != req) {
+            prev = prev->next;
+        }
+
+        if (prev->next == req) {
+            prev->next = req->next;
+            if (gArtReqEnd == req)
+                gArtReqEnd = prev;
+
+            req->next = gArtReqList;
+            gArtReqList = req;
+        }
+    }
+    EIntr();
+}
+
 // Called ONLY by the worker.
 static load_image_request_t *artPop(void)
 {
@@ -1070,7 +1107,7 @@ static int cacheRequestIsSIO2(item_list_t *list, const char *value)
     return bdmModeIsSIO2(mode);
 }
 
-GSTEXTURE *cacheGetTexture(image_cache_t *cache, item_list_t *list, int *cacheId, int *UID, char *value)
+GSTEXTURE *cacheGetTextureEx(image_cache_t *cache, item_list_t *list, int *cacheId, int *UID, char *value, int isPriority)
 {
     int i, rtime;
     if (cache == NULL || list == NULL || cacheId == NULL || UID == NULL || value == NULL || value[0] == '\0')
@@ -1101,6 +1138,11 @@ GSTEXTURE *cacheGetTexture(image_cache_t *cache, item_list_t *list, int *cacheId
                     // Still loading -- but mark it as still WANTED. This stamp is the only evidence
                     // the worker has that anyone is still looking at this row (see cacheLoadImage).
                     entry->lastUsed = guiFrameId;
+                    if (isPriority) {
+                        load_image_request_t *req = (load_image_request_t *)entry->qr;
+                        if (req != NULL && !(req->sio2 && gArtNavActive))
+                            artPromote(req);
+                    }
                     return NULL;
                 } else if (entry->lastUsed == 0) {
                     *cacheId = -2;
@@ -1140,6 +1182,11 @@ GSTEXTURE *cacheGetTexture(image_cache_t *cache, item_list_t *list, int *cacheId
                     *cacheId = i;
                     *UID = entry->UID;
                     entry->lastUsed = guiFrameId;
+                    if (isPriority) {
+                        load_image_request_t *req = (load_image_request_t *)entry->qr;
+                        if (req != NULL && !(req->sio2 && gArtNavActive))
+                            artPromote(req);
+                    }
                     return NULL;
                 }
 
@@ -1326,13 +1373,19 @@ GSTEXTURE *cacheGetTexture(image_cache_t *cache, item_list_t *list, int *cacheId
         cache->activeRequests++;
 
         // artPush takes its own DIntr bracket and does the gArtQueuedCount++ inside it. It cannot
-        // fail: no allocation, no queue cap. The old ioPutRequest-refused rollback is gone with
-        // ioPutRequest, and the reason it existed is now structural -- nothing can refuse a push, so
-        // no slot can be left with qr set and never cleared. (That failure killed 1-slot caches
-        // outright: backgrounds and screenshots vanished for the session. See rebuild-38/43.)
-        artPush(req);
+        // fail: no allocation, no queue cap. Priority requests push to the head of the FIFO unless
+        // an SIO2 request is being made while a direction is held (which falls back to tail to protect #340).
+        if (isPriority && !(req->sio2 && gArtNavActive))
+            artPushFront(req);
+        else
+            artPush(req);
         cacheWakeArtWorker();
     }
 
     return NULL;
+}
+
+GSTEXTURE *cacheGetTexture(image_cache_t *cache, item_list_t *list, int *cacheId, int *UID, char *value)
+{
+    return cacheGetTextureEx(cache, list, cacheId, UID, value, 0);
 }
