@@ -438,10 +438,29 @@ static void texReadFileFunction(png_structp pngPtr, png_bytep data, png_size_t l
 // present art absent costs one placeholder until the next list rebuild clears the memo, while
 // calling absent art transient costs repeated reads of a file that does not exist, on the very
 // device the user is browsing, for most of a library (most games ship no cover at all).
+// Diagnostic only, drawn by the debug HUD as OE. Counts staged-art opens that failed with something
+// OTHER than ENOENT on a non-MMCE device -- i.e. every time the branch below brands a cover
+// "permanently absent" on evidence that is not the filesystem saying "no such file".
+//
+// It exists because that call is now load-bearing in a way it was not before. The absence memo used
+// to be wiped on every list rebuild, so a wrong answer cost one re-probe; it now survives until a
+// device hotplug or a settings apply, so a wrong answer costs the cover for the session. master only
+// ever parks on a real ENOENT, and the comment at this function's call site already says BDM USB
+// should self-heal the same way -- but the code returns 1 unconditionally, so it does not.
+//
+// NOT "fixed" blind: if errno is not faithfully mapped on the BDM path, switching to `err == ENOENT`
+// turns every genuine miss into an endless retry, which is precisely the expensive behaviour being
+// removed elsewhere in this build. If OE stays 0 on hardware, the current branch is harmless and
+// should be left alone. If OE climbs, match master.
+unsigned int gTexStagedOpenNonEnoent = 0;
+
 static int texStagedOpenIsAbsence(const char *filePath, int err)
 {
     if (filePath != NULL && !strncmp(filePath, "mmce", 4))
         return err == ENOENT;
+
+    if (err != ENOENT)
+        gTexStagedOpenNonEnoent++;
 
     return 1;
 }

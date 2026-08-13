@@ -140,6 +140,10 @@ int texLookupInternalTexId(const char *name);
 int texLoadInternal(GSTEXTURE *texture, int texId);
 int texLoadFromMemory(GSTEXTURE *texture, const void *buf, u32 size);
 int texDiscoverLoad(GSTEXTURE *texture, const char *path, int texId);
+
+// Debug HUD (OE): staged-art opens that failed with errno != ENOENT on a non-MMCE device, i.e. covers
+// branded permanently absent on evidence that was not "no such file". See texStagedOpenIsAbsence.
+extern unsigned int gTexStagedOpenNonEnoent;
 void texSetLoadAbortFlag(volatile int *abortRequested);
 void texFree(GSTEXTURE *texture);
 

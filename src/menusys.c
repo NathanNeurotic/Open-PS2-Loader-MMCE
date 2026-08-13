@@ -1233,10 +1233,46 @@ void menuHandleInputMenu()
     }
 }
 
-static void menuRenderElements(theme_element_t *elem)
+// May this list be asked for per-game config right now? Keeps automatic metadata off the active
+// scroll for the two modes where fetching it is expensive: APPS reads a config per app, and MMCE
+// talks to the memory-card bus that also carries the pad. master's predicate.
+#define MENU_APP_CONFIG_IDLE_FRAMES  1
+#define MENU_MMCE_CONFIG_IDLE_FRAMES 3
+
+static int menuCanRequestItemConfig(item_list_t *list)
+{
+    if (list != NULL && list->mode == APP_MODE)
+        return guiInactiveFrames >= MENU_APP_CONFIG_IDLE_FRAMES;
+
+    if (list != NULL && list->mode == MMCE_MODE)
+        return guiInactiveFrames >= MENU_MMCE_CONFIG_IDLE_FRAMES;
+
+    return 1;
+}
+
+static void menuRenderElements(theme_elems_t *elems)
 {
     // selected_item can't be NULL here as we only allow to switch to "Main" rendering when there is at least one device activated
-    _menuRequestConfig();
+    theme_element_t *elem = elems->first;
+    item_list_t *list = (selected_item != NULL && selected_item->item != NULL) ? selected_item->item->userdata : NULL;
+
+    // ONLY IF SOMETHING ON SCREEN ACTUALLY READS IT. This was unconditional: every settled row
+    // enqueued an IO_CUSTOM_SIMPLEACTION that opens CFG/<game>.cfg on the game device, whether or not
+    // the theme has a single element capable of displaying it. On the stock theme that is every row's
+    // worth of storage traffic bought for nothing -- and a per-game cfg usually does NOT exist, so it
+    // is the expensive kind of file operation: a lookup that must walk the whole directory before it
+    // can answer "no". Measured on hardware at ~3 accepted actions/sec while merely browsing, on the
+    // ioman worker (priority 32), which outranks the art thread (64) and shares the one process-wide
+    // fileXio RPC channel with it. That is the queue the art was waiting behind.
+    //
+    // elems->needsItemConfig has been set by the theme parser all along and READ BY NOTHING -- the
+    // third field in this tree to ship with its data half and no code half, after cache_entry_t.key
+    // and gArtShutdownAbandoned. It is exact rather than approximate: the parser sets it for
+    // AttributeText, GameCountText and AttributeImage (themes.c), and those are precisely the only
+    // three draw functions that consume the config argument. It is per-FAMILY, so the info screen
+    // still loads what it needs the moment it is shown.
+    if (elems->needsItemConfig && menuCanRequestItemConfig(list))
+        _menuRequestConfig();
 
     WaitSema(menuSemaId);
 
@@ -1288,16 +1324,16 @@ void menuRenderMain(void)
         // SEPARATE cover cache from the device's ISO list -- the view reuses the device's game list
         // (same item ids), so a shared cache thrashes on every L3 toggle. This also covers the
         // Favourites tab's own VCD view: VCD favourites render with the PS1 family, not the favs one.
-        menuRenderElements(menuGetMainElems(list)->first);
+        menuRenderElements(menuGetMainElems(list));
         gTheme->itemsList = thmResolveItemsList(&gTheme->vcdMainElems, gTheme->vcdItemsList ? gTheme->vcdItemsList : gTheme->gamesItemsList, selected_item->item->icon_id);
     } else if (list->mode == FAV_MODE) {
-        menuRenderElements(menuGetMainElems(list)->first);
+        menuRenderElements(menuGetMainElems(list));
         gTheme->itemsList = thmResolveItemsList(&gTheme->favsMainElems, gTheme->favsItemsList ? gTheme->favsItemsList : gTheme->gamesItemsList, selected_item->item->icon_id);
     } else if (list->mode == APP_MODE) {
-        menuRenderElements(menuGetMainElems(list)->first);
+        menuRenderElements(menuGetMainElems(list));
         gTheme->itemsList = thmResolveItemsList(&gTheme->appsMainElems, gTheme->appsItemsList ? gTheme->appsItemsList : gTheme->gamesItemsList, selected_item->item->icon_id);
     } else {
-        menuRenderElements(menuGetMainElems(list)->first);
+        menuRenderElements(menuGetMainElems(list));
         // Always falls back to gamesItemsList, never NULL: the scroll/paging code (menuNextV/PrevV/
         // Page) derefs gTheme->itemsList->extended with no NULL check.
         gTheme->itemsList = thmResolveItemsList(&gTheme->mainElems, gTheme->gamesItemsList, selected_item->item->icon_id);
@@ -1394,16 +1430,16 @@ void menuRenderInfo(void)
     item_list_t *list = selected_item->item->userdata;
 
     if (vcdViewActive(list->mode)) {
-        menuRenderElements(menuGetInfoElems(list)->first);
+        menuRenderElements(menuGetInfoElems(list));
         gTheme->itemsList = thmResolveItemsList(&gTheme->vcdInfoElems, gTheme->vcdItemsList ? gTheme->vcdItemsList : gTheme->gamesItemsList, selected_item->item->icon_id);
     } else if (list->mode == FAV_MODE) {
-        menuRenderElements(menuGetInfoElems(list)->first);
+        menuRenderElements(menuGetInfoElems(list));
         gTheme->itemsList = thmResolveItemsList(&gTheme->favsInfoElems, gTheme->favsItemsList ? gTheme->favsItemsList : gTheme->gamesItemsList, selected_item->item->icon_id);
     } else if (list->mode == APP_MODE) {
-        menuRenderElements(menuGetInfoElems(list)->first);
+        menuRenderElements(menuGetInfoElems(list));
         gTheme->itemsList = thmResolveItemsList(&gTheme->appsInfoElems, gTheme->appsItemsList ? gTheme->appsItemsList : gTheme->gamesItemsList, selected_item->item->icon_id);
     } else {
-        menuRenderElements(menuGetInfoElems(list)->first);
+        menuRenderElements(menuGetInfoElems(list));
         gTheme->itemsList = thmResolveItemsList(&gTheme->infoElems, gTheme->gamesItemsList, selected_item->item->icon_id);
     }
 }

@@ -974,10 +974,18 @@ static void updateMenuFromGameList(opl_io_module_t *mdl)
     guiExecDeferredOps();
     clearMenuGameList(mdl);
 
-    // A rebuilt list is the natural retry point for art that failed earlier (files added, device
-    // remounted): clear the miss memo so the fresh rows probe once more. Runs on the IO worker;
-    // the GUI-side reader tolerates a mid-memset read (fixed-size, always NUL-terminated slots).
-    cacheInvalidateFailMemo();
+    // NO cacheInvalidateFailMemo() HERE, and this is deliberate -- it used to sit on this line.
+    //
+    // The reasoning was "a rebuilt list is the natural retry point for art that failed earlier". The
+    // flaw is what rebuilds a list: not just the user changing view, but every background device
+    // rescan that lands while they browse. So the memo was thrown away every few seconds and a game
+    // with no cover was re-probed forever, which is the expensive case -- a lookup for a file that
+    // does not exist must walk the whole directory before it can answer.
+    //
+    // The retry now hangs off the event that can actually make absent art exist: a device generation
+    // change (hotplug, or a Device Settings apply) in menuUpdateHook, plus the deliberate
+    // applyConfig invalidation. master keeps only the latter; ours keeps the hotplug case too, so
+    // plugging in a stick with new art still picks it up without a reboot.
 
     const char *temp = NULL;
     if (gRememberLastPlayed)
@@ -1154,6 +1162,16 @@ static void menuUpdateHook()
         unsigned int gen = bdmGetGeneration();
         int genChanged = (gen != lastSeenBdmGeneration);
         clock_t now = clock();
+
+        // "Storage changed underneath us" is the ONLY routine event that can make previously-absent
+        // art exist, so it is the only routine event that should re-open the question. The memo used
+        // to be cleared by updateMenuFromGameList instead -- i.e. on every list rebuild, including the
+        // background rescans that fire while the user simply browses -- which meant a missing cover
+        // was re-probed over and over forever. That is the expensive direction: a lookup for a file
+        // that is not there has to walk the whole directory before it can say so, and this build
+        // measured art loads spanning 82 ms to 2922 ms with the decoded size held constant.
+        if (genChanged)
+            cacheInvalidateFailMemo();
         // Consume the generation bump only if every hotplug-driven enqueue is ACCEPTED:
         // ioPutRequest can fail (queue blocked during teardown, allocation failure), and
         // committing lastSeenBdmGeneration up front would silently eat the one immediate-rescan

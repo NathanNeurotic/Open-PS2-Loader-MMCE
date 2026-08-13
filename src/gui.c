@@ -2705,8 +2705,12 @@ static void guiDrawOverlays()
         // "PS1 box scans are simply enormous PNGs" and "something about that path is slow" -- are
         // indistinguishable from a millisecond alone. WxH tells them apart in one glance: a
         // 1000x1400 scan decoding for eight seconds is arithmetic, a 184x256 one is a bug.
-        snprintf(artdbg, sizeof(artdbg), "Q%d A%d D%d X%d %dms(ok %dms %dx%d)  F%u/%u OV%u  NR%u MT%u  IO %d/%d T%u/%u",
-                 q, a, d, cacheDebugDropped(), lastMs, okMs, w, h,
+        // OE = staged-art opens that failed with errno != ENOENT, i.e. covers branded permanently
+        // absent on evidence that was not the filesystem saying "no such file". Must stay 0; if it
+        // climbs, transient bus errors are eating real art and texStagedOpenIsAbsence needs master's
+        // ENOENT-only rule.
+        snprintf(artdbg, sizeof(artdbg), "Q%d A%d D%d X%d %dms(ok %dms %dx%d) OE%u  F%u/%u OV%u  NR%u MT%u  IO %d/%d T%u/%u",
+                 q, a, d, cacheDebugDropped(), lastMs, okMs, w, h, gTexStagedOpenNonEnoent,
                  (unsigned)(fLast / 1000), (unsigned)(fWorst / 1000), (unsigned)fOver,
                  (unsigned)padNR, (unsigned)padEmpty,
                  ioGetPending(IO_CUSTOM_SIMPLEACTION), ioGetPending(IO_MENU_UPDATE_DEFFERED),
