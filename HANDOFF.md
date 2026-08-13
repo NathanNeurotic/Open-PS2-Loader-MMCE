@@ -33,7 +33,7 @@ cd .claude/worktrees/<yourname>
 ```
 
 Numbered "rebuild-NNN" steps are sequential branches `rebuild/step-NNN-<slug>`. The next one is
-**166**. (164 and 165 both landed on the `step-164` branch -- the numbering is a log, not a rule.) Each is one focused change with a long explanatory commit message — **keep that convention,
+**169**. (164 through 168 all landed on the `step-164` branch -- the numbering is a log, not a rule.) Each is one focused change with a long explanatory commit message — **keep that convention,
 the commit messages are the project's real documentation.**
 
 ---
@@ -484,3 +484,99 @@ against `master` (open, needs merging — GitHub reads templates from the defaul
    question of the whole session (section 5) and one photo answers it.
 3. **Merge PR #463** so bug reports can name a flavour that exists.
 4. Section 12's art-batching lead — needs no hardware, just a careful read of four functions.
+
+
+---
+
+# 14. CURRENT STATE, 2026-08-13 (read this section first)
+
+**Tip branch: `rebuild/step-164-eth-bounded-teardown`. It contains rebuild-164 through 168.**
+**Latest CI: run `31710438197`, four flavours, all green.**
+
+⚠ **NOTHING SINCE rebuild-162 HAS BEEN TESTED ON HARDWARE.** Five steps are stacked up unverified.
+Getting that tested is job one; everything else can wait behind it.
+
+## What landed since section 13
+
+**164** — backed rebuild-163 out completely (163 fixed #382 but froze exit from a UDPFS boot), and
+fixed #382 the narrow way instead: `ethDeinitModules` had an **unbounded** `WaitSema` on the teardown
+path, now bounded at ~3 s.
+
+**165/166** — first attempt at #380 (PS1 rows showing full titles instead of the disc id). Both were
+effectively **inert**: `sbPopulateConfig` re-derives `#Startup` from the filename, so an id resolved
+earlier never reached the display. Superseded by 167. Left in history because the reasoning matters.
+
+**167 — three fixes, and the first is the important one:**
+- **SMB art no longer vanishes.** `textures.c` separates a real ENOENT (`ERR_BAD_FILE`, absent) from
+  a contended bus or a share mid-reconnect (`ERR_FILE_IO`, transient). **Two places threw that away**:
+  the generic loose-file arm returned `ERR_BAD_FILE` unconditionally (and that is the arm SMB/ETH/pfs
+  take — the staged path only claims `mmce*`/`mass*`), and `cacheLoadImage` tested only `result < 0`
+  and parked every failure as absent. The fork parks only on `ERR_BAD_FILE` and retries the rest; our
+  texcache had **zero** references to either code. That is why art is instant on the fork over SMB and
+  died on ours. Harmless until rebuild-155 made the absence verdict outlive the list rebuild that used
+  to wipe it. **New HUD field `TF`** counts transient retries.
+- **#382 fix restored without the freeze.** New `bgmQuiesce()` signals the BGM threads and returns
+  immediately; the join stays in `audioEnd()`. 163's *order* was right, its blocking *wait* at the top
+  of deinit was not.
+- **VCD id resolution moved off the scan.** The scan does no device IO at all now (it records only
+  which directory a VCD came from); the disc is read lazily on the per-game config path — async, once
+  per settled row, gated on the theme having an element that shows it. Identity (art, CFG, launch)
+  stays the **filename**.
+
+**168 — the background could only be requested as a side effect of another load finishing.**
+`drawGameImage` gated the Background element on `... && !cacheHasPendingArt()`. That predicate is
+`queued > 0 || active > 0`, the worker drains without yielding, and `artPop` increments *active*
+before the previous release decrements it — so the lane reads busy **continuously** across a whole
+batch. No mid-batch idle frame exists, so the background could only be requested in the frame after
+the entire lane drained. The fork has **no gate at all** here: one unconditional request for
+backgrounds and covers alike. Gate removed; the 30-frame idle margin already did the ordering job.
+
+## THE OPEN QUESTION, and what is already ruled out
+
+**Art still arrives in batches rather than rolling** — reported on USB (Nathan), SMB (L10N37) and VCD
+(miladera22-sketch). **Three transports, so it is not the device.**
+
+⛔ **Do not re-litigate these.** Two 16-agent adversarial passes have run on this, and on the
+`open()` latency spike. **Nothing survived refutation in either.** Specifically killed, with code
+citations, in `tasks/wh1n6pt40.output` and `tasks/wk9sphckp.output` under the session temp dir:
+- fileXio lock contention with the ioman worker (the lock brackets ONE RPC, not a batch)
+- `clock()` measuring descheduled time (it is wall time, but 48 ms *total* loads prove the stall is real)
+- first-access / mount / spin-up costs
+- a HUD sampling artefact
+- **any cover-vs-cover publish gap** — both passes examined the cover path in both trees and found
+  none. The publish (`entry->texture`, then `lastUsed`, then `qr = NULL` last) is picked up by
+  `cacheGetTexture`'s fast path on the very next frame, identically in both builds, and every cover
+  site calls the requesting path every frame.
+
+**So the remaining suspect is the `open()` spike, not the cache.** A 140x200 cover opens in 3-8 ms
+normally and **2730 ms** occasionally, and `O:2730` on a 2794 ms load means 2730 of it was inside
+`open()`. That fits L10N37's SMB report and miladera's VCD one better than anything cache-side.
+
+**The one instrument that splits it** is already built and shipping: `W<ms>@<simple>/<menu>/<bgm><h|m>`
+— the worst open of the session with the queue depth captured **at** that open, plus whether the BGM
+decoder (which bypasses ioman entirely and shares the same file channel) was mid-read. One photo of
+that field after a VCD-page scroll is worth more than another investigation.
+
+## What to do, in order
+
+1. **Get 164-168 tested.** Exit from a UDPFS boot (163's regression must be gone), an ETH launch with
+   BGM playing (#382 — Vass327 is responsive), the PS1 list showing ids (#380 — miladera22-sketch),
+   SMB art surviving a reconnect (#388 — L10N37), and whether backgrounds now roll in.
+2. **Read `W` and `TF`** off a VCD-page scroll. `W` decides the open-spike question; `TF` should be
+   ~0 on a healthy device and climbing on a flaky share.
+3. **Merge PR #463** (issue template — four flavour names). GitHub reads templates from `master`.
+4. L10N37 also reported a **"Network mode" setting in Game Sources that appears dead** (toggles
+   Auto/Manual with no visible effect). Unexamined.
+
+## Standing judgement calls from this session
+
+- **The fork is a working example — use it.** Three separate bugs this session were "master does X,
+  we do not" (the cache reunion, the CFG-read gate, the transient-failure lane), each found only
+  after a hardware report. **When a symptom appears, diff the fork FIRST.**
+- **But adapt, do not transplant.** A wholesale `texcache.c` swap was started and reverted: master's
+  file lacks eight symbols this tree's callers depend on (`cacheLookupTexture`, `cacheDropQueuedArt`,
+  `cacheShutdownArtLoads`, `cacheTickArt`, five debug accessors) plus the MX4SIO/SIO2 protection that
+  fixed #340. Master keys its whole navigation-contention apparatus on `MMCE_MODE`; widening that
+  predicate to include MX4SIO is the small, correct version of that port if it is ever wanted.
+- **Every counter must distinguish "not used" from "broken".** `IX0/0` cost two builds; `OE` could
+  not see the SMB bug it was built for because it only incremented on an arm SMB never takes.
