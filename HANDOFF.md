@@ -832,4 +832,18 @@ filename test; the parse exists only as a display fallback. The real defect was 
 resolver can return `AAAA-NNNNN` while the filename fallback yields `AAAA_NNN.NN`, so the caption
 visibly changed shape when the disc read landed. 171 canonicalises to `AAAA_NNN.NN` (the PS2
 page's form) at the memo store; the barcode's own resolver is untouched. Amended description
-posted to miladera.
+posted to miladera. **One function owns the id shape: `vcdCanonDisplayId` (vcdsupport.c:227).**
+Any future change to the caption id form belongs there and nowhere else — the display chain and
+the RetroGEM launch/barcode resolver must NOT pick up their own normalisers.
+
+**172 — the fail-closed audit Nathan ordered on 171's request path, shipped same day.** His
+question: a row with no memo entry (memo full at VCD_ID_MEMO_MAX=512, or never scanned) has
+nothing to dedupe against — does it re-queue on every settle, the CFG-storm shape #155 removed?
+Answer, verified by reading: NO for the main case — `vcdRequestDisplayId` returns on
+`m == NULL` BEFORE `ioPutRequest`, so nothing is ever queued for such a row. But the audit found
+one real hole: `vcdResolveDisplayId` returns on `m->dir == NULL` BEFORE setting `asked`, and the
+request side never tested dir — so an entry whose dir strdup OOM'd in `vcdNoteScanDir` would
+re-queue an ioman request on every settle while selected (one in flight at a time via the
+pending flag, but forever). OOM-gated, which is exactly when a request loop is least wanted.
+Fix: one condition at the queue source — `m->dir == NULL` now fails closed like `asked`.
+Recoverable: a later rescan re-points dir and re-arms the row. Commit 95aabdc8.
