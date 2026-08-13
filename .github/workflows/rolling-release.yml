@@ -904,6 +904,16 @@ jobs:
               $PREREL \
               $TARGET
           fi
+          # The tag must follow the publish, on BOTH paths: `gh release edit/upload` never
+          # re-targets it, and `gh release create` REUSES an existing tag as-is (a stale
+          # leftover tag outranks --target). Without this the tag drifts from the assets
+          # forever -- the same tag-vs-assets mismatch the stale June tag caused, found
+          # live on the 2026-08-13 republish one tip behind. Rolling only: a v* tag is the
+          # pushed ref itself and must never move.
+          if [[ "${GITHUB_REF}" != refs/tags/v* ]]; then
+            echo "Re-targeting tag $TAG -> $GITHUB_SHA"
+            gh api "repos/$GITHUB_REPOSITORY/git/refs/tags/$TAG" -X PATCH -f sha="$GITHUB_SHA" -F force=true >/dev/null
+          fi
 
       # --- MEGA archival (publishing-branch rolling builds only) -------------------------------
       # The GitHub 'rolling' release above keeps OVERWRITING the latest build. To keep a PERMANENT
