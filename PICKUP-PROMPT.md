@@ -14,7 +14,8 @@ C:\Users\natha\Github\Open-PS2-Loader\.claude\worktrees\opl-issue-340-diagnosis-
 Work in **that** directory. It is a git worktree, and it is already correct in three ways that
 matter:
 
-- it is checked out on the current tip branch, **`rebuild/step-164-eth-bounded-teardown`**;
+- it is checked out on the current tip branch, **`rebuild/step-164-eth-bounded-teardown`**
+  (commit `3e24e991`, fully pushed, working tree clean — that branch holds steps 164 through 168);
 - **`HANDOFF.md` and this file are sitting in it** — read `HANDOFF.md` first, from section 0;
 - ⚠ **it is the one directory the build container is mounted to.** `oplbuild92` exposes it as
   `/src`, so `docker exec oplbuild92 sh -c "cd /src && make -j8 opl.elf"` compiles *this*
@@ -120,12 +121,24 @@ Do not change any part of this. My testers rely on it looking identical.
 # Now read the handoff
 
 **`HANDOFF.md` is in the directory named at the top of this file. Read it in this order:**
-**§0 (the working contract) → §0b (environment traps — CRLF, shell quoting, NUL bytes, git and gh
-gotchas that each cost the previous agent real time) → §0c (process rules, each naming a build
-that shipped wrong) → §14 (current state) → then the whole file.** It has the repo layout, the HUD decoder, the full fix history, the
+
+| § | what it is | why you cannot skip it |
+|---|---|---|
+| **0** | the working contract | branches, the build/CI loop, the exact tester link format |
+| **0b** | environment traps | CRLF files, shell-quoting failures, NUL bytes, clang-format reflow, git/gh gotchas — each one cost the previous agent real time |
+| **0c** | process rules | eight rules, each naming the specific build that shipped wrong because the rule did not exist yet |
+| **14** | current state | what landed in 164–168, and an explicit list of hypotheses already **disproven with code citations** |
+| **15** | open: rumble | works on the fork, not the rebuild — diagnosed, not fixed |
+| 1–13 | reference | repo layout, the HUD decoder, the full fix history |
+ It has the repo layout, the HUD decoder, the full fix history, the
 standing traps, and — most importantly — an explicit list of hypotheses already **disproven with code
 citations**, so you do not spend a day re-deriving dead ends.
 
+
+## The last green build
+
+Run **31710438197** on that branch, four flavours, all green. If I ask for links before you have
+built anything yourself, that is the run to give me — in the exact format above.
 
 ## The one-paragraph situation
 
@@ -141,9 +154,18 @@ in either tree, which moves suspicion to an intermittent `open()` stall — a 14
 ## What I need from you first
 
 1. **rebuild-164 through 168 have never run on hardware.** Give me test links in the format above and
-   tell me exactly what to look for. That is the top priority; everything else waits behind real data.
-2. Once I report back, the HUD field **`W<ms>@<simple>/<menu>/<bgm><h|m>`** is built specifically to
-   settle the open-stall question in one reading. `HANDOFF.md` §14 explains how to interpret it.
+   tell me exactly what to look for. Everything else waits behind real data. What is stacked up
+   unverified: SMB art no longer vanishing after a reconnect (#388, tester L10N37), issue #382's fix
+   restored without the exit freeze it caused (tester Vass327), PS1 rows showing the disc's real game
+   ID (#380, tester miladera22-sketch), the VCD scan no longer doing device I/O, and backgrounds
+   loading on their own schedule instead of only when another cover finishes.
+2. **`W<ms>@<simple>/<menu>/<bgm><h|m>`** in the debug HUD is built specifically to settle the
+   remaining open question in one reading. §14 explains how to interpret it. `TF` should read ~0 on a
+   healthy device.
+3. **Rumble is broken on the rebuild and works on the fork.** §15 has the diagnosis, the exact lines,
+   and the log line that confirms it in one boot. **Do not fix it the obvious way** — §15 says why.
+4. **PR #463** is open against `master` (issue-template flavour names). It needs merging or my bug
+   reports keep naming build flavours that no longer exist.
 
 ## How I want you to work on the code
 
