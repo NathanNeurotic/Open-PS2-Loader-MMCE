@@ -58,8 +58,8 @@ the naming right for you.
 OrbitOPL Toolbox is third-party and independently maintained — **please report Toolbox
 issues to its own repository, not here.**
 
-**Which one to download:** prefer a **PINNED** flavour — `APP_RIPTOPL-PS2DEVPINNED` or
-`APP_RIPTOPL-OFFICIALPINNED` in the package zip. Pinned builds are digest-locked and
-reproducible, so a report against one can be rebuilt and compared later. When you report,
-**name the flavour you are running — Settings → About shows it** in the version string.
-That one line is what makes a report actionable.
+<!-- The "which flavour to download" guidance deliberately does NOT live here: it belongs
+     to the "## Get started" section below (in the workflow), which lists all four
+     flavours. It used to sit at this block's tail, stranded above the detailed list --
+     one home, one copy. -->
+
