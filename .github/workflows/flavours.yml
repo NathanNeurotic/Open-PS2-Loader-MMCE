@@ -1,21 +1,40 @@
 name: build-flavours
 
-# RiptOPL rebuild-branch companion: build this branch's UNMODIFIED official OPL source in all
-# three RiptOPL CI toolchains, so every rebuild step ships the same three flavours as master:
-#   OFFICIALSDK     -- ghcr.io/ps2homebrew/ps2homebrew:main (official OPL's own CI container)
-#   PS2DEVLATESTSDK -- ps2dev/ps2dev:latest
-#   PS2DEVPINNEDSDK -- ps2dev/ps2dev pinned by digest (2026-07-28 snapshot, same pin as master CI)
-# This file is the ONLY RiptOPL addition on the rebuild base branch; the source tree stays
-# byte-identical to upstream. Each ELF self-identifies via LOCALVERSION ("-<FLAVOUR>" suffix).
-
-# Until now this fired ONLY on push to rebuild/**, so master had NO CI at all and pull requests were
-# never built -- a regression could land on master unbuilt. The rebuild becomes master at v1.0, so
-# master must be covered before that happens, not after.
+# FOUR FLAVOURS, along two independent axes: WHICH toolchain, and PINNED vs ROLLING.
 #
+#                      pinned (reproducible)          rolling (early warning)
+#   ps2dev             PS2DEVPINNED                   PS2DEVROLLING
+#   official OPL CI    OFFICIALPINNED                 OFFICIALROLLING
+#
+# WHY THIS SPLIT EXISTS. Issue #382: one tester ran the same build in three flavours and got three
+# different results -- official worked, ps2dev-latest started the game then black-screened, the
+# pinned build failed outright. Identical source. There was then no way to tell whether that spread
+# was our bug or the toolchain moving underneath us, because "latest" means something different every
+# day: a report from last week was not comparable to a report from today, and neither could be
+# reproduced on demand.
+#
+# The two columns answer two different questions and should be read that way:
+#   PINNED  -- what testers should use. Reproducible, comparable across weeks, and the only builds a
+#              bug report can meaningfully name. If a pinned build breaks, it is us.
+#   ROLLING -- early warning. Tracks upstream so a toolchain regression surfaces here rather than in
+#              a release. If a rolling build breaks while its pinned twin does not, it is upstream,
+#              and that is a different bug with a different owner.
+#
+# ⚠ EVERY BUG REPORT MUST NAME ITS FLAVOUR. Each artifact carries BUILD-MANIFEST.txt recording the
+# image, the resolved digest where known, the compiler version and the source commit -- so a report
+# identifies exactly what ran. Without that this is four names and the same ambiguity as before.
+#
+# ⚠ THE PINS ARE A DELIBERATE, DATED DECISION, not a snapshot to refresh casually. Moving one
+# invalidates comparability with every report gathered against it. Bump them on purpose, note the
+# date, and expect to re-baseline.
+#
+# Each ELF also self-identifies via LOCALVERSION ("-<FLAVOUR>" suffix), so a stray ELF with no zip
+# around it is still identifiable.
+
 # push is restricted to the two INTEGRATION branches on purpose. Adding pull_request while leaving
 # push on 'rebuild/**' made every PR build TWICE (once for the branch push, once for the PR event) --
-# observed on PR #410, 6 build jobs where 3 were wanted. Feature branches are covered by their PR;
-# these two branches are covered by the merge that lands on them.
+# observed on PR #410. Feature branches are covered by their PR; these two are covered by the merge
+# that lands on them.
 on:
   push:
     branches:
@@ -30,12 +49,26 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - flavour: OFFICIALSDK
-            image: ghcr.io/ps2homebrew/ps2homebrew:main
-          - flavour: PS2DEVLATESTSDK
+          # --- PINNED: reproducible. Give these to testers. ---
+          # ps2dev, pinned 2026-08-13.
+          - flavour: PS2DEVPINNED
+            image: ps2dev/ps2dev@sha256:8fba50ecc2229acd7f8da63d34302f12939b7d4fa6848dda1e6a0ce083321a11
+            digest: sha256:8fba50ecc2229acd7f8da63d34302f12939b7d4fa6848dda1e6a0ce083321a11
+            pinned: "yes (2026-08-13)"
+          # Official OPL's own CI container, pinned 2026-08-13.
+          - flavour: OFFICIALPINNED
+            image: ghcr.io/ps2homebrew/ps2homebrew@sha256:a1b1f87f09a88f64efbe11356aae47098d4d54b3b3a84f0609fa42369244e25d
+            digest: sha256:a1b1f87f09a88f64efbe11356aae47098d4d54b3b3a84f0609fa42369244e25d
+            pinned: "yes (2026-08-13)"
+          # --- ROLLING: early warning. Expect these to move without us changing anything. ---
+          - flavour: PS2DEVROLLING
             image: ps2dev/ps2dev:latest
-          - flavour: PS2DEVPINNEDSDK
-            image: ps2dev/ps2dev@sha256:c64ae69c9817865ed98ff054e4ae5360b9e280ed952c97946bca95d9d35be995
+            digest: ""
+            pinned: "no (tracks ps2dev/ps2dev:latest)"
+          - flavour: OFFICIALROLLING
+            image: ghcr.io/ps2homebrew/ps2homebrew:main
+            digest: ""
+            pinned: "no (tracks ps2homebrew:main)"
     runs-on: ubuntu-latest
     container: ${{ matrix.image }}
     steps:
@@ -61,6 +94,33 @@ jobs:
       - name: Compile -> make clean release (${{ matrix.flavour }})
         run: make --trace clean && make --trace LOCALVERSION=${{ matrix.flavour }} release
 
+      # Written AFTER the build so the compiler probe reflects what actually compiled. Every probe is
+      # `|| true`: this file is a diagnostic and must never be the reason a good build fails to ship.
+      # A rolling flavour has no digest to record here (the tag is resolved by the runner before this
+      # step exists) -- the compiler version below is what identifies it, and it is the part that
+      # actually matters when a toolchain change breaks something.
+      - name: Record build manifest (${{ matrix.flavour }})
+        if: ${{ always() }}
+        run: |
+          {
+            echo "flavour:      ${{ matrix.flavour }}"
+            echo "pinned:       ${{ matrix.pinned }}"
+            echo "image:        ${{ matrix.image }}"
+            echo "digest:       ${{ matrix.digest }}"
+            echo "built (UTC):  $(date -u '+%Y-%m-%d %H:%M:%S')"
+            echo "run:          ${{ github.run_id }}"
+            echo "ref:          ${{ github.ref }}"
+            echo "commit:       ${{ github.sha }}"
+            echo "---- toolchain ----"
+            (mips64r5900el-ps2-elf-gcc --version 2>/dev/null || ee-gcc --version 2>/dev/null || echo "ee compiler: not probed") | head -1
+            (iop-gcc --version 2>/dev/null || mipsel-none-elf-gcc --version 2>/dev/null || echo "iop compiler: not probed") | head -1
+            echo "PS2SDK=${PS2SDK:-unset}"
+            for v in "$PS2SDK/../.version" "$PS2SDK/.version" /usr/local/ps2dev/.version; do
+              [ -f "$v" ] && { echo "sdk version file ($v):"; cat "$v"; break; }
+            done
+          } > BUILD-MANIFEST.txt 2>/dev/null || true
+          cat BUILD-MANIFEST.txt || true
+
       - name: Upload ELF (${{ matrix.flavour }})
         if: ${{ success() }}
         uses: actions/upload-artifact@v4
@@ -69,4 +129,5 @@ jobs:
           path: |
             RIPTOPL-*.ELF
             OPNPS2LD-*.ELF
+            BUILD-MANIFEST.txt
           if-no-files-found: error
