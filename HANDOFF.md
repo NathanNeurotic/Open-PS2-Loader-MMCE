@@ -935,3 +935,14 @@ REVISION ticks DOWN (~2543 → ~2531) as the twelve bookkeeping commits stop cou
 hash now names the last CODE commit (95aabdc8). Tagged v* releases untouched. LOCAL
 container builds always printed `-dirty`+expr noise: a worktree's .git is a FILE whose
 gitdir pointer is host-absolute, dead inside the container — pre-existing, don't chase.
+
+**179 — REVISION stays HEAD-based; the code anchor moves to GIT_HASH only.** Claude's
+review of 178 caught it BEFORE publish (run 31744839948 cancelled mid-build, nothing
+went out): REVISION is the ordinal testers compare, so code-anchoring it made versions
+go backwards (2543 → ~2531) and broke comparability with every report on file, all
+HEAD-derived. Adopted his shape: REVISION = HEAD count (monotonic, strictly increasing);
+GIT_HASH = CODE_ANCHOR short hash (the reproducibility half — "check out what the tester
+ran"). Exclusion list unchanged. No user-visible scheme change, so NO notes disclaimer
+needed: 2543 → ~2547 on the next publish. **Lesson logged:** a version ordinal must
+never be derived from anything that can move backwards; identity lives in the hash,
+ordinality lives in the count.
