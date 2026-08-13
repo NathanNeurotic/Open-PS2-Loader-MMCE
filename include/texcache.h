@@ -17,11 +17,26 @@ typedef struct
 
     int UID;
 
-    // The value this slot was loaded FOR (a game's startup id, or a VCD's filename). The cache used
-    // to be addressable only by (slot index, UID), which are handed out per request -- so a row that
-    // lost its ids could never find art it already had, even sitting decoded in the very next slot.
-    // Every list rebuild resets those ids, which is why a rebuild threw the whole viewport away.
+    // The value this slot was loaded FOR (a game's startup id, or a VCD's filename). The cache is
+    // otherwise addressable only by (slot index, UID), which are handed out per request -- so a row
+    // that lost its ids could not find art it already had, even sitting decoded in the very next
+    // slot. Every list rebuild resets those ids, so a rebuild threw the whole viewport away and
+    // re-read every visible cover off the device.
+    //
+    // ⚠ This field and the comment above it shipped in rebuild-129 with NO code behind them: nothing
+    // in the tree ever wrote it or read it until rebuild-153. That is the fifth instance of this
+    // project's recurring defect shape (data half + comment half land, code half does not), and it
+    // is why the rebuild's art felt worse than master's -- master has the same reunion, keyed on a
+    // malloc'd entry->value.
+    //
+    // Empty means "no key": set only when the value FITS, so a match is always a whole-string match
+    // and two long VCD filenames sharing a prefix can never trade covers.
     char key[64];
+
+    // Which fail generation the "absent" park (lastUsed == 0) belongs to. cacheInvalidateFailMemo()
+    // bumps the global; a memo from an older generation is ignored, so "new art may have appeared"
+    // (applyConfig, a list rebuild) makes rows re-probe exactly as it always claimed to.
+    unsigned int failEpoch;
 } cache_entry_t;
 
 

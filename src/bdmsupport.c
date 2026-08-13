@@ -381,6 +381,10 @@ static void bdmLoadBlockDeviceModules(void)
 
     WaitSema(bdmLoadModuleLock);
 
+    // Snapshot, compared after the loads below. See the refresh at the end of this function for why
+    // a transport enabled from Settings needed a "double tap" before its tab appeared.
+    int modsWere = iUSBModLoaded + iLinkModLoaded + mx4sioModLoaded + hddModLoaded + udpbdModLoaded;
+
     if (gEnableUSB && !iUSBModLoaded) {
         // Load USB Block Device drivers -- the prime suspect for a real exFAT/USB boot wedge.
         guiSetBootStatusSticky(_l(_STR_BOOT_LOADING_USB));
@@ -445,7 +449,30 @@ static void bdmLoadBlockDeviceModules(void)
             sysShutdownDev9();
     }
 
+    int modsNow = iUSBModLoaded + iLinkModLoaded + mx4sioModLoaded + hddModLoaded + udpbdModLoaded;
+
     SignalSema(bdmLoadModuleLock);
+
+    // A DRIVER THAT ARRIVED LATE NEEDS ONE MORE LOOK, and without this it does not get one. Enabling
+    // a transport from Device Settings runs, in this order:
+    //
+    //   guiShowDeviceSettings -> bdmForceDeviceRefresh()   generation bumps HERE
+    //                         -> applyConfig -> bdmEnumerateDevices
+    //                                        -> ioPutRequest(bdmLoadBlockDeviceModules)  queued
+    //   ...IO worker, some time later...     -> THIS FUNCTION, driver finally loads
+    //
+    // The generation bump -- the thing that clears the "tab is hidden" latch and makes menuUpdateHook
+    // look again -- happens BEFORE the driver exists. By the time the card mounts, everything that
+    // would have noticed has already run and concluded there is nothing there, and the next bump
+    // needs a real hotplug. Toggling the setting a second time supplies one, which is exactly the
+    // "MX4SIO needs a double tap" behaviour Nathan hit: the driver was loaded the first time and
+    // nothing ever asked again.
+    //
+    // Bumping on a load that actually SUCCEEDED closes the window for every transport, not just SDC.
+    // Safe from this thread: bdmForceDeviceRefresh only increments the generation counter, and it is
+    // called after SignalSema so it never runs under bdmLoadModuleLock.
+    if (modsNow != modsWere)
+        bdmForceDeviceRefresh();
 }
 
 void bdmLoadModules(void)

@@ -28,6 +28,11 @@ typedef struct load_image_request
     // Art epoch this request was queued in; a mismatch means the whole VIEW it belonged to is gone.
     // See cacheDropQueuedArt().
     unsigned int epoch;
+    // Fail generation CURRENT WHEN THIS PROBE WAS ISSUED. An "absent" park is stamped with this and
+    // not with the live global, deliberately: if cacheInvalidateFailMemo() fires while the read is
+    // in flight, someone is telling us new art may have appeared and our answer may predate it, so
+    // the memo lands stale and the row probes again. Wrong in the cheap direction.
+    unsigned int failEpoch;
     // Chunk-level abort, read by textures.c via texSetLoadAbortFlag. Lets a cancel interrupt a load
     // that is ALREADY RUNNING, which neither the stale-stamp test nor the epoch test can do -- both
     // only ever caught a request still sitting in the queue.
@@ -137,16 +142,26 @@ static int artTarLoadImage(const char *value, const char *suffix, GSTEXTURE *tex
 
 
 
-// NO FAIL MEMO. uOPL and rebuild-66 have none: a load that fails parks its ROW (lastUsed = 0 ->
-// cacheId -2 in cacheGetTextureEx) and is not asked again until a list rebuild, which is the same
-// protection one layer down and without a hash table to get wrong. Ours added a retry budget on top
-// to soften a mis-detected absence; absence is detected correctly now (rebuild-108), and the retry
-// lane was how the IO worker got pinned (rebuild-103/105). Subtracted.
+// NO HASH-TABLE FAIL MEMO, and no retry budget: a load that fails parks its SLOT (lastUsed = 0 ->
+// cacheId -2 in cacheGetTexture) and is not asked again, which is the same protection one layer down
+// and without a side table to get wrong. The retry budget that used to sit on top was how the IO
+// worker got pinned (rebuild-103/105), and absence is detected correctly now (rebuild-108).
+//
+// What rebuild-153 added is only the GENERATION. The park used to survive exactly as long as the
+// row's cache_id did, so every list rebuild re-probed every missing cover -- and on hardware a MISS
+// is the expensive case, not the hit: Nathan's capture shows successful covers at 55-81 ms against
+// 1091, 2586, 2677 and 7120 ms for the ones that resolve to nothing. Re-probing those on every
+// rebuild is most of where the art throughput went (~0.7 loads/sec observed, against the >12/sec the
+// 55-81 ms hits imply).
+static unsigned int gArtFailEpoch = 1;
+
 void cacheInvalidateFailMemo(void)
 {
-    // Kept as a no-op so the callers that mark "new art may have appeared" (applyConfig, every list
-    // rebuild) need no change: rows re-ask naturally, because a rebuild gives every item a fresh
-    // cache_id anyway.
+    // Now has teeth. The callers that mean "new art may have appeared" (applyConfig, every list
+    // rebuild) get what they always asked for: parked rows re-probe, and nothing else is disturbed.
+    gArtFailEpoch++;
+    if (gArtFailEpoch == 0) // 0 is the memset value in a fresh slot; never let a stale park match it
+        gArtFailEpoch = 1;
 }
 
 // Minimum frames of no input before any art may be requested, regardless of the Art Delay
@@ -624,6 +639,15 @@ static void cacheLoadImage(load_image_request_t *req)
         return;
     }
 
+    // Superseded before we ever started (the one-slot background case in cacheGetTexture). Same
+    // release as the two above -- and note it clears the slot rather than parking it, because a
+    // request that was cancelled says NOTHING about whether the file exists.
+    if (req->abortRequested) {
+        cacheClearItem(req->entry, 0);
+        artReleaseRequest(req, 0);
+        return;
+    }
+
     // ---- from here the request owns a device read + PNG decode ----
     //
     // STAGED TEXTURE. The decode lands in a GSTEXTURE this THREAD owns, and only a finished image is
@@ -700,7 +724,19 @@ static void cacheLoadImage(load_image_request_t *req)
         req->entry->lastUsed = guiFrameId;
     } else {
         texFree(&staged); // our own pixels, never the entry's -- no gsKit contact on this thread
+
+        // ABORTED IS NOT ABSENT. texLoad honours abortRequested mid-read and returns a plain
+        // failure, so parking the row here would memo "this game has no background" purely because
+        // the user moved on -- and with the fail generation that memo now OUTLIVES a list rebuild.
+        // Clear the slot instead: no memo, no key, and the row re-requests when it is next drawn.
+        if (req->abortRequested) {
+            cacheClearItem(req->entry, 0);
+            artReleaseRequest(req, 0);
+            return;
+        }
+
         req->entry->lastUsed = 0;
+        req->entry->failEpoch = req->failEpoch;
     }
     req->entry->qr = NULL;
 
@@ -969,55 +1005,154 @@ GSTEXTURE *cacheGetTexture(image_cache_t *cache, item_list_t *list, int *cacheId
     // ENQUEUE decision instead -- the only place it saves anything real (an IO attempt).
 
     if (*cacheId == -2) {
-        return NULL;
+        // Parked as absent. Honour it only while it belongs to the CURRENT fail generation, so
+        // cacheInvalidateFailMemo() can genuinely re-open the question (the epoch rides in *UID,
+        // which is meaningless in the -2 state).
+        if ((unsigned int)*UID == gArtFailEpoch)
+            return NULL;
+        *cacheId = -1;
     } else if (*cacheId != -1) {
-        cache_entry_t *entry = &cache->content[*cacheId];
-        if (entry->UID == *UID) {
-            if (entry->qr) {
-                // Still loading -- but mark it as still WANTED. This stamp is the only evidence the
-                // worker has that anyone is still looking at this row (see cacheLoadImage).
-                entry->lastUsed = guiFrameId;
-                return NULL;
-            } else if (entry->lastUsed == 0) {
-                *cacheId = -2;
-                return NULL;
-            } else {
-                entry->lastUsed = guiFrameId;
-                return &entry->texture;
+        // Bounds check, which this path never had: a row keeps its cache_id across a theme switch,
+        // and the new theme's cache can be SMALLER. content[*cacheId] was then an out-of-bounds read
+        // whose UID happened not to match often enough to be noticed.
+        if (*cacheId >= 0 && *cacheId < cache->count) {
+            cache_entry_t *entry = &cache->content[*cacheId];
+            if (entry->UID == *UID) {
+                if (entry->qr) {
+                    // Still loading -- but mark it as still WANTED. This stamp is the only evidence
+                    // the worker has that anyone is still looking at this row (see cacheLoadImage).
+                    entry->lastUsed = guiFrameId;
+                    return NULL;
+                } else if (entry->lastUsed == 0) {
+                    *cacheId = -2;
+                    *UID = (int)gArtFailEpoch;
+                    return NULL;
+                } else {
+                    entry->lastUsed = guiFrameId;
+                    return &entry->texture;
+                }
             }
         }
 
         *cacheId = -1;
     }
 
-    // Under the cache pre-delay (to avoid filling cache while moving around) -- with a FLOOR that
-    // the user's Art Delay setting cannot lower past.
+    // REUNION BY VALUE. The ids above are handed out per REQUEST, so anything that renumbers rows --
+    // every list rebuild, every device rescan that lands while the user browses, an L3 ISO/VCD
+    // toggle -- makes every row forget art this cache is still holding, decoded, one slot away. The
+    // row then re-requests it and pays the device again.
     //
-    // Why a floor exists at all: the IO worker is priority 30 and the GUI/pad thread is 31, so the
-    // worker PREEMPTS rendering and input whenever it is runnable. The device read mostly blocks
-    // (the GUI runs happily through it) but the PNG decode is pure CPU -- tens of ms of it -- and
-    // during that the menu stops sampling the pad. With Art Delay 0 this predicate is
-    // `guiInactiveFrames < 0`, never true, so covers are requested WHILE a direction is held: every
-    // decode eats frames, the held-repeat then catches up in one step, and scrolling gains a
-    // rhythmic lurch -- one per decode. Reported from hardware as "pressing at the same pace, every
-    // so many clicks it jumps", and absent from both uOPL and rebuild-66, neither of which requests
-    // art mid-scroll.
+    // Cheap enough to run on every miss: it is a strcmp against at most `count` slots (typically 6
+    // to 32) and ONLY on the path that was already about to claim a slot and malloc a request. The
+    // fast path -- a row whose ids still match -- returns above without touching this.
     //
-    // A couple of frames is below the threshold of noticing for someone who set the delay to 0 to
-    // make art appear promptly, and it is enough to keep decodes out of an active scroll.
-    int artDelay = list->delay;
-    if (artDelay < ART_MIN_SETTLE_FRAMES)
-        artDelay = ART_MIN_SETTLE_FRAMES;
-    if (guiInactiveFrames < artDelay)
-        return NULL;
+    // The in-flight case matters as much as the ready one: without it, a rebuild that lands while a
+    // cover is loading orphans that request and immediately queues a SECOND read of the same file.
+    {
+        size_t keyLen = strlen(value);
+        if (keyLen > 0 && keyLen < sizeof(cache->content[0].key)) {
+            for (i = 0; i < cache->count; i++) {
+                cache_entry_t *entry = &cache->content[i];
+
+                if (entry->key[0] == '\0' || strcmp(entry->key, value) != 0)
+                    continue;
+
+                if (entry->qr) { // already being loaded FOR US -- adopt it, do not queue a duplicate
+                    *cacheId = i;
+                    *UID = entry->UID;
+                    entry->lastUsed = guiFrameId;
+                    return NULL;
+                }
+
+                if (entry->lastUsed == 0) { // known absent, from this generation
+                    if (entry->failEpoch == gArtFailEpoch) {
+                        *cacheId = -2;
+                        *UID = (int)gArtFailEpoch;
+                        return NULL;
+                    }
+                    break; // stale memo: fall through and re-probe
+                }
+
+                if (entry->texture.Mem != NULL) {
+                    *cacheId = i;
+                    *UID = entry->UID;
+                    entry->lastUsed = guiFrameId;
+                    return &entry->texture;
+                }
+
+                break;
+            }
+        }
+    }
+
+    // Which bus this cover lives on decides whether it may be asked for mid-scroll. Resolved HERE,
+    // on the GUI thread -- see cacheRequestIsSIO2 for why it cannot be done on the worker.
+    int isSio2 = cacheRequestIsSIO2(list, value);
+
+    // THE IDLE GATE IS FOR SIO2 ONLY (MMCE and MX4SIO). master gates exactly the same way, on
+    // MMCE_MODE alone; the rebuild applied it to every device, and that is most of the "pop-in"
+    // feel -- on USB, HDD and the network transports nothing was even ASKED FOR until the user had
+    // been still for several frames, so art could not start arriving until after they stopped.
+    //
+    // The floor's original justification is gone, and it went with rebuild-152. It read: "the IO
+    // worker is priority 30 and the GUI/pad thread is 31, so the worker PREEMPTS rendering and
+    // input; the PNG decode is tens of ms of pure CPU and during it the menu stops sampling the
+    // pad." True while art rode the IO worker. Art now has its own thread at priority 64 -- BELOW
+    // the GUI -- so a decode cannot preempt rendering or input by construction. The lurch that
+    // motivated the floor is not reachable from this path any more.
+    //
+    // What remains true is bus contention, which priority does not fix: an MX4SIO cover and the pad
+    // share SIO2, and an MMCE cover shares the card bus. Those keep the gate, and artPop keeps
+    // refusing to START one while a direction is held.
+    if (isSio2) {
+        int artDelay = list->delay;
+        if (artDelay < ART_MIN_SETTLE_FRAMES)
+            artDelay = ART_MIN_SETTLE_FRAMES;
+        if (guiInactiveFrames < artDelay)
+            return NULL;
+    }
+
+    // LATEST SELECTION WINS on a one-slot background cache. With one slot there is no eviction to
+    // fall back on: a background queued or loading for a selection the user has already left owns
+    // the only slot until it finishes, so the cover for where they ARE cannot even be requested
+    // until the abandoned one has been read off the device in full -- seconds, on the evidence
+    // above. The stale-stamp cancellation in cacheLoadImage cannot help, because the row it belongs
+    // to may still be on screen and still stamping.
+    //
+    // Marking it aborted rather than dropping it keeps one owner for the request: the worker
+    // releases it on its own terms, whether it is still queued or already inside the read.
+    if (cache->count == 1 && cache->suffix != NULL && strcmp(cache->suffix, "BG") == 0) {
+        cache_entry_t *only = &cache->content[0];
+        if (only->qr != NULL && only->key[0] != '\0' && strcmp(only->key, value) != 0)
+            ((load_image_request_t *)only->qr)->abortRequested = 1;
+    }
 
 
     cache_entry_t *currEntry, *oldestEntry = NULL;
     rtime = guiFrameId;
 
+    // WHILE A DIRECTION IS HELD, CLAIM ONLY SLOTS THAT COST NOTHING TO TAKE -- free ones and ones
+    // parked as absent. Never evict a decoded texture mid-scroll.
+    //
+    // This is the guard that makes dropping the idle gate above safe rather than a trade. Requesting
+    // art during a scroll means claiming a slot per row passed, and every claim runs
+    // cacheClearItem(entry, 1) -- it FREES whatever cover was in that slot. Most of those requests
+    // are then thrown away 20 frames later by the stale-stamp cancellation, so an unguarded scroll
+    // would spend the cache to buy images it never loads and leave the user watching covers they
+    // already had disappear. That is a worse bug than the one being fixed here.
+    //
+    // With the guard, a cold list (all slots free) starts loading covers the moment the user begins
+    // moving, and a warm one holds what it has and resumes the instant they stop -- with no fixed
+    // delay in front of it any more, which is the actual win over the old gate.
+    int navHoldsCache = gArtNavActive;
+
     for (i = 0; i < cache->count; i++) {
         currEntry = &cache->content[i];
-        if (!currEntry->qr && currEntry->lastUsed < rtime) {
+        if (currEntry->qr)
+            continue;
+        if (navHoldsCache && currEntry->lastUsed > 0)
+            continue; // holds a decoded image; leave it alone until the scroll stops
+        if (currEntry->lastUsed < rtime) {
             oldestEntry = currEntry;
             rtime = currEntry->lastUsed;
             *cacheId = i;
@@ -1050,15 +1185,24 @@ GSTEXTURE *cacheGetTexture(image_cache_t *cache, item_list_t *list, int *cacheId
         req->value = (char *)req + sizeof(load_image_request_t);
         strcpy(req->value, value);
         req->cacheUID = cache->nextUID;
-        req->epoch = gArtEpoch; // the view this cover belongs to; see cacheDropQueuedArt()
+        req->epoch = gArtEpoch;         // the view this cover belongs to; see cacheDropQueuedArt()
+        req->failEpoch = gArtFailEpoch; // the generation an "absent" answer would belong to
         req->abortRequested = 0;
         req->next = NULL;
-        // Resolved HERE, on the GUI thread -- see cacheRequestIsSIO2 for why not on the worker.
-        req->sio2 = (unsigned char)cacheRequestIsSIO2(list, value);
+        req->sio2 = (unsigned char)isSio2; // resolved above, on the GUI thread
 
         cacheClearItem(oldestEntry, 1);
         oldestEntry->qr = req;
         oldestEntry->UID = cache->nextUID;
+
+        // The slot's identity, and the only thing that lets a renumbered row find this art again.
+        // Written only when the value FITS, so a hit is always a whole-string match; an over-long
+        // value simply gets no key and behaves exactly as it did before rebuild-153.
+        {
+            size_t keyLen = strlen(value);
+            if (keyLen < sizeof(oldestEntry->key))
+                memcpy(oldestEntry->key, value, keyLen + 1);
+        }
 
         // BORN WANTED. cacheClearItem one line above just wrote the module's "this slot is free"
         // sentinel -- lastUsed = -1 -- and the cancellation in cacheLoadImage reads that SAME field
