@@ -302,8 +302,9 @@ jobs:
     # OFFICIALROLLING (third flavour): the EXACT container official OPL's rolling pre-release
     # compiles in (ghcr.io/ps2homebrew/ps2homebrew:main) -- a separate SDK lineage from
     # ps2dev/ps2dev, so hardware reports can split toolchain effects from RiptOPL code.
-    # Best-effort by design (continue-on-error): main ELF only, no ds5/1080p/extras; a
-    # failure here must never block the two ps2dev flavours from publishing.
+    # Best-effort by design (continue-on-error): main ELF + a named DS5 loader, no
+    # variants/debug extras; a failure here must never block the two ps2dev flavours
+    # from publishing.
     continue-on-error: true
     container: ghcr.io/ps2homebrew/ps2homebrew:main
     steps:
@@ -350,6 +351,26 @@ jobs:
           echo "Staged officialsdk rolling assets:"
           ls -la rolling
 
+      - name: Build + stage DualSense (DS5) loader (OFFICIALROLLING)
+        # Same DS5 policy as the ps2dev flavours, now in the official container (Nathan,
+        # 2026-08-13: "there should be a ds5 build for all 4 flavours"). OFF by default;
+        # a ready-made DUALSENSE=1 loader ships as a named top-level asset. Best-effort:
+        # if DUALSENSE=1 cannot build in this container the WARN is loud and the flavour
+        # simply ships without a DS5 asset, exactly like before this step existed.
+        run: |
+          make --trace clean
+          rm -f RIPTOPL-*.ELF   # drop the main build's leftover named ELF (already staged) so the DS5 output is unambiguous
+          if make --trace LOCALVERSION=OFFICIALROLLING-ds5 DUALSENSE=1 release; then
+            DS5_ELF="$(ls RIPTOPL-*.ELF 2>/dev/null | head -n1)"
+            if [ -n "${DS5_ELF:-}" ] && [ -f "$DS5_ELF" ]; then
+              cp -f "$DS5_ELF" rolling/RIPTOPL-OFFICIALROLLING-ds5.ELF
+            else
+              echo "WARN: OFFICIALROLLING DUALSENSE=1 build produced no ELF; skipping DS5 asset this run" >&2
+            fi
+          else
+            echo "WARN: OFFICIALROLLING DUALSENSE=1 build failed; skipping DS5 asset this run" >&2
+          fi
+
       - name: Upload officialsdk rolling assets
         uses: actions/upload-artifact@v6
         with:
@@ -368,8 +389,9 @@ jobs:
     # us -- the official flavour was the one that WORKED, and it was also the only one with no
     # pinned twin to reproduce against. Pair every lineage, or the comparison cannot be made.
     #
-    # Best-effort (continue-on-error), matching its rolling twin: main ELF only, no ds5/extras. A
-    # failure here must never block the ps2dev flavours from publishing.
+    # Best-effort (continue-on-error), matching its rolling twin: main ELF + a named DS5
+    # loader, no variants/debug extras. A failure here must never block the ps2dev
+    # flavours from publishing.
     continue-on-error: true
     container: ghcr.io/ps2homebrew/ps2homebrew@sha256:a1b1f87f09a88f64efbe11356aae47098d4d54b3b3a84f0609fa42369244e25d
     steps:
@@ -405,6 +427,24 @@ jobs:
           sha256sum "$PS2SDK"/iop/irx/*.irx > rolling/IRX-MANIFEST-OFFICIALPINNED.txt 2>/dev/null || true
           echo "Staged official-pinned rolling assets:"
           ls -la rolling
+
+      - name: Build + stage DualSense (DS5) loader (OFFICIALPINNED)
+        # DS5 for the pinned official flavour too, so all four flavours carry a DS5
+        # loader and a DS5 owner can stay on a reproducible build of EITHER lineage.
+        # Best-effort, same as its rolling twin.
+        run: |
+          make --trace clean
+          rm -f RIPTOPL-*.ELF   # drop the main build's leftover named ELF (already staged) so the DS5 output is unambiguous
+          if make --trace LOCALVERSION=OFFICIALPINNED-ds5 DUALSENSE=1 release; then
+            DS5_ELF="$(ls RIPTOPL-*.ELF 2>/dev/null | head -n1)"
+            if [ -n "${DS5_ELF:-}" ] && [ -f "$DS5_ELF" ]; then
+              cp -f "$DS5_ELF" rolling/RIPTOPL-OFFICIALPINNED-ds5.ELF
+            else
+              echo "WARN: OFFICIALPINNED DUALSENSE=1 build produced no ELF; skipping DS5 asset this run" >&2
+            fi
+          else
+            echo "WARN: OFFICIALPINNED DUALSENSE=1 build failed; skipping DS5 asset this run" >&2
+          fi
 
       - name: Upload official-pinned rolling assets
         uses: actions/upload-artifact@v6
@@ -502,7 +542,7 @@ jobs:
             mv -f rolling/RIPTOPL-OFFICIALPINNED.ELF "rolling/RIPTOPL-${VER}-OFFICIALPINNED.ELF"
           fi
           # DualSense (DS5) named loaders, one per SDK flavour (best-effort -- any may be absent).
-          for sdk in PS2DEVPINNED PS2DEVROLLING; do
+          for sdk in PS2DEVPINNED PS2DEVROLLING OFFICIALPINNED OFFICIALROLLING; do
             if [ -f "rolling/RIPTOPL-${sdk}-ds5.ELF" ]; then
               mv -f "rolling/RIPTOPL-${sdk}-ds5.ELF" "rolling/RIPTOPL-${VER}-${sdk}-ds5.ELF"
             fi
@@ -803,7 +843,7 @@ jobs:
             if [ "${HAS_OFFICIALPINNED:-}" = yes ]; then
               printf -- '- %s-OFFICIALPINNED.ELF: bare loader, official container DIGEST-PINNED (REPRODUCIBLE -- quote this one in bug reports)\n' "$VERSIONED_BASE"
             fi
-            for sdk in PS2DEVPINNED PS2DEVROLLING; do
+            for sdk in PS2DEVPINNED PS2DEVROLLING OFFICIALPINNED OFFICIALROLLING; do
               if [ -f "rolling/${VERSIONED_BASE}-${sdk}-ds5.ELF" ]; then
                 printf -- '- %s-%s-ds5.ELF: %s toolchain WITH DualSense (DS5 USB) pad support (same reliability as the %s bare loader above)\n' "$VERSIONED_BASE" "$sdk" "$sdk" "$sdk"
               fi
