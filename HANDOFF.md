@@ -490,6 +490,17 @@ against `master` (open, needs merging — GitHub reads templates from the defaul
 
 # 0. THE WORKING CONTRACT -- do not deviate from this
 
+**WORK IN THIS DIRECTORY:**
+`C:\Users\natha\Github\Open-PS2-Loader\.claude\worktrees\opl-issue-340-diagnosis-2cdb77`
+
+It is already on the tip branch, it holds this file, and **it is the one directory the build
+container is mounted to** (`oplbuild92` exposes it as `/src`). Do NOT `git worktree add` a fresh
+directory: the container would still build this one, so you would edit one tree and compile
+another and see no effect from your changes. Branch with `git checkout -b` INSIDE it. The main
+checkout at `C:/Users/natha/Github/Open-PS2-Loader` is on `rebuild/main` and does not even
+contain this file.
+
+
 Nathan's side and his testers' side must look identical across a handover. These are not suggestions.
 
 **BRANCHES.** Never commit to `master`, `rebuild/main`, or any existing `rebuild/step-*` branch.

@@ -5,6 +5,35 @@ another agent that ran out of budget. I am the owner, Nathan — I test every bu
 hardware, and other testers report through GitHub issues. **My side and my testers' side must not
 change during this handover.** The rules below are how that stays true.
 
+## START HERE — the exact directory
+
+```
+C:\Users\natha\Github\Open-PS2-Loader\.claude\worktrees\opl-issue-340-diagnosis-2cdb77
+```
+
+Work in **that** directory. It is a git worktree, and it is already correct in three ways that
+matter:
+
+- it is checked out on the current tip branch, **`rebuild/step-164-eth-bounded-teardown`**;
+- **`HANDOFF.md` and this file are sitting in it** — read `HANDOFF.md` first, from section 0;
+- ⚠ **it is the one directory the build container is mounted to.** `oplbuild92` exposes it as
+  `/src`, so `docker exec oplbuild92 sh -c "cd /src && make -j8 opl.elf"` compiles *this*
+  worktree and nothing else.
+
+⚠ **Do not `git worktree add` a fresh directory to work in.** A new worktree is not what the
+container builds, so you would be editing one tree and compiling another — your fixes would
+appear to do nothing, which reads like a wrong diagnosis rather than a wrong setup. Make your
+branches **inside** the directory above:
+
+```bash
+cd C:/Users/natha/Github/Open-PS2-Loader/.claude/worktrees/opl-issue-340-diagnosis-2cdb77
+git fetch origin
+git checkout -b rebuild/step-169-<slug>      # next number is 169
+```
+
+⚠ The **main checkout** at `C:/Users/natha/Github/Open-PS2-Loader` sits on `rebuild/main` and
+has **no `HANDOFF.md`**. Do not start there and do not commit there.
+
 ---
 
 # NON-NEGOTIABLE WORKING CONTRACT — read before anything else
@@ -18,10 +47,11 @@ change during this handover.** The rules below are how that stays true.
   164–168). Always branch from the latest step branch, not from `master`.
 
 ```bash
-cd C:/Users/natha/Github/Open-PS2-Loader
+cd C:/Users/natha/Github/Open-PS2-Loader/.claude/worktrees/opl-issue-340-diagnosis-2cdb77
 git fetch origin
-git worktree add .claude/worktrees/<name> -b rebuild/step-169-<slug> origin/rebuild/step-164-eth-bounded-teardown
+git checkout -b rebuild/step-169-<slug>
 ```
+(Branch **inside** that worktree — see "START HERE" for why a new worktree will not build.)
 
 - Write a **long, explanatory commit message** saying what changed, why, what evidence drove it, and
   what it does *not* fix. The commit messages are this project's real documentation — keep that up.
@@ -39,7 +69,7 @@ Do not change any part of this. My testers rely on it looking identical.
 2. **Run clang-format 12** on every `.c`/`.h` you touched (CI enforces it and is not a required
    check, so a red format check can still merge):
    ```bash
-   docker run --rm -v "//c/Users/natha/Github/Open-PS2-Loader/.claude/worktrees/<name>://work" \
+   docker run --rm -v "//c/Users/natha/Github/Open-PS2-Loader/.claude/worktrees/opl-issue-340-diagnosis-2cdb77://work" \
      -w //work xianpengshen/clang-tools:12 clang-format --style=file -i <files>
    ```
 3. **Push the branch, then trigger CI on it:**
@@ -89,12 +119,11 @@ Do not change any part of this. My testers rely on it looking identical.
 
 # Now read the handoff
 
-**`HANDOFF.md` is on branch `rebuild/step-164-eth-bounded-teardown`. Start at section 14 (current
-state), then read the whole file.** It has the repo layout, the HUD decoder, the full fix history, the
+**`HANDOFF.md` is in the directory named at the top of this file. Start at section 0 (the working
+contract), then section 14 (current state), then read the whole thing.** It has the repo layout, the HUD decoder, the full fix history, the
 standing traps, and — most importantly — an explicit list of hypotheses already **disproven with code
 citations**, so you do not spend a day re-deriving dead ends.
 
-Repo is checked out at `C:\Users\natha\Github\Open-PS2-Loader`.
 
 ## The one-paragraph situation
 
