@@ -900,3 +900,14 @@ publish has gone out). **Publish procedure from here:** Nathan names a tip → f
 rebuild/main → push fires the workflow → inspect (prerelease flag, tag SHA, notes, four
 flavours, version, MEGA) BEFORE any tester gets the URL. Master remains on the OLD
 lineage by design; do not push to it.
+
+**176 — post-publish notes restructure (Nathan's read of the live page).** Three defects
+in the download guidance: `APP_RIPTOPL-OFFICIALPINNED/` missing from Get started (four
+folders ship, three were described); the "prefer PINNED" paragraph stranded ABOVE the Get
+started heading (two competing download statements); numbered items could gap under the
+HAS_ guards. Fixed in the workflow (all four flavours as bullets, best-effort entries
+guarded by their HAS_ flags, guidance leads the Get started section) and the block (tail
+paragraph removed, comment marks why it must not return). Live release body patched with
+the identical restructure, rest byte-preserved. Branch `rebuild/step-176-notes-four-flavours`.
+MSYS trap logged: native Windows python cannot open MSYS /tmp absolute paths — cd there
+and use relative names.
