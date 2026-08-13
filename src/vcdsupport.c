@@ -117,10 +117,14 @@ static int vcdEntryCmp(const void *a, const void *b)
 //
 // The first attempt parsed the id out of the FILENAME. Free, and correct when a file is named
 // "SLUS_123.45.Title" -- and the reporter's library is not, which is why he still saw full titles on
-// the build meant to fix it. So when the name yields nothing, ask the DISC: retrogemGetVcdGameID
-// reads the id from inside the image (ISO 9660 / SYSTEM.CNF, then PVD, then partition and subpath
-// forms). It is the same resolver the RetroGEM barcode uses, so a game reports the SAME id here as
-// it does to the scanner -- which is the point, not a coincidence.
+// the build meant to fix it.
+//
+// THE DISC IS ASKED FIRST; the filename is only a fallback. retrogemGetVcdGameID reads the id from
+// inside the image (ISO 9660 / SYSTEM.CNF, then PVD, then partition and subpath forms), and that is
+// ground truth -- a filename is a label somebody typed. It is also the same resolver the RetroGEM
+// barcode uses at launch, so a game reports the SAME id to the theme as it does to the scanner. That
+// property is the point, and reading the name first would have quietly broken it: the list and the
+// barcode could then disagree about one game.
 //
 // RESOLVED HERE, IN THE SCAN, AND DELIBERATELY NOT ONE LAYER UP. There are two VCD layouts:
 // vcdScanDir appends "POPS" to a device root, and vcdScanDirRoot takes a directory DIRECTLY (the
@@ -193,33 +197,45 @@ static void vcdResolveScanId(const char *dirPath, const char *fileName, const ch
 {
     idOut[0] = '\0';
 
-    if (vcdExtractGameId(baseName, idOut, idSize) && idOut[0] != '\0')
-        return; // the name already carries it: free
-
+    // 1. ALREADY ANSWERED. A remembered id -- or a remembered "this disc carries none" -- settles it
+    //    without touching the device, however many times a rescan rebuilds the list.
     const char *memo = vcdIdMemoFind(baseName);
     if (memo != NULL) {
-        snprintf(idOut, idSize, "%s", memo);
-        return; // including a remembered "no id" -- do not open it again
-    }
-
-    if (budget == NULL || *budget <= 0)
-        return; // out of budget this scan; a later build resolves it
-
-    char vcdPath[256];
-    char discId[RETROGEM_GAMEID_MAX];
-    size_t dl = strlen(dirPath);
-    const char *sep = (dl > 0 && dirPath[dl - 1] == '/') ? "" : "/";
-
-    (*budget)--;
-    if (snprintf(vcdPath, sizeof(vcdPath), "%s%s%s", dirPath, sep, fileName) >= (int)sizeof(vcdPath))
-        return;
-
-    if (retrogemGetVcdGameID(vcdPath, discId, sizeof(discId)) && discId[0] != '\0') {
-        vcdIdMemoAdd(baseName, discId);
-        snprintf(idOut, idSize, "%s", discId);
+        if (memo[0] != '\0') {
+            snprintf(idOut, idSize, "%s", memo);
+            return;
+        }
+        vcdExtractGameId(baseName, idOut, idSize); // known to have none: fall back to the name
         return;
     }
-    vcdIdMemoAdd(baseName, ""); // genuinely has none
+
+    // 2. ASK THE DISC FIRST. The image is ground truth; a filename is a label somebody typed, and the
+    //    two can disagree -- a file named "SLUS_123.45.Whatever" holding a different game is a
+    //    rename, not a fact about the disc. It is also the SAME resolver the RetroGEM barcode uses at
+    //    launch, so trusting the name here while the barcode reads the image would let the two
+    //    disagree about one game -- which is exactly the property this change exists to guarantee.
+    //    Correctness ahead of speed: the cost is bounded below, a wrong id is not.
+    if (budget != NULL && *budget > 0) {
+        char vcdPath[256];
+        char discId[RETROGEM_GAMEID_MAX];
+        size_t dl = strlen(dirPath);
+        const char *sep = (dl > 0 && dirPath[dl - 1] == '/') ? "" : "/";
+
+        if (snprintf(vcdPath, sizeof(vcdPath), "%s%s%s", dirPath, sep, fileName) < (int)sizeof(vcdPath)) {
+            (*budget)--;
+            if (retrogemGetVcdGameID(vcdPath, discId, sizeof(discId)) && discId[0] != '\0') {
+                vcdIdMemoAdd(baseName, discId);
+                snprintf(idOut, idSize, "%s", discId);
+                return;
+            }
+            vcdIdMemoAdd(baseName, ""); // the disc genuinely carries none -- stop asking it
+        }
+    }
+
+    // 3. FALL BACK TO THE NAME: for a disc with no id of its own, and for the ones this scan ran out
+    //    of budget for. The budget case is PROVISIONAL and deliberately NOT memoized -- those discs
+    //    are asked on a later scan and the answer upgrades from the name to the real id.
+    vcdExtractGameId(baseName, idOut, idSize);
 }
 
 static int vcdScanOpenDir(const char *dirPath, vcd_entry_t **outList)
