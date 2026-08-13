@@ -362,3 +362,71 @@ Vass327 to retest **naming the flavour**.
 the exit hang, and a key-length fix aimed at a limit that was never exceeded). Both times the answer
 came from a counter or a HUD field, not from reading code. Bound the wait *and* add a counter that
 says whether the bound was ever hit.
+
+
+---
+
+## 11. ⛔ REGRESSION IN rebuild-163 — START HERE
+
+**Nathan, testing 163 (PS2DEVLATESTSDK), booted from UDPFS:** set everything up, activated the USB
+page, did scroll testing, then **on exit it froze with horizontal flickering bars on screen. Unable
+to exit.**
+
+**Treat rebuild-163 as bad. The known-good build is rebuild-162** (`rebuild/step-162-latch-all-contenders`,
+run 31692159834). 162 has every art fix plus the full worst-open latch and does NOT have the
+teardown reorder.
+
+### What 163 changed, and why it is the suspect
+
+163 moved `bgmStop()` to the **top of `deinit`/`deinitEx`**, before `ioBlockOpsTimed` and before
+`deinitAllSupport`, so the music would stop before the device it streams from is destroyed
+(issue #382). It is the only thing in 163. The freeze is on the exit path. That is close to
+conclusive, but it has NOT been proven — do not assume the mechanism, find it.
+
+### Specific things to check first
+
+1. **`bgmStop()` waits by `SetAlarm(...)` + `SleepThread()`.** That is fine on the thread it was
+   written for. Confirm `deinit` runs on that same thread in the **exit** case — exit and launch may
+   not reach `deinit` the same way. A `SleepThread()` that nothing wakes is a hang with the screen
+   left exactly as it was, and **horizontal flickering bars are a GS/video-state symptom**, i.e. the
+   EE stopped somewhere with the display half-configured — consistent with blocking *earlier* in
+   teardown than before.
+2. **rebuild-154 gave `bgmStop()` an abandon path** that returns WITHOUT calling `bgmDeinit()` when
+   the threads do not stop in ~3 s each. `audioEnd()` later re-checks `bgmIoThreadRunning` and calls
+   `bgmStop()` **again** — a second ~6 s of waiting, and on the second pass the semaphores may be in
+   a different state. Trace both calls in sequence.
+3. **BGM streaming from the boot device.** Nathan booted from **UDPFS** (network). If `bgm.ogg` was
+   on that share, stopping the decoder early means waiting on a network read while the network is
+   still up — a different wait from the ATA case this was modelled on.
+4. `bgmStop()` is now called unconditionally, including when audio exists but BGM was never started.
+   Verify the early-return guards actually cover that on **every** path.
+
+**The cheap safe fix if you cannot find it quickly:** revert 163's two `bgmStop()` calls and instead
+solve #382 the narrow way — an `ethCleanUp`/`ethDeinitModules` guard mirroring rebuild-154's
+`gArtAbandoned` skip in `hddCleanUp`. Ordering was the more general fix, which is why I tried it,
+but "general" is not worth a hang on exit.
+
+---
+
+## 12. Art still arrives in BATCHES, one step behind
+
+Same 163 test, VCD page: *"speed did improve, but it would only pop in the art after the next art
+loaded. Art drops in batches rather than rolling."* Navigation is solid.
+
+This is a **different symptom from slowness** and it is diagnostic. A cover that appears only once
+the *next* cover has loaded means the texture is published but the row that wanted it does not
+redraw until something else forces a re-evaluation. Suspect the publish/observe seam rather than the
+device:
+
+- `cacheLoadImage` publishes with `entry->qr = NULL` **last** (deliberate, it is the handoff signal).
+  Confirm the drawing path re-reads the entry every frame rather than caching the returned pointer.
+- Rows that are drawn but not requesting use `cacheLookupTexture()` (lookup-only). It returns NULL
+  unless `*cacheId`/`*UID` already match. A row whose load just completed may therefore need a
+  `cacheGetTexture()` pass before it can see its own art — and that pass may only happen on the next
+  selection change. **That is the exact shape of "it appears when the next one loads."**
+- The reunion-by-value scan added in rebuild-153 updates `*cacheId`/`*UID` — check whether the
+  lookup-only path benefits from it or bypasses it.
+
+Worth one careful read of `cacheGetTexture` / `cacheLookupTexture` / `getGameImage` /
+`getGameImageCached` together, tracing one row from request to first frame drawn. No hardware needed
+to form the hypothesis; a HUD counter for "frames between publish and first draw" would confirm it.
