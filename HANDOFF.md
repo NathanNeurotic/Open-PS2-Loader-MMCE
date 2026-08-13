@@ -261,7 +261,7 @@ frames are extracted with ffmpeg and the line is read off them. Current format (
 `artdbg`):
 
 ```
-Q<n> A<n> D<n> X<n> <totalMs>ms(ok <okMs> <W>x<H>) O:<openMs>/<missOpenMs> OE<n> IX<dirs>/<absent>/<failed> KL<n>  F<frameMs>/<worstMs> OV<n>  NR<n> MT<n>  IO <pendSimple>/<pendMenu> T<totSimple>/<totMenu>
+Q<n> A<n> D<n> X<n> <totalMs>ms(ok <okMs> <W>x<H>) O:<openMs>/<missOpenMs> W<ms>@<simple>/<menu>/<bgm><h|m> OE<n> IX<dirs>/<absent>/<failed> KL<n> TF<n> SX<stale>/<full> SP<last>/<max>  F<frameMs>/<worstMs> OV<n>  NR<n> MT<n>  IO <pendSimple>/<pendMenu> T<totSimple>/<totMenu>
 ```
 
 | field | meaning |
@@ -275,6 +275,10 @@ Q<n> A<n> D<n> X<n> <totalMs>ms(ok <okMs> <W>x<H>) O:<openMs>/<missOpenMs> OE<n>
 | `F`/`OV` | last & worst frame ms, frames over ~1.5 vsyncs. |
 | `NR`/`MT` | pad fault counters: longest run of unreadable polls / longest run of empty ones. |
 | `IO a/b T c/d` | the shared ioman queue: pending SIMPLEACTION / pending MENU_UPDATE, then lifetime totals. |
+| `W<ms>@<s>/<m>/<bgm><h\|m>` | worst `open()` of the session, with the ioman queue depths captured AT that open, whether the BGM decoder was mid-read, and hit/miss. THE open-spike instrument (§14). |
+| `TF` | transient-failure art retries (167). ~0 on a healthy device; climbing = a flaky share being retried instead of branded absent. |
+| `SX<stale>/<full>` | SFX silently discarded (169): cursor ticks aged out (harmless) / ANY sound killed by a saturated ring (the press-eater, #364). |
+| `SP<last>/<max>` | per-press audsrv RPC wall ms on the dispatch thread — the since-#340 diag nothing read until 169. SP huge + SX flat = slow IOP; SP small + SX/full climbing = starved dispatcher. |
 
 **Extracting a HUD line from one of Nathan's videos:**
 
@@ -785,3 +789,35 @@ counter for "padActSet returned early because actuators == 0", settles it in one
 survive a real disconnect. Preserve the last known-good count across an interrupted init and only
 zero it when the pad is genuinely gone, or re-run `padInfoAct` when a bounded init bailed early.
 Whichever way, keep the bounded waits: they fix a freeze, and that is not worth trading for haptics.
+
+---
+
+# 16. Since §14/§15 were written (KIMI, same day): steps 169–170
+
+**169 — #364, shipped green** (run 31721698642, branch `rebuild/step-169-sfx-presses-not-stale`).
+zackcage6 confirmed on 31710438197: menu SFX (open/close, confirm/deny) cut unless each action has
+a ~5 s gap. Cause: the SFX dispatch ring's stale test aged out CONFIRM/CANCEL at >500 ms, and the
+full ring dropped any id, whenever the dispatcher fell behind under load — deliberate presses
+silently discarded. The fork has no queue at all (plays synchronously; the menu pays the 352 ms
+#340 stall), so reverting to it would have been wrong. Fix: queue kept, stale test now covers
+CURSOR only; deliberate presses always play, even late. New HUD fields `SX<stale>/<full>` (silent
+drops) and `SP<last>/<max>` (per-press audsrv RPC wall ms — the #340-era diag NOTHING read until
+now; sixth instance of the write-only defect shape). If SP shows the RPC itself wedging for
+seconds under BGM, the cause is IOP/SIF-side and 169 only makes it visible — said so in the commit.
+
+**170 — #380: the THIRD inert-fix verdict, then the real fix.** 165/166/167 all resolved the PS1
+disc id without the value reaching the screen: 167 wrote it to `#Startup` in sbPopulateConfig,
+consumed only by `AttributeText attribute=#Startup` — bound by NO shipped theme
+(misc/theme_coverflow.cfg, misc/conf_theme_OPL.cfg) and by neither of miladera's attachments
+(their only GameID element is on the apps page). The caption is `drawItemText` (themes.c), which
+reads `itemGetStartup` → for a VCD view the FILENAME (bdmGetGameStartup). Fix: the VCD arm of
+drawItemText shows the resolved id (memo → filename parse → title fallback), resolved OFF the
+render thread by a new one-slot request on the ioman worker (`vcdRequestDisplayId` /
+`vcdDisplayIdCached`, vcdsupport.c; hooked in menuRenderElements). Nathan's two conditions
+honoured: the menusys needsItemConfig gate is UNTOUCHED (own async request, id-only, memo-deduped
+per session), and the product call is stated in the commit: the caption shows the id
+unconditionally when resolvable, matching the PS2 page; the title stays in the row text.
+
+**Tester state:** #382 retest asked (Vass327, OFFICIALROLLING on 31710438197 — comment posted).
+The #380 ask was HELD until 170 existed (167 could not have worked); miladera gets one ask with a
+build that can actually work.
