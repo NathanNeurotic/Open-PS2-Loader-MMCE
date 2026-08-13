@@ -71,9 +71,16 @@ DECI2_DEBUG ?= 0
 TTY_APPROACH ?= UDP
 
 # ======== DO NOT MODIFY VALUES AFTER THIS POINT! UNLESS YOU KNOW WHAT YOU ARE DOING ========
-REVISION = $(shell expr $(shell git rev-list --count HEAD) + 2)
+# REVISION/GIT_HASH anchor to the last commit that touched anything the build can
+# consume -- NOT to HEAD. Pure bookkeeping commits (docs, CI, handoff/process files,
+# prebuilt drops) must not produce a "new" version of byte-identical code: the version
+# string is the reproducibility contract (a report names it, a build reproduces it), so
+# it may only move when the code does. The exclusion list errs toward caution -- anything
+# NOT named here still ticks the version, so a missed code path can never silently collide.
+CODE_ANCHOR = $(shell git log -1 --format=%H -- . ':(exclude).github' ':(exclude)HANDOFF.md' ':(exclude)agent-file-drop' ':(exclude)frame_builds' ':(exclude)notes' ':(exclude)obj' ':(exclude).claude' ':(exclude).agents' ':(exclude).codex' ':(exclude).codex-tmp-nhddl' ':(exclude).codex-tmp-wle-r3z' 2>/dev/null)
+REVISION = $(shell expr $(shell git rev-list --count $(if $(CODE_ANCHOR),$(CODE_ANCHOR),HEAD)) + 2)
 
-GIT_HASH = $(shell git rev-parse --short=7 HEAD 2>/dev/null)
+GIT_HASH = $(shell git rev-parse --short=7 $(if $(CODE_ANCHOR),$(CODE_ANCHOR),HEAD) 2>/dev/null)
 ifeq ($(shell git diff --quiet; echo $$?),1)
   DIRTY = -dirty
 endif
