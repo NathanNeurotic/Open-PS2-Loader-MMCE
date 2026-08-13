@@ -866,3 +866,22 @@ zip per run to /RiptOPL/Rolling/<ver>/run_<n>/, VARIANTS/DEBUG excluded, nothing
 overwritten on MEGA. Validation limit, stated plainly: the notes step is inside the gated
 publish job so it CANNOT be rehearsed from a branch — checked by YAML parse + local
 simulation of the exact printf/cat fragment only.
+
+**174 — rolling-release gate widened: rebuild/main is the publish knob** (branch
+`rebuild/step-174-rebuild-main-publishes`; workflow + notes block only, no PS2 code).
+Supersedes 173's gate description. Context: merging PR #463 to master FIRED
+rolling-release.yml and published an old-lineage build to the `rolling` tag (run
+31724547932) — Nathan deleted the release. Audit then found the tag itself had been stale
+since 2026-06-16 (`1ee48076`): every rolling release since June hung off it, so "source
+at this tag" never matched the assets (the assets were always built from the right
+commit). Stale tag DELETED with Nathan's go. He chose option (b): NO master cutover —
+instead `on: push: branches`, the publish-rolling `if:`, and BOTH MEGA steps now include
+`refs/heads/rebuild/main`; release TITLE is plain "Rolling"; notes header/footer
+de-mastered. rebuild/main (stale at the step-91 merge, verified ancestor of step-173, so
+it fast-forwards cleanly) is now the ONLY publish trigger: Nathan names the tip, it is
+fast-forwarded, the push fires the workflow. Notes block also gained: the "this build can
+be ahead of what has been hardware-verified" line (rolling-channel honesty while 164+
+await hardware; Nathan can veto) and a ONE-TIME stale-tag paragraph marked for removal
+after the first correct publish. **To publish:** ff rebuild/main to the named tip → push
+fires the workflow → ONE inspection cycle (tag target, rendered notes, four flavours,
+version string) BEFORE any tester gets the link. Nothing has published; master untouched.
