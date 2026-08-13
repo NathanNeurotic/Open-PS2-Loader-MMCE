@@ -740,3 +740,48 @@ that field after a VCD-page scroll is worth more than another investigation.
   predicate to include MX4SIO is the small, correct version of that port if it is ever wanted.
 - **Every counter must distinguish "not used" from "broken".** `IX0/0` cost two builds; `OE` could
   not see the SMB bug it was built for because it only incremented on an arm SMB never takes.
+
+---
+
+# 15. OPEN: rumble works on the fork, not the rebuild (reported 2026-08-13, UNFIXED)
+
+Nathan: "I don't think rumble is working... it does work on the fork though, just not our rebuild."
+`gEnableRumble` defaults to 0 in BOTH trees, so he had turned it on.
+
+**Everything downstream is intact and was checked:** `sfxPlay()` calls `sfxRumble()` ABOVE all audio
+gates (src/sound.c:482), the tuned pulses are byte-for-byte the fork's (sound.c:453-476), the decay +
+per-frame re-send is present in the pad read loop (pad.c:657-666, and the re-send matters because
+freepad drops `padSetActDirect` outside TASK_UPDATE_PAD while still reporting success), realignment
+is handled (`padRumbleRealign`, pad.c:488), and the four `padRumbleFlush()` sites match the fork
+4-for-4. None of that is the bug.
+
+**LEADING HYPOTHESIS -- not yet proven, do not ship it blind:**
+
+`padActSet` (pad.c) opens with:
+
+    if (pad->actuators == 0)
+        return;
+
+and `initializePad` CLEARS that count up front, pad.c:165-170:
+
+    // Cleared up front because every path below can return before padInfoAct() is reached.
+    pad->actuators = 0;
+
+`padInfoAct()` is only reached later, at pad.c:240. **The fork never pre-clears** -- `git show
+origin/master:src/pad.c` line 343 assigns `padInfoAct()` straight into the field and nothing zeroes
+it beforehand.
+
+Our #340 work BOUNDED the pad-init waits (that was the fix for the device-enable freeze -- an
+unbounded `waitPadReady` spinning the GUI thread). So if `initializePad` now returns early on a slow
+or contended pad, it never reaches line 240, `actuators` stays 0, and **every rumble call silently
+no-ops**. The fork survives the same interruption because a previously-detected count is never
+destroyed, and its unbounded waits reach the detection anyway.
+
+**How to confirm before fixing:** the LOG at pad.c:241 prints the count (`PAD # of actuators: %d`),
+and pad.c:256 logs `PAD Did not find any actuators.` A debug build that shows 0 there, or a HUD
+counter for "padActSet returned early because actuators == 0", settles it in one boot.
+
+**If confirmed, the fix is NOT to delete the pre-clear** -- it exists so a stale count does not
+survive a real disconnect. Preserve the last known-good count across an interrupted init and only
+zero it when the pad is genuinely gone, or re-run `padInfoAct` when a bounded init bailed early.
+Whichever way, keep the bounded waits: they fix a freeze, and that is not worth trading for haptics.
