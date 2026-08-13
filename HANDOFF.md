@@ -946,3 +946,17 @@ ran"). Exclusion list unchanged. No user-visible scheme change, so NO notes disc
 needed: 2543 → ~2547 on the next publish. **Lesson logged:** a version ordinal must
 never be derived from anything that can move backwards; identity lives in the hash,
 ordinality lives in the count.
+
+**180 — the rolling tag now FOLLOWS the publish.** The 2026-08-13 republish exposed it:
+`gh release edit/upload` never re-targets the tag, so the tag stayed on the first
+publish's commit while assets moved on — the June stale-tag disease recreated by the
+pipeline itself. Live tag moved by hand (→ 0127499b); workflow fixed so BOTH publish
+paths force-move the tag to GITHUB_SHA (rolling only; v* tags never move). Sits on
+`rebuild/step-180-tag-follows-publish` awaiting Nathan's next named tip — the live
+release is already correct, so no republish was needed for it. **Current live state:**
+rolling = v1.2.0-Beta-2553-95a138c (run 31745407636): REVISION HEAD-based and monotonic
+(2543 → 2553), GIT_HASH = code anchor (95a138c = step-179's Makefile commit — Makefile
+IS a build input, correctly not excluded), all four ds5 ELFs present and listed,
+four-flavour Get started, stale-tag paragraph gone (removed in 175 as designed), tag =
+0127499b, MEGA run_463. Claude's review loop caught 178 pre-publish; log it as the model
+for anything user-visible that can move backwards.
