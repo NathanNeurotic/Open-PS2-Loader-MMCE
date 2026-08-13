@@ -885,3 +885,18 @@ await hardware; Nathan can veto) and a ONE-TIME stale-tag paragraph marked for r
 after the first correct publish. **To publish:** ff rebuild/main to the named tip → push
 fires the workflow → ONE inspection cycle (tag target, rendered notes, four flavours,
 version string) BEFORE any tester gets the link. Nothing has published; master untouched.
+
+**THE ROLLING CHANNEL IS LIVE (2026-08-13, run 31740369719).** rebuild/main was
+fast-forwarded to the step-174 tip (`64f40204`) and published
+`v1.2.0-Beta-2543-64f4020` to tag `rolling` — prerelease (NOT Latest; pops-bundle keeps
+that badge), tag pointing at the pushed SHA (first correct target since June), all four
+APP_RIPTOPL-* folders + bare ELFs + DS5 loaders + VARIANTS/DEBUG/LANGS + src.zip,
+MEGA archive at /RiptOPL/Rolling/v1.2.0-Beta-2543-64f4020/run_460/. The release body
+carries the full new-lineage block. One blemish found in inspection and fixed in
+**175** (`rebuild/step-175-notes-cleanup`): an "Other downloads" line still called
+PS2DEVROLLING "RECOMMENDED" — patched in the live body (one line, rest byte-preserved)
+and in the workflow; the one-time stale-tag paragraph was removed from the block (its
+publish has gone out). **Publish procedure from here:** Nathan names a tip → ff
+rebuild/main → push fires the workflow → inspect (prerelease flag, tag SHA, notes, four
+flavours, version, MEGA) BEFORE any tester gets the URL. Master remains on the OLD
+lineage by design; do not push to it.
