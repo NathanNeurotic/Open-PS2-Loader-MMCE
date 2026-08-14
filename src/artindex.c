@@ -253,6 +253,11 @@ int artIndexMayExist(const char *fullPath)
     if (fullPath == NULL || fullPath[0] == '\0')
         return 1;
 
+    // Reject SMB / backslash paths: artIndexSplit expects '/' directory separators.
+    // Returning 1 ("uncertain; perform real open") guarantees SMB art is never falsely declared absent.
+    if (strchr(fullPath, '\\') != NULL || !strncmp(fullPath, "smb", 3))
+        return 1;
+
     // Not the owner thread: never touch the slots at all. See gArtIndexOwnerThread.
     if (gArtIndexOwnerThread < 0 || GetThreadId() != gArtIndexOwnerThread) {
         gArtIndexWrongThread++; // HUD: if this climbs, confinement is rejecting the art worker itself

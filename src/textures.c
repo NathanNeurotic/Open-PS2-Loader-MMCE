@@ -520,26 +520,24 @@ static int texStagedOpenIsAbsence(const char *filePath, int err)
 
     // ONLY A REAL "no such file" MEANS ABSENT. Anything else is transient and must be retried.
     //
-    // This used to return 1 unconditionally for every non-MMCE device, so ANY open failure --
-    // a contended bus, a network blip, an SMB share mid-reconnect -- branded that cover permanently
-    // missing. It was survivable while the memo was thrown away on the next list rebuild. rebuild-155
-    // made the memo persist until a device generation bump, and that turned a momentary failure into
-    // a cover that never comes back.
+    // On BDM/USB ("mass*"), ps2sdk's bdmfs_fatfs returns the negated FatFs result (fs_driver.c: `ret = -ret;`),
+    // which libcglue converts to open() == -1 with errno == +result. For missing files, FatFs returns
+    // FR_NO_FILE (4) or FR_NO_PATH (5) (ff.h). Checking ONLY ENOENT (2) caused every genuine USB miss to be
+    // branded a transient failure (OE/TF lockstep), skipping the VCD POPS fallback in bdmsupport.c and
+    // continuously re-probing the 4.3 s USB directory walk on every scroll.
     //
-    // Reported by L10N37 on issue #388, over SMB, and his description is exactly this: art worked
-    // when he first connected, then "it dropping artwork altogether for a bunch of games",
-    // reconnecting did not fix it, and two reboots ended with no artwork at all. He also notes it is
-    // absent from the older builds -- correct, because the memo did not survive a rebuild there.
-    // My regression, and the counter I added to catch it could not see it: OE only ever incremented
-    // on the staged arm (mmce/mass), and SMB does not take that arm.
-    //
-    // The trade I was worried about when I left this alone -- if errno is not faithful, a genuine
-    // miss retries forever and browsing gets slow -- is the RIGHT way round to be wrong. Slow art is
-    // a complaint; art that silently never returns is a broken loader.
-    if (err != ENOENT)
+    // On MMCE ("mmce*"), mmceman returns -ENOENT specifically for card not-found, so err == ENOENT applies.
+    int isAbsence = (err == ENOENT);
+    if (filePath != NULL && !strncmp(filePath, "mass", 4)) {
+        // FatFs codes: FR_NO_FILE (4), FR_NO_PATH (5), FR_INVALID_NAME (6)
+        if (err == 4 || err == 5 || err == 6)
+            isAbsence = 1;
+    }
+
+    if (!isAbsence)
         gTexStagedOpenNonEnoent++;
 
-    return err == ENOENT;
+    return isAbsence;
 }
 
 static int texShouldUseMemoryReader(const char *filePath)
