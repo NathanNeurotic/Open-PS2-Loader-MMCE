@@ -26,7 +26,7 @@ Nathan's side and his testers' side must look identical across a handover. These
 
 **BRANCHES.** Never commit to `master`, `rebuild/main`, or any existing `rebuild/step-*` branch.
 Every change goes on a NEW branch you create, `rebuild/step-NNN-<slug>`, branched from the current
-tip. **Next number: 184. Current tip: `rebuild/step-183-art-absence-fatfs-mapping`.** One focused change
+tip. **Next number: 185. Current tip: `rebuild/step-184-bgm-theme-fallback-restore`.** One focused change
 per step, with a long explanatory commit message -- what changed, why, what evidence drove it, and
 what it does NOT fix. Those messages are this project's real documentation. Never force-push, never
 rewrite history, never merge to `master` without asking. (`rebuild/main` moves only as the
@@ -996,6 +996,13 @@ clearing the cache slot instead of parking it, retrying the 4.3s USB directory w
 every scroll, and breaking the `if (r == ERR_BAD_FILE)` condition in `bdmsupport.c` so the VCD POPS
 cover fallback was completely bypassed. Step 183 maps errno 4/5/6 on `mass*` to genuine absence, guards
 `artindex` against backslash SMB paths, and streamlines the HUD formatting.
+
+**184 — BGM theme-to-default fallback restore & vorbis clean-up.**
+In `sound.c:bgmLoad()`, custom themes without bundled `sound/bgm.ogg` were trapping `gDefaultBGMPath`
+in an `else` branch of `if (themeID != 0)`, preventing user-configured BGM from ever playing on custom
+themes (miladera22-sketch #380 symptom 4). Restored master's clean fallback chain (theme BGM first,
+then `gDefaultBGMPath`), properly freeing `vorbisFile` on misses to prevent uninitialized memory access
+in `bgmDeinit()`.
 
 # 17. CURRENT STATE, 2026-08-13 (late) — SUPERSEDES §14
 

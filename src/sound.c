@@ -681,31 +681,57 @@ static void bgmIoThread(void *arg)
 
 static int bgmLoad(void)
 {
-    FILE *bgmFile;
     char bgmPath[256];
+    int themeID;
 
     vorbisFile = malloc(sizeof(OggVorbis_File));
+    if (vorbisFile == NULL)
+        return -ENOMEM;
+
     memset(vorbisFile, 0, sizeof(OggVorbis_File));
 
-    int themeID = thmGetGuiValue();
-    if (themeID != 0) {
-        char *thmPath = thmGetFilePath(themeID);
+    themeID = thmGetGuiValue();
+    char *thmPath = thmGetFilePath(themeID);
+    if (thmPath != NULL) {
         snprintf(bgmPath, sizeof(bgmPath), "%ssound/bgm.ogg", thmPath);
-    } else
-        snprintf(bgmPath, sizeof(bgmPath), gDefaultBGMPath);
+        FILE *bgmFile = fopen(bgmPath, "rb");
+        if (bgmFile != NULL) {
+            if (ov_open_callbacks(bgmFile, vorbisFile, NULL, 0, OV_CALLBACKS_DEFAULT) == 0) {
+                LOG("BGM: Loaded theme BGM %s\n", bgmPath);
+                return 0;
+            }
 
-    bgmFile = fopen(bgmPath, "rb");
-    if (bgmFile == NULL) {
-        LOG("BGM: Failed to open Ogg file %s\n", bgmPath);
-        return -ENOENT;
+            LOG("BGM: Theme BGM is not a valid Ogg bitstream: %s\n", bgmPath);
+            fclose(bgmFile);
+            memset(vorbisFile, 0, sizeof(OggVorbis_File));
+        } else {
+            LOG("BGM: Theme BGM not found: %s\n", bgmPath);
+        }
     }
 
-    if (ov_open_callbacks(bgmFile, vorbisFile, NULL, 0, OV_CALLBACKS_DEFAULT) < 0) {
-        LOG("BGM: Input does not appear to be an Ogg bitstream.\n");
-        return -ENOENT;
+    if (gDefaultBGMPath[0] != '\0') {
+        FILE *bgmFile;
+
+        snprintf(bgmPath, sizeof(bgmPath), "%s", gDefaultBGMPath);
+        bgmFile = fopen(bgmPath, "rb");
+        if (bgmFile != NULL) {
+            if (ov_open_callbacks(bgmFile, vorbisFile, NULL, 0, OV_CALLBACKS_DEFAULT) == 0) {
+                LOG("BGM: Loaded configured BGM %s\n", bgmPath);
+                return 0;
+            }
+
+            LOG("BGM: Configured BGM is not a valid Ogg bitstream: %s\n", bgmPath);
+            fclose(bgmFile);
+            memset(vorbisFile, 0, sizeof(OggVorbis_File));
+        } else {
+            LOG("BGM: Configured BGM not found: %s\n", bgmPath);
+        }
     }
 
-    return 0;
+    LOG("BGM: No theme or configured BGM available.\n");
+    free(vorbisFile);
+    vorbisFile = NULL;
+    return -ENOENT;
 }
 
 static int bgmInit(void)
