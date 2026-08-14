@@ -26,7 +26,7 @@ Nathan's side and his testers' side must look identical across a handover. These
 
 **BRANCHES.** Never commit to `master`, `rebuild/main`, or any existing `rebuild/step-*` branch.
 Every change goes on a NEW branch you create, `rebuild/step-NNN-<slug>`, branched from the current
-tip. **Next number: 186. Current tip: `rebuild/step-185-art-queue-batching-and-warming-tame`.** One focused change
+tip. **Next number: 187. Current tip: `rebuild/step-186-bring-master-docs-and-readme`.** One focused change
 per step, with a long explanatory commit message -- what changed, why, what evidence drove it, and
 what it does NOT fix. Those messages are this project's real documentation. Never force-push, never
 rewrite history, never merge to `master` without asking. (`rebuild/main` moves only as the
@@ -1014,6 +1014,18 @@ Fixed the post-scroll queue surge and batch pop-in effect:
    and caused BGM stutter.
 3. Added `RotateThreadReadyQueue(ART_THREAD_PRIORITY)` in `cacheArtWorkerThread` between consecutive
    loads to allow BGM audio I/O to be scheduled cleanly.
+
+**186 — Restored master documentation suite, user guides, and reference assets.**
+Ported the entire documentation ecosystem from origin/master to achieve complete documentation parity:
+1. `README.md` (full RiptOPL README with discoverability, quick start, feature overview, and troubleshooting).
+2. `CREDITS` (restored community, tester, contributor, and foundation acknowledgments).
+3. `ROLLING_RELEASE.md` (updated for 4-flavour release matrix and rebuild/main publish knob).
+4. `docs/` (8 complete documents: `LANGUAGES.md`, `MX4SIO.md`, `NEUTRINO.md`, `NEUTRINO-PARITY-2026-07-05.md`,
+   `PARITY-AUDIT-2026-07-06.md`, `RECOVERY-2026-07-03.md`, `THEME_ENGINE.md`, `VCD.md`).
+5. `lng/README.md` (`lng_fork/` translation overlay system).
+6. `modules/freepad/PROVENANCE.md` (freepad driver provenance).
+7. `pc/smbserver/` (standalone SMBv1 server reference and selftest scripts).
+8. `reference/wopl-coverflow/` (reference assets and theme configuration).
 
 # 17. CURRENT STATE, 2026-08-13 (late) — SUPERSEDES §14
 
