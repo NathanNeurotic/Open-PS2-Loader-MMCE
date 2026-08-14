@@ -3059,6 +3059,8 @@ void deinitEx(int exception, int modeSelected, int modeSelected2)
 #endif
     unloadPads();
 
+    audioEnd();
+
     for (int i = 0; i < MODE_COUNT; i++) {
         if (list_support[i].support != NULL) {
             int spared = (modeSelected2 >= 0 && list_support[i].support->mode == modeSelected2);
@@ -3066,7 +3068,6 @@ void deinitEx(int exception, int modeSelected, int modeSelected2)
         }
     }
 
-    audioEnd();
     ioEnd();
     guiEnd();
     menuEnd();
@@ -3117,9 +3118,10 @@ void deinit(int exception, int modeSelected)
 #endif
     unloadPads();
 
+    audioEnd();
+
     deinitAllSupport(exception, modeSelected);
 
-    audioEnd();
     ioEnd();
     guiEnd();
     menuEnd();

@@ -17,10 +17,8 @@
 // See artindex.h for why this exists. Everything below is in service of one rule: an uncertain answer
 // is always "go and look".
 
-// Directories held at once. Three covers the realistic worst case in one view -- a device's ART/
-// folder, a second device's, and the POPS folder the VCD fallback probes -- without turning this into
-// a cache that needs an eviction policy of its own.
-#define ART_INDEX_SLOTS 3
+// Directories held at once. Twelve covers simultaneous ART/, POPS/, and theme folders across multiple devices.
+#define ART_INDEX_SLOTS 12
 
 // Refuse to hold a directory larger than this. Not a memory limit so much as a sanity limit: a sweep
 // that big is itself slow enough to be the wrong trade, and a caller is better served by the ordinary
@@ -126,8 +124,21 @@ static int artIndexSplit(const char *fullPath, char *dirOut, int dirMax, const c
     if (dirLen <= 0 || dirLen >= dirMax)
         return 0;
 
-    memcpy(dirOut, fullPath, dirLen);
-    dirOut[dirLen] = '\0';
+    // Canonicalize "mass0:/ART" -> "mass0:ART" so both forms match the same slot
+    const char *colon = strchr(fullPath, ':');
+    if (colon != NULL && colon < cut && colon[1] == '/') {
+        int headLen = (int)(colon - fullPath) + 1;
+        int tailLen = (int)(cut - (colon + 2));
+        if (headLen + tailLen >= dirMax)
+            return 0;
+        memcpy(dirOut, fullPath, headLen);
+        if (tailLen > 0)
+            memcpy(dirOut + headLen, colon + 2, tailLen);
+        dirOut[headLen + tailLen] = '\0';
+    } else {
+        memcpy(dirOut, fullPath, dirLen);
+        dirOut[dirLen] = '\0';
+    }
 
     *baseOut = (slash != NULL) ? slash + 1 : cut;
     if ((*baseOut)[0] == '\0')

@@ -353,15 +353,27 @@ static int udpfsGetImage(item_list_t *itemList, char *folder, int isRelative, ch
 {
     char path[256];
 
-    // OPL's own ART/<name>_COV.png is the PRIMARY lookup (same path PS2 uses; the cache also retries once
-    // with a strict PS1 ID).
+    // 1. Primary lookup: ART/<value>_<suffix>.png
     if (isRelative)
         snprintf(path, sizeof(path), "%s%s/%s_%s", udpfsPrefix, folder, value, suffix);
     else
         snprintf(path, sizeof(path), "%s%s_%s", folder, value, suffix);
     int r = texDiscoverLoad(resultTex, path, -1);
-    // On a VCD (PS1) genuine miss, fall back to the POPSLoader-style suffixless cover next to the .VCD.
-    // Cover/icon only, VCD view only.
+
+    // 2. VCD GameID lookup in ART/: e.g. ART/<GAME_ID>_<suffix>.png (SLUS_005.51_COV.png)
+    if (r == ERR_BAD_FILE && vcdViewActive(itemList->mode)) {
+        char gameId[VCD_ID_MAX];
+        gameId[0] = '\0';
+        if (vcdExtractGameId(value, gameId, sizeof(gameId)) || vcdDisplayIdCached(value, gameId, sizeof(gameId))) {
+            if (isRelative)
+                snprintf(path, sizeof(path), "%s%s/%s_%s", udpfsPrefix, folder, gameId, suffix);
+            else
+                snprintf(path, sizeof(path), "%s%s_%s", folder, gameId, suffix);
+            r = texDiscoverLoad(resultTex, path, -1);
+        }
+    }
+
+    // 3. POPSLoader-style suffixless cover: POPS/<value>.png or POPS/<gameId>.png
     if (r == ERR_BAD_FILE && isRelative && vcdViewActive(itemList->mode))
         r = vcdLoadPopsCover(udpfsPrefix, value, suffix, resultTex);
     return r;

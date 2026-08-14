@@ -529,6 +529,7 @@ static int bgmInit(void)
 
         if (outSema < 0) {
             DeleteSema(inSema);
+            inSema = -1;
             return outSema;
         }
     } else
@@ -561,13 +562,18 @@ static int bgmInit(void)
         } else {
             DeleteSema(inSema);
             DeleteSema(outSema);
+            inSema = -1;
+            outSema = -1;
             DeleteThread(bgmThreadID);
+            bgmThreadID = -1;
             result = bgmIoThreadID;
         }
     } else {
         result = bgmThreadID;
         DeleteSema(inSema);
         DeleteSema(outSema);
+        inSema = -1;
+        outSema = -1;
     }
 
     return result;
@@ -575,10 +581,22 @@ static int bgmInit(void)
 
 static void bgmDeinit(void)
 {
-    DeleteSema(inSema);
-    DeleteSema(outSema);
-    DeleteThread(bgmThreadID);
-    DeleteThread(bgmIoThreadID);
+    if (inSema >= 0) {
+        DeleteSema(inSema);
+        inSema = -1;
+    }
+    if (outSema >= 0) {
+        DeleteSema(outSema);
+        outSema = -1;
+    }
+    if (bgmThreadID >= 0) {
+        DeleteThread(bgmThreadID);
+        bgmThreadID = -1;
+    }
+    if (bgmIoThreadID >= 0) {
+        DeleteThread(bgmIoThreadID);
+        bgmIoThreadID = -1;
+    }
 
     if (vorbisFile != NULL) {
         // Vorbisfile takes care of fclose for file-backed sources.
@@ -586,6 +604,7 @@ static void bgmDeinit(void)
         free(vorbisFile);
         vorbisFile = NULL;
     }
+    bgmIsPlaying = 0;
 }
 
 static void bgmShutdownDelayCallback(s32 alarm_id, u16 time, void *common)
@@ -601,6 +620,11 @@ void bgmStart(void)
         LOG("BGM: %s: ERROR: not initialized!\n", __FUNCTION__);
         return;
     }
+
+    if (bgmIsPlaying || bgmThreadRunning || bgmIoThreadRunning)
+        bgmStop();
+    else if (inSema >= 0 || outSema >= 0 || bgmThreadID >= 0 || bgmIoThreadID >= 0 || vorbisFile != NULL)
+        bgmDeinit();
 
     int ret = bgmInit();
     if (ret >= 0) {
@@ -632,8 +656,10 @@ void bgmQuiesce(void)
         return;
 
     terminateFlag = 1;
-    SignalSema(inSema);
-    SignalSema(outSema);
+    if (inSema >= 0)
+        SignalSema(inSema);
+    if (outSema >= 0)
+        SignalSema(outSema);
 }
 
 void bgmStop(void)
@@ -648,25 +674,19 @@ void bgmStop(void)
     LOG("BGM: terminating threads...\n");
 
     terminateFlag = 1;
-    SignalSema(inSema);
-    SignalSema(outSema);
+    if (inSema >= 0)
+        SignalSema(inSema);
+    if (outSema >= 0)
+        SignalSema(outSema);
 
     threadId = GetThreadId();
-    int waits = BGM_STOP_WAIT_SLICES;
-    while (bgmIoThreadRunning && waits-- > 0) {
+    while (bgmIoThreadRunning) {
         SetAlarm(200 * 16, &bgmShutdownDelayCallback, (void *)threadId);
         SleepThread();
     }
-    waits = BGM_STOP_WAIT_SLICES;
-    while (bgmThreadRunning && waits-- > 0) {
+    while (bgmThreadRunning) {
         SetAlarm(200 * 16, &bgmShutdownDelayCallback, (void *)threadId);
         SleepThread();
-    }
-
-    if (bgmIoThreadRunning || bgmThreadRunning) {
-        LOG("BGM: threads did not stop (io=%d play=%d) -- abandoning\n",
-            (int)bgmIoThreadRunning, (int)bgmThreadRunning);
-        return;
     }
 
     bgmDeinit();

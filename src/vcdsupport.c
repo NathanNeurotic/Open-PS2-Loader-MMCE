@@ -554,7 +554,18 @@ int vcdLoadPopsCover(const char *scanPrefix, const char *value, const char *suff
 
     // Same directory the scan reads: "<scanPrefix>POPS<sep><value>"; texDiscoverLoad appends the extension.
     snprintf(path, sizeof(path), "%s%s%c%s", scanPrefix, POPS_FOLDER, vcdSep(scanPrefix), value);
-    return texDiscoverLoad(resultTex, path, -1);
+    int r = texDiscoverLoad(resultTex, path, -1);
+    if (r >= 0)
+        return r;
+
+    // Also try POPS/<gameId> suffixless cover
+    char gameId[VCD_ID_MAX];
+    gameId[0] = '\0';
+    if (vcdExtractGameId(value, gameId, sizeof(gameId)) || vcdDisplayIdCached(value, gameId, sizeof(gameId))) {
+        snprintf(path, sizeof(path), "%s%s%c%s", scanPrefix, POPS_FOLDER, vcdSep(scanPrefix), gameId);
+        r = texDiscoverLoad(resultTex, path, -1);
+    }
+    return r;
 }
 
 // Probe POPS/POPSTARTER.ELF on a device root given WITHOUT a trailing separator ("mass0", "mc0", "pfs0").
