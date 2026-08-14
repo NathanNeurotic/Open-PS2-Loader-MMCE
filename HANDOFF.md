@@ -26,7 +26,7 @@ Nathan's side and his testers' side must look identical across a handover. These
 
 **BRANCHES.** Never commit to `master`, `rebuild/main`, or any existing `rebuild/step-*` branch.
 Every change goes on a NEW branch you create, `rebuild/step-NNN-<slug>`, branched from the current
-tip. **Next number: 195. Current tip: `rebuild/step-194-revert-to-known-good-2566`.** One focused change
+tip. **Next number: 196. Current tip: `rebuild/step-195-apa-pfs-common-partition-cwd`.** One focused change
 per step, with a long explanatory commit message -- what changed, why, what evidence drove it, and
 what it does NOT fix. Those messages are this project's real documentation. Never force-push, never
 rewrite history, never merge to `master` without asking. (`rebuild/main` moves only as the
@@ -1219,5 +1219,19 @@ it), not a re-derivation of (a).
    - Restored every source file, header, module, Makefile, script, and documentation asset across the entire repository to the exact bytecode state of commit `bb21e3432e20d00443946b0ec800a7d85bc96f9c`.
    - Confirmed via `git diff --stat bb21e343` that only `HANDOFF.md` differs (for history and pointer tracking).
    - This returns the repository to the exact build that was verified working on hardware.
+
+# 25. STEP-195: APA / PFS `__common` Partition Resolution & HDD CWD Support (2026-08-14)
+
+### What was implemented in Step 195:
+1. **HDD Boot CWD Prioritization in `tryAlternateDevice()` (`src/opl.c`)**:
+   - When booted from internal HDD/APA (`argv[0]` / `gBootDir` / `pwd` contains `hdd` or `pfs`), OPL directly probes the HDD first via `checkLoadConfigHDD()`, resolving the target partition via `hdd0:__common/OPL/conf_hdd.cfg` (or defaulting to `+OPL`) and mounting `pfs0:` without falling back to or touching a Memory Card.
+   - Preserves `gHDDPrefix` (`pfs0:` / `pfs0:OPL/`) as the active config home so memory-card-free users boot straight into their HDD settings.
+2. **HDD Save Mount Support in `trySaveConfigHDD()` (`src/opl.c`)**:
+   - In `trySaveConfigHDD()`, ensured `hddLoadSupportModules()` is called before `configSetMove(gHDDPrefix)` and `configWriteMulti()`, guaranteeing `pfs0:` is mounted before save writes to avoid Error 19 (`ENODEV`).
+3. **Partition Normalization for Custom Settings Path (`src/opl.c`)**:
+   - In `prepareCustomSettingsPath()`, automatically translates typed partition paths (`+OPL`, `hdd0:+OPL`, `__common`, `hdd0:__common`) to the mounted PFS filesystem path (`pfs0:` / `pfs0:OPL/`).
+4. **Colon-Slash Path Normalization (`src/config.c`)**:
+   - Implemented `configBuildPath` to properly handle trailing colons and slashes across prefixes (`pfs0:`, `pfs0:OPL/`, `mc0:OPL`), preventing malformed double slashes (`pfs0://conf_opl.cfg`).
+
 
 
