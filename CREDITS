@@ -41,6 +41,9 @@ by Marcus R. Brown
 USB, Network and PS2HDD modules
 by ps2dev's taken from PS2SDK
 
+MMCE (Memory Card Mass Storage protocol)
+by bbsan2k
+
 OPL-CL project/network update support
 by icyson55
 
@@ -49,3 +52,62 @@ by Eric Young (eay@mincom.oz.au)
 
 CI/CD Implementation using Dockers and GiHubActions
 by fjtrujy
+
+-----------------------------------------------------------------------------
+
+RiptOPL fork
+by NathanNeurotic (Ripto)
+
+RiptOPL stands entirely on the shoulders of the PS2 homebrew community. None of it
+would exist without the ps2homebrew team (https://github.com/ps2homebrew) and their
+many years of open-source work on Open PS2 Loader and the PS2SDK, kept free, open,
+and readable so that people like us can study it, learn from it, and build on it.
+Every feature in this fork began as their code and their ideas.
+
+RiptOPL is a direct agglomeration of the wider OPL family, bringing together
+features, code, and ideas from:
+
+  - rickgaiser's OPL                https://github.com/rickgaiser/Open-PS2-Loader
+  - neutrino                        https://github.com/rickgaiser/neutrino
+  - sOPL (mystyq)                   https://github.com/mystyq/Stable-Open-PS2-Loader
+  - uOPL (Wolf3s)                   https://github.com/Wolf3s/uOPL
+  - wOPL (KrahJohlito)              https://github.com/KrahJohlito/wOPL
+  - OPL DB (Jay-Jay-OPL)            https://github.com/Jay-Jay-OPL/OPL-Daily-Builds
+  - POPSLoader                      https://github.com/NathanNeurotic/POPSLoader
+  - OPL RetroGEM ID (CosmicScale)   https://github.com/CosmicScale/Open-PS2-Loader-Retro-GEM
+  - nhddl (pcm720)                  https://github.com/pcm720/nhddl
+  - Modulo-R1 (AdityaKumar7209)     https://github.com/AdityaKumar7209/Modulo-R1-Beta-Preview---PS2
+  - official OPL                    https://github.com/ps2homebrew/Open-PS2-Loader
+
+Special and sincere thanks to:
+
+  - Wolf3s and KrahJohlito - the driving force behind uOPL / wOPL, where much of
+    this fork's modern functionality originated. The Neutrino external-core loader
+    and the Coverflow and Favourites interfaces are all reimplementations of
+    features they designed and pioneered together. This fork is as much a tribute
+    to their work as anything else.
+  - bbsan2k - for the MMCE (Memory Card Mass Storage) protocol that makes SD-via-
+    memory-card loading through the PS2's memory-card slot possible.
+  - saildot4k - for BDMA-ATA (exFAT internal-HDD block-device support), and the
+    fixes, feedback, and oversight that shaped this fork's block-device work.
+  - Berion - for the artwork and theme design that has shaped how OPL looks.
+  - AdityaKumar7209 - whose Modulo-R1 project inspired this fork's folder
+    browsing in the game list. We didn't use their code; the idea of navigating
+    game subfolders came from seeing it there.
+  - Ifcaro and jimmikaelkael - the original Open PS2 Loader authors - and every
+    contributor across OPL's long history, all named above in this file.
+
+BDMA-ATA (exFAT internal-HDD block-device support), plus fixes, feedback and oversight
+by saildot4k
+
+Testing, bug reports and real-hardware feedback
+by eliminator1403, lucaslmgv, AndrewBento, AcidReach, bodvenomz, nuno6573, Blade1984
+and zackcage6
+
+Financial support
+by Akilluminati47
+
+If you want the canonical, actively-maintained project, it lives at
+https://github.com/ps2homebrew/Open-PS2-Loader - please support it. This fork is a
+downstream labor of love, not a replacement, and it exists only because that
+upstream work is open for everyone to learn from.
