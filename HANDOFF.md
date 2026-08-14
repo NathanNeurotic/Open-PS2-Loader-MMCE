@@ -26,7 +26,7 @@ Nathan's side and his testers' side must look identical across a handover. These
 
 **BRANCHES.** Never commit to `master`, `rebuild/main`, or any existing `rebuild/step-*` branch.
 Every change goes on a NEW branch you create, `rebuild/step-NNN-<slug>`, branched from the current
-tip. **Next number: 192. Current tip: `rebuild/step-191-fix-bgm-freeze-artindex-deinit`.** One focused change
+tip. **Next number: 193. Current tip: `rebuild/step-192-honor-pfs-hdd-cwd-and-custom-path`.** One focused change
 per step, with a long explanatory commit message -- what changed, why, what evidence drove it, and
 what it does NOT fix. Those messages are this project's real documentation. Never force-push, never
 rewrite history, never merge to `master` without asking. (`rebuild/main` moves only as the
@@ -1191,4 +1191,15 @@ it), not a re-derivation of (a).
    - In `src/opl.c`, restored `audioEnd()` execution order to run *after* `deinitAllSupport()` in `deinit()` and `moduleCleanup()` in `deinitEx()`, matching `bb21e343` and `master`.
 4. **CI Format Parity**:
    - In `src/themes.c`, formatted macro definitions (lines 19–65) with `clang-format 12` column alignment to pass `CI-format-check`.
+
+# 22. STEP-192: Honor PFS / APA HDD Boot CWD & Custom Settings Path (2026-08-14)
+
+### What was fixed in Step 192:
+1. **Preserve PFS and APA HDD Boot Directory (`gBootDir`)**:
+   - In `src/opl.c`, stopped wiping `gBootDir` to empty when booted from HDD/FHDB (`hdd0:...` or `pfs0:...`).
+   - Brought up the HDD/PFS driver stack (`hddLoadModules()`, `hddLoadSupportModules()`) on APA/PFS boot so `pfs0:` is mounted before config loading, and translated raw launch paths (e.g. `hdd0:__sysconf:pfs:/FMCB` $\rightarrow$ `pfs0:/FMCB`, `hdd0:+OPL` $\rightarrow$ `pfs0:`) so settings are saved and loaded directly beside the ELF on HDD without requiring a Memory Card.
+2. **Translate Typed APA Partition Paths in Custom Settings Path**:
+   - In `src/opl.c` (`prepareCustomSettingsPath`), automatically translate typed partition targets (`hdd0:+OPL`, `hdd0:/+OPL`, `+OPL`, `+OPL/CFG`) to the mounted PFS filesystem path (`pfs0:` / `pfs0:CFG`), preventing `openFile` from attempting raw I/O on `hdd0:` which caused `ENODEV` (Error 19: "No such device").
+3. **PFS Colon-Slash Normalization**:
+   - In `src/config.c`, implemented `configBuildPath` to properly handle trailing colons and slashes across prefixes (e.g., `pfs0:`, `pfs0:OPL/`, `mc0:OPL`), preventing malformed double slashes (`pfs0://conf_opl.cfg`) that caused filesystem errors.
 
