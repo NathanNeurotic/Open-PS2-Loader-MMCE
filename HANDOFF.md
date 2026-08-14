@@ -26,7 +26,7 @@ Nathan's side and his testers' side must look identical across a handover. These
 
 **BRANCHES.** Never commit to `master`, `rebuild/main`, or any existing `rebuild/step-*` branch.
 Every change goes on a NEW branch you create, `rebuild/step-NNN-<slug>`, branched from the current
-tip. **Next number: 188. Current tip: `rebuild/step-187-restore-master-audio-engine`.** One focused change
+tip. **Next number: 189. Current tip: `rebuild/step-188-master-parity-art-audio-launch`.** One focused change
 per step, with a long explanatory commit message -- what changed, why, what evidence drove it, and
 what it does NOT fix. Those messages are this project's real documentation. Never force-push, never
 rewrite history, never merge to `master` without asking. (`rebuild/main` moves only as the
@@ -1153,3 +1153,12 @@ the intermittent-`open()`-stall suspicion (3–8 ms normal, 2730 ms occasional) 
 by elimination. If the question looks wrong to you, SAY SO — Nathan is bringing in fresh
 perspective deliberately. But bring evidence (the `W` reading above is built to provide
 it), not a re-derivation of (a).
+
+# 18. STEP-188: VCD GameID Art Lookup, Art Index 12 Slots, BGM Lifecycle, & Coverflow Safety (2026-08-14)
+
+### What was fixed in Step 188:
+1. **Multi-Tier VCD Art Lookup**: Added fallback lookup for Game ID artwork (`<GAME_ID>_COV.png`, `_BG.png`, `_ICO.png`, etc.) across `bdmsupport.c`, `ethsupport.c`, `hddsupport.c`, and `udpfssupport.c`. Standard OPL Manager covers in `ART/` now hit on the 2nd probe rather than failing to POPS.
+2. **`vcdLoadPopsCover`**: Added Game ID fallback (`POPS/<gameId>.png`) beside filename fallback.
+3. **`ARTINDEX` Directory Hash Slots**: Expanded `ART_INDEX_SLOTS` from 3 to 12 and canonicalized directory paths (stripping redundant slash variations) so active directories (`ART/`, `POPS/`, `THM/`, `CFG/`) stay in RAM without thrashing.
+4. **BGM / Audio Lifecycle & Teardown Order**: In `src/sound.c`, properly reset thread IDs, semaphores, and `vorbisFile` in `bgmDeinit()`. In `src/gui.c`, cleanly stop BGM when disabled in Settings and start when enabled. In `src/opl.c`, ordered `audioEnd()` before `deinitAllSupport()` unmounts filesystems, preventing launch and exit freezes.
+5. **Coverflow Navigation Asymmetry**: In `src/menusys.c`, added defensive NULL guards for `gTheme->itemsList` and bypassed vertical list pagination math during horizontal Coverflow animation steps, eliminating the Left vs Right navigation hitch.
