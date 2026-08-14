@@ -952,7 +952,7 @@ static void drawGameImage(struct menu_list *menu, struct submenu_list *item, con
             // single getGameImageTexture() call for backgrounds and covers alike, so a background
             // joins the same FIFO on the frame it is first drawn and publishes when its turn comes.
             // That is the difference between rolling and dropping in batches.
-            if (guiInactiveFrames >= (list != NULL ? list->delay : 0) + BG_REQUEST_EXTRA_IDLE_FRAMES)
+            if (guiInactiveFrames >= (list != NULL ? list->delay : 0))
                 texture = getGameImageTexture(gameImage->cache, menu->item->userdata, &item->item);
             else
                 texture = getGameImageCached(gameImage->cache, &item->item);

@@ -26,7 +26,7 @@ Nathan's side and his testers' side must look identical across a handover. These
 
 **BRANCHES.** Never commit to `master`, `rebuild/main`, or any existing `rebuild/step-*` branch.
 Every change goes on a NEW branch you create, `rebuild/step-NNN-<slug>`, branched from the current
-tip. **Next number: 197. Current tip: `rebuild/step-196-restore-2566-clean-tree`.** One focused change
+tip. **Next number: 198. Current tip: `rebuild/step-197-bgm-priority-fast-bg-art-and-hdd-common-cwd`.** One focused change
 per step, with a long explanatory commit message -- what changed, why, what evidence drove it, and
 what it does NOT fix. Those messages are this project's real documentation. Never force-push, never
 rewrite history, never merge to `master` without asking. (`rebuild/main` moves only as the
@@ -1161,4 +1161,19 @@ it), not a re-derivation of (a).
    - Restored `src/opl.c` and `src/config.c` to the exact state of `bb21e343`.
    - Confirmed via `git diff bb21e343 --stat` that 100% of all C source files, headers, makefiles, and IRX binaries are identical to `bb21e343` (v2566), the known-good build verified working on hardware.
    - Synchronous module loading during early `_loadConfig()` is completely eliminated, restoring normal clean APA/HDD booting.
+
+# 27. STEP-197: BGM Resiliency, 3606 Background Art Speed, and Clean APA/HDD CWD Resolution (2026-08-14)
+
+### What was changed:
+1. **BGM Priority & Buffer Resiliency (Lag-Free Audio Streaming)**:
+   - Raised BGM I/O decoder thread priority to `0x3E` (62) in `src/sound.c`.
+   - Lowered Art Worker Thread priority to `0x48` (72) in `src/texcache.c`, ensuring texture decoding never starves audio buffer refilling.
+   - Expanded the BGM ring buffer from 16 to 32 slots (128KB, ~750ms headroom) to absorb USB disk read bursts smoothly.
+2. **Fast Background Art Loading (3606 Speed Parity)**:
+   - Removed the artificial 30-frame `BG_REQUEST_EXTRA_IDLE_FRAMES` delay in `src/themes.c:955` so background images load immediately on settle alongside covers (matching version 3606).
+3. **Clean APA/HDD CWD & __common Resolution**:
+   - In `src/opl.c`, when booted from HDD (`gBootDir` starts with `hdd` or `pfs`), OPL stays on HDD (`__common/OPL/` or partition specified in `conf_hdd.cfg`) and does not touch Memory Cards.
+   - In `src/opl.c:prepareCustomSettingsPath()`, translated `+OPL`, `__common`, `hdd0:...` partition paths directly to mounted PFS paths.
+   - In `src/opl.c:trySaveConfigHDD()`, ensured `hddLoadSupportModules()` mounts `pfs0:` before writing so saves succeed without Error 19 (`ENODEV`).
+   - In `src/config.c`, added `configBuildPath()` to prevent double slash path concatenation on PFS prefixes.
 
