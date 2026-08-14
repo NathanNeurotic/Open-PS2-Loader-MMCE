@@ -26,7 +26,7 @@ Nathan's side and his testers' side must look identical across a handover. These
 
 **BRANCHES.** Never commit to `master`, `rebuild/main`, or any existing `rebuild/step-*` branch.
 Every change goes on a NEW branch you create, `rebuild/step-NNN-<slug>`, branched from the current
-tip. **Next number: 187. Current tip: `rebuild/step-186-bring-master-docs-and-readme`.** One focused change
+tip. **Next number: 188. Current tip: `rebuild/step-187-restore-master-audio-engine`.** One focused change
 per step, with a long explanatory commit message -- what changed, why, what evidence drove it, and
 what it does NOT fix. Those messages are this project's real documentation. Never force-push, never
 rewrite history, never merge to `master` without asking. (`rebuild/main` moves only as the
@@ -1026,6 +1026,17 @@ Ported the entire documentation ecosystem from origin/master to achieve complete
 6. `modules/freepad/PROVENANCE.md` (freepad driver provenance).
 7. `pc/smbserver/` (standalone SMBv1 server reference and selftest scripts).
 8. `reference/wopl-coverflow/` (reference assets and theme configuration).
+
+**187 — Restored master audio engine, rotating cursor channels, and clean BGM streaming.**
+Fixes #364 (BGM stutter during scrolling and sound effects cut without ~5s cooldown):
+1. Restored master's classic 16-buffer producer-consumer BGM streaming in `src/sound.c`. Eliminated the flawed
+   `partsToRead` PollSema loop that polled semaphore tokens without decoding audio, which had caused 4 out of
+   5 playback buffers to be sent to `audsrv_play_audio` unwritten/garbage, creating audio gaps and stutter.
+2. Restored master's direct `sfxPlay` with 6 rotating cursor channels (`CURSOR_SFX_CHANNEL_COUNT 6`, base 8)
+   and 45ms rate limiting on cursor ticks, eliminating `sfxDispatchThread`'s queue saturation and stale-tick
+   drops that cut off menu open/close and confirm sounds without a 5-second cooldown.
+3. Preserved all hardened safety guards: bounded wait loops in `bgmStop()`, `bgmQuiesce()` for graceful exit,
+   `gBgmInRead` HUD flag, `sfxRumble(id)` menu haptics, and `gDefaultBGMPath` fallback.
 
 # 17. CURRENT STATE, 2026-08-13 (late) — SUPERSEDES §14
 
