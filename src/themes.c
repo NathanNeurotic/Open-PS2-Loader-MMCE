@@ -1235,6 +1235,8 @@ static void drawCoverFlow(struct menu_list *menu, struct submenu_list *item, con
     */
     mutable_image_t *elemImg = (mutable_image_t *)elem->extended;
     int warmRadius = (elemImg != NULL && elemImg->cache != NULL) ? (elemImg->cache->count - 1) / 2 : 0;
+    if (warmRadius > 2)
+        warmRadius = 2; // Tame lookahead burst: warm at most 2 immediate neighbours on each side
     struct
     {
         image_cache_t *cache;

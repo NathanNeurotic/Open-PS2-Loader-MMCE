@@ -881,6 +881,9 @@ static void cacheArtWorkerThread(void *arg)
 
             cacheLoadImage(req);
 
+            // Yield the ready queue so other threads (such as BGM I/O) can process between loads.
+            RotateThreadReadyQueue(ART_THREAD_PRIORITY);
+
             if (gArtTerminate)
                 break;
         }
@@ -1258,19 +1261,9 @@ GSTEXTURE *cacheGetTextureEx(image_cache_t *cache, item_list_t *list, int *cache
     rtime = guiFrameId;
 
     // WHILE A DIRECTION IS HELD, CLAIM ONLY SLOTS THAT COST NOTHING TO TAKE -- free ones and ones
-    // parked as absent. Never evict a decoded texture mid-scroll.
-    //
-    // This is the guard that makes dropping the idle gate above safe rather than a trade. Requesting
-    // art during a scroll means claiming a slot per row passed, and every claim runs
-    // cacheClearItem(entry, 1) -- it FREES whatever cover was in that slot. Most of those requests
-    // are then thrown away 20 frames later by the stale-stamp cancellation, so an unguarded scroll
-    // would spend the cache to buy images it never loads and leave the user watching covers they
-    // already had disappear. That is a worse bug than the one being fixed here.
-    //
-    // With the guard, a cold list (all slots free) starts loading covers the moment the user begins
-    // moving, and a warm one holds what it has and resumes the instant they stop -- with no fixed
-    // delay in front of it any more, which is the actual win over the old gate.
-    int navHoldsCache = gArtNavActive;
+    // parked as absent. Never evict a decoded texture mid-scroll on SIO2/MMCE where bus contention
+    // with pad polling exists. USB, HDD, and SMB stream-evict smoothly without holding.
+    int navHoldsCache = isSio2 && gArtNavActive;
 
     for (i = 0; i < cache->count; i++) {
         currEntry = &cache->content[i];

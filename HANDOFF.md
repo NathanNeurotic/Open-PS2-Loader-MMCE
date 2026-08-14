@@ -26,7 +26,7 @@ Nathan's side and his testers' side must look identical across a handover. These
 
 **BRANCHES.** Never commit to `master`, `rebuild/main`, or any existing `rebuild/step-*` branch.
 Every change goes on a NEW branch you create, `rebuild/step-NNN-<slug>`, branched from the current
-tip. **Next number: 185. Current tip: `rebuild/step-184-bgm-theme-fallback-restore`.** One focused change
+tip. **Next number: 186. Current tip: `rebuild/step-185-art-queue-batching-and-warming-tame`.** One focused change
 per step, with a long explanatory commit message -- what changed, why, what evidence drove it, and
 what it does NOT fix. Those messages are this project's real documentation. Never force-push, never
 rewrite history, never merge to `master` without asking. (`rebuild/main` moves only as the
@@ -1003,6 +1003,17 @@ in an `else` branch of `if (themeID != 0)`, preventing user-configured BGM from 
 themes (miladera22-sketch #380 symptom 4). Restored master's clean fallback chain (theme BGM first,
 then `gDefaultBGMPath`), properly freeing `vorbisFile` on misses to prevent uninitialized memory access
 in `bgmDeinit()`.
+
+**185 — Art queue un-batching, nav-hold SIO2 restriction, and Coverflow warming clamp.**
+Fixed the post-scroll queue surge and batch pop-in effect:
+1. Restricted `navHoldsCache` in `texcache.c` to `isSio2 && gArtNavActive` (matching master), allowing
+   USB, HDD, and SMB to smoothly stream-evict and enqueue incoming covers during active scrolling rather
+   than withholding all eviction and dumping ~20 covers in a single burst upon stopping.
+2. Clamped Coverflow `warmRadius` in `themes.c` to at most 2 items on each side (4 surrounding covers
+   total instead of 18), eliminating the 2-second USB bus flooding storm that starved `bgmIoThread`
+   and caused BGM stutter.
+3. Added `RotateThreadReadyQueue(ART_THREAD_PRIORITY)` in `cacheArtWorkerThread` between consecutive
+   loads to allow BGM audio I/O to be scheduled cleanly.
 
 # 17. CURRENT STATE, 2026-08-13 (late) — SUPERSEDES §14
 
