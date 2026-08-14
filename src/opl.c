@@ -1457,18 +1457,42 @@ static void writeConfigPathRedirect(const char *path)
 // Make a typed settings path usable: the user may name a device that is not mounted yet (that is the
 // whole point of typing it rather than picking from a list), so force-load its transport and rewrite
 // the prefix to the massN: OPL can actually read. Returns 1 when `path` is ready to hand to
-// configInit(), 0 when it is not a BDM path at all (mc?:/pfs0:/mmce -- usable as typed), and -1 when
-// it names a BDM device that never mounted.
-//
-// A -1 MUST NOT silently fall back to mc: an unreachable path is a user error to surface, and
-// re-homing onto whatever memory card happens to be inserted is exactly the incident item 11 exists
-// to prevent (a stray mc?:OPL folder stamped onto an unrelated card).
 static int prepareCustomSettingsPath(char *path, int pathLen)
 {
     int bdmType = BDM_TYPE_UNKNOWN;
 
     if (path == NULL || path[0] == '\0')
         return 0;
+
+    // APA HDD / PFS paths: translate "hdd0:+OPL", "hdd0:/+OPL", "+OPL", "+OPL/CFG", "pfs0:..." to the mounted PFS path
+    if (!strncmp(path, "hdd", 3) || path[0] == '+' || !strncmp(path, "pfs", 3)) {
+        hddLoadModules();
+        hddLoadSupportModules();
+
+        if (path[0] == '+') {
+            const char *slash = strchr(path, '/');
+            if (slash != NULL && slash[1] != '\0')
+                snprintf(path, pathLen, "pfs0:%s", slash + 1);
+            else
+                snprintf(path, pathLen, "pfs0:");
+        } else if (!strncmp(path, "hdd", 3)) {
+            const char *oplSub = strstr(path, "+OPL");
+            if (oplSub != NULL) {
+                const char *slash = strchr(oplSub, '/');
+                if (slash != NULL && slash[1] != '\0')
+                    snprintf(path, pathLen, "pfs0:%s", slash + 1);
+                else
+                    snprintf(path, pathLen, "pfs0:");
+            } else {
+                const char *pfsSub = strstr(path, ":pfs:/");
+                if (pfsSub != NULL)
+                    snprintf(path, pathLen, "pfs0:%s", pfsSub + 5);
+                else
+                    snprintf(path, pathLen, "%s", gHDDPrefix ? gHDDPrefix : "pfs0:");
+            }
+        }
+        return 0; // ready for configSetMove
+    }
 
     // Not a BDM namespace -> nothing to load; mc?: is ROM-backed and pfs0:/mmce are handled by their
     // own stacks, which are already up by the time a save runs.
@@ -1615,8 +1639,7 @@ static void configReadNeutrinoGlobals(config_set_t *configOPL)
 }
 
 // Basename of the ELF OPL was booted as (argv[0]); pairs with gBootDir. resolveBootDirToMass uses
-// it to verify WHICH mounted massN: slot is the boot device (launcher slot numbering need not
-// match OPL's). Empty when the boot dir came from getcwd() or argv[0] had no filename part.
+// this to verify the BDM slot actually holds the boot binary before claiming a match.
 static char gBootElfName[64];
 // BDM_TYPE_* of the resolved boot device, BDM_TYPE_UNKNOWN for non-BDM boots. Set by
 // resolveBootDirToMass(); consumed by the _saveConfig re-resolve retry.
@@ -1628,14 +1651,33 @@ static void resolveBootDirToMass(void)
     if (gBootDir[0] == '\0')
         return;
 
-    // uLE hands APA-HDD boots as "hdd0:<partition>:pfs:/..." -- a launch identity OPL can never open
-    // (OPL's own APA mount is pfs0: on the +OPL partition, a different namespace). Unresolvable: drop
-    // to legacy discovery, whose checkLoadConfigHDD probes the APA config location properly.
-    if (!strncmp(gBootDir, "hdd", 3)) {
-        LOG("BOOT unresolvable APA boot dir %s -> legacy discovery\n", gBootDir);
-        gBootDir[0] = '\0';
+    // APA-HDD / PFS boot (FHDB, uLE HDD, or direct PFS boot):
+    // Bring up the HDD/PFS stack so the partition is mounted to pfs0: and settings can load/save to HDD.
+    if (!strncmp(gBootDir, "hdd", 3) || !strncmp(gBootDir, "pfs", 3)) {
+        LOG("BOOT APA/PFS boot dir %s -> initializing HDD/PFS\n", gBootDir);
+        hddLoadModules();
+        hddLoadSupportModules();
+
+        if (!strncmp(gBootDir, "hdd", 3)) {
+            const char *pfsSub = strstr(gBootDir, ":pfs:/");
+            if (pfsSub != NULL) {
+                // e.g. "hdd0:__sysconf:pfs:/FMCB" -> "pfs0:/FMCB"
+                char sub[sizeof(gBootDir)];
+                snprintf(sub, sizeof(sub), "pfs0:%s", pfsSub + 5);
+                snprintf(gBootDir, sizeof(gBootDir), "%s", sub);
+            } else if (strstr(gBootDir, "+OPL") != NULL) {
+                const char *oplSub = strstr(gBootDir, "+OPL");
+                const char *slash = strchr(oplSub, '/');
+                if (slash != NULL && slash[1] != '\0')
+                    snprintf(gBootDir, sizeof(gBootDir), "pfs0:%s", slash + 1);
+                else
+                    snprintf(gBootDir, sizeof(gBootDir), "pfs0:");
+            } else {
+                snprintf(gBootDir, sizeof(gBootDir), "%s", gHDDPrefix ? gHDDPrefix : "pfs0:");
+            }
+        }
         configEnd();
-        configInit(NULL);
+        configInit(gBootDir);
         return;
     }
 
