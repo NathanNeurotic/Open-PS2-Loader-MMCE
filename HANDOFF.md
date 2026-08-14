@@ -26,7 +26,7 @@ Nathan's side and his testers' side must look identical across a handover. These
 
 **BRANCHES.** Never commit to `master`, `rebuild/main`, or any existing `rebuild/step-*` branch.
 Every change goes on a NEW branch you create, `rebuild/step-NNN-<slug>`, branched from the current
-tip. **Next number: 189. Current tip: `rebuild/step-188-master-parity-art-audio-launch`.** One focused change
+tip. **Next number: 190. Current tip: `rebuild/step-189-readme-add-ps2-launcher`.** One focused change
 per step, with a long explanatory commit message -- what changed, why, what evidence drove it, and
 what it does NOT fix. Those messages are this project's real documentation. Never force-push, never
 rewrite history, never merge to `master` without asking. (`rebuild/main` moves only as the
@@ -1162,3 +1162,7 @@ it), not a re-derivation of (a).
 3. **`ARTINDEX` Directory Hash Slots**: Expanded `ART_INDEX_SLOTS` from 3 to 12 and canonicalized directory paths (stripping redundant slash variations) so active directories (`ART/`, `POPS/`, `THM/`, `CFG/`) stay in RAM without thrashing.
 4. **BGM / Audio Lifecycle & Teardown Order**: In `src/sound.c`, properly reset thread IDs, semaphores, and `vorbisFile` in `bgmDeinit()`. In `src/gui.c`, cleanly stop BGM when disabled in Settings and start when enabled. In `src/opl.c`, ordered `audioEnd()` before `deinitAllSupport()` unmounts filesystems, preventing launch and exit freezes.
 5. **Coverflow Navigation Asymmetry**: In `src/menusys.c`, added defensive NULL guards for `gTheme->itemsList` and bypassed vertical list pagination math during horizontal Coverflow animation steps, eliminating the Left vs Right navigation hitch.
+
+# 19. STEP-189: Add PS2-Launcher to README.md Projects List (2026-08-14)
+
+- Added `[PS2-Launcher](https://github.com/Irfanlesnar/PS2-Launcher)` to the acknowledgements projects list in `README.md` alongside `sOPL`, `uOPL`, `wOPL`, `Modulo-R1`, etc.
