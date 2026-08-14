@@ -26,7 +26,7 @@ Nathan's side and his testers' side must look identical across a handover. These
 
 **BRANCHES.** Never commit to `master`, `rebuild/main`, or any existing `rebuild/step-*` branch.
 Every change goes on a NEW branch you create, `rebuild/step-NNN-<slug>`, branched from the current
-tip. **Next number: 198. Current tip: `rebuild/step-197-bgm-priority-fast-bg-art-and-hdd-common-cwd`.** One focused change
+tip. **Next number: 199. Current tip: `rebuild/step-198-restore-official-apa-boot-path`.** One focused change
 per step, with a long explanatory commit message -- what changed, why, what evidence drove it, and
 what it does NOT fix. Those messages are this project's real documentation. Never force-push, never
 rewrite history, never merge to `master` without asking. (`rebuild/main` moves only as the
@@ -1176,4 +1176,11 @@ it), not a re-derivation of (a).
    - In `src/opl.c:prepareCustomSettingsPath()`, translated `+OPL`, `__common`, `hdd0:...` partition paths directly to mounted PFS paths.
    - In `src/opl.c:trySaveConfigHDD()`, ensured `hddLoadSupportModules()` mounts `pfs0:` before writing so saves succeed without Error 19 (`ENODEV`).
    - In `src/config.c`, added `configBuildPath()` to prevent double slash path concatenation on PFS prefixes.
+
+# 28. STEP-198: Restore Exact Official OPL APA Boot Path (2026-08-14)
+
+### What was changed:
+1. **Official OPL APA Boot Parity**:
+   - Restored `resolveBootDirToMass()` and `tryAlternateDevice()` in `src/opl.c` to exact official OPL behavior: on APA/PFS boots, `gBootDir` is blanked to allow the GUI, GS context, and greeting splash to initialize immediately without early synchronous DEV9/ATA module stalls.
+   - Preserves BGM priority elevation (`0x3E`), Art Worker priority (`0x48`), expanded 32-slot audio ring buffer, fast 3606 background art loading, and safe `pfs0:` mounting on save.
 

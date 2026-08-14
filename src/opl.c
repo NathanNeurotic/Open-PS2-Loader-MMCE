@@ -1545,22 +1545,6 @@ static int tryAlternateDevice(int types)
     // settings are strictly homed to gBootDir. Never probe alternate devices (mass0:/hdd0:) or hijack
     // the save location away from CWD/Memory Card.
     if (gBootDir[0] != '\0') {
-        // If booted from HDD/APA/PFS (e.g. "hdd0:__sysconf:pfs:/FMCB", "hdd0:+OPL", "hdd0:__common", "pfs0:"):
-        // Default to __common/OPL/ and resolve partition via conf_hdd.cfg (or +OPL) without touching Memory Card.
-        if (!strncmp(gBootDir, "hdd", 3) || !strncmp(gBootDir, "pfs", 3)) {
-            value = checkLoadConfigHDD(types);
-            if (value & CONFIG_OPL)
-                return value;
-            // Even if no config existed yet, keep HDD partition as the config home
-            if (gHDDPrefix != NULL) {
-                configEnd();
-                configInit(gHDDPrefix);
-                configPrepareNotifications(gHDDPrefix);
-                showCfgPopup = 0;
-                return 0;
-            }
-        }
-
         // LEGACY READ-ONLY FALLBACK. Every build before the CWD doctrine -- ours and official alike
         // -- homed settings at mc?:OPL, so every existing install's config lives THERE, not beside
         // the ELF. Without this, upgrading silently reset every user to defaults (reported from
@@ -1609,21 +1593,7 @@ static int tryAlternateDevice(int types)
         return 0;
     }
 
-    // Bare ELF launch without boot directory context: check HDD first if pwd is hdd, else MC first.
-    char pwd[64] = {0};
-    if (getcwd(pwd, sizeof(pwd)) != NULL && (!strncmp(pwd, "hdd", 3) || !strncmp(pwd, "pfs", 3))) {
-        value = checkLoadConfigHDD(types);
-        if (value & CONFIG_OPL)
-            return value;
-        if (gHDDPrefix != NULL) {
-            configEnd();
-            configInit(gHDDPrefix);
-            configPrepareNotifications(gHDDPrefix);
-            showCfgPopup = 0;
-            return 0;
-        }
-    }
-
+    // Bare ELF launch without boot directory context: try Memory Card first.
     if (sysCheckMC() >= 0) {
         configPrepareNotifications(gBaseMCDir);
         showCfgPopup = 0;
@@ -1696,11 +1666,14 @@ static void resolveBootDirToMass(void)
     if (gBootDir[0] == '\0')
         return;
 
-    // APA-HDD / PFS boots (FHDB, uLE HDD, __common, etc.):
-    // Leave gBootDir intact so tryAlternateDevice knows OPL booted from HDD and probes
-    // hdd0:__common/OPL/conf_hdd.cfg first without blocking early boot.
+    // uLE hands APA-HDD boots as "hdd0:<partition>:pfs:/..." -- a launch identity OPL can never open
+    // (OPL's own APA mount is pfs0: on the +OPL partition, a different namespace). Unresolvable: drop
+    // to legacy discovery, whose checkLoadConfigHDD probes the APA config location properly.
     if (!strncmp(gBootDir, "hdd", 3) || !strncmp(gBootDir, "pfs", 3)) {
-        LOG("BOOT APA/PFS boot dir %s -> HDD discovery\n", gBootDir);
+        LOG("BOOT unresolvable APA boot dir %s -> legacy discovery\n", gBootDir);
+        gBootDir[0] = '\0';
+        configEnd();
+        configInit(NULL);
         return;
     }
 
