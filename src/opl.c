@@ -1464,36 +1464,6 @@ static int prepareCustomSettingsPath(char *path, int pathLen)
     if (path == NULL || path[0] == '\0')
         return 0;
 
-    // APA HDD / PFS paths: translate "hdd0:+OPL", "hdd0:/+OPL", "+OPL", "+OPL/CFG", "pfs0:..." to the mounted PFS path
-    if (!strncmp(path, "hdd", 3) || path[0] == '+' || !strncmp(path, "pfs", 3)) {
-        hddLoadModules();
-        hddLoadSupportModules();
-
-        if (path[0] == '+') {
-            const char *slash = strchr(path, '/');
-            if (slash != NULL && slash[1] != '\0')
-                snprintf(path, pathLen, "pfs0:%s", slash + 1);
-            else
-                snprintf(path, pathLen, "pfs0:");
-        } else if (!strncmp(path, "hdd", 3)) {
-            const char *oplSub = strstr(path, "+OPL");
-            if (oplSub != NULL) {
-                const char *slash = strchr(oplSub, '/');
-                if (slash != NULL && slash[1] != '\0')
-                    snprintf(path, pathLen, "pfs0:%s", slash + 1);
-                else
-                    snprintf(path, pathLen, "pfs0:");
-            } else {
-                const char *pfsSub = strstr(path, ":pfs:/");
-                if (pfsSub != NULL)
-                    snprintf(path, pathLen, "pfs0:%s", pfsSub + 5);
-                else
-                    snprintf(path, pathLen, "%s", gHDDPrefix ? gHDDPrefix : "pfs0:");
-            }
-        }
-        return 0; // ready for configSetMove
-    }
-
     // Not a BDM namespace -> nothing to load; mc?: is ROM-backed and pfs0:/mmce are handled by their
     // own stacks, which are already up by the time a save runs.
     if (strncmp(path, "mass", 4) && strncmp(path, "usb", 3) && strncmp(path, "ata", 3) &&
@@ -1651,33 +1621,14 @@ static void resolveBootDirToMass(void)
     if (gBootDir[0] == '\0')
         return;
 
-    // APA-HDD / PFS boot (FHDB, uLE HDD, or direct PFS boot):
-    // Bring up the HDD/PFS stack so the partition is mounted to pfs0: and settings can load/save to HDD.
-    if (!strncmp(gBootDir, "hdd", 3) || !strncmp(gBootDir, "pfs", 3)) {
-        LOG("BOOT APA/PFS boot dir %s -> initializing HDD/PFS\n", gBootDir);
-        hddLoadModules();
-        hddLoadSupportModules();
-
-        if (!strncmp(gBootDir, "hdd", 3)) {
-            const char *pfsSub = strstr(gBootDir, ":pfs:/");
-            if (pfsSub != NULL) {
-                // e.g. "hdd0:__sysconf:pfs:/FMCB" -> "pfs0:/FMCB"
-                char sub[sizeof(gBootDir)];
-                snprintf(sub, sizeof(sub), "pfs0:%s", pfsSub + 5);
-                snprintf(gBootDir, sizeof(gBootDir), "%s", sub);
-            } else if (strstr(gBootDir, "+OPL") != NULL) {
-                const char *oplSub = strstr(gBootDir, "+OPL");
-                const char *slash = strchr(oplSub, '/');
-                if (slash != NULL && slash[1] != '\0')
-                    snprintf(gBootDir, sizeof(gBootDir), "pfs0:%s", slash + 1);
-                else
-                    snprintf(gBootDir, sizeof(gBootDir), "pfs0:");
-            } else {
-                snprintf(gBootDir, sizeof(gBootDir), "%s", gHDDPrefix ? gHDDPrefix : "pfs0:");
-            }
-        }
+    // uLE hands APA-HDD boots as "hdd0:<partition>:pfs:/..." -- a launch identity OPL can never open
+    // (OPL's own APA mount is pfs0: on the +OPL partition, a different namespace). Unresolvable: drop
+    // to legacy discovery, whose checkLoadConfigHDD probes the APA config location properly.
+    if (!strncmp(gBootDir, "hdd", 3)) {
+        LOG("BOOT unresolvable APA boot dir %s -> legacy discovery\n", gBootDir);
+        gBootDir[0] = '\0';
         configEnd();
-        configInit(gBootDir);
+        configInit(NULL);
         return;
     }
 

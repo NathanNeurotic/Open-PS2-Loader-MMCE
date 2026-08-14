@@ -902,10 +902,8 @@ static void menuNextV()
         selected_item->item->current = cur->next;
         sfxPlay(SFX_CURSOR);
         // coverflow slide animation; the wrap branch below stays instant
-        if (gTheme->coverflow) {
+        if (gTheme->coverflow)
             thmTriggerCoverflowAnim(1);
-            return;
-        }
 
         if (gTheme->itemsList && gTheme->itemsList->extended) {
             // if the current item is beyond the page start, move the page start one page down
@@ -935,10 +933,8 @@ static void menuPrevV()
         sfxPlay(SFX_CURSOR);
 
         // coverflow slide animation; the wrap branch below stays instant
-        if (gTheme->coverflow) {
+        if (gTheme->coverflow)
             thmTriggerCoverflowAnim(-1);
-            return;
-        }
 
         if (gTheme->itemsList && gTheme->itemsList->extended) {
             // if the current item is on the page start, move the page start one page up

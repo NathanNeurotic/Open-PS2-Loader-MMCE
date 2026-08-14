@@ -26,7 +26,7 @@ Nathan's side and his testers' side must look identical across a handover. These
 
 **BRANCHES.** Never commit to `master`, `rebuild/main`, or any existing `rebuild/step-*` branch.
 Every change goes on a NEW branch you create, `rebuild/step-NNN-<slug>`, branched from the current
-tip. **Next number: 193. Current tip: `rebuild/step-192-honor-pfs-hdd-cwd-and-custom-path`.** One focused change
+tip. **Next number: 194. Current tip: `rebuild/step-193-revert-apa-sync-init-restore-stable-boot`.** One focused change
 per step, with a long explanatory commit message -- what changed, why, what evidence drove it, and
 what it does NOT fix. Those messages are this project's real documentation. Never force-push, never
 rewrite history, never merge to `master` without asking. (`rebuild/main` moves only as the
@@ -1202,4 +1202,13 @@ it), not a re-derivation of (a).
    - In `src/opl.c` (`prepareCustomSettingsPath`), automatically translate typed partition targets (`hdd0:+OPL`, `hdd0:/+OPL`, `+OPL`, `+OPL/CFG`) to the mounted PFS filesystem path (`pfs0:` / `pfs0:CFG`), preventing `openFile` from attempting raw I/O on `hdd0:` which caused `ENODEV` (Error 19: "No such device").
 3. **PFS Colon-Slash Normalization**:
    - In `src/config.c`, implemented `configBuildPath` to properly handle trailing colons and slashes across prefixes (e.g., `pfs0:`, `pfs0:OPL/`, `mc0:OPL`), preventing malformed double slashes (`pfs0://conf_opl.cfg`) that caused filesystem errors.
+
+# 23. STEP-193: Revert APA Pre-Init Sync Module Loading & Restore Coverflow Pagination (2026-08-14)
+
+### What was fixed in Step 193:
+1. **Revert Synchronous HDD/PFS Module Loading during `_loadConfig()`**:
+   - In `src/opl.c`, reverted `resolveBootDirToMass()` and `prepareCustomSettingsPath()` back to the proven behavior from v2566 (`bb21e343`) and `master`.
+   - Booting from APA partition (`hdd0:...`) now blanks `gBootDir` and delegates HDD initialization to the safe asynchronous path (`deferredInit()`) after the GUI/GS is initialized, eliminating the early-boot lockup / hard black screen.
+2. **Restore Coverflow Pagination Invariant**:
+   - In `src/menusys.c`, removed early `return;` statements in `menuNextV()` and `menuPrevV()` that prevented `pagestart` from updating during Coverflow scrolling.
 
