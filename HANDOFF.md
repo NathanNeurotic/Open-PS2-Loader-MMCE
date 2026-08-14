@@ -26,7 +26,7 @@ Nathan's side and his testers' side must look identical across a handover. These
 
 **BRANCHES.** Never commit to `master`, `rebuild/main`, or any existing `rebuild/step-*` branch.
 Every change goes on a NEW branch you create, `rebuild/step-NNN-<slug>`, branched from the current
-tip. **Next number: 188. Current tip: `rebuild/step-187-restore-master-audio-engine`.** One focused change
+tip. **Next number: 197. Current tip: `rebuild/step-196-restore-2566-clean-tree`.** One focused change
 per step, with a long explanatory commit message -- what changed, why, what evidence drove it, and
 what it does NOT fix. Those messages are this project's real documentation. Never force-push, never
 rewrite history, never merge to `master` without asking. (`rebuild/main` moves only as the
@@ -1153,3 +1153,12 @@ the intermittent-`open()`-stall suspicion (3–8 ms normal, 2730 ms occasional) 
 by elimination. If the question looks wrong to you, SAY SO — Nathan is bringing in fresh
 perspective deliberately. But bring evidence (the `W` reading above is built to provide
 it), not a re-derivation of (a).
+
+# 26. STEP-196: Restore 100% Exact Tree Parity to Known-Good v2566 (`bb21e343`) (2026-08-14)
+
+### What was restored:
+1. **100% Tree Parity with `bb21e343` (v2566)**:
+   - Restored `src/opl.c` and `src/config.c` to the exact state of `bb21e343`.
+   - Confirmed via `git diff bb21e343 --stat` that 100% of all C source files, headers, makefiles, and IRX binaries are identical to `bb21e343` (v2566), the known-good build verified working on hardware.
+   - Synchronous module loading during early `_loadConfig()` is completely eliminated, restoring normal clean APA/HDD booting.
+
