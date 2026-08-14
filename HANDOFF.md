@@ -26,7 +26,7 @@ Nathan's side and his testers' side must look identical across a handover. These
 
 **BRANCHES.** Never commit to `master`, `rebuild/main`, or any existing `rebuild/step-*` branch.
 Every change goes on a NEW branch you create, `rebuild/step-NNN-<slug>`, branched from the current
-tip. **Next number: 190. Current tip: `rebuild/step-189-readme-add-ps2-launcher`.** One focused change
+tip. **Next number: 191. Current tip: `rebuild/step-190-bg-art-speed-bgm-priority`.** One focused change
 per step, with a long explanatory commit message -- what changed, why, what evidence drove it, and
 what it does NOT fix. Those messages are this project's real documentation. Never force-push, never
 rewrite history, never merge to `master` without asking. (`rebuild/main` moves only as the
@@ -1166,3 +1166,15 @@ it), not a re-derivation of (a).
 # 19. STEP-189: Add PS2-Launcher to README.md Projects List (2026-08-14)
 
 - Added `[PS2-Launcher](https://github.com/Irfanlesnar/PS2-Launcher)` to the acknowledgements projects list in `README.md` alongside `sOPL`, `uOPL`, `wOPL`, `Modulo-R1`, etc.
+
+# 20. STEP-190: Remove Background Art Idle Throttle & Elevate BGM Thread Priority (2026-08-14)
+
+### What was fixed in Step 190:
+1. **Background Art (`_BG.png`) Load Speed**:
+   - In `src/themes.c`, removed the artificial `BG_REQUEST_EXTRA_IDLE_FRAMES` (30 frames / 500 ms) idle input delay and `getGameImageCached` fallback in `drawGameImage()`.
+   - Restored direct `getGameImageTexture()` call matching `master` / version 3606 so per-game backgrounds are requested promptly as the user moves between games without requiring a half-second pause of zero controller input.
+2. **BGM Audio Thread Priority**:
+   - In `src/sound.c`, updated `BGM_THREAD_BASE_PRIO` from `0x40` (64) to `0x38` (56).
+   - `bgmThread` now runs at priority 56 and `bgmIoThread` (Vorbis stream reader/decoder) at priority 57, ensuring time-critical audio buffer feeding outranks background texture decoding (`ART_THREAD_PRIORITY 64`) on the Sony EE kernel scheduler.
+   - Prevents audio ring buffer starvation and stuttering when scrolling games on USB.
+

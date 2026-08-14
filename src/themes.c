@@ -52,11 +52,6 @@
 // nicety on a fast device and a liability on USB, where it costs four extra reads for every one the
 // user asked for. The reference builds do not do it; neither do we now.
 #define COVER_WARM_RADIUS            0
-// Extra idle frames a per-game BACKGROUND waits beyond the art delay before it may be requested, so
-// the cover always reaches the IO queue first (see drawGameImage). Half a second at 60 Hz: long
-// enough that a cover request is queued and usually finished, short enough that a background still
-// arrives while the user is reading the row.
-#define BG_REQUEST_EXTRA_IDLE_FRAMES 30
 // Cache slots per AttributeImage element. An AttributeImage is NOT a per-game image -- it is a small FIXED
 // SET of glyphs keyed by the attribute's value, so the cache only ever needs to hold that attribute's whole
 // value set to be thrash-free. Our built-in attributes are tiny (#Format = ISO/ZSO/VCD/UL/ELF/HDL = 6,
@@ -875,23 +870,6 @@ static GSTEXTURE *getGameImageTexture(image_cache_t *cache, void *support, struc
     return getGameImageTextureEx(cache, support, item, 0);
 }
 
-// Draw-what-we-have companion to the above: same eligibility checks, but it only ever returns art
-// that is ALREADY loaded -- no slot claim, no queued read. Used by rows that are deliberately not
-// requesting this frame so they keep showing their thumbnail instead of flicking to the placeholder.
-static GSTEXTURE *getGameImageCached(image_cache_t *cache, struct submenu_item *item)
-{
-    if (item == NULL || item->isFolder || !gEnableArt)
-        return NULL;
-
-    if (cache == NULL || cache->userId < 0 || item->cache_id == NULL || item->cache_uid == NULL)
-        return NULL;
-
-    if (gTheme == NULL || cache->userId >= gTheme->gameCacheCount)
-        return NULL;
-
-    return cacheLookupTexture(cache, &item->cache_id[cache->userId], &item->cache_uid[cache->userId]);
-}
-
 // Favourites element redirection (defined in the Coverflow section below; used by both draw
 // paths so an APP favourite renders with the apps element, not the game cover element).
 static theme_element_t *thmGetElemForItem(struct menu_list *menu, struct submenu_list *item, theme_element_t *elem);
@@ -917,49 +895,7 @@ static void drawGameImage(struct menu_list *menu, struct submenu_list *item, con
         // inside it. A full-screen PNG is ~5x the pixels of a cover, so the cover the user is
         // actually waiting for sat behind the better part of a second of somebody else's scenery.
         // That is the whole gap to official OPL, whose built-in theme has no per-game background on
-        // the main page at all (it uses a static image), and it explains why a device with no _BG
-        // art in its set feels fine while one with a full art set does not.
-        //
-        // So hold the background back: request it only once the cover has had its turn -- an extra
-        // idle margin beyond the art delay AND an idle art path. Until then draw whatever is already
-        // cached, which keeps a background that IS loaded on screen instead of flickering to the
-        // default. Nothing is lost but the order.
-        int isBackground = (drawElem->type == ELEM_TYPE_BACKGROUND);
-        GSTEXTURE *texture;
-
-        if (isBackground) {
-            // NO !cacheHasPendingArt() TERM, and removing it is the point.
-            //
-            // The idle margin above already does the whole job this gate was written for: hold the
-            // background back until the cover has had its turn. The lane-idle conjunct that used to
-            // sit here added nothing to that ordering and turned the request into an EVENT rather
-            // than a schedule -- cacheHasPendingArt() is (queued > 0 || active > 0), the worker
-            // drains without yielding, and artPop increments active before artReleaseRequest
-            // decrements it, so from the GUI thread the lane reads busy CONTINUOUSLY from the first
-            // enqueue of a page until the last request of the whole batch is released. There is no
-            // mid-batch idle frame for this test to catch.
-            //
-            // So the background could only be requested in the single frame after the entire art
-            // lane went quiet -- i.e. as a side effect of the LAST cover completing. On the shipped
-            // theme that is the biggest thing on screen (main0/info0 are type=Background, gEnableBGArt
-            // defaults on, and the Background element is forced first in the draw list), and it is
-            // Nathan's sentence almost verbatim: "it would only pop in the art after the next art
-            // loaded". Meanwhile the rows keep asking for covers every frame, refilling the queue and
-            // holding the gate shut, so it could stay closed for seconds and then everything changed
-            // at once.
-            //
-            // The fork has no gate here at all -- origin/master src/themes.c drawGameImage is a
-            // single getGameImageTexture() call for backgrounds and covers alike, so a background
-            // joins the same FIFO on the frame it is first drawn and publishes when its turn comes.
-            // That is the difference between rolling and dropping in batches.
-            if (guiInactiveFrames >= (list != NULL ? list->delay : 0) + BG_REQUEST_EXTRA_IDLE_FRAMES)
-                texture = getGameImageTexture(gameImage->cache, menu->item->userdata, &item->item);
-            else
-                texture = getGameImageCached(gameImage->cache, &item->item);
-        } else {
-            // PRIORITY: the highlighted game's own cover, the one image the user is looking for.
-            texture = getGameImageTextureEx(gameImage->cache, menu->item->userdata, &item->item, 1);
-        }
+        GSTEXTURE *texture = getGameImageTexture(gameImage->cache, menu->item->userdata, &item->item);
 
         if (!texture || !texture->Mem) {
             // #2: on the Favourites page a COVER element with no real art must not draw the embedded
