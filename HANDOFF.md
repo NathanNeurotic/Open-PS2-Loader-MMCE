@@ -26,7 +26,7 @@ Nathan's side and his testers' side must look identical across a handover. These
 
 **BRANCHES.** Never commit to `master`, `rebuild/main`, or any existing `rebuild/step-*` branch.
 Every change goes on a NEW branch you create, `rebuild/step-NNN-<slug>`, branched from the current
-tip. **Next number: 191. Current tip: `rebuild/step-190-bg-art-speed-bgm-priority`.** One focused change
+tip. **Next number: 192. Current tip: `rebuild/step-191-fix-bgm-freeze-artindex-deinit`.** One focused change
 per step, with a long explanatory commit message -- what changed, why, what evidence drove it, and
 what it does NOT fix. Those messages are this project's real documentation. Never force-push, never
 rewrite history, never merge to `master` without asking. (`rebuild/main` moves only as the
@@ -1177,4 +1177,18 @@ it), not a re-derivation of (a).
    - In `src/sound.c`, updated `BGM_THREAD_BASE_PRIO` from `0x40` (64) to `0x38` (56).
    - `bgmThread` now runs at priority 56 and `bgmIoThread` (Vorbis stream reader/decoder) at priority 57, ensuring time-critical audio buffer feeding outranks background texture decoding (`ART_THREAD_PRIORITY 64`) on the Sony EE kernel scheduler.
    - Prevents audio ring buffer starvation and stuttering when scrolling games on USB.
+
+# 21. STEP-191: Fix BGM SleepThread Freeze, Restore Safe Art Path Splitting, & Deinit Teardown Order (2026-08-14)
+
+### What was fixed in Step 191:
+1. **BGM `bgmStop()` Bounded Wait Recovery**:
+   - In `src/sound.c`, restored `BGM_STOP_WAIT_SLICES` (16 slices) loop bounds and timeout handling when waiting for `bgmIoThreadRunning` and `bgmThreadRunning` to terminate.
+   - Prevents the GUI thread from hanging in an infinite `SleepThread()` loop on boot/screen transitions when BGM is stopped or restarted.
+2. **`artIndexSplit()` Safe Path Splitting**:
+   - In `src/artindex.c`, restored simple, bounds-safe path splitting (`memcpy(dirOut, fullPath, dirLen)`) without fragile prefix subtraction.
+   - Prevents root paths (e.g. `mass0:/SLUS_200.01_COV.png`) from generating negative `tailLen` calculations and truncating colons into invalid device names (`mass0`).
+3. **Deinit Teardown Order Alignment**:
+   - In `src/opl.c`, restored `audioEnd()` execution order to run *after* `deinitAllSupport()` in `deinit()` and `moduleCleanup()` in `deinitEx()`, matching `bb21e343` and `master`.
+4. **CI Format Parity**:
+   - In `src/themes.c`, formatted macro definitions (lines 19–65) with `clang-format 12` column alignment to pass `CI-format-check`.
 

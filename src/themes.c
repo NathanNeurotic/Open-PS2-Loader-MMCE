@@ -16,9 +16,9 @@
 #include <time.h>
 #include <math.h>
 
-#define MENU_POS_V                   50
-#define HINT_HEIGHT                  32
-#define DECORATOR_SIZE               20
+#define MENU_POS_V             50
+#define HINT_HEIGHT            32
+#define DECORATOR_SIZE         20
 // Cover cache depth. Hardware (debug HUD, art delay 0, one USB device, BG off): 73 ms per cover
 // load -- the load path is fine -- but D climbing past 100 COMPLETED loads in a single browse, far
 // more covers than the library shows. That is the same files being read again and again: the
@@ -27,7 +27,7 @@
 // is the "drag" that survived removing the throttles. Sized so the visible set and its warmed
 // neighbours fit together; at the size themes actually ship (140x200 in that capture) a decoded
 // cover is well under 100 KB, so this trades ~1 MB of EE RAM for not re-reading USB.
-#define COVER_CACHE_SLOTS            20
+#define COVER_CACHE_SLOTS      20
 // How many rows either side of the SELECTED row may be warmed. Measured: the warm loop asked for
 // every visible row -- 18 on the shipped theme -- where uOPL asks for exactly one (its
 // decorator-less list branch requests nothing at all; only the cover panel does). At 73 ms per load
@@ -51,7 +51,7 @@
 // Warming exists so that landing on a neighbour finds its cover already there (#296). That is a real
 // nicety on a fast device and a liability on USB, where it costs four extra reads for every one the
 // user asked for. The reference builds do not do it; neither do we now.
-#define COVER_WARM_RADIUS            0
+#define COVER_WARM_RADIUS      0
 // Cache slots per AttributeImage element. An AttributeImage is NOT a per-game image -- it is a small FIXED
 // SET of glyphs keyed by the attribute's value, so the cache only ever needs to hold that attribute's whole
 // value set to be thrash-free. Our built-in attributes are tiny (#Format = ISO/ZSO/VCD/UL/ELF/HDL = 6,
@@ -60,7 +60,7 @@
 // 32 covers any realistic custom attribute with headroom. Genuinely cheap -- cacheInitCache allocates only
 // `count` empty cache_entry_t structs (no texture memory until a glyph is actually loaded into a slot), so
 // 32 slots is ~2-3 KB of EE RAM and a #DiscType cache still only ever HOLDS its 3.
-#define ATTR_IMAGE_CACHE_SLOTS       32
+#define ATTR_IMAGE_CACHE_SLOTS 32
 
 extern const char conf_theme_OPL_cfg;
 extern u16 size_conf_theme_OPL_cfg;

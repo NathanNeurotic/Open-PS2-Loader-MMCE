@@ -124,21 +124,8 @@ static int artIndexSplit(const char *fullPath, char *dirOut, int dirMax, const c
     if (dirLen <= 0 || dirLen >= dirMax)
         return 0;
 
-    // Canonicalize "mass0:/ART" -> "mass0:ART" so both forms match the same slot
-    const char *colon = strchr(fullPath, ':');
-    if (colon != NULL && colon < cut && colon[1] == '/') {
-        int headLen = (int)(colon - fullPath) + 1;
-        int tailLen = (int)(cut - (colon + 2));
-        if (headLen + tailLen >= dirMax)
-            return 0;
-        memcpy(dirOut, fullPath, headLen);
-        if (tailLen > 0)
-            memcpy(dirOut + headLen, colon + 2, tailLen);
-        dirOut[headLen + tailLen] = '\0';
-    } else {
-        memcpy(dirOut, fullPath, dirLen);
-        dirOut[dirLen] = '\0';
-    }
+    memcpy(dirOut, fullPath, dirLen);
+    dirOut[dirLen] = '\0';
 
     *baseOut = (slash != NULL) ? slash + 1 : cut;
     if ((*baseOut)[0] == '\0')
