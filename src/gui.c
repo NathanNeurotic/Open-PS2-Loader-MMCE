@@ -1968,13 +1968,8 @@ static void guiSetAudioSettingsState(void)
     diaGetString(diaAudioConfig, CFG_DEFAULT_BGM_PATH, gDefaultBGMPath, sizeof(gDefaultBGMPath));
     audioSetVolume();
 
-    if (gEnableBGM) {
-        if (!isBgmPlaying())
-            bgmStart();
-    } else {
-        if (isBgmPlaying())
-            bgmStop();
-    }
+    if (gEnableBGM && !isBgmPlaying())
+        bgmStart();
 }
 
 static int guiAudioUpdater(int modified)

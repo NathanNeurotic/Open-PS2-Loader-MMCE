@@ -17,8 +17,10 @@
 // See artindex.h for why this exists. Everything below is in service of one rule: an uncertain answer
 // is always "go and look".
 
-// Directories held at once. Twelve covers simultaneous ART/, POPS/, and theme folders across multiple devices.
-#define ART_INDEX_SLOTS 12
+// Directories held at once. Three covers the realistic worst case in one view -- a device's ART/
+// folder, a second device's, and the POPS folder the VCD fallback probes -- without turning this into
+// a cache that needs an eviction policy of its own.
+#define ART_INDEX_SLOTS 3
 
 // Refuse to hold a directory larger than this. Not a memory limit so much as a sanity limit: a sweep
 // that big is itself slow enough to be the wrong trade, and a caller is better served by the ordinary

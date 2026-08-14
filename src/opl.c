@@ -1457,6 +1457,12 @@ static void writeConfigPathRedirect(const char *path)
 // Make a typed settings path usable: the user may name a device that is not mounted yet (that is the
 // whole point of typing it rather than picking from a list), so force-load its transport and rewrite
 // the prefix to the massN: OPL can actually read. Returns 1 when `path` is ready to hand to
+// configInit(), 0 when it is not a BDM path at all (mc?:/pfs0:/mmce -- usable as typed), and -1 when
+// it names a BDM device that never mounted.
+//
+// A -1 MUST NOT silently fall back to mc: an unreachable path is a user error to surface, and
+// re-homing onto whatever memory card happens to be inserted is exactly the incident item 11 exists
+// to prevent (a stray mc?:OPL folder stamped onto an unrelated card).
 static int prepareCustomSettingsPath(char *path, int pathLen)
 {
     int bdmType = BDM_TYPE_UNKNOWN;
@@ -1609,7 +1615,8 @@ static void configReadNeutrinoGlobals(config_set_t *configOPL)
 }
 
 // Basename of the ELF OPL was booted as (argv[0]); pairs with gBootDir. resolveBootDirToMass uses
-// this to verify the BDM slot actually holds the boot binary before claiming a match.
+// it to verify WHICH mounted massN: slot is the boot device (launcher slot numbering need not
+// match OPL's). Empty when the boot dir came from getcwd() or argv[0] had no filename part.
 static char gBootElfName[64];
 // BDM_TYPE_* of the resolved boot device, BDM_TYPE_UNKNOWN for non-BDM boots. Set by
 // resolveBootDirToMass(); consumed by the _saveConfig re-resolve retry.
