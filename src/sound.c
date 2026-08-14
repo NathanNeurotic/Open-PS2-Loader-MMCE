@@ -682,13 +682,21 @@ void bgmStop(void)
         SignalSema(outSema);
 
     threadId = GetThreadId();
-    while (bgmIoThreadRunning) {
+    int waits = BGM_STOP_WAIT_SLICES;
+    while (bgmIoThreadRunning && waits-- > 0) {
         SetAlarm(200 * 16, &bgmShutdownDelayCallback, (void *)threadId);
         SleepThread();
     }
-    while (bgmThreadRunning) {
+    waits = BGM_STOP_WAIT_SLICES;
+    while (bgmThreadRunning && waits-- > 0) {
         SetAlarm(200 * 16, &bgmShutdownDelayCallback, (void *)threadId);
         SleepThread();
+    }
+
+    if (bgmIoThreadRunning || bgmThreadRunning) {
+        LOG("BGM: threads did not stop (io=%d play=%d) -- abandoning\n",
+            (int)bgmIoThreadRunning, (int)bgmThreadRunning);
+        return;
     }
 
     bgmDeinit();
