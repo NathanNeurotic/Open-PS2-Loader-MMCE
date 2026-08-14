@@ -26,7 +26,7 @@ Nathan's side and his testers' side must look identical across a handover. These
 
 **BRANCHES.** Never commit to `master`, `rebuild/main`, or any existing `rebuild/step-*` branch.
 Every change goes on a NEW branch you create, `rebuild/step-NNN-<slug>`, branched from the current
-tip. **Next number: 182. Current tip: `rebuild/step-181-handoff-refresh`.** One focused change
+tip. **Next number: 184. Current tip: `rebuild/step-183-art-absence-fatfs-mapping`.** One focused change
 per step, with a long explanatory commit message -- what changed, why, what evidence drove it, and
 what it does NOT fix. Those messages are this project's real documentation. Never force-push, never
 rewrite history, never merge to `master` without asking. (`rebuild/main` moves only as the
@@ -983,9 +983,19 @@ rolling = v1.2.0-Beta-2553-95a138c (run 31745407636): REVISION HEAD-based and mo
 IS a build input, correctly not excluded), all four ds5 ELFs present and listed,
 four-flavour Get started, stale-tag paragraph gone (removed in 175 as designed), tag =
 0127499b, MEGA run_463. Claude's review loop caught 178 pre-publish; log it as the model
-for anything user-visible that can move backwards.
+**182 — art queue priority lane + dual-port ACT HUD.** Focused selection art pushes to the front
+of the worker FIFO (`artPushFront`/`artPromote`) so the cursor cover pops in instantly without waiting
+for queued surrounding covers. Added dual-port `ACT<p0>/<p1>` (`padGetActuatorDiag`) to the debug HUD
+to diagnose rumble alignment and actuator detection without needing an EE serial cable.
 
----
+**183 — FatFs FR_NO_FILE absence mapping + artindex SMB guard + VCD fallback restore.**
+On FatFs-backed BDM (`mass*`), `bdmfs_fatfs` returns `-FR_NO_FILE` (-4) or `-FR_NO_PATH` (-5), which
+EE `libcglue` turns into `open() == -1` with `errno == 4` / `5`. Testing strictly `ENOENT` (2) caused
+every USB missing cover to be treated as a transient I/O error (`OE`/`TF` climbing in lockstep),
+clearing the cache slot instead of parking it, retrying the 4.3s USB directory walk endlessly on
+every scroll, and breaking the `if (r == ERR_BAD_FILE)` condition in `bdmsupport.c` so the VCD POPS
+cover fallback was completely bypassed. Step 183 maps errno 4/5/6 on `mass*` to genuine absence, guards
+`artindex` against backslash SMB paths, and streamlines the HUD formatting.
 
 # 17. CURRENT STATE, 2026-08-13 (late) — SUPERSEDES §14
 
