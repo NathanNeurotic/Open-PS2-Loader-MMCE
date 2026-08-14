@@ -26,7 +26,7 @@ Nathan's side and his testers' side must look identical across a handover. These
 
 **BRANCHES.** Never commit to `master`, `rebuild/main`, or any existing `rebuild/step-*` branch.
 Every change goes on a NEW branch you create, `rebuild/step-NNN-<slug>`, branched from the current
-tip. **Next number: 194. Current tip: `rebuild/step-193-revert-apa-sync-init-restore-stable-boot`.** One focused change
+tip. **Next number: 195. Current tip: `rebuild/step-194-revert-to-known-good-2566`.** One focused change
 per step, with a long explanatory commit message -- what changed, why, what evidence drove it, and
 what it does NOT fix. Those messages are this project's real documentation. Never force-push, never
 rewrite history, never merge to `master` without asking. (`rebuild/main` moves only as the
@@ -1211,4 +1211,13 @@ it), not a re-derivation of (a).
    - Booting from APA partition (`hdd0:...`) now blanks `gBootDir` and delegates HDD initialization to the safe asynchronous path (`deferredInit()`) after the GUI/GS is initialized, eliminating the early-boot lockup / hard black screen.
 2. **Restore Coverflow Pagination Invariant**:
    - In `src/menusys.c`, removed early `return;` statements in `menuNextV()` and `menuPrevV()` that prevented `pagestart` from updating during Coverflow scrolling.
+
+# 24. STEP-194: Complete Hard Revert to Known-Good v2566 (`bb21e343`) (2026-08-14)
+
+### What was restored:
+1. **100% Tree Parity with `bb21e343` (v2566)**:
+   - Restored every source file, header, module, Makefile, script, and documentation asset across the entire repository to the exact bytecode state of commit `bb21e3432e20d00443946b0ec800a7d85bc96f9c`.
+   - Confirmed via `git diff --stat bb21e343` that only `HANDOFF.md` differs (for history and pointer tracking).
+   - This returns the repository to the exact build that was verified working on hardware.
+
 

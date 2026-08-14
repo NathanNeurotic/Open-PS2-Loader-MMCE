@@ -884,11 +884,9 @@ static void menuLastPage()
 
         selected_item->item->current = cur;
 
-        if (gTheme->itemsList && gTheme->itemsList->extended) {
-            int itms = ((items_list_t *)gTheme->itemsList->extended)->displayedItems;
-            while (--itms && cur->prev) // and move back to have a full page
-                cur = cur->prev;
-        }
+        int itms = ((items_list_t *)gTheme->itemsList->extended)->displayedItems;
+        while (--itms && cur->prev) // and move back to have a full page
+            cur = cur->prev;
 
         selected_item->item->pagestart = cur;
     }
@@ -905,20 +903,33 @@ static void menuNextV()
         if (gTheme->coverflow)
             thmTriggerCoverflowAnim(1);
 
-        if (gTheme->itemsList && gTheme->itemsList->extended) {
-            // if the current item is beyond the page start, move the page start one page down
-            cur = selected_item->item->pagestart;
-            int itms = ((items_list_t *)gTheme->itemsList->extended)->displayedItems + 1;
-            while (--itms && cur)
-                if (selected_item->item->current == cur)
-                    return;
-                else
-                    cur = cur->next;
+        // if the current item is beyond the page start, move the page start one page down
+        cur = selected_item->item->pagestart;
+        int itms = ((items_list_t *)gTheme->itemsList->extended)->displayedItems + 1;
+        while (--itms && cur)
+            if (selected_item->item->current == cur)
+                return;
+            else
+                cur = cur->next;
 
-            selected_item->item->pagestart = selected_item->item->current;
-        }
+        selected_item->item->pagestart = selected_item->item->current;
     } else { // wrap to start
         menuFirstPage();
+        /*
+          Animate the wrap too, but ONLY in coverflow (#271).
+
+          The carousel's visible window already wraps -- drawCoverFlow fans covers[] out through
+          menu->item->last / ->submenu -- so last->first is a single VISUAL step there, exactly like
+          every other move. Leaving it instant (10c19f1b's documented intent) therefore singled out
+          the two entries at the seam: stepping onto the first game, and the step immediately after
+          it, got no slide and no scale transfer while every other step did. That is what the
+          reporter sees as the selection "clipping/skipping on the first game and the one following
+          it", and it is also the most likely source of "the 3D effect drops to a flat 2D scroll" --
+          because at the seam it literally does.
+
+          The flat list views keep the instant jump: there the wrap really is an N-item page jump,
+          not one step, so a one-step slide would misrepresent it.
+        */
         if (gTheme->coverflow)
             thmTriggerCoverflowAnim(1);
     }
@@ -932,18 +943,16 @@ static void menuPrevV()
         selected_item->item->current = cur->prev;
         sfxPlay(SFX_CURSOR);
 
+        // if the current item is on the page start, move the page start one page up
+        if (selected_item->item->pagestart == cur) {
+            int itms = ((items_list_t *)gTheme->itemsList->extended)->displayedItems + 1; // +1 because the selection will move as well
+            while (--itms && selected_item->item->pagestart->prev)
+                selected_item->item->pagestart = selected_item->item->pagestart->prev;
+        }
+
         // coverflow slide animation; the wrap branch below stays instant
         if (gTheme->coverflow)
             thmTriggerCoverflowAnim(-1);
-
-        if (gTheme->itemsList && gTheme->itemsList->extended) {
-            // if the current item is on the page start, move the page start one page up
-            if (selected_item->item->pagestart == cur) {
-                int itms = ((items_list_t *)gTheme->itemsList->extended)->displayedItems + 1; // +1 because the selection will move as well
-                while (--itms && selected_item->item->pagestart->prev)
-                    selected_item->item->pagestart = selected_item->item->pagestart->prev;
-            }
-        }
     } else { // wrap to end
         menuLastPage();
         // Mirror of the wrap in menuNextV -- see the rationale there (#271).
@@ -954,9 +963,6 @@ static void menuPrevV()
 
 static void menuNextPage()
 {
-    if (!gTheme->itemsList || !gTheme->itemsList->extended)
-        return;
-
     submenu_list_t *cur = selected_item->item->pagestart;
     int displayed = ((items_list_t *)gTheme->itemsList->extended)->displayedItems;
 
@@ -982,9 +988,6 @@ static void menuNextPage()
 
 static void menuPrevPage()
 {
-    if (!gTheme->itemsList || !gTheme->itemsList->extended)
-        return;
-
     submenu_list_t *cur = selected_item->item->pagestart;
 
     if (cur && cur->prev) {

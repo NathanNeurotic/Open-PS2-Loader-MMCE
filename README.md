@@ -230,8 +230,7 @@ and ideas from [rickgaiser's OPL](https://github.com/rickgaiser/Open-PS2-Loader)
 [POPSLoader](https://github.com/NathanNeurotic/POPSLoader),
 [OPL RetroGEM ID by CosmicScale](https://github.com/CosmicScale/Open-PS2-Loader-Retro-GEM),
 [nhddl](https://github.com/pcm720/nhddl),
-[Modulo-R1](https://github.com/AdityaKumar7209/Modulo-R1-Beta-Preview---PS2),
-[PS2-Launcher](https://github.com/Irfanlesnar/PS2-Launcher), and
+[Modulo-R1](https://github.com/AdityaKumar7209/Modulo-R1-Beta-Preview---PS2), and
 [official OPL](https://github.com/ps2homebrew/Open-PS2-Loader).
 
 With special and sincere thanks to:
