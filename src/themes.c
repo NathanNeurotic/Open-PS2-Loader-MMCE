@@ -48,10 +48,10 @@
 // pad thread, eating frames until the held-repeat catches up in one lurch -- the rhythmic jump that
 // survived the settle floor, because the floor only stops requests DURING a press, not between them.
 //
-// Warming exists so that landing on a neighbour finds its cover already there (#296). That is a real
-// nicety on a fast device and a liability on USB, where it costs four extra reads for every one the
-// user asked for. The reference builds do not do it; neither do we now.
-#define COVER_WARM_RADIUS            0
+// Warming exists so that landing on a neighbour finds its cover already there (#296).
+// Restored to radius 2 (issue #488) so List Mode enjoys seamless rolling cover lookahead
+// matching Coverflow mode without stutter.
+#define COVER_WARM_RADIUS            2
 // Extra idle frames a per-game BACKGROUND waits beyond the art delay before it may be requested, so
 // the cover always reaches the IO queue first (see drawGameImage). Half a second at 60 Hz: long
 // enough that a cover request is queued and usually finished, short enough that a background still
