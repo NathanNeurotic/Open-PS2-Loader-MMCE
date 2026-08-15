@@ -2382,11 +2382,14 @@ void applyConfig(int themeID, int langID, int skipDeviceRefresh)
     // already ON and no archive present -- then plugs one in -- keeps getting nothing until a
     // reboot. The Artwork page's own toggle-flip re-arm only covers the case where the toggle
     // CHANGES; this covers the rest.
-    // NOTE(rebuild): the fork pairs this with cacheInvalidateFailMemo(), which the rebuild's
-    // official-derived texcache does not have. Only the .tar half applies here.
-    tarInvalidate(TAR_KIND_ART);
-    cacheInvalidateFailMemo();
-    artIndexInvalidate(); // a settings apply is the user's own "I changed something, look again"
+    // Gate archive and directory index invalidation on full device refresh (skipDeviceRefresh == 0).
+    // Pure theme/color UI switches (skipDeviceRefresh == 1) keep the indices warm in memory (issue #488)
+    // so returning to List Mode does not re-probe USB 1.1 storage.
+    if (skipDeviceRefresh == 0) {
+        tarInvalidate(TAR_KIND_ART);
+        cacheInvalidateFailMemo();
+        artIndexInvalidate(); // a full settings apply is the user's own "I changed something, look again"
+    }
 
     // The bound is FAV_MODE, not APP_MODE. The Game Sources picker offers six entries and the last
     // of them is Favourites (guiShowDeviceConfig deviceNames[], byte-identical to the fork), so an
