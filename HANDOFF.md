@@ -26,7 +26,7 @@ Nathan's side and his testers' side must look identical across a handover. These
 
 **BRANCHES.** Never commit to `master`, `rebuild/main`, or any existing `rebuild/step-*` branch.
 Every change goes on a NEW branch you create, `rebuild/step-NNN-<slug>`, branched from the current
-tip. **Next number: 202. Current tip: `rebuild/step-201-apa-memory-safety-and-bounds-hardening`.** One focused change
+tip. **Next number: 203. Current tip: `rebuild/step-202-mega-upload-all-four-elf-flavours`.** One focused change
 per step, with a long explanatory commit message -- what changed, why, what evidence drove it, and
 what it does NOT fix. Those messages are this project's real documentation. Never force-push, never
 rewrite history, never merge to `master` without asking. (`rebuild/main` moves only as the
@@ -1213,4 +1213,12 @@ it), not a re-derivation of (a).
    - `hddGetFileBlockInfo`: Fixed out-of-bounds heap over-read by replacing `memcpy(blocks, inode->data, max * sizeof(pfs_blockinfo_t))` with `memcpy(blocks, inode->data, inode->number_data * sizeof(pfs_blockinfo_t))`.
    - `hddGetPartitionInfo`: Added `nsub > APA_MAXSUB` clamping before copying sub-partitions to `parts[APA_MAXSUB + 1]`, preventing stack buffer corruption on invalid or corrupted APA partition headers.
    - `hddGetHDLGamelist`: Restored `saw_hdl` check to return `-ENOMEM` when partitions exist on disk but all memory allocations fail.
+
+# 28. STEP-202: Include regular ELFs in all 4 flavours in MEGA uploads (2026-08-15)
+
+### What changed:
+1. **`.github/workflows/rolling-release.yml`**:
+   - In step `Build all-in-one MEGA archive`: Staged the regular standalone ELFs for all four SDK flavours (`PS2DEVROLLING`, `PS2DEVPINNED`, `OFFICIALROLLING`, `OFFICIALPINNED`) into `mega-out/`.
+   - In step `Upload archive and regular ELFs in all 4 flavours to MEGA`: Updated `mega-put` args to upload the all-in-one zip archive AND the four regular standalone ELFs directly to `/RiptOPL/Rolling/<version>/run_<run_number>/`.
+2. **`README.md`**: Updated MEGA archival description from "both loader ELFs" to "all four loader ELFs".
 
