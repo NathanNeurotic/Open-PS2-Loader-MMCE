@@ -163,10 +163,17 @@ static int udpfsNeedsUpdate(item_list_t *itemList)
     return result;
 }
 
+static int udpfsFoldersCreated = 0;
+
 static int udpfsUpdateGameList(item_list_t *itemList)
 {
     if (udpfsIomanModLoaded == 0)
         return 0;
+
+    if (!udpfsFoldersCreated) {
+        sbCreateFolders(udpfsPrefix, 1);
+        udpfsFoldersCreated = 1;
+    }
 
     if (vcdViewActive(itemList->mode)) {
         int r = vcdFillGameList(udpfsPrefix, &udpfsGames);

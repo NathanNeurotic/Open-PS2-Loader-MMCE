@@ -224,9 +224,13 @@ static int checkFile(char *path, int mode)
     // "<dev>:/". One extra opendir per O_CREAT write only (never on reads); on MMCE that is one SIO2
     // round-trip on an already user-initiated, infrequent save.
     if (mode & O_CREAT) {
-        char *pos = strrchr(path, '/');
-        const char *devSlash = strstr(path, ":/");
-        if (pos != NULL && devSlash != NULL && pos > devSlash + 1) {
+        char *lastSlash = strrchr(path, '/');
+        char *lastBackslash = strrchr(path, '\\');
+        char *pos = lastSlash;
+        if (lastBackslash != NULL && (pos == NULL || lastBackslash > pos))
+            pos = lastBackslash;
+        const char *colon = strchr(path, ':');
+        if (pos != NULL && colon != NULL && pos > colon + 1) {
             char dirPath[256];
             int n = (int)(pos - path);
             if (n < (int)sizeof(dirPath)) {
