@@ -1569,7 +1569,7 @@ static int tryAlternateDevice(int types)
         closedir(dir);
         configEnd();
         configInit("mass0:");
-    } else if (hddLoadModules() >= 0) {
+    } else if (hddLoadModulesReady()) {
         hddLoadSupportModules();
         if (gHDDPrefix != NULL) {
             dir = opendir(gHDDPrefix);
@@ -1626,30 +1626,120 @@ static char gBootElfName[64];
 static int gBootDirBdmType = BDM_TYPE_UNKNOWN;
 
 
+// Parse APA boot paths from WLE-R3Z / uLE / FHDB / HDD-OSD:
+// "hdd0:/__common/OPL", "hdd0:__common/OPL", "hdd0:/+OPL", "hdd0:+OPL", "hdd1:/__common/OPL",
+// "hdd0:__sysconf:pfs:/FMCB", "hdd0:/__sysconf/FMCB", "hdd0:/__contents/APPS", etc.
+static int apaParseBootPath(const char *bootPath, char *outPart, size_t partSize, char *outBootDir, size_t bootDirSize, char *outHddPrefix, size_t prefixSize)
+{
+    if (bootPath == NULL || strncmp(bootPath, "hdd", 3) != 0)
+        return -1;
+    // Strictly accept only unit numbers 0 and 1 followed by ':' or '/'
+    if (bootPath[3] != '0' && bootPath[3] != '1')
+        return -1;
+
+    const char *p = bootPath;
+    char unit[16] = "hdd0";
+    if (!strncmp(p, "hdd1", 4))
+        snprintf(unit, sizeof(unit), "hdd1");
+    else
+        snprintf(unit, sizeof(unit), "hdd0");
+
+    p += 4; // skip "hdd0" / "hdd1"
+    while (*p == ':' || *p == '/')
+        p++;
+
+    if (*p == '\0')
+        return -1;
+
+    // Extract partition name (up to '/', ':', or end of string)
+    char part[64] = {0};
+    size_t i = 0;
+    while (*p != '\0' && *p != '/' && *p != ':' && i < sizeof(part) - 1) {
+        part[i++] = *p++;
+    }
+    part[i] = '\0';
+
+    // Skip pseudo-PFS tokens like ":pfs:" or slashes
+    while (*p != '\0') {
+        if (!strncmp(p, ":pfs:", 5))
+            p += 5;
+        else if (*p == ':' || *p == '/')
+            p++;
+        else
+            break;
+    }
+
+    // Extract subfolder (e.g. "OPL", "FMCB", "APPS", etc.)
+    char subfolder[64] = {0};
+    i = 0;
+    while (*p != '\0' && i < sizeof(subfolder) - 1) {
+        if (*p == '\\')
+            subfolder[i++] = '/';
+        else
+            subfolder[i++] = *p;
+        p++;
+    }
+    subfolder[i] = '\0';
+    while (i > 0 && subfolder[i - 1] == '/')
+        subfolder[--i] = '\0';
+
+    // If an ELF filename is present at the tail of the path, strip it to leave only the directory
+    char *dot = strrchr(subfolder, '.');
+    if (dot != NULL && (!strcasecmp(dot, ".elf") || !strcasecmp(dot, ".ELF"))) {
+        char *lastSlash = strrchr(subfolder, '/');
+        if (lastSlash != NULL)
+            *lastSlash = '\0';
+        else
+            subfolder[0] = '\0';
+    }
+
+    snprintf(outPart, partSize, "%s:%s", unit, part);
+    if (subfolder[0] != '\0') {
+        snprintf(outBootDir, bootDirSize, "pfs0:%s", subfolder);
+        snprintf(outHddPrefix, prefixSize, "pfs0:%s/", subfolder);
+    } else {
+        snprintf(outBootDir, bootDirSize, "pfs0:");
+        snprintf(outHddPrefix, prefixSize, "pfs0:");
+    }
+    return 0;
+}
+
 static void resolveBootDirToMass(void)
 {
     if (gBootDir[0] == '\0')
         return;
 
-    // APA-HDD boot: WLE-R3Z / uLE / FHDB / HDD-OSD hand paths like "hdd0:__common/OPL", "hdd0:+OPL",
-    // "hdd0:__sysconf:pfs:/FMCB", "hdd1:...", or "pfs0:OPL".
+    // APA-HDD boot: WLE-R3Z / uLE / FHDB / HDD-OSD hand paths like "hdd0:/__common/OPL", "hdd0:+OPL",
+    // "hdd0:__sysconf:pfs:/FMCB", "hdd1:/__common/OPL", "hdd0:/__contents/APPS", or "pfs0:OPL".
     // Lazy-load the APA HDD modules and PFS filesystem, resolving gBootDir to the mounted pfs0: path
     // so config and CWD live on the APA partition beside the ELF with no multi-device probe discovery.
     if (!strncmp(gBootDir, "hdd", 3) || !strncmp(gBootDir, "pfs", 3)) {
-        if (hddLoadModules() >= 0) {
+        if (hddLoadModulesReady()) {
+            char targetPart[64] = {0};
+            char resolvedBootDir[sizeof(gBootDir)] = {0};
+            char resolvedHddPrefix[64] = {0};
+
+            if (apaParseBootPath(gBootDir, targetPart, sizeof(targetPart), resolvedBootDir, sizeof(resolvedBootDir), resolvedHddPrefix, sizeof(resolvedHddPrefix)) == 0) {
+                // Set gOPLPart to the exact partition where the ELF was launched from
+                snprintf(gOPLPart, sizeof(gOPLPart), "%s", targetPart);
+            }
+
             hddLoadSupportModules();
-            if (gHDDPrefix != NULL && gHDDPrefix[0] != '\0') {
-                DIR *dir = opendir(gHDDPrefix);
+
+            const char *prefixToCheck = (resolvedBootDir[0] != '\0') ? resolvedBootDir : gHDDPrefix;
+            if (prefixToCheck != NULL && prefixToCheck[0] != '\0') {
+                DIR *dir = opendir(prefixToCheck);
                 if (dir != NULL) {
                     closedir(dir);
-                    char resolved[sizeof(gBootDir)];
-                    snprintf(resolved, sizeof(resolved), "%s", gHDDPrefix);
-                    size_t rlen = strlen(resolved);
-                    while (rlen > 0 && resolved[rlen - 1] == '/')
-                        resolved[--rlen] = '\0';
-
-                    LOG("BOOT resolved APA boot dir %s -> %s\n", gBootDir, resolved);
-                    snprintf(gBootDir, sizeof(gBootDir), "%s", resolved);
+                    if (resolvedBootDir[0] != '\0') {
+                        snprintf(gBootDir, sizeof(gBootDir), "%s", resolvedBootDir);
+                    } else if (gHDDPrefix != NULL) {
+                        snprintf(gBootDir, sizeof(gBootDir), "%s", gHDDPrefix);
+                        size_t rlen = strlen(gBootDir);
+                        while (rlen > 0 && gBootDir[rlen - 1] == '/')
+                            gBootDir[--rlen] = '\0';
+                    }
+                    LOG("BOOT resolved APA boot dir -> %s (part %s)\n", gBootDir, gOPLPart);
                     configEnd();
                     configInit(gBootDir);
                     if (gHDDStartMode == START_MODE_DISABLED)

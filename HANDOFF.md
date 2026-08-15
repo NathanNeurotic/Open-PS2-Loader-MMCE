@@ -26,7 +26,7 @@ Nathan's side and his testers' side must look identical across a handover. These
 
 **BRANCHES.** Never commit to `master`, `rebuild/main`, or any existing `rebuild/step-*` branch.
 Every change goes on a NEW branch you create, `rebuild/step-NNN-<slug>`, branched from the current
-tip. **Next number: 205. Current tip: `rebuild/step-204-lazy-apa-boot-and-bgm-buffer-expansion`.** One focused change
+tip. **Next number: 206. Current tip: `rebuild/step-205-wler3z-apa-boot-path-parser`.** One focused change
 per step, with a long explanatory commit message -- what changed, why, what evidence drove it, and
 what it does NOT fix. Those messages are this project's real documentation. Never force-push, never
 rewrite history, never merge to `master` without asking. (`rebuild/main` moves only as the
@@ -1238,4 +1238,19 @@ Switching from Coverflow back to List Mode exhibited noticeable cover artwork lo
 1. **`src/opl.c`**: In `resolveBootDirToMass()`, added lazy-loading for APA HDD boots (`hdd*` / `pfs*`). It calls `hddLoadModules()` and `hddLoadSupportModules()`, mounts the active partition to `pfs0:`, validates the mount via `opendir(gHDDPrefix)`, rewrites `gBootDir` to `gHDDPrefix` (e.g. `pfs0:` or `pfs0:OPL`), homes config sets directly there, and sets `gHDDStartMode = START_MODE_AUTO`.
 2. **`src/sound.c`**: Expanded `BGM_RING_BUFFER_COUNT` from `32` to `128` (512 KB, ~2.9s of audio buffering), providing ample pre-buffered headroom to glide through USB background reads without audio dropouts (Issue #364).
 3. **`src/themes.c`**: Removed artificial `guiInactiveFrames >= list->delay` background loading idle deferral in `drawGameImage`, restoring master's immediate frame-0 background art loading with zero delay.
+
+# 31. STEP-205: WLE-R3Z Multi-HDD and Subfolder Boot Path Parser (2026-08-15)
+
+## Problem
+
+wLaunchELF-R3Z supports dual HDDs (`hdd0:` and `hdd1:`) and passes `argv[0]` as a full path containing partition names and arbitrary subfolders (e.g. `hdd0:/__common/OPL/OPNPSX.ELF`, `hdd0:/__sysconf/FMCB/OPNPSX.ELF`, `hdd1:/__common/OPL/OPNPSX.ELF`, `hdd0:__sysconf:pfs:/FMCB/OPNPSX.ELF`, or `hdd0:/__contents/APPS/OPL/OPNPSX.ELF`). OPL previously hardcoded `hdd0:+OPL` when mounting PFS, ignoring the ELF's actual partition and subfolder, or misparsed paths with leading slashes following the drive prefix, leading to unmounted filesystems and black screens.
+
+## Solution
+
+1. **`src/opl.c`**: Added `apaParseBootPath()` to robustly parse all APA path variations from WLE-R3Z / uLE / FHDB / HDD-OSD:
+   - Identifies drive units (`hdd0` vs `hdd1`) and rejects invalid/unsupported prefixes.
+   - Extracts the specific partition name into `gOPLPart` (e.g. `hdd0:__common`, `hdd0:__sysconf`, `hdd1:__common`, `hdd0:+OPL`).
+   - Extracts any nested subfolder (e.g. `OPL`, `FMCB`, `APPS/OPL`), resolving `gBootDir` to `pfs0:<subfolder>` (or `pfs0:` for root) and stripping any terminal ELF binary name.
+   - Validates the mount via `opendir()`, homes configuration sets directly there, and sets `gHDDStartMode = START_MODE_AUTO` using `hddLoadModulesReady()`.
+
 
