@@ -348,7 +348,7 @@ void sfxPlay(int id)
 /*--    Theme Background Music    -------------------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------------------------------------------------*/
 
-#define BGM_RING_BUFFER_COUNT 32
+#define BGM_RING_BUFFER_COUNT 128 // 512 KB buffer (~2.9s of audio): glides through USB 1.1 background art reads (#364)
 #define BGM_RING_BUFFER_SIZE  4096
 #define BGM_STOP_WAIT_SLICES  16
 #define BGM_THREAD_BASE_PRIO  0x3E
