@@ -1216,6 +1216,7 @@ it), not a re-derivation of (a).
 
 # 28. STEP-202: Include regular ELFs in all 4 flavours in MEGA uploads (2026-08-15)
 
+<<<<<<< HEAD
 ### What changed:
 1. **`.github/workflows/rolling-release.yml`**:
    - In step `Build all-in-one MEGA archive`: Staged the regular standalone ELFs for all four SDK flavours (`PS2DEVROLLING`, `PS2DEVPINNED`, `OFFICIALROLLING`, `OFFICIALPINNED`) into `mega-out/`.

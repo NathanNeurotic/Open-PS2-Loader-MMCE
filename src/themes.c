@@ -928,34 +928,9 @@ static void drawGameImage(struct menu_list *menu, struct submenu_list *item, con
         GSTEXTURE *texture;
 
         if (isBackground) {
-            // NO !cacheHasPendingArt() TERM, and removing it is the point.
-            //
-            // The idle margin above already does the whole job this gate was written for: hold the
-            // background back until the cover has had its turn. The lane-idle conjunct that used to
-            // sit here added nothing to that ordering and turned the request into an EVENT rather
-            // than a schedule -- cacheHasPendingArt() is (queued > 0 || active > 0), the worker
-            // drains without yielding, and artPop increments active before artReleaseRequest
-            // decrements it, so from the GUI thread the lane reads busy CONTINUOUSLY from the first
-            // enqueue of a page until the last request of the whole batch is released. There is no
-            // mid-batch idle frame for this test to catch.
-            //
-            // So the background could only be requested in the single frame after the entire art
-            // lane went quiet -- i.e. as a side effect of the LAST cover completing. On the shipped
-            // theme that is the biggest thing on screen (main0/info0 are type=Background, gEnableBGArt
-            // defaults on, and the Background element is forced first in the draw list), and it is
-            // Nathan's sentence almost verbatim: "it would only pop in the art after the next art
-            // loaded". Meanwhile the rows keep asking for covers every frame, refilling the queue and
-            // holding the gate shut, so it could stay closed for seconds and then everything changed
-            // at once.
-            //
-            // The fork has no gate here at all -- origin/master src/themes.c drawGameImage is a
-            // single getGameImageTexture() call for backgrounds and covers alike, so a background
-            // joins the same FIFO on the frame it is first drawn and publishes when its turn comes.
-            // That is the difference between rolling and dropping in batches.
-            if (guiInactiveFrames >= (list != NULL ? list->delay : 0))
-                texture = getGameImageTexture(gameImage->cache, menu->item->userdata, &item->item);
-            else
-                texture = getGameImageCached(gameImage->cache, &item->item);
+            // Match master: request the background texture immediately on the first frame without
+            // idle-frame deferral, giving instant master-style background loading.
+            texture = getGameImageTexture(gameImage->cache, menu->item->userdata, &item->item);
         } else {
             // PRIORITY: the highlighted game's own cover, the one image the user is looking for.
             texture = getGameImageTextureEx(gameImage->cache, menu->item->userdata, &item->item, 1);
