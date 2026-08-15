@@ -75,7 +75,9 @@ static void hddInitModules(void)
     snprintf(path, sizeof(path), "%sLNG", gHDDPrefix);
     lngAddLanguages(path, "/", hddGameList.mode);
 
-    sbCreateFolders(gHDDPrefix, 0);
+    sbCreateFolders("pfs0:/", 0);
+    if (gHDDPrefix != NULL && strcmp(gHDDPrefix, "pfs0:/") != 0 && strcmp(gHDDPrefix, "pfs0:") != 0)
+        sbCreateFolders(gHDDPrefix, 0);
 }
 
 // HD Pro Kit is mapping the 1st word in ROM0 seg as a main ATA controller,

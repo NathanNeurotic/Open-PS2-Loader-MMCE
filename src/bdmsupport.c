@@ -709,9 +709,13 @@ static int bdmNeedsUpdate(item_list_t *itemList)
     } else if (result == 1)
         sfxPlay(SFX_BD_CONNECT);
 
-    // Belt-and-suspenders: never create the library tree at an empty prefix (= the CWD/boot folder).
+    // Belt-and-suspenders: create folders on the device root and any custom prefix.
     if (!pDeviceData->FoldersCreated && pDeviceData->bdmPrefix[0] != '\0') {
-        sbCreateFolders(pDeviceData->bdmPrefix, 1);
+        char root[32];
+        snprintf(root, sizeof(root), "mass%d:/", itemList->mode);
+        sbCreateFolders(root, 1);
+        if (strcmp(pDeviceData->bdmPrefix, root) != 0 && strncmp(pDeviceData->bdmPrefix, root, strlen(root)) != 0)
+            sbCreateFolders(pDeviceData->bdmPrefix, 1);
         pDeviceData->FoldersCreated = 1;
     }
 

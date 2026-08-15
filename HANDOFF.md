@@ -1206,52 +1206,6 @@ it), not a re-derivation of (a).
 4. **Safe PFS Mount on Save**:
    - In `src/opl.c:trySaveConfigHDD()`, ensured `hddLoadSupportModules()` mounts `pfs0:` before writing.
 
-# 27. STEP-201: APA HDD Memory Safety & Bounds Hardening (2026-08-15)
-
-### What changed:
-1. **`src/hdd.c` Memory Safety & Buffer Overflow Fixes**:
-   - `hddGetFileBlockInfo`: Fixed out-of-bounds heap over-read by replacing `memcpy(blocks, inode->data, max * sizeof(pfs_blockinfo_t))` with `memcpy(blocks, inode->data, inode->number_data * sizeof(pfs_blockinfo_t))`.
-   - `hddGetPartitionInfo`: Added `nsub > APA_MAXSUB` clamping before copying sub-partitions to `parts[APA_MAXSUB + 1]`, preventing stack buffer corruption on invalid or corrupted APA partition headers.
-   - `hddGetHDLGamelist`: Restored `saw_hdl` check to return `-ENOMEM` when partitions exist on disk but all memory allocations fail.
-
-# 28. STEP-202: Include regular ELFs in all 4 flavours in MEGA uploads (2026-08-15)
-
-### What changed:
-1. **`.github/workflows/rolling-release.yml`**:
-   - In step `Build all-in-one MEGA archive`: Staged the regular standalone ELFs for all four SDK flavours (`PS2DEVROLLING`, `PS2DEVPINNED`, `OFFICIALROLLING`, `OFFICIALPINNED`) into `mega-out/`.
-   - In step `Upload archive and regular ELFs in all 4 flavours to MEGA`: Updated `mega-put` args to upload the all-in-one zip archive AND the four regular standalone ELFs directly to `/RiptOPL/Rolling/<version>/run_<run_number>/`.
-2. **`README.md`**: Updated MEGA archival description from "both loader ELFs" to "all four loader ELFs".
-
-# 29. STEP-203: Seamless List Mode rolling cover art lookahead warming & cache retention (Issue #488) (2026-08-15)
-
-### Problem:
-Switching from Coverflow back to List Mode exhibited noticeable cover artwork loading latency and placeholder delays during scrolling. Coverflow benefited from active 2-neighbor lookahead prefetching (`warmRadius = 2`), while List Mode had `COVER_WARM_RADIUS` disabled (`0`), forcing on-demand USB reads on every highlight. Additionally, `applyConfig()` unconditionally invalidated the in-memory `art.tar` index and directory listings on pure theme switches.
-
-### Solution:
-1. **`src/themes.c`**: Restored `COVER_WARM_RADIUS` to `2` for List Mode (`drawItemsList`), giving List Mode the same smooth rolling lookahead warming as Coverflow.
-2. **`src/opl.c`**: Gated `tarInvalidate(TAR_KIND_ART)`, `cacheInvalidateFailMemo()`, and `artIndexInvalidate()` on `skipDeviceRefresh == 0`, keeping archive and directory indices warm during pure theme/color UI transitions.
-
-# 30. STEP-204: Lazy-load APA HDD boot CWD resolution, BGM ring buffer expansion & instant master background loading (2026-08-15)
-
-### What changed:
-1. **`src/opl.c`**: In `resolveBootDirToMass()`, added lazy-loading for APA HDD boots (`hdd*` / `pfs*`). It calls `hddLoadModules()` and `hddLoadSupportModules()`, mounts the active partition to `pfs0:`, validates the mount via `opendir(gHDDPrefix)`, rewrites `gBootDir` to `gHDDPrefix` (e.g. `pfs0:` or `pfs0:OPL`), homes config sets directly there, and sets `gHDDStartMode = START_MODE_AUTO`.
-2. **`src/sound.c`**: Expanded `BGM_RING_BUFFER_COUNT` from `32` to `128` (512 KB, ~2.9s of audio buffering), providing ample pre-buffered headroom to glide through USB background reads without audio dropouts (Issue #364).
-3. **`src/themes.c`**: Removed artificial `guiInactiveFrames >= list->delay` background loading idle deferral in `drawGameImage`, restoring master's immediate frame-0 background art loading with zero delay.
-
-# 31. STEP-205: WLE-R3Z Multi-HDD and Subfolder Boot Path Parser (2026-08-15)
-
-## Problem
-
-wLaunchELF-R3Z supports dual HDDs (`hdd0:` and `hdd1:`) and passes `argv[0]` as a full path containing partition names and arbitrary subfolders (e.g. `hdd0:/__common/OPL/OPNPSX.ELF`, `hdd0:/__sysconf/FMCB/OPNPSX.ELF`, `hdd1:/__common/OPL/OPNPSX.ELF`, `hdd0:__sysconf:pfs:/FMCB/OPNPSX.ELF`, or `hdd0:/__contents/APPS/OPL/OPNPSX.ELF`). OPL previously hardcoded `hdd0:+OPL` when mounting PFS, ignoring the ELF's actual partition and subfolder, or misparsed paths with leading slashes following the drive prefix, leading to unmounted filesystems and black screens.
-
-## Solution
-
-1. **`src/opl.c`**: Added `apaParseBootPath()` to robustly parse all APA path variations from WLE-R3Z / uLE / FHDB / HDD-OSD:
-   - Identifies drive units (`hdd0` vs `hdd1`) and rejects invalid/unsupported prefixes.
-   - Extracts the specific partition name into `gOPLPart` (e.g. `hdd0:__common`, `hdd0:__sysconf`, `hdd1:__common`, `hdd0:+OPL`).
-   - Extracts any nested subfolder (e.g. `OPL`, `FMCB`, `APPS/OPL`), resolving `gBootDir` to `pfs0:<subfolder>` (or `pfs0:` for root) and stripping any terminal ELF binary name.
-   - Validates the mount via `opendir()`, homes configuration sets directly there, and sets `gHDDStartMode = START_MODE_AUTO` using `hddLoadModulesReady()`.
-
 # 32. STEP-206: Fix APA Boot Directory Resolution Infinite Recursion (2026-08-15)
 
 ## Problem
@@ -1265,3 +1219,25 @@ When booting from an APA HDD path (such as `hdd0:/__common/OPL/OPNPSX.ELF` or `h
    - Gated the `configEnd(); configInit(gBootDir);` re-homing call on `if (strcmp(before, gBootDir) != 0)`. On the re-homed pass (`before == "pfs0:OPL"`), execution terminates cleanly without re-entering `configInit()`.
 2. **`src/opl.c:apaParseBootPath()`**:
    - Added direct support for already-mounted PFS paths (`pfs0:OPL`, `pfs0:`), populating `outBootDir` and `outHddPrefix` cleanly and returning success without rejecting `pfs` prefixes.
+
+# 33. STEP-207: Generate Root Folders on Device Mount & Fix Per-Game Save Failure (2026-08-15)
+
+## Problem
+
+When connecting to SMBv1/v2/v3 shares (reported in PS2-Servers Issue #180) or mounting other storage devices (BDM, HDD, UDPFS), OPL failed to generate default folders (`CD`, `DVD`, `CFG`, `ART`, `THM`, `LNG`, `VMC`, `CHT`, `APPS`, `POPS`) on the root of the device. Furthermore, when users attempted to save per-game settings (`CFG/<game_startup>.cfg`), `configWrite()` failed with `EIO` (`error 5`) because `smbman` rejected paths lacking a leading path separator (`smb0:CFG`) and `checkFile()` in `src/util.c` only recognized forward slashes (`/`), failing to auto-create missing parent directories on Windows / SMB backslash paths.
+
+## Solution
+
+1. **`src/supportbase.c:sbCreateFoldersFromList()` & `sbCreateFolders()`**:
+   - Automatically detect whether the target device path ends with a separator (`/` or `\`) and insert `\` for SMB devices or `/` for block/filesystem devices.
+   - Added `"POPS"` to `basicFolders[]` so POPSTARTER PS1 VCD folders are generated on device root.
+2. **`src/ethsupport.c:ethInitSMB()`**:
+   - Called `sbCreateFolders(ethBase, 1)` to generate folders directly on the root of the SMB share (`smb0:\`), plus any custom prefix folder.
+3. **`src/bdmsupport.c:bdmUpdateDeviceData()`**:
+   - Constructed the device root (`mass<N>:/`) and called `sbCreateFolders(root, 1)` to ensure standard folders exist on the root of USB/BDM drives.
+4. **`src/hddsupport.c:hddInit()`**:
+   - Ensured `sbCreateFolders("pfs0:/", 0)` creates basic folders on the root of the APA partition.
+5. **`src/udpfssupport.c:udpfsUpdateGameList()`**:
+   - Added `sbCreateFolders(udpfsPrefix, 1)` on first scan to ensure standard folders exist on UDPFS mounts.
+6. **`src/util.c:checkFile()`**:
+   - Updated parent directory detection in `checkFile()` under `O_CREAT` to handle both forward slashes (`/`) and backslashes (`\`) for all device paths, auto-creating the parent directory (`smb0:\CFG`, `mass0:/CFG`, `pfs0:/CFG`, etc.) if missing.

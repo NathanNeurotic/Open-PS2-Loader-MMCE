@@ -1081,16 +1081,27 @@ static void sbCreateFoldersFromList(const char *path, const char **folders)
 {
     int i;
     char fullpath[256];
+    size_t len = path ? strlen(path) : 0;
+    char sep = '/';
+
+    if (len > 0 && (path[len - 1] == '/' || path[len - 1] == '\\')) {
+        sep = '\0';
+    } else if (path != NULL && strncmp(path, "smb", 3) == 0) {
+        sep = '\\';
+    }
 
     for (i = 0; folders[i] != NULL; i++) {
-        sprintf(fullpath, "%s%s", path, folders[i]);
+        if (sep != '\0')
+            snprintf(fullpath, sizeof(fullpath), "%s%c%s", path, sep, folders[i]);
+        else
+            snprintf(fullpath, sizeof(fullpath), "%s%s", path, folders[i]);
         mkdir(fullpath, 0777);
     }
 }
 
 void sbCreateFolders(const char *path, int createDiscImgFolders)
 {
-    const char *basicFolders[] = {"CFG", "THM", "LNG", "ART", "VMC", "CHT", "APPS", NULL};
+    const char *basicFolders[] = {"CFG", "THM", "LNG", "ART", "VMC", "CHT", "APPS", "POPS", NULL};
     const char *discImgFolders[] = {"CD", "DVD", NULL};
 
     sbCreateFoldersFromList(path, basicFolders);
