@@ -26,7 +26,7 @@ Nathan's side and his testers' side must look identical across a handover. These
 
 **BRANCHES.** Never commit to `master`, `rebuild/main`, or any existing `rebuild/step-*` branch.
 Every change goes on a NEW branch you create, `rebuild/step-NNN-<slug>`, branched from the current
-tip. **Next number: 201. Current tip: `rebuild/step-200-fix-null-deref-and-apa-pfs-prefix-resolution`.** One focused change
+tip. **Next number: 202. Current tip: `rebuild/step-201-apa-memory-safety-and-bounds-hardening`.** One focused change
 per step, with a long explanatory commit message -- what changed, why, what evidence drove it, and
 what it does NOT fix. Those messages are this project's real documentation. Never force-push, never
 rewrite history, never merge to `master` without asking. (`rebuild/main` moves only as the
@@ -1205,4 +1205,12 @@ it), not a re-derivation of (a).
    - In `src/config.c`, added `configBuildPath()` to cleanly format paths with `pfs0:` prefixes without double slashes (`pfs0:conf_opl.cfg` and `pfs0:OPL/conf_opl.cfg`).
 4. **Safe PFS Mount on Save**:
    - In `src/opl.c:trySaveConfigHDD()`, ensured `hddLoadSupportModules()` mounts `pfs0:` before writing.
+
+# 27. STEP-201: APA HDD Memory Safety & Bounds Hardening (2026-08-15)
+
+### What changed:
+1. **`src/hdd.c` Memory Safety & Buffer Overflow Fixes**:
+   - `hddGetFileBlockInfo`: Fixed out-of-bounds heap over-read by replacing `memcpy(blocks, inode->data, max * sizeof(pfs_blockinfo_t))` with `memcpy(blocks, inode->data, inode->number_data * sizeof(pfs_blockinfo_t))`.
+   - `hddGetPartitionInfo`: Added `nsub > APA_MAXSUB` clamping before copying sub-partitions to `parts[APA_MAXSUB + 1]`, preventing stack buffer corruption on invalid or corrupted APA partition headers.
+   - `hddGetHDLGamelist`: Restored `saw_hdl` check to return `-ENOMEM` when partitions exist on disk but all memory allocations fail.
 
