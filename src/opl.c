@@ -1631,7 +1631,28 @@ static int gBootDirBdmType = BDM_TYPE_UNKNOWN;
 // "hdd0:__sysconf:pfs:/FMCB", "hdd0:/__sysconf/FMCB", "hdd0:/__contents/APPS", etc.
 static int apaParseBootPath(const char *bootPath, char *outPart, size_t partSize, char *outBootDir, size_t bootDirSize, char *outHddPrefix, size_t prefixSize)
 {
-    if (bootPath == NULL || strncmp(bootPath, "hdd", 3) != 0)
+    if (bootPath == NULL)
+        return -1;
+
+    // Direct PFS mount paths (e.g. "pfs0:OPL", "pfs0:", "pfs:OPL")
+    if (bootPath[0] == 'p' && bootPath[1] == 'f' && bootPath[2] == 's' &&
+        ((isdigit((unsigned char)bootPath[3]) && bootPath[4] == ':') || bootPath[3] == ':')) {
+        if (outBootDir != NULL && bootDirSize > 0)
+            snprintf(outBootDir, bootDirSize, "%s", bootPath);
+        if (outHddPrefix != NULL && prefixSize > 0) {
+            snprintf(outHddPrefix, prefixSize, "%s", bootPath);
+            size_t len = strlen(outHddPrefix);
+            if (len > 0 && outHddPrefix[len - 1] != '/') {
+                if (len + 1 < prefixSize) {
+                    outHddPrefix[len] = '/';
+                    outHddPrefix[len + 1] = '\0';
+                }
+            }
+        }
+        return 0;
+    }
+
+    if (strncmp(bootPath, "hdd", 3) != 0)
         return -1;
     // Strictly accept only unit numbers 0 and 1 followed by ':' or '/'
     if (bootPath[3] != '0' && bootPath[3] != '1')
@@ -1715,13 +1736,17 @@ static void resolveBootDirToMass(void)
     // so config and CWD live on the APA partition beside the ELF with no multi-device probe discovery.
     if (!strncmp(gBootDir, "hdd", 3) || !strncmp(gBootDir, "pfs", 3)) {
         if (hddLoadModulesReady()) {
+            char before[sizeof(gBootDir)];
+            snprintf(before, sizeof(before), "%s", gBootDir);
             char targetPart[64] = {0};
             char resolvedBootDir[sizeof(gBootDir)] = {0};
             char resolvedHddPrefix[64] = {0};
 
             if (apaParseBootPath(gBootDir, targetPart, sizeof(targetPart), resolvedBootDir, sizeof(resolvedBootDir), resolvedHddPrefix, sizeof(resolvedHddPrefix)) == 0) {
-                // Set gOPLPart to the exact partition where the ELF was launched from
-                snprintf(gOPLPart, sizeof(gOPLPart), "%s", targetPart);
+                if (targetPart[0] != '\0') {
+                    // Set gOPLPart to the exact partition where the ELF was launched from
+                    snprintf(gOPLPart, sizeof(gOPLPart), "%s", targetPart);
+                }
             }
 
             hddLoadSupportModules();
@@ -1739,11 +1764,15 @@ static void resolveBootDirToMass(void)
                         while (rlen > 0 && gBootDir[rlen - 1] == '/')
                             gBootDir[--rlen] = '\0';
                     }
-                    LOG("BOOT resolved APA boot dir -> %s (part %s)\n", gBootDir, gOPLPart);
-                    configEnd();
-                    configInit(gBootDir);
                     if (gHDDStartMode == START_MODE_DISABLED)
                         gHDDStartMode = START_MODE_AUTO;
+
+                    // Only re-home configInit if gBootDir actually changed (prevents infinite recursion)
+                    if (strcmp(before, gBootDir) != 0) {
+                        LOG("BOOT resolved APA boot dir %s -> %s (part %s)\n", before, gBootDir, gOPLPart);
+                        configEnd();
+                        configInit(gBootDir);
+                    }
                     return;
                 }
             }
