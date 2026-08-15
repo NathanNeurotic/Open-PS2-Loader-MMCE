@@ -1569,7 +1569,7 @@ static int tryAlternateDevice(int types)
         closedir(dir);
         configEnd();
         configInit("mass0:");
-    } else {
+    } else if (gHDDPrefix != NULL) {
         dir = opendir(gHDDPrefix);
         if (dir != NULL) {
             closedir(dir);
@@ -2090,8 +2090,9 @@ static int trySaveConfigBDM(int types)
 static int trySaveConfigHDD(int types)
 {
     hddLoadModules();
+    hddLoadSupportModules();
     // Check that the formatted & usable HDD is connected.
-    if (hddCheck() == 0) {
+    if (hddCheck() == 0 && gHDDPrefix != NULL) {
         configSetMove(gHDDPrefix);
         return configWriteMulti(types);
     }
@@ -2107,23 +2108,20 @@ static int trySaveConfigMC(int types)
 
 static int trySaveAlternateDevice(int types)
 {
-    // Big enough for a real device prefix and ZEROED first: getcwd() into a bare char[8] left the
-    // buffer as stack garbage when it failed (this function is only reachable when the boot
-    // identity could not be determined -- exactly when getcwd is most likely to fail), and the
-    // strncmp probes below then read uninitialised bytes. A "mass"-shaped garbage match steered
-    // the save at a device that was never the cwd.
-    char pwd[16] = {0};
+    char pwd[64] = {0};
     int value;
 
-    if (getcwd(pwd, sizeof(pwd)) == NULL)
+    if (gBootDir[0] != '\0')
+        snprintf(pwd, sizeof(pwd), "%s", gBootDir);
+    else if (getcwd(pwd, sizeof(pwd)) == NULL)
         pwd[0] = '\0';
 
     // First, try the device that OPL booted from.
-    if (!strncmp(pwd, "mass", 4) && (pwd[4] == ':' || pwd[5] == ':')) {
-        if ((value = trySaveConfigBDM(types)) > 0)
-            return value;
-    } else if (!strncmp(pwd, "hdd", 3) && (pwd[3] == ':' || pwd[4] == ':')) {
+    if (!strncmp(pwd, "hdd", 3) || !strncmp(pwd, "pfs", 3)) {
         if ((value = trySaveConfigHDD(types)) > 0)
+            return value;
+    } else if (!strncmp(pwd, "mass", 4) && (pwd[4] == ':' || pwd[5] == ':')) {
+        if ((value = trySaveConfigBDM(types)) > 0)
             return value;
     }
 

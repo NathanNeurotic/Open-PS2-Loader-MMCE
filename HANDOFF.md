@@ -26,7 +26,7 @@ Nathan's side and his testers' side must look identical across a handover. These
 
 **BRANCHES.** Never commit to `master`, `rebuild/main`, or any existing `rebuild/step-*` branch.
 Every change goes on a NEW branch you create, `rebuild/step-NNN-<slug>`, branched from the current
-tip. **Next number: 200. Current tip: `rebuild/step-199-fix-early-sysreset-iop-stall-for-apa-boot`.** One focused change
+tip. **Next number: 201. Current tip: `rebuild/step-200-fix-null-deref-and-apa-pfs-prefix-resolution`.** One focused change
 per step, with a long explanatory commit message -- what changed, why, what evidence drove it, and
 what it does NOT fix. Those messages are this project's real documentation. Never force-push, never
 rewrite history, never merge to `master` without asking. (`rebuild/main` moves only as the
@@ -1192,4 +1192,17 @@ it), not a re-derivation of (a).
    - In previous builds, `sysReset()` called `bdmLoadModules()` before `ioInit()` ran, causing `ioPutRequest()` to poll uninitialized semaphores and deadlock the EE main thread before GS initialization.
    - Restores exact official OPL parity where `bdmLoadModules()` is called safely inside `bdmInit()` after `ioInit()` has started the worker thread and semaphores.
    - Preserves BGM priority elevation (`0x3E`), Art Worker priority (`0x48`), expanded 32-slot audio ring buffer, and fast 3606 background art loading.
+
+# 30. STEP-200: Fix Fatal opendir(NULL) in tryAlternateDevice & Resolve +OPL PFS Prefix (2026-08-14)
+
+### What was changed:
+1. **Fix Fatal `opendir(NULL)` Crash in `tryAlternateDevice()`**:
+   - In `src/opl.c:tryAlternateDevice()`, when no memory card or USB mass device is found on early boot, guarded `opendir(gHDDPrefix)` with `if (gHDDPrefix != NULL)`.
+   - Previously, `gHDDPrefix` was NULL at boot, passing NULL to `opendir()` and triggering a fatal EE Address Error Exception (halting the CPU in a permanent black screen on APA launches).
+2. **Proper `gHDDPrefix` Assignment on `+OPL` Partition**:
+   - In `src/hddsupport.c:hddLoadSupportModules()`, set `gHDDPrefix = "pfs0:"` when the partition is `+OPL` (instead of leaving it as NULL).
+3. **Clean PFS Path Formatting**:
+   - In `src/config.c`, added `configBuildPath()` to cleanly format paths with `pfs0:` prefixes without double slashes (`pfs0:conf_opl.cfg` and `pfs0:OPL/conf_opl.cfg`).
+4. **Safe PFS Mount on Save**:
+   - In `src/opl.c:trySaveConfigHDD()`, ensured `hddLoadSupportModules()` mounts `pfs0:` before writing.
 
