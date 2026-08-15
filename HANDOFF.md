@@ -26,7 +26,7 @@ Nathan's side and his testers' side must look identical across a handover. These
 
 **BRANCHES.** Never commit to `master`, `rebuild/main`, or any existing `rebuild/step-*` branch.
 Every change goes on a NEW branch you create, `rebuild/step-NNN-<slug>`, branched from the current
-tip. **Next number: 204. Current tip: `rebuild/step-203-seamless-list-mode-rolling-art-warming`.** One focused change
+tip. **Next number: 205. Current tip: `rebuild/step-204-lazy-apa-boot-and-bgm-buffer-expansion`.** One focused change
 per step, with a long explanatory commit message -- what changed, why, what evidence drove it, and
 what it does NOT fix. Those messages are this project's real documentation. Never force-push, never
 rewrite history, never merge to `master` without asking. (`rebuild/main` moves only as the
@@ -1216,6 +1216,7 @@ it), not a re-derivation of (a).
 
 # 28. STEP-202: Include regular ELFs in all 4 flavours in MEGA uploads (2026-08-15)
 
+<<<<<<< HEAD
 ### What changed:
 1. **`.github/workflows/rolling-release.yml`**:
    - In step `Build all-in-one MEGA archive`: Staged the regular standalone ELFs for all four SDK flavours (`PS2DEVROLLING`, `PS2DEVPINNED`, `OFFICIALROLLING`, `OFFICIALPINNED`) into `mega-out/`.
@@ -1230,4 +1231,11 @@ Switching from Coverflow back to List Mode exhibited noticeable cover artwork lo
 ### Solution:
 1. **`src/themes.c`**: Restored `COVER_WARM_RADIUS` to `2` for List Mode (`drawItemsList`), giving List Mode the same smooth rolling lookahead warming as Coverflow.
 2. **`src/opl.c`**: Gated `tarInvalidate(TAR_KIND_ART)`, `cacheInvalidateFailMemo()`, and `artIndexInvalidate()` on `skipDeviceRefresh == 0`, keeping archive and directory indices warm during pure theme/color UI transitions.
+
+# 30. STEP-204: Lazy-load APA HDD boot CWD resolution, BGM ring buffer expansion & instant master background loading (2026-08-15)
+
+### What changed:
+1. **`src/opl.c`**: In `resolveBootDirToMass()`, added lazy-loading for APA HDD boots (`hdd*` / `pfs*`). It calls `hddLoadModules()` and `hddLoadSupportModules()`, mounts the active partition to `pfs0:`, validates the mount via `opendir(gHDDPrefix)`, rewrites `gBootDir` to `gHDDPrefix` (e.g. `pfs0:` or `pfs0:OPL`), homes config sets directly there, and sets `gHDDStartMode = START_MODE_AUTO`.
+2. **`src/sound.c`**: Expanded `BGM_RING_BUFFER_COUNT` from `32` to `128` (512 KB, ~2.9s of audio buffering), providing ample pre-buffered headroom to glide through USB background reads without audio dropouts (Issue #364).
+3. **`src/themes.c`**: Removed artificial `guiInactiveFrames >= list->delay` background loading idle deferral in `drawGameImage`, restoring master's immediate frame-0 background art loading with zero delay.
 

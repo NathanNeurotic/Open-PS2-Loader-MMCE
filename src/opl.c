@@ -1569,12 +1569,15 @@ static int tryAlternateDevice(int types)
         closedir(dir);
         configEnd();
         configInit("mass0:");
-    } else if (gHDDPrefix != NULL) {
-        dir = opendir(gHDDPrefix);
-        if (dir != NULL) {
-            closedir(dir);
-            configEnd();
-            configInit(gHDDPrefix);
+    } else if (hddLoadModules() >= 0) {
+        hddLoadSupportModules();
+        if (gHDDPrefix != NULL) {
+            dir = opendir(gHDDPrefix);
+            if (dir != NULL) {
+                closedir(dir);
+                configEnd();
+                configInit(gHDDPrefix);
+            }
         }
     }
     showCfgPopup = 0;
@@ -1628,11 +1631,34 @@ static void resolveBootDirToMass(void)
     if (gBootDir[0] == '\0')
         return;
 
-    // uLE hands APA-HDD boots as "hdd0:<partition>:pfs:/..." -- a launch identity OPL can never open
-    // (OPL's own APA mount is pfs0: on the +OPL partition, a different namespace). Unresolvable: drop
-    // to legacy discovery, whose checkLoadConfigHDD probes the APA config location properly.
-    if (!strncmp(gBootDir, "hdd", 3)) {
-        LOG("BOOT unresolvable APA boot dir %s -> legacy discovery\n", gBootDir);
+    // APA-HDD boot: WLE-R3Z / uLE / FHDB / HDD-OSD hand paths like "hdd0:__common/OPL", "hdd0:+OPL",
+    // "hdd0:__sysconf:pfs:/FMCB", "hdd1:...", or "pfs0:OPL".
+    // Lazy-load the APA HDD modules and PFS filesystem, resolving gBootDir to the mounted pfs0: path
+    // so config and CWD live on the APA partition beside the ELF with no multi-device probe discovery.
+    if (!strncmp(gBootDir, "hdd", 3) || !strncmp(gBootDir, "pfs", 3)) {
+        if (hddLoadModules() >= 0) {
+            hddLoadSupportModules();
+            if (gHDDPrefix != NULL && gHDDPrefix[0] != '\0') {
+                DIR *dir = opendir(gHDDPrefix);
+                if (dir != NULL) {
+                    closedir(dir);
+                    char resolved[sizeof(gBootDir)];
+                    snprintf(resolved, sizeof(resolved), "%s", gHDDPrefix);
+                    size_t rlen = strlen(resolved);
+                    while (rlen > 0 && resolved[rlen - 1] == '/')
+                        resolved[--rlen] = '\0';
+
+                    LOG("BOOT resolved APA boot dir %s -> %s\n", gBootDir, resolved);
+                    snprintf(gBootDir, sizeof(gBootDir), "%s", resolved);
+                    configEnd();
+                    configInit(gBootDir);
+                    if (gHDDStartMode == START_MODE_DISABLED)
+                        gHDDStartMode = START_MODE_AUTO;
+                    return;
+                }
+            }
+        }
+        LOG("BOOT APA boot dir %s failed to mount -> fallback to MC\n", gBootDir);
         gBootDir[0] = '\0';
         configEnd();
         configInit(NULL);
