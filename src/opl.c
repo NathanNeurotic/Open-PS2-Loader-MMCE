@@ -1470,43 +1470,6 @@ static int prepareCustomSettingsPath(char *path, int pathLen)
     if (path == NULL || path[0] == '\0')
         return 0;
 
-    // APA HDD / PFS paths: translate "hdd0:+OPL", "hdd0:/+OPL", "+OPL", "+OPL/CFG", "pfs0:...", "hdd0:__common..."
-    // to the mounted PFS path.
-    if (!strncmp(path, "hdd", 3) || path[0] == '+' || !strncmp(path, "pfs", 3) || !strncmp(path, "__common", 8)) {
-        hddLoadModules();
-        hddLoadSupportModules();
-
-        if (path[0] == '+') {
-            const char *slash = strchr(path, '/');
-            if (slash != NULL && slash[1] != '\0')
-                snprintf(path, pathLen, "pfs0:%s", slash + 1);
-            else
-                snprintf(path, pathLen, "pfs0:");
-        } else if (!strncmp(path, "__common", 8)) {
-            const char *slash = strchr(path, '/');
-            if (slash != NULL && slash[1] != '\0')
-                snprintf(path, pathLen, "pfs0:%s", slash + 1);
-            else
-                snprintf(path, pathLen, "pfs0:OPL/");
-        } else if (!strncmp(path, "hdd", 3)) {
-            const char *oplSub = strstr(path, "+OPL");
-            if (oplSub != NULL) {
-                const char *slash = strchr(oplSub, '/');
-                if (slash != NULL && slash[1] != '\0')
-                    snprintf(path, pathLen, "pfs0:%s", slash + 1);
-                else
-                    snprintf(path, pathLen, "pfs0:");
-            } else {
-                const char *pfsSub = strstr(path, ":pfs:/");
-                if (pfsSub != NULL)
-                    snprintf(path, pathLen, "pfs0:%s", pfsSub + 5);
-                else
-                    snprintf(path, pathLen, "%s", gHDDPrefix ? gHDDPrefix : "pfs0:");
-            }
-        }
-        return 0; // ready for configSetMove / configInit
-    }
-
     // Not a BDM namespace -> nothing to load; mc?: is ROM-backed and pfs0:/mmce are handled by their
     // own stacks, which are already up by the time a save runs.
     if (strncmp(path, "mass", 4) && strncmp(path, "usb", 3) && strncmp(path, "ata", 3) &&
@@ -1607,10 +1570,9 @@ static int tryAlternateDevice(int types)
         configEnd();
         configInit("mass0:");
     } else {
-        value = checkLoadConfigHDD(types);
-        if (value & CONFIG_OPL)
-            return value;
-        if (gHDDPrefix != NULL) {
+        dir = opendir(gHDDPrefix);
+        if (dir != NULL) {
+            closedir(dir);
             configEnd();
             configInit(gHDDPrefix);
         }
@@ -1669,7 +1631,7 @@ static void resolveBootDirToMass(void)
     // uLE hands APA-HDD boots as "hdd0:<partition>:pfs:/..." -- a launch identity OPL can never open
     // (OPL's own APA mount is pfs0: on the +OPL partition, a different namespace). Unresolvable: drop
     // to legacy discovery, whose checkLoadConfigHDD probes the APA config location properly.
-    if (!strncmp(gBootDir, "hdd", 3) || !strncmp(gBootDir, "pfs", 3)) {
+    if (!strncmp(gBootDir, "hdd", 3)) {
         LOG("BOOT unresolvable APA boot dir %s -> legacy discovery\n", gBootDir);
         gBootDir[0] = '\0';
         configEnd();
@@ -2128,9 +2090,8 @@ static int trySaveConfigBDM(int types)
 static int trySaveConfigHDD(int types)
 {
     hddLoadModules();
-    hddLoadSupportModules();
     // Check that the formatted & usable HDD is connected.
-    if (hddCheck() == 0 && gHDDPrefix != NULL) {
+    if (hddCheck() == 0) {
         configSetMove(gHDDPrefix);
         return configWriteMulti(types);
     }
@@ -2146,20 +2107,23 @@ static int trySaveConfigMC(int types)
 
 static int trySaveAlternateDevice(int types)
 {
-    char pwd[64] = {0};
+    // Big enough for a real device prefix and ZEROED first: getcwd() into a bare char[8] left the
+    // buffer as stack garbage when it failed (this function is only reachable when the boot
+    // identity could not be determined -- exactly when getcwd is most likely to fail), and the
+    // strncmp probes below then read uninitialised bytes. A "mass"-shaped garbage match steered
+    // the save at a device that was never the cwd.
+    char pwd[16] = {0};
     int value;
 
-    if (gBootDir[0] != '\0')
-        snprintf(pwd, sizeof(pwd), "%s", gBootDir);
-    else if (getcwd(pwd, sizeof(pwd)) == NULL)
+    if (getcwd(pwd, sizeof(pwd)) == NULL)
         pwd[0] = '\0';
 
     // First, try the device that OPL booted from.
-    if (!strncmp(pwd, "hdd", 3) || !strncmp(pwd, "pfs", 3)) {
-        if ((value = trySaveConfigHDD(types)) > 0)
-            return value;
-    } else if (!strncmp(pwd, "mass", 4) && (pwd[4] == ':' || pwd[5] == ':')) {
+    if (!strncmp(pwd, "mass", 4) && (pwd[4] == ':' || pwd[5] == ':')) {
         if ((value = trySaveConfigBDM(types)) > 0)
+            return value;
+    } else if (!strncmp(pwd, "hdd", 3) && (pwd[3] == ':' || pwd[4] == ':')) {
+        if ((value = trySaveConfigHDD(types)) > 0)
             return value;
     }
 

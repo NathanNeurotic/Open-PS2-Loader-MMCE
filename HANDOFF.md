@@ -26,7 +26,7 @@ Nathan's side and his testers' side must look identical across a handover. These
 
 **BRANCHES.** Never commit to `master`, `rebuild/main`, or any existing `rebuild/step-*` branch.
 Every change goes on a NEW branch you create, `rebuild/step-NNN-<slug>`, branched from the current
-tip. **Next number: 199. Current tip: `rebuild/step-198-restore-official-apa-boot-path`.** One focused change
+tip. **Next number: 200. Current tip: `rebuild/step-199-fix-early-sysreset-iop-stall-for-apa-boot`.** One focused change
 per step, with a long explanatory commit message -- what changed, why, what evidence drove it, and
 what it does NOT fix. Those messages are this project's real documentation. Never force-push, never
 rewrite history, never merge to `master` without asking. (`rebuild/main` moves only as the
@@ -1183,4 +1183,13 @@ it), not a re-derivation of (a).
 1. **Official OPL APA Boot Parity**:
    - Restored `resolveBootDirToMass()` and `tryAlternateDevice()` in `src/opl.c` to exact official OPL behavior: on APA/PFS boots, `gBootDir` is blanked to allow the GUI, GS context, and greeting splash to initialize immediately without early synchronous DEV9/ATA module stalls.
    - Preserves BGM priority elevation (`0x3E`), Art Worker priority (`0x48`), expanded 32-slot audio ring buffer, fast 3606 background art loading, and safe `pfs0:` mounting on save.
+
+# 29. STEP-199: Fix Early sysReset IOP Stall & Premature bdmLoadModules (2026-08-14)
+
+### What was changed:
+1. **Eliminate Premature `bdmLoadModules()` in `sysReset()`**:
+   - Removed the `if (modload_mask & SYS_LOAD_USB_MODULES) { bdmLoadModules(); }` call from `sysReset()` in `src/system.c`.
+   - In previous builds, `sysReset()` called `bdmLoadModules()` before `ioInit()` ran, causing `ioPutRequest()` to poll uninitialized semaphores and deadlock the EE main thread before GS initialization.
+   - Restores exact official OPL parity where `bdmLoadModules()` is called safely inside `bdmInit()` after `ioInit()` has started the worker thread and semaphores.
+   - Preserves BGM priority elevation (`0x3E`), Art Worker priority (`0x48`), expanded 32-slot audio ring buffer, and fast 3606 background art loading.
 

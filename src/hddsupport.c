@@ -409,8 +409,6 @@ void hddLoadSupportModules(void)
         if (gOPLPart[5] != '+') {
             hddCheckOPLFolder(hddPrefix);
             gHDDPrefix = "pfs0:OPL/";
-        } else {
-            gHDDPrefix = "pfs0:";
         }
     }
 }

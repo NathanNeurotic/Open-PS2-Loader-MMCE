@@ -277,9 +277,6 @@ void sysReset(int modload_mask)
     LOG("[USBD]:\n");
     sysLoadModuleBuffer(&usbd_irx, size_usbd_irx, 0, NULL);
 
-    if (modload_mask & SYS_LOAD_USB_MODULES) {
-        bdmLoadModules();
-    }
     if (modload_mask & SYS_LOAD_ISOFS_MODULE) {
         LOG("[ISOFS]:\n");
         sysLoadModuleBuffer(&isofs_irx, size_isofs_irx, 0, NULL);

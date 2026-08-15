@@ -292,18 +292,6 @@ void configPrepareNotifications(char *prefix)
         *(colpos + 1) = '\0';
 }
 
-static void configBuildPath(char *out, size_t outSize, const char *prefix, const char *filename)
-{
-    size_t len = prefix ? strlen(prefix) : 0;
-    if (len == 0) {
-        snprintf(out, outSize, "%s", filename);
-    } else if (prefix[len - 1] == '/' || prefix[len - 1] == ':') {
-        snprintf(out, outSize, "%s%s", prefix, filename);
-    } else {
-        snprintf(out, outSize, "%s/%s", prefix, filename);
-    }
-}
-
 void configInit(char *prefix)
 {
     char path[256];
@@ -312,10 +300,10 @@ void configInit(char *prefix)
     if (!prefix)
         prefix = gBaseMCDir;
 
-    configBuildPath(legacyNetConfigPath, sizeof(legacyNetConfigPath), prefix, "IPCONFIG.DAT");
+    snprintf(legacyNetConfigPath, sizeof(legacyNetConfigPath), "%s/IPCONFIG.DAT", prefix);
 
     for (i = 0; i < CONFIG_INDEX_COUNT; i++) {
-        configBuildPath(path, sizeof(path), prefix, configFilenames[i]);
+        snprintf(path, sizeof(path), "%s/%s", prefix, configFilenames[i]);
         configAlloc(1 << i, &configFiles[i], path);
     }
 
@@ -330,10 +318,10 @@ void configSetMove(char *prefix)
     if (!prefix)
         prefix = gBaseMCDir;
 
-    configBuildPath(legacyNetConfigPath, sizeof(legacyNetConfigPath), prefix, "IPCONFIG.DAT");
+    snprintf(legacyNetConfigPath, sizeof(legacyNetConfigPath), "%s/IPCONFIG.DAT", prefix);
 
     for (i = 0; i < CONFIG_INDEX_COUNT; i++) {
-        configBuildPath(path, sizeof(path), prefix, configFilenames[i]);
+        snprintf(path, sizeof(path), "%s/%s", prefix, configFilenames[i]);
         configMove(&configFiles[i], path);
     }
 
