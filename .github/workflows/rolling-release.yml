@@ -970,7 +970,25 @@ jobs:
           done
           ( cd rolling && zip -r -X "../mega-out/${ARCHIVE}" $MEGA_FILES >/dev/null )
 
-          echo "MEGA_ARCHIVE=mega-out/${ARCHIVE}" >> "$GITHUB_ENV"
+          # Copy the regular standalone ELFs in all 4 flavours so they are available
+          # directly in the MEGA folder alongside the all-in-one archive.
+          for elf in "rolling/${VERSIONED_BASE}-PS2DEVROLLING.ELF" \
+                     "rolling/${VERSIONED_BASE}-PS2DEVPINNED.ELF" \
+                     "rolling/${VERSIONED_BASE}-OFFICIALROLLING.ELF" \
+                     "rolling/${VERSIONED_BASE}-OFFICIALPINNED.ELF"; do
+            if [ -f "$elf" ]; then
+              cp -f "$elf" mega-out/
+            fi
+          done
+
+          MEGA_UPLOAD_FILES="mega-out/${ARCHIVE}"
+          for f in mega-out/*.ELF; do
+            if [ -f "$f" ]; then
+              MEGA_UPLOAD_FILES="$MEGA_UPLOAD_FILES $f"
+            fi
+          done
+          echo "MEGA_UPLOAD_FILES=${MEGA_UPLOAD_FILES}" >> "$GITHUB_ENV"
+
           # Suggested layout: /RiptOPL/Rolling/<version>/run_<run number>/ -- run number keeps every
           # build in its own immutable folder (nothing is ever overwritten on MEGA).
           echo "MEGA_REMOTE_DIR=/RiptOPL/Rolling/${VER}/run_${GITHUB_RUN_NUMBER}/" >> "$GITHUB_ENV"
@@ -979,8 +997,10 @@ jobs:
           unzip -l "mega-out/${ARCHIVE}"
           echo "== MEGA archive SHA256 =="
           sha256sum "mega-out/${ARCHIVE}" | tee "mega-out/${ARCHIVE}.sha256"
+          echo "== MEGA staged files for upload =="
+          ls -la mega-out
 
-      - name: Upload the all-in-one archive to MEGA
+      - name: Upload archive and regular ELFs in all 4 flavours to MEGA
         if: (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/rebuild/main') && env.USERNAME != '' && env.PASSWORD != ''
         # Pinned to a full commit SHA rather than @master: this third-party action runs with the
         # MEGA credentials, so freeze it to a reviewed snapshot instead of trusting whatever is on
@@ -988,8 +1008,8 @@ jobs:
         # validated for this change, so behavior is identical. Bump deliberately (re-review first).
         uses: Difegue/action-megacmd@bf698c68edaf91143b2a52d3468595202011bf17 # v1.4.0
         with:
-          # Runs `mega-put -c <archive> <remotedir>/`: -c creates the remote folder path if missing,
-          # the trailing slash puts the file INTO that folder. Uploads ONLY the single all-in-one
-          # zip -- individual assets are NOT uploaded separately. Credentials come from the job-level
+          # Runs `mega-put -c <files...> <remotedir>/`: -c creates the remote folder path if missing,
+          # the trailing slash puts the files INTO that folder. Uploads the all-in-one zip archive
+          # and the regular ELFs for all four SDK flavours. Credentials come from the job-level
           # USERNAME/PASSWORD env, which this action reads by those exact names.
-          args: put -c ${{ env.MEGA_ARCHIVE }} ${{ env.MEGA_REMOTE_DIR }}
+          args: put -c ${{ env.MEGA_UPLOAD_FILES }} ${{ env.MEGA_REMOTE_DIR }}

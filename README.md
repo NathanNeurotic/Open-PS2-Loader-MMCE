@@ -332,7 +332,7 @@ contains and how to pull it.
 
 > 🗄️ **Permanent archive (MEGA):** the GitHub `rolling` pre-release only ever holds the *latest*
 > build — every push overwrites it. So **every** rolling build is also archived permanently to MEGA
-> as one self-contained zip of the installable payload (both loader ELFs, the installable
+> as one self-contained zip of the installable payload (all four loader ELFs, the installable
 > package zip, the source snapshot, `SHA256SUMS.txt`, and the IRX manifests — the large VARIANTS
 > and DEBUG diagnostic bundles stay on the GitHub release only). Click the **MEGA**
 > badge at the top of this README — or [browse the archive here](https://mega.nz/folder/74pRHKRB#9SLDkrkvZAbeKO4Qvxg9LQ) —
