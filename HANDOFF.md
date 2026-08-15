@@ -1216,7 +1216,6 @@ it), not a re-derivation of (a).
 
 # 28. STEP-202: Include regular ELFs in all 4 flavours in MEGA uploads (2026-08-15)
 
-<<<<<<< HEAD
 ### What changed:
 1. **`.github/workflows/rolling-release.yml`**:
    - In step `Build all-in-one MEGA archive`: Staged the regular standalone ELFs for all four SDK flavours (`PS2DEVROLLING`, `PS2DEVPINNED`, `OFFICIALROLLING`, `OFFICIALPINNED`) into `mega-out/`.
@@ -1253,4 +1252,16 @@ wLaunchELF-R3Z supports dual HDDs (`hdd0:` and `hdd1:`) and passes `argv[0]` as 
    - Extracts any nested subfolder (e.g. `OPL`, `FMCB`, `APPS/OPL`), resolving `gBootDir` to `pfs0:<subfolder>` (or `pfs0:` for root) and stripping any terminal ELF binary name.
    - Validates the mount via `opendir()`, homes configuration sets directly there, and sets `gHDDStartMode = START_MODE_AUTO` using `hddLoadModulesReady()`.
 
+# 32. STEP-206: Fix APA Boot Directory Resolution Infinite Recursion (2026-08-15)
 
+## Problem
+
+When booting from an APA HDD path (such as `hdd0:/__common/OPL/OPNPSX.ELF` or `hdd0:__common:pfs:/OPL/OPNPSX.ELF` from wLaunchELF-R3Z / uLE / FHDB), `configInit()` called `_loadConfig()`, which called `resolveBootDirToMass()`. Inside `resolveBootDirToMass()`, `gBootDir` was resolved to `pfs0:OPL` and re-homed by calling `configEnd(); configInit(gBootDir);`. In that second `configInit()` call, `_loadConfig()` ran again, triggered `resolveBootDirToMass()` on `pfs0:OPL`, and unconditionally re-homed `configInit(gBootDir)` in an infinite recursive loop. This blew the EE call stack within milliseconds, hanging the PlayStation 2 in a permanent black screen prior to graphics initialization.
+
+## Solution
+
+1. **`src/opl.c:resolveBootDirToMass()`**:
+   - Recorded `before` boot directory buffer before APA path parsing.
+   - Gated the `configEnd(); configInit(gBootDir);` re-homing call on `if (strcmp(before, gBootDir) != 0)`. On the re-homed pass (`before == "pfs0:OPL"`), execution terminates cleanly without re-entering `configInit()`.
+2. **`src/opl.c:apaParseBootPath()`**:
+   - Added direct support for already-mounted PFS paths (`pfs0:OPL`, `pfs0:`), populating `outBootDir` and `outHddPrefix` cleanly and returning success without rejecting `pfs` prefixes.
