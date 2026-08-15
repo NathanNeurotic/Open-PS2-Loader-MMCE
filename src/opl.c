@@ -1569,7 +1569,7 @@ static int tryAlternateDevice(int types)
         closedir(dir);
         configEnd();
         configInit("mass0:");
-    } else if (hddLoadModules() >= 0) {
+    } else if (hddLoadModulesReady()) {
         hddLoadSupportModules();
         if (gHDDPrefix != NULL) {
             dir = opendir(gHDDPrefix);
@@ -1701,7 +1701,7 @@ static void resolveBootDirToMass(void)
     // Lazy-load the APA HDD modules and PFS filesystem, resolving gBootDir to the mounted pfs0: path
     // so config and CWD live on the APA partition beside the ELF with no multi-device probe discovery.
     if (!strncmp(gBootDir, "hdd", 3) || !strncmp(gBootDir, "pfs", 3)) {
-        if (hddLoadModules() >= 0) {
+        if (hddLoadModulesReady()) {
             char targetPart[64] = {0};
             char resolvedBootDir[sizeof(gBootDir)] = {0};
             char resolvedHddPrefix[64] = {0};
