@@ -26,7 +26,7 @@ Nathan's side and his testers' side must look identical across a handover. These
 
 **BRANCHES.** Never commit to `master`, `rebuild/main`, or any existing `rebuild/step-*` branch.
 Every change goes on a NEW branch you create, `rebuild/step-NNN-<slug>`, branched from the current
-tip. **Next number: 188. Current tip: `rebuild/step-187-restore-master-audio-engine`.** One focused change
+tip. **Next number: 189. Current tip: `rebuild/step-188-apa-handling-parity`.** One focused change
 per step, with a long explanatory commit message -- what changed, why, what evidence drove it, and
 what it does NOT fix. Those messages are this project's real documentation. Never force-push, never
 rewrite history, never merge to `master` without asking. (`rebuild/main` moves only as the
@@ -1153,3 +1153,18 @@ the intermittent-`open()`-stall suspicion (3–8 ms normal, 2730 ms occasional) 
 by elimination. If the question looks wrong to you, SAY SO — Nathan is bringing in fresh
 perspective deliberately. But bring evidence (the `W` reading above is built to provide
 it), not a re-derivation of (a).
+
+# 26. STEP-188: APA HDD Handling Parity & Memory Safety Hardening (2026-08-15)
+
+### What changed:
+1. **`src/hdd.c` Memory Safety & Buffer Overflow Fixes**:
+   - `hddGetFileBlockInfo`: Fixed out-of-bounds heap over-read by replacing `memcpy(blocks, inode->data, max * sizeof(pfs_blockinfo_t))` with `memcpy(blocks, inode->data, inode->number_data * sizeof(pfs_blockinfo_t))`.
+   - `hddGetPartitionInfo`: Added `nsub > APA_MAXSUB` clamping before copying to `parts[APA_MAXSUB + 1]`, preventing stack buffer corruption on invalid/corrupted APA partition headers.
+   - `hddGetHDLGamelist`: Restored `saw_hdl` check to return `-ENOMEM` when partitions exist on disk but all memory allocations fail.
+
+2. **`src/opl.c` APA/PFS Boot & CWD Discovery**:
+   - `resolveBootDirToMass`: Preserved `gBootDir` when booting from `hdd` or `pfs` partitions (FHDB, uLE HDD, `hdd0:+OPL`, `hdd0:__common`) so downstream discovery recognizes the HDD boot context without blocking early boot.
+   - `tryAlternateDevice`: Restored `checkLoadConfigHDD(types)` probe so booting from HDD/APA without a memory card config mounts `+OPL` to `pfs0:` and loads `conf_opl.cfg` / `conf_hdd.cfg` (and legacy `conf_riptopl.cfg`), setting `START_MODE_AUTO` for HDD mode.
+   - `trySaveAlternateDevice`: Expanded `pwd` buffer from 16 to 64 bytes and prioritized HDD/PFS saves when booted from HDD, preventing settings from being misdirected to a Memory Card.
+   - `trySaveConfigHDD`: Ensured `hddLoadSupportModules()` is called before `hddCheck()` so `pfs0:` is mounted before saving.
+
