@@ -1634,8 +1634,9 @@ static int apaParseBootPath(const char *bootPath, char *outPart, size_t partSize
     if (bootPath == NULL)
         return -1;
 
-    // Direct PFS mount paths (e.g. "pfs0:OPL", "pfs0:")
-    if (!strncmp(bootPath, "pfs", 3)) {
+    // Direct PFS mount paths (e.g. "pfs0:OPL", "pfs0:", "pfs:OPL")
+    if (bootPath[0] == 'p' && bootPath[1] == 'f' && bootPath[2] == 's' &&
+        ((isdigit((unsigned char)bootPath[3]) && bootPath[4] == ':') || bootPath[3] == ':')) {
         if (outBootDir != NULL && bootDirSize > 0)
             snprintf(outBootDir, bootDirSize, "%s", bootPath);
         if (outHddPrefix != NULL && prefixSize > 0) {
