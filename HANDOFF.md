@@ -1241,13 +1241,16 @@ Switching from Coverflow back to List Mode exhibited noticeable cover artwork lo
 
 # 31. STEP-205: WLE-R3Z Multi-HDD and Subfolder Boot Path Parser (2026-08-15)
 
-### Problem:
+## Problem
+
 wLaunchELF-R3Z supports dual HDDs (`hdd0:` and `hdd1:`) and passes `argv[0]` as a full path containing partition names and arbitrary subfolders (e.g. `hdd0:/__common/OPL/OPNPSX.ELF`, `hdd0:/__sysconf/FMCB/OPNPSX.ELF`, `hdd1:/__common/OPL/OPNPSX.ELF`, `hdd0:__sysconf:pfs:/FMCB/OPNPSX.ELF`, or `hdd0:/__contents/APPS/OPL/OPNPSX.ELF`). OPL previously hardcoded `hdd0:+OPL` when mounting PFS, ignoring the ELF's actual partition and subfolder, or misparsed paths with leading slashes following the drive prefix, leading to unmounted filesystems and black screens.
 
-### Solution:
+## Solution
+
 1. **`src/opl.c`**: Added `apaParseBootPath()` to robustly parse all APA path variations from WLE-R3Z / uLE / FHDB / HDD-OSD:
-   - Identifies drive units (`hdd0` vs `hdd1`).
+   - Identifies drive units (`hdd0` vs `hdd1`) and rejects invalid/unsupported prefixes.
    - Extracts the specific partition name into `gOPLPart` (e.g. `hdd0:__common`, `hdd0:__sysconf`, `hdd1:__common`, `hdd0:+OPL`).
-   - Extracts any nested subfolder (e.g. `OPL`, `FMCB`, `APPS/OPL`), resolving `gBootDir` to `pfs0:<subfolder>` (or `pfs0:` for root).
-   - Validates the mount via `opendir()`, homes configuration sets directly there, and sets `gHDDStartMode = START_MODE_AUTO`.
+   - Extracts any nested subfolder (e.g. `OPL`, `FMCB`, `APPS/OPL`), resolving `gBootDir` to `pfs0:<subfolder>` (or `pfs0:` for root) and stripping any terminal ELF binary name.
+   - Validates the mount via `opendir()`, homes configuration sets directly there, and sets `gHDDStartMode = START_MODE_AUTO` using `hddLoadModulesReady()`.
+
 

@@ -1633,6 +1633,9 @@ static int apaParseBootPath(const char *bootPath, char *outPart, size_t partSize
 {
     if (bootPath == NULL || strncmp(bootPath, "hdd", 3) != 0)
         return -1;
+    // Strictly accept only unit numbers 0 and 1 followed by ':' or '/'
+    if (bootPath[3] != '0' && bootPath[3] != '1')
+        return -1;
 
     const char *p = bootPath;
     char unit[16] = "hdd0";
@@ -1679,6 +1682,16 @@ static int apaParseBootPath(const char *bootPath, char *outPart, size_t partSize
     subfolder[i] = '\0';
     while (i > 0 && subfolder[i - 1] == '/')
         subfolder[--i] = '\0';
+
+    // If an ELF filename is present at the tail of the path, strip it to leave only the directory
+    char *dot = strrchr(subfolder, '.');
+    if (dot != NULL && (!strcasecmp(dot, ".elf") || !strcasecmp(dot, ".ELF"))) {
+        char *lastSlash = strrchr(subfolder, '/');
+        if (lastSlash != NULL)
+            *lastSlash = '\0';
+        else
+            subfolder[0] = '\0';
+    }
 
     snprintf(outPart, partSize, "%s:%s", unit, part);
     if (subfolder[0] != '\0') {
