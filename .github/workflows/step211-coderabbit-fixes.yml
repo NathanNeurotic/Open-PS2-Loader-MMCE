@@ -10,11 +10,11 @@ permissions:
 
 jobs:
   patch:
-    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: rebuild/step-211-consolidated-apa-config-safety
           fetch-depth: 0
 
       - name: Apply accepted CodeRabbit fixes
