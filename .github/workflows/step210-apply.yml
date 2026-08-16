@@ -1,0 +1,271 @@
+name: step210-apply-common-fallback
+
+on:
+  push:
+    branches:
+      - rebuild/step-210-common-config-fallback-no-apa-create
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: rebuild/step-210-common-config-fallback-no-apa-create
+          fetch-depth: 0
+
+      - name: Apply Step 210 policy
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path, old, new):
+              p = Path(path)
+              s = p.read_text()
+              count = s.count(old)
+              if count != 1:
+                  raise SystemExit(f"{path}: expected exactly one match, found {count}")
+              p.write_text(s.replace(old, new, 1))
+
+          # 1) HDD ownership: conf_hdd.cfg is the only redirect away from __common.
+          old = '''    // Prefer the conventional +OPL partition when it ALREADY exists.
+              if (hddPartitionMountable("hdd0:+OPL")) {
+                  snprintf(gOPLPart, sizeof(gOPLPart), "hdd0:+OPL");
+                  LOG("HDD: using existing +OPL data partition\\n");
+                  return;
+              }
+
+              // Safe final fallback: __common is a standard existing system PFS partition. OPL data
+              // lives in its OPL/ directory; creating folders/files inside a mounted PFS partition is
+              // ordinary filesystem I/O and does not alter the APA partition table.
+              if (hddPartitionMountable("hdd0:__common")) {
+                  snprintf(gOPLPart, sizeof(gOPLPart), "hdd0:__common");
+                  LOG("HDD: +OPL unavailable; falling back to existing __common/OPL/\\n");
+                  return;
+              }
+          '''
+          new = '''    // No usable configured target: __common/OPL is the canonical safe HDD home.
+              // Do NOT opportunistically select +OPL merely because it exists. A +OPL (or any other
+              // partition) is used only when __common/OPL/conf_hdd.cfg explicitly points to it.
+              // This keeps ownership deterministic and guarantees that discovery never needs to
+              // manufacture an APA partition just to obtain a writable config/data home.
+              if (hddPartitionMountable("hdd0:__common")) {
+                  snprintf(gOPLPart, sizeof(gOPLPart), "hdd0:__common");
+                  LOG("HDD: no usable configured data partition; using canonical __common/OPL/ fallback\\n");
+                  return;
+              }
+          '''
+          replace_once('src/hddsupport.c', old, new)
+
+          # 2) Track whether this save used an HDD fallback so the success UI tells the user.
+          replace_once(
+              'src/opl.c',
+              'static char gLastSaveTarget[sizeof(gCustomSettingsPath)];\n',
+              'static char gLastSaveTarget[sizeof(gCustomSettingsPath)];\n'
+              'static int gHddSettingsFallbackNotice = 0;\n'
+              'static int gBootHddCommonFallback = 0;\n'
+          )
+
+          # 3) Add a safe resolver for the NORMAL HDD home after an explicit HDD custom path fails.
+          marker = '''// Make a typed settings path usable: the user may name a device that is not mounted yet. APA/PFS
+          // paths are handled first and rewritten to OPL's already-mounted pfs0: data partition; BDM paths
+          // keep the existing transport resolver. An unreachable EXPLICIT target is an error, never a cue
+          // to scatter settings onto another device.
+          static int prepareCustomSettingsPath(char *path, int pathLen)
+          '''
+          replacement = '''static int isApaSettingsPath(const char *path)
+          {
+              return path != NULL && (!strncmp(path, "hdd", 3) || !strncmp(path, "pfs", 3) || path[0] == '+');
+          }
+
+          // Resolve the normal safe HDD settings home after an explicit HDD path cannot be used.
+          // hddLoadSupportModules owns the policy: honour an existing conf_hdd.cfg target first;
+          // otherwise mount the guaranteed __common partition and use __common/OPL/. It never creates
+          // or formats an APA partition. This helper only accepts the resulting mounted PFS namespace.
+          static int prepareHddSettingsFallback(char *path, int pathLen)
+          {
+              DIR *dir;
+              int n;
+
+              if (!hddLoadModulesReady())
+                  return -1;
+
+              hddLoadSupportModules();
+              if (gHDDPrefix == NULL || gHDDPrefix[0] == '\\0')
+                  return -1;
+
+              dir = opendir(gHDDPrefix);
+              if (dir == NULL)
+                  return -1;
+              closedir(dir);
+
+              n = snprintf(path, pathLen, "%s", gHDDPrefix);
+              return (n >= 0 && n < pathLen) ? 1 : -1;
+          }
+
+          // Make a typed settings path usable: the user may name a device that is not mounted yet. APA/PFS
+          // paths are handled first and rewritten to OPL's already-mounted pfs0: data partition; BDM paths
+          // keep the existing transport resolver. HDD targets have a deterministic safe fallback in
+          // _saveConfig(); non-HDD explicit targets still fail rather than scattering settings elsewhere.
+          static int prepareCustomSettingsPath(char *path, int pathLen)
+          '''
+          replace_once('src/opl.c', marker, replacement)
+
+          replace_once(
+              'src/opl.c',
+              '''    if (!strncmp(path, "hdd", 3) || !strncmp(path, "pfs", 3) || path[0] == '+')
+                  return prepareCustomApaSettingsPath(path, pathLen);
+          ''',
+              '''    if (isApaSettingsPath(path))
+                  return prepareCustomApaSettingsPath(path, pathLen);
+          '''
+          )
+
+          # 4) APA boot resolution: never fall back to MC/raw CWD. If normal resolution somehow cannot
+          # mount __common, keep a safe PFS home that will fail closed instead of writing raw APA.
+          old = '''        LOG("BOOT APA boot dir %s failed to mount -> fallback to MC\\n", gBootDir);
+                  gBootDir[0] = '\\0';
+                  configEnd();
+                  configInit(NULL);
+                  return;
+          '''
+          new = '''        LOG("BOOT APA boot dir %s could not resolve an HDD data home; refusing MC/raw fallback\\n", gBootDir);
+                  snprintf(gBootDir, sizeof(gBootDir), "pfs0:OPL");
+                  gHDDStartMode = START_MODE_AUTO;
+                  gBootHddCommonFallback = 1;
+                  configEnd();
+                  configInit(gBootDir);
+                  return;
+          '''
+          replace_once('src/opl.c', old, new)
+
+          # Mark the ordinary __common choice on an APA boot so the eventual save message makes the
+          # fallback visible. An explicitly configured __common is harmlessly reported as the safe home.
+          old = '''                    gBootHomeApa = 1;
+                              if (gHDDStartMode == START_MODE_DISABLED)
+                                  gHDDStartMode = START_MODE_AUTO;
+          '''
+          new = '''                    gBootHomeApa = 1;
+                              if (!strcmp(gOPLPart, "hdd0:__common"))
+                                  gBootHddCommonFallback = 1;
+                              if (gHDDStartMode == START_MODE_DISABLED)
+                                  gHDDStartMode = START_MODE_AUTO;
+          '''
+          replace_once('src/opl.c', old, new)
+
+          # 5) Explicit HDD custom-path failure now falls back through the normal HDD ownership policy.
+          old = '''        if (prepareCustomSettingsPath(customSettingsTarget, sizeof(customSettingsTarget)) < 0) {
+                      LOG("CONFIG custom settings path %s unreachable; aborting explicit save\\n", gCustomSettingsPath);
+                      if (gLastSaveErrno == 0)
+                          gLastSaveErrno = ENODEV;
+                      lscret = 0;
+                      lscstatus = 0;
+                      return;
+                  }
+                  configSetMove(customSettingsTarget);
+                  customSettingsExplicit = 1;
+          '''
+          new = '''        if (prepareCustomSettingsPath(customSettingsTarget, sizeof(customSettingsTarget)) < 0) {
+                      if (isApaSettingsPath(gCustomSettingsPath) &&
+                          prepareHddSettingsFallback(customSettingsTarget, sizeof(customSettingsTarget)) > 0) {
+                          LOG("CONFIG HDD custom settings path %s unavailable; falling back safely to %s\\n",
+                              gCustomSettingsPath, customSettingsTarget);
+                          configSetMove(customSettingsTarget);
+                          gHddSettingsFallbackNotice = 1;
+                          gLastSaveErrno = 0;
+                      } else {
+                          LOG("CONFIG custom settings path %s unreachable; aborting explicit save\\n", gCustomSettingsPath);
+                          if (gLastSaveErrno == 0)
+                              gLastSaveErrno = ENODEV;
+                          lscret = 0;
+                          lscstatus = 0;
+                          return;
+                      }
+                  } else {
+                      configSetMove(customSettingsTarget);
+                      customSettingsExplicit = 1;
+                  }
+          '''
+          replace_once('src/opl.c', old, new)
+
+          # Reset the per-attempt notice, leaving the boot-time common fallback state intact.
+          replace_once(
+              'src/opl.c',
+              '''    gLastSaveErrno = 0;
+              gLastSaveTarget[0] = '\\0';
+          ''',
+              '''    gLastSaveErrno = 0;
+              gLastSaveTarget[0] = '\\0';
+              gHddSettingsFallbackNotice = 0;
+          '''
+          )
+
+          # Use an explicit localized success message when an HDD fallback was selected.
+          old = '''        if (lscret) {
+                      char *path = configGetDir();
+
+                      snprintf(notification, sizeof(notification), _l(_STR_SETTINGS_SAVED), path);
+
+                      guiMsgBox(notification, 0, NULL);
+          '''
+          new = '''        if (lscret) {
+                      char *path = configGetDir();
+
+                      if (gHddSettingsFallbackNotice || gBootHddCommonFallback)
+                          snprintf(notification, sizeof(notification), _l(_STR_SETTINGS_HDD_FALLBACK), path);
+                      else
+                          snprintf(notification, sizeof(notification), _l(_STR_SETTINGS_SAVED), path);
+
+                      guiMsgBox(notification, 0, NULL);
+          '''
+          replace_once('src/opl.c', old, new)
+
+          # 6) Append the new localized fallback message at the END so existing positional IDs do not move.
+          lang = Path('lng_tmpl/_base.yml')
+          s = lang.read_text()
+          label = '- label: SETTINGS_HDD_FALLBACK\n  string: "HDD settings used the safe fallback home: %s"\n'
+          if 'label: SETTINGS_HDD_FALLBACK' not in s:
+              if not s.endswith('\n'):
+                  s += '\n'
+              s += label
+              lang.write_text(s)
+
+          # 7) Handoff: Step 210 becomes the current tip and documents the deterministic policy.
+          handoff = Path('HANDOFF.md')
+          s = handoff.read_text()
+          old_pointer = 'tip. **Next number: 210. Current tip: `rebuild/step-209-apa-data-integrity-no-create`.**'
+          new_pointer = 'tip. **Next number: 211. Current tip: `rebuild/step-210-common-config-fallback-no-apa-create`.**'
+          if old_pointer not in s:
+              raise SystemExit('HANDOFF.md: Step 209 pointer not found')
+          s = s.replace(old_pointer, new_pointer, 1)
+          if '## Step 210 — deterministic __common HDD config fallback' not in s:
+              s += '''\n\n---\n\n## Step 210 — deterministic __common HDD config fallback\n\nHDD config/data ownership is now deterministic and existing-partitions-only.\n`hdd0:__common/OPL/conf_hdd.cfg` is the sole authority that may redirect OPL to another existing\nPFS partition (normally `+OPL`). If that file is absent, malformed, names a missing/unmountable\npartition, or the HDD boot/custom settings path cannot be resolved, RiptOPL falls back to the\nalready-existing `hdd0:__common` partition and stores its files under `pfs0:OPL/`. It does not\nopportunistically select an unreferenced `+OPL` partition.\n\nAn unreachable explicit HDD custom settings path falls back through the same normal HDD ownership\nresolver and the successful save reports that a safe fallback home was used. Non-HDD custom paths\nretain the fail-visible/no-scatter policy. If even `__common` cannot mount, config remains pointed at\na harmless PFS namespace and the write fails closed; it never falls back to raw `hddN:` or creates,\nformats, resizes, or repairs APA metadata. The raw-APA firewall in `config.c` remains the independent\nlast line of defense.\n'''
+          handoff.write_text(s)
+          PY
+
+      - name: Verify patch shape
+        shell: bash
+        run: |
+          set -euxo pipefail
+          ! grep -R "hddCreateOPLPartition" -n src include
+          ! grep -n 'hddPartitionMountable("hdd0:+OPL")' src/hddsupport.c
+          grep -n 'using canonical __common/OPL/ fallback' src/hddsupport.c
+          grep -n 'SETTINGS_HDD_FALLBACK' src/opl.c lng_tmpl/_base.yml
+          grep -n 'blocked dangerous raw APA write path' src/config.c
+          git diff --check
+
+      - name: Commit production change and remove helper workflow
+        shell: bash
+        run: |
+          set -euxo pipefail
+          rm .github/workflows/step210-apply.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/hddsupport.c src/opl.c src/config.c lng_tmpl/_base.yml HANDOFF.md .github/workflows/step210-apply.yml
+          git diff --cached --check
+          git commit -m "rebuild-210: make __common the deterministic safe HDD fallback"
+          git push origin HEAD:rebuild/step-210-common-config-fallback-no-apa-create
