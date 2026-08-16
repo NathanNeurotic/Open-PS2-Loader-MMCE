@@ -926,6 +926,7 @@ static void drawGameImage(struct menu_list *menu, struct submenu_list *item, con
         // default. Nothing is lost but the order.
         int isBackground = (drawElem->type == ELEM_TYPE_BACKGROUND);
         GSTEXTURE *texture;
+        int coverflowCoverSettled = 1;
 
         if (isBackground) {
             // Prioritize the highlighted game's cover before the background so the small cover
@@ -947,15 +948,32 @@ static void drawGameImage(struct menu_list *menu, struct submenu_list *item, con
                     struct theme_element *cfElem = thmGetElemForItem(menu, item, gTheme->coverflow);
                     if (cfElem != NULL && cfElem->extended != NULL) {
                         mutable_image_t *cfImg = (mutable_image_t *)cfElem->extended;
-                        if (cfImg != NULL && cfImg->cache != NULL)
-                            getGameImageTextureEx(cfImg->cache, menu->item->userdata, &item->item, 1);
+                        if (cfImg != NULL && cfImg->cache != NULL) {
+                            GSTEXTURE *coverTexture = getGameImageTextureEx(cfImg->cache, menu->item->userdata, &item->item, 1);
+
+                            // Coverflow draws after the Background element. If its selected cover is still
+                            // pending, starting a full-screen BG read here would occupy the art worker before
+                            // the carousel gets to enqueue its visible neighbours. Hold only this background
+                            // request for that short window. A loaded cover, disabled art, or a confirmed
+                            // absent cover (-2) releases the gate immediately.
+                            if (gEnableArt && coverTexture == NULL && cfImg->cache->userId >= 0 &&
+                                cfImg->cache->userId < gTheme->gameCacheCount && item->item.cache_id != NULL &&
+                                item->item.cache_id[cfImg->cache->userId] != -2)
+                                coverflowCoverSettled = 0;
+                        }
                     }
                 }
             }
 
-            // Match master: request the background texture immediately on the first frame without
-            // idle-frame deferral, giving instant master-style background loading.
-            texture = getGameImageTexture(gameImage->cache, menu->item->userdata, &item->item);
+            // List mode keeps master's immediate background request. Coverflow is different: its
+            // Background element is painted before the carousel, so on a cold selection the large BG read
+            // could start before the side covers even reach the queue. Draw an already-cached background
+            // while the selected cover settles; the same frame's Coverflow draw then gets first claim on
+            // visible-neighbour reads. This is admission ordering, not an artificial frame delay.
+            if (coverflowCoverSettled)
+                texture = getGameImageTexture(gameImage->cache, menu->item->userdata, &item->item);
+            else
+                texture = getGameImageCached(gameImage->cache, &item->item);
         } else {
             // PRIORITY: the highlighted game's own cover, the one image the user is looking for.
             texture = getGameImageTextureEx(gameImage->cache, menu->item->userdata, &item->item, 1);

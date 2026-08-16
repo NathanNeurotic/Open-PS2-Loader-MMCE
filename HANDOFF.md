@@ -1323,3 +1323,15 @@ Three hardware-driven corrections are intentionally shipped together for one tes
 The Step-209/210/211 data-integrity barriers remain non-negotiable: raw `hddN:` config I/O is blocked,
 `conf_hdd.cfg` may select only an existing mountable PFS target, `__common/OPL/` is the canonical HDD
 fallback, and no config/discovery path creates, formats, resizes, or repairs an APA partition.
+
+### Step 212 follow-up — Coverflow background admission
+
+USB hardware feedback on Beta-2587 (`172569c`) confirmed that background-art throughput and BGM
+continuity were fixed, while Coverflow side-cover arrival became the remaining visible slowdown.
+Coverflow's Background element draws before the carousel; after prioritizing the selected cover it
+could still start a much larger `_BG` read before `drawCoverFlow()` had a chance to enqueue the
+visible neighbouring covers. Step 212 now suppresses only that new background enqueue while the
+selected Coverflow cover is still pending. The cached background may continue drawing; once the
+selected cover is loaded, art is disabled, or the cover is confirmed absent, background admission
+returns to the immediate path. List mode is unchanged. This preserves BGM priority and the dedicated
+art-worker design while ordering USB device work around what the user is visibly waiting for.
