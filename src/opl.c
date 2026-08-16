@@ -1261,6 +1261,7 @@ void setErrorMessagePathCode(int strId, const char *path, int error)
 
 static int lscstatus = CONFIG_ALL;
 static int lscret = 0;
+static char gLastSaveTarget[sizeof(gCustomSettingsPath)];
 
 static int checkLoadConfigBDM(int types)
 {
@@ -1343,6 +1344,9 @@ static int checkLoadConfigHDD(int types)
 // token is unreadable until the transport is up -- so those boots are indistinguishable from a local
 // one here and correctly leave this at 0. See the classification branch for what that costs.
 static int gBootHomeDeferred = 0;
+// Set only after an APA/PFS boot home has successfully mounted. Used after config read because
+// a stored HDD=Disabled value must not turn off the transport OPL itself was launched from.
+static int gBootHomeApa = 0;
 
 // When this function is called, the current device for loading/saving config is the memory card.
 // "Custom Settings Path" bootstrap.
@@ -1480,6 +1484,8 @@ static int prepareCustomApaSettingsPath(char *path, int pathLen)
     const char *p = path;
     const char *unit = "hdd0";
     size_t i = 0;
+    DIR *dir;
+    int n;
 
     if (!strncmp(path, "pfs", 3)) {
         if (path[3] == ':')
@@ -1504,9 +1510,24 @@ static int prepareCustomApaSettingsPath(char *path, int pathLen)
         while (*p == '/' || *p == '\\')
             p++;
         if (*p != '\0')
-            snprintf(canonical, sizeof(canonical), "pfs0:%s", p);
+            n = snprintf(canonical, sizeof(canonical), "pfs0:%s", p);
         else
-            snprintf(canonical, sizeof(canonical), "pfs0:");
+            n = snprintf(canonical, sizeof(canonical), "pfs0:");
+        if (n < 0 || n >= (int)sizeof(canonical) || n >= pathLen) {
+            gLastSaveErrno = ENODEV;
+            return -1;
+        }
+
+        // A custom settings target is a directory. Validate the actual requested directory now
+        // instead of letting configWrite fail later after appending settings_riptopl.cfg.
+        dir = opendir(canonical);
+        if (dir == NULL) {
+            LOG("CONFIG PFS settings directory %s does not exist\n", canonical);
+            gLastSaveErrno = ENOENT;
+            return -1;
+        }
+        closedir(dir);
+
         snprintf(path, pathLen, "%s", canonical);
         return 1;
     }
@@ -1514,8 +1535,11 @@ static int prepareCustomApaSettingsPath(char *path, int pathLen)
     if (path[0] == '+') {
         p = path;
     } else {
-        if (strncmp(path, "hdd", 3) != 0 || (path[3] != '0' && path[3] != '1') || path[4] != ':')
-            return 0;
+        if (strncmp(path, "hdd", 3) != 0 || (path[3] != '0' && path[3] != '1') || path[4] != ':') {
+            LOG("CONFIG malformed APA settings path %s rejected\n", path);
+            gLastSaveErrno = ENODEV;
+            return -1;
+        }
         if (path[3] == '1')
             unit = "hdd1";
         p = path + 5;
@@ -1533,13 +1557,16 @@ static int prepareCustomApaSettingsPath(char *path, int pathLen)
     }
     snprintf(targetPart, sizeof(targetPart), "%s:%s", unit, subfolder);
 
+    // Launchers use both `:pfs:` and `/pfs:` spellings. Strip separators first, then
+    // consume the pseudo-filesystem token so neither spelling leaks `pfs:` into the directory name.
     while (*p != '\0') {
-        if (!strncmp(p, ":pfs:", 5))
-            p += 5;
-        else if (*p == ':' || *p == '/' || *p == '\\')
+        while (*p == ':' || *p == '/' || *p == '\\')
             p++;
-        else
-            break;
+        if (!strncmp(p, "pfs:", 4)) {
+            p += 4;
+            continue;
+        }
+        break;
     }
 
     i = 0;
@@ -1567,22 +1594,30 @@ static int prepareCustomApaSettingsPath(char *path, int pathLen)
         return -1;
     }
 
-    DIR *dir = opendir(gHDDPrefix);
-    if (dir == NULL) {
+    // HDD notation is relative to OPL's ACTIVE data home, not blindly to the PFS root.
+    // For +OPL that home is `pfs0:`; for the legacy __common layout it is `pfs0:OPL/`.
+    if (subfolder[0] != '\0') {
+        size_t prefixLen = strlen(gHDDPrefix);
+        if (prefixLen > 0 && (gHDDPrefix[prefixLen - 1] == ':' || gHDDPrefix[prefixLen - 1] == '/'))
+            n = snprintf(canonical, sizeof(canonical), "%s%s", gHDDPrefix, subfolder);
+        else
+            n = snprintf(canonical, sizeof(canonical), "%s/%s", gHDDPrefix, subfolder);
+    } else {
+        n = snprintf(canonical, sizeof(canonical), "%s", gHDDPrefix);
+    }
+
+    if (n < 0 || n >= (int)sizeof(canonical) || n >= pathLen) {
         gLastSaveErrno = ENODEV;
+        return -1;
+    }
+
+    dir = opendir(canonical);
+    if (dir == NULL) {
+        LOG("CONFIG APA settings directory %s does not exist\n", canonical);
+        gLastSaveErrno = ENOENT;
         return -1;
     }
     closedir(dir);
-
-    if (subfolder[0] != '\0')
-        snprintf(canonical, sizeof(canonical), "pfs0:%s", subfolder);
-    else
-        snprintf(canonical, sizeof(canonical), "pfs0:");
-
-    if ((int)strlen(canonical) >= pathLen) {
-        gLastSaveErrno = ENODEV;
-        return -1;
-    }
     snprintf(path, pathLen, "%s", canonical);
     LOG("CONFIG APA settings path -> %s (OPL part %s)\n", path, gOPLPart);
     return 1;
@@ -1764,6 +1799,7 @@ static int gBootDirBdmType = BDM_TYPE_UNKNOWN;
 
 static void resolveBootDirToMass(void)
 {
+    gBootHomeApa = 0;
     if (gBootDir[0] == '\0')
         return;
 
@@ -1785,6 +1821,7 @@ static void resolveBootDirToMass(void)
                     while (rlen > 0 && gBootDir[rlen - 1] == '/')
                         gBootDir[--rlen] = '\0';
 
+                    gBootHomeApa = 1;
                     if (gHDDStartMode == START_MODE_DISABLED)
                         gHDDStartMode = START_MODE_AUTO;
 
@@ -1977,6 +2014,10 @@ static void _loadConfig()
             configGetInt(configOPL, CONFIG_OPL_AUTOSTART_LAST, &gAutoStartLastPlayed);
             configGetInt(configOPL, CONFIG_OPL_BDM_MODE, &gBDMStartMode);
             configGetInt(configOPL, CONFIG_OPL_HDD_MODE, &gHDDStartMode);
+            // resolveBootDirToMass runs before this read. A stored Disabled value must not undo
+            // the AUTO fallback for an APA/PFS boot that already mounted and served OPL itself.
+            if (gBootHomeApa && gHDDStartMode == START_MODE_DISABLED)
+                gHDDStartMode = START_MODE_AUTO;
             configGetInt(configOPL, CONFIG_OPL_ETH_MODE, &gETHStartMode);
             configGetInt(configOPL, CONFIG_OPL_APP_MODE, &gAPPStartMode);
             configGetInt(configOPL, CONFIG_OPL_ENABLE_USB, &gEnableUSB);
@@ -2478,6 +2519,8 @@ static void _saveConfig()
     // visibly if it cannot be reached; never silently save to the normal home instead.
     if (gCustomSettingsPath[0] != '\0') {
         snprintf(customSettingsTarget, sizeof(customSettingsTarget), "%s", gCustomSettingsPath);
+        // Keep the user-facing spelling for any failure before configSetMove changes configGetDir().
+        snprintf(gLastSaveTarget, sizeof(gLastSaveTarget), "%s", gCustomSettingsPath);
         if (prepareCustomSettingsPath(customSettingsTarget, sizeof(customSettingsTarget)) < 0) {
             LOG("CONFIG custom settings path %s unreachable; aborting explicit save\n", gCustomSettingsPath);
             if (gLastSaveErrno == 0)
@@ -2655,6 +2698,7 @@ int saveConfig(int types, int showUI)
     // later one, and (worse) a save that never reached configWrite at all reported whatever was left,
     // usually the 0 that produced the nonsensical "(error 0)".
     gLastSaveErrno = 0;
+    gLastSaveTarget[0] = '\0';
 
     guiHandleDeferedIO(&lscstatus, _l(_STR_SAVING_SETTINGS), IO_CUSTOM_SIMPLEACTION, &_saveConfig, OPL_DEFERRED_IO_TIMEOUT_MS);
 
@@ -2673,8 +2717,10 @@ int saveConfig(int types, int showUI)
             // touched the config, so reporting a write error against the config path is a lie.
             if (gLastDeferredTimedOut)
                 snprintf(notification, sizeof(notification), "%s", _l(_STR_ERR_DEVICE_BUSY_TIMEOUT));
-            else
-                snprintf(notification, sizeof(notification), _l(_STR_ERROR_SAVING_SETTINGS_TO), configGetDir(), gLastSaveErrno);
+            else {
+                const char *failedPath = gLastSaveTarget[0] != '\0' ? gLastSaveTarget : configGetDir();
+                snprintf(notification, sizeof(notification), _l(_STR_ERROR_SAVING_SETTINGS_TO), failedPath, gLastSaveErrno);
+            }
             guiMsgBox(notification, 0, NULL);
         }
     }
