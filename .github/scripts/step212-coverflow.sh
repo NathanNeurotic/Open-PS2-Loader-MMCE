@@ -56,7 +56,7 @@ art-worker design while ordering USB device work around what the user is visibly
 """
 if "### Step 212 follow-up — Coverflow background admission" in text:
     raise SystemExit("HANDOFF.md: follow-up note already present")
-handoff.write_text(text.rstrip() + note + "\n")
+handoff.write_text(text.rstrip() + note.rstrip() + "\n")
 PY
 
 git diff --check
