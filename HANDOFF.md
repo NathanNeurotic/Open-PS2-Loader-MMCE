@@ -1248,10 +1248,10 @@ When connecting to SMBv1/v2/v3 shares (reported in PS2-Servers Issue #180) or mo
 ## Step 209 — APA data-integrity stop-ship hardening
 
 **Invariant: RiptOPL never creates an APA partition implicitly.** HDD configuration/data discovery is
-existing-partitions-only: use a valid partition named by `__common/OPL/conf_hdd.cfg`, otherwise an
-already-existing `+OPL`, otherwise the already-existing `__common` partition with `pfs0:OPL/` as the
-data home. If none mount, fail closed. Folder creation inside an already-mounted PFS partition remains
-ordinary filesystem I/O and is allowed; APA partition creation/formatting is not.
+existing-partitions-only: use a valid partition named by `__common/OPL/conf_hdd.cfg`, otherwise the
+already-existing `__common` partition with `pfs0:OPL/` as the data home. An unreferenced `+OPL` is
+never selected. If neither target mounts, fail closed. Folder creation inside an already-mounted PFS
+partition remains ordinary filesystem I/O and is allowed; APA partition creation/formatting is not.
 
 The trigger for this rule was the Aug-15 FHDB custom-settings incident. A pre-208 path could pass
 `hdd0:/+OPL/settings_riptopl.cfg` into the generic config writer with `O_CREAT`. PS2SDK's `hddN:`

@@ -1900,6 +1900,9 @@ static void resolveBootDirToMass(void)
         }
         LOG("BOOT APA boot dir %s could not resolve an HDD data home; refusing MC/raw fallback\n", gBootDir);
         snprintf(gBootDir, sizeof(gBootDir), "pfs0:OPL");
+        // The launch transport is still APA even though the persistent data home did not mount.
+        // Preserve that fact so the post-config repair keeps HDD enabled for a safe retry.
+        gBootHomeApa = 1;
         gHDDStartMode = START_MODE_AUTO;
         gBootHddCommonFallback = 1;
         configEnd();
@@ -2785,7 +2788,9 @@ int saveConfig(int types, int showUI)
         if (lscret) {
             char *path = configGetDir();
 
-            if (gHddSettingsFallbackNotice || gBootHddCommonFallback) {
+            // Boot fallback state only describes an HDD save when this save actually landed on PFS.
+            if (gHddSettingsFallbackNotice ||
+                (gBootHddCommonFallback && path != NULL && !strncmp(path, "pfs", 3))) {
                 const char *displayHome = path;
                 if (!strcmp(gOPLPart, "hdd0:__common"))
                     displayHome = "hdd0:__common/OPL";
