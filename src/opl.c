@@ -1262,6 +1262,8 @@ void setErrorMessagePathCode(int strId, const char *path, int error)
 static int lscstatus = CONFIG_ALL;
 static int lscret = 0;
 static char gLastSaveTarget[sizeof(gCustomSettingsPath)];
+static int gHddSettingsFallbackNotice = 0;
+static int gBootHddCommonFallback = 0;
 
 static int checkLoadConfigBDM(int types)
 {
@@ -1651,10 +1653,40 @@ static int prepareCustomApaSettingsPath(char *path, int pathLen)
     return 1;
 }
 
+static int isApaSettingsPath(const char *path)
+{
+    return path != NULL && (!strncmp(path, "hdd", 3) || !strncmp(path, "pfs", 3) || path[0] == '+');
+}
+
+// Resolve the normal safe HDD settings home after an explicit HDD path cannot be used.
+// hddLoadSupportModules owns the policy: honour an existing conf_hdd.cfg target first;
+// otherwise mount the guaranteed __common partition and use __common/OPL/. It never creates
+// or formats an APA partition. This helper only accepts the resulting mounted PFS namespace.
+static int prepareHddSettingsFallback(char *path, int pathLen)
+{
+    DIR *dir;
+    int n;
+
+    if (!hddLoadModulesReady())
+        return -1;
+
+    hddLoadSupportModules();
+    if (gHDDPrefix == NULL || gHDDPrefix[0] == '\0')
+        return -1;
+
+    dir = opendir(gHDDPrefix);
+    if (dir == NULL)
+        return -1;
+    closedir(dir);
+
+    n = snprintf(path, pathLen, "%s", gHDDPrefix);
+    return (n >= 0 && n < pathLen) ? 1 : -1;
+}
+
 // Make a typed settings path usable: the user may name a device that is not mounted yet. APA/PFS
 // paths are handled first and rewritten to OPL's already-mounted pfs0: data partition; BDM paths
-// keep the existing transport resolver. An unreachable EXPLICIT target is an error, never a cue
-// to scatter settings onto another device.
+// keep the existing transport resolver. HDD targets have a deterministic safe fallback in
+// _saveConfig(); non-HDD explicit targets still fail rather than scattering settings elsewhere.
 static int prepareCustomSettingsPath(char *path, int pathLen)
 {
     int bdmType = BDM_TYPE_UNKNOWN;
@@ -1662,7 +1694,7 @@ static int prepareCustomSettingsPath(char *path, int pathLen)
     if (path == NULL || path[0] == '\0')
         return 0;
 
-    if (!strncmp(path, "hdd", 3) || !strncmp(path, "pfs", 3) || path[0] == '+')
+    if (isApaSettingsPath(path))
         return prepareCustomApaSettingsPath(path, pathLen);
 
     if (strncmp(path, "mass", 4) && strncmp(path, "usb", 3) && strncmp(path, "ata", 3) &&
@@ -1850,6 +1882,8 @@ static void resolveBootDirToMass(void)
                         gBootDir[--rlen] = '\0';
 
                     gBootHomeApa = 1;
+                    if (!strcmp(gOPLPart, "hdd0:__common"))
+                        gBootHddCommonFallback = 1;
                     if (gHDDStartMode == START_MODE_DISABLED)
                         gHDDStartMode = START_MODE_AUTO;
 
@@ -1863,10 +1897,12 @@ static void resolveBootDirToMass(void)
                 }
             }
         }
-        LOG("BOOT APA boot dir %s failed to mount -> fallback to MC\n", gBootDir);
-        gBootDir[0] = '\0';
+        LOG("BOOT APA boot dir %s could not resolve an HDD data home; refusing MC/raw fallback\n", gBootDir);
+        snprintf(gBootDir, sizeof(gBootDir), "pfs0:OPL");
+        gHDDStartMode = START_MODE_AUTO;
+        gBootHddCommonFallback = 1;
         configEnd();
-        configInit(NULL);
+        configInit(gBootDir);
         return;
     }
 
@@ -2550,15 +2586,25 @@ static void _saveConfig()
         // Keep the user-facing spelling for any failure before configSetMove changes configGetDir().
         snprintf(gLastSaveTarget, sizeof(gLastSaveTarget), "%s", gCustomSettingsPath);
         if (prepareCustomSettingsPath(customSettingsTarget, sizeof(customSettingsTarget)) < 0) {
-            LOG("CONFIG custom settings path %s unreachable; aborting explicit save\n", gCustomSettingsPath);
-            if (gLastSaveErrno == 0)
-                gLastSaveErrno = ENODEV;
-            lscret = 0;
-            lscstatus = 0;
-            return;
+            if (isApaSettingsPath(gCustomSettingsPath) &&
+                prepareHddSettingsFallback(customSettingsTarget, sizeof(customSettingsTarget)) > 0) {
+                LOG("CONFIG HDD custom settings path %s unavailable; falling back safely to %s\n",
+                    gCustomSettingsPath, customSettingsTarget);
+                configSetMove(customSettingsTarget);
+                gHddSettingsFallbackNotice = 1;
+                gLastSaveErrno = 0;
+            } else {
+                LOG("CONFIG custom settings path %s unreachable; aborting explicit save\n", gCustomSettingsPath);
+                if (gLastSaveErrno == 0)
+                    gLastSaveErrno = ENODEV;
+                lscret = 0;
+                lscstatus = 0;
+                return;
+            }
+        } else {
+            configSetMove(customSettingsTarget);
+            customSettingsExplicit = 1;
         }
-        configSetMove(customSettingsTarget);
-        customSettingsExplicit = 1;
     }
 
     lscret = configWriteChecked(lscstatus);
@@ -2727,6 +2773,7 @@ int saveConfig(int types, int showUI)
     // usually the 0 that produced the nonsensical "(error 0)".
     gLastSaveErrno = 0;
     gLastSaveTarget[0] = '\0';
+    gHddSettingsFallbackNotice = 0;
 
     guiHandleDeferedIO(&lscstatus, _l(_STR_SAVING_SETTINGS), IO_CUSTOM_SIMPLEACTION, &_saveConfig, OPL_DEFERRED_IO_TIMEOUT_MS);
 
@@ -2734,7 +2781,10 @@ int saveConfig(int types, int showUI)
         if (lscret) {
             char *path = configGetDir();
 
-            snprintf(notification, sizeof(notification), _l(_STR_SETTINGS_SAVED), path);
+            if (gHddSettingsFallbackNotice || gBootHddCommonFallback)
+                snprintf(notification, sizeof(notification), _l(_STR_SETTINGS_HDD_FALLBACK), path);
+            else
+                snprintf(notification, sizeof(notification), _l(_STR_SETTINGS_SAVED), path);
 
             guiMsgBox(notification, 0, NULL);
         } else {

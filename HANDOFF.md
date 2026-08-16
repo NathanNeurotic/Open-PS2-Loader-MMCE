@@ -26,7 +26,7 @@ Nathan's side and his testers' side must look identical across a handover. These
 
 **BRANCHES.** Never commit to `master`, `rebuild/main`, or any existing `rebuild/step-*` branch.
 Every change goes on a NEW branch you create, `rebuild/step-NNN-<slug>`, branched from the current
-tip. **Next number: 210. Current tip: `rebuild/step-209-apa-data-integrity-no-create`.** One focused change
+tip. **Next number: 211. Current tip: `rebuild/step-210-common-config-fallback-no-apa-create`.** One focused change
 per step, with a long explanatory commit message -- what changed, why, what evidence drove it, and
 what it does NOT fix. Those messages are this project's real documentation. Never force-push, never
 rewrite history, never merge to `master` without asking. (`rebuild/main` moves only as the
@@ -1263,3 +1263,22 @@ browseable. Therefore `config.c` now independently rejects every raw `hddN:` con
 and `config.path` writes are never relative to an unknown/raw APA CWD. These guards are intentional
 defense-in-depth and must not be removed merely because the higher-level resolver currently emits
 `pfs0:` correctly.
+
+
+---
+
+## Step 210 — deterministic __common HDD config fallback
+
+HDD config/data ownership is now deterministic and existing-partitions-only.
+`hdd0:__common/OPL/conf_hdd.cfg` is the sole authority that may redirect OPL to another existing
+PFS partition (normally `+OPL`). If that file is absent, malformed, names a missing/unmountable
+partition, or the HDD boot/custom settings path cannot be resolved, RiptOPL falls back to the
+already-existing `hdd0:__common` partition and stores its files under `pfs0:OPL/`. It does not
+opportunistically select an unreferenced `+OPL` partition.
+
+An unreachable explicit HDD custom settings path falls back through the same normal HDD ownership
+resolver and the successful save reports that a safe fallback home was used. Non-HDD custom paths
+retain the fail-visible/no-scatter policy. If even `__common` cannot mount, config remains pointed at
+a harmless PFS namespace and the write fails closed; it never falls back to raw `hddN:` or creates,
+formats, resizes, or repairs APA metadata. The raw-APA firewall in `config.c` remains the independent
+last line of defense.

@@ -192,19 +192,14 @@ static void hddFindOPLPartition(void)
         }
     }
 
-    // Prefer the conventional +OPL partition when it ALREADY exists.
-    if (hddPartitionMountable("hdd0:+OPL")) {
-        snprintf(gOPLPart, sizeof(gOPLPart), "hdd0:+OPL");
-        LOG("HDD: using existing +OPL data partition\n");
-        return;
-    }
-
-    // Safe final fallback: __common is a standard existing system PFS partition. OPL data
-    // lives in its OPL/ directory; creating folders/files inside a mounted PFS partition is
-    // ordinary filesystem I/O and does not alter the APA partition table.
+    // No usable configured target: __common/OPL is the canonical safe HDD home.
+    // Do NOT opportunistically select +OPL merely because it exists. A +OPL (or any other
+    // partition) is used only when __common/OPL/conf_hdd.cfg explicitly points to it.
+    // This keeps ownership deterministic and guarantees that discovery never needs to
+    // manufacture an APA partition just to obtain a writable config/data home.
     if (hddPartitionMountable("hdd0:__common")) {
         snprintf(gOPLPart, sizeof(gOPLPart), "hdd0:__common");
-        LOG("HDD: +OPL unavailable; falling back to existing __common/OPL/\n");
+        LOG("HDD: no usable configured data partition; using canonical __common/OPL/ fallback\n");
         return;
     }
 

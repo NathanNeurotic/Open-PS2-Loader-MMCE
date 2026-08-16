@@ -1056,3 +1056,5 @@ gui_strings:
   string: "PS1 (VCD) launches from a USB stick only. The PS2 cannot detect whether a stick is fat32 or exFAT, so POPSTARTER's driver must be chosen. Ask prompts on every USB VCD launch; exFAT or fat32 pin the answer and skip the prompt."
 - label: VCD_USB_BDMA_ASK
   string: Ask
+- label: SETTINGS_HDD_FALLBACK
+  string: "HDD settings used the safe fallback home: %s"
