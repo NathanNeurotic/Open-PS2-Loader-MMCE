@@ -1727,6 +1727,45 @@ static int tryReadRecoveryConfigHome(int types, const char *home)
     return value;
 }
 
+static void restoreRecoverySaveHome(const char *recoveredHome)
+{
+    // Recovery is discovery only. Never let the probed MC/USB path silently become the
+    // next save destination. Local boots return to their real boot home; bare boots return
+    // to the normal mc?:OPL home. A deferred network boot cannot save back to its unreadable
+    // share during bootstrap, so select a concrete reachable MC home when possible.
+    if (gBootHomeDeferred) {
+        const char *mcHome = NULL;
+        DIR *dir;
+
+        if (!strncmp(recoveredHome, "mc0:", 4))
+            mcHome = "mc0:/OPL";
+        else if (!strncmp(recoveredHome, "mc1:", 4))
+            mcHome = "mc1:/OPL";
+        else {
+            dir = opendir("mc0:/");
+            if (dir != NULL) {
+                closedir(dir);
+                mcHome = "mc0:/OPL";
+            } else {
+                dir = opendir("mc1:/");
+                if (dir != NULL) {
+                    closedir(dir);
+                    mcHome = "mc1:/OPL";
+                }
+            }
+        }
+
+        if (mcHome != NULL)
+            configSetMove((char *)mcHome);
+        else
+            configSetMove(NULL); // no concrete MC is reachable: keep the normal fail-visible wildcard home
+    } else if (gBootDir[0] != '\0') {
+        configSetMove(gBootDir);
+    } else {
+        configSetMove(NULL);
+    }
+}
+
 static int tryMissingConfigPathRecovery(int types)
 {
     static const char *const mcHomes[] = {
@@ -1742,8 +1781,7 @@ static int tryMissingConfigPathRecovery(int types)
     for (unsigned int i = 0; i < sizeof(mcHomes) / sizeof(mcHomes[0]); i++) {
         value = tryReadRecoveryConfigHome(types, mcHomes[i]);
         if (value & CONFIG_OPL) {
-            if (gBootDir[0] != '\0' && !gBootHomeDeferred)
-                configSetMove(gBootDir); // read-old, write-normal; no silent MC save hijack
+            restoreRecoverySaveHome(mcHomes[i]);
             return value;
         }
     }
@@ -1760,16 +1798,14 @@ static int tryMissingConfigPathRecovery(int types)
             snprintf(home, sizeof(home), "mass%d:/", slots[i]);
             value = tryReadRecoveryConfigHome(types, home);
             if (value & CONFIG_OPL) {
-                if (gBootDir[0] != '\0' && !gBootHomeDeferred)
-                    configSetMove(gBootDir);
+                restoreRecoverySaveHome(home);
                 return value;
             }
 
             snprintf(home, sizeof(home), "mass%d:/OPL", slots[i]);
             value = tryReadRecoveryConfigHome(types, home);
             if (value & CONFIG_OPL) {
-                if (gBootDir[0] != '\0' && !gBootHomeDeferred)
-                    configSetMove(gBootDir);
+                restoreRecoverySaveHome(home);
                 return value;
             }
         }

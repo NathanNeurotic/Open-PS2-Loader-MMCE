@@ -1313,8 +1313,11 @@ Three hardware-driven corrections are intentionally shipped together for one tes
    read-only search for an already-existing master config on `mc0` (OPL dir then root), `mc1` (same),
    then mounted USB devices (root then `/OPL`). Both MC slots are probed directly rather than relying on
    `sysCheckMC()`. USB recovery force-loads only the USB transport and filters by live USB device type.
-   A known local boot restores its normal save home after the read, so this cannot silently scatter new
-   config files. If the recovered config contains Custom Settings Path, the next explicit Save Changes
+   Recovery always restores the normal save home after the read, so the probed MC/USB location never
+   silently becomes the next write target. Local boots return to their boot home; bare boots return to
+   `mc?:OPL`; deferred network boots explicitly select a reachable MC bootstrap home (or the normal
+   fail-visible MC wildcard if neither slot is reachable). If the recovered config contains Custom Settings
+   Path, the next explicit Save Changes
    honors it and regenerates `config.path` through the normal guarded writer.
 
 The Step-209/210/211 data-integrity barriers remain non-negotiable: raw `hddN:` config I/O is blocked,
