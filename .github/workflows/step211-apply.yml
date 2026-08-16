@@ -1,0 +1,87 @@
+name: step211-apply-coderabbit-fixes
+
+on:
+  push:
+    branches:
+      - rebuild/step-211-consolidated-apa-config-safety
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: rebuild/step-211-consolidated-apa-config-safety
+          fetch-depth: 0
+
+      - name: Apply accepted CodeRabbit fixes
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p = Path('src/opl.c')
+          s = p.read_text()
+
+          replacements = [
+              (
+                  '        snprintf(gBootDir, sizeof(gBootDir), "pfs0:OPL");\n        gHDDStartMode = START_MODE_AUTO;\n        gBootHddCommonFallback = 1;\n',
+                  '        snprintf(gBootDir, sizeof(gBootDir), "pfs0:OPL");\n        // The launch transport is still APA even though the persistent data home did not mount.\n        // Preserve that fact so the post-config repair keeps HDD enabled for a safe retry.\n        gBootHomeApa = 1;\n        gHDDStartMode = START_MODE_AUTO;\n        gBootHddCommonFallback = 1;\n',
+              ),
+              (
+                  '            if (gHddSettingsFallbackNotice || gBootHddCommonFallback) {\n',
+                  '            // Boot fallback state only describes an HDD save when this save actually landed on PFS.\n            if (gHddSettingsFallbackNotice ||\n                (gBootHddCommonFallback && path != NULL && !strncmp(path, "pfs", 3))) {\n',
+              ),
+          ]
+
+          for old, new in replacements:
+              count = s.count(old)
+              if count != 1:
+                  raise SystemExit(f'src/opl.c expected exactly one match, found {count}: {old.splitlines()[0]}')
+              s = s.replace(old, new, 1)
+          p.write_text(s)
+
+          p = Path('HANDOFF.md')
+          s = p.read_text()
+          old = '''**Invariant: RiptOPL never creates an APA partition implicitly.** HDD configuration/data discovery is
+          existing-partitions-only: use a valid partition named by `__common/OPL/conf_hdd.cfg`, otherwise an
+          already-existing `+OPL`, otherwise the already-existing `__common` partition with `pfs0:OPL/` as the
+          data home. If none mount, fail closed. Folder creation inside an already-mounted PFS partition remains
+          ordinary filesystem I/O and is allowed; APA partition creation/formatting is not.
+'''
+          new = '''**Invariant: RiptOPL never creates an APA partition implicitly.** HDD configuration/data discovery is
+          existing-partitions-only: use a valid partition named by `__common/OPL/conf_hdd.cfg`, otherwise the
+          already-existing `__common` partition with `pfs0:OPL/` as the data home. An unreferenced `+OPL` is
+          never selected. If neither target mounts, fail closed. Folder creation inside an already-mounted PFS
+          partition remains ordinary filesystem I/O and is allowed; APA partition creation/formatting is not.
+'''
+          count = s.count(old)
+          if count != 1:
+              raise SystemExit(f'HANDOFF.md expected one stale Step-209 policy block, found {count}')
+          p.write_text(s.replace(old, new, 1))
+          PY
+
+      - name: Verify accepted fixes
+        shell: bash
+        run: |
+          set -euxo pipefail
+          grep -n 'gBootHomeApa = 1;' src/opl.c
+          grep -n 'gBootHddCommonFallback && path != NULL' src/opl.c
+          ! grep -n 'otherwise an$' HANDOFF.md
+          git diff --check
+
+      - name: Commit production fixes and remove helpers
+        shell: bash
+        run: |
+          set -euxo pipefail
+          rm -f .github/workflows/step211-apply.yml
+          rm -f .github/workflows/step211-coderabbit-fixes.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/opl.c HANDOFF.md .github/workflows/step211-apply.yml .github/workflows/step211-coderabbit-fixes.yml
+          git diff --cached --check
+          git commit -m "rebuild-211: address CodeRabbit HDD fallback edge cases"
+          git push origin HEAD:rebuild/step-211-consolidated-apa-config-safety
