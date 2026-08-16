@@ -348,10 +348,15 @@ void sfxPlay(int id)
 /*--    Theme Background Music    -------------------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------------------------------------------------*/
 
-#define BGM_RING_BUFFER_COUNT 128 // 512 KB buffer (~2.9s of audio): glides through USB 1.1 background art reads (#364)
+#define BGM_RING_BUFFER_COUNT 192 // 768 KB buffer (~4.35s): extra headroom for long device/list bursts (#364)
 #define BGM_RING_BUFFER_SIZE  4096
 #define BGM_STOP_WAIT_SLICES  16
-#define BGM_THREAD_BASE_PRIO  0x3E
+// EE priorities are strict (lower number wins): playback=30, Vorbis I/O/decode=31. Playback is
+// tiny and normally blocked in audsrv; decode now outranks the background I/O worker (32) while
+// sharing the GUI/pad tier (31), whose vsync wait yields naturally. This prevents a long runnable
+// background queue from starving refills; the larger ring also covers stalls that are IOP-bound,
+// where EE thread priority cannot help.
+#define BGM_THREAD_BASE_PRIO 0x1E
 #define BGM_THREAD_STACK_SIZE 0x1000
 
 extern void *_gp;

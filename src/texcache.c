@@ -51,9 +51,9 @@ typedef struct load_image_request
     char *value;
 } load_image_request_t;
 
-// Art thread priority. LOWER NUMBER WINS on the EE. GUI/pad thread is 31 (opl.c), the shared io
-// worker 32 (ioman.c), sound 62 (0x3E). 72 (0x48) puts art below every one of them: it can never take
-// the CPU from input, from a config save, from a list rebuild, or from audio decoding.
+// Art thread priority. LOWER NUMBER WINS on the EE. BGM playback/decode are 30/31 (sound.c), the
+// GUI/pad thread is 31 (opl.c), and the shared io worker is 32 (ioman.c). 72 (0x48) puts art below
+// every one of them: it can never take the CPU from input, config work, list rebuilds, or audio.
 #define ART_THREAD_PRIORITY 72
 
 // ...and lower still while reading anything on SIO2. EE priority does not speed up or slow down a
