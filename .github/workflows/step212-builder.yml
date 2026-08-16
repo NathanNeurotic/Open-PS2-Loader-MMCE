@@ -5,32 +5,38 @@ on:
     branches:
       - automation/step-212-builder
     paths:
-      - .github/scripts/step212_builder.py
       - .github/workflows/step212-builder.yml
 
 permissions:
   contents: write
 
 jobs:
-  build-step-212:
+  format-step-212:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout builder
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Apply three production commits to Step 212
+      - name: Apply exact clang-format correction
         run: |
-          cp .github/scripts/step212_builder.py /tmp/step212_builder.py
+          git config user.name "NathanNeurotic Step Builder"
+          git config user.email "actions@users.noreply.github.com"
+          git fetch origin rebuild/step-212-apa-boot-and-bgm-resilience
+          git checkout rebuild/step-212-apa-boot-and-bgm-resilience
+          test "$(git rev-parse HEAD)" = "a7c780a3fa574d1657084dbb1f8a1d436425800c"
           python3 - <<'PY'
           from pathlib import Path
-          p = Path('/tmp/step212_builder.py')
+          p = Path('src/sound.c')
           text = p.read_text()
-          old = 'handoff.write_text(text.rstrip() + append + "\\n")'
-          new = 'handoff.write_text(text.rstrip() + append.rstrip() + "\\n")'
+          old = '#define BGM_THREAD_BASE_PRIO 0x1E'
+          new = '#define BGM_THREAD_BASE_PRIO  0x1E'
           if text.count(old) != 1:
-              raise SystemExit('expected one HANDOFF write expression')
+              raise SystemExit('expected exactly one BGM priority format line')
           p.write_text(text.replace(old, new, 1))
           PY
-          python3 /tmp/step212_builder.py
+          git diff --check
+          git add src/sound.c
+          git commit -m "rebuild-212: satisfy clang-format for BGM priority define" -m "Formatting-only follow-up from CI-format-check: align BGM_THREAD_BASE_PRIO with the surrounding macro definitions. No runtime behavior changes."
+          git push origin HEAD:rebuild/step-212-apa-boot-and-bgm-resilience
