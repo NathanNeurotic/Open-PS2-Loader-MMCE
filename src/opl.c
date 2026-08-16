@@ -1706,6 +1706,83 @@ static int prepareCustomSettingsPath(char *path, int pathLen)
 }
 
 
+// Last-resort READ-ONLY discovery for a missing/stale config.path. This exists to recover the
+// chicken-and-egg custom-settings value from an already-existing config; it never creates a config,
+// never changes APA metadata, and never makes an arbitrary discovered device the permanent save home.
+// A known local boot self-migrates the loaded in-memory sets back to its normal boot home; if the
+// recovered config contains Custom Settings Path, _saveConfig will honor it and regenerate config.path
+// on the user's next explicit Save Changes.
+static int tryReadRecoveryConfigHome(int types, const char *home)
+{
+    DIR *dir = opendir(home);
+    if (dir == NULL)
+        return 0;
+    closedir(dir);
+
+    configEnd();
+    configInit((char *)home);
+    int value = configReadMulti(types);
+    if (value & CONFIG_OPL)
+        LOG("CONFIG recovery found existing settings at %s\n", home);
+    return value;
+}
+
+static int tryMissingConfigPathRecovery(int types)
+{
+    static const char *const mcHomes[] = {
+        "mc0:/OPL",
+        "mc0:/",
+        "mc1:/OPL",
+        "mc1:/",
+    };
+    int value;
+
+    // Do not trust sysCheckMC() for recovery: the report that drove this path is specifically a card
+    // that served the ELF but was not selected by the normal card probe. Directly test both slots.
+    for (unsigned int i = 0; i < sizeof(mcHomes) / sizeof(mcHomes[0]); i++) {
+        value = tryReadRecoveryConfigHome(types, mcHomes[i]);
+        if (value & CONFIG_OPL) {
+            if (gBootDir[0] != '\0' && !gBootHomeDeferred)
+                configSetMove(gBootDir); // read-old, write-normal; no silent MC save hijack
+            return value;
+        }
+    }
+
+    // USB is third choice. Force only the USB transport, then inspect only slots whose live driver
+    // identity is USB; ATA/MX4SIO/iLink are not pulled into this recovery scan. Check both the device
+    // root and the conventional /OPL directory. configRead() itself handles the legacy filename.
+    if (bdmEnsureSourceModules(BDM_TYPE_USB, 1500)) {
+        int slots[MAX_BDM_DEVICES];
+        int count = bdmGetDeviceSlotsByType(BDM_TYPE_USB, slots, MAX_BDM_DEVICES);
+        for (int i = 0; i < count; i++) {
+            char home[32];
+
+            snprintf(home, sizeof(home), "mass%d:/", slots[i]);
+            value = tryReadRecoveryConfigHome(types, home);
+            if (value & CONFIG_OPL) {
+                if (gBootDir[0] != '\0' && !gBootHomeDeferred)
+                    configSetMove(gBootDir);
+                return value;
+            }
+
+            snprintf(home, sizeof(home), "mass%d:/OPL", slots[i]);
+            value = tryReadRecoveryConfigHome(types, home);
+            if (value & CONFIG_OPL) {
+                if (gBootDir[0] != '\0' && !gBootHomeDeferred)
+                    configSetMove(gBootDir);
+                return value;
+            }
+        }
+    }
+
+    // Every failed probe re-homed the config_set filenames. Put them back exactly where normal boot
+    // discovery expects them before the existing fallback policy continues.
+    configEnd();
+    configInit(gBootDir[0] != '\0' ? gBootDir : NULL);
+    return 0;
+}
+
+
 static int tryAlternateDevice(int types)
 {
     char redirectPath[64];
@@ -1737,12 +1814,23 @@ static int tryAlternateDevice(int types)
     }
 
     // APA/PFS boot identity is authoritative. If the first early mount missed because the disk was
-    // still settling, retry the existing-partition resolver here. Never turn an APA boot into an MC
-    // config home merely because that first PFS mount was not ready yet.
+    // still settling, retry the existing-partition resolver before broad read-only recovery.
     if (gBootHomeApa) {
         value = checkLoadConfigHDD(types);
         if (value & CONFIG_OPL)
             return value;
+    }
+
+    // No redirect (or a stale redirect) must not strand an otherwise valid install. Search existing
+    // conventional homes read-only: both MC slots first, then USB. A known boot home is restored as
+    // the save destination after the read, so discovery cannot silently scatter future writes.
+    value = tryMissingConfigPathRecovery(types);
+    if (value & CONFIG_OPL)
+        return value;
+
+    // An APA launch that still has no mountable existing PFS home fails closed here. Do not fall
+    // through into the legacy MC write-home logic merely because recovery also found nothing.
+    if (gBootHomeApa) {
         configPrepareNotifications(gBootDir);
         showCfgPopup = 0;
         return 0;

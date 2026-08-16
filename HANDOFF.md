@@ -26,7 +26,7 @@ Nathan's side and his testers' side must look identical across a handover. These
 
 **BRANCHES.** Never commit to `master`, `rebuild/main`, or any existing `rebuild/step-*` branch.
 Every change goes on a NEW branch you create, `rebuild/step-NNN-<slug>`, branched from the current
-tip. **Next number: 212. Current tip: `rebuild/step-211-consolidated-apa-config-safety`.** One focused change
+tip. **Next number: 213. Current tip: `rebuild/step-212-apa-boot-and-bgm-resilience`.** One focused change
 per step, with a long explanatory commit message -- what changed, why, what evidence drove it, and
 what it does NOT fix. Those messages are this project's real documentation. Never force-push, never
 rewrite history, never merge to `master` without asking. (`rebuild/main` moves only as the
@@ -1293,3 +1293,30 @@ notification state is reset if resolution reruns, failed writes after a graceful
 fallback report the actual fallback target, and the success notification names the real APA home
 (`hdd0:__common/OPL` or the existing partition selected by `conf_hdd.cfg`) rather than the temporary
 `pfs0:` mount alias. No partition-creation behavior is reintroduced.
+
+---
+
+## Step 212 — APA boot recovery, BGM starvation protection, and config.path recovery
+
+Three hardware-driven corrections are intentionally shipped together for one test round.
+
+1. **APA boot mount-state invariant.** `gHDDPrefix` now starts at `NULL`; only a successful existing-PFS
+   mount assigns `pfs0:` / `pfs0:OPL/`. Step 211 had made non-NULL mean "mounted" while `setDefaults()`
+   still pre-seeded `"pfs0:"`, allowing a fresh HDD boot to skip discovery/mount entirely. A failed first
+   APA mount keeps the real launch identity, retries only the existing-partition HDD resolver, never
+   falls through to an MC write home, and never creates/formats APA metadata.
+2. **BGM load resilience.** PCM buffering grows from 128 to 192 × 4096-byte slots (768 KiB, about 4.35 s).
+   Playback/decode priorities move from 62/63 to 30/31: playback is tiny and normally blocked in audsrv;
+   Vorbis refill now outranks the priority-32 background I/O worker while art remains priority 72. This
+   addresses both EE scheduling starvation and longer IOP/device stalls.
+3. **Missing/stale `config.path` recovery.** If normal home/redirect loading fails, RiptOPL performs a
+   read-only search for an already-existing master config on `mc0` (OPL dir then root), `mc1` (same),
+   then mounted USB devices (root then `/OPL`). Both MC slots are probed directly rather than relying on
+   `sysCheckMC()`. USB recovery force-loads only the USB transport and filters by live USB device type.
+   A known local boot restores its normal save home after the read, so this cannot silently scatter new
+   config files. If the recovered config contains Custom Settings Path, the next explicit Save Changes
+   honors it and regenerates `config.path` through the normal guarded writer.
+
+The Step-209/210/211 data-integrity barriers remain non-negotiable: raw `hddN:` config I/O is blocked,
+`conf_hdd.cfg` may select only an existing mountable PFS target, `__common/OPL/` is the canonical HDD
+fallback, and no config/discovery path creates, formats, resizes, or repairs an APA partition.
