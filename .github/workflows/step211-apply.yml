@@ -23,86 +23,44 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
 
-          def replace_once(path, old, new):
-              p = Path(path)
-              s = p.read_text()
-              n = s.count(old)
-              if n != 1:
-                  raise SystemExit(f"{path}: expected one match, got {n}")
-              p.write_text(s.replace(old, new, 1))
+          p = Path('src/opl.c')
+          s = p.read_text()
 
-          # Reset boot-derived notification state if boot resolution is ever re-run in-session.
-          replace_once(
-              'src/opl.c',
-              '''static void resolveBootDirToMass(void)
-              {
-                  gBootHomeApa = 0;
-          ''',
-              '''static void resolveBootDirToMass(void)
-              {
-                  gBootHomeApa = 0;
-                  gBootHddCommonFallback = 0;
-          '''
-          )
+          replacements = [
+              (
+                  "static void resolveBootDirToMass(void)\n{\n    gBootHomeApa = 0;\n",
+                  "static void resolveBootDirToMass(void)\n{\n    gBootHomeApa = 0;\n    gBootHddCommonFallback = 0;\n",
+              ),
+              (
+                  "    // Custom Settings Path is an explicit destination. Resolve it before the write and fail\n    // visibly if it cannot be reached; never silently save to the normal home instead.\n",
+                  "    // Custom Settings Path is an explicit destination. Non-HDD targets still fail visibly\n    // when unreachable. HDD/APA targets are different: they have a guaranteed safe ownership\n    // chain (conf_hdd.cfg target -> __common/OPL), so an invalid HDD target falls back there\n    // explicitly and the success dialog tells the user which HDD home was actually used.\n",
+              ),
+              (
+                  "                configSetMove(customSettingsTarget);\n                gHddSettingsFallbackNotice = 1;\n                gLastSaveErrno = 0;\n",
+                  "                configSetMove(customSettingsTarget);\n                snprintf(gLastSaveTarget, sizeof(gLastSaveTarget), \"%s\", customSettingsTarget);\n                gHddSettingsFallbackNotice = 1;\n                gLastSaveErrno = 0;\n",
+              ),
+              (
+                  "            if (gHddSettingsFallbackNotice || gBootHddCommonFallback)\n                snprintf(notification, sizeof(notification), _l(_STR_SETTINGS_HDD_FALLBACK), path);\n            else\n                snprintf(notification, sizeof(notification), _l(_STR_SETTINGS_SAVED), path);\n",
+                  "            if (gHddSettingsFallbackNotice || gBootHddCommonFallback) {\n                const char *displayHome = path;\n                if (!strcmp(gOPLPart, \"hdd0:__common\"))\n                    displayHome = \"hdd0:__common/OPL\";\n                else if (gOPLPart[0] != '\\0')\n                    displayHome = gOPLPart;\n                snprintf(notification, sizeof(notification), _l(_STR_SETTINGS_HDD_FALLBACK), displayHome);\n            } else {\n                snprintf(notification, sizeof(notification), _l(_STR_SETTINGS_SAVED), path);\n            }\n",
+              ),
+          ]
 
-          # The save-policy comment must describe the new HDD-specific graceful fallback accurately.
-          replace_once(
-              'src/opl.c',
-              '''    // Custom Settings Path is an explicit destination. Resolve it before the write and fail
-                  // visibly if it cannot be reached; never silently save to the normal home instead.
-          ''',
-              '''    // Custom Settings Path is an explicit destination. Non-HDD targets still fail visibly
-                  // when unreachable. HDD/APA targets are different: they have a guaranteed safe ownership
-                  // chain (conf_hdd.cfg target -> __common/OPL), so an invalid HDD target falls back there
-                  // explicitly and the success dialog tells the user which HDD home was actually used.
-          '''
-          )
-
-          # Once fallback is selected, any later write failure must name the location we actually tried,
-          # not the rejected custom spelling that caused us to fall back.
-          replace_once(
-              'src/opl.c',
-              '''                configSetMove(customSettingsTarget);
-                              gHddSettingsFallbackNotice = 1;
-                              gLastSaveErrno = 0;
-          ''',
-              '''                configSetMove(customSettingsTarget);
-                              snprintf(gLastSaveTarget, sizeof(gLastSaveTarget), "%s", customSettingsTarget);
-                              gHddSettingsFallbackNotice = 1;
-                              gLastSaveErrno = 0;
-          '''
-          )
-
-          # Make the fallback notification name the real APA home instead of the transient pfs0: alias.
-          replace_once(
-              'src/opl.c',
-              '''            if (gHddSettingsFallbackNotice || gBootHddCommonFallback)
-                          snprintf(notification, sizeof(notification), _l(_STR_SETTINGS_HDD_FALLBACK), path);
-                      else
-                          snprintf(notification, sizeof(notification), _l(_STR_SETTINGS_SAVED), path);
-          ''',
-              '''            if (gHddSettingsFallbackNotice || gBootHddCommonFallback) {
-                          const char *displayHome = path;
-                          if (!strcmp(gOPLPart, "hdd0:__common"))
-                              displayHome = "hdd0:__common/OPL";
-                          else if (gOPLPart[0] != '\\0')
-                              displayHome = gOPLPart;
-                          snprintf(notification, sizeof(notification), _l(_STR_SETTINGS_HDD_FALLBACK), displayHome);
-                      } else {
-                          snprintf(notification, sizeof(notification), _l(_STR_SETTINGS_SAVED), path);
-                      }
-          '''
-          )
+          for old, new in replacements:
+              count = s.count(old)
+              if count != 1:
+                  raise SystemExit(f'src/opl.c: expected exactly one match, found {count}: {old.splitlines()[0]}')
+              s = s.replace(old, new, 1)
+          p.write_text(s)
 
           handoff = Path('HANDOFF.md')
           s = handoff.read_text()
           old = 'tip. **Next number: 211. Current tip: `rebuild/step-210-common-config-fallback-no-apa-create`.**'
           new = 'tip. **Next number: 212. Current tip: `rebuild/step-211-consolidated-apa-config-safety`.**'
-          if old not in s:
-              raise SystemExit('HANDOFF pointer not found')
+          if s.count(old) != 1:
+              raise SystemExit('HANDOFF.md: Step 210 pointer not found exactly once')
           s = s.replace(old, new, 1)
           if '## Step 211 — consolidated APA config safety finalization' not in s:
-              s += '''\n\n---\n\n## Step 211 — consolidated APA config safety finalization\n\nFinal audit polish for the Step-208 through Step-210 HDD config safety stack. Boot-derived fallback\nnotification state is reset if resolution reruns, failed writes after a graceful HDD custom-path\nfallback report the actual fallback target, and the success notification names the real APA home\n(`hdd0:__common/OPL` or the existing partition selected by `conf_hdd.cfg`) rather than the temporary\n`pfs0:` mount alias. No partition-creation behavior is reintroduced.\n'''
+              s += "\n\n---\n\n## Step 211 — consolidated APA config safety finalization\n\nFinal audit polish for the Step-208 through Step-210 HDD config safety stack. Boot-derived fallback\nnotification state is reset if resolution reruns, failed writes after a graceful HDD custom-path\nfallback report the actual fallback target, and the success notification names the real APA home\n(`hdd0:__common/OPL` or the existing partition selected by `conf_hdd.cfg`) rather than the temporary\n`pfs0:` mount alias. No partition-creation behavior is reintroduced.\n"
           handoff.write_text(s)
           PY
 
