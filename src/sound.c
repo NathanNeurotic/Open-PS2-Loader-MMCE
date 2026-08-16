@@ -356,7 +356,7 @@ void sfxPlay(int id)
 // sharing the GUI/pad tier (31), whose vsync wait yields naturally. This prevents a long runnable
 // background queue from starving refills; the larger ring also covers stalls that are IOP-bound,
 // where EE thread priority cannot help.
-#define BGM_THREAD_BASE_PRIO 0x1E
+#define BGM_THREAD_BASE_PRIO  0x1E
 #define BGM_THREAD_STACK_SIZE 0x1000
 
 extern void *_gp;
