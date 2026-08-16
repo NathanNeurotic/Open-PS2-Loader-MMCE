@@ -21,4 +21,15 @@ jobs:
           fetch-depth: 0
 
       - name: Apply three production commits to Step 212
-        run: python3 .github/scripts/step212_builder.py
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('.github/scripts/step212_builder.py')
+          text = p.read_text()
+          old = 'handoff.write_text(text.rstrip() + append + "\\n")'
+          new = 'handoff.write_text(text.rstrip() + append.rstrip() + "\\n")'
+          if text.count(old) != 1:
+              raise SystemExit('expected one HANDOFF write expression')
+          p.write_text(text.replace(old, new, 1))
+          PY
+          python3 .github/scripts/step212_builder.py
