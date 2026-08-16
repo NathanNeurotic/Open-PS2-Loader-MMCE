@@ -1,0 +1,110 @@
+name: step208-review-fixes
+
+on:
+  push:
+    branches:
+      - rebuild/step-208-apa-pfs-config-fav-fix
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: rebuild/step-208-apa-pfs-config-fav-fix
+          fetch-depth: 0
+
+      - name: Apply accepted review fixes
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('src/opl.c')
+          text = path.read_text()
+
+          def replace_once(old, new, label):
+              global text
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{label}: expected 1 match, found {count}')
+              text = text.replace(old, new, 1)
+
+          replace_once(
+              'static int lscstatus = CONFIG_ALL;\nstatic int lscret = 0;\n',
+              'static int lscstatus = CONFIG_ALL;\nstatic int lscret = 0;\nstatic char gLastSaveTarget[sizeof(gCustomSettingsPath)];\n',
+              'save target state')
+
+          replace_once(
+              'static int gBootHomeDeferred = 0;\n',
+              'static int gBootHomeDeferred = 0;\n// Set only after an APA/PFS boot home has successfully mounted. Used after config read because\n// a stored HDD=Disabled value must not turn off the transport OPL itself was launched from.\nstatic int gBootHomeApa = 0;\n',
+              'APA boot marker')
+
+          replace_once(
+              '    const char *unit = "hdd0";\n    size_t i = 0;\n',
+              '    const char *unit = "hdd0";\n    size_t i = 0;\n    DIR *dir;\n    int n;\n',
+              'APA parser locals')
+
+          replace_once(
+              '''        while (*p == '/' || *p == '\\\\')\n            p++;\n        if (*p != '\\0')\n            snprintf(canonical, sizeof(canonical), "pfs0:%s", p);\n        else\n            snprintf(canonical, sizeof(canonical), "pfs0:");\n        snprintf(path, pathLen, "%s", canonical);\n        return 1;\n''',
+              '''        while (*p == '/' || *p == '\\\\')\n            p++;\n        if (*p != '\\0')\n            n = snprintf(canonical, sizeof(canonical), "pfs0:%s", p);\n        else\n            n = snprintf(canonical, sizeof(canonical), "pfs0:");\n        if (n < 0 || n >= (int)sizeof(canonical) || n >= pathLen) {\n            gLastSaveErrno = ENODEV;\n            return -1;\n        }\n\n        // A custom settings target is a directory. Validate the actual requested directory now\n        // instead of letting configWrite fail later after appending settings_riptopl.cfg.\n        dir = opendir(canonical);\n        if (dir == NULL) {\n            LOG("CONFIG PFS settings directory %s does not exist\\n", canonical);\n            gLastSaveErrno = ENOENT;\n            return -1;\n        }\n        closedir(dir);\n\n        snprintf(path, pathLen, "%s", canonical);\n        return 1;\n''',
+              'direct PFS validation')
+
+          replace_once(
+              '''        if (strncmp(path, "hdd", 3) != 0 || (path[3] != '0' && path[3] != '1') || path[4] != ':')\n            return 0;\n''',
+              '''        if (strncmp(path, "hdd", 3) != 0 || (path[3] != '0' && path[3] != '1') || path[4] != ':') {\n            LOG("CONFIG malformed APA settings path %s rejected\\n", path);\n            gLastSaveErrno = ENODEV;\n            return -1;\n        }\n''',
+              'malformed APA rejection')
+
+          replace_once(
+              '''    while (*p != '\\0') {\n        if (!strncmp(p, ":pfs:", 5))\n            p += 5;\n        else if (*p == ':' || *p == '/' || *p == '\\\\')\n            p++;\n        else\n            break;\n    }\n''',
+              '''    // Launchers use both `:pfs:` and `/pfs:` spellings. Strip separators first, then\n    // consume the pseudo-filesystem token so neither spelling leaks `pfs:` into the directory name.\n    while (*p != '\\0') {\n        while (*p == ':' || *p == '/' || *p == '\\\\')\n            p++;\n        if (!strncmp(p, "pfs:", 4)) {\n            p += 4;\n            continue;\n        }\n        break;\n    }\n''',
+              'pfs separator normalization')
+
+          replace_once(
+              '''    DIR *dir = opendir(gHDDPrefix);\n    if (dir == NULL) {\n        gLastSaveErrno = ENODEV;\n        return -1;\n    }\n    closedir(dir);\n\n    if (subfolder[0] != '\\0')\n        snprintf(canonical, sizeof(canonical), "pfs0:%s", subfolder);\n    else\n        snprintf(canonical, sizeof(canonical), "pfs0:");\n\n    if ((int)strlen(canonical) >= pathLen) {\n        gLastSaveErrno = ENODEV;\n        return -1;\n    }\n''',
+              '''    // HDD notation is relative to OPL's ACTIVE data home, not blindly to the PFS root.\n    // For +OPL that home is `pfs0:`; for the legacy __common layout it is `pfs0:OPL/`.\n    if (subfolder[0] != '\\0') {\n        size_t prefixLen = strlen(gHDDPrefix);\n        if (prefixLen > 0 && (gHDDPrefix[prefixLen - 1] == ':' || gHDDPrefix[prefixLen - 1] == '/'))\n            n = snprintf(canonical, sizeof(canonical), "%s%s", gHDDPrefix, subfolder);\n        else\n            n = snprintf(canonical, sizeof(canonical), "%s/%s", gHDDPrefix, subfolder);\n    } else {\n        n = snprintf(canonical, sizeof(canonical), "%s", gHDDPrefix);\n    }\n\n    if (n < 0 || n >= (int)sizeof(canonical) || n >= pathLen) {\n        gLastSaveErrno = ENODEV;\n        return -1;\n    }\n\n    dir = opendir(canonical);\n    if (dir == NULL) {\n        LOG("CONFIG APA settings directory %s does not exist\\n", canonical);\n        gLastSaveErrno = ENOENT;\n        return -1;\n    }\n    closedir(dir);\n''',
+              'HDD data-home canonicalization')
+
+          replace_once(
+              '''static void resolveBootDirToMass(void)\n{\n    if (gBootDir[0] == '\\0')\n        return;\n''',
+              '''static void resolveBootDirToMass(void)\n{\n    gBootHomeApa = 0;\n    if (gBootDir[0] == '\\0')\n        return;\n''',
+              'APA marker reset')
+
+          replace_once(
+              '''                    if (gHDDStartMode == START_MODE_DISABLED)\n                        gHDDStartMode = START_MODE_AUTO;\n\n                    // Preserve rebuild-206's recursion guard: re-home only when resolution changed it.\n''',
+              '''                    gBootHomeApa = 1;\n                    if (gHDDStartMode == START_MODE_DISABLED)\n                        gHDDStartMode = START_MODE_AUTO;\n\n                    // Preserve rebuild-206's recursion guard: re-home only when resolution changed it.\n''',
+              'APA marker success')
+
+          replace_once(
+              '''            configGetInt(configOPL, CONFIG_OPL_BDM_MODE, &gBDMStartMode);\n            configGetInt(configOPL, CONFIG_OPL_HDD_MODE, &gHDDStartMode);\n            configGetInt(configOPL, CONFIG_OPL_ETH_MODE, &gETHStartMode);\n''',
+              '''            configGetInt(configOPL, CONFIG_OPL_BDM_MODE, &gBDMStartMode);\n            configGetInt(configOPL, CONFIG_OPL_HDD_MODE, &gHDDStartMode);\n            // resolveBootDirToMass runs before this read. A stored Disabled value must not undo\n            // the AUTO fallback for an APA/PFS boot that already mounted and served OPL itself.\n            if (gBootHomeApa && gHDDStartMode == START_MODE_DISABLED)\n                gHDDStartMode = START_MODE_AUTO;\n            configGetInt(configOPL, CONFIG_OPL_ETH_MODE, &gETHStartMode);\n''',
+              'post-read HDD start mode')
+
+          replace_once(
+              '''    if (gCustomSettingsPath[0] != '\\0') {\n        snprintf(customSettingsTarget, sizeof(customSettingsTarget), "%s", gCustomSettingsPath);\n        if (prepareCustomSettingsPath(customSettingsTarget, sizeof(customSettingsTarget)) < 0) {\n''',
+              '''    if (gCustomSettingsPath[0] != '\\0') {\n        snprintf(customSettingsTarget, sizeof(customSettingsTarget), "%s", gCustomSettingsPath);\n        // Keep the user-facing spelling for any failure before configSetMove changes configGetDir().\n        snprintf(gLastSaveTarget, sizeof(gLastSaveTarget), "%s", gCustomSettingsPath);\n        if (prepareCustomSettingsPath(customSettingsTarget, sizeof(customSettingsTarget)) < 0) {\n''',
+              'custom failure target')
+
+          replace_once(
+              '''    gLastSaveErrno = 0;\n\n    guiHandleDeferedIO(&lscstatus, _l(_STR_SAVING_SETTINGS), IO_CUSTOM_SIMPLEACTION, &_saveConfig, OPL_DEFERRED_IO_TIMEOUT_MS);\n''',
+              '''    gLastSaveErrno = 0;\n    gLastSaveTarget[0] = '\\0';\n\n    guiHandleDeferedIO(&lscstatus, _l(_STR_SAVING_SETTINGS), IO_CUSTOM_SIMPLEACTION, &_saveConfig, OPL_DEFERRED_IO_TIMEOUT_MS);\n''',
+              'save target reset')
+
+          replace_once(
+              '''            if (gLastDeferredTimedOut)\n                snprintf(notification, sizeof(notification), "%s", _l(_STR_ERR_DEVICE_BUSY_TIMEOUT));\n            else\n                snprintf(notification, sizeof(notification), _l(_STR_ERROR_SAVING_SETTINGS_TO), configGetDir(), gLastSaveErrno);\n''',
+              '''            if (gLastDeferredTimedOut)\n                snprintf(notification, sizeof(notification), "%s", _l(_STR_ERR_DEVICE_BUSY_TIMEOUT));\n            else {\n                const char *failedPath = gLastSaveTarget[0] != '\\0' ? gLastSaveTarget : configGetDir();\n                snprintf(notification, sizeof(notification), _l(_STR_ERROR_SAVING_SETTINGS_TO), failedPath, gLastSaveErrno);\n            }\n''',
+              'save error path')
+
+          path.write_text(text)
+          PY
+
+      - name: Commit accepted review fixes and remove helper workflow
+        run: |
+          git config user.name "NathanNeurotic Step Builder"
+          git config user.email "actions@users.noreply.github.com"
+          git add src/opl.c
+          git rm .github/workflows/step208-review-fixes.yml
+          git commit -m "rebuild-208: address accepted review findings"
+          git push origin HEAD:rebuild/step-208-apa-pfs-config-fav-fix
