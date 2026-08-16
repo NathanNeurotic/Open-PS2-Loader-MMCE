@@ -1101,8 +1101,20 @@ static int configBuildWoplPath(const char *path, char *out, int outSize)
     return 0;
 }
 
+static int configPathIsRawApa(const char *path)
+{
+    // hddN: is not a filesystem path. It is PS2SDK's raw APA partition namespace, where
+    // O_CREAT means "create an APA partition". Config files must always use mounted PFS
+    // (pfsN:) instead. Keep this guard here even if higher-level path resolution regresses.
+    return path != NULL && !strncmp(path, "hdd", 3) && path[3] >= '0' && path[3] <= '9' && path[4] == ':';
+}
+
 int configRead(config_set_t *configSet)
 {
+    if (configSet != NULL && configPathIsRawApa(configSet->filename)) {
+        LOG("CONFIG refusing raw APA read path %s; use a mounted pfsN: path\n", configSet->filename);
+        return 0;
+    }
     int ret;
     file_buffer_t *fileBuffer = openFileBuffer(configSet->filename, O_RDONLY, 0, 4096);
 
@@ -1152,6 +1164,15 @@ int configWrite(config_set_t *configSet)
     if (configSet->modified) {
         if (configSet->filename == NULL)
             return 0; // in-memory-only config set: nothing to persist (and openFile would deref NULL)
+
+        // Absolute safety boundary: never let a config save reach PS2SDK's raw APA namespace.
+        // A past custom path such as hdd0:/+OPL/settings_riptopl.cfg reached open(..., O_CREAT),
+        // which the APA driver interprets as partition creation rather than file creation.
+        if (configPathIsRawApa(configSet->filename)) {
+            LOG("CONFIG blocked dangerous raw APA write path %s; use mounted pfsN: instead\n", configSet->filename);
+            gLastSaveErrno = EACCES;
+            return 0;
+        }
 
         // The write is NON-ATOMIC: openFileBuffer opens with O_TRUNC, emptying the existing good file
         // BEFORE the new content is flushed. On flaky media (a wedged HDD -- the reported case) the

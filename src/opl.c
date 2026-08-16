@@ -1261,6 +1261,9 @@ void setErrorMessagePathCode(int strId, const char *path, int error)
 
 static int lscstatus = CONFIG_ALL;
 static int lscret = 0;
+static char gLastSaveTarget[sizeof(gCustomSettingsPath)];
+static int gHddSettingsFallbackNotice = 0;
+static int gBootHddCommonFallback = 0;
 
 static int checkLoadConfigBDM(int types)
 {
@@ -1312,6 +1315,10 @@ static int checkLoadConfigHDD(int types)
 
     hddLoadModules();
     hddLoadSupportModules();
+    if (gHDDPrefix == NULL) {
+        LOG("CONFIG HDD load skipped: no existing PFS data home is mounted\n");
+        return 0;
+    }
 
     snprintf(path, sizeof(path), "%s%s", gHDDPrefix, CONFIG_OPL_FILENAME);
     value = open(path, O_RDONLY);
@@ -1343,6 +1350,9 @@ static int checkLoadConfigHDD(int types)
 // token is unreadable until the transport is up -- so those boots are indistinguishable from a local
 // one here and correctly leave this at 0. See the classification branch for what that costs.
 static int gBootHomeDeferred = 0;
+// Set only after an APA/PFS boot home has successfully mounted. Used after config read because
+// a stored HDD=Disabled value must not turn off the transport OPL itself was launched from.
+static int gBootHomeApa = 0;
 
 // When this function is called, the current device for loading/saving config is the memory card.
 // "Custom Settings Path" bootstrap.
@@ -1376,19 +1386,47 @@ static int mcConfigPathRedirect(char *out, int outLen)
     return 1;
 }
 
+static int configPathRedirectLocation(char *out, int outLen)
+{
+    // Never compose a writable bootstrap file in raw APA space. hddN: is a partition
+    // namespace, not a PFS filesystem; any file-like O_CREAT there is unsafe by definition.
+    if (!strncmp(gBootDir, "hdd", 3)) {
+        out[0] = '\0';
+        return 0;
+    }
+
+    // With a known local/network boot identity, anchor config.path absolutely to that home
+    // instead of trusting the process CWD. APA boots have already been rewritten to pfs0:.
+    if (gBootDir[0] != '\0') {
+        size_t len = strlen(gBootDir);
+        if (len > 0 && (gBootDir[len - 1] == ':' || gBootDir[len - 1] == '/' || gBootDir[len - 1] == '\\'))
+            snprintf(out, outLen, "%s%s", gBootDir, configPathRedirectFile);
+        else
+            snprintf(out, outLen, "%s/%s", gBootDir, configPathRedirectFile);
+    } else {
+        // Read-only legacy discovery may still inspect a relative redirect. Writers reject this
+        // case below because an unknown CWD could itself be raw hddN: space.
+        snprintf(out, outLen, "%s", configPathRedirectFile);
+    }
+
+    return 1;
+}
+
 static int readConfigPathRedirect(char *outPath, int outPathLen)
 {
     int fd;
     int len;
+    char redirectFile[sizeof(gBootDir) + 32];
 
-    fd = open((char *)configPathRedirectFile, O_RDONLY);
+    // APA launchers can leave the process CWD in raw hdd0: space. Once the data partition
+    // is mounted, anchor the bootstrap pointer to the resolved PFS config home instead of
+    // sending an ordinary file open through the raw APA namespace.
+    if (!configPathRedirectLocation(redirectFile, sizeof(redirectFile)))
+        return 0;
+    fd = open(redirectFile, O_RDONLY);
     if (fd < 0) {
         char mcPath[64];
 
-        // Fall back to the card mirror ONLY for a boot whose own folder cannot be read yet. Gating on
-        // gBootHomeDeferred rather than just "the CWD copy is missing" keeps every local boot on
-        // exactly its previous behaviour: a stale mirror left over from some earlier setup must never
-        // get to redirect a boot whose own CWD copy is simply absent.
         if (!gBootHomeDeferred || !mcConfigPathRedirect(mcPath, sizeof(mcPath)))
             return 0;
 
@@ -1402,7 +1440,6 @@ static int readConfigPathRedirect(char *outPath, int outPathLen)
     if (len <= 0)
         return 0;
 
-    // Written by hand as often as by us -- tolerate trailing newline/whitespace.
     while (len > 0 && (outPath[len - 1] == '\r' || outPath[len - 1] == '\n' || outPath[len - 1] == ' ' || outPath[len - 1] == '\t'))
         len--;
     outPath[len] = '\0';
@@ -1410,59 +1447,246 @@ static int readConfigPathRedirect(char *outPath, int outPathLen)
     return len > 0;
 }
 
-static void writeConfigPathRedirect(const char *path)
+static int writeConfigPathRedirect(const char *path)
 {
-    int fd = open((char *)configPathRedirectFile, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+    char redirectFile[sizeof(gBootDir) + 32];
+    int fd;
+    int primaryOk = 0;
+
+    // No boot identity means no provably safe place for an O_CREAT bootstrap file:
+    // the launcher may have left CWD in raw APA space. The config payload may still save via
+    // normal legacy discovery, but we do not manufacture a redirect in an unknown namespace.
+    if (gBootDir[0] == '\0') {
+        LOG("CONFIG refusing relative config.path write with unknown boot CWD\n");
+        return 0;
+    }
+    if (!configPathRedirectLocation(redirectFile, sizeof(redirectFile))) {
+        LOG("CONFIG refusing config.path write in raw APA boot namespace %s\n", gBootDir);
+        return 0;
+    }
+    fd = open(redirectFile, O_WRONLY | O_CREAT | O_TRUNC, 0666);
     if (fd >= 0) {
-        write(fd, path, strlen(path));
-        write(fd, "\n", 1);
+        int n1 = write(fd, path, strlen(path));
+        int n2 = write(fd, "\n", 1);
         close(fd);
+        primaryOk = (n1 == (int)strlen(path) && n2 == 1);
     }
 
-    // Mirror to the memory card, and ONLY for a boot that will not be able to read the copy above
-    // next time. Two gates stack to make this the narrowest write it can be: gBootHomeDeferred means
-    // the CWD is a network share, and this function's only caller that can reach it is the custom-path
-    // block in _saveConfig, which fires solely when gCustomSettingsPath is non-empty -- i.e. when the
-    // user typed a destination themselves. The other caller needs gBootDir empty, which a deferred
-    // boot never is.
-    //
-    // So no card is ever touched on a normal boot, and none is touched on a network boot either
-    // unless the user has explicitly named a settings path that would otherwise be forgotten. That is
-    // the line this codebase keeps re-learning: never home settings on a card nobody named
-    // (FifthFox, HW 2026-07-16). A pointer the user asked for is not that.
     if (gBootHomeDeferred) {
         char mcPath[64];
+        int mirrorOk = 0;
 
         if (mcConfigPathRedirect(mcPath, sizeof(mcPath))) {
             fd = open(mcPath, O_WRONLY | O_CREAT | O_TRUNC, 0666);
             if (fd < 0) {
-                // The OPL folder may not exist on this card yet -- create it and retry once.
                 char mcDir[64];
                 snprintf(mcDir, sizeof(mcDir), "mc%d:/OPL", sysCheckMC());
                 mkdir(mcDir, 0777);
                 fd = open(mcPath, O_WRONLY | O_CREAT | O_TRUNC, 0666);
             }
             if (fd >= 0) {
-                write(fd, path, strlen(path));
-                write(fd, "\n", 1);
+                int n1 = write(fd, path, strlen(path));
+                int n2 = write(fd, "\n", 1);
                 close(fd);
-                LOG("CONFIG mirrored settings path to %s\n", mcPath);
-            } else {
-                LOG("CONFIG could not mirror settings path to %s\n", mcPath);
+                mirrorOk = (n1 == (int)strlen(path) && n2 == 1);
+                if (mirrorOk)
+                    LOG("CONFIG mirrored settings path to %s\n", mcPath);
             }
+            if (!mirrorOk)
+                LOG("CONFIG could not mirror settings path to %s\n", mcPath);
         }
+
+        // The card mirror is the only bootstrap copy a deferred network boot can read.
+        return mirrorOk;
     }
+
+    return primaryOk;
 }
 
-// Make a typed settings path usable: the user may name a device that is not mounted yet (that is the
-// whole point of typing it rather than picking from a list), so force-load its transport and rewrite
-// the prefix to the massN: OPL can actually read. Returns 1 when `path` is ready to hand to
-// configInit(), 0 when it is not a BDM path at all (mc?:/pfs0:/mmce -- usable as typed), and -1 when
-// it names a BDM device that never mounted.
-//
-// A -1 MUST NOT silently fall back to mc: an unreachable path is a user error to surface, and
-// re-homing onto whatever memory card happens to be inserted is exactly the incident item 11 exists
-// to prevent (a stray mc?:OPL folder stamped onto an unrelated card).
+// Convert an explicit APA settings target to the already-owned pfs0: mount. OPL's HDD
+// support owns pfs0: for gOPLPart; Step-208 deliberately refuses to remount another APA
+// partition (or borrow transient pfs1:) merely to store settings.
+static int prepareCustomApaSettingsPath(char *path, int pathLen)
+{
+    char targetPart[64] = {0};
+    char subfolder[64] = {0};
+    char canonical[64] = {0};
+    const char *p = path;
+    const char *unit = "hdd0";
+    size_t i = 0;
+    DIR *dir;
+    int n;
+
+    if (!strncmp(path, "pfs", 3)) {
+        if (path[3] == ':')
+            p = path + 4;
+        else if (path[3] == '0' && path[4] == ':')
+            p = path + 5;
+        else {
+            gLastSaveErrno = ENODEV;
+            return -1; // pfs1: is transient HDD scan space, not a settings home.
+        }
+
+        if (!hddLoadModulesReady()) {
+            gLastSaveErrno = ENODEV;
+            return -1;
+        }
+        hddLoadSupportModules();
+        if (gOPLPart[0] == '\0' || gHDDPrefix == NULL) {
+            gLastSaveErrno = ENODEV;
+            return -1;
+        }
+
+        while (*p == '/' || *p == '\\')
+            p++;
+        if (*p != '\0')
+            n = snprintf(canonical, sizeof(canonical), "pfs0:%s", p);
+        else
+            n = snprintf(canonical, sizeof(canonical), "pfs0:");
+        if (n < 0 || n >= (int)sizeof(canonical) || n >= pathLen) {
+            gLastSaveErrno = ENODEV;
+            return -1;
+        }
+
+        // A custom settings target is a directory. Validate the actual requested directory now
+        // instead of letting configWrite fail later after appending settings_riptopl.cfg.
+        dir = opendir(canonical);
+        if (dir == NULL) {
+            LOG("CONFIG PFS settings directory %s does not exist\n", canonical);
+            gLastSaveErrno = ENOENT;
+            return -1;
+        }
+        closedir(dir);
+
+        snprintf(path, pathLen, "%s", canonical);
+        return 1;
+    }
+
+    if (path[0] == '+') {
+        p = path;
+    } else {
+        if (strncmp(path, "hdd", 3) != 0 || (path[3] != '0' && path[3] != '1') || path[4] != ':') {
+            LOG("CONFIG malformed APA settings path %s rejected\n", path);
+            gLastSaveErrno = ENODEV;
+            return -1;
+        }
+        if (path[3] == '1')
+            unit = "hdd1";
+        p = path + 5;
+        while (*p == '/' || *p == ':')
+            p++;
+    }
+
+    while (*p != '\0' && *p != '/' && *p != ':' && i < sizeof(targetPart) - 6) {
+        subfolder[i++] = *p++;
+    }
+    subfolder[i] = '\0';
+    if (subfolder[0] == '\0') {
+        gLastSaveErrno = ENODEV;
+        return -1;
+    }
+    snprintf(targetPart, sizeof(targetPart), "%s:%s", unit, subfolder);
+
+    // Launchers use both `:pfs:` and `/pfs:` spellings. Strip separators first, then
+    // consume the pseudo-filesystem token so neither spelling leaks `pfs:` into the directory name.
+    while (*p != '\0') {
+        while (*p == ':' || *p == '/' || *p == '\\')
+            p++;
+        if (!strncmp(p, "pfs:", 4)) {
+            p += 4;
+            continue;
+        }
+        break;
+    }
+
+    i = 0;
+    while (*p != '\0' && i < sizeof(subfolder) - 1) {
+        subfolder[i++] = (*p == '\\') ? '/' : *p;
+        p++;
+    }
+    subfolder[i] = '\0';
+    while (i > 0 && subfolder[i - 1] == '/')
+        subfolder[--i] = '\0';
+
+    if (!hddLoadModulesReady()) {
+        gLastSaveErrno = ENODEV;
+        return -1;
+    }
+    hddLoadSupportModules();
+    if (gOPLPart[0] == '\0' || gHDDPrefix == NULL) {
+        gLastSaveErrno = ENODEV;
+        return -1;
+    }
+
+    if (strcmp(targetPart, gOPLPart) != 0) {
+        LOG("CONFIG APA settings partition %s rejected; active OPL data partition is %s\n", targetPart, gOPLPart);
+        gLastSaveErrno = ENODEV;
+        return -1;
+    }
+
+    // HDD notation is relative to OPL's ACTIVE data home, not blindly to the PFS root.
+    // For +OPL that home is `pfs0:`; for the legacy __common layout it is `pfs0:OPL/`.
+    if (subfolder[0] != '\0') {
+        size_t prefixLen = strlen(gHDDPrefix);
+        if (prefixLen > 0 && (gHDDPrefix[prefixLen - 1] == ':' || gHDDPrefix[prefixLen - 1] == '/'))
+            n = snprintf(canonical, sizeof(canonical), "%s%s", gHDDPrefix, subfolder);
+        else
+            n = snprintf(canonical, sizeof(canonical), "%s/%s", gHDDPrefix, subfolder);
+    } else {
+        n = snprintf(canonical, sizeof(canonical), "%s", gHDDPrefix);
+    }
+
+    if (n < 0 || n >= (int)sizeof(canonical) || n >= pathLen) {
+        gLastSaveErrno = ENODEV;
+        return -1;
+    }
+
+    dir = opendir(canonical);
+    if (dir == NULL) {
+        LOG("CONFIG APA settings directory %s does not exist\n", canonical);
+        gLastSaveErrno = ENOENT;
+        return -1;
+    }
+    closedir(dir);
+    snprintf(path, pathLen, "%s", canonical);
+    LOG("CONFIG APA settings path -> %s (OPL part %s)\n", path, gOPLPart);
+    return 1;
+}
+
+static int isApaSettingsPath(const char *path)
+{
+    return path != NULL && (!strncmp(path, "hdd", 3) || !strncmp(path, "pfs", 3) || path[0] == '+');
+}
+
+// Resolve the normal safe HDD settings home after an explicit HDD path cannot be used.
+// hddLoadSupportModules owns the policy: honour an existing conf_hdd.cfg target first;
+// otherwise mount the guaranteed __common partition and use __common/OPL/. It never creates
+// or formats an APA partition. This helper only accepts the resulting mounted PFS namespace.
+static int prepareHddSettingsFallback(char *path, int pathLen)
+{
+    DIR *dir;
+    int n;
+
+    if (!hddLoadModulesReady())
+        return -1;
+
+    hddLoadSupportModules();
+    if (gHDDPrefix == NULL || gHDDPrefix[0] == '\0')
+        return -1;
+
+    dir = opendir(gHDDPrefix);
+    if (dir == NULL)
+        return -1;
+    closedir(dir);
+
+    n = snprintf(path, pathLen, "%s", gHDDPrefix);
+    return (n >= 0 && n < pathLen) ? 1 : -1;
+}
+
+// Make a typed settings path usable: the user may name a device that is not mounted yet. APA/PFS
+// paths are handled first and rewritten to OPL's already-mounted pfs0: data partition; BDM paths
+// keep the existing transport resolver. HDD targets have a deterministic safe fallback in
+// _saveConfig(); non-HDD explicit targets still fail rather than scattering settings elsewhere.
 static int prepareCustomSettingsPath(char *path, int pathLen)
 {
     int bdmType = BDM_TYPE_UNKNOWN;
@@ -1470,14 +1694,13 @@ static int prepareCustomSettingsPath(char *path, int pathLen)
     if (path == NULL || path[0] == '\0')
         return 0;
 
-    // Not a BDM namespace -> nothing to load; mc?: is ROM-backed and pfs0:/mmce are handled by their
-    // own stacks, which are already up by the time a save runs.
+    if (isApaSettingsPath(path))
+        return prepareCustomApaSettingsPath(path, pathLen);
+
     if (strncmp(path, "mass", 4) && strncmp(path, "usb", 3) && strncmp(path, "ata", 3) &&
         strncmp(path, "mx4sio", 6) && strncmp(path, "sd", 2) && strncmp(path, "ilink", 5))
         return 0;
 
-    // elfName is empty: we are resolving a settings folder, not the boot ELF, so there is no
-    // filename to verify the slot with -- the first mounted device of the right type wins.
     return bdmResolveBootDir(path, pathLen, "", &bdmType);
 }
 
@@ -1498,6 +1721,14 @@ static int tryAlternateDevice(int types)
             value = configReadMulti(types);
             if (value & CONFIG_OPL)
                 return value;
+
+            // A stale pointer must not leave local config_set filenames homed on the missing target.
+            // Network boot keeps its existing deferred-home handling below.
+            if (!gBootHomeDeferred) {
+                configEnd();
+                configInit(gBootDir[0] != '\0' ? gBootDir : NULL);
+                LOG("CONFIG stale settings redirect failed; restored normal home %s\n", gBootDir);
+            }
         } else {
             // Named a BDM device that never mounted.
             LOG("CONFIG custom settings path %s did not mount\n", redirectPath);
@@ -1626,150 +1857,40 @@ static char gBootElfName[64];
 static int gBootDirBdmType = BDM_TYPE_UNKNOWN;
 
 
-// Parse APA boot paths from WLE-R3Z / uLE / FHDB / HDD-OSD:
-// "hdd0:/__common/OPL", "hdd0:__common/OPL", "hdd0:/+OPL", "hdd0:+OPL", "hdd1:/__common/OPL",
-// "hdd0:__sysconf:pfs:/FMCB", "hdd0:/__sysconf/FMCB", "hdd0:/__contents/APPS", etc.
-static int apaParseBootPath(const char *bootPath, char *outPart, size_t partSize, char *outBootDir, size_t bootDirSize, char *outHddPrefix, size_t prefixSize)
-{
-    if (bootPath == NULL)
-        return -1;
-
-    // Direct PFS mount paths (e.g. "pfs0:OPL", "pfs0:", "pfs:OPL")
-    if (bootPath[0] == 'p' && bootPath[1] == 'f' && bootPath[2] == 's' &&
-        ((isdigit((unsigned char)bootPath[3]) && bootPath[4] == ':') || bootPath[3] == ':')) {
-        if (outBootDir != NULL && bootDirSize > 0)
-            snprintf(outBootDir, bootDirSize, "%s", bootPath);
-        if (outHddPrefix != NULL && prefixSize > 0) {
-            snprintf(outHddPrefix, prefixSize, "%s", bootPath);
-            size_t len = strlen(outHddPrefix);
-            if (len > 0 && outHddPrefix[len - 1] != '/') {
-                if (len + 1 < prefixSize) {
-                    outHddPrefix[len] = '/';
-                    outHddPrefix[len + 1] = '\0';
-                }
-            }
-        }
-        return 0;
-    }
-
-    if (strncmp(bootPath, "hdd", 3) != 0)
-        return -1;
-    // Strictly accept only unit numbers 0 and 1 followed by ':' or '/'
-    if (bootPath[3] != '0' && bootPath[3] != '1')
-        return -1;
-
-    const char *p = bootPath;
-    char unit[16] = "hdd0";
-    if (!strncmp(p, "hdd1", 4))
-        snprintf(unit, sizeof(unit), "hdd1");
-    else
-        snprintf(unit, sizeof(unit), "hdd0");
-
-    p += 4; // skip "hdd0" / "hdd1"
-    while (*p == ':' || *p == '/')
-        p++;
-
-    if (*p == '\0')
-        return -1;
-
-    // Extract partition name (up to '/', ':', or end of string)
-    char part[64] = {0};
-    size_t i = 0;
-    while (*p != '\0' && *p != '/' && *p != ':' && i < sizeof(part) - 1) {
-        part[i++] = *p++;
-    }
-    part[i] = '\0';
-
-    // Skip pseudo-PFS tokens like ":pfs:" or slashes
-    while (*p != '\0') {
-        if (!strncmp(p, ":pfs:", 5))
-            p += 5;
-        else if (*p == ':' || *p == '/')
-            p++;
-        else
-            break;
-    }
-
-    // Extract subfolder (e.g. "OPL", "FMCB", "APPS", etc.)
-    char subfolder[64] = {0};
-    i = 0;
-    while (*p != '\0' && i < sizeof(subfolder) - 1) {
-        if (*p == '\\')
-            subfolder[i++] = '/';
-        else
-            subfolder[i++] = *p;
-        p++;
-    }
-    subfolder[i] = '\0';
-    while (i > 0 && subfolder[i - 1] == '/')
-        subfolder[--i] = '\0';
-
-    // If an ELF filename is present at the tail of the path, strip it to leave only the directory
-    char *dot = strrchr(subfolder, '.');
-    if (dot != NULL && (!strcasecmp(dot, ".elf") || !strcasecmp(dot, ".ELF"))) {
-        char *lastSlash = strrchr(subfolder, '/');
-        if (lastSlash != NULL)
-            *lastSlash = '\0';
-        else
-            subfolder[0] = '\0';
-    }
-
-    snprintf(outPart, partSize, "%s:%s", unit, part);
-    if (subfolder[0] != '\0') {
-        snprintf(outBootDir, bootDirSize, "pfs0:%s", subfolder);
-        snprintf(outHddPrefix, prefixSize, "pfs0:%s/", subfolder);
-    } else {
-        snprintf(outBootDir, bootDirSize, "pfs0:");
-        snprintf(outHddPrefix, prefixSize, "pfs0:");
-    }
-    return 0;
-}
-
 static void resolveBootDirToMass(void)
 {
+    gBootHomeApa = 0;
+    gBootHddCommonFallback = 0;
     if (gBootDir[0] == '\0')
         return;
 
-    // APA-HDD boot: WLE-R3Z / uLE / FHDB / HDD-OSD hand paths like "hdd0:/__common/OPL", "hdd0:+OPL",
-    // "hdd0:__sysconf:pfs:/FMCB", "hdd1:/__common/OPL", "hdd0:/__contents/APPS", or "pfs0:OPL".
-    // Lazy-load the APA HDD modules and PFS filesystem, resolving gBootDir to the mounted pfs0: path
-    // so config and CWD live on the APA partition beside the ELF with no multi-device probe discovery.
+    // APA-HDD boot: the ELF launch partition and OPL's persistent data partition are separate
+    // concepts. FHDB/uLE/HDD-OSD may launch from __sysconf/__common/__contents, but hddsupport
+    // alone owns gOPLPart and mounts that data partition on pfs0:. Config follows gHDDPrefix.
     if (!strncmp(gBootDir, "hdd", 3) || !strncmp(gBootDir, "pfs", 3)) {
         if (hddLoadModulesReady()) {
             char before[sizeof(gBootDir)];
             snprintf(before, sizeof(before), "%s", gBootDir);
-            char targetPart[64] = {0};
-            char resolvedBootDir[sizeof(gBootDir)] = {0};
-            char resolvedHddPrefix[64] = {0};
-
-            if (apaParseBootPath(gBootDir, targetPart, sizeof(targetPart), resolvedBootDir, sizeof(resolvedBootDir), resolvedHddPrefix, sizeof(resolvedHddPrefix)) == 0) {
-                if (targetPart[0] != '\0') {
-                    // Set gOPLPart to the exact partition where the ELF was launched from
-                    snprintf(gOPLPart, sizeof(gOPLPart), "%s", targetPart);
-                }
-            }
 
             hddLoadSupportModules();
-
-            const char *prefixToCheck = (resolvedBootDir[0] != '\0') ? resolvedBootDir : gHDDPrefix;
-            if (prefixToCheck != NULL && prefixToCheck[0] != '\0') {
-                DIR *dir = opendir(prefixToCheck);
+            if (gHDDPrefix != NULL && gHDDPrefix[0] != '\0') {
+                DIR *dir = opendir(gHDDPrefix);
                 if (dir != NULL) {
                     closedir(dir);
-                    if (resolvedBootDir[0] != '\0') {
-                        snprintf(gBootDir, sizeof(gBootDir), "%s", resolvedBootDir);
-                    } else if (gHDDPrefix != NULL) {
-                        snprintf(gBootDir, sizeof(gBootDir), "%s", gHDDPrefix);
-                        size_t rlen = strlen(gBootDir);
-                        while (rlen > 0 && gBootDir[rlen - 1] == '/')
-                            gBootDir[--rlen] = '\0';
-                    }
+                    snprintf(gBootDir, sizeof(gBootDir), "%s", gHDDPrefix);
+                    size_t rlen = strlen(gBootDir);
+                    while (rlen > 0 && gBootDir[rlen - 1] == '/')
+                        gBootDir[--rlen] = '\0';
+
+                    gBootHomeApa = 1;
+                    if (!strcmp(gOPLPart, "hdd0:__common"))
+                        gBootHddCommonFallback = 1;
                     if (gHDDStartMode == START_MODE_DISABLED)
                         gHDDStartMode = START_MODE_AUTO;
 
-                    // Only re-home configInit if gBootDir actually changed (prevents infinite recursion)
+                    // Preserve rebuild-206's recursion guard: re-home only when resolution changed it.
                     if (strcmp(before, gBootDir) != 0) {
-                        LOG("BOOT resolved APA boot dir %s -> %s (part %s)\n", before, gBootDir, gOPLPart);
+                        LOG("BOOT resolved APA launch %s -> data home %s (OPL part %s)\n", before, gBootDir, gOPLPart);
                         configEnd();
                         configInit(gBootDir);
                     }
@@ -1777,10 +1898,15 @@ static void resolveBootDirToMass(void)
                 }
             }
         }
-        LOG("BOOT APA boot dir %s failed to mount -> fallback to MC\n", gBootDir);
-        gBootDir[0] = '\0';
+        LOG("BOOT APA boot dir %s could not resolve an HDD data home; refusing MC/raw fallback\n", gBootDir);
+        snprintf(gBootDir, sizeof(gBootDir), "pfs0:OPL");
+        // The launch transport is still APA even though the persistent data home did not mount.
+        // Preserve that fact so the post-config repair keeps HDD enabled for a safe retry.
+        gBootHomeApa = 1;
+        gHDDStartMode = START_MODE_AUTO;
+        gBootHddCommonFallback = 1;
         configEnd();
-        configInit(NULL);
+        configInit(gBootDir);
         return;
     }
 
@@ -1956,6 +2082,10 @@ static void _loadConfig()
             configGetInt(configOPL, CONFIG_OPL_AUTOSTART_LAST, &gAutoStartLastPlayed);
             configGetInt(configOPL, CONFIG_OPL_BDM_MODE, &gBDMStartMode);
             configGetInt(configOPL, CONFIG_OPL_HDD_MODE, &gHDDStartMode);
+            // resolveBootDirToMass runs before this read. A stored Disabled value must not undo
+            // the AUTO fallback for an APA/PFS boot that already mounted and served OPL itself.
+            if (gBootHomeApa && gHDDStartMode == START_MODE_DISABLED)
+                gHDDStartMode = START_MODE_AUTO;
             configGetInt(configOPL, CONFIG_OPL_ETH_MODE, &gETHStartMode);
             configGetInt(configOPL, CONFIG_OPL_APP_MODE, &gAPPStartMode);
             configGetInt(configOPL, CONFIG_OPL_ENABLE_USB, &gEnableUSB);
@@ -2313,6 +2443,8 @@ static int configWriteChecked(int types)
 static void _saveConfig()
 {
     char temp[256];
+    char customSettingsTarget[sizeof(gCustomSettingsPath)] = {0};
+    int customSettingsExplicit = 0;
 
     if (lscstatus & CONFIG_OPL) {
         config_set_t *configOPL = configGetByType(CONFIG_OPL);
@@ -2451,22 +2583,34 @@ static void _saveConfig()
         configPrepareNotifications(gBaseMCDir);
     }
 
-    // Custom Settings Path: re-home the config set BEFORE the write, so this save (and every later
-    // one) lands where the user asked. Typed paths may name a device that is not mounted yet, so
-    // resolve/lazy-load first; a path that never mounts is left alone and the write falls through to
-    // the normal home -- deliberately NOT re-homed onto mc, which would scatter settings onto an
-    // unrelated memory card (the incident item 11 exists to prevent).
+    // Custom Settings Path is an explicit destination. Non-HDD targets still fail visibly
+    // when unreachable. HDD/APA targets are different: they have a guaranteed safe ownership
+    // chain (conf_hdd.cfg target -> __common/OPL), so an invalid HDD target falls back there
+    // explicitly and the success dialog tells the user which HDD home was actually used.
     if (gCustomSettingsPath[0] != '\0') {
-        char target[sizeof(gCustomSettingsPath)];
-        snprintf(target, sizeof(target), "%s", gCustomSettingsPath);
-        if (prepareCustomSettingsPath(target, sizeof(target)) >= 0) {
-            configSetMove(target);
-            // Mirror it to the cwd redirect: this key lives inside the config we are about to write
-            // to `target`, so without the pointer the NEXT boot could not find it. Written even when
-            // the value is unchanged -- cheap, and it self-heals a deleted/corrupt redirect.
-            writeConfigPathRedirect(target);
+        snprintf(customSettingsTarget, sizeof(customSettingsTarget), "%s", gCustomSettingsPath);
+        // Keep the user-facing spelling for any failure before configSetMove changes configGetDir().
+        snprintf(gLastSaveTarget, sizeof(gLastSaveTarget), "%s", gCustomSettingsPath);
+        if (prepareCustomSettingsPath(customSettingsTarget, sizeof(customSettingsTarget)) < 0) {
+            if (isApaSettingsPath(gCustomSettingsPath) &&
+                prepareHddSettingsFallback(customSettingsTarget, sizeof(customSettingsTarget)) > 0) {
+                LOG("CONFIG HDD custom settings path %s unavailable; falling back safely to %s\n",
+                    gCustomSettingsPath, customSettingsTarget);
+                configSetMove(customSettingsTarget);
+                snprintf(gLastSaveTarget, sizeof(gLastSaveTarget), "%s", customSettingsTarget);
+                gHddSettingsFallbackNotice = 1;
+                gLastSaveErrno = 0;
+            } else {
+                LOG("CONFIG custom settings path %s unreachable; aborting explicit save\n", gCustomSettingsPath);
+                if (gLastSaveErrno == 0)
+                    gLastSaveErrno = ENODEV;
+                lscret = 0;
+                lscstatus = 0;
+                return;
+            }
         } else {
-            LOG("CONFIG custom settings path %s unreachable; saving to the normal home\n", gCustomSettingsPath);
+            configSetMove(customSettingsTarget);
+            customSettingsExplicit = 1;
         }
     }
 
@@ -2482,6 +2626,19 @@ static void _saveConfig()
         config_set_t *oplCfg = configGetByType(CONFIG_OPL);
         if (oplCfg != NULL)
             checkMCSaveIcons(oplCfg->filename);
+    }
+
+    // Persist the bootstrap pointer only after the explicit config write succeeded. An explicit
+    // target owns the whole save attempt: whether it succeeds or fails, do not retry onto the boot
+    // device or an alternate device behind the user's back.
+    if (customSettingsExplicit) {
+        if (lscret > 0 && !writeConfigPathRedirect(customSettingsTarget)) {
+            LOG("CONFIG could not persist settings redirect for %s\n", customSettingsTarget);
+            gLastSaveErrno = EIO;
+            lscret = 0;
+        }
+        lscstatus = 0;
+        return;
     }
 
     // Boot-device save retry: BDM slot numbering can change between the boot-time resolve and this
@@ -2622,6 +2779,8 @@ int saveConfig(int types, int showUI)
     // later one, and (worse) a save that never reached configWrite at all reported whatever was left,
     // usually the 0 that produced the nonsensical "(error 0)".
     gLastSaveErrno = 0;
+    gLastSaveTarget[0] = '\0';
+    gHddSettingsFallbackNotice = 0;
 
     guiHandleDeferedIO(&lscstatus, _l(_STR_SAVING_SETTINGS), IO_CUSTOM_SIMPLEACTION, &_saveConfig, OPL_DEFERRED_IO_TIMEOUT_MS);
 
@@ -2629,7 +2788,18 @@ int saveConfig(int types, int showUI)
         if (lscret) {
             char *path = configGetDir();
 
-            snprintf(notification, sizeof(notification), _l(_STR_SETTINGS_SAVED), path);
+            // Boot fallback state only describes an HDD save when this save actually landed on PFS.
+            if (gHddSettingsFallbackNotice ||
+                (gBootHddCommonFallback && path != NULL && !strncmp(path, "pfs", 3))) {
+                const char *displayHome = path;
+                if (!strcmp(gOPLPart, "hdd0:__common"))
+                    displayHome = "hdd0:__common/OPL";
+                else if (gOPLPart[0] != '\0')
+                    displayHome = gOPLPart;
+                snprintf(notification, sizeof(notification), _l(_STR_SETTINGS_HDD_FALLBACK), displayHome);
+            } else {
+                snprintf(notification, sizeof(notification), _l(_STR_SETTINGS_SAVED), path);
+            }
 
             guiMsgBox(notification, 0, NULL);
         } else {
@@ -2640,8 +2810,10 @@ int saveConfig(int types, int showUI)
             // touched the config, so reporting a write error against the config path is a lie.
             if (gLastDeferredTimedOut)
                 snprintf(notification, sizeof(notification), "%s", _l(_STR_ERR_DEVICE_BUSY_TIMEOUT));
-            else
-                snprintf(notification, sizeof(notification), _l(_STR_ERROR_SAVING_SETTINGS_TO), configGetDir(), gLastSaveErrno);
+            else {
+                const char *failedPath = gLastSaveTarget[0] != '\0' ? gLastSaveTarget : configGetDir();
+                snprintf(notification, sizeof(notification), _l(_STR_ERROR_SAVING_SETTINGS_TO), failedPath, gLastSaveErrno);
+            }
             guiMsgBox(notification, 0, NULL);
         }
     }

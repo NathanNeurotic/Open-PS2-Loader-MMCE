@@ -26,7 +26,7 @@ Nathan's side and his testers' side must look identical across a handover. These
 
 **BRANCHES.** Never commit to `master`, `rebuild/main`, or any existing `rebuild/step-*` branch.
 Every change goes on a NEW branch you create, `rebuild/step-NNN-<slug>`, branched from the current
-tip. **Next number: 206. Current tip: `rebuild/step-205-wler3z-apa-boot-path-parser`.** One focused change
+tip. **Next number: 212. Current tip: `rebuild/step-211-consolidated-apa-config-safety`.** One focused change
 per step, with a long explanatory commit message -- what changed, why, what evidence drove it, and
 what it does NOT fix. Those messages are this project's real documentation. Never force-push, never
 rewrite history, never merge to `master` without asking. (`rebuild/main` moves only as the
@@ -1241,3 +1241,55 @@ When connecting to SMBv1/v2/v3 shares (reported in PS2-Servers Issue #180) or mo
    - Added `sbCreateFolders(udpfsPrefix, 1)` on first scan to ensure standard folders exist on UDPFS mounts.
 6. **`src/util.c:checkFile()`**:
    - Updated parent directory detection in `checkFile()` under `O_CREAT` to handle both forward slashes (`/`) and backslashes (`\`) for all device paths, auto-creating the parent directory (`smb0:\CFG`, `mass0:/CFG`, `pfs0:/CFG`, etc.) if missing.
+
+
+---
+
+## Step 209 — APA data-integrity stop-ship hardening
+
+**Invariant: RiptOPL never creates an APA partition implicitly.** HDD configuration/data discovery is
+existing-partitions-only: use a valid partition named by `__common/OPL/conf_hdd.cfg`, otherwise the
+already-existing `__common` partition with `pfs0:OPL/` as the data home. An unreferenced `+OPL` is
+never selected. If neither target mounts, fail closed. Folder creation inside an already-mounted PFS
+partition remains ordinary filesystem I/O and is allowed; APA partition creation/formatting is not.
+
+The trigger for this rule was the Aug-15 FHDB custom-settings incident. A pre-208 path could pass
+`hdd0:/+OPL/settings_riptopl.cfg` into the generic config writer with `O_CREAT`. PS2SDK's `hddN:`
+driver is the raw APA namespace, so that flag enters `apaOpen()`'s partition-create branch. A normal
+config filename supplies no APA size/type tuple, leaving size zero; with a reusable free block,
+`apaInsertPartition()` can repeatedly split/flush APA headers while trying to reach that impossible
+size. This is a credible mechanism for an APA chain becoming invalid while existing PFS files remain
+browseable. Therefore `config.c` now independently rejects every raw `hddN:` config read/write path,
+and `config.path` writes are never relative to an unknown/raw APA CWD. These guards are intentional
+defense-in-depth and must not be removed merely because the higher-level resolver currently emits
+`pfs0:` correctly.
+
+
+---
+
+## Step 210 — deterministic __common HDD config fallback
+
+HDD config/data ownership is now deterministic and existing-partitions-only.
+`hdd0:__common/OPL/conf_hdd.cfg` is the sole authority that may redirect OPL to another existing
+PFS partition (normally `+OPL`). If that file is absent, malformed, names a missing/unmountable
+partition, or the HDD boot/custom settings path cannot be resolved, RiptOPL falls back to the
+already-existing `hdd0:__common` partition and stores its files under `pfs0:OPL/`. It does not
+opportunistically select an unreferenced `+OPL` partition.
+
+An unreachable explicit HDD custom settings path falls back through the same normal HDD ownership
+resolver and the successful save reports that a safe fallback home was used. Non-HDD custom paths
+retain the fail-visible/no-scatter policy. If even `__common` cannot mount, config remains pointed at
+a harmless PFS namespace and the write fails closed; it never falls back to raw `hddN:` or creates,
+formats, resizes, or repairs APA metadata. The raw-APA firewall in `config.c` remains the independent
+last line of defense.
+
+
+---
+
+## Step 211 — consolidated APA config safety finalization
+
+Final audit polish for the Step-208 through Step-210 HDD config safety stack. Boot-derived fallback
+notification state is reset if resolution reruns, failed writes after a graceful HDD custom-path
+fallback report the actual fallback target, and the success notification names the real APA home
+(`hdd0:__common/OPL` or the existing partition selected by `conf_hdd.cfg`) rather than the temporary
+`pfs0:` mount alias. No partition-creation behavior is reintroduced.
