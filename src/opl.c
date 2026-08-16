@@ -1350,8 +1350,9 @@ static int checkLoadConfigHDD(int types)
 // token is unreadable until the transport is up -- so those boots are indistinguishable from a local
 // one here and correctly leave this at 0. See the classification branch for what that costs.
 static int gBootHomeDeferred = 0;
-// Set only after an APA/PFS boot home has successfully mounted. Used after config read because
-// a stored HDD=Disabled value must not turn off the transport OPL itself was launched from.
+// Set for an APA/PFS launch identity, even when the first persistent-home mount attempt fails.
+// Used after config read because a stored HDD=Disabled value must not turn off the transport OPL
+// itself was launched from, and by discovery to prohibit an unrelated MC write fallback.
 static int gBootHomeApa = 0;
 
 // When this function is called, the current device for loading/saving config is the memory card.
@@ -1735,6 +1736,18 @@ static int tryAlternateDevice(int types)
         }
     }
 
+    // APA/PFS boot identity is authoritative. If the first early mount missed because the disk was
+    // still settling, retry the existing-partition resolver here. Never turn an APA boot into an MC
+    // config home merely because that first PFS mount was not ready yet.
+    if (gBootHomeApa) {
+        value = checkLoadConfigHDD(types);
+        if (value & CONFIG_OPL)
+            return value;
+        configPrepareNotifications(gBootDir);
+        showCfgPopup = 0;
+        return 0;
+    }
+
     // If OPL was booted from a valid CWD/boot directory (gBootDir is set, e.g. "mc0:/OPL" or "mc0:"),
     // settings are strictly homed to gBootDir. Never probe alternate devices (mass0:/hdd0:) or hijack
     // the save location away from CWD/Memory Card.
@@ -1898,15 +1911,14 @@ static void resolveBootDirToMass(void)
                 }
             }
         }
-        LOG("BOOT APA boot dir %s could not resolve an HDD data home; refusing MC/raw fallback\n", gBootDir);
-        snprintf(gBootDir, sizeof(gBootDir), "pfs0:OPL");
+        LOG("BOOT APA boot dir %s could not resolve an HDD data home; keeping launch identity for safe retry\n", gBootDir);
         // The launch transport is still APA even though the persistent data home did not mount.
-        // Preserve that fact so the post-config repair keeps HDD enabled for a safe retry.
+        // Keep the real launch identity rather than inventing an unmounted pfs0:OPL home. The raw
+        // hddN: config firewall makes the first read fail closed, and tryAlternateDevice retries
+        // only the existing-partition HDD ownership chain.
         gBootHomeApa = 1;
         gHDDStartMode = START_MODE_AUTO;
-        gBootHddCommonFallback = 1;
-        configEnd();
-        configInit(gBootDir);
+        gBootHddCommonFallback = 0;
         return;
     }
 
@@ -3475,7 +3487,10 @@ static void setDefaults(void)
     gAutoLaunchBDMGame = NULL;
     gAutoLaunchDeviceData = NULL;
     gOPLPart[0] = '\0';
-    gHDDPrefix = "pfs0:";
+    // NULL is the only truthful pre-mount state. hddLoadSupportModules() uses non-NULL as the
+    // proof that the persistent pfs0: data home is already mounted; seeding this with "pfs0:"
+    // skipped discovery/mount entirely on a fresh APA boot.
+    gHDDPrefix = NULL;
     gBaseMCDir = "mc?:OPL";
 
     bdmCacheSize = 16;
