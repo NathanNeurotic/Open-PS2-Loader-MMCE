@@ -1,0 +1,24 @@
+name: Step 212 one-shot builder
+
+on:
+  push:
+    branches:
+      - automation/step-212-builder
+    paths:
+      - .github/scripts/step212_builder.py
+      - .github/workflows/step212-builder.yml
+
+permissions:
+  contents: write
+
+jobs:
+  build-step-212:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout builder
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply three production commits to Step 212
+        run: python3 .github/scripts/step212_builder.py
