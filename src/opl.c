@@ -1860,6 +1860,7 @@ static int gBootDirBdmType = BDM_TYPE_UNKNOWN;
 static void resolveBootDirToMass(void)
 {
     gBootHomeApa = 0;
+    gBootHddCommonFallback = 0;
     if (gBootDir[0] == '\0')
         return;
 
@@ -2579,8 +2580,10 @@ static void _saveConfig()
         configPrepareNotifications(gBaseMCDir);
     }
 
-    // Custom Settings Path is an explicit destination. Resolve it before the write and fail
-    // visibly if it cannot be reached; never silently save to the normal home instead.
+    // Custom Settings Path is an explicit destination. Non-HDD targets still fail visibly
+    // when unreachable. HDD/APA targets are different: they have a guaranteed safe ownership
+    // chain (conf_hdd.cfg target -> __common/OPL), so an invalid HDD target falls back there
+    // explicitly and the success dialog tells the user which HDD home was actually used.
     if (gCustomSettingsPath[0] != '\0') {
         snprintf(customSettingsTarget, sizeof(customSettingsTarget), "%s", gCustomSettingsPath);
         // Keep the user-facing spelling for any failure before configSetMove changes configGetDir().
@@ -2591,6 +2594,7 @@ static void _saveConfig()
                 LOG("CONFIG HDD custom settings path %s unavailable; falling back safely to %s\n",
                     gCustomSettingsPath, customSettingsTarget);
                 configSetMove(customSettingsTarget);
+                snprintf(gLastSaveTarget, sizeof(gLastSaveTarget), "%s", customSettingsTarget);
                 gHddSettingsFallbackNotice = 1;
                 gLastSaveErrno = 0;
             } else {
@@ -2781,10 +2785,16 @@ int saveConfig(int types, int showUI)
         if (lscret) {
             char *path = configGetDir();
 
-            if (gHddSettingsFallbackNotice || gBootHddCommonFallback)
-                snprintf(notification, sizeof(notification), _l(_STR_SETTINGS_HDD_FALLBACK), path);
-            else
+            if (gHddSettingsFallbackNotice || gBootHddCommonFallback) {
+                const char *displayHome = path;
+                if (!strcmp(gOPLPart, "hdd0:__common"))
+                    displayHome = "hdd0:__common/OPL";
+                else if (gOPLPart[0] != '\0')
+                    displayHome = gOPLPart;
+                snprintf(notification, sizeof(notification), _l(_STR_SETTINGS_HDD_FALLBACK), displayHome);
+            } else {
                 snprintf(notification, sizeof(notification), _l(_STR_SETTINGS_SAVED), path);
+            }
 
             guiMsgBox(notification, 0, NULL);
         } else {

@@ -26,7 +26,7 @@ Nathan's side and his testers' side must look identical across a handover. These
 
 **BRANCHES.** Never commit to `master`, `rebuild/main`, or any existing `rebuild/step-*` branch.
 Every change goes on a NEW branch you create, `rebuild/step-NNN-<slug>`, branched from the current
-tip. **Next number: 211. Current tip: `rebuild/step-210-common-config-fallback-no-apa-create`.** One focused change
+tip. **Next number: 212. Current tip: `rebuild/step-211-consolidated-apa-config-safety`.** One focused change
 per step, with a long explanatory commit message -- what changed, why, what evidence drove it, and
 what it does NOT fix. Those messages are this project's real documentation. Never force-push, never
 rewrite history, never merge to `master` without asking. (`rebuild/main` moves only as the
@@ -1282,3 +1282,14 @@ retain the fail-visible/no-scatter policy. If even `__common` cannot mount, conf
 a harmless PFS namespace and the write fails closed; it never falls back to raw `hddN:` or creates,
 formats, resizes, or repairs APA metadata. The raw-APA firewall in `config.c` remains the independent
 last line of defense.
+
+
+---
+
+## Step 211 — consolidated APA config safety finalization
+
+Final audit polish for the Step-208 through Step-210 HDD config safety stack. Boot-derived fallback
+notification state is reset if resolution reruns, failed writes after a graceful HDD custom-path
+fallback report the actual fallback target, and the success notification names the real APA home
+(`hdd0:__common/OPL` or the existing partition selected by `conf_hdd.cfg`) rather than the temporary
+`pfs0:` mount alias. No partition-creation behavior is reintroduced.
