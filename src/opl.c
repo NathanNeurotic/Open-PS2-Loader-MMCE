@@ -1313,6 +1313,10 @@ static int checkLoadConfigHDD(int types)
 
     hddLoadModules();
     hddLoadSupportModules();
+    if (gHDDPrefix == NULL) {
+        LOG("CONFIG HDD load skipped: no existing PFS data home is mounted\n");
+        return 0;
+    }
 
     snprintf(path, sizeof(path), "%s%s", gHDDPrefix, CONFIG_OPL_FILENAME);
     value = open(path, O_RDONLY);
@@ -1380,17 +1384,30 @@ static int mcConfigPathRedirect(char *out, int outLen)
     return 1;
 }
 
-static void configPathRedirectLocation(char *out, int outLen)
+static int configPathRedirectLocation(char *out, int outLen)
 {
-    if (!strncmp(gBootDir, "pfs", 3)) {
+    // Never compose a writable bootstrap file in raw APA space. hddN: is a partition
+    // namespace, not a PFS filesystem; any file-like O_CREAT there is unsafe by definition.
+    if (!strncmp(gBootDir, "hdd", 3)) {
+        out[0] = '\0';
+        return 0;
+    }
+
+    // With a known local/network boot identity, anchor config.path absolutely to that home
+    // instead of trusting the process CWD. APA boots have already been rewritten to pfs0:.
+    if (gBootDir[0] != '\0') {
         size_t len = strlen(gBootDir);
         if (len > 0 && (gBootDir[len - 1] == ':' || gBootDir[len - 1] == '/' || gBootDir[len - 1] == '\\'))
             snprintf(out, outLen, "%s%s", gBootDir, configPathRedirectFile);
         else
             snprintf(out, outLen, "%s/%s", gBootDir, configPathRedirectFile);
     } else {
+        // Read-only legacy discovery may still inspect a relative redirect. Writers reject this
+        // case below because an unknown CWD could itself be raw hddN: space.
         snprintf(out, outLen, "%s", configPathRedirectFile);
     }
+
+    return 1;
 }
 
 static int readConfigPathRedirect(char *outPath, int outPathLen)
@@ -1402,7 +1419,8 @@ static int readConfigPathRedirect(char *outPath, int outPathLen)
     // APA launchers can leave the process CWD in raw hdd0: space. Once the data partition
     // is mounted, anchor the bootstrap pointer to the resolved PFS config home instead of
     // sending an ordinary file open through the raw APA namespace.
-    configPathRedirectLocation(redirectFile, sizeof(redirectFile));
+    if (!configPathRedirectLocation(redirectFile, sizeof(redirectFile)))
+        return 0;
     fd = open(redirectFile, O_RDONLY);
     if (fd < 0) {
         char mcPath[64];
@@ -1433,7 +1451,17 @@ static int writeConfigPathRedirect(const char *path)
     int fd;
     int primaryOk = 0;
 
-    configPathRedirectLocation(redirectFile, sizeof(redirectFile));
+    // No boot identity means no provably safe place for an O_CREAT bootstrap file:
+    // the launcher may have left CWD in raw APA space. The config payload may still save via
+    // normal legacy discovery, but we do not manufacture a redirect in an unknown namespace.
+    if (gBootDir[0] == '\0') {
+        LOG("CONFIG refusing relative config.path write with unknown boot CWD\n");
+        return 0;
+    }
+    if (!configPathRedirectLocation(redirectFile, sizeof(redirectFile))) {
+        LOG("CONFIG refusing config.path write in raw APA boot namespace %s\n", gBootDir);
+        return 0;
+    }
     fd = open(redirectFile, O_WRONLY | O_CREAT | O_TRUNC, 0666);
     if (fd >= 0) {
         int n1 = write(fd, path, strlen(path));

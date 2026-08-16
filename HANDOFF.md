@@ -26,7 +26,7 @@ Nathan's side and his testers' side must look identical across a handover. These
 
 **BRANCHES.** Never commit to `master`, `rebuild/main`, or any existing `rebuild/step-*` branch.
 Every change goes on a NEW branch you create, `rebuild/step-NNN-<slug>`, branched from the current
-tip. **Next number: 206. Current tip: `rebuild/step-205-wler3z-apa-boot-path-parser`.** One focused change
+tip. **Next number: 210. Current tip: `rebuild/step-209-apa-data-integrity-no-create`.** One focused change
 per step, with a long explanatory commit message -- what changed, why, what evidence drove it, and
 what it does NOT fix. Those messages are this project's real documentation. Never force-push, never
 rewrite history, never merge to `master` without asking. (`rebuild/main` moves only as the
@@ -1241,3 +1241,25 @@ When connecting to SMBv1/v2/v3 shares (reported in PS2-Servers Issue #180) or mo
    - Added `sbCreateFolders(udpfsPrefix, 1)` on first scan to ensure standard folders exist on UDPFS mounts.
 6. **`src/util.c:checkFile()`**:
    - Updated parent directory detection in `checkFile()` under `O_CREAT` to handle both forward slashes (`/`) and backslashes (`\`) for all device paths, auto-creating the parent directory (`smb0:\CFG`, `mass0:/CFG`, `pfs0:/CFG`, etc.) if missing.
+
+
+---
+
+## Step 209 — APA data-integrity stop-ship hardening
+
+**Invariant: RiptOPL never creates an APA partition implicitly.** HDD configuration/data discovery is
+existing-partitions-only: use a valid partition named by `__common/OPL/conf_hdd.cfg`, otherwise an
+already-existing `+OPL`, otherwise the already-existing `__common` partition with `pfs0:OPL/` as the
+data home. If none mount, fail closed. Folder creation inside an already-mounted PFS partition remains
+ordinary filesystem I/O and is allowed; APA partition creation/formatting is not.
+
+The trigger for this rule was the Aug-15 FHDB custom-settings incident. A pre-208 path could pass
+`hdd0:/+OPL/settings_riptopl.cfg` into the generic config writer with `O_CREAT`. PS2SDK's `hddN:`
+driver is the raw APA namespace, so that flag enters `apaOpen()`'s partition-create branch. A normal
+config filename supplies no APA size/type tuple, leaving size zero; with a reusable free block,
+`apaInsertPartition()` can repeatedly split/flush APA headers while trying to reach that impossible
+size. This is a credible mechanism for an APA chain becoming invalid while existing PFS files remain
+browseable. Therefore `config.c` now independently rejects every raw `hddN:` config read/write path,
+and `config.path` writes are never relative to an unknown/raw APA CWD. These guards are intentional
+defense-in-depth and must not be removed merely because the higher-level resolver currently emits
+`pfs0:` correctly.

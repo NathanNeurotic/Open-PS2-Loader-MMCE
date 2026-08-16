@@ -67,6 +67,13 @@ static void hddInitModules(void)
     hddLoadModules();
     hddLoadSupportModules();
 
+    // Existing-partitions-only discovery may legitimately fail closed. Do not dereference a
+    // missing data home, and do not create any folders until a PFS partition is actually mounted.
+    if (gHDDPrefix == NULL) {
+        LOG("HDDSUPPORT InitModules: no existing PFS data home mounted\n");
+        return;
+    }
+
     // update Themes
     char path[256];
     snprintf(path, sizeof(path), "%sTHM", gHDDPrefix);
@@ -75,9 +82,10 @@ static void hddInitModules(void)
     snprintf(path, sizeof(path), "%sLNG", gHDDPrefix);
     lngAddLanguages(path, "/", hddGameList.mode);
 
-    sbCreateFolders("pfs0:/", 0);
-    if (gHDDPrefix != NULL && strcmp(gHDDPrefix, "pfs0:/") != 0 && strcmp(gHDDPrefix, "pfs0:") != 0)
-        sbCreateFolders(gHDDPrefix, 0);
+    // Create normal OPL folders only INSIDE the selected mounted PFS data home. For +OPL this
+    // is pfs0:; for the safe __common fallback it is pfs0:OPL/. Never spray OPL folders into
+    // the root of __common and never create an APA partition to obtain a home.
+    sbCreateFolders(gHDDPrefix, 0);
 }
 
 // HD Pro Kit is mapping the 1st word in ROM0 seg as a main ATA controller,
@@ -118,10 +126,6 @@ static int hddCheckHDProKit(void)
     return ret;
 }
 
-// Taken from libhdd:
-#define PFS_ZONE_SIZE 8192
-#define PFS_FRAGMENT  0x00000000
-
 static void hddCheckOPLFolder(const char *mountPoint)
 {
     DIR *dir;
@@ -136,65 +140,77 @@ static void hddCheckOPLFolder(const char *mountPoint)
         closedir(dir);
 }
 
-static void hddFindOPLPartition(void)
+static int hddPartitionMountable(const char *partition)
 {
-    static config_set_t *config;
-    char name[64];
-    int fd, ret = 0;
+    int ret;
 
+    // Discovery is deliberately non-creating at the APA level: fileXioMount can only
+    // attach an existing partition. Never probe availability with open(..., O_CREAT),
+    // because hddN: is the raw APA namespace and O_CREAT means APA partition creation.
     fileXioUmount(hddPrefix);
+    ret = fileXioMount(hddPrefix, partition, FIO_MT_RDWR);
+    if (ret == 0)
+        fileXioUmount(hddPrefix);
 
-    ret = fileXioMount("pfs0:", "hdd0:__common", FIO_MT_RDWR);
-    if (ret == 0) {
-        fd = open("pfs0:OPL/conf_hdd.cfg", O_RDONLY);
-        if (fd >= 0) {
-            config = configAlloc(0, NULL, "pfs0:OPL/conf_hdd.cfg");
-            configRead(config);
-
-            configGetStrCopy(config, "hdd_partition", name, sizeof(name));
-            snprintf(gOPLPart, sizeof(gOPLPart), "hdd0:%s", name);
-
-            configFree(config);
-            close(fd);
-
-            return;
-        }
-
-        hddCheckOPLFolder(hddPrefix);
-
-        fd = open("pfs0:OPL/conf_hdd.cfg", O_CREAT | O_TRUNC | O_WRONLY);
-        if (fd >= 0) {
-            config = configAlloc(0, NULL, "pfs0:OPL/conf_hdd.cfg");
-            configRead(config);
-
-            configSetStr(config, "hdd_partition", "+OPL");
-            configWrite(config);
-
-            configFree(config);
-            close(fd);
-        }
-    }
-
-    snprintf(gOPLPart, sizeof(gOPLPart), "hdd0:+OPL");
-
-    return;
+    return ret == 0;
 }
 
-static int hddCreateOPLPartition(const char *name)
+static void hddFindOPLPartition(void)
 {
-    int formatArg[3] = {PFS_ZONE_SIZE, 0x2d66, PFS_FRAGMENT};
-    int fd, result;
-    char cmd[140];
+    config_set_t *config;
+    char name[64] = {0};
+    char candidate[sizeof(gOPLPart)];
 
-    sprintf(cmd, "%s,,,128M,PFS", name);
-    if ((fd = open(cmd, O_CREAT | O_TRUNC | O_WRONLY)) >= 0) {
-        close(fd);
-        result = fileXioFormat(hddPrefix, name, (const char *)&formatArg, sizeof(formatArg));
-    } else {
-        result = fd;
+    // First honour an existing __common/OPL/conf_hdd.cfg, but only when the named
+    // partition already exists and mounts as PFS. Discovery must never manufacture it.
+    fileXioUmount(hddPrefix);
+    if (fileXioMount(hddPrefix, "hdd0:__common", FIO_MT_RDWR) == 0) {
+        config = configAlloc(0, NULL, "pfs0:OPL/conf_hdd.cfg");
+        if (config != NULL) {
+            if (configRead(config))
+                configGetStrCopy(config, "hdd_partition", name, sizeof(name));
+            configFree(config);
+        }
+        fileXioUmount(hddPrefix);
+
+        if (name[0] != '\0') {
+            // conf_hdd.cfg historically stores a bare APA ID (for example +OPL).
+            // Accept hdd0:<id> too, but never redirect data ownership to hdd1 here.
+            if (!strncmp(name, "hdd0:", 5))
+                snprintf(candidate, sizeof(candidate), "%s", name);
+            else if (!strncmp(name, "hdd", 3))
+                candidate[0] = '\0';
+            else
+                snprintf(candidate, sizeof(candidate), "hdd0:%s", name);
+
+            if (candidate[0] != '\0' && hddPartitionMountable(candidate)) {
+                snprintf(gOPLPart, sizeof(gOPLPart), "%s", candidate);
+                LOG("HDD: using configured existing data partition %s\n", gOPLPart);
+                return;
+            }
+            LOG("HDD: configured data partition %s is unavailable; ignoring it\n", name);
+        }
     }
 
-    return result;
+    // Prefer the conventional +OPL partition when it ALREADY exists.
+    if (hddPartitionMountable("hdd0:+OPL")) {
+        snprintf(gOPLPart, sizeof(gOPLPart), "hdd0:+OPL");
+        LOG("HDD: using existing +OPL data partition\n");
+        return;
+    }
+
+    // Safe final fallback: __common is a standard existing system PFS partition. OPL data
+    // lives in its OPL/ directory; creating folders/files inside a mounted PFS partition is
+    // ordinary filesystem I/O and does not alter the APA partition table.
+    if (hddPartitionMountable("hdd0:__common")) {
+        snprintf(gOPLPart, sizeof(gOPLPart), "hdd0:__common");
+        LOG("HDD: +OPL unavailable; falling back to existing __common/OPL/\n");
+        return;
+    }
+
+    // Nothing suitable exists. Leave the data partition unresolved and fail closed.
+    gOPLPart[0] = '\0';
+    LOG("HDD: no existing PFS data partition is available; refusing to create one\n");
 }
 
 int hddLoadModules(void)
@@ -336,12 +352,14 @@ void hddLoadSupportModules(void)
                            "-n" // Number of buffers
                            "\0"
                            "40"; // Default value: 8 | Max value: 127
+    int ret;
+    int nonSony;
 
     LOG("HDDSUPPORT LoadSupportModules\n");
 
     // Check if the drive contains MBR/GPT partition data before we load the APA/PFS modules. If the drive is not
     // APA then loading the APA irx modules can corrupt the drive as it will try to write APA partition data.
-    int nonSony = hddDetectNonSonyFileSystem();
+    nonSony = hddDetectNonSonyFileSystem();
     if (nonSony != 0) {
         // Drive is MBR/GPT style, or unknown, bail out or risk corrupting the drive.
         LOG("HDDSUPPORT LoadSupportModules bailing out early (%d)...\n", nonSony);
@@ -361,7 +379,7 @@ void hddLoadSupportModules(void)
 
     if (!hddSupportModulesLoaded) {
         LOG("[HDD]:\n");
-        int ret = sysLoadModuleBuffer(&ps2hdd_irx, size_ps2hdd_irx, sizeof(hddarg), hddarg);
+        ret = sysLoadModuleBuffer(&ps2hdd_irx, size_ps2hdd_irx, sizeof(hddarg), hddarg);
         if (ret < 0) {
             LOG("HDD: No HardDisk Drive detected.\n");
             if (!hddSupportErrToasted) {
@@ -371,7 +389,7 @@ void hddLoadSupportModules(void)
             return;
         }
 
-        // Check if a HDD unit is connected
+        // Check if a HDD unit is connected.
         if (hddCheck() < 0) {
             LOG("HDD: No HardDisk Drive detected.\n");
             if (!hddSupportErrToasted) {
@@ -393,27 +411,58 @@ void hddLoadSupportModules(void)
         }
 
         hddSupportModulesLoaded = 1;
-        hddSupportErrToasted = 0; // recovered -- a future, different failure gets its own toast
+        hddSupportErrToasted = 0;
         LOG("HDDSUPPORT modules loaded\n");
+    }
 
-        if (gOPLPart[0] == '\0')
-            hddFindOPLPartition();
+    // The modules and the persistent pfs0: data mount have separate lifetimes. If an
+    // existing partition was temporarily unavailable, keep the modules loaded and retry
+    // discovery/mount on a later call instead of poisoning the session or reloading IRXes.
+    if (gHDDPrefix != NULL)
+        return;
 
+    if (gOPLPart[0] == '\0')
+        hddFindOPLPartition();
+
+    if (gOPLPart[0] == '\0') {
+        if (!hddSupportErrToasted) {
+            setErrorMessageWithCode(_STR_HDD_NOT_FORMATTED_ERROR, ERROR_HDD_MODULE_PFS_FAILURE);
+            hddSupportErrToasted = 1;
+        }
+        return;
+    }
+
+    fileXioUmount(hddPrefix);
+    ret = fileXioMount(hddPrefix, gOPLPart, FIO_MT_RDWR);
+
+    // A configured data partition may disappear or cease to mount. Never respond by
+    // creating/reformatting APA metadata. Fall back to the existing __common partition only.
+    if (ret < 0 && strcmp(gOPLPart, "hdd0:__common") != 0) {
+        LOG("HDD: could not mount %s (%d); trying existing __common/OPL/ fallback\n", gOPLPart, ret);
         fileXioUmount(hddPrefix);
+        ret = fileXioMount(hddPrefix, "hdd0:__common", FIO_MT_RDWR);
+        if (ret == 0)
+            snprintf(gOPLPart, sizeof(gOPLPart), "hdd0:__common");
+    }
 
-        ret = fileXioMount(hddPrefix, gOPLPart, FIO_MT_RDWR);
-        if (ret == -ENOENT) {
-            // Attempt to create the partition.
-            if ((hddCreateOPLPartition(gOPLPart)) >= 0)
-                fileXioMount(hddPrefix, gOPLPart, FIO_MT_RDWR);
+    if (ret < 0) {
+        LOG("HDD: no existing PFS data partition could be mounted (%d); no partition was created\n", ret);
+        // Force the next call to rediscover. This does not unload/reload the APA/PFS modules.
+        gOPLPart[0] = '\0';
+        gHDDPrefix = NULL;
+        if (!hddSupportErrToasted) {
+            setErrorMessageWithCode(_STR_HDD_NOT_FORMATTED_ERROR, ERROR_HDD_MODULE_PFS_FAILURE);
+            hddSupportErrToasted = 1;
         }
+        return;
+    }
 
-        if (gOPLPart[5] != '+') {
-            hddCheckOPLFolder(hddPrefix);
-            gHDDPrefix = "pfs0:OPL/";
-        } else {
-            gHDDPrefix = "pfs0:";
-        }
+    hddSupportErrToasted = 0;
+    if (gOPLPart[5] != '+') {
+        hddCheckOPLFolder(hddPrefix);
+        gHDDPrefix = "pfs0:OPL/";
+    } else {
+        gHDDPrefix = "pfs0:";
     }
 }
 
@@ -607,13 +656,19 @@ static int hddUpdateGameList(item_list_t *itemList)
     // are idempotent (hddLoadModules dedupes via ALREADYLOADED and its failed count is retryable
     // post-#241; hddLoadSupportModules no-ops once hddSupportModulesLoaded), so tab entry / refresh
     // becomes a real second attempt. Runs on the IO worker like the original init.
-    if (!hddSupportModulesLoaded) {
+    if (!hddSupportModulesLoaded || gHDDPrefix == NULL) {
         // Only chase the support stack when the base modules are actually resident -- calling it
         // anyway made a failed base load toast TWICE (base failure + the doomed non-Sony probe's)
-        // on the first pass (Gemini + CodeRabbit review of #249, vetted).
+        // on the first pass (Gemini + CodeRabbit review of #249, vetted). A loaded module stack
+        // with no data mount is also retryable: Step-209 deliberately separates those lifetimes.
         if (hddLoadModulesReady())
             hddLoadSupportModules();
     }
+
+    // Fail closed when no existing PFS data home could be mounted. The update path must not
+    // construct filenames from a NULL prefix or fall into any alternate partition-creation path.
+    if (gHDDPrefix == NULL)
+        return 0;
 
     if (vcdViewActive(itemList->mode))
         // Reuse the session's built list on view flips; hddBuildVcdGameList runs only when never
@@ -1232,6 +1287,7 @@ static void hddCleanUp(item_list_t *itemList, int exception)
         fileXioDevctl("pfs:", PDIOC_CLOSEALL, NULL, 0, NULL, 0);
 
         hddSupportModulesLoaded = 0;
+        gHDDPrefix = NULL; // pfs0: is no longer a valid persistent data-home mount marker
     }
 }
 
@@ -1258,6 +1314,7 @@ static void hddShutdown(item_list_t *itemList)
         fileXioDevctl("pfs:", PDIOC_CLOSEALL, NULL, 0, NULL, 0);
 
         hddSupportModulesLoaded = 0;
+        gHDDPrefix = NULL; // pfs0: is no longer a valid persistent data-home mount marker
     }
 
     if (hddModulesLoadCount > 0) {
