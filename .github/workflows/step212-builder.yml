@@ -11,7 +11,7 @@ permissions:
   contents: write
 
 jobs:
-  format-step-212:
+  coderabbit-step-212:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -19,24 +19,130 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Apply exact clang-format correction
+      - name: Apply accepted recovery save-home fix
         run: |
           git config user.name "NathanNeurotic Step Builder"
           git config user.email "actions@users.noreply.github.com"
           git fetch origin rebuild/step-212-apa-boot-and-bgm-resilience
           git checkout rebuild/step-212-apa-boot-and-bgm-resilience
-          test "$(git rev-parse HEAD)" = "a7c780a3fa574d1657084dbb1f8a1d436425800c"
+          test "$(git rev-parse HEAD)" = "1464414dabad24ecfe6d9f8c274ccf0df6b657df"
           python3 - <<'PY'
           from pathlib import Path
-          p = Path('src/sound.c')
-          text = p.read_text()
-          old = '#define BGM_THREAD_BASE_PRIO 0x1E'
-          new = '#define BGM_THREAD_BASE_PRIO  0x1E'
-          if text.count(old) != 1:
-              raise SystemExit('expected exactly one BGM priority format line')
-          p.write_text(text.replace(old, new, 1))
+
+          def replace_once(path, old, new):
+              p = Path(path)
+              text = p.read_text()
+              if text.count(old) != 1:
+                  raise SystemExit(f'{path}: expected exactly one match, found {text.count(old)}')
+              p.write_text(text.replace(old, new, 1))
+
+          marker = '''static int tryMissingConfigPathRecovery(int types)
+          {
+          '''
+          helper = '''static void restoreRecoverySaveHome(const char *recoveredHome)
+          {
+              // Recovery is discovery only. Never let the probed MC/USB path silently become the
+              // next save destination. Local boots return to their real boot home; bare boots return
+              // to the normal mc?:OPL home. A deferred network boot cannot save back to its unreadable
+              // share during bootstrap, so select a concrete reachable MC home when possible.
+              if (gBootHomeDeferred) {
+                  const char *mcHome = NULL;
+                  DIR *dir;
+
+                  if (!strncmp(recoveredHome, "mc0:", 4))
+                      mcHome = "mc0:/OPL";
+                  else if (!strncmp(recoveredHome, "mc1:", 4))
+                      mcHome = "mc1:/OPL";
+                  else {
+                      dir = opendir("mc0:/");
+                      if (dir != NULL) {
+                          closedir(dir);
+                          mcHome = "mc0:/OPL";
+                      } else {
+                          dir = opendir("mc1:/");
+                          if (dir != NULL) {
+                              closedir(dir);
+                              mcHome = "mc1:/OPL";
+                          }
+                      }
+                  }
+
+                  if (mcHome != NULL)
+                      configSetMove((char *)mcHome);
+                  else
+                      configSetMove(NULL); // no concrete MC is reachable: keep the normal fail-visible wildcard home
+              } else if (gBootDir[0] != '\\0') {
+                  configSetMove(gBootDir);
+              } else {
+                  configSetMove(NULL);
+              }
+          }
+
+          static int tryMissingConfigPathRecovery(int types)
+          {
+          '''
+          replace_once('src/opl.c', marker, helper)
+
+          replace_once(
+              'src/opl.c',
+              '''        value = tryReadRecoveryConfigHome(types, mcHomes[i]);
+                  if (value & CONFIG_OPL) {
+                      if (gBootDir[0] != '\\0' && !gBootHomeDeferred)
+                          configSetMove(gBootDir); // read-old, write-normal; no silent MC save hijack
+                      return value;
+                  }
+          ''',
+              '''        value = tryReadRecoveryConfigHome(types, mcHomes[i]);
+                  if (value & CONFIG_OPL) {
+                      restoreRecoverySaveHome(mcHomes[i]);
+                      return value;
+                  }
+          ''')
+
+          replace_once(
+              'src/opl.c',
+              '''            value = tryReadRecoveryConfigHome(types, home);
+                      if (value & CONFIG_OPL) {
+                          if (gBootDir[0] != '\\0' && !gBootHomeDeferred)
+                              configSetMove(gBootDir);
+                          return value;
+                      }
+
+                      snprintf(home, sizeof(home), "mass%d:/OPL", slots[i]);
+                      value = tryReadRecoveryConfigHome(types, home);
+                      if (value & CONFIG_OPL) {
+                          if (gBootDir[0] != '\\0' && !gBootHomeDeferred)
+                              configSetMove(gBootDir);
+                          return value;
+                      }
+          ''',
+              '''            value = tryReadRecoveryConfigHome(types, home);
+                      if (value & CONFIG_OPL) {
+                          restoreRecoverySaveHome(home);
+                          return value;
+                      }
+
+                      snprintf(home, sizeof(home), "mass%d:/OPL", slots[i]);
+                      value = tryReadRecoveryConfigHome(types, home);
+                      if (value & CONFIG_OPL) {
+                          restoreRecoverySaveHome(home);
+                          return value;
+                      }
+          ''')
+
+          replace_once(
+              'HANDOFF.md',
+              '''   A known local boot restores its normal save home after the read, so this cannot silently scatter new
+             config files. If the recovered config contains Custom Settings Path, the next explicit Save Changes
+          ''',
+              '''   Recovery always restores the normal save home after the read, so the probed MC/USB location never
+             silently becomes the next write target. Local boots return to their boot home; bare boots return to
+             `mc?:OPL`; deferred network boots explicitly select a reachable MC bootstrap home (or the normal
+             fail-visible MC wildcard if neither slot is reachable). If the recovered config contains Custom Settings
+             Path, the next explicit Save Changes
+          ''')
           PY
           git diff --check
-          git add src/sound.c
-          git commit -m "rebuild-212: satisfy clang-format for BGM priority define" -m "Formatting-only follow-up from CI-format-check: align BGM_THREAD_BASE_PRIO with the surrounding macro definitions. No runtime behavior changes."
+          git add src/opl.c HANDOFF.md
+          git commit -m "rebuild-212: restore normal save home after recovery" -m "Accept CodeRabbit's data-integrity finding on the missing-config.path recovery path. The recovery scan is read-only by contract, so a successfully probed MC/USB location must not implicitly become the next save destination. Restore local boots to gBootDir, bare boots to the normal mc?:OPL home, and deferred network boots to a concrete reachable MC bootstrap home when possible (otherwise the normal fail-visible MC wildcard). The recovered in-memory settings remain loaded; Custom Settings Path is still honored by the next explicit Save Changes."
           git push origin HEAD:rebuild/step-212-apa-boot-and-bgm-resilience
