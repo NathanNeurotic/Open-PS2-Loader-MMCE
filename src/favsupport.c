@@ -482,17 +482,21 @@ static int favUpdateItemList(item_list_t *itemList)
         return 0;
     }
 
-    // L3 view split: the Favourites tab has its own VCD view (like every device page). In ISO view it
-    // lists the disc favourites; in VCD view it lists the PS1/.VCD favourites. Records for the other
-    // view are skipped this pass (the L3 toggle marks FAV dirty -> a rebuild re-filters).
+    // Resolve EVERY record before filtering the Favourites tab's independent ISO/VCD view. Resolution
+    // also restores the star on the source submenu. Filtering first meant a saved VCD record was never
+    // resolved while FAV itself was in ISO view, so rebuilding the HDD list on an L3 toggle erased the
+    // visible star and loadFavourites() could not put it back (#495).
     int favVcdView = vcdViewActive(FAV_MODE);
     for (int i = 0; i < rawCount; i++) {
-        if ((recs[i].isVcd ? 1 : 0) != favVcdView)
-            continue;
-
         int resolvedMode = recs[i].mode;
         int resolvedId = recs[i].id;
         item_list_t *owner = favResolve(recs[i].mode, recs[i].id, recs[i].text, recs[i].isVcd, &resolvedMode, &resolvedId);
+
+        // The FAV page still deliberately has its own L3 split: resolution above is global star/state
+        // reconciliation; only display population is filtered to the page's current view.
+        if ((recs[i].isVcd ? 1 : 0) != favVcdView)
+            continue;
+
         if (owner == NULL) {
             // APPS never populate on their own: gAPPStartMode defaults to MANUAL and nothing scans a
             // MANUAL tab until the user opens it, so every stored app favourite sat hidden ("device
