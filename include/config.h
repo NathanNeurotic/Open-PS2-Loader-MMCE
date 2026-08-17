@@ -262,6 +262,7 @@ void configSetVMCDisable(config_set_t *configSet, int slot, int disabled);
 void configRemoveVMCDisable(config_set_t *configSet, int slot);
 
 char *configGetDir(void);
+char *configGetLoadDir(void);
 void configPrepareNotifications(char *prefix);
 
 #endif

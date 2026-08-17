@@ -112,6 +112,9 @@ typedef struct
     theme_element_t *first;
     theme_element_t *last;
     unsigned char needsItemConfig;
+    // Set only when this family contains ItemText, the element that consumes the optional deep
+    // VCD display ID. Keeps cosmetic disc-image inspection completely demand-driven.
+    unsigned char needsVcdDisplayId;
 } theme_elems_t;
 
 typedef struct

@@ -28,30 +28,10 @@
 // neighbours fit together; at the size themes actually ship (140x200 in that capture) a decoded
 // cover is well under 100 KB, so this trades ~1 MB of EE RAM for not re-reading USB.
 #define COVER_CACHE_SLOTS            20
-// How many rows either side of the SELECTED row may be warmed. Measured: the warm loop asked for
-// every visible row -- 18 on the shipped theme -- where uOPL asks for exactly one (its
-// decorator-less list branch requests nothing at all; only the cover panel does). At 73 ms per load
-// that is 1314 ms of device time per page turn against uOPL's 73 ms, and the hardware HUD's D109 is
-// almost exactly six page turns x 18. Warming still earns its keep -- landing on a neighbour should
-// not wait for a read -- but it only has to cover where the cursor can plausibly go next, not the
-// whole page. Measured from the SELECTED row, not from the top of the page, because menusys scrolls
-// by whole pages: from pagestart the budget would be spent on the far end of the new page.
-// 0 = no viewport warming: the selected row's cover is requested (before the row loop) and nothing
-// else, which is exactly what uOPL does and why uOPL does not do this.
-//
-// Measured on hardware at radius 2: "ART Q17 A1 R0 D42  71ms". Seventeen covers queued with one
-// loading -- we were REQUESTING faster than the device can serve. Five requests per settle against
-// ~71 ms a load is ~14 loads/second of capacity, and a user scrolling at a normal pace generates
-// more than that, so the queue grows without bound while they move. Two things follow, and both are
-// exactly what was reported: the cover for the row they are ON sits at the BACK of that queue so
-// art "gets fucked pretty quickly", and every decode that does run preempts the priority-31 GUI and
-// pad thread, eating frames until the held-repeat catches up in one lurch -- the rhythmic jump that
-// survived the settle floor, because the floor only stops requests DURING a press, not between them.
-//
-// Warming exists so that landing on a neighbour finds its cover already there (#296).
-// Restored to radius 2 (issue #488) so List Mode enjoys seamless rolling cover lookahead
-// matching Coverflow mode without stutter.
-#define COVER_WARM_RADIUS            2
+// Cover warming is derived from each resolved COV cache's actual capacity. The selected cover
+// always claims the first slot; the remaining slots are walked center-out on both sides. This
+// restores the pre-2587 "already waiting for you" behavior without a fixed +/-2 cap, while the
+// BGM low-water gate in texcache.c remains the device-level safety valve under real contention.
 // Extra idle frames a per-game BACKGROUND waits beyond the art delay before it may be requested, so
 // the cover always reaches the IO queue first (see drawGameImage). Half a second at 60 Hz: long
 // enough that a cover request is queued and usually finished, short enough that a background still
@@ -926,6 +906,7 @@ static void drawGameImage(struct menu_list *menu, struct submenu_list *item, con
         // default. Nothing is lost but the order.
         int isBackground = (drawElem->type == ELEM_TYPE_BACKGROUND);
         GSTEXTURE *texture;
+        int coverflowCoverSettled = 1;
 
         if (isBackground) {
             // Prioritize the highlighted game's cover before the background so the small cover
@@ -947,15 +928,32 @@ static void drawGameImage(struct menu_list *menu, struct submenu_list *item, con
                     struct theme_element *cfElem = thmGetElemForItem(menu, item, gTheme->coverflow);
                     if (cfElem != NULL && cfElem->extended != NULL) {
                         mutable_image_t *cfImg = (mutable_image_t *)cfElem->extended;
-                        if (cfImg != NULL && cfImg->cache != NULL)
-                            getGameImageTextureEx(cfImg->cache, menu->item->userdata, &item->item, 1);
+                        if (cfImg != NULL && cfImg->cache != NULL) {
+                            GSTEXTURE *coverTexture = getGameImageTextureEx(cfImg->cache, menu->item->userdata, &item->item, 1);
+
+                            // Coverflow draws after the Background element. If its selected cover is still
+                            // pending, starting a full-screen BG read here would occupy the art worker before
+                            // the carousel gets to enqueue its visible neighbours. Hold only this background
+                            // request for that short window. A loaded cover, disabled art, or a confirmed
+                            // absent cover (-2) releases the gate immediately.
+                            if (gEnableArt && coverTexture == NULL && cfImg->cache->userId >= 0 &&
+                                cfImg->cache->userId < gTheme->gameCacheCount && item->item.cache_id != NULL &&
+                                item->item.cache_id[cfImg->cache->userId] != -2)
+                                coverflowCoverSettled = 0;
+                        }
                     }
                 }
             }
 
-            // Match master: request the background texture immediately on the first frame without
-            // idle-frame deferral, giving instant master-style background loading.
-            texture = getGameImageTexture(gameImage->cache, menu->item->userdata, &item->item);
+            // List mode keeps master's immediate background request. Coverflow is different: its
+            // Background element is painted before the carousel, so on a cold selection the large BG read
+            // could start before the side covers even reach the queue. Draw an already-cached background
+            // while the selected cover settles; the same frame's Coverflow draw then gets first claim on
+            // visible-neighbour reads. This is admission ordering, not an artificial frame delay.
+            if (coverflowCoverSettled)
+                texture = getGameImageTexture(gameImage->cache, menu->item->userdata, &item->item);
+            else
+                texture = getGameImageCached(gameImage->cache, &item->item);
         } else {
             // PRIORITY: the highlighted game's own cover, the one image the user is looking for.
             texture = getGameImageTextureEx(gameImage->cache, menu->item->userdata, &item->item, 1);
@@ -1235,8 +1233,6 @@ static void drawCoverFlow(struct menu_list *menu, struct submenu_list *item, con
     */
     mutable_image_t *elemImg = (mutable_image_t *)elem->extended;
     int warmRadius = (elemImg != NULL && elemImg->cache != NULL) ? (elemImg->cache->count - 1) / 2 : 0;
-    if (warmRadius > 2)
-        warmRadius = 2; // Tame lookahead burst: warm at most 2 immediate neighbours on each side
     struct
     {
         image_cache_t *cache;
@@ -1720,45 +1716,64 @@ static void drawItemsList(struct menu_list *menu, struct submenu_list *item, con
             posY -= elem->height >> 1;
         }
 
-        // The row loop starts at pagestart, which may put several visible covers
-        // ahead of the selection. Submit the selected row first; its loop lookup
-        // reuses the same value-keyed cache entry.
-        if (itemsList->decoratorImage != NULL && !item->item.isFolder)
-            getGameImageTextureEx(itemsList->decoratorImage->cache, menu->item->userdata, &item->item, 1);
-        else if (itemsList->coverElem != NULL && !item->item.isFolder) {
-            // No decorator: the plain List only ever demanded the selected cover (via the
-            // separately drawn COV element), so artwork arrived one highlight at a time
-            // (#296). Warm the selected cover first through the family COV element;
-            // thmGetElemForItem keeps Favourites game/APP routing intact.
+        // List admission mirrors Coverflow: selected first, then center-out warming sized by
+        // the actual resolved cover cache. Merely being visible is not enough to start a read; the
+        // warm radius is bounded by cache capacity, so the selected cover keeps a reserved slot and
+        // loose PNG users regain the deep lookahead older fast builds provided. Games, APPS,
+        // Favourites and VCD all pass through this one scheduler.
+        image_cache_t *selectedCache = NULL;
+        if (itemsList->decoratorImage != NULL && !item->item.isFolder) {
+            selectedCache = itemsList->decoratorImage->cache;
+            getGameImageTextureEx(selectedCache, menu->item->userdata, &item->item, 1);
+        } else if (itemsList->coverElem != NULL && !item->item.isFolder) {
             mutable_image_t *selImg = (mutable_image_t *)thmGetElemForItem(menu, item, itemsList->coverElem)->extended;
-            if (selImg != NULL && selImg->cache != NULL)
-                getGameImageTextureEx(selImg->cache, menu->item->userdata, &item->item, 1);
+            if (selImg != NULL && selImg->cache != NULL) {
+                selectedCache = selImg->cache;
+                getGameImageTextureEx(selectedCache, menu->item->userdata, &item->item, 1);
+            }
         }
 
-        // Budget viewport warming PER RESOLVED CACHE, minus one slot kept for the
-        // selected cover requested above, so row warming can never evict it. Two
-        // slots suffice: thmGetElemForItem routes a row to either the family COV
-        // cache or (Favourites APP rows) the apps COV cache, whose slot count may
-        // differ. Rows past a budget are simply not requested this frame.
+        int warmRadius = (selectedCache != NULL && selectedCache->count > 1) ? selectedCache->count - 1 : 0;
         struct
         {
             image_cache_t *cache;
             int left;
-        } warmBudget[2] = {{NULL, 0}, {NULL, 0}};
+        } listWarm[2] = {{NULL, 0}, {NULL, 0}};
+        submenu_list_t *walkSide[2] = {item, item}; // [0] next, [1] previous
+        for (int step = 0; step < warmRadius; step++) {
+            for (int side = 0; side < 2; side++) {
+                submenu_list_t *walk = walkSide[side];
+                submenu_list_t *next = side ? walk->prev : walk->next;
+                if (next == NULL || next == walk)
+                    continue;
+                walkSide[side] = next;
+                if (next->item.isFolder)
+                    continue;
 
-        // Where the selection sits on this page (pointer walk, no I/O) so warming can be centred on
-        // the cursor rather than on whatever happens to be drawn first.
-        int selIndex = -1;
-        {
-            submenu_list_t *scan = menu->item->pagestart;
-            int idx = 0;
-            while (scan != NULL && idx < itemsList->displayedItems) {
-                if (scan == item) {
-                    selIndex = idx;
-                    break;
+                image_cache_t *warmCache = NULL;
+                if (itemsList->decoratorImage != NULL) {
+                    warmCache = itemsList->decoratorImage->cache;
+                } else if (itemsList->coverElem != NULL) {
+                    mutable_image_t *warmImg = (mutable_image_t *)thmGetElemForItem(menu, next, itemsList->coverElem)->extended;
+                    if (warmImg != NULL)
+                        warmCache = warmImg->cache;
                 }
-                scan = scan->next;
-                idx++;
+                if (warmCache == NULL || warmCache->count < 2)
+                    continue;
+
+                int b;
+                for (b = 0; b < 2 && listWarm[b].cache != NULL && listWarm[b].cache != warmCache; b++)
+                    ;
+                if (b == 2)
+                    continue;
+                if (listWarm[b].cache == NULL) {
+                    listWarm[b].cache = warmCache;
+                    listWarm[b].left = warmCache->count - 1; // selected's slot remains reserved
+                }
+                if (listWarm[b].left > 0) {
+                    listWarm[b].left--;
+                    getGameImageTexture(warmCache, list, &next->item);
+                }
             }
         }
 
@@ -1772,9 +1787,6 @@ static void drawItemsList(struct menu_list *menu, struct submenu_list *item, con
             else
                 color = elem->color;
 
-            // Folder browsing: a folder row shows its name with a trailing "/" and is NEVER routed
-            // through the cover cache (it has no startup key -- doing so would thrash the cache and
-            // paint the empty case frame). The default decorator slot keeps the text aligned with games.
             const char *dispText = vcdDisplayName(list ? list->mode : -1, submenuItemGetText(&ps->item));
             char folderBuf[256];
             if (ps->item.isFolder) {
@@ -1785,54 +1797,24 @@ static void drawItemsList(struct menu_list *menu, struct submenu_list *item, con
             if (itemsList->decoratorImage) {
                 GSTEXTURE *itemIconTex = NULL;
 
-                if (ps->item.isFolder) {
-                    itemIconTex = NULL; // folders never carry a cover
-                } else {
-                    // Every visible row asks for its thumbnail, exactly as uOPL does. The
-                    // cursor-distance gate that used to live here only mattered while requests were
-                    // being refused by a queue cap; with no cap the order they arrive in is the
-                    // order the worker takes them, and the selected row is submitted first anyway.
-                    itemIconTex = getGameImageTexture(itemsList->decoratorImage->cache, menu->item->userdata, &ps->item);
+                if (!ps->item.isFolder) {
+                    // Admission happened center-out above. Farther visible rows draw only what is
+                    // already resident, so a 10-20-row viewport cannot flood USB with loose PNG opens.
+                    itemIconTex = getGameImageCached(itemsList->decoratorImage->cache, &ps->item);
                 }
 
                 if (itemIconTex && itemIconTex->Mem)
                     rmDrawPixmap(itemIconTex, posX, posY, elem->aligned, DECORATOR_SIZE, DECORATOR_SIZE, elem->scaled, gDefaultCol, 0);
-                else {
-                    if (itemsList->decoratorImage->defaultTexture)
-                        rmDrawPixmap(&itemsList->decoratorImage->defaultTexture->source, posX, posY, elem->aligned, DECORATOR_SIZE, DECORATOR_SIZE, elem->scaled, gDefaultCol, 0);
-                }
+                else if (itemsList->decoratorImage->defaultTexture)
+                    rmDrawPixmap(&itemsList->decoratorImage->defaultTexture->source, posX, posY, elem->aligned, DECORATOR_SIZE, DECORATOR_SIZE, elem->scaled, gDefaultCol, 0);
+
                 textEndX = fntRenderString(elem->font, elem->posX + DECORATOR_SIZE, posY, elem->aligned, elem->width, elem->height, dispText, color);
             } else {
-                // No decorator: warm this visible row's cover so scrolling never waits on a
-                // cold cache (#296). The selected row was already requested above; folders
-                // carry no cover. Warming stops when the resolved cache's frame budget is
-                // spent (selected's slot stays reserved).
-                if (ps != item && !ps->item.isFolder && itemsList->coverElem != NULL) {
-                    mutable_image_t *rowImg = (mutable_image_t *)thmGetElemForItem(menu, ps, itemsList->coverElem)->extended;
-                    if (rowImg != NULL && rowImg->cache != NULL) {
-                        int b;
-                        for (b = 0; b < 2 && warmBudget[b].cache != NULL && warmBudget[b].cache != rowImg->cache; b++)
-                            ;
-                        if (b < 2) {
-                            if (warmBudget[b].cache == NULL) {
-                                warmBudget[b].cache = rowImg->cache;
-                                warmBudget[b].left = rowImg->cache->count - 1; // selected's reserved slot
-                            }
-                            int dist = (others - 1) - selIndex;
-                            if (dist < 0)
-                                dist = -dist;
-
-                            if (warmBudget[b].left > 0 && (selIndex < 0 || dist <= COVER_WARM_RADIUS)) {
-                                warmBudget[b].left--;
-                                getGameImageTexture(rowImg->cache, list, &ps->item);
-                            }
-                        }
-                    }
-                }
+                // Decorator-less Lists use the same center-out warming above; their separate COV
+                // element draws the selected cover. No additional per-visible-row reads start here.
                 textEndX = fntRenderString(elem->font, elem->posX, posY, elem->aligned, elem->width, elem->height, dispText, color);
             }
 
-            // Favourites: draw a small star just after the item text.
             if (ps->item.favourited) {
                 GSTEXTURE *favTex = thmGetTexture(FAV_MARK);
                 if (favTex != NULL && favTex->Mem != NULL)
@@ -2406,6 +2388,7 @@ static int addGUIElem(const char *themePath, config_set_t *themeConfig, theme_t 
                 elem = initBasic(themePath, themeConfig, theme, name, ELEM_TYPE_GAME_IMAGE, 0, 0, ALIGN_CENTER, DIM_UNDEF, DIM_UNDEF, SCALING_RATIO, gDefaultCol, theme->fonts[0]);
                 initGameImage(themePath, themeConfig, theme, elem, name, "COV", COVER_CACHE_SLOTS, NULL, NULL);
             } else if (!strcmp(elementsType[ELEM_TYPE_ITEM_TEXT], type)) {
+                elems->needsVcdDisplayId = 1;
                 elem = initBasic(themePath, themeConfig, theme, name, ELEM_TYPE_ITEM_TEXT, 0, 0, ALIGN_CENTER, DIM_UNDEF, DIM_UNDEF, SCALING_RATIO, theme->textColor, theme->fonts[0]);
                 elem->drawElem = &drawItemText;
             } else if (!strcmp(elementsType[ELEM_TYPE_HINT_TEXT], type)) {

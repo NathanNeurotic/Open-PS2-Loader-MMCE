@@ -25,6 +25,7 @@
 #include "include/config.h"
 #include "include/supportbase.h" // sbPopulateConfig + base_game_info_t (VCD favourite config)
 #include "include/vcdsupport.h"  // vcdViewActive / vcdConsumeDirty (VCD favourites)
+#include "include/ethsupport.h"  // ETH ISO favourite resolution while the live source is in VCD view
 #include "include/favsupport.h"
 
 int gFAVStartMode;
@@ -362,20 +363,52 @@ static submenu_list_t *favFindItemByText(submenu_list_t *sub, const char *text)
     return NULL;
 }
 
+static int favResolveStoredId(item_list_t *source, int id, const char *text, int isVcd, int *outId)
+{
+    if (source == NULL || text == NULL || outId == NULL || source->itemGetCount == NULL || source->itemGetName == NULL)
+        return 0;
+
+    // ETH has one live backing array whose contents follow the source page's L3 state, so a shallow
+    // viewOverride cannot turn VCD-backed ethGames into the ISO list. Resolve that one mode through
+    // ETH's private read-only ISO backing probe. Every other device keeps the existing proxy path.
+    if (source->mode == ETH_MODE && !isVcd)
+        return ethResolveIsoFavourite(id, text, outId);
+
+    item_list_t view = *source;
+    view.viewOverride = isVcd ? ITEM_VIEW_FORCE_VCD : ITEM_VIEW_FORCE_ISO;
+    int count = view.itemGetCount(&view);
+
+    // APP ids are aggregate-list positions and can move; their stable identity is the title.
+    if (source->mode == APP_MODE) {
+        for (int i = 0; i < count; i++) {
+            char *name = view.itemGetName(&view, i);
+            if (name != NULL && strcmp(name, text) == 0) {
+                *outId = i;
+                return 1;
+            }
+        }
+        return 0;
+    }
+
+    if (id < 0 || id >= count)
+        return 0;
+    char *name = view.itemGetName(&view, id);
+    if (name == NULL || strcmp(name, text) != 0)
+        return 0;
+    *outId = id;
+    return 1;
+}
+
 static item_list_t *favResolve(int mode, int id, const char *text, int isVcd, int *outMode, int *outId)
 {
     *outMode = mode;
     *outId = id;
 
-    // VCD (PS1) favourites resolve by NAME, not by a live submenu id. The source device may be in its
-    // ISO view right now (its submenu/games array holds discs, not VCDs), yet we must still surface +
-    // launch the PS1 favourite. So we only need a loaded device that can launch a VCD (itemLaunchVcd
-    // != NULL); art/config/launch all key off the stored name + the device's prefix (itemGetPrefix).
-    // A device that provides no itemLaunchVcd is skipped here -- a future-proof backstop, since every
-    // VCD-capable device (BDM/ETH/MMCE/HDD) implements it today.
+    // VCD favourites are name-addressed and already view-independent: art/config/launch all key off
+    // the stored .VCD basename. Bind them to a loaded VCD-capable source without disturbing that
+    // source page's current ISO/VCD view.
     if (isVcd) {
         if (mode >= BDM_MODE && mode <= BDM_MODE_LAST) {
-            // Prefer the stored slot; else the first loaded BDM slot (a stick can change slots).
             opl_io_module_t *mod = oplGetModule(mode);
             if (mod != NULL && mod->support != NULL && mod->support->itemLaunchVcd != NULL) {
                 favVcdMarkStar(mod, id, text);
@@ -400,37 +433,45 @@ static item_list_t *favResolve(int mode, int id, const char *text, int isVcd, in
         return mod->support;
     }
 
+    // ISO/DVD/CD favourites must be just as independent. Validate against a forced-ISO shallow
+    // support view, which reads the source's retained ISO backing array even when its visible page
+    // is currently VCD. Only mark a live submenu star when that submenu itself is in ISO view.
     if (mode >= BDM_MODE && mode <= BDM_MODE_LAST) {
         for (int m = BDM_MODE; m <= BDM_MODE_LAST; m++) {
             opl_io_module_t *mod = oplGetModule(m);
             if (mod == NULL || mod->support == NULL)
                 continue;
-            submenu_list_t *src = submenuFindItemByIdAndText(mod->subMenu, id, text);
-            if (src != NULL) {
-                src->item.favourited = 1;
+            int liveId = id;
+            if (favResolveStoredId(mod->support, id, text, 0, &liveId)) {
+                if (!vcdViewActive(mod->support->mode)) {
+                    submenu_list_t *src = submenuFindItemByIdAndText(mod->subMenu, liveId, text);
+                    if (src != NULL)
+                        src->item.favourited = 1;
+                }
                 *outMode = m;
+                *outId = liveId;
                 return mod->support;
             }
         }
         return NULL;
     }
+
     if (mode < 0 || mode >= MODE_COUNT)
         return NULL;
     opl_io_module_t *mod = oplGetModule(mode);
     if (mod == NULL || mod->support == NULL)
         return NULL;
-    submenu_list_t *src = submenuFindItemByIdAndText(mod->subMenu, id, text);
-    if (src == NULL && mode == APP_MODE) {
-        // Apps: the stored id is an aggregate-list index that shifts whenever the device set or
-        // conf_apps changes (see favIdsMatchForMode above). Fall back to the title, and hand the LIVE
-        // row id back to the caller so the launch/config/startup proxies hit the right appsList slot.
-        src = favFindItemByText(mod->subMenu, text);
-        if (src != NULL)
-            *outId = src->item.id;
-    }
-    if (src == NULL)
+
+    int liveId = id;
+    if (!favResolveStoredId(mod->support, id, text, 0, &liveId))
         return NULL;
-    src->item.favourited = 1;
+
+    if (!vcdViewActive(mod->support->mode)) {
+        submenu_list_t *src = submenuFindItemByIdAndText(mod->subMenu, liveId, text);
+        if (src != NULL)
+            src->item.favourited = 1;
+    }
+    *outId = liveId;
     return mod->support;
 }
 
@@ -540,6 +581,20 @@ static int favGetItemCount(item_list_t *itemList) { return favCount; }
 
 static int favValidIndex(int id) { return (favArray != NULL && id >= 0 && id < favCount); }
 
+// Build a stack-local view of a favourite's LIVE source support. Only viewOverride changes; priv,
+// callbacks, flags and owner all come from the current source object. This lets Favourites keep its
+// ISO/VCD split independent from the source page's own L3 state without copying or mutating device
+// state. The returned pointer is valid only as long as `view` remains in scope.
+static item_list_t *favOwnerView(int id, item_list_t *view)
+{
+    if (!favValidIndex(id) || view == NULL || favArray[id].owner == NULL)
+        return NULL;
+
+    *view = *favArray[id].owner;
+    view->viewOverride = favArray[id].isVcd ? ITEM_VIEW_FORCE_VCD : ITEM_VIEW_FORCE_ISO;
+    return view;
+}
+
 // Source device mode (APP_MODE / HDD_MODE / BDM range / ...) of the FAV item at FAV-list index
 // id, or -1 if id is out of range. Lets the theme engine redirect e.g. an APP favourite to the
 // apps element (correct art folder + case overlay) instead of the game cover element.
@@ -572,7 +627,8 @@ static char *favGetItemStartup(item_list_t *itemList, int id)
         return "";
     if (favArray[id].isVcd)
         return favArray[id].text; // VCD favourites key art/launch off the .VCD name, not a submenu id
-    item_list_t *o = favArray[id].owner;
+    item_list_t ownerView;
+    item_list_t *o = favOwnerView(id, &ownerView);
     if (o == NULL || o->itemGetStartup == NULL || !favOwnerHasId(o, favArray[id].id))
         return "";
     return o->itemGetStartup(o, favArray[id].id);
@@ -582,7 +638,8 @@ static config_set_t *favGetConfig(item_list_t *itemList, int id)
 {
     if (!favValidIndex(id))
         return NULL;
-    item_list_t *o = favArray[id].owner;
+    item_list_t ownerView;
+    item_list_t *o = favOwnerView(id, &ownerView);
     if (o == NULL)
         return NULL;
     // VCD favourite: the owner's id-based config is the disc list (wrong list / wrong id while the
@@ -611,7 +668,8 @@ static void favLaunchItem(item_list_t *itemList, int id, config_set_t *configSet
 {
     if (!favValidIndex(id))
         return;
-    item_list_t *o = favArray[id].owner;
+    item_list_t ownerView;
+    item_list_t *o = favOwnerView(id, &ownerView);
     if (o == NULL)
         return;
     // VCD favourite: hand the .VCD name to the owner's POPSTARTER launcher. This is view-independent
@@ -635,7 +693,8 @@ static int favGetImage(item_list_t *itemList, char *folder, int isRelative, char
     if (favArray == NULL || value == NULL)
         return -1;
     for (int i = 0; i < favCount; i++) {
-        item_list_t *o = favArray[i].owner;
+        item_list_t ownerView;
+        item_list_t *o = favOwnerView(i, &ownerView);
         if (o == NULL)
             continue;
         // VCD favourite: route both the primary filename and the cache's strict-ID fallback through
@@ -682,8 +741,10 @@ static int favGetImage(item_list_t *itemList, char *folder, int isRelative, char
     // bogus "absent"); a bare -1 may just mean "this owner can't key that path".
     if (!isRelative) {
         for (int i = 0; i < favCount; i++) {
-            item_list_t *o = favArray[i].owner;
-            if (o == NULL || o->itemGetImage == NULL || !favOwnerHasId(o, favArray[i].id))
+            item_list_t ownerView;
+            item_list_t *o = favOwnerView(i, &ownerView);
+            if (o == NULL || o->itemGetImage == NULL ||
+                (!favArray[i].isVcd && !favOwnerHasId(o, favArray[i].id)))
                 continue;
             int r = o->itemGetImage(o, folder, isRelative, value, suffix, resultTex, psm);
             if (r != -1)
@@ -714,7 +775,8 @@ int favGetArtMode(const char *value)
     if (favArray == NULL || value == NULL)
         return -1;
     for (int i = 0; i < favCount; i++) {
-        item_list_t *o = favArray[i].owner;
+        item_list_t ownerView;
+        item_list_t *o = favOwnerView(i, &ownerView);
         if (o == NULL)
             continue;
         if (favArray[i].isVcd) {
@@ -762,7 +824,8 @@ unsigned char favGetFlags(item_list_t *itemList)
     // Prefer the SOURCE list's live flags so dynamic capabilities are forwarded -- e.g. a BDM
     // device backed by ATA only sets MODE_FLAG_COMPAT_DMA on itemList->flags after its scan, so
     // re-deriving from mode alone would hide the DMA compat option for ATA-backed favourites.
-    item_list_t *o = favArray[id].owner;
+    item_list_t ownerView;
+    item_list_t *o = favOwnerView(id, &ownerView);
     if (o != NULL)
         return o->flags;
     // Fallback by resolved mode if the owner pointer is somehow absent.
@@ -784,7 +847,8 @@ static int favCheckVMC(item_list_t *itemList, char *name, int createSize)
     int id = mod->menuItem.current->item.id;
     if (!favValidIndex(id))
         return -1;
-    item_list_t *o = favArray[id].owner;
+    item_list_t ownerView;
+    item_list_t *o = favOwnerView(id, &ownerView);
     if (o == NULL || o->itemCheckVMC == NULL)
         return -1;
     return o->itemCheckVMC(o, name, createSize);

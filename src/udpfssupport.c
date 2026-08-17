@@ -128,7 +128,7 @@ static int udpfsNeedsUpdate(item_list_t *itemList)
     // Folder browsing: descend/ascend forces one rescan.
     if (folderConsumeDirty(itemList->mode))
         return 1;
-    if (vcdViewActive(itemList->mode))
+    if (vcdListViewActive(itemList))
         return 0;
 
     if (udpfsULSizePrev == -2)
@@ -175,7 +175,7 @@ static int udpfsUpdateGameList(item_list_t *itemList)
         udpfsFoldersCreated = 1;
     }
 
-    if (vcdViewActive(itemList->mode)) {
+    if (vcdListViewActive(itemList)) {
         int r = vcdFillGameList(udpfsPrefix, &udpfsGames);
         if (r >= 0) // r < 0: transient scan failure -> preserve the last-good list
             udpfsGameCount = r;
@@ -211,7 +211,7 @@ static int udpfsGetGameNameLength(item_list_t *itemList, int id)
 static char *udpfsGetGameStartup(item_list_t *itemList, int id)
 {
     // VCD view keys per-game data (CFG/art) off the VCD filename, not a disc ID (see sbPopulateConfig).
-    if (vcdViewActive(itemList->mode))
+    if (vcdListViewActive(itemList))
         return udpfsGames[id].name;
     return udpfsGames[id].startup;
 }
@@ -254,7 +254,7 @@ static void udpfsLaunchGame(item_list_t *itemList, int id, config_set_t *configS
     sbSetBrowseSub(folderGetSub(itemList->mode));
 
     // VCD view: udpfs cannot host a POPSTARTER launch (network filesystem) -> hand off to the guard.
-    if (game != NULL && vcdViewActive(itemList->mode)) {
+    if (game != NULL && vcdListViewActive(itemList)) {
         udpfsLaunchVcd(itemList, game->name, configSet);
         return;
     }
@@ -369,7 +369,7 @@ static int udpfsGetImage(item_list_t *itemList, char *folder, int isRelative, ch
     int r = texDiscoverLoad(resultTex, path, -1);
     // On a VCD (PS1) genuine miss, fall back to the POPSLoader-style suffixless cover next to the .VCD.
     // Cover/icon only, VCD view only.
-    if (r == ERR_BAD_FILE && isRelative && vcdViewActive(itemList->mode))
+    if (r == ERR_BAD_FILE && isRelative && vcdListViewActive(itemList))
         r = vcdLoadPopsCover(udpfsPrefix, value, suffix, resultTex);
     return r;
 }

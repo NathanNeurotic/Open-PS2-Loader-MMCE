@@ -26,7 +26,7 @@ Nathan's side and his testers' side must look identical across a handover. These
 
 **BRANCHES.** Never commit to `master`, `rebuild/main`, or any existing `rebuild/step-*` branch.
 Every change goes on a NEW branch you create, `rebuild/step-NNN-<slug>`, branched from the current
-tip. **Next number: 212. Current tip: `rebuild/step-211-consolidated-apa-config-safety`.** One focused change
+tip. **Next number: 213. Current tip: `rebuild/step-212-apa-boot-and-bgm-resilience`.** One focused change
 per step, with a long explanatory commit message -- what changed, why, what evidence drove it, and
 what it does NOT fix. Those messages are this project's real documentation. Never force-push, never
 rewrite history, never merge to `master` without asking. (`rebuild/main` moves only as the
@@ -1293,3 +1293,186 @@ notification state is reset if resolution reruns, failed writes after a graceful
 fallback report the actual fallback target, and the success notification names the real APA home
 (`hdd0:__common/OPL` or the existing partition selected by `conf_hdd.cfg`) rather than the temporary
 `pfs0:` mount alias. No partition-creation behavior is reintroduced.
+
+---
+
+## Step 212 — APA boot recovery, BGM starvation protection, and config.path recovery
+
+Three hardware-driven corrections are intentionally shipped together for one test round.
+
+1. **APA boot mount-state invariant.** `gHDDPrefix` now starts at `NULL`; only a successful existing-PFS
+   mount assigns `pfs0:` / `pfs0:OPL/`. Step 211 had made non-NULL mean "mounted" while `setDefaults()`
+   still pre-seeded `"pfs0:"`, allowing a fresh HDD boot to skip discovery/mount entirely. A failed first
+   APA mount keeps the real launch identity, retries only the existing-partition HDD resolver, never
+   falls through to an MC write home, and never creates/formats APA metadata.
+2. **BGM load resilience.** PCM buffering grows from 128 to 192 × 4096-byte slots (768 KiB, about 4.35 s).
+   Playback/decode priorities move from 62/63 to 30/31: playback is tiny and normally blocked in audsrv;
+   Vorbis refill now outranks the priority-32 background I/O worker while art remains priority 72. This
+   addresses both EE scheduling starvation and longer IOP/device stalls.
+3. **Missing/stale `config.path` recovery.** If normal home/redirect loading fails, RiptOPL performs a
+   read-only search for an already-existing master config on `mc0` (OPL dir then root), `mc1` (same),
+   then mounted USB devices (root then `/OPL`). Both MC slots are probed directly rather than relying on
+   `sysCheckMC()`. USB recovery force-loads only the USB transport and filters by live USB device type.
+   Recovery always restores the normal save home after the read, so the probed MC/USB location never
+   silently becomes the next write target. Local boots return to their boot home; bare boots return to
+   `mc?:OPL`; deferred network boots explicitly select a reachable MC bootstrap home (or the normal
+   fail-visible MC wildcard if neither slot is reachable). If the recovered config contains Custom Settings
+   Path, the next explicit Save Changes
+   honors it and regenerates `config.path` through the normal guarded writer.
+
+The Step-209/210/211 data-integrity barriers remain non-negotiable: raw `hddN:` config I/O is blocked,
+`conf_hdd.cfg` may select only an existing mountable PFS target, `__common/OPL/` is the canonical HDD
+fallback, and no config/discovery path creates, formats, resizes, or repairs an APA partition.
+
+### Step 212 follow-up — Coverflow background admission
+
+USB hardware feedback on Beta-2587 (`172569c`) confirmed that background-art throughput and BGM
+continuity were fixed, while Coverflow side-cover arrival became the remaining visible slowdown.
+Coverflow's Background element draws before the carousel; after prioritizing the selected cover it
+could still start a much larger `_BG` read before `drawCoverFlow()` had a chance to enqueue the
+visible neighbouring covers. Step 212 now suppresses only that new background enqueue while the
+selected Coverflow cover is still pending. The cached background may continue drawing; once the
+selected cover is loaded, art is disabled, or the cover is confirmed absent, background admission
+returns to the immediate path. The later hardware pass extends the same selected-first discipline to
+List/APPS/Favourites/VCD with cache-sized center-out warming. This preserves BGM priority and the
+dedicated art-worker design while ordering device work around what the user is visibly waiting for.
+
+### Step 212 hardware follow-up — list/VCD/APA/MC scheduling and ownership
+
+The combined Step-212 hardware round exposed four additional shared-lifecycle issues, fixed in this
+same PR so testers do not need another branch/artifact cycle:
+
+- **APA enumeration is independent from the config/art PFS home.** HDL PS2 games continue to come
+  from the APA/HDL partition table, and HDD VCDs from existing POPS partitions (`pfs1:` scan space).
+  Neither page is a CD/DVD-folder scan. A missing persistent `pfs0:` data home now disables only the
+  features that actually require it (games.bin, CFG, ART, VMC/sidecars); the lists remain visible.
+  All Step-209/210/211 no-create/no-format/raw-APA-write barriers remain intact.
+- **Memory-card ownership is concrete.** An `mc1:` launch prefers slot 2 for bootstrap redirects,
+  missing-config recovery and the legacy `OPL/` read even when `mc0:` is also populated. `mc0:` is
+  symmetric; non-MC boots retain the historical first-present policy.
+- **List art admission is cache-sized around the cursor.** The generic List renderer (Games, APPS,
+  Favourites and VCD) requests the selected cover first, then walks outward using the resolved COV
+  cache capacity instead of a fixed +/-2 cap. Farther visible rows draw resident art without starting
+  reads. Coverflow uses the same cache-sized rule again, restoring the older deep lookahead that made
+  loose covers feel preloaded while BGM low-water admission remains the device-level safety valve.
+- **Metadata cannot monopolize the device.** APP `#Size` opens are deferred to the info screen.
+  Generic VCD config population uses filename parsing only and never opens the `.VCD`. Deep PS1-ID
+  inspection runs only when the active theme family contains the ItemText element that consumes it,
+  skips filenames that already carry a strict ID, and yields whenever art is pending or BGM reserve
+  is low. BGM itself keeps the 30/31 priorities + 768 KiB ring and now prevents new art reads below
+  its low-water reserve; `OV_HOLE` is recoverable instead of terminating playback.
+
+Hardware acceptance should explicitly cover: APA PS2 + VCD pages with/without the persistent PFS
+home, mc0 and mc1 boots with both cards inserted, loose-PNG List/Coverflow on USB, APPS/Favourites
+missing-art navigation, a VCD theme with no ItemText (zero deep image reads), and one with ItemText
+(the ID may pop in opportunistically without starving art/audio). VCD favourite persistence remains
+part of the regression matrix.
+
+Final review polish in the same Step-212 PR also accepts CodeRabbit's persistent-home remount finding
+(clear `gHDDPrefix`/`gOPLPart` if the post-POPS restore mount fails) and bare-launch recovery finding
+(when there is no boot identity, the already-existing recovered MC/USB config home remains the save
+owner). Normal successful HDD-save notifications now translate transient `pfs0:` back to the physical
+owner (`hdd0:__common/OPL` or the configured existing partition) so testers can locate the files.
+A final persistence guard in `configWrite()` also materializes a populated config when recovery or
+self-migration moved its filename to a new save home but the in-memory values remained unmodified.
+Previously that state returned success without creating the destination file -- a hardware-visible
+"Settings saved" toast with no `settings_riptopl.cfg` on the resolved HDD/MC/USB home. Existing
+files remain on the no-write fast path, empty optional sets are not created, and the raw-APA write
+firewall still runs before any actual O_CREAT. `conf_hdd.cfg` remains an optional pre-existing HDD
+home redirect; RiptOPL's master settings file is `settings_riptopl.cfg`.
+
+### Step 212 APA config-source/save-home correction
+
+Hardware on the stacked Step-212 artifact exposed a paired state bug: config recovery could read an
+existing master config from MC/USB, then re-home the live sets to the raw `hdd0:` APA launch identity.
+The load toast therefore claimed `hdd0:` even though no HDD settings file existed, and the next explicit
+Save reached the raw-APA firewall and failed with EACCES / error 13. Load-source reporting is now tracked
+separately from future save ownership, failed recovery preserves an already-mounted safe PFS home, and
+every non-custom APA save resolves the existing-PFS chain (`conf_hdd.cfg` target -> `__common/OPL`) before
+`configWrite()`. If no safe PFS home exists it fails visibly with ENODEV; it never creates/formats/repairs
+APA metadata.
+
+
+### Step 212 follow-up — deterministic APA config ownership and review closure
+
+Milker_Myers hardware feedback exposed that an APA/FHDB boot could still fall through the generic missing-`config.path` recovery scan and import an older MC/USB master config. That is now prohibited for APA-origin boots. APA configuration ownership is deterministic: mount existing PFS support, honor `__common/OPL/conf_hdd.cfg` when it names an existing mountable target, otherwise use existing `__common/OPL/`, honor a valid explicit `config.path` from that mounted home, and otherwise keep defaults homed to that safe PFS location for the first explicit save. No APA partition is created, formatted, resized, repaired, or opened with a file-style `O_CREAT`.
+
+The same follow-up closes the current CodeRabbit findings without broad device rewrites:
+
+- list-only APA sessions skip NULL HDD prefixes in legacy APPS discovery and HDD argv autolaunch uses metadata-only defaults when no persistent PFS home exists;
+- ETH ISO favourites use an ETH-private read-only ISO backing probe only when the live ETH page is showing VCD, leaving every other device's view handling unchanged;
+- List neighbour warming uses every available cache slot (`count - 1`) while the existing per-cache admission counter and BGM low-water gate still bound storage work;
+- direct `pfs:` / `pfs0:` custom paths remain direct mounted-PFS syntax; HDD notation continues to resolve relative to the active configured data home.
+
+Hardware regression emphasis: APA/FHDB save/reboot with and without MC inserted; existing `conf_hdd.cfg -> +OPL`; missing master config first-save creation under `__common/OPL`; explicit HDD custom path fallback; MC0/MC1 boot ownership; USB/MMCE/MX4SIO/ETH normal save/load; ETH ISO favourites while the source page is in VCD view; and BGM/art stress after the List cache-budget correction.
+
+### Step 212 hardware follow-up — APA lists, rolling art focus, config latency
+
+- APA HDL/VCD enumeration no longer hard-stops solely because the combined persistent-PFS support latch is incomplete; the read-only scanners get a chance to report actual availability after the normal support retry.
+- Cache-sized cover prefetch remains aggressive, but queued requests now carry a selected-game focus generation. Moving the cursor discards the old speculative neighborhood before another read; a warmed request that becomes selected is adopted into the new generation.
+- Native OPL game selection reuses a browse-prefetched per-game config when the exact list+row is already resident instead of invalidating and rereading it just to enter/launch.
+- Info-screen #Size resolution is discretionary storage IO and waits for BGM reserve to recover, abandoning stale work if the user navigates away.
+- Hardware retest priorities: APA HDL + HDD VCD visibility; long loose-PNG scrolling without batch stalls; USB BGM while repeatedly entering Info; native-core X/Triangle config latency on settled vs immediate selections.
+
+## Step 212 follow-up — transactional HDD refresh / metadata dedupe / art overlap
+
+- Do not treat the current HDL backing list as scratch space for `games.bin`: cache and live APA
+  candidates are built separately and only a successful replacement is published. A failed refresh
+  preserves the last-good HDL list; a valid cache may rescue a first-entry live-scan failure.
+- Locked-to-VCD startup performs its initial HDD VCD build even without an L3 dirty bit. Explicit
+  Refresh in HDD VCD view invalidates the session VCD cache before rebuilding.
+- Direct HDD/HDL Info does not queue the generic CFG+stat size pass (APA metadata already owns size);
+  generic Info size resolution is one-at-a-time so repeated enter/back cannot stack duplicate reads.
+- A failed VCD cosmetic-ID enqueue releases its one-slot pending latch.
+- Pending cover requests that are touched by the new frame adopt the new focus generation even when
+  they remain neighbours; only the selected request is promoted. This keeps overlapping Coverflow/List
+  lookahead instead of dropping and rereading it after every navigation step.
+- This follow-up deliberately does NOT change ATA/DEV9 readiness: working HDD VCD enumeration proves
+  the relevant APA/PFS stack is resident for the reported HDL-list symptom.
+
+## Step 212 follow-up — APA enumerators publish only complete walks
+
+- `hddGetHDLGamelist()` now treats a negative `fileXioDread()` and any record-allocation failure as
+  scan failure; it never turns a truncated APA table walk into a successful partial HDL list.
+- `hddGetPopsPartitionList()` now distinguishes a successful zero-candidate APA walk from failure and
+  rejects partial walks on dopen/dread/OOM errors.
+- HDD VCD rebuilds are transactional. A failed APA walk or incomplete candidate scan preserves a
+  non-empty last-good VCD list instead of clearing it first; a successful zero-candidate walk may
+  authoritatively clear/latch the list. A first-ever incomplete scan may expose only entries actually
+  proven readable, but remains unlatched so an explicit refresh can retry.
+- These are enumeration/list-lifetime corrections above the transport layer. No ATA/DEV9 readiness
+  policy changed.
+
+## Step 212 follow-up — VCD directory walks distinguish EOF from failure
+
+- `vcdScanOpenDir()` no longer treats every `readdir()` NULL as clean EOF. It clears `errno` before
+  each read and returns scan failure when NULL arrives with an error, discarding the partial candidate
+  list so callers retain their last-good backing list.
+- Reaching `VCD_MAX_ITEMS` remains the intentional list-cap condition; a normal EOF still returns the
+  completed scan.
+- With this change the HDL APA walk, POPS APA-partition walk, and VCD directory walk all reject
+  incomplete enumeration rather than publishing it as authoritative. No ATA/DEV9 behavior changed.
+
+## Step 212 follow-up — review hardening after transactional enumeration
+
+- HDD VCD backing-array publication is serialized with `guiLock`: games pointer, partition pointer,
+  count, cache latch, and old-array retirement move as one GUI-reader-safe handoff. Direct VCD launch
+  copies the parallel name/partition fields before any blocking work; GameID likewise receives a stack
+  copy of startup instead of holding a mutable list pointer across its multi-frame display.
+- Info `#Size` admission remains single-worker but is now latest-wins: same-row repeats dedupe, while
+  a different row replaces the target and is processed before the worker exits.
+- VCD favourites no longer require their intentionally-nonstable numeric id for absolute theme-image
+  fallback; their text/name identity remains authoritative.
+- HDD autolaunch allocation failure now calls `miniDeinit(NULL)` to unwind `miniInit(HDD_MODE)`.
+- No ATA/DEV9 readiness behavior changed.
+
+## Step 212 follow-up — close remaining backing-list publication gaps
+
+- ETH ISO favourites resolved while the live ETH page is in VCD view now keep using the private
+  `ethFavIsoGames` snapshot for every id-based read/config/launch accessor. `viewOverride=FORCE_ISO`
+  can no longer validate against the snapshot and then apply that numeric id to live VCD-backed
+  `ethGames`; an invalidated snapshot fails closed until normal favourite resolution rebuilds it.
+- HDL live-list replacement now mirrors the VCD publication contract: pointer, count, candidate
+  ownership transfer, and retirement of the old array occur under `guiLock()`. A GUI frame cannot
+  pass an old count check and then dereference a freed `hddGames.games` allocation during refresh.
+- No ATA/DEV9 readiness behavior and no APA write/create/format policy changed.

@@ -459,6 +459,10 @@ void hddLoadSupportModules(void)
     } else {
         gHDDPrefix = "pfs0:";
     }
+
+    // A prior list pass may have parked relative HDD artwork as unavailable while no persistent
+    // PFS home existed. Re-arm those misses exactly when the home becomes usable again.
+    cacheInvalidateFailMemo();
 }
 
 void hddInit(item_list_t *itemList)
@@ -482,9 +486,9 @@ item_list_t *hddGetObject(int initOnly)
 // Once-per-session latch (POPSLoader's HAS_CHECKED parity: "HDD is checked only once since it cannot
 // be removed/replaced without damaging the console"). While set, hddUpdateGameList's VCD branch reuses
 // the built arrays so an L3 toggle rebuilds only the submenu, never re-walks the partitions. A latch
-// (not hddVcdGames != NULL) so a drive whose candidates scanned to ZERO VCDs is also remembered. The
-// no-candidates early return deliberately does NOT latch: hddGetPopsPartitionList returns 0 for a
-// transient hdd0: dopen failure too, and that walk is one mount-free APA pass -- cheap to repeat.
+// (not hddVcdGames != NULL) so a drive whose candidates scanned to ZERO VCDs is also remembered.
+// hddGetPopsPartitionList distinguishes a successful zero-candidate walk from a failed APA walk;
+// only the former may replace/latch the current VCD list.
 // Cleared by hddFreeVcdGameList (covers rebuilds + hddCleanUp/hddShutdown teardown) and by
 // hddVcdInvalidateCache (the first-disc-only setting filters at scan time, so its change must rescan).
 // The generation counter keeps an invalidation from being SWALLOWED by a build already in flight on
@@ -499,14 +503,42 @@ void hddVcdInvalidateCache(void)
     hddVcdListBuilt = 0;
 }
 
+static void hddPublishVcdGameList(base_game_info_t *games, char (*parts)[APA_IDMAX + 1], int count, int built)
+{
+    base_game_info_t *oldGames;
+    char(*oldParts)[APA_IDMAX + 1];
+
+    guiLock();
+    oldGames = hddVcdGames;
+    oldParts = hddVcdParts;
+    hddVcdGames = games;
+    hddVcdParts = parts;
+    hddVcdGameCount = count;
+    hddVcdListBuilt = built;
+    free(oldGames);
+    free(oldParts);
+    guiUnlock();
+}
+
 static void hddFreeVcdGameList(void)
 {
-    free(hddVcdGames);
-    hddVcdGames = NULL;
-    free(hddVcdParts);
-    hddVcdParts = NULL;
-    hddVcdGameCount = 0;
-    hddVcdListBuilt = 0;
+    hddPublishVcdGameList(NULL, NULL, 0, 0);
+}
+
+static void hddPublishHdlGameList(hdl_games_list_t *replacement)
+{
+    hdl_games_list_t old;
+
+    if (replacement == NULL)
+        return;
+
+    guiLock();
+    old = hddGames;
+    hddGames = *replacement;
+    replacement->games = NULL;
+    replacement->count = 0;
+    hddFreeHDLGamelist(&old);
+    guiUnlock();
 }
 
 // Build the HDD VCD game list from both supported APA/PFS shapes. Exact __.POPS / __.POPS0..9
@@ -523,17 +555,31 @@ static void hddFreeVcdGameList(void)
 static int hddBuildVcdGameList(void)
 {
     hdd_pops_list_t parts;
+    base_game_info_t *newGames = NULL;
+    char(*newParts)[APA_IDMAX + 1] = NULL;
     int total = 0;
+    int scanIncomplete = 0;
     unsigned int genAtEntry = hddVcdCacheGen; // re-latch below only if no invalidation raced this build
-
-    hddFreeVcdGameList();
 
     // Best-effort cleanup from an interrupted prior scan. This never touches pfs0:, which remains the
     // live OPL data mount used by both PS2 and VCD config/art lookups.
     fileXioUmount("pfs1:");
 
-    if (hddGetPopsPartitionList(&parts) <= 0)
-        return 0; // no candidates OR a transient dopen failure -- deliberately NOT latched (see above)
+    int partCount = hddGetPopsPartitionList(&parts);
+    if (partCount < 0) {
+        // TRANSACTIONAL LIST OWNERSHIP: a failed APA table walk is not an empty VCD library. Keep the
+        // last-good arrays exactly as they are and leave the cache unlatched so a later explicit
+        // refresh can retry.
+        LOG("HDD VCD: APA partition enumeration failed (%d); preserving %d last-good game(s)\n", partCount, hddVcdGameCount);
+        hddVcdListBuilt = 0;
+        return hddVcdGameCount;
+    }
+    if (partCount == 0) {
+        // This time zero is authoritative: hdd0: opened and the complete APA walk found no candidates.
+        hddFreeVcdGameList();
+        hddVcdListBuilt = (genAtEntry == hddVcdCacheGen);
+        return 0;
+    }
 
     for (int p = 0; p < parts.count; p++) {
         char mountSrc[64];
@@ -546,90 +592,113 @@ static int hddBuildVcdGameList(void)
             char discId[12]; // validation only -- the entry keys off the full label, never the ID
             if (!vcdExtractGameId(parts.names[p] + 3, discId, sizeof(discId))) {
                 // ID-less label (e.g. PP.CASTLEVANIA): require ONE exact IMAGE0.VCD at the partition
-                // root. This probe is what keeps PP.* HDDOSD apps off the PS1 list; ID-shaped labels
-                // above skip it because no documented app family matches the strict ID pattern.
-                if (fileXioMount("pfs1:", mountSrc, FIO_MT_RDONLY) < 0)
-                    continue; // can't mount this partition -> skip it
+                // root. A mount failure means this refresh was incomplete; an open miss AFTER a
+                // successful mount is authoritative and simply identifies a non-POPS HDDOSD app.
+                if (fileXioMount("pfs1:", mountSrc, FIO_MT_RDONLY) < 0) {
+                    scanIncomplete = 1;
+                    continue;
+                }
                 int imgfd = open("pfs1:/IMAGE0.VCD", O_RDONLY);
                 if (imgfd >= 0)
                     close(imgfd); // close before unmount; ps2fs may reject an unmount with a live fd
                 fileXioUmount("pfs1:");
                 if (imgfd < 0)
-                    continue; // candidate name alone is insufficient (PP.* HDDOSD apps are common)
+                    continue;
             }
 
-            base_game_info_t *grownGames = realloc(hddVcdGames, (total + 1) * sizeof(base_game_info_t));
-            if (grownGames == NULL)
+            base_game_info_t *grownGames = realloc(newGames, (total + 1) * sizeof(base_game_info_t));
+            if (grownGames == NULL) {
+                scanIncomplete = 1;
                 break;
-            hddVcdGames = grownGames;
-            char(*grownParts)[APA_IDMAX + 1] = realloc(hddVcdParts, (total + 1) * sizeof(*hddVcdParts));
-            if (grownParts == NULL)
+            }
+            newGames = grownGames;
+            char(*grownParts)[APA_IDMAX + 1] = realloc(newParts, (total + 1) * sizeof(*newParts));
+            if (grownParts == NULL) {
+                scanIncomplete = 1;
                 break;
-            hddVcdParts = grownParts;
+            }
+            newParts = grownParts;
 
-            base_game_info_t *g = &hddVcdGames[total];
+            base_game_info_t *g = &newGames[total];
             memset(g, 0, sizeof(base_game_info_t));
             snprintf(g->name, sizeof(g->name), "%s", parts.names[p] + 3); // strip PP. / __. for display
-            snprintf(g->startup, sizeof(g->startup), "%s", g->name);      // keep VCD identity = name (pooled entries do the same)
+            snprintf(g->startup, sizeof(g->startup), "%s", g->name);      // keep VCD identity = name
             snprintf(g->extension, sizeof(g->extension), ".VCD");
             g->parts = 1;
-            g->format = GAME_FORMAT_ISO;                                       // harmless; VCD flag gates the launch
-            snprintf(hddVcdParts[total], APA_IDMAX + 1, "%s", parts.names[p]); // case-preserved full label
-            total += 1;
+            g->format = GAME_FORMAT_ISO;                                    // VCD flag gates launch
+            snprintf(newParts[total], APA_IDMAX + 1, "%s", parts.names[p]); // case-preserved label
+            total++;
             continue;
         }
 
         // __.POPS[0-9]? pooled container: mount and scan its root for *.VCD entries.
-        if (fileXioMount("pfs1:", mountSrc, FIO_MT_RDONLY) < 0)
-            continue; // can't mount this partition -> skip it
+        if (fileXioMount("pfs1:", mountSrc, FIO_MT_RDONLY) < 0) {
+            scanIncomplete = 1;
+            continue;
+        }
 
         vcd_entry_t *vcds = NULL;
         int n = vcdScanDirRoot("pfs1:/", &vcds);
         fileXioUmount("pfs1:");
-        if (n <= 0) {
+        if (n < 0) {
+            free(vcds);
+            scanIncomplete = 1;
+            continue;
+        }
+        if (n == 0) {
             free(vcds);
             continue;
         }
 
-        base_game_info_t *grownGames = realloc(hddVcdGames, (total + n) * sizeof(base_game_info_t));
+        base_game_info_t *grownGames = realloc(newGames, (total + n) * sizeof(base_game_info_t));
         if (grownGames == NULL) {
             free(vcds);
+            scanIncomplete = 1;
             break;
         }
-        hddVcdGames = grownGames;
-        char(*grownParts)[APA_IDMAX + 1] = realloc(hddVcdParts, (total + n) * sizeof(*hddVcdParts));
+        newGames = grownGames;
+        char(*grownParts)[APA_IDMAX + 1] = realloc(newParts, (total + n) * sizeof(*newParts));
         if (grownParts == NULL) {
             free(vcds);
+            scanIncomplete = 1;
             break;
         }
-        hddVcdParts = grownParts;
+        newParts = grownParts;
 
         int kept = 0;
         for (int i = 0; i < n; i++) {
             if (gVcdFirstDiscOnly && vcdIsHiddenDisc(vcds[i].name))
-                continue; // #118: hide discs 2+ of a multi-disc PS1 set (device lists only)
-            base_game_info_t *g = &hddVcdGames[total + kept];
+                continue;
+            base_game_info_t *g = &newGames[total + kept];
             memset(g, 0, sizeof(base_game_info_t));
             snprintf(g->name, sizeof(g->name), "%s", vcds[i].name);
             snprintf(g->startup, sizeof(g->startup), "%s", vcds[i].name);
             snprintf(g->extension, sizeof(g->extension), ".VCD");
             g->parts = 1;
-            g->format = GAME_FORMAT_ISO; // harmless; the per-mode VCD flag gates the launch path
-            snprintf(hddVcdParts[total + kept], APA_IDMAX + 1, "%s", parts.names[p]);
+            g->format = GAME_FORMAT_ISO;
+            snprintf(newParts[total + kept], APA_IDMAX + 1, "%s", parts.names[p]);
             kept++;
         }
         free(vcds);
-        total += kept; // realloc over-allocated to (total+n); hidden discs leave harmless unused slots
+        total += kept;
     }
 
     hddFreePopsPartitionList(&parts);
-
     fileXioUmount("pfs1:");
 
-    hddVcdGameCount = total;
-    // Remember a scanned-to-zero result too (candidates existed, none were VCDs) so toggles don't
-    // re-probe them. Skip the latch if an invalidation arrived while this build was running.
-    hddVcdListBuilt = (genAtEntry == hddVcdCacheGen);
+    // If a refresh could not inspect every candidate, a non-empty last-good list has more authority
+    // than a newly-built partial one. This is the VCD twin of the transactional HDL refresh above.
+    if (scanIncomplete && hddVcdGameCount > 0) {
+        free(newGames);
+        free(newParts);
+        hddVcdListBuilt = 0;
+        LOG("HDD VCD: incomplete refresh; preserving %d last-good game(s)\n", hddVcdGameCount);
+        return hddVcdGameCount;
+    }
+
+    // A first-ever incomplete scan may still expose the entries it proved readable, but it is never
+    // latched as complete. A fully successful zero/nonzero scan is latched unless invalidated mid-run.
+    hddPublishVcdGameList(newGames, newParts, total, !scanIncomplete && (genAtEntry == hddVcdCacheGen));
     return total;
 }
 
@@ -638,8 +707,11 @@ static int hddNeedsUpdate(item_list_t *itemList)
        Hence any update request would be issued by the user, which should be taken as an explicit request to re-scan the HDD. */
     if (vcdConsumeDirty(itemList->mode))
         return 1; // L3 toggle / default-view change -> rebuild the submenu (the ARRAY may be cached)
-    if (vcdViewActive(itemList->mode))
-        return 0; // in VCD view: skip the HDL re-scan churn
+    if (vcdListViewActive(itemList))
+        // The locked-to-VCD startup path also receives the normal initial deferred update, but no
+        // toggle dirtied the view first. Build once when the VCD backing list does not exist yet.
+        // A manual HDD/VCD refresh invalidates this latch before posting the same deferred update.
+        return !hddVcdListBuilt;
     return 1;
 }
 
@@ -660,41 +732,63 @@ static int hddUpdateGameList(item_list_t *itemList)
             hddLoadSupportModules();
     }
 
-    // Fail closed when no existing PFS data home could be mounted. The update path must not
-    // construct filenames from a NULL prefix or fall into any alternate partition-creation path.
-    if (gHDDPrefix == NULL)
-        return 0;
+    // Game discovery and the persistent config/art PFS home are separate lifetimes. HDL games
+    // live in the APA table and HDD VCDs live in existing POPS partitions; neither requires the
+    // long-lived pfs0: data home. Step 211 accidentally returned an empty page whenever that home
+    // was unavailable even though the APA/PFS support modules were healthy. Require only the support
+    // stack here; config/art accessors below remain NULL-safe and fail closed independently.
+    // The combined support latch includes PS2FS/PFS readiness, but the PS2 list itself is an
+    // APA-table read and must not disappear merely because the persistent PFS side is still settling.
+    // Retry above, then let each read-only scanner prove what is actually available. HDL enumeration
+    // fails harmlessly if hdd0: is not ready; the VCD builder likewise skips mounts it cannot open.
+    if (!hddSupportModulesLoaded)
+        LOG("HDDSUPPORT UpdateGameList: PFS support incomplete; attempting read-only APA enumeration anyway\n");
 
-    if (vcdViewActive(itemList->mode))
+    if (vcdListViewActive(itemList))
         // Reuse the session's built list on view flips; hddBuildVcdGameList runs only when never
         // built, invalidated (first-disc-only change), or freed by teardown (hddFreeVcdGameList).
         return hddVcdListBuilt ? hddVcdGameCount : hddBuildVcdGameList();
 
-    hdl_games_list_t hddGamesNew;
-    int ret;
+    hdl_games_list_t cachedGames = {0};
+    hdl_games_list_t hddGamesNew = {0};
+    int cacheRet, scanRet = 0;
 
-    // Force a live APA scan not only when the cache fails to load (ret != 0) or a prior build asked for it
-    // (hddForceUpdate), but ALSO when the cache loaded EMPTY (count 0). A missing/empty/stale games.bin
-    // otherwise left the first HDD page blank until a second manual refresh (provato's HW report).
-    if (((ret = hddLoadGameListCache(&hddGames)) != 0) || (hddForceUpdate) || (hddGames.count == 0)) {
-        hddGamesNew.count = 0;
-        hddGamesNew.games = NULL;
-        ret = hddGetHDLGamelist(&hddGamesNew);
-        if (ret == 0) {
-            hddUpdateGameListCache(&hddGames, &hddGamesNew);
-            hddFreeHDLGamelist(&hddGames);
-            hddGames = hddGamesNew;
+    // TRANSACTIONAL REFRESH. hddGames is the LIVE backing array used by the menu. The old path
+    // passed it directly to hddLoadGameListCache(), whose first action is hddFreeHDLGamelist(): a
+    // missing/corrupt games.bin therefore destroyed a perfectly good live list BEFORE the fallback
+    // APA scan had proved it could replace it. If that scan failed, VCD -> HDL returned to a blank
+    // PS2 page even though the previous HDL list had been valid. Build cache/live candidates off to
+    // the side and publish only a successful replacement.
+    cacheRet = hddLoadGameListCache(&cachedGames);
+
+    // Force a live APA scan when the cache is absent/bad, a prior build requested a refresh, or the
+    // cache is empty. Otherwise the initial boot may use the valid games.bin exactly as before.
+    if (cacheRet == 0 && !hddForceUpdate && cachedGames.count > 0) {
+        hddPublishHdlGameList(&cachedGames);
+    } else {
+        scanRet = hddGetHDLGamelist(&hddGamesNew);
+        if (scanRet == 0) {
+            hddUpdateGameListCache(&cachedGames, &hddGamesNew);
+            hddPublishHdlGameList(&hddGamesNew);
+        } else {
+            // Keep the last-good live list. On a first entry with no live list yet, a valid cache is
+            // still a safer fallback than turning a transient scan failure into an empty page.
+            if (hddGames.count == 0 && cachedGames.count > 0)
+                hddPublishHdlGameList(&cachedGames);
+            LOG("HDDSUPPORT HDL refresh failed (%d); preserving %u last-good game(s)\n", scanRet, hddGames.count);
         }
     }
 
+    hddFreeHDLGamelist(&cachedGames);
+    hddFreeHDLGamelist(&hddGamesNew);
     hddForceUpdate = 1; // Subsequent refresh operations will cause the HDD to be scanned.
 
-    return (ret == 0 ? hddGames.count : 0);
+    return hddGames.count;
 }
 
 static int hddGetGameCount(item_list_t *itemList)
 {
-    return vcdViewActive(itemList->mode) ? hddVcdGameCount : (int)hddGames.count;
+    return vcdListViewActive(itemList) ? hddVcdGameCount : (int)hddGames.count;
 }
 
 // Toggle-window guard (Codex/Fable audit), mirroring mmceActiveGame. HDD_MODE is vcdModeSupported, so the L3
@@ -721,28 +815,28 @@ static hdl_game_info_t *hddActiveHdl(int id)
 
 static void *hddGetGame(item_list_t *itemList, int id)
 {
-    return vcdViewActive(itemList->mode) ? (void *)hddActiveVcd(id) : (void *)hddActiveHdl(id);
+    return vcdListViewActive(itemList) ? (void *)hddActiveVcd(id) : (void *)hddActiveHdl(id);
 }
 
 static char *hddGetGameName(item_list_t *itemList, int id)
 {
-    return vcdViewActive(itemList->mode) ? hddActiveVcd(id)->name : hddActiveHdl(id)->name;
+    return vcdListViewActive(itemList) ? hddActiveVcd(id)->name : hddActiveHdl(id)->name;
 }
 
 static int hddGetGameNameLength(item_list_t *itemList, int id)
 {
-    return vcdViewActive(itemList->mode) ? VCD_NAME_MAX : (HDL_GAME_NAME_MAX + 1);
+    return vcdListViewActive(itemList) ? VCD_NAME_MAX : (HDL_GAME_NAME_MAX + 1);
 }
 
 static char *hddGetGameStartup(item_list_t *itemList, int id)
 {
     // VCD view keys per-game CFG/art off the VCD filename (game->name), not a disc id.
-    return vcdViewActive(itemList->mode) ? hddActiveVcd(id)->name : hddActiveHdl(id)->startup;
+    return vcdListViewActive(itemList) ? hddActiveVcd(id)->name : hddActiveHdl(id)->startup;
 }
 
 static void hddDeleteGame(item_list_t *itemList, int id)
 {
-    if (vcdViewActive(itemList->mode))
+    if (vcdListViewActive(itemList))
         return; // a VCD is not an HDL partition -- no delete in VCD view
     hdl_game_info_t *game = hddActiveHdl(id);
     if (game == &hddEmptyHdl)
@@ -753,7 +847,7 @@ static void hddDeleteGame(item_list_t *itemList, int id)
 
 static void hddRenameGame(item_list_t *itemList, int id, char *newName)
 {
-    if (vcdViewActive(itemList->mode))
+    if (vcdListViewActive(itemList))
         return; // a VCD is not an HDL partition -- no rename in VCD view
     hdl_game_info_t *game = hddActiveHdl(id);
     if (game == &hddEmptyHdl)
@@ -797,9 +891,16 @@ static int hddResolveHddPopstarter(char *elfOut, int elfLen)
         }
     }
 
-    // Not found: restore the default OPL data-partition mount so normal HDD IO keeps working.
+    // Not found: restore the default OPL data-partition mount when one exists. A list-only
+    // APA session may legitimately have no persistent data home, in which case there is nothing
+    // truthful to remount and an empty gOPLPart must never be passed to fileXioMount.
     fileXioUmount(hddPrefix);
-    fileXioMount(hddPrefix, gOPLPart, FIO_MT_RDWR);
+    if (gOPLPart[0] != '\0' && fileXioMount(hddPrefix, gOPLPart, FIO_MT_RDWR) < 0) {
+        // The restore mount is part of the persistent-home invariant. Never leave a non-NULL
+        // prefix advertising an unmounted pfs0: after POPSTARTER discovery borrowed the slot.
+        gHDDPrefix = NULL;
+        gOPLPart[0] = '\0';
+    }
     return 0;
 }
 
@@ -872,7 +973,7 @@ static void hddLaunchVcd(item_list_t *itemList, const char *vcdName, config_set_
         snprintf(resolvedName, sizeof(resolvedName), "%s", hddVcdGames[idx].name);
         snprintf(resolvedPart, sizeof(resolvedPart), "%s", hddVcdParts[idx]);
     }
-    ioBlockOps(0);
+    ioBlockOps(0); // resolvedName/resolvedPart are now independent of the mutable backing arrays
     if (idx < 0) {
         guiMsgBox(_l(_STR_POPSTARTER_NOT_FOUND), 0, NULL);
         return;
@@ -994,11 +1095,21 @@ void hddLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
     // POPSTARTER self-mounts it after the loader's IOP reset. HW-VALIDATE: POPSTARTER's exact HDD
     // selector/partition contract is hardware-testable -- POPSLoader proved the shape with a vendored
     // loader; we use the stock ps2sdk loader, the same one the shipping USB/MMCE/SMB VCD launch uses.
-    if (gAutoLaunchGame == NULL && vcdViewActive(itemList->mode)) {
+    if (gAutoLaunchGame == NULL && vcdListViewActive(itemList)) {
+        char vcdName[VCD_NAME_MAX];
+        char vcdPart[APA_IDMAX + 1];
+
+        guiLock();
         base_game_info_t *vcd = hddActiveVcd(id);
-        if (vcd == &hddEmptyVcd)
-            return; // stale id in the L3 toggle window -> nothing to launch (hddVcdParts[id] would also OOB)
-        hddDoLaunchVcd(itemList, vcd->name, hddVcdParts[id]);
+        if (vcd == &hddEmptyVcd) {
+            guiUnlock();
+            return; // stale id in the L3 toggle window -> nothing to launch
+        }
+        snprintf(vcdName, sizeof(vcdName), "%s", vcd->name);
+        snprintf(vcdPart, sizeof(vcdPart), "%s", hddVcdParts[id]);
+        guiUnlock();
+
+        hddDoLaunchVcd(itemList, vcdName, vcdPart);
         return;
     }
 
@@ -1128,14 +1239,18 @@ void hddLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
 
     sbPrepare(NULL, configSet, size_irx, irx, &i);
 
-    if ((result = sbLoadCheats(gHDDPrefix, game->startup)) < 0) {
-        // #265: let the user back out instead of sitting through the whole load. The helper does
-        // the sbUnprepare itself -- see include/supportbase.h; skipping it breaks the NEXT launch.
-        // `settings` is not assigned until below, so derive the common block from the IRX base.
-        if (!sbCheatsMissingContinue((u8 *)irx + i, result))
-            return;
+    if (gHDDPrefix != NULL) {
+        if ((result = sbLoadCheats(gHDDPrefix, game->startup)) < 0) {
+            // #265: let the user back out instead of sitting through the whole load. The helper does
+            // the sbUnprepare itself -- see include/supportbase.h; skipping it breaks the NEXT launch.
+            // `settings` is not assigned until below, so derive the common block from the IRX base.
+            if (!sbCheatsMissingContinue((u8 *)irx + i, result))
+                return;
+        }
+        sbLoadImage(gHDDPrefix, game->startup);
+    } else {
+        LOG("HDDSUPPORT launch: no persistent PFS data home; skipping HDD cheats/image sidecars\n");
     }
-    sbLoadImage(gHDDPrefix, game->startup);
 
     settings = (struct cdvdman_settings_hdd *)((u8 *)irx + i);
 
@@ -1196,27 +1311,45 @@ void hddLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
 static config_set_t *hddGetConfig(item_list_t *itemList, int id)
 {
     char path[256];
+    char vcdId[VCD_ID_MAX];
+    config_set_t *config;
 
-    // VCD (PS1) view: `id` indexes hddVcdGames, NOT hddGames (which stays at its zero/ISO-view state --
-    // {games=NULL,count=0} on a PS1-only HDD). Mirror the other VCD-aware accessors and key the per-game
-    // CFG off the VCD basename, instead of dereferencing &hddGames.games[id] off a NULL base (crash).
-    if (vcdViewActive(itemList->mode)) {
-        base_game_info_t *g = hddActiveVcd(id); // toggle-window safe: empty entry on a stale id (no OOB)
-        return sbPopulateConfig(g, gHDDPrefix, "/");
+    // VCD (PS1) view: `id` indexes hddVcdGames, NOT hddGames. The list itself is discoverable from
+    // APA even when the persistent config/art PFS home is temporarily unavailable. In that state
+    // return a runtime-only config instead of dereferencing a NULL prefix or hiding the whole list.
+    if (vcdListViewActive(itemList)) {
+        base_game_info_t *g = hddActiveVcd(id);
+        if (gHDDPrefix != NULL)
+            return sbPopulateConfig(g, gHDDPrefix, "/");
+
+        config = configAlloc(0, NULL, NULL);
+        if (config == NULL)
+            return NULL;
+        configSetStr(config, CONFIG_ITEM_NAME, g->name);
+        configSetInt(config, CONFIG_ITEM_SIZE, 0);
+        configSetStr(config, CONFIG_ITEM_FORMAT, "VCD");
+        sbSetDiscAttributes(config, 1, 1);
+        configSetStr(config, CONFIG_ITEM_STARTUP,
+                     vcdExtractGameId(g->name, vcdId, sizeof(vcdId)) ? vcdId : g->name);
+        return config;
     }
 
-    hdl_game_info_t *game = hddActiveHdl(id); // toggle-window safe: empty entry on a stale id (no OOB)
+    hdl_game_info_t *game = hddActiveHdl(id);
 
-    snprintf(path, sizeof(path), "%sCFG/%s.cfg", gHDDPrefix, game->startup);
-    config_set_t *config = configAlloc(0, NULL, path);
-    configRead(config); // Does not matter if the config file exists or not.
+    if (gHDDPrefix != NULL) {
+        snprintf(path, sizeof(path), "%sCFG/%s.cfg", gHDDPrefix, game->startup);
+        config = configAlloc(0, NULL, path);
+        if (config != NULL)
+            configRead(config); // Does not matter if the config file exists or not.
+    } else {
+        config = configAlloc(0, NULL, NULL); // metadata only; no unsafe/imaginary save destination
+    }
+    if (config == NULL)
+        return NULL;
 
     configSetStr(config, CONFIG_ITEM_NAME, game->name);
     configSetInt(config, CONFIG_ITEM_SIZE, game->total_size_in_kb >> 10);
     configSetStr(config, CONFIG_ITEM_FORMAT, "HDL");
-    // HDD bypasses sbPopulateConfig, so set #System/#Media/#DiscType via the shared helper (FR #49) --
-    // without it a theme's #DiscType / #System AttributeImage badge never rendered on HDD games. HDL
-    // titles are always PS2; reuse game->disctype for the CD-vs-DVD axis.
     sbSetDiscAttributes(config, 0, game->disctype == SCECdPS2CD);
     configSetStr(config, CONFIG_ITEM_STARTUP, game->startup);
 
@@ -1226,6 +1359,13 @@ static config_set_t *hddGetConfig(item_list_t *itemList, int id)
 static int hddGetImage(item_list_t *itemList, char *folder, int isRelative, char *value, char *suffix, GSTEXTURE *resultTex, short psm)
 {
     char path[256];
+
+    // The APA/HDL list is allowed to exist without a persistent PFS data home, but relative ART is
+    // not. Park the lookup cheaply instead of formatting a path through NULL; a later successful
+    // data-home mount invalidates the miss generation above and re-arms artwork. Absolute theme
+    // image requests remain independent and are still allowed.
+    if (isRelative && gHDDPrefix == NULL)
+        return ERR_BAD_FILE;
 
     // PS1 (VCD) art uses this same ART path as PS2. The cache supplies the filename first and may retry
     // once with a strict PS1 ID after a genuine miss; pfs0: remains the current OPL data mount.
@@ -1288,7 +1428,7 @@ static void hddCleanUp(item_list_t *itemList, int exception)
 
 static int hddCheckVMC(item_list_t *itemList, char *name, int createSize)
 {
-    return sysCheckVMC(gHDDPrefix, "/", name, createSize, NULL);
+    return gHDDPrefix != NULL ? sysCheckVMC(gHDDPrefix, "/", name, createSize, NULL) : -1;
 }
 
 // This may be called, even if hddInit() was not.
@@ -1340,8 +1480,8 @@ static int hddLoadGameListCache(hdl_games_list_t *cache)
     hdl_game_info_t *games;
     int result, size, count;
 
-    if (!gHDDGameListCache)
-        return 1;
+    if (!gHDDGameListCache || gHDDPrefix == NULL)
+        return 1; // cache is optional PFS data; live APA scanning does not depend on it
 
     hddFreeHDLGamelist(cache);
 
@@ -1388,8 +1528,8 @@ static int hddUpdateGameListCache(hdl_games_list_t *cache, hdl_games_list_t *gam
     FILE *file;
     int result, i, j, modified;
 
-    if (!gHDDGameListCache)
-        return 1;
+    if (!gHDDGameListCache || gHDDPrefix == NULL)
+        return 1; // no persistent PFS home: keep the live list in RAM and skip games.bin writes
 
     if (cache->count > 0) {
         modified = 0;

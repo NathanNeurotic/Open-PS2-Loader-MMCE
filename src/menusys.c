@@ -24,6 +24,7 @@
 #include "include/vcdsupport.h"   // vcdViewActive() -- VCD launches never use Neutrino
 #include "include/bdmsupport.h"   // bdmSupportIsUDPBD() -- UDPBD games are Neutrino-only
 #include <assert.h>
+#include <delaythread.h>
 
 enum MENU_IDs {
     MENU_SETTINGS = 0,
@@ -71,6 +72,17 @@ static int actionStatus;
 static int menuSaveResult; // last per-game configWrite() result, published by _menuSaveConfig
 static int itemConfigId;
 static config_set_t *itemConfig;
+// Owner of itemConfigId, including while an async read is in flight. IDs are only indices within a
+// list, so (id == id) across two tabs is not the same game/config. This also lets X/Triangle safely
+// reuse the browse-prefetched config instead of forcing a second device read.
+static item_list_t *itemConfigList;
+// One Info/#Size worker at a time, with a latest-wins target. Repeated enter/back/enter on the
+// SAME row does not queue duplicate CFG+stat reads; moving to another row while one is active replaces
+// the requested target and the worker loops to that newest row before releasing its latch.
+static unsigned char infoSizeWorkerPending;
+static item_list_t *infoSizeRequestList;
+static int infoSizeRequestId = -1;
+static unsigned int infoSizeRequestGeneration;
 
 static u8 parentalLockCheckEnabled = 1;
 
@@ -189,6 +201,8 @@ static void _menuLoadConfig()
     if (!itemConfig) {
         item_list_t *list = selected_item->item->userdata;
         itemConfig = list->itemGetConfig(list, itemConfigId);
+        if (itemConfig != NULL)
+            itemConfigList = list;
     }
     actionStatus = 0;
     SignalSema(menuSemaId);
@@ -227,7 +241,7 @@ static void _menuLoadConfigAsync()
     // per-list indices, so a tab switch mid-read yields the same number from a different device --
     // re-check the owning list too, or device A's per-game config lands on device B's row.
     WaitSema(menuSemaId);
-    if (loadedConfig != NULL && itemConfig == NULL && itemConfigId == configId &&
+    if (loadedConfig != NULL && itemConfig == NULL && itemConfigId == configId && itemConfigList == list &&
         selected_item != NULL && selected_item->item != NULL && selected_item->item->userdata == list) {
         itemConfig = loadedConfig;
         loadedConfig = NULL;
@@ -238,57 +252,117 @@ static void _menuLoadConfigAsync()
         configFree(loadedConfig); // lost the race -- drop it, never publish another row's config
 }
 
-// Opening the info screen needs #Size, which the scroll-time config load deliberately skips
-// (sbConfigStatSize off -> no slow per-game stat while browsing). Rebuild the current item's
-// config once with the size resolved and swap it in, but only if the selection is unchanged --
-// the user may have scrolled away before this IO request ran. game->sizeMB is cached afterwards,
-// so subsequent scrolls/info views show the size with no further stat.
+// Opening the info screen needs #Size, which the scroll-time config load deliberately skips.
+// The worker is single-instance but the TARGET is replaceable: if the user opens Info for B while A
+// is still resolving, A is discarded when stale and the same worker immediately processes B.
 static void _menuResolveInfoSize()
 {
-    item_list_t *list = NULL;
-    config_set_t *loadedConfig = NULL;
-    int configId = -1;
+    for (;;) {
+        item_list_t *list = NULL;
+        config_set_t *loadedConfig = NULL;
+        int configId = -1;
+        unsigned int generation = 0;
 
-    WaitSema(menuSemaId);
-    if (selected_item != NULL && selected_item->item != NULL && selected_item->item->current != NULL && itemConfigId >= 0 && itemConfigId == selected_item->item->current->item.id) {
-        list = selected_item->item->userdata;
-        configId = itemConfigId;
+        WaitSema(menuSemaId);
+        list = infoSizeRequestList;
+        configId = infoSizeRequestId;
+        generation = infoSizeRequestGeneration;
+        SignalSema(menuSemaId);
+
+        if (list == NULL || configId < 0)
+            goto complete_request;
+
+        // #Size is cosmetic/discretionary IO. Wait for BGM reserve, but stop waiting on a target that
+        // has already been superseded or a selection the user left; the next loop takes the newest.
+        while (!bgmDiscretionaryIoAllowed()) {
+            int stillWanted;
+            DelayThread(10 * 1000);
+            WaitSema(menuSemaId);
+            stillWanted = infoSizeRequestGeneration == generation && infoSizeRequestList == list &&
+                          infoSizeRequestId == configId && selected_item != NULL &&
+                          selected_item->item != NULL && selected_item->item->current != NULL &&
+                          selected_item->item->userdata == list &&
+                          selected_item->item->current->item.id == configId;
+            SignalSema(menuSemaId);
+            if (!stillWanted)
+                goto complete_request;
+        }
+
+        // itemGetConfig runs outside menuSemaId: it is the slow CFG+stat operation.
+        sbSetConfigStatSize(1);
+        loadedConfig = list->itemGetConfig(list, configId);
+        sbSetConfigStatSize(0);
+
+        // Publish only if this request is STILL the newest target and the same row is selected.
+        WaitSema(menuSemaId);
+        if (loadedConfig != NULL && infoSizeRequestGeneration == generation &&
+            infoSizeRequestList == list && infoSizeRequestId == configId && selected_item != NULL &&
+            selected_item->item != NULL && selected_item->item->current != NULL &&
+            selected_item->item->userdata == list && selected_item->item->current->item.id == configId) {
+            if (itemConfig != NULL)
+                configFree(itemConfig);
+            itemConfig = loadedConfig;
+            itemConfigId = configId;
+            itemConfigList = list;
+            loadedConfig = NULL;
+        }
+        SignalSema(menuSemaId);
+
+        if (loadedConfig != NULL)
+            configFree(loadedConfig);
+
+    complete_request:
+        WaitSema(menuSemaId);
+        if (infoSizeRequestGeneration == generation) {
+            // Nobody replaced this target while it ran: the queue is drained.
+            infoSizeRequestList = NULL;
+            infoSizeRequestId = -1;
+            infoSizeWorkerPending = 0;
+            SignalSema(menuSemaId);
+            return;
+        }
+        // A newer target arrived while this one ran. Leave the worker latch set and loop directly;
+        // no second IO request is needed and the newest request cannot be lost behind a queue failure.
+        SignalSema(menuSemaId);
     }
-    SignalSema(menuSemaId);
-
-    if (list == NULL || configId < 0)
-        return;
-
-    // itemGetConfig runs OUTSIDE the semaphore on purpose: it is the slow call (a CFG read plus the
-    // ISO stat this whole mechanism exists to defer), and holding menuSemaId across it would block
-    // the GUI thread for exactly as long as the stat we are trying to keep off the scroll path.
-    sbSetConfigStatSize(1);
-    loadedConfig = list->itemGetConfig(list, configId);
-    sbSetConfigStatSize(0);
-
-    if (loadedConfig == NULL)
-        return;
-
-    // Re-check the selection under the sema: if the user scrolled away while the stat ran, the
-    // freshly loaded config belongs to a row that is no longer current -- drop it rather than
-    // publish someone else's #Size.
-    WaitSema(menuSemaId);
-    if (selected_item != NULL && selected_item->item != NULL && selected_item->item->current != NULL && itemConfigId == configId && itemConfigId == selected_item->item->current->item.id) {
-        if (itemConfig != NULL)
-            configFree(itemConfig);
-        itemConfig = loadedConfig;
-        loadedConfig = NULL;
-    }
-    SignalSema(menuSemaId);
-
-    if (loadedConfig != NULL)
-        configFree(loadedConfig);
 }
 
-// Queued when the info screen opens: resolve #Size for the current item without blocking the UI.
+// Queued when the info screen opens: resolve #Size without blocking the UI. Same-row repeats dedupe;
+// a different row replaces the target even when the worker is already active.
 void menuRequestInfoSize(void)
 {
-    ioPutRequest(IO_CUSTOM_SIMPLEACTION, &_menuResolveInfoSize);
+    int queueWorker = 0;
+
+    WaitSema(menuSemaId);
+    if (selected_item == NULL || selected_item->item == NULL || selected_item->item->current == NULL) {
+        SignalSema(menuSemaId);
+        return;
+    }
+
+    item_list_t *list = selected_item->item->userdata;
+    int configId = selected_item->item->current->item.id;
+
+    if (infoSizeWorkerPending && infoSizeRequestList == list && infoSizeRequestId == configId) {
+        SignalSema(menuSemaId);
+        return; // exact same work is already active/queued
+    }
+
+    infoSizeRequestList = list;
+    infoSizeRequestId = configId;
+    infoSizeRequestGeneration++;
+    if (!infoSizeWorkerPending) {
+        infoSizeWorkerPending = 1;
+        queueWorker = 1;
+    }
+    SignalSema(menuSemaId);
+
+    if (queueWorker && ioPutRequest(IO_CUSTOM_SIMPLEACTION, &_menuResolveInfoSize) != IO_OK) {
+        WaitSema(menuSemaId);
+        infoSizeWorkerPending = 0;
+        infoSizeRequestList = NULL;
+        infoSizeRequestId = -1;
+        SignalSema(menuSemaId);
+    }
 }
 
 static void _menuSaveConfig()
@@ -328,7 +402,8 @@ static void _menuRequestConfig()
     if (selected_item == NULL || selected_item->item == NULL || selected_item->item->current == NULL) {
         // The list can be rebuilt out from under us between the GUI's check and this callback.
         actionStatus = 0;
-    } else if (itemConfigId != selected_item->item->current->item.id) {
+    } else if (itemConfigId != selected_item->item->current->item.id ||
+               itemConfigList != selected_item->item->userdata) {
         if (itemConfig) {
             configFree(itemConfig);
             itemConfig = NULL;
@@ -336,6 +411,7 @@ static void _menuRequestConfig()
         item_list_t *list = selected_item->item->userdata;
         if (itemConfigId == -1 || guiInactiveFrames >= list->delay) {
             itemConfigId = selected_item->item->current->item.id;
+            itemConfigList = list;
             shouldQueueLoad = 1;
         } else
             actionStatus = 0; // still settling: nothing queued, so release the waiter now
@@ -349,17 +425,36 @@ static void _menuRequestConfig()
     // Queue OUTSIDE the sema: both load variants take it too.
     if (shouldQueueLoad && ioPutRequest(IO_CUSTOM_SIMPLEACTION, waiterPending ? (void *)&_menuLoadConfig : (void *)&_menuLoadConfigAsync) != IO_OK) {
         WaitSema(menuSemaId);
-        if (itemConfig == NULL)
+        if (itemConfig == NULL) {
             itemConfigId = -1; // let the next pass retry rather than caching a row that never loaded
+            itemConfigList = NULL;
+        }
         actionStatus = 0;
         SignalSema(menuSemaId);
     }
 }
 
+static config_set_t *menuGetCachedCurrentConfig(void)
+{
+    config_set_t *cached = NULL;
+
+    WaitSema(menuSemaId);
+    if (itemConfig != NULL && selected_item != NULL && selected_item->item != NULL &&
+        selected_item->item->current != NULL && itemConfigId == selected_item->item->current->item.id &&
+        itemConfigList == selected_item->item->userdata)
+        cached = itemConfig;
+    SignalSema(menuSemaId);
+
+    return cached;
+}
+
 config_set_t *menuLoadConfig()
 {
+    config_set_t *cached = menuGetCachedCurrentConfig();
+    if (cached != NULL)
+        return cached; // browse-time prefetch already paid the device read
+
     actionStatus = 1;
-    itemConfigId = -1;
     guiHandleDeferedIO(&actionStatus, _l(_STR_LOADING_SETTINGS), IO_CUSTOM_SIMPLEACTION, &_menuRequestConfig, OPL_DEFERRED_IO_TIMEOUT_MS);
     return itemConfig;
 }
@@ -367,8 +462,11 @@ config_set_t *menuLoadConfig()
 // we don't want a pop up when transitioning to or refreshing Game Menu gui.
 config_set_t *gameMenuLoadConfig(struct UIItem *ui)
 {
+    config_set_t *cached = menuGetCachedCurrentConfig();
+    if (cached != NULL)
+        return cached; // same fast path, without showing a fake loading phase
+
     actionStatus = 1;
-    itemConfigId = -1;
     guiGameHandleDeferedIO(&actionStatus, ui, IO_CUSTOM_SIMPLEACTION, &_menuRequestConfig);
     return itemConfig;
 }
@@ -460,6 +558,11 @@ void menuInit()
     selected_item = NULL;
     itemConfigId = -1;
     itemConfig = NULL;
+    itemConfigList = NULL;
+    infoSizeWorkerPending = 0;
+    infoSizeRequestList = NULL;
+    infoSizeRequestId = -1;
+    infoSizeRequestGeneration = 0;
     mainMenu = NULL;
     mainMenuCurrent = NULL;
     gameMenu = NULL;
@@ -1274,11 +1377,11 @@ static void menuRenderElements(theme_elems_t *elems)
     if (elems->needsItemConfig && menuCanRequestItemConfig(list))
         _menuRequestConfig();
 
-    // The VCD caption id (#380) rides its OWN async request, independent of the needsItemConfig
-    // gate above -- that gate stays exactly as rebuild-155 wrote it. The request resolves ONLY the
-    // id (no CFG read), on the ioman worker; the resolver's per-session memo dedupes, so this costs
-    // one strcmp walk per frame and at most one queued resolve per settled VCD row per session.
-    if (list != NULL && vcdViewActive(list->mode) && selected_item->item->current != NULL) {
+    // Deep VCD ID inspection is cosmetic and must be explicit-theme-demand only. ItemText is
+    // the sole render element that consumes vcdDisplayIdCached(), so a family without ItemText does
+    // zero .VCD opens/seeks here. The resolver itself is opportunistic and yields to art/BGM.
+    if (elems->needsVcdDisplayId && list != NULL && vcdViewActive(list->mode) &&
+        selected_item->item->current != NULL) {
         char *vcdName = list->itemGetStartup(list, selected_item->item->current->item.id);
         if (vcdName != NULL)
             vcdRequestDisplayId(vcdName);

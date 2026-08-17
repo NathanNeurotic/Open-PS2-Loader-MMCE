@@ -267,6 +267,18 @@ static struct config_value_t *getConfigItemForName(config_set_t *configSet, cons
 }
 
 static char cfgDevice[8];
+static char cfgLoadDevice[8];
+
+static void configPrepareDevice(char *device, size_t deviceSize, const char *prefix)
+{
+    char *colpos;
+
+    if (prefix == NULL)
+        prefix = "";
+    snprintf(device, deviceSize, "%s", prefix);
+    if ((colpos = strchr(device, ':')) != NULL)
+        *(colpos + 1) = '\0';
+}
 
 char *configGetDir(void)
 {
@@ -274,22 +286,33 @@ char *configGetDir(void)
     // detected. Blind substitution stamped getmcID()'s -1 (0xFF) -- or a probe-time other-card digit --
     // over a CONCRETE "mc0:"/"mc1:" prefix from an appdir-on-MC boot, so the "Settings saved to %s"
     // toast rendered a garbage byte or the wrong card. Legacy "mc?:" homes keep today's behaviour.
-    if (!strncmp(cfgDevice, "mc", 2) && cfgDevice[2] == '?' && getmcID() >= 0) {
+    if (!strncmp(cfgDevice, "mc", 2) && cfgDevice[2] == '?' && getmcID() >= 0)
         cfgDevice[2] = getmcID();
-    }
 
-    char *path = cfgDevice;
-    return path;
+    return cfgDevice;
+}
+
+char *configGetLoadDir(void)
+{
+    if (!strncmp(cfgLoadDevice, "mc", 2) && cfgLoadDevice[2] == '?' && getmcID() >= 0)
+        cfgLoadDevice[2] = getmcID();
+
+    return cfgLoadDevice[0] != '\0' ? cfgLoadDevice : cfgDevice;
 }
 
 void configPrepareNotifications(char *prefix)
 {
-    char *colpos;
+    configPrepareDevice(cfgDevice, sizeof(cfgDevice), prefix);
+}
 
-    snprintf(cfgDevice, sizeof(cfgDevice), "%s", prefix); // prefix is caller/config data, never a format string
-
-    if ((colpos = strchr(cfgDevice, ':')) != NULL)
-        *(colpos + 1) = '\0';
+static void configPrepareLoadNotification(const char *path)
+{
+    // pfs0: is OPL's transient mount name. When it backs the known persistent APA home, report
+    // the physical HDD owner instead so "loaded from" names the device that actually supplied it.
+    if (path != NULL && !strncmp(path, "pfs0:", 5) && gOPLPart[0] != '\0')
+        configPrepareDevice(cfgLoadDevice, sizeof(cfgLoadDevice), gOPLPart);
+    else
+        configPrepareDevice(cfgLoadDevice, sizeof(cfgLoadDevice), path);
 }
 
 static void configBuildPath(char *out, size_t outSize, const char *prefix, const char *filename)
@@ -1161,6 +1184,22 @@ int configRead(config_set_t *configSet)
 
 int configWrite(config_set_t *configSet)
 {
+    // A config can be re-homed after it was read (legacy migration, missing-config recovery,
+    // boot-home self-migration). configMove/configSetMove intentionally preserve the in-memory
+    // values and their modified flag, so an unchanged set may now point at a destination file that
+    // does not exist. Returning the normal "unmodified = success" result in that state is a false
+    // positive: the UI reports Saved, but nothing was materialized at the new home. If a populated
+    // set is clean yet its CURRENT filename is absent, make this explicit save create it. Existing
+    // files stay on the zero-write fast path; empty sets are not manufactured merely because their
+    // optional file is absent. This is filesystem-only and never bypasses the raw-APA firewall below.
+    if (!configSet->modified && configSet->filename != NULL && configSet->head != NULL) {
+        iox_stat_t stat;
+        if (fileXioGetStat(configSet->filename, &stat) < 0) {
+            LOG("CONFIG current save destination %s is absent; materializing populated config\n", configSet->filename);
+            configSet->modified = 1;
+        }
+    }
+
     if (configSet->modified) {
         if (configSet->filename == NULL)
             return 0; // in-memory-only config set: nothing to persist (and openFile would deref NULL)
@@ -1372,8 +1411,13 @@ int configReadMulti(int types)
 
         if (configSet->type & types) {
             configClear(configSet);
-            if (configRead(configSet))
+            if (configRead(configSet)) {
                 result |= configSet->type;
+                // Record the file source BEFORE higher-level recovery re-homes the live config sets
+                // for a future save. Load notifications must describe evidence, not ownership policy.
+                if (configSet->type == CONFIG_OPL)
+                    configPrepareLoadNotification(configSet->filename);
+            }
         }
     }
 

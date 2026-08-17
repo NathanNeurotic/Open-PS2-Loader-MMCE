@@ -23,6 +23,8 @@
 #include "include/bdmsupport.h"  // BDM_TYPE_* + bdmGetDeviceRootByType (BDMA source differentiation)
 #include "include/mmcesupport.h" // mmceLoadModules (ensure mmceman for the MMCE BDMA source)
 #include "include/gui.h"         // guiWarning (passing toast on a failed launch-path BDMA equip)
+#include "include/texcache.h"    // cosmetic ID resolver yields while artwork is pending
+#include "include/sound.h"       // cosmetic ID resolver yields to BGM low-water protection
 #include "include/util.h"        // checkMCSaveIconsDir -- browser icon pair for the POPSTARTER folder
 #include "include/lang.h"        // _l + _STR_BDMA_ERR_* (same texts the Settings-screen equip shows)
 #include "include/textures.h"    // texDiscoverLoad + ERR_BAD_FILE (VCD POPS cover fallback)
@@ -375,15 +377,25 @@ static void vcdResolveQueuedDisplayId(void)
     gVcdIdReqPending = 0;
     EIntr();
 
-    // The resolver itself: opens the VCD and reads the id out of the image (memoized, one attempt
-    // per game per session). It runs HERE, on the ioman worker, so a slow device cannot stall the
-    // render thread -- the whole reason the caption does not call it directly.
+    // Async is not enough by itself: a device read can still starve the same USB/PFS channel
+    // used by artwork and BGM. This metadata has zero authority over those assets, so if either
+    // pipeline is busy simply abandon this attempt; the still-selected row asks again next frame.
+    if (cacheHasPendingArt() || !bgmDiscretionaryIoAllowed())
+        return;
+
     vcdResolveDisplayId(name, id, sizeof(id));
 }
 
 void vcdRequestDisplayId(const char *name)
 {
+    char parsed[VCD_ID_MAX];
+
     if (name == NULL || name[0] == '\0')
+        return;
+
+    // Filename already supplies exactly what ItemText needs: display it immediately and never pay
+    // for a deep image read merely to rediscover the same cosmetic ID.
+    if (vcdExtractGameId(name, parsed, sizeof(parsed)))
         return;
 
     vcd_id_memo_t *m = vcdIdMemoFind(name);
@@ -406,7 +418,13 @@ void vcdRequestDisplayId(const char *name)
     gVcdIdReqPending = 1;
     EIntr();
 
-    ioPutRequest(IO_CUSTOM_SIMPLEACTION, &vcdResolveQueuedDisplayId);
+    if (ioPutRequest(IO_CUSTOM_SIMPLEACTION, &vcdResolveQueuedDisplayId) != IO_OK) {
+        // No worker owns the one-slot request when enqueue fails. Release the latch immediately or
+        // every future cosmetic ID request is suppressed for the rest of the session.
+        DIntr();
+        gVcdIdReqPending = 0;
+        EIntr();
+    }
 }
 
 // dirPath is the directory that was just opened; fileName is what readdir returned (with ".VCD");
@@ -449,7 +467,22 @@ static int vcdScanOpenDir(const char *dirPath, vcd_entry_t **outList)
 
     int count = 0;
     struct dirent *de;
-    while (count < VCD_MAX_ITEMS && (de = readdir(dir)) != NULL) {
+    while (count < VCD_MAX_ITEMS) {
+        // POSIX readdir() uses the same NULL result for clean end-of-directory and for an error.
+        // Clear errno immediately before each call so a nonzero value on NULL belongs to this read,
+        // not to earlier work in the loop. Publishing the entries collected before a read failure
+        // as a complete list would undo the transactional list ownership in every caller.
+        errno = 0;
+        de = readdir(dir);
+        if (de == NULL) {
+            if (errno != 0) {
+                closedir(dir);
+                free(list);
+                return -1; // incomplete scan: caller preserves its last-good backing list
+            }
+            break; // clean end-of-directory
+        }
+
         int len = (int)strlen(de->d_name);
         if (len < 5 || strcasecmp(de->d_name + len - 4, ".VCD") != 0)
             continue;          // keep only "*.VCD" (case-insensitive)
@@ -745,6 +778,17 @@ int vcdViewActive(int mode)
     if (gDefaultGameView == GAME_VIEW_VCD)
         return 1;         // locked to the VCD (PS1) list
     return vcdView[mode]; // GAME_VIEW_BOTH: per-device L3 toggle (defaults to ISO)
+}
+
+int vcdListViewActive(const item_list_t *itemList)
+{
+    if (itemList == NULL)
+        return 0;
+    if (itemList->viewOverride == ITEM_VIEW_FORCE_ISO)
+        return 0;
+    if (itemList->viewOverride == ITEM_VIEW_FORCE_VCD)
+        return 1;
+    return vcdViewActive(itemList->mode);
 }
 
 void vcdToggleView(int mode)

@@ -8,6 +8,7 @@
 #include "include/renderman.h"
 #include "include/tar.h"
 #include "include/pad.h"        // getKeyPressed -- the SIO2 nav gate, GUI thread only
+#include "include/sound.h"      // BGM low-water admission: don't start art while audio reserve is critical
 #include "include/bdmsupport.h" // bdmModeIsSIO2 -- is this cover on the pad's bus?
 #include "include/appsupport.h" // appGetArtMode -- APP rows are proxies for another device
 #include "include/favsupport.h" // favGetArtMode -- so are FAV rows
@@ -34,6 +35,10 @@ typedef struct load_image_request
     // in flight, someone is telling us new art may have appeared and our answer may predate it, so
     // the memo lands stale and the row probes again. Wrong in the cheap direction.
     unsigned int failEpoch;
+    // Selection generation this request belongs to. Deep cover lookahead is intentionally aggressive,
+    // but once the cursor moves its old neighborhood is no longer useful. A stale generation is dropped
+    // before another device read; an already-running uninterruptible RPC is allowed to finish safely.
+    unsigned int focusEpoch;
     // Chunk-level abort, read by textures.c via texSetLoadAbortFlag. Lets a cancel interrupt a load
     // that is ALREADY RUNNING, which neither the stale-stamp test nor the epoch test can do -- both
     // only ever caught a request still sitting in the queue.
@@ -51,9 +56,9 @@ typedef struct load_image_request
     char *value;
 } load_image_request_t;
 
-// Art thread priority. LOWER NUMBER WINS on the EE. GUI/pad thread is 31 (opl.c), the shared io
-// worker 32 (ioman.c), sound 62 (0x3E). 72 (0x48) puts art below every one of them: it can never take
-// the CPU from input, from a config save, from a list rebuild, or from audio decoding.
+// Art thread priority. LOWER NUMBER WINS on the EE. BGM playback/decode are 30/31 (sound.c), the
+// GUI/pad thread is 31 (opl.c), and the shared io worker is 32 (ioman.c). 72 (0x48) puts art below
+// every one of them: it can never take the CPU from input, config work, list rebuilds, or audio.
 #define ART_THREAD_PRIORITY 72
 
 // ...and lower still while reading anything on SIO2. EE priority does not speed up or slow down a
@@ -308,6 +313,48 @@ static int gCacheLoadsCancelled = 0;
 // first. That is the whole "slow to be correct" symptom, and it is why the fork feels faster here:
 // its art runs on a dedicated thread and never sits in front of the rebuild.
 static unsigned int gArtEpoch = 0;
+
+// Selection-focus epoch. The selected cover is the only priority art request, so it is also the
+// authoritative signal that the useful prefetch neighborhood changed. Keep only a hash+length here:
+// VCD basenames may exceed the cache reunion key, and a collision can at worst preserve a little
+// obsolete prefetch -- it can never select the wrong texture or affect identity. GUI thread writes;
+// the art worker only compares the epoch captured in each request.
+static volatile unsigned int gArtFocusEpoch = 1;
+static item_list_t *gArtFocusList = NULL;
+static unsigned int gArtFocusHash = 0;
+static size_t gArtFocusLen = 0;
+
+static unsigned int artFocusHashValue(const char *value)
+{
+    unsigned int h = 2166136261u; // FNV-1a
+    const unsigned char *p = (const unsigned char *)value;
+    while (*p != '\0') {
+        h ^= *p++;
+        h *= 16777619u;
+    }
+    return h;
+}
+
+static void artUpdateFocus(item_list_t *list, const char *value)
+{
+    size_t len = strlen(value);
+    unsigned int hash = artFocusHashValue(value);
+
+    if (gArtFocusList == list && gArtFocusLen == len && gArtFocusHash == hash)
+        return;
+
+    gArtFocusList = list;
+    gArtFocusLen = len;
+    gArtFocusHash = hash;
+    gArtFocusEpoch++;
+    if (gArtFocusEpoch == 0)
+        gArtFocusEpoch = 1;
+
+    // Do not forcibly kill gArtCurrentReq here. It may be a warmed neighbor that just became the
+    // selected cover; its priority lookup below will adopt it into this new epoch. If it is truly
+    // obsolete, cacheLoadImage drops it before IO when possible; a whole-file RPC already in flight
+    // remains intentionally unkillable for device/RPC safety.
+}
 
 void cacheDropQueuedArt(void)
 {
@@ -665,6 +712,17 @@ static void cacheLoadImage(load_image_request_t *req)
         return;
     }
 
+    // SELECTION-GENERATION CANCELLATION. Cache-sized lookahead intentionally queues deeply so the
+    // next covers can already be waiting, but a new selection makes the PREVIOUS neighborhood
+    // speculative waste. Drop it immediately before device IO instead of waiting up to
+    // ART_CANCEL_STALE_FRAMES for row draw stamps to age out. If this request itself became selected,
+    // the priority reunion path updated focusEpoch before promotion, so it survives.
+    if (req->focusEpoch != gArtFocusEpoch) {
+        cacheClearItem(req->entry, 0);
+        artReleaseRequest(req, 0);
+        return;
+    }
+
     // CANCELLATION. The queue is FIFO and a scroll enqueues a cover per row it passes, so by the
     // time a request reaches the front the user has usually moved on -- and reading it anyway is
     // both wasted device time and a PNG decode that preempts the priority-31 GUI/pad thread. Every
@@ -879,6 +937,13 @@ static void cacheArtWorkerThread(void *arg)
             if (!req)
                 break; // queue empty, or its head is an SIO2 cover deferred while a direction is held
 
+            // Device-level backpressure, not another CPU-priority tweak. Finish any read already in
+            // flight, but while BGM's decoded reserve is critical do not START the next PNG open.
+            // The request remains owned by this worker and cacheLoadImage re-checks stale/abort state
+            // after the wait, so scrolling can still make this work evaporate before it touches disk.
+            while (!gArtTerminate && !req->abortRequested && !bgmDiscretionaryIoAllowed())
+                DelayThread(10 * 1000);
+
             cacheLoadImage(req);
 
             // Yield the ready queue so other threads (such as BGM I/O) can process between loads.
@@ -912,6 +977,10 @@ void cacheInit()
     gArtQueuedCount = 0;
     gArtActiveCount = 0;
     gArtNavActive = 0;
+    gArtFocusEpoch = 1;
+    gArtFocusList = NULL;
+    gArtFocusHash = 0;
+    gArtFocusLen = 0;
 
     gArtThread.attr = 0;
     gArtThread.option = 0;
@@ -1116,6 +1185,12 @@ GSTEXTURE *cacheGetTextureEx(image_cache_t *cache, item_list_t *list, int *cache
     if (cache == NULL || list == NULL || cacheId == NULL || UID == NULL || value == NULL || value[0] == '\0')
         return NULL;
 
+    // A priority request is the highlighted cover. Move the global focus before ANY cache fast-path
+    // return so even a cover that is already resident immediately invalidates queued lookahead from
+    // the selection we just left.
+    if (isPriority)
+        artUpdateFocus(list, value);
+
     // NO memo lookup here. This function runs for EVERY art element on screen EVERY frame --
     // including covers that are already loaded and rendering -- and the memo check costs a
     // snprintf + hash + strcmp. Placed here it taxed every cached frame (dozens of format-string
@@ -1141,9 +1216,15 @@ GSTEXTURE *cacheGetTextureEx(image_cache_t *cache, item_list_t *list, int *cache
                     // Still loading -- but mark it as still WANTED. This stamp is the only evidence
                     // the worker has that anyone is still looking at this row (see cacheLoadImage).
                     entry->lastUsed = guiFrameId;
-                    if (isPriority) {
-                        load_image_request_t *req = (load_image_request_t *)entry->qr;
-                        if (req != NULL && !(req->sio2 && gArtNavActive))
+                    load_image_request_t *req = (load_image_request_t *)entry->qr;
+                    if (req != NULL) {
+                        // Any pending cover touched by THIS frame is still useful to the new
+                        // selection neighborhood. Adopt it into the current generation even when
+                        // it is merely a neighbour; only the highlighted cover gets queue promotion.
+                        // Without this, overlapping lookahead (+2 becomes +1 after one step) kept
+                        // the OLD generation and the worker discarded work the new frame still wanted.
+                        req->focusEpoch = gArtFocusEpoch;
+                        if (isPriority && !(req->sio2 && gArtNavActive))
                             artPromote(req);
                     }
                     return NULL;
@@ -1185,9 +1266,15 @@ GSTEXTURE *cacheGetTextureEx(image_cache_t *cache, item_list_t *list, int *cache
                     *cacheId = i;
                     *UID = entry->UID;
                     entry->lastUsed = guiFrameId;
-                    if (isPriority) {
-                        load_image_request_t *req = (load_image_request_t *)entry->qr;
-                        if (req != NULL && !(req->sio2 && gArtNavActive))
+                    load_image_request_t *req = (load_image_request_t *)entry->qr;
+                    if (req != NULL) {
+                        // Any pending cover touched by THIS frame is still useful to the new
+                        // selection neighborhood. Adopt it into the current generation even when
+                        // it is merely a neighbour; only the highlighted cover gets queue promotion.
+                        // Without this, overlapping lookahead (+2 becomes +1 after one step) kept
+                        // the OLD generation and the worker discarded work the new frame still wanted.
+                        req->focusEpoch = gArtFocusEpoch;
+                        if (isPriority && !(req->sio2 && gArtNavActive))
                             artPromote(req);
                     }
                     return NULL;
@@ -1304,8 +1391,9 @@ GSTEXTURE *cacheGetTextureEx(image_cache_t *cache, item_list_t *list, int *cache
         req->value = (char *)req + sizeof(load_image_request_t);
         strcpy(req->value, value);
         req->cacheUID = cache->nextUID;
-        req->epoch = gArtEpoch;         // the view this cover belongs to; see cacheDropQueuedArt()
-        req->failEpoch = gArtFailEpoch; // the generation an "absent" answer would belong to
+        req->epoch = gArtEpoch;           // the view this cover belongs to; see cacheDropQueuedArt()
+        req->failEpoch = gArtFailEpoch;   // the generation an "absent" answer would belong to
+        req->focusEpoch = gArtFocusEpoch; // selected-game neighborhood this speculative read serves
         req->abortRequested = 0;
         req->next = NULL;
         req->sio2 = (unsigned char)isSio2; // resolved above, on the GUI thread

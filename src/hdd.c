@@ -185,80 +185,85 @@ static struct GameDataEntry *GetGameListRecord(struct GameDataEntry *head, const
 
 int hddGetHDLGamelist(hdl_games_list_t *game_list)
 {
-    struct GameDataEntry *head, *current, *next, *pGameEntry;
-    unsigned int count, i;
+    struct GameDataEntry *head = NULL, *current = NULL, *next, *pGameEntry;
+    unsigned int count = 0, i;
     iox_dirent_t dirent;
-    int fd, ret;
+    int fd, ret = 0, readResult = 0;
 
     hddFreeHDLGamelist(game_list);
 
-    ret = 0;
-    if ((fd = fileXioDopen("hdd0:")) >= 0) {
-        head = current = NULL;
-        count = 0;
-        int saw_hdl = 0;
-        while (fileXioDread(fd, &dirent) > 0) {
-            if (dirent.stat.mode == HDL_FS_MAGIC) {
-                saw_hdl = 1;
-                if ((pGameEntry = GetGameListRecord(head, dirent.name)) == NULL) {
-                    if (head == NULL) {
-                        current = head = malloc(sizeof(struct GameDataEntry));
-                    } else {
-                        current = current->next = malloc(sizeof(struct GameDataEntry));
-                    }
+    fd = fileXioDopen("hdd0:");
+    if (fd < 0)
+        return fd;
 
-                    if (current == NULL)
-                        break;
+    while ((readResult = fileXioDread(fd, &dirent)) > 0) {
+        if (dirent.stat.mode != HDL_FS_MAGIC)
+            continue;
 
-                    strncpy(current->id, dirent.name, APA_IDMAX);
-                    current->id[APA_IDMAX] = '\0';
-                    count++;
-                    current->next = NULL;
-                    current->size = 0;
-                    current->lba = 0;
-                    pGameEntry = current;
-                }
-
-                if (!(dirent.stat.attr & APA_FLAG_SUB)) {
-                    // Note: The APA specification states that there is a 4KB area used for storing the partition's information, before the extended attribute area.
-                    pGameEntry->lba = dirent.stat.private_5 + (HDL_GAME_DATA_OFFSET + 4096) / 512;
-                }
-
-                pGameEntry->size += (dirent.stat.size / 4); // size in HDD sectors * (512 / 2048) = 0.25x
+        pGameEntry = GetGameListRecord(head, dirent.name);
+        if (pGameEntry == NULL) {
+            struct GameDataEntry *newEntry = malloc(sizeof(struct GameDataEntry));
+            if (newEntry == NULL) {
+                ret = -ENOMEM;
+                break;
             }
+
+            if (head == NULL)
+                head = newEntry;
+            else
+                current->next = newEntry;
+            current = newEntry;
+
+            strncpy(current->id, dirent.name, APA_IDMAX);
+            current->id[APA_IDMAX] = '\0';
+            current->next = NULL;
+            current->size = 0;
+            current->lba = 0;
+            count++;
+            pGameEntry = current;
         }
 
-        fileXioDclose(fd);
+        if (!(dirent.stat.attr & APA_FLAG_SUB)) {
+            // Note: The APA specification states that there is a 4KB area used for storing the
+            // partition's information, before the extended attribute area.
+            pGameEntry->lba = dirent.stat.private_5 + (HDL_GAME_DATA_OFFSET + 4096) / 512;
+        }
 
-        if (saw_hdl && head == NULL)
-            ret = -ENOMEM;
+        pGameEntry->size += (dirent.stat.size / 4); // HDD sectors * (512 / 2048) = 0.25x
+    }
 
-        if (head != NULL) {
-            if ((game_list->games = malloc(sizeof(hdl_game_info_t) * count)) != NULL) {
-                memset(game_list->games, 0, sizeof(hdl_game_info_t) * count);
+    fileXioDclose(fd);
 
-                for (i = 0, current = head; i < count; i++, current = current->next) {
-                    if ((ret = hddGetHDLGameInfo(current, &game_list->games[i])) != 0)
-                        break;
-                }
+    // A directory read error is not "end of APA table". Returning success here used to publish a
+    // partial list and made games disappear after a refresh. The caller now builds into a candidate
+    // list, so propagating the failure preserves the last-good live array.
+    if (ret == 0 && readResult < 0)
+        ret = readResult;
 
-                if (ret) {
-                    free(game_list->games);
-                    game_list->games = NULL;
-                } else {
-                    game_list->count = count;
-                }
+    if (ret == 0 && head != NULL) {
+        game_list->games = malloc(sizeof(hdl_game_info_t) * count);
+        if (game_list->games != NULL) {
+            memset(game_list->games, 0, sizeof(hdl_game_info_t) * count);
+
+            for (i = 0, current = head; i < count; i++, current = current->next) {
+                if ((ret = hddGetHDLGameInfo(current, &game_list->games[i])) != 0)
+                    break;
+            }
+
+            if (ret != 0) {
+                free(game_list->games);
+                game_list->games = NULL;
             } else {
-                ret = ENOMEM;
+                game_list->count = count;
             }
-
-            for (current = head; current != NULL; current = next) {
-                next = current->next;
-                free(current);
-            }
+        } else {
+            ret = -ENOMEM;
         }
-    } else {
-        ret = fd;
+    }
+
+    for (current = head; current != NULL; current = next) {
+        next = current->next;
+        free(current);
     }
 
     return ret;
@@ -311,16 +316,17 @@ int hddIsPopsPartitionGame(const char *name)
 int hddGetPopsPartitionList(hdd_pops_list_t *list)
 {
     iox_dirent_t dirent;
-    int fd, i, count = 0;
+    int fd, i, count = 0, readResult = 0, ret = 0;
     char(*names)[APA_IDMAX + 1] = NULL;
 
     list->count = 0;
     list->names = NULL;
 
-    if ((fd = fileXioDopen("hdd0:")) < 0)
-        return 0;
+    fd = fileXioDopen("hdd0:");
+    if (fd < 0)
+        return fd; // distinguish an enumeration failure from a valid zero-candidate disk
 
-    while (fileXioDread(fd, &dirent) > 0) {
+    while ((readResult = fileXioDread(fd, &dirent)) > 0) {
         if (dirent.stat.attr != HDD_APA_ATTR_MAIN_PARTITION || dirent.stat.mode != HDD_APA_FS_TYPE_PFS)
             continue; // skip APA sub-partitions and HDL/raw/system formats
         if (!hddIsPopsContainerName(dirent.name) && !hddIsPopsPartitionGame(dirent.name))
@@ -337,8 +343,10 @@ int hddGetPopsPartitionList(hdd_pops_list_t *list)
             continue;
 
         char(*grown)[APA_IDMAX + 1] = realloc(names, (count + 1) * sizeof(*names));
-        if (grown == NULL)
-            break; // OOM: keep what we already collected
+        if (grown == NULL) {
+            ret = -ENOMEM;
+            break;
+        }
         names = grown;
         strncpy(names[count], dirent.name, APA_IDMAX);
         names[count][APA_IDMAX] = '\0';
@@ -346,9 +354,16 @@ int hddGetPopsPartitionList(hdd_pops_list_t *list)
     }
     fileXioDclose(fd);
 
+    if (ret == 0 && readResult < 0)
+        ret = readResult;
+    if (ret < 0) {
+        free(names);
+        return ret; // never publish a partial APA partition walk as a complete candidate set
+    }
+
     if (count == 0) {
         free(names);
-        return 0;
+        return 0; // successful enumeration, no POPS candidates
     }
 
     qsort(names, count, sizeof(*names), hddPopsNameCompare);

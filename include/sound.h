@@ -34,6 +34,9 @@ void bgmStop(void);
 // exit path. See the comment on the definition -- this is rebuild-163's fix minus its freeze.
 void bgmQuiesce(void);
 int isBgmPlaying(void);
+// Discretionary storage users (art, cosmetic metadata) should not START a new read while the
+// decoded BGM reserve is below its low-water mark. Always true when BGM is off/not yet primed.
+int bgmDiscretionaryIoAllowed(void);
 void bgmMute(void);
 void bgmUnMute(void);
 
