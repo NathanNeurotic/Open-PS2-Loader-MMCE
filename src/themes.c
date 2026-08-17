@@ -1733,7 +1733,7 @@ static void drawItemsList(struct menu_list *menu, struct submenu_list *item, con
             }
         }
 
-        int warmRadius = (selectedCache != NULL && selectedCache->count > 1) ? (selectedCache->count - 1) / 2 : 0;
+        int warmRadius = (selectedCache != NULL && selectedCache->count > 1) ? selectedCache->count - 1 : 0;
         struct
         {
             image_cache_t *cache;
@@ -1759,8 +1759,6 @@ static void drawItemsList(struct menu_list *menu, struct submenu_list *item, con
                         warmCache = warmImg->cache;
                 }
                 if (warmCache == NULL || warmCache->count < 2)
-                    continue;
-                if (step >= (warmCache->count - 1) / 2)
                     continue;
 
                 int b;
