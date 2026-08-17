@@ -33,6 +33,22 @@ static int ethGameCount = 0;
 static unsigned char ethModulesLoaded = 0;
 static base_game_info_t *ethGames = NULL;
 
+// Favourites needs to validate an ISO record even when the live ETH page currently owns the VCD
+// array. Keep that alternate backing list private to ETH instead of teaching generic viewOverride
+// to rescan or mutating the visible list. It is populated lazily, read-only, and invalidated by every
+// ETH list mutation/reconnect. No other device class uses this cache.
+static base_game_info_t *ethFavIsoGames = NULL;
+static int ethFavIsoGameCount = 0;
+static unsigned char ethFavIsoValid = 0;
+
+static void ethInvalidateFavIsoBacking(void)
+{
+    free(ethFavIsoGames);
+    ethFavIsoGames = NULL;
+    ethFavIsoGameCount = 0;
+    ethFavIsoValid = 0;
+}
+
 static struct ip4_addr lastIP;
 static struct ip4_addr lastNM;
 static struct ip4_addr lastGW;
@@ -488,6 +504,8 @@ void ethInit(item_list_t *itemList)
     if (ethInitSema() < 0)
         return;
 
+    ethInvalidateFavIsoBacking();
+
     if (gNetworkStartup >= ERROR_ETH_SMB_CONN) {
         LOG("ETHSUPPORT Re-Init\n");
         thmReinit(ethBase);
@@ -561,6 +579,8 @@ static int ethNeedsUpdate(item_list_t *itemList)
 
 static int ethUpdateGameList(item_list_t *itemList)
 {
+    ethInvalidateFavIsoBacking();
+
     if (gPCShareName[0]) {
         if (gNetworkStartup != 0)
             return 0;
@@ -619,6 +639,45 @@ static int ethUpdateGameList(item_list_t *itemList)
     return ethGameCount;
 }
 
+int ethResolveIsoFavourite(int id, const char *name, int *outId)
+{
+    base_game_info_t *games;
+    int count;
+
+    if (name == NULL || outId == NULL || id < 0 || !gPCShareName[0] || gNetworkStartup != 0)
+        return 0;
+
+    if (!vcdViewActive(ETH_MODE)) {
+        // The live ETH backing store already IS the ISO list. Preserve the old id+name validation.
+        games = ethGames;
+        count = ethGameCount;
+    } else {
+        // The live backing store is VCD. Build a separate read-only ISO snapshot once for this ETH
+        // generation; sbReadList receives its own cache-size/count state and cannot replace ethGames.
+        if (!ethFavIsoValid) {
+            int probeSize = -2;
+            int probeCount = 0;
+            base_game_info_t *probeGames = NULL;
+
+            if (sbReadList(&probeGames, ethPrefix, NULL, &probeSize, &probeCount) < 0) {
+                free(probeGames);
+                return 0;
+            }
+            ethFavIsoGames = probeGames;
+            ethFavIsoGameCount = probeCount;
+            ethFavIsoValid = 1;
+        }
+        games = ethFavIsoGames;
+        count = ethFavIsoGameCount;
+    }
+
+    if (games == NULL || id >= count || strcmp(games[id].name, name) != 0)
+        return 0;
+
+    *outId = id;
+    return 1;
+}
+
 static int ethGetGameCount(item_list_t *itemList)
 {
     return ethGameCount;
@@ -652,12 +711,14 @@ static char *ethGetGameStartup(item_list_t *itemList, int id)
 
 static void ethDeleteGame(item_list_t *itemList, int id)
 {
+    ethInvalidateFavIsoBacking();
     sbDelete(&ethGames, ethPrefix, "\\", ethGameCount, id);
     ethULSizePrev = -2;
 }
 
 static void ethRenameGame(item_list_t *itemList, int id, char *newName)
 {
+    ethInvalidateFavIsoBacking();
     sbRename(&ethGames, ethPrefix, "\\", ethGameCount, id, newName);
     ethULSizePrev = -2;
 }
@@ -914,6 +975,8 @@ static void ethCleanUp(item_list_t *itemList, int exception)
         LOG("ETHSUPPORT CleanUp\n");
 
         free(ethGames);
+        ethGames = NULL;
+        ethInvalidateFavIsoBacking();
 
         // disconnect from the active SMB session
         if ((exception & UNMOUNT_EXCEPTION) == 0)
@@ -931,6 +994,8 @@ static void ethShutdown(item_list_t *itemList)
         LOG("ETHSUPPORT Shutdown\n");
 
         free(ethGames);
+        ethGames = NULL;
+        ethInvalidateFavIsoBacking();
 
         // disconnect from the active SMB session
         ethSMBDisconnect();

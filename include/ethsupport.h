@@ -24,5 +24,8 @@ int ethGetNetConfig(u8 *ip_address, u8 *netmask, u8 *gateway);
 int ethApplyConfig(void);
 int ethGetDHCPStatus(void);
 item_list_t *ethGetObject(int initOnly);
+// Resolve a stored ETH ISO favourite against the ISO backing view even while the live ETH page
+// is showing VCDs. Read-only; never changes the visible ETH list or L3 view.
+int ethResolveIsoFavourite(int id, const char *name, int *outId);
 
 #endif

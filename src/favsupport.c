@@ -25,6 +25,7 @@
 #include "include/config.h"
 #include "include/supportbase.h" // sbPopulateConfig + base_game_info_t (VCD favourite config)
 #include "include/vcdsupport.h"  // vcdViewActive / vcdConsumeDirty (VCD favourites)
+#include "include/ethsupport.h"  // ETH ISO favourite resolution while the live source is in VCD view
 #include "include/favsupport.h"
 
 int gFAVStartMode;
@@ -366,6 +367,12 @@ static int favResolveStoredId(item_list_t *source, int id, const char *text, int
 {
     if (source == NULL || text == NULL || outId == NULL || source->itemGetCount == NULL || source->itemGetName == NULL)
         return 0;
+
+    // ETH has one live backing array whose contents follow the source page's L3 state, so a shallow
+    // viewOverride cannot turn VCD-backed ethGames into the ISO list. Resolve that one mode through
+    // ETH's private read-only ISO backing probe. Every other device keeps the existing proxy path.
+    if (source->mode == ETH_MODE && !isVcd)
+        return ethResolveIsoFavourite(id, text, outId);
 
     item_list_t view = *source;
     view.viewOverride = isVcd ? ITEM_VIEW_FORCE_VCD : ITEM_VIEW_FORCE_ISO;
