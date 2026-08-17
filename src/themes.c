@@ -28,30 +28,10 @@
 // neighbours fit together; at the size themes actually ship (140x200 in that capture) a decoded
 // cover is well under 100 KB, so this trades ~1 MB of EE RAM for not re-reading USB.
 #define COVER_CACHE_SLOTS            20
-// How many rows either side of the SELECTED row may be warmed. Measured: the warm loop asked for
-// every visible row -- 18 on the shipped theme -- where uOPL asks for exactly one (its
-// decorator-less list branch requests nothing at all; only the cover panel does). At 73 ms per load
-// that is 1314 ms of device time per page turn against uOPL's 73 ms, and the hardware HUD's D109 is
-// almost exactly six page turns x 18. Warming still earns its keep -- landing on a neighbour should
-// not wait for a read -- but it only has to cover where the cursor can plausibly go next, not the
-// whole page. Measured from the SELECTED row, not from the top of the page, because menusys scrolls
-// by whole pages: from pagestart the budget would be spent on the far end of the new page.
-// 0 = no viewport warming: the selected row's cover is requested (before the row loop) and nothing
-// else, which is exactly what uOPL does and why uOPL does not do this.
-//
-// Measured on hardware at radius 2: "ART Q17 A1 R0 D42  71ms". Seventeen covers queued with one
-// loading -- we were REQUESTING faster than the device can serve. Five requests per settle against
-// ~71 ms a load is ~14 loads/second of capacity, and a user scrolling at a normal pace generates
-// more than that, so the queue grows without bound while they move. Two things follow, and both are
-// exactly what was reported: the cover for the row they are ON sits at the BACK of that queue so
-// art "gets fucked pretty quickly", and every decode that does run preempts the priority-31 GUI and
-// pad thread, eating frames until the held-repeat catches up in one lurch -- the rhythmic jump that
-// survived the settle floor, because the floor only stops requests DURING a press, not between them.
-//
-// Warming exists so that landing on a neighbour finds its cover already there (#296).
-// Restored to radius 2 (issue #488) so List Mode enjoys seamless rolling cover lookahead
-// matching Coverflow mode without stutter.
-#define COVER_WARM_RADIUS            2
+// Cover warming is derived from each resolved COV cache's actual capacity. The selected cover
+// always claims the first slot; the remaining slots are walked center-out on both sides. This
+// restores the pre-2587 "already waiting for you" behavior without a fixed +/-2 cap, while the
+// BGM low-water gate in texcache.c remains the device-level safety valve under real contention.
 // Extra idle frames a per-game BACKGROUND waits beyond the art delay before it may be requested, so
 // the cover always reaches the IO queue first (see drawGameImage). Half a second at 60 Hz: long
 // enough that a cover request is queued and usually finished, short enough that a background still
@@ -1253,8 +1233,6 @@ static void drawCoverFlow(struct menu_list *menu, struct submenu_list *item, con
     */
     mutable_image_t *elemImg = (mutable_image_t *)elem->extended;
     int warmRadius = (elemImg != NULL && elemImg->cache != NULL) ? (elemImg->cache->count - 1) / 2 : 0;
-    if (warmRadius > 2)
-        warmRadius = 2; // Tame lookahead burst: warm at most 2 immediate neighbours on each side
     struct
     {
         image_cache_t *cache;
@@ -1738,21 +1716,31 @@ static void drawItemsList(struct menu_list *menu, struct submenu_list *item, con
             posY -= elem->height >> 1;
         }
 
-        // List admission now mirrors Coverflow's useful property: selected first, then a small
-        // center-out neighbourhood. Merely being visible on a tall List is no longer permission to
-        // start a device read. This matters most for loose USB PNGs (a .tar index masks the open/read
-        // churn), and fixes the same burst on Games, APPS, Favourites and VCD because they all render
-        // through this one function.
+        // List admission mirrors Coverflow: selected first, then center-out warming sized by
+        // the actual resolved cover cache. Merely being visible is not enough to start a read; the
+        // warm radius is bounded by cache capacity, so the selected cover keeps a reserved slot and
+        // loose PNG users regain the deep lookahead older fast builds provided. Games, APPS,
+        // Favourites and VCD all pass through this one scheduler.
+        image_cache_t *selectedCache = NULL;
         if (itemsList->decoratorImage != NULL && !item->item.isFolder) {
-            getGameImageTextureEx(itemsList->decoratorImage->cache, menu->item->userdata, &item->item, 1);
+            selectedCache = itemsList->decoratorImage->cache;
+            getGameImageTextureEx(selectedCache, menu->item->userdata, &item->item, 1);
         } else if (itemsList->coverElem != NULL && !item->item.isFolder) {
             mutable_image_t *selImg = (mutable_image_t *)thmGetElemForItem(menu, item, itemsList->coverElem)->extended;
-            if (selImg != NULL && selImg->cache != NULL)
-                getGameImageTextureEx(selImg->cache, menu->item->userdata, &item->item, 1);
+            if (selImg != NULL && selImg->cache != NULL) {
+                selectedCache = selImg->cache;
+                getGameImageTextureEx(selectedCache, menu->item->userdata, &item->item, 1);
+            }
         }
 
+        int warmRadius = (selectedCache != NULL && selectedCache->count > 1) ? (selectedCache->count - 1) / 2 : 0;
+        struct
+        {
+            image_cache_t *cache;
+            int left;
+        } listWarm[2] = {{NULL, 0}, {NULL, 0}};
         submenu_list_t *walkSide[2] = {item, item}; // [0] next, [1] previous
-        for (int step = 0; step < COVER_WARM_RADIUS; step++) {
+        for (int step = 0; step < warmRadius; step++) {
             for (int side = 0; side < 2; side++) {
                 submenu_list_t *walk = walkSide[side];
                 submenu_list_t *next = side ? walk->prev : walk->next;
@@ -1762,12 +1750,31 @@ static void drawItemsList(struct menu_list *menu, struct submenu_list *item, con
                 if (next->item.isFolder)
                     continue;
 
+                image_cache_t *warmCache = NULL;
                 if (itemsList->decoratorImage != NULL) {
-                    getGameImageTexture(itemsList->decoratorImage->cache, list, &next->item);
+                    warmCache = itemsList->decoratorImage->cache;
                 } else if (itemsList->coverElem != NULL) {
                     mutable_image_t *warmImg = (mutable_image_t *)thmGetElemForItem(menu, next, itemsList->coverElem)->extended;
-                    if (warmImg != NULL && warmImg->cache != NULL)
-                        getGameImageTexture(warmImg->cache, list, &next->item);
+                    if (warmImg != NULL)
+                        warmCache = warmImg->cache;
+                }
+                if (warmCache == NULL || warmCache->count < 2)
+                    continue;
+                if (step >= (warmCache->count - 1) / 2)
+                    continue;
+
+                int b;
+                for (b = 0; b < 2 && listWarm[b].cache != NULL && listWarm[b].cache != warmCache; b++)
+                    ;
+                if (b == 2)
+                    continue;
+                if (listWarm[b].cache == NULL) {
+                    listWarm[b].cache = warmCache;
+                    listWarm[b].left = warmCache->count - 1; // selected's slot remains reserved
+                }
+                if (listWarm[b].left > 0) {
+                    listWarm[b].left--;
+                    getGameImageTexture(warmCache, list, &next->item);
                 }
             }
         }
