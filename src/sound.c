@@ -348,18 +348,18 @@ void sfxPlay(int id)
 /*--    Theme Background Music    -------------------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------------------------------------------------*/
 
-#define BGM_RING_BUFFER_COUNT       192 // 768 KB buffer (~4.35s): extra headroom for long device/list bursts (#364)
-#define BGM_RING_BUFFER_SIZE        4096
-#define BGM_STOP_WAIT_SLICES        16
-#define BGM_IO_LOW_WATER_CHUNKS     48 // ~1.1 s: stop STARTING discretionary device reads
-#define BGM_IO_RESUME_WATER_CHUNKS  80 // ~1.8 s: hysteresis before artwork/cosmetic IO resumes
+#define BGM_RING_BUFFER_COUNT      192 // 768 KB buffer (~4.35s): extra headroom for long device/list bursts (#364)
+#define BGM_RING_BUFFER_SIZE       4096
+#define BGM_STOP_WAIT_SLICES       16
+#define BGM_IO_LOW_WATER_CHUNKS    48 // ~1.1 s: stop STARTING discretionary device reads
+#define BGM_IO_RESUME_WATER_CHUNKS 80 // ~1.8 s: hysteresis before artwork/cosmetic IO resumes
 // EE priorities are strict (lower number wins): playback=30, Vorbis I/O/decode=31. Playback is
 // tiny and normally blocked in audsrv; decode now outranks the background I/O worker (32) while
 // sharing the GUI/pad tier (31), whose vsync wait yields naturally. This prevents a long runnable
 // background queue from starving refills; the larger ring also covers stalls that are IOP-bound,
 // where EE thread priority cannot help.
-#define BGM_THREAD_BASE_PRIO  0x1E
-#define BGM_THREAD_STACK_SIZE 0x1000
+#define BGM_THREAD_BASE_PRIO       0x1E
+#define BGM_THREAD_STACK_SIZE      0x1000
 
 extern void *_gp;
 
