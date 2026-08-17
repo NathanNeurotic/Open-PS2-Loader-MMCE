@@ -18,4 +18,4 @@ jobs:
         with:
           fetch-depth: 0
       - run: bash .github/scripts/step212-coverflow.sh
-        # Exact-head clang-format correction after the hardware follow-up stack.
+        # Transactional HDD refresh, metadata dedupe, and art-overlap follow-up.
