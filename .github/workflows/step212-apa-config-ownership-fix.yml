@@ -1,0 +1,92 @@
+name: Step 212 APA config ownership fix
+
+on:
+  push:
+    branches:
+      - rebuild/step-212-apa-boot-and-bgm-resilience
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: rebuild/step-212-apa-boot-and-bgm-resilience
+          fetch-depth: 0
+      - name: Apply fixes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          python3 - <<'PY'
+          from pathlib import Path
+
+          # config.h: expose the actual load-source notification separately from the save home.
+          p = Path('include/config.h')
+          s = p.read_text()
+          old = '''char *configGetDir(void);\nvoid configPrepareNotifications(char *prefix);\n'''
+          new = '''char *configGetDir(void);\nchar *configGetLoadDir(void);\nvoid configPrepareNotifications(char *prefix);\n'''
+          if old not in s:
+              raise SystemExit('config.h notification declarations not found')
+          p.write_text(s.replace(old, new, 1))
+
+          # config.c: keep a dedicated source-of-truth for where CONFIG_OPL was actually read.
+          p = Path('src/config.c')
+          s = p.read_text()
+          old = '''static char cfgDevice[8];\n\nchar *configGetDir(void)\n{\n    // Substitute the wildcard slot digit ONLY when it actually is the "mc?:" wildcard AND a card was\n    // detected. Blind substitution stamped getmcID()'s -1 (0xFF) -- or a probe-time other-card digit --\n    // over a CONCRETE "mc0:"/"mc1:" prefix from an appdir-on-MC boot, so the "Settings saved to %s"\n    // toast rendered a garbage byte or the wrong card. Legacy "mc?:" homes keep today's behaviour.\n    if (!strncmp(cfgDevice, "mc", 2) && cfgDevice[2] == '?' && getmcID() >= 0) {\n        cfgDevice[2] = getmcID();\n    }\n\n    char *path = cfgDevice;\n    return path;\n}\n\nvoid configPrepareNotifications(char *prefix)\n{\n    char *colpos;\n\n    snprintf(cfgDevice, sizeof(cfgDevice), "%s", prefix); // prefix is caller/config data, never a format string\n\n    if ((colpos = strchr(cfgDevice, ':')) != NULL)\n        *(colpos + 1) = '\\0';\n}\n'''
+          new = '''static char cfgDevice[8];\nstatic char cfgLoadDevice[8];\n\nstatic void configPrepareDevice(char *device, size_t deviceSize, const char *prefix)\n{\n    char *colpos;\n\n    if (prefix == NULL)\n        prefix = "";\n    snprintf(device, deviceSize, "%s", prefix);\n    if ((colpos = strchr(device, ':')) != NULL)\n        *(colpos + 1) = '\\0';\n}\n\nchar *configGetDir(void)\n{\n    // Substitute the wildcard slot digit ONLY when it actually is the "mc?:" wildcard AND a card was\n    // detected. Blind substitution stamped getmcID()'s -1 (0xFF) -- or a probe-time other-card digit --\n    // over a CONCRETE "mc0:"/"mc1:" prefix from an appdir-on-MC boot, so the "Settings saved to %s"\n    // toast rendered a garbage byte or the wrong card. Legacy "mc?:" homes keep today's behaviour.\n    if (!strncmp(cfgDevice, "mc", 2) && cfgDevice[2] == '?' && getmcID() >= 0)\n        cfgDevice[2] = getmcID();\n\n    return cfgDevice;\n}\n\nchar *configGetLoadDir(void)\n{\n    if (!strncmp(cfgLoadDevice, "mc", 2) && cfgLoadDevice[2] == '?' && getmcID() >= 0)\n        cfgLoadDevice[2] = getmcID();\n\n    return cfgLoadDevice[0] != '\\0' ? cfgLoadDevice : cfgDevice;\n}\n\nvoid configPrepareNotifications(char *prefix)\n{\n    configPrepareDevice(cfgDevice, sizeof(cfgDevice), prefix);\n}\n\nstatic void configPrepareLoadNotification(const char *path)\n{\n    // pfs0: is OPL's transient mount name. When it backs the known persistent APA home, report\n    // the physical HDD owner instead so "loaded from" names the device that actually supplied it.\n    if (path != NULL && !strncmp(path, "pfs0:", 5) && gOPLPart[0] != '\\0')\n        configPrepareDevice(cfgLoadDevice, sizeof(cfgLoadDevice), gOPLPart);\n    else\n        configPrepareDevice(cfgLoadDevice, sizeof(cfgLoadDevice), path);\n}\n'''
+          if old not in s:
+              raise SystemExit('config.c notification block not found')
+          s = s.replace(old, new, 1)
+
+          old = '''        if (configSet->type & types) {\n            configClear(configSet);\n            if (configRead(configSet))\n                result |= configSet->type;\n        }\n'''
+          new = '''        if (configSet->type & types) {\n            configClear(configSet);\n            if (configRead(configSet)) {\n                result |= configSet->type;\n                // Record the file source BEFORE higher-level recovery re-homes the live config sets\n                // for a future save. Load notifications must describe evidence, not ownership policy.\n                if (configSet->type == CONFIG_OPL)\n                    configPrepareLoadNotification(configSet->filename);\n            }\n        }\n'''
+          if old not in s:
+              raise SystemExit('configReadMulti block not found')
+          p.write_text(s.replace(old, new, 1))
+
+          # gui.c: show the actual read source, not whatever directory owns the next save.
+          p = Path('src/gui.c')
+          s = p.read_text()
+          old = '''        if (showCfgPopup) {\n            snprintf(notification, sizeof(notification), _l(_STR_CFG_NOTIFICATION), configGetDir());\n'''
+          new = '''        if (showCfgPopup) {\n            snprintf(notification, sizeof(notification), _l(_STR_CFG_NOTIFICATION), configGetLoadDir());\n'''
+          if old not in s:
+              raise SystemExit('gui config popup block not found')
+          p.write_text(s.replace(old, new, 1))
+
+          # opl.c: keep a real mounted PFS home after failed discovery, and make APA explicit saves\n          # resolve through the safe HDD ownership chain before the writer can ever see raw hddN:.
+          p = Path('src/opl.c')
+          s = p.read_text()
+          old = '''    // Every failed probe re-homed the config_set filenames. Put them back exactly where normal boot\n    // discovery expects them before the existing fallback policy continues.\n    configEnd();\n    configInit(gBootDir[0] != '\\0' ? gBootDir : NULL);\n    return 0;\n}\n'''
+          new = '''    // Every failed probe re-homed the config_set filenames. For APA, preserve an already-mounted\n    // safe PFS home instead of falling back to the raw hddN: launch namespace. Raw APA remains only\n    // a fail-closed launch identity when no writable PFS owner exists at all.\n    configEnd();\n    if (gBootHomeApa && gHDDPrefix != NULL && gHDDPrefix[0] != '\\0')\n        configInit(gHDDPrefix);\n    else\n        configInit(gBootDir[0] != '\\0' ? gBootDir : NULL);\n    return 0;\n}\n'''
+          if old not in s:
+              raise SystemExit('recovery reset block not found')
+          s = s.replace(old, new, 1)
+
+          old = '''    // An APA launch that still has no mountable existing PFS home fails closed here. Do not fall\n    // through into the legacy MC write-home logic merely because recovery also found nothing.\n    if (gBootHomeApa) {\n        configPrepareNotifications(gBootDir);\n        showCfgPopup = 0;\n        return 0;\n    }\n'''
+          new = '''    // An APA launch that still has no config fails closed here. Never overwrite a valid mounted\n    // PFS notification/home with the raw hddN: launch identity merely because no settings file exists.\n    // If no PFS home is mounted, the explicit-save gate below retries the safe ownership chain.\n    if (gBootHomeApa) {\n        if (gHDDPrefix != NULL && gHDDPrefix[0] != '\\0')\n            configSetMove(gHDDPrefix);\n        showCfgPopup = 0;\n        return 0;\n    }\n'''
+          if old not in s:
+              raise SystemExit('APA no-config branch not found')
+          s = s.replace(old, new, 1)
+
+          old = '''    char *path = configGetDir();\n    // Only for the legacy no-boot-identity case. With a known boot dir the config home IS the boot\n'''
+          new = '''    // APA launch identity is raw partition space, never a writable config filesystem. Even when\n    // discovery loaded defaults or recovered settings elsewhere, an ordinary APA save without an\n    // explicit Custom Settings Path must resolve the existing-PFS ownership chain NOW. This keeps\n    // raw hddN: out of configWrite entirely: configured existing target first, then __common/OPL,\n    // otherwise fail visibly without creating/formatting/repairing any APA partition.\n    if (gBootHomeApa && gCustomSettingsPath[0] == '\\0') {\n        char hddSaveHome[64];\n        if (prepareHddSettingsFallback(hddSaveHome, sizeof(hddSaveHome)) <= 0) {\n            if (gOPLPart[0] != '\\0')\n                snprintf(gLastSaveTarget, sizeof(gLastSaveTarget), "%s", gOPLPart);\n            else\n                snprintf(gLastSaveTarget, sizeof(gLastSaveTarget), "%s", "hdd0:__common/OPL");\n            gLastSaveErrno = ENODEV;\n            lscret = 0;\n            lscstatus = 0;\n            return;\n        }\n        configSetMove(hddSaveHome);\n    }\n\n    char *path = configGetDir();\n    // Only for the legacy no-boot-identity case. With a known boot dir the config home IS the boot\n'''
+          if old not in s:
+              raise SystemExit('save-home insertion point not found')
+          p.write_text(s.replace(old, new, 1))
+
+          # Record the hardware-confirmed symptom and invariant in the handoff.
+          p = Path('HANDOFF.md')
+          s = p.read_text().rstrip() + '''\n\n### Step 212 APA config-source/save-home correction\nHardware on the stacked Step-212 artifact exposed a paired state bug: config recovery could read an\nexisting master config from MC/USB, then re-home the live sets to the raw `hdd0:` APA launch identity.\nThe load toast therefore claimed `hdd0:` even though no HDD settings file existed, and the next explicit\nSave reached the raw-APA firewall and failed with EACCES / error 13. Load-source reporting is now tracked\nseparately from future save ownership, failed recovery preserves an already-mounted safe PFS home, and\nevery non-custom APA save resolves the existing-PFS chain (`conf_hdd.cfg` target -> `__common/OPL`) before\n`configWrite()`. If no safe PFS home exists it fails visibly with ENODEV; it never creates/formats/repairs\nAPA metadata.\n'''
+          p.write_text(s)
+          PY
+
+          git diff --check
+          git add include/config.h src/config.c src/gui.c src/opl.c HANDOFF.md
+          git commit -m "rebuild-212: separate APA load source from safe save ownership"
+          git rm .github/workflows/step212-apa-config-ownership-fix.yml
+          git commit -m "chore: remove Step 212 APA config helper"
+          git push origin HEAD:rebuild/step-212-apa-boot-and-bgm-resilience
