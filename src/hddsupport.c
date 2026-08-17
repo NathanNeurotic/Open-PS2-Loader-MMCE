@@ -506,7 +506,7 @@ void hddVcdInvalidateCache(void)
 static void hddPublishVcdGameList(base_game_info_t *games, char (*parts)[APA_IDMAX + 1], int count, int built)
 {
     base_game_info_t *oldGames;
-    char (*oldParts)[APA_IDMAX + 1];
+    char(*oldParts)[APA_IDMAX + 1];
 
     guiLock();
     oldGames = hddVcdGames;

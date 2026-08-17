@@ -311,7 +311,7 @@ static void _menuResolveInfoSize()
         if (loadedConfig != NULL)
             configFree(loadedConfig);
 
-complete_request:
+    complete_request:
         WaitSema(menuSemaId);
         if (infoSizeRequestGeneration == generation) {
             // Nobody replaced this target while it ran: the queue is drained.
