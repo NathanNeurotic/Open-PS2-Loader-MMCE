@@ -18,4 +18,4 @@ jobs:
         with:
           fetch-depth: 0
       - run: bash .github/scripts/step212-coverflow.sh
-        # APA HDL/VCD enumerators publish only complete transactional walks.
+        # VCD directory scans distinguish clean EOF from incomplete enumeration.
