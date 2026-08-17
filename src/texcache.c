@@ -8,6 +8,7 @@
 #include "include/renderman.h"
 #include "include/tar.h"
 #include "include/pad.h"        // getKeyPressed -- the SIO2 nav gate, GUI thread only
+#include "include/sound.h"      // BGM low-water admission: don't start art while audio reserve is critical
 #include "include/bdmsupport.h" // bdmModeIsSIO2 -- is this cover on the pad's bus?
 #include "include/appsupport.h" // appGetArtMode -- APP rows are proxies for another device
 #include "include/favsupport.h" // favGetArtMode -- so are FAV rows
@@ -878,6 +879,13 @@ static void cacheArtWorkerThread(void *arg)
 
             if (!req)
                 break; // queue empty, or its head is an SIO2 cover deferred while a direction is held
+
+            // Device-level backpressure, not another CPU-priority tweak. Finish any read already in
+            // flight, but while BGM's decoded reserve is critical do not START the next PNG open.
+            // The request remains owned by this worker and cacheLoadImage re-checks stale/abort state
+            // after the wait, so scrolling can still make this work evaporate before it touches disk.
+            while (!gArtTerminate && !req->abortRequested && !bgmDiscretionaryIoAllowed())
+                DelayThread(10 * 1000);
 
             cacheLoadImage(req);
 

@@ -348,9 +348,11 @@ void sfxPlay(int id)
 /*--    Theme Background Music    -------------------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------------------------------------------------*/
 
-#define BGM_RING_BUFFER_COUNT 192 // 768 KB buffer (~4.35s): extra headroom for long device/list bursts (#364)
-#define BGM_RING_BUFFER_SIZE  4096
-#define BGM_STOP_WAIT_SLICES  16
+#define BGM_RING_BUFFER_COUNT       192 // 768 KB buffer (~4.35s): extra headroom for long device/list bursts (#364)
+#define BGM_RING_BUFFER_SIZE        4096
+#define BGM_STOP_WAIT_SLICES        16
+#define BGM_IO_LOW_WATER_CHUNKS     48 // ~1.1 s: stop STARTING discretionary device reads
+#define BGM_IO_RESUME_WATER_CHUNKS  80 // ~1.8 s: hysteresis before artwork/cosmetic IO resumes
 // EE priorities are strict (lower number wins): playback=30, Vorbis I/O/decode=31. Playback is
 // tiny and normally blocked in audsrv; decode now outranks the background I/O worker (32) while
 // sharing the GUI/pad tier (31), whose vsync wait yields naturally. This prevents a long runnable
@@ -369,9 +371,41 @@ static volatile unsigned char terminateFlag, bgmIsPlaying;
 static volatile unsigned char rdPtr, wrPtr;
 static char bgmBuffer[BGM_RING_BUFFER_COUNT][BGM_RING_BUFFER_SIZE];
 static volatile unsigned char bgmThreadRunning, bgmIoThreadRunning;
+static volatile int bgmBufferedChunks = 0;
+static volatile unsigned char bgmBufferPrimed = 0;
+static volatile unsigned char bgmIoThrottle = 0;
 
 // Nonzero while bgmIoThread may be inside a device read. Read by the art worst-open latch.
 volatile int gBgmInRead = 0;
+
+static void bgmAdjustBufferedChunks(int delta)
+{
+    DIntr();
+    bgmBufferedChunks += delta;
+    if (bgmBufferedChunks < 0)
+        bgmBufferedChunks = 0;
+    else if (bgmBufferedChunks > BGM_RING_BUFFER_COUNT)
+        bgmBufferedChunks = BGM_RING_BUFFER_COUNT;
+    if (bgmBufferedChunks >= BGM_IO_RESUME_WATER_CHUNKS)
+        bgmBufferPrimed = 1;
+    EIntr();
+}
+
+int bgmDiscretionaryIoAllowed(void)
+{
+    if (!bgmIsPlaying || !gEnableBGM || !bgmBufferPrimed)
+        return 1;
+
+    int buffered = bgmBufferedChunks;
+    if (bgmIoThrottle) {
+        if (buffered >= BGM_IO_RESUME_WATER_CHUNKS)
+            bgmIoThrottle = 0;
+    } else if (buffered <= BGM_IO_LOW_WATER_CHUNKS) {
+        bgmIoThrottle = 1;
+    }
+
+    return !bgmIoThrottle;
+}
 
 static u8 bgmThreadStack[BGM_THREAD_STACK_SIZE] __attribute__((aligned(16)));
 static u8 bgmIoThreadStack[BGM_THREAD_STACK_SIZE] __attribute__((aligned(16)));
@@ -387,6 +421,7 @@ static void bgmThread(void *arg)
         if (terminateFlag)
             break;
 
+        bgmAdjustBufferedChunks(-1);
         audsrv_wait_audio(BGM_RING_BUFFER_SIZE);
         audsrv_play_audio(bgmBuffer[rdPtr], BGM_RING_BUFFER_SIZE);
         rdPtr = (rdPtr + 1) % BGM_RING_BUFFER_COUNT;
@@ -422,8 +457,14 @@ static void bgmIoThread(void *arg)
             if (ret > 0) {
                 bufferPtr += ret;
                 decodeTotal -= ret;
+            } else if (ret == OV_HOLE) {
+                // Recoverable Vorbis discontinuity. libvorbisfile explicitly permits callers to
+                // continue after OV_HOLE; treating it as a fatal device error made one stressed
+                // read permanently stop BGM instead of recovering on the next packet.
+                LOG("BGM: recoverable Vorbis hole; continuing.\n");
+                continue;
             } else if (ret < 0) {
-                LOG("BGM: I/O error while reading.\n");
+                LOG("BGM: fatal I/O/decode error while reading (%d).\n", ret);
                 terminateFlag = 1;
                 break;
             } else if (ret == 0) {
@@ -441,6 +482,7 @@ static void bgmIoThread(void *arg)
             break;
 
         wrPtr = (wrPtr + 1) % BGM_RING_BUFFER_COUNT;
+        bgmAdjustBufferedChunks(1);
         SignalSema(outSema);
     } while (!terminateFlag && gEnableBGM);
 
@@ -518,6 +560,9 @@ static int bgmInit(void)
     wrPtr = 0;
     bgmThreadRunning = 0;
     bgmIoThreadRunning = 0;
+    bgmBufferedChunks = 0;
+    bgmBufferPrimed = 0;
+    bgmIoThrottle = 0;
 
     sema.max_count = BGM_RING_BUFFER_COUNT;
     sema.init_count = BGM_RING_BUFFER_COUNT;
