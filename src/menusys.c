@@ -1274,11 +1274,11 @@ static void menuRenderElements(theme_elems_t *elems)
     if (elems->needsItemConfig && menuCanRequestItemConfig(list))
         _menuRequestConfig();
 
-    // The VCD caption id (#380) rides its OWN async request, independent of the needsItemConfig
-    // gate above -- that gate stays exactly as rebuild-155 wrote it. The request resolves ONLY the
-    // id (no CFG read), on the ioman worker; the resolver's per-session memo dedupes, so this costs
-    // one strcmp walk per frame and at most one queued resolve per settled VCD row per session.
-    if (list != NULL && vcdViewActive(list->mode) && selected_item->item->current != NULL) {
+    // Deep VCD ID inspection is cosmetic and must be explicit-theme-demand only. ItemText is
+    // the sole render element that consumes vcdDisplayIdCached(), so a family without ItemText does
+    // zero .VCD opens/seeks here. The resolver itself is opportunistic and yields to art/BGM.
+    if (elems->needsVcdDisplayId && list != NULL && vcdViewActive(list->mode) &&
+        selected_item->item->current != NULL) {
         char *vcdName = list->itemGetStartup(list, selected_item->item->current->item.id);
         if (vcdName != NULL)
             vcdRequestDisplayId(vcdName);

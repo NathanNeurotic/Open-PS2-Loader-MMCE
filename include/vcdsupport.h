@@ -44,8 +44,8 @@ int vcdExtractGameId(const char *name, char *idOut, int idSize);
 // must never block on IO. Called per entry by the scan.
 void vcdNoteScanDir(const char *name, const char *dirPath);
 
-// DISPLAY-ONLY PS1 disc id, resolved lazily from the image on the per-game CONFIG path (async, once
-// per settled row, and only when the theme has an element that shows it). Returns 1 and writes the
+// DISPLAY-ONLY PS1 disc id, resolved lazily from the image only when the active theme family
+// contains the ItemText element that consumes it. Returns 1 and writes the
 // id, or 0 when there is none -- the caller then shows the filename, as before. NOT identity: art,
 // CFG and the launch all key off the VCD filename.
 int vcdResolveDisplayId(const char *name, char *idOut, int idSize);
@@ -55,7 +55,7 @@ int vcdResolveDisplayId(const char *name, char *idOut, int idSize);
 int vcdDisplayIdCached(const char *name, char *idOut, int idSize);
 
 // Ask for a settled VCD row's id to be resolved off-thread (one queued resolve per row per
-// session, memo-deduped, independent of the theme's config needs). Called per frame from the
+// session, memo-deduped, only under explicit ItemText demand). Called per frame from the
 // menu render path; a cold memo with a request already in flight is a no-op.
 void vcdRequestDisplayId(const char *name);
 

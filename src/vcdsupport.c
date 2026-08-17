@@ -23,6 +23,8 @@
 #include "include/bdmsupport.h"  // BDM_TYPE_* + bdmGetDeviceRootByType (BDMA source differentiation)
 #include "include/mmcesupport.h" // mmceLoadModules (ensure mmceman for the MMCE BDMA source)
 #include "include/gui.h"         // guiWarning (passing toast on a failed launch-path BDMA equip)
+#include "include/texcache.h"    // cosmetic ID resolver yields while artwork is pending
+#include "include/sound.h"       // cosmetic ID resolver yields to BGM low-water protection
 #include "include/util.h"        // checkMCSaveIconsDir -- browser icon pair for the POPSTARTER folder
 #include "include/lang.h"        // _l + _STR_BDMA_ERR_* (same texts the Settings-screen equip shows)
 #include "include/textures.h"    // texDiscoverLoad + ERR_BAD_FILE (VCD POPS cover fallback)
@@ -375,15 +377,25 @@ static void vcdResolveQueuedDisplayId(void)
     gVcdIdReqPending = 0;
     EIntr();
 
-    // The resolver itself: opens the VCD and reads the id out of the image (memoized, one attempt
-    // per game per session). It runs HERE, on the ioman worker, so a slow device cannot stall the
-    // render thread -- the whole reason the caption does not call it directly.
+    // Async is not enough by itself: a device read can still starve the same USB/PFS channel
+    // used by artwork and BGM. This metadata has zero authority over those assets, so if either
+    // pipeline is busy simply abandon this attempt; the still-selected row asks again next frame.
+    if (cacheHasPendingArt() || !bgmDiscretionaryIoAllowed())
+        return;
+
     vcdResolveDisplayId(name, id, sizeof(id));
 }
 
 void vcdRequestDisplayId(const char *name)
 {
+    char parsed[VCD_ID_MAX];
+
     if (name == NULL || name[0] == '\0')
+        return;
+
+    // Filename already supplies exactly what ItemText needs: display it immediately and never pay
+    // for a deep image read merely to rediscover the same cosmetic ID.
+    if (vcdExtractGameId(name, parsed, sizeof(parsed)))
         return;
 
     vcd_id_memo_t *m = vcdIdMemoFind(name);

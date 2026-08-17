@@ -1335,3 +1335,33 @@ selected Coverflow cover is still pending. The cached background may continue dr
 selected cover is loaded, art is disabled, or the cover is confirmed absent, background admission
 returns to the immediate path. List mode is unchanged. This preserves BGM priority and the dedicated
 art-worker design while ordering USB device work around what the user is visibly waiting for.
+
+### Step 212 hardware follow-up — list/VCD/APA/MC scheduling and ownership
+
+The combined Step-212 hardware round exposed four additional shared-lifecycle issues, fixed in this
+same PR so testers do not need another branch/artifact cycle:
+
+- **APA enumeration is independent from the config/art PFS home.** HDL PS2 games continue to come
+  from the APA/HDL partition table, and HDD VCDs from existing POPS partitions (`pfs1:` scan space).
+  Neither page is a CD/DVD-folder scan. A missing persistent `pfs0:` data home now disables only the
+  features that actually require it (games.bin, CFG, ART, VMC/sidecars); the lists remain visible.
+  All Step-209/210/211 no-create/no-format/raw-APA-write barriers remain intact.
+- **Memory-card ownership is concrete.** An `mc1:` launch prefers slot 2 for bootstrap redirects,
+  missing-config recovery and the legacy `OPL/` read even when `mc0:` is also populated. `mc0:` is
+  symmetric; non-MC boots retain the historical first-present policy.
+- **List art admission is bounded around the cursor.** The generic List renderer (Games, APPS,
+  Favourites and VCD) requests the selected cover first and only +/-2 neighbours; farther visible
+  rows draw resident art without starting new loose-PNG reads. This brings List request pressure in
+  line with Coverflow rather than making viewport height equal I/O queue depth.
+- **Metadata cannot monopolize the device.** APP `#Size` opens are deferred to the info screen.
+  Generic VCD config population uses filename parsing only and never opens the `.VCD`. Deep PS1-ID
+  inspection runs only when the active theme family contains the ItemText element that consumes it,
+  skips filenames that already carry a strict ID, and yields whenever art is pending or BGM reserve
+  is low. BGM itself keeps the 30/31 priorities + 768 KiB ring and now prevents new art reads below
+  its low-water reserve; `OV_HOLE` is recoverable instead of terminating playback.
+
+Hardware acceptance should explicitly cover: APA PS2 + VCD pages with/without the persistent PFS
+home, mc0 and mc1 boots with both cards inserted, loose-PNG List/Coverflow on USB, APPS/Favourites
+missing-art navigation, a VCD theme with no ItemText (zero deep image reads), and one with ItemText
+(the ID may pop in opportunistically without starving art/audio). VCD favourite persistence remains
+part of the regression matrix.
