@@ -1373,3 +1373,10 @@ Final review polish in the same Step-212 PR also accepts CodeRabbit's persistent
 (when there is no boot identity, the already-existing recovered MC/USB config home remains the save
 owner). Normal successful HDD-save notifications now translate transient `pfs0:` back to the physical
 owner (`hdd0:__common/OPL` or the configured existing partition) so testers can locate the files.
+A final persistence guard in `configWrite()` also materializes a populated config when recovery or
+self-migration moved its filename to a new save home but the in-memory values remained unmodified.
+Previously that state returned success without creating the destination file -- a hardware-visible
+"Settings saved" toast with no `settings_riptopl.cfg` on the resolved HDD/MC/USB home. Existing
+files remain on the no-write fast path, empty optional sets are not created, and the raw-APA write
+firewall still runs before any actual O_CREAT. `conf_hdd.cfg` remains an optional pre-existing HDD
+home redirect; RiptOPL's master settings file is `settings_riptopl.cfg`.

@@ -1161,6 +1161,22 @@ int configRead(config_set_t *configSet)
 
 int configWrite(config_set_t *configSet)
 {
+    // A config can be re-homed after it was read (legacy migration, missing-config recovery,
+    // boot-home self-migration). configMove/configSetMove intentionally preserve the in-memory
+    // values and their modified flag, so an unchanged set may now point at a destination file that
+    // does not exist. Returning the normal "unmodified = success" result in that state is a false
+    // positive: the UI reports Saved, but nothing was materialized at the new home. If a populated
+    // set is clean yet its CURRENT filename is absent, make this explicit save create it. Existing
+    // files stay on the zero-write fast path; empty sets are not manufactured merely because their
+    // optional file is absent. This is filesystem-only and never bypasses the raw-APA firewall below.
+    if (!configSet->modified && configSet->filename != NULL && configSet->head != NULL) {
+        iox_stat_t stat;
+        if (fileXioGetStat(configSet->filename, &stat) < 0) {
+            LOG("CONFIG current save destination %s is absent; materializing populated config\n", configSet->filename);
+            configSet->modified = 1;
+        }
+    }
+
     if (configSet->modified) {
         if (configSet->filename == NULL)
             return 0; // in-memory-only config set: nothing to persist (and openFile would deref NULL)
