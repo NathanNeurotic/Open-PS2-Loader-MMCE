@@ -1333,8 +1333,9 @@ could still start a much larger `_BG` read before `drawCoverFlow()` had a chance
 visible neighbouring covers. Step 212 now suppresses only that new background enqueue while the
 selected Coverflow cover is still pending. The cached background may continue drawing; once the
 selected cover is loaded, art is disabled, or the cover is confirmed absent, background admission
-returns to the immediate path. List mode is unchanged. This preserves BGM priority and the dedicated
-art-worker design while ordering USB device work around what the user is visibly waiting for.
+returns to the immediate path. The later hardware pass extends the same selected-first discipline to
+List/APPS/Favourites/VCD with cache-sized center-out warming. This preserves BGM priority and the
+dedicated art-worker design while ordering device work around what the user is visibly waiting for.
 
 ### Step 212 hardware follow-up — list/VCD/APA/MC scheduling and ownership
 
@@ -1349,10 +1350,11 @@ same PR so testers do not need another branch/artifact cycle:
 - **Memory-card ownership is concrete.** An `mc1:` launch prefers slot 2 for bootstrap redirects,
   missing-config recovery and the legacy `OPL/` read even when `mc0:` is also populated. `mc0:` is
   symmetric; non-MC boots retain the historical first-present policy.
-- **List art admission is bounded around the cursor.** The generic List renderer (Games, APPS,
-  Favourites and VCD) requests the selected cover first and only +/-2 neighbours; farther visible
-  rows draw resident art without starting new loose-PNG reads. This brings List request pressure in
-  line with Coverflow rather than making viewport height equal I/O queue depth.
+- **List art admission is cache-sized around the cursor.** The generic List renderer (Games, APPS,
+  Favourites and VCD) requests the selected cover first, then walks outward using the resolved COV
+  cache capacity instead of a fixed +/-2 cap. Farther visible rows draw resident art without starting
+  reads. Coverflow uses the same cache-sized rule again, restoring the older deep lookahead that made
+  loose covers feel preloaded while BGM low-water admission remains the device-level safety valve.
 - **Metadata cannot monopolize the device.** APP `#Size` opens are deferred to the info screen.
   Generic VCD config population uses filename parsing only and never opens the `.VCD`. Deep PS1-ID
   inspection runs only when the active theme family contains the ItemText element that consumes it,
@@ -1365,3 +1367,9 @@ home, mc0 and mc1 boots with both cards inserted, loose-PNG List/Coverflow on US
 missing-art navigation, a VCD theme with no ItemText (zero deep image reads), and one with ItemText
 (the ID may pop in opportunistically without starving art/audio). VCD favourite persistence remains
 part of the regression matrix.
+
+Final review polish in the same Step-212 PR also accepts CodeRabbit's persistent-home remount finding
+(clear `gHDDPrefix`/`gOPLPart` if the post-POPS restore mount fails) and bare-launch recovery finding
+(when there is no boot identity, the already-existing recovered MC/USB config home remains the save
+owner). Normal successful HDD-save notifications now translate transient `pfs0:` back to the physical
+owner (`hdd0:__common/OPL` or the configured existing partition) so testers can locate the files.
