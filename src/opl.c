@@ -1372,13 +1372,23 @@ static int gBootHomeApa = 0;
 // booter was silently lost on the next boot.
 static const char *configPathRedirectFile = "config.path";
 
-// Absolute mc-side location for that mirror. A memory card is the only store that needs NO
-// configuration to reach -- mcman is loaded by sysReset before anything else, no network, no
-// transport flags, no ordering. Composed from sysCheckMC() so it names the slot that actually holds
-// a card. Returns 0 when there is none.
+// Prefer the concrete slot OPL actually booted from. With both cards inserted, a generic
+// first-present probe must not redirect an mc1 boot's bootstrap/config traffic onto mc0. For
+// non-MC boots retain the historical first-present fallback.
+static int preferredMcSlot(void)
+{
+    if (!strncmp(gBootDir, "mc0:", 4))
+        return 0;
+    if (!strncmp(gBootDir, "mc1:", 4))
+        return 1;
+    return sysCheckMC();
+}
+
+// Absolute mc-side location for the bootstrap mirror. A concrete MC boot owns its own slot;
+// network/bare boots use the existing first-present policy. Returns 0 when there is none.
 static int mcConfigPathRedirect(char *out, int outLen)
 {
-    int slot = sysCheckMC();
+    int slot = preferredMcSlot();
 
     if (slot < 0)
         return 0;
@@ -1768,20 +1778,31 @@ static void restoreRecoverySaveHome(const char *recoveredHome)
 
 static int tryMissingConfigPathRecovery(int types)
 {
-    static const char *const mcHomes[] = {
-        "mc0:/OPL",
-        "mc0:/",
-        "mc1:/OPL",
-        "mc1:/",
-    };
     int value;
+    int slots[2] = {0, 1};
+    int preferred = preferredMcSlot();
 
-    // Do not trust sysCheckMC() for recovery: the report that drove this path is specifically a card
-    // that served the ELF but was not selected by the normal card probe. Directly test both slots.
-    for (unsigned int i = 0; i < sizeof(mcHomes) / sizeof(mcHomes[0]); i++) {
-        value = tryReadRecoveryConfigHome(types, mcHomes[i]);
+    // A concrete mc1 boot searches mc1 first even when mc0 is also inserted. Otherwise retain the
+    // historical mc0->mc1 recovery order. Both slots are still probed directly; sysCheckMC() is
+    // deliberately not used as a substitute for trying the second card.
+    if (preferred == 1) {
+        slots[0] = 1;
+        slots[1] = 0;
+    }
+    for (int i = 0; i < 2; i++) {
+        char home[16];
+
+        snprintf(home, sizeof(home), "mc%d:/OPL", slots[i]);
+        value = tryReadRecoveryConfigHome(types, home);
         if (value & CONFIG_OPL) {
-            restoreRecoverySaveHome(mcHomes[i]);
+            restoreRecoverySaveHome(home);
+            return value;
+        }
+
+        snprintf(home, sizeof(home), "mc%d:/", slots[i]);
+        value = tryReadRecoveryConfigHome(types, home);
+        if (value & CONFIG_OPL) {
+            restoreRecoverySaveHome(home);
             return value;
         }
     }
@@ -1891,7 +1912,13 @@ static int tryAlternateDevice(int types)
         // truth matters more, and after the first save the two agree anyway.
         int homeLeftOnCard = 0;
         if (sysCheckMC() >= 0) {
-            configSetMove(NULL); // point the config files at the legacy mc?:OPL home
+            char concreteMcHome[16];
+            if (!strncmp(gBootDir, "mc0:", 4) || !strncmp(gBootDir, "mc1:", 4)) {
+                snprintf(concreteMcHome, sizeof(concreteMcHome), "mc%c:/OPL", gBootDir[2]);
+                configSetMove(concreteMcHome); // MC boot: legacy fallback stays on the booted slot
+            } else {
+                configSetMove(NULL); // non-MC boot: retain the historical mc?:OPL selection
+            }
             value = configReadMulti(types);
 
             // SELF-MIGRATION IS WRONG WHEN THE BOOT DEVICE CANNOT BE READ AT BOOT. The move-back
