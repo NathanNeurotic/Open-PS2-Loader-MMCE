@@ -1442,3 +1442,13 @@ Hardware regression emphasis: APA/FHDB save/reboot with and without MC inserted;
   proven readable, but remains unlatched so an explicit refresh can retry.
 - These are enumeration/list-lifetime corrections above the transport layer. No ATA/DEV9 readiness
   policy changed.
+
+## Step 212 follow-up — VCD directory walks distinguish EOF from failure
+
+- `vcdScanOpenDir()` no longer treats every `readdir()` NULL as clean EOF. It clears `errno` before
+  each read and returns scan failure when NULL arrives with an error, discarding the partial candidate
+  list so callers retain their last-good backing list.
+- Reaching `VCD_MAX_ITEMS` remains the intentional list-cap condition; a normal EOF still returns the
+  completed scan.
+- With this change the HDL APA walk, POPS APA-partition walk, and VCD directory walk all reject
+  incomplete enumeration rather than publishing it as authoritative. No ATA/DEV9 behavior changed.
