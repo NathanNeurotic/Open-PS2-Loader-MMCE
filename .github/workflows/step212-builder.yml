@@ -17,10 +17,5 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Prepare normalized builder
-        run: |
-          cp .github/scripts/step212-coverflow.sh /tmp/step212-builder.sh
-          sed -i 's/text\.rstrip() + note + "\\n"/text.rstrip() + note.rstrip() + "\\n"/' /tmp/step212-builder.sh
-      - run: bash /tmp/step212-builder.sh
-        # Patch script validates exact production head before writing.
-        # Consolidated hardware follow-up: APA lists, MC1, List art, APP metadata, BGM, VCD ID.
+      - run: bash .github/scripts/step212-coverflow.sh
+        # Formatting-only follow-up for the consolidated Step-212 hardware head.
