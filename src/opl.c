@@ -2954,19 +2954,22 @@ int saveConfig(int types, int showUI)
     if (showUI) {
         if (lscret) {
             char *path = configGetDir();
+            const char *displayHome = path;
+            int savedOnHddHome = path != NULL && !strncmp(path, "pfs", 3) && gOPLPart[0] != '\0';
 
-            // Boot fallback state only describes an HDD save when this save actually landed on PFS.
-            if (gHddSettingsFallbackNotice ||
-                (gBootHddCommonFallback && path != NULL && !strncmp(path, "pfs", 3))) {
-                const char *displayHome = path;
+            // pfs0: is only the transient mount name. For every successful HDD save, show the
+            // physical APA/PFS owner the user can actually find in a partition browser.
+            if (savedOnHddHome) {
                 if (!strcmp(gOPLPart, "hdd0:__common"))
                     displayHome = "hdd0:__common/OPL";
-                else if (gOPLPart[0] != '\0')
+                else
                     displayHome = gOPLPart;
-                snprintf(notification, sizeof(notification), _l(_STR_SETTINGS_HDD_FALLBACK), displayHome);
-            } else {
-                snprintf(notification, sizeof(notification), _l(_STR_SETTINGS_SAVED), path);
             }
+
+            if (gHddSettingsFallbackNotice || (gBootHddCommonFallback && savedOnHddHome))
+                snprintf(notification, sizeof(notification), _l(_STR_SETTINGS_HDD_FALLBACK), displayHome);
+            else
+                snprintf(notification, sizeof(notification), _l(_STR_SETTINGS_SAVED), displayHome);
 
             guiMsgBox(notification, 0, NULL);
         } else {
