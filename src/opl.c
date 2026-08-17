@@ -920,6 +920,8 @@ config_set_t *oplGetLegacyAppsConfig(void)
         listSupport = list_support[i].support;
         if ((listSupport != NULL) && (listSupport->enabled) && (listSupport->itemGetPrefix != NULL)) {
             char *prefix = listSupport->itemGetPrefix(listSupport);
+            if (prefix == NULL || prefix[0] == '\0')
+                continue;
             snprintf(appsPath, sizeof(appsPath), "%sconf_apps.cfg", prefix);
 
             fd = openFile(appsPath, O_RDONLY);
@@ -943,12 +945,14 @@ config_set_t *oplGetLegacyAppsInfo(char *name)
     int i, fd;
     item_list_t *listSupport;
     config_set_t *appConfig;
-    char appsPath[128];
+    char appsPath[128] = {0};
 
     for (i = MODE_COUNT - 1; i >= 0; i--) {
         listSupport = list_support[i].support;
         if ((listSupport != NULL) && (listSupport->enabled) && (listSupport->itemGetPrefix != NULL)) {
             char *prefix = listSupport->itemGetPrefix(listSupport);
+            if (prefix == NULL || prefix[0] == '\0')
+                continue;
             snprintf(appsPath, sizeof(appsPath), "%sCFG%s%s.cfg", prefix, i == ETH_MODE ? "\\" : "/", name);
 
             fd = openFile(appsPath, O_RDONLY);
@@ -960,9 +964,10 @@ config_set_t *oplGetLegacyAppsInfo(char *name)
         }
     }
 
-    /* Apps config not found on any device, go with last tested device.
-       Does not matter if the config file could be loaded or not */
-    appConfig = configAlloc(0, NULL, appsPath);
+    /* Apps config not found on any device, go with the last tested device when one had a
+       real prefix. A valid list-only APA session can have no persistent PFS prefix at all; in that
+       state return metadata-only config instead of inventing a path on another device. */
+    appConfig = configAlloc(0, NULL, appsPath[0] != '\0' ? appsPath : NULL);
 
     return appConfig;
 }
@@ -4056,9 +4061,20 @@ static void autoLaunchHDDGame(char *argv[])
     gAutoLaunchGame->start_sector = strtoul(argv[2], NULL, 0);
     snprintf(gOPLPart, sizeof(gOPLPart), "hdd0:%s", argv[3]);
 
-    snprintf(path, sizeof(path), "%sCFG/%s.cfg", gHDDPrefix, gAutoLaunchGame->startup);
-    configSet = configAlloc(0, NULL, path);
-    configRead(configSet);
+    if (gHDDPrefix != NULL && gHDDPrefix[0] != '\0') {
+        snprintf(path, sizeof(path), "%sCFG/%s.cfg", gHDDPrefix, gAutoLaunchGame->startup);
+        configSet = configAlloc(0, NULL, path);
+        configRead(configSet);
+    } else {
+        // HDL autolaunch does not require a persistent config/art PFS home. Keep the launch alive
+        // with defaults only; never format a NULL prefix into a bogus path.
+        configSet = configAlloc(0, NULL, NULL);
+    }
+    if (configSet == NULL) {
+        free(gAutoLaunchGame);
+        gAutoLaunchGame = NULL;
+        return;
+    }
 
     hddLaunchGame(NULL, -1, configSet);
 }
