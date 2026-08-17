@@ -459,6 +459,10 @@ void hddLoadSupportModules(void)
     } else {
         gHDDPrefix = "pfs0:";
     }
+
+    // A prior list pass may have parked relative HDD artwork as unavailable while no persistent
+    // PFS home existed. Re-arm those misses exactly when the home becomes usable again.
+    cacheInvalidateFailMemo();
 }
 
 void hddInit(item_list_t *itemList)
@@ -660,9 +664,12 @@ static int hddUpdateGameList(item_list_t *itemList)
             hddLoadSupportModules();
     }
 
-    // Fail closed when no existing PFS data home could be mounted. The update path must not
-    // construct filenames from a NULL prefix or fall into any alternate partition-creation path.
-    if (gHDDPrefix == NULL)
+    // Game discovery and the persistent config/art PFS home are separate lifetimes. HDL games
+    // live in the APA table and HDD VCDs live in existing POPS partitions; neither requires the
+    // long-lived pfs0: data home. Step 211 accidentally returned an empty page whenever that home
+    // was unavailable even though the APA/PFS support modules were healthy. Require only the support
+    // stack here; config/art accessors below remain NULL-safe and fail closed independently.
+    if (!hddSupportModulesLoaded)
         return 0;
 
     if (vcdViewActive(itemList->mode))
@@ -797,9 +804,12 @@ static int hddResolveHddPopstarter(char *elfOut, int elfLen)
         }
     }
 
-    // Not found: restore the default OPL data-partition mount so normal HDD IO keeps working.
+    // Not found: restore the default OPL data-partition mount when one exists. A list-only
+    // APA session may legitimately have no persistent data home, in which case there is nothing
+    // truthful to remount and an empty gOPLPart must never be passed to fileXioMount.
     fileXioUmount(hddPrefix);
-    fileXioMount(hddPrefix, gOPLPart, FIO_MT_RDWR);
+    if (gOPLPart[0] != '\0')
+        fileXioMount(hddPrefix, gOPLPart, FIO_MT_RDWR);
     return 0;
 }
 
@@ -1128,14 +1138,18 @@ void hddLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
 
     sbPrepare(NULL, configSet, size_irx, irx, &i);
 
-    if ((result = sbLoadCheats(gHDDPrefix, game->startup)) < 0) {
-        // #265: let the user back out instead of sitting through the whole load. The helper does
-        // the sbUnprepare itself -- see include/supportbase.h; skipping it breaks the NEXT launch.
-        // `settings` is not assigned until below, so derive the common block from the IRX base.
-        if (!sbCheatsMissingContinue((u8 *)irx + i, result))
-            return;
+    if (gHDDPrefix != NULL) {
+        if ((result = sbLoadCheats(gHDDPrefix, game->startup)) < 0) {
+            // #265: let the user back out instead of sitting through the whole load. The helper does
+            // the sbUnprepare itself -- see include/supportbase.h; skipping it breaks the NEXT launch.
+            // `settings` is not assigned until below, so derive the common block from the IRX base.
+            if (!sbCheatsMissingContinue((u8 *)irx + i, result))
+                return;
+        }
+        sbLoadImage(gHDDPrefix, game->startup);
+    } else {
+        LOG("HDDSUPPORT launch: no persistent PFS data home; skipping HDD cheats/image sidecars\n");
     }
-    sbLoadImage(gHDDPrefix, game->startup);
 
     settings = (struct cdvdman_settings_hdd *)((u8 *)irx + i);
 
@@ -1196,27 +1210,45 @@ void hddLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
 static config_set_t *hddGetConfig(item_list_t *itemList, int id)
 {
     char path[256];
+    char vcdId[VCD_ID_MAX];
+    config_set_t *config;
 
-    // VCD (PS1) view: `id` indexes hddVcdGames, NOT hddGames (which stays at its zero/ISO-view state --
-    // {games=NULL,count=0} on a PS1-only HDD). Mirror the other VCD-aware accessors and key the per-game
-    // CFG off the VCD basename, instead of dereferencing &hddGames.games[id] off a NULL base (crash).
+    // VCD (PS1) view: `id` indexes hddVcdGames, NOT hddGames. The list itself is discoverable from
+    // APA even when the persistent config/art PFS home is temporarily unavailable. In that state
+    // return a runtime-only config instead of dereferencing a NULL prefix or hiding the whole list.
     if (vcdViewActive(itemList->mode)) {
-        base_game_info_t *g = hddActiveVcd(id); // toggle-window safe: empty entry on a stale id (no OOB)
-        return sbPopulateConfig(g, gHDDPrefix, "/");
+        base_game_info_t *g = hddActiveVcd(id);
+        if (gHDDPrefix != NULL)
+            return sbPopulateConfig(g, gHDDPrefix, "/");
+
+        config = configAlloc(0, NULL, NULL);
+        if (config == NULL)
+            return NULL;
+        configSetStr(config, CONFIG_ITEM_NAME, g->name);
+        configSetInt(config, CONFIG_ITEM_SIZE, 0);
+        configSetStr(config, CONFIG_ITEM_FORMAT, "VCD");
+        sbSetDiscAttributes(config, 1, 1);
+        configSetStr(config, CONFIG_ITEM_STARTUP,
+                     vcdExtractGameId(g->name, vcdId, sizeof(vcdId)) ? vcdId : g->name);
+        return config;
     }
 
-    hdl_game_info_t *game = hddActiveHdl(id); // toggle-window safe: empty entry on a stale id (no OOB)
+    hdl_game_info_t *game = hddActiveHdl(id);
 
-    snprintf(path, sizeof(path), "%sCFG/%s.cfg", gHDDPrefix, game->startup);
-    config_set_t *config = configAlloc(0, NULL, path);
-    configRead(config); // Does not matter if the config file exists or not.
+    if (gHDDPrefix != NULL) {
+        snprintf(path, sizeof(path), "%sCFG/%s.cfg", gHDDPrefix, game->startup);
+        config = configAlloc(0, NULL, path);
+        if (config != NULL)
+            configRead(config); // Does not matter if the config file exists or not.
+    } else {
+        config = configAlloc(0, NULL, NULL); // metadata only; no unsafe/imaginary save destination
+    }
+    if (config == NULL)
+        return NULL;
 
     configSetStr(config, CONFIG_ITEM_NAME, game->name);
     configSetInt(config, CONFIG_ITEM_SIZE, game->total_size_in_kb >> 10);
     configSetStr(config, CONFIG_ITEM_FORMAT, "HDL");
-    // HDD bypasses sbPopulateConfig, so set #System/#Media/#DiscType via the shared helper (FR #49) --
-    // without it a theme's #DiscType / #System AttributeImage badge never rendered on HDD games. HDL
-    // titles are always PS2; reuse game->disctype for the CD-vs-DVD axis.
     sbSetDiscAttributes(config, 0, game->disctype == SCECdPS2CD);
     configSetStr(config, CONFIG_ITEM_STARTUP, game->startup);
 
@@ -1226,6 +1258,13 @@ static config_set_t *hddGetConfig(item_list_t *itemList, int id)
 static int hddGetImage(item_list_t *itemList, char *folder, int isRelative, char *value, char *suffix, GSTEXTURE *resultTex, short psm)
 {
     char path[256];
+
+    // The APA/HDL list is allowed to exist without a persistent PFS data home, but relative ART is
+    // not. Park the lookup cheaply instead of formatting a path through NULL; a later successful
+    // data-home mount invalidates the miss generation above and re-arms artwork. Absolute theme
+    // image requests remain independent and are still allowed.
+    if (isRelative && gHDDPrefix == NULL)
+        return ERR_BAD_FILE;
 
     // PS1 (VCD) art uses this same ART path as PS2. The cache supplies the filename first and may retry
     // once with a strict PS1 ID after a genuine miss; pfs0: remains the current OPL data mount.
@@ -1288,7 +1327,7 @@ static void hddCleanUp(item_list_t *itemList, int exception)
 
 static int hddCheckVMC(item_list_t *itemList, char *name, int createSize)
 {
-    return sysCheckVMC(gHDDPrefix, "/", name, createSize, NULL);
+    return gHDDPrefix != NULL ? sysCheckVMC(gHDDPrefix, "/", name, createSize, NULL) : -1;
 }
 
 // This may be called, even if hddInit() was not.
@@ -1340,8 +1379,8 @@ static int hddLoadGameListCache(hdl_games_list_t *cache)
     hdl_game_info_t *games;
     int result, size, count;
 
-    if (!gHDDGameListCache)
-        return 1;
+    if (!gHDDGameListCache || gHDDPrefix == NULL)
+        return 1; // cache is optional PFS data; live APA scanning does not depend on it
 
     hddFreeHDLGamelist(cache);
 
@@ -1388,8 +1427,8 @@ static int hddUpdateGameListCache(hdl_games_list_t *cache, hdl_games_list_t *gam
     FILE *file;
     int result, i, j, modified;
 
-    if (!gHDDGameListCache)
-        return 1;
+    if (!gHDDGameListCache || gHDDPrefix == NULL)
+        return 1; // no persistent PFS home: keep the live list in RAM and skip games.bin writes
 
     if (cache->count > 0) {
         modified = 0;
