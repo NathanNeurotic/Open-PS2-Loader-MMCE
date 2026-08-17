@@ -1413,3 +1413,19 @@ Hardware regression emphasis: APA/FHDB save/reboot with and without MC inserted;
 - Native OPL game selection reuses a browse-prefetched per-game config when the exact list+row is already resident instead of invalidating and rereading it just to enter/launch.
 - Info-screen #Size resolution is discretionary storage IO and waits for BGM reserve to recover, abandoning stale work if the user navigates away.
 - Hardware retest priorities: APA HDL + HDD VCD visibility; long loose-PNG scrolling without batch stalls; USB BGM while repeatedly entering Info; native-core X/Triangle config latency on settled vs immediate selections.
+
+## Step 212 follow-up — transactional HDD refresh / metadata dedupe / art overlap
+
+- Do not treat the current HDL backing list as scratch space for `games.bin`: cache and live APA
+  candidates are built separately and only a successful replacement is published. A failed refresh
+  preserves the last-good HDL list; a valid cache may rescue a first-entry live-scan failure.
+- Locked-to-VCD startup performs its initial HDD VCD build even without an L3 dirty bit. Explicit
+  Refresh in HDD VCD view invalidates the session VCD cache before rebuilding.
+- Direct HDD/HDL Info does not queue the generic CFG+stat size pass (APA metadata already owns size);
+  generic Info size resolution is one-at-a-time so repeated enter/back cannot stack duplicate reads.
+- A failed VCD cosmetic-ID enqueue releases its one-slot pending latch.
+- Pending cover requests that are touched by the new frame adopt the new focus generation even when
+  they remain neighbours; only the selected request is promoted. This keeps overlapping Coverflow/List
+  lookahead instead of dropping and rereading it after every navigation step.
+- This follow-up deliberately does NOT change ATA/DEV9 readiness: working HDD VCD enumeration proves
+  the relevant APA/PFS stack is resident for the reported HDL-list symptom.

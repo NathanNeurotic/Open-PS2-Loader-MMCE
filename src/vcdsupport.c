@@ -418,7 +418,13 @@ void vcdRequestDisplayId(const char *name)
     gVcdIdReqPending = 1;
     EIntr();
 
-    ioPutRequest(IO_CUSTOM_SIMPLEACTION, &vcdResolveQueuedDisplayId);
+    if (ioPutRequest(IO_CUSTOM_SIMPLEACTION, &vcdResolveQueuedDisplayId) != IO_OK) {
+        // No worker owns the one-slot request when enqueue fails. Release the latch immediately or
+        // every future cosmetic ID request is suppressed for the rest of the session.
+        DIntr();
+        gVcdIdReqPending = 0;
+        EIntr();
+    }
 }
 
 // dirPath is the directory that was just opened; fileName is what readdir returned (with ".VCD");

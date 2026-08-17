@@ -643,7 +643,10 @@ static int hddNeedsUpdate(item_list_t *itemList)
     if (vcdConsumeDirty(itemList->mode))
         return 1; // L3 toggle / default-view change -> rebuild the submenu (the ARRAY may be cached)
     if (vcdListViewActive(itemList))
-        return 0; // in VCD view: skip the HDL re-scan churn
+        // The locked-to-VCD startup path also receives the normal initial deferred update, but no
+        // toggle dirtied the view first. Build once when the VCD backing list does not exist yet.
+        // A manual HDD/VCD refresh invalidates this latch before posting the same deferred update.
+        return !hddVcdListBuilt;
     return 1;
 }
 
@@ -681,26 +684,50 @@ static int hddUpdateGameList(item_list_t *itemList)
         // built, invalidated (first-disc-only change), or freed by teardown (hddFreeVcdGameList).
         return hddVcdListBuilt ? hddVcdGameCount : hddBuildVcdGameList();
 
-    hdl_games_list_t hddGamesNew;
-    int ret;
+    hdl_games_list_t cachedGames = {0};
+    hdl_games_list_t hddGamesNew = {0};
+    int cacheRet, scanRet = 0;
 
-    // Force a live APA scan not only when the cache fails to load (ret != 0) or a prior build asked for it
-    // (hddForceUpdate), but ALSO when the cache loaded EMPTY (count 0). A missing/empty/stale games.bin
-    // otherwise left the first HDD page blank until a second manual refresh (provato's HW report).
-    if (((ret = hddLoadGameListCache(&hddGames)) != 0) || (hddForceUpdate) || (hddGames.count == 0)) {
-        hddGamesNew.count = 0;
-        hddGamesNew.games = NULL;
-        ret = hddGetHDLGamelist(&hddGamesNew);
-        if (ret == 0) {
-            hddUpdateGameListCache(&hddGames, &hddGamesNew);
+    // TRANSACTIONAL REFRESH. hddGames is the LIVE backing array used by the menu. The old path
+    // passed it directly to hddLoadGameListCache(), whose first action is hddFreeHDLGamelist(): a
+    // missing/corrupt games.bin therefore destroyed a perfectly good live list BEFORE the fallback
+    // APA scan had proved it could replace it. If that scan failed, VCD -> HDL returned to a blank
+    // PS2 page even though the previous HDL list had been valid. Build cache/live candidates off to
+    // the side and publish only a successful replacement.
+    cacheRet = hddLoadGameListCache(&cachedGames);
+
+    // Force a live APA scan when the cache is absent/bad, a prior build requested a refresh, or the
+    // cache is empty. Otherwise the initial boot may use the valid games.bin exactly as before.
+    if (cacheRet == 0 && !hddForceUpdate && cachedGames.count > 0) {
+        hddFreeHDLGamelist(&hddGames);
+        hddGames = cachedGames;
+        cachedGames.games = NULL;
+        cachedGames.count = 0;
+    } else {
+        scanRet = hddGetHDLGamelist(&hddGamesNew);
+        if (scanRet == 0) {
+            hddUpdateGameListCache(&cachedGames, &hddGamesNew);
             hddFreeHDLGamelist(&hddGames);
             hddGames = hddGamesNew;
+            hddGamesNew.games = NULL;
+            hddGamesNew.count = 0;
+        } else {
+            // Keep the last-good live list. On a first entry with no live list yet, a valid cache is
+            // still a safer fallback than turning a transient scan failure into an empty page.
+            if (hddGames.count == 0 && cachedGames.count > 0) {
+                hddGames = cachedGames;
+                cachedGames.games = NULL;
+                cachedGames.count = 0;
+            }
+            LOG("HDDSUPPORT HDL refresh failed (%d); preserving %u last-good game(s)\n", scanRet, hddGames.count);
         }
     }
 
+    hddFreeHDLGamelist(&cachedGames);
+    hddFreeHDLGamelist(&hddGamesNew);
     hddForceUpdate = 1; // Subsequent refresh operations will cause the HDD to be scanned.
 
-    return (ret == 0 ? hddGames.count : 0);
+    return hddGames.count;
 }
 
 static int hddGetGameCount(item_list_t *itemList)

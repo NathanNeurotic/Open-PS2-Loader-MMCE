@@ -1216,15 +1216,16 @@ GSTEXTURE *cacheGetTextureEx(image_cache_t *cache, item_list_t *list, int *cache
                     // Still loading -- but mark it as still WANTED. This stamp is the only evidence
                     // the worker has that anyone is still looking at this row (see cacheLoadImage).
                     entry->lastUsed = guiFrameId;
-                    if (isPriority) {
-                        load_image_request_t *req = (load_image_request_t *)entry->qr;
-                        if (req != NULL) {
-                            // A warmed neighbor can become the selected row while still queued/in-flight.
-                            // Adopt that exact request into the new focus generation instead of throwing it away.
-                            req->focusEpoch = gArtFocusEpoch;
-                            if (!(req->sio2 && gArtNavActive))
-                                artPromote(req);
-                        }
+                    load_image_request_t *req = (load_image_request_t *)entry->qr;
+                    if (req != NULL) {
+                        // Any pending cover touched by THIS frame is still useful to the new
+                        // selection neighborhood. Adopt it into the current generation even when
+                        // it is merely a neighbour; only the highlighted cover gets queue promotion.
+                        // Without this, overlapping lookahead (+2 becomes +1 after one step) kept
+                        // the OLD generation and the worker discarded work the new frame still wanted.
+                        req->focusEpoch = gArtFocusEpoch;
+                        if (isPriority && !(req->sio2 && gArtNavActive))
+                            artPromote(req);
                     }
                     return NULL;
                 } else if (entry->lastUsed == 0) {
@@ -1265,15 +1266,16 @@ GSTEXTURE *cacheGetTextureEx(image_cache_t *cache, item_list_t *list, int *cache
                     *cacheId = i;
                     *UID = entry->UID;
                     entry->lastUsed = guiFrameId;
-                    if (isPriority) {
-                        load_image_request_t *req = (load_image_request_t *)entry->qr;
-                        if (req != NULL) {
-                            // A warmed neighbor can become the selected row while still queued/in-flight.
-                            // Adopt that exact request into the new focus generation instead of throwing it away.
-                            req->focusEpoch = gArtFocusEpoch;
-                            if (!(req->sio2 && gArtNavActive))
-                                artPromote(req);
-                        }
+                    load_image_request_t *req = (load_image_request_t *)entry->qr;
+                    if (req != NULL) {
+                        // Any pending cover touched by THIS frame is still useful to the new
+                        // selection neighborhood. Adopt it into the current generation even when
+                        // it is merely a neighbour; only the highlighted cover gets queue promotion.
+                        // Without this, overlapping lookahead (+2 becomes +1 after one step) kept
+                        // the OLD generation and the worker discarded work the new frame still wanted.
+                        req->focusEpoch = gArtFocusEpoch;
+                        if (isPriority && !(req->sio2 && gArtNavActive))
+                            artPromote(req);
                     }
                     return NULL;
                 }

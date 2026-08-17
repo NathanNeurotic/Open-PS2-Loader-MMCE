@@ -76,6 +76,10 @@ static config_set_t *itemConfig;
 // list, so (id == id) across two tabs is not the same game/config. This also lets X/Triangle safely
 // reuse the browse-prefetched config instead of forcing a second device read.
 static item_list_t *itemConfigList;
+// One Info/#Size resolve at a time. Repeated enter/back/enter used to enqueue duplicate CFG+stat
+// reads for the same row on the single IO worker, multiplying storage contention without producing
+// any additional state. Keep the request latched until its worker pass finishes or is abandoned.
+static unsigned char infoSizeRequestPending;
 
 static u8 parentalLockCheckEnabled = 1;
 
@@ -245,6 +249,13 @@ static void _menuLoadConfigAsync()
         configFree(loadedConfig); // lost the race -- drop it, never publish another row's config
 }
 
+static void menuInfoSizeComplete(void)
+{
+    WaitSema(menuSemaId);
+    infoSizeRequestPending = 0;
+    SignalSema(menuSemaId);
+}
+
 // Opening the info screen needs #Size, which the scroll-time config load deliberately skips
 // (sbConfigStatSize off -> no slow per-game stat while browsing). Rebuild the current item's
 // config once with the size resolved and swap it in, but only if the selection is unchanged --
@@ -265,8 +276,10 @@ static void _menuResolveInfoSize()
     }
     SignalSema(menuSemaId);
 
-    if (list == NULL || configId < 0)
+    if (list == NULL || configId < 0) {
+        menuInfoSizeComplete();
         return;
+    }
 
     // #Size is cosmetic/discretionary IO. ART already yields when BGM reserve is critical, but this
     // path did not: repeatedly entering Info on USB could still make a CFG+stat compete with the
@@ -282,8 +295,10 @@ static void _menuResolveInfoSize()
                       itemConfigList == list && itemConfigId == selected_item->item->current->item.id &&
                       selected_item->item->userdata == list;
         SignalSema(menuSemaId);
-        if (!stillWanted)
+        if (!stillWanted) {
+            menuInfoSizeComplete();
             return;
+        }
     }
 
     // itemGetConfig runs OUTSIDE the semaphore on purpose: it is the slow call (a CFG read plus the
@@ -293,8 +308,10 @@ static void _menuResolveInfoSize()
     loadedConfig = list->itemGetConfig(list, configId);
     sbSetConfigStatSize(0);
 
-    if (loadedConfig == NULL)
+    if (loadedConfig == NULL) {
+        menuInfoSizeComplete();
         return;
+    }
 
     // Re-check the selection under the sema: if the user scrolled away while the stat ran, the
     // freshly loaded config belongs to a row that is no longer current -- drop it rather than
@@ -313,12 +330,23 @@ static void _menuResolveInfoSize()
 
     if (loadedConfig != NULL)
         configFree(loadedConfig);
+
+    menuInfoSizeComplete();
 }
 
 // Queued when the info screen opens: resolve #Size for the current item without blocking the UI.
 void menuRequestInfoSize(void)
 {
-    ioPutRequest(IO_CUSTOM_SIMPLEACTION, &_menuResolveInfoSize);
+    WaitSema(menuSemaId);
+    if (infoSizeRequestPending) {
+        SignalSema(menuSemaId);
+        return;
+    }
+    infoSizeRequestPending = 1;
+    SignalSema(menuSemaId);
+
+    if (ioPutRequest(IO_CUSTOM_SIMPLEACTION, &_menuResolveInfoSize) != IO_OK)
+        menuInfoSizeComplete();
 }
 
 static void _menuSaveConfig()
@@ -515,6 +543,7 @@ void menuInit()
     itemConfigId = -1;
     itemConfig = NULL;
     itemConfigList = NULL;
+    infoSizeRequestPending = 0;
     mainMenu = NULL;
     mainMenuCurrent = NULL;
     gameMenu = NULL;

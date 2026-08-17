@@ -390,13 +390,16 @@ static void itemExecRefresh(struct menu_item *curMenu)
     item_list_t *support = curMenu->userdata;
 
     if (support && support->enabled) {
-        // Fork shape verbatim. FAV has no device to rescan: loadFavourites() re-reads
-        // favourites.bin and schedules its own rebuild. Everything else posts the deferred
-        // update and lets the device's own NeedsUpdate logic decide what a refresh means.
-        if (support->mode == FAV_MODE)
+        // FAV has no device to rescan: loadFavourites() re-reads favourites.bin and schedules its
+        // own rebuild. HDD's VCD view is intentionally cached across ordinary L3 flips, so an
+        // explicit user Refresh must invalidate that cache before posting the deferred update.
+        if (support->mode == FAV_MODE) {
             loadFavourites();
-        else
+        } else {
+            if (support->mode == HDD_MODE && vcdListViewActive(support))
+                hddVcdInvalidateCache();
             ioPutRequest(IO_MENU_UPDATE_DEFFERED, &support->mode);
+        }
         sfxPlay(SFX_CONFIRM);
     }
 }
@@ -473,7 +476,10 @@ static void itemExecSquare(struct menu_item *curMenu)
         // busy spinner (Andrew, #120). Skipping it for VCD strictly REDUCES channel traffic and drops
         // no displayed data (the info page shows no size for a VCD anyway).
         item_list_t *support = curMenu->userdata;
-        if (support == NULL || !vcdViewActive(support->mode))
+        // Direct HDD/HDL rows already carry their size in APA metadata (total_size_in_kb), so the
+        // generic CFG+stat pass is redundant there. VCD rows likewise have no meaningful #Size.
+        // Avoid putting either no-op read onto the shared IO worker merely for opening Info.
+        if (support == NULL || (!vcdListViewActive(support) && support->mode != HDD_MODE))
             menuRequestInfoSize();
         guiSwitchScreen(GUI_SCREEN_INFO);
     }
