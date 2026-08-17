@@ -18,4 +18,4 @@ jobs:
         with:
           fetch-depth: 0
       - run: bash .github/scripts/step212-coverflow.sh
-        # Hardware follow-up: APA enumeration, rolling art focus, config/BGM IO latency.
+        # Completed hardware follow-up transaction; production head is now guarded separately.
