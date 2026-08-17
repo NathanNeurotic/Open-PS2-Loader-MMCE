@@ -1739,10 +1739,10 @@ static int tryReadRecoveryConfigHome(int types, const char *home)
 
 static void restoreRecoverySaveHome(const char *recoveredHome)
 {
-    // Recovery is discovery only. Never let the probed MC/USB path silently become the
-    // next save destination. Local boots return to their real boot home; bare boots return
-    // to the normal mc?:OPL home. A deferred network boot cannot save back to its unreadable
-    // share during bootstrap, so select a concrete reachable MC home when possible.
+    // Recovery is discovery only and never writes by itself. Known local boots return to their
+    // real boot home; a bare launch has no independent owner, so the existing config home that was
+    // actually recovered becomes the next explicit-save home. A deferred network boot cannot save
+    // back to its unreadable share during bootstrap, so select a concrete reachable MC home when possible.
     if (gBootHomeDeferred) {
         const char *mcHome = NULL;
         DIR *dir;
