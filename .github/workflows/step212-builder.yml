@@ -18,5 +18,4 @@ jobs:
         with:
           fetch-depth: 0
       - run: bash .github/scripts/step212-coverflow.sh
-        # One-shot hardware-feedback pass: deterministic APA config ownership, review fixes,
-        # and tightly gated ETH/HDD follow-ups. Production branch is guarded by exact head SHA.
+        # Format-only follow-up after exact-head CI; production branch is guarded by exact SHA.
