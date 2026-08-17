@@ -790,7 +790,10 @@ static config_set_t *appGetConfig(item_list_t *itemList, int id)
         configSetStr(config, CONFIG_ITEM_MEDIA, "APP");
         configSetStr(config, CONFIG_ITEM_FORMAT, "ELF");
 
-        snprintf(tmp, sizeof(tmp), "%.2f", appGetELFSize(cur->val));
+        if (sbConfigStatSizeEnabled())
+            snprintf(tmp, sizeof(tmp), "%.2f", appGetELFSize(cur->val));
+        else
+            snprintf(tmp, sizeof(tmp), "0.00");
         configSetStr(config, CONFIG_ITEM_SIZE, tmp);
     } else {
         char path[256];
@@ -807,7 +810,10 @@ static config_set_t *appGetConfig(item_list_t *itemList, int id)
         configSetStr(config, CONFIG_ITEM_MEDIA, "APP");
         configSetStr(config, CONFIG_ITEM_FORMAT, "ELF");
 
-        snprintf(tmp, sizeof(tmp), "%.2f", appGetELFSize(path));
+        if (sbConfigStatSizeEnabled())
+            snprintf(tmp, sizeof(tmp), "%.2f", appGetELFSize(path));
+        else
+            snprintf(tmp, sizeof(tmp), "0.00");
         configSetStr(config, CONFIG_ITEM_SIZE, tmp);
     }
     return config;

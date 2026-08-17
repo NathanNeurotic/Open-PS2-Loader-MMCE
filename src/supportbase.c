@@ -944,6 +944,11 @@ void sbSetConfigStatSize(int enable)
     sbConfigStatSize = enable;
 }
 
+int sbConfigStatSizeEnabled(void)
+{
+    return sbConfigStatSize;
+}
+
 config_set_t *sbPopulateConfig(base_game_info_t *game, const char *prefix, const char *sep)
 {
     char path[256];
