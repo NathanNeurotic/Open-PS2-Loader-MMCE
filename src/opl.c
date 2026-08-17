@@ -1836,10 +1836,14 @@ static int tryMissingConfigPathRecovery(int types)
         }
     }
 
-    // Every failed probe re-homed the config_set filenames. Put them back exactly where normal boot
-    // discovery expects them before the existing fallback policy continues.
+    // Every failed probe re-homed the config_set filenames. For APA, preserve an already-mounted
+    // safe PFS home instead of falling back to the raw hddN: launch namespace. Raw APA remains only
+    // a fail-closed launch identity when no writable PFS owner exists at all.
     configEnd();
-    configInit(gBootDir[0] != '\0' ? gBootDir : NULL);
+    if (gBootHomeApa && gHDDPrefix != NULL && gHDDPrefix[0] != '\0')
+        configInit(gHDDPrefix);
+    else
+        configInit(gBootDir[0] != '\0' ? gBootDir : NULL);
     return 0;
 }
 
@@ -1889,10 +1893,12 @@ static int tryAlternateDevice(int types)
     if (value & CONFIG_OPL)
         return value;
 
-    // An APA launch that still has no mountable existing PFS home fails closed here. Do not fall
-    // through into the legacy MC write-home logic merely because recovery also found nothing.
+    // An APA launch that still has no config fails closed here. Never overwrite a valid mounted
+    // PFS notification/home with the raw hddN: launch identity merely because no settings file exists.
+    // If no PFS home is mounted, the explicit-save gate below retries the safe ownership chain.
     if (gBootHomeApa) {
-        configPrepareNotifications(gBootDir);
+        if (gHDDPrefix != NULL && gHDDPrefix[0] != '\0')
+            configSetMove(gHDDPrefix);
         showCfgPopup = 0;
         return 0;
     }
@@ -2724,6 +2730,26 @@ static void _saveConfig()
         configSetStr(configNet, CONFIG_NET_SMB_SHARE, gPCShareName);
         configSetStr(configNet, CONFIG_NET_SMB_USER, gPCUserName);
         configSetStr(configNet, CONFIG_NET_SMB_PASSW, gPCPassword);
+    }
+
+    // APA launch identity is raw partition space, never a writable config filesystem. Even when
+    // discovery loaded defaults or recovered settings elsewhere, an ordinary APA save without an
+    // explicit Custom Settings Path must resolve the existing-PFS ownership chain NOW. This keeps
+    // raw hddN: out of configWrite entirely: configured existing target first, then __common/OPL,
+    // otherwise fail visibly without creating/formatting/repairing any APA partition.
+    if (gBootHomeApa && gCustomSettingsPath[0] == '\0') {
+        char hddSaveHome[64];
+        if (prepareHddSettingsFallback(hddSaveHome, sizeof(hddSaveHome)) <= 0) {
+            if (gOPLPart[0] != '\0')
+                snprintf(gLastSaveTarget, sizeof(gLastSaveTarget), "%s", gOPLPart);
+            else
+                snprintf(gLastSaveTarget, sizeof(gLastSaveTarget), "%s", "hdd0:__common/OPL");
+            gLastSaveErrno = ENODEV;
+            lscret = 0;
+            lscstatus = 0;
+            return;
+        }
+        configSetMove(hddSaveHome);
     }
 
     char *path = configGetDir();

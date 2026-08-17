@@ -267,6 +267,18 @@ static struct config_value_t *getConfigItemForName(config_set_t *configSet, cons
 }
 
 static char cfgDevice[8];
+static char cfgLoadDevice[8];
+
+static void configPrepareDevice(char *device, size_t deviceSize, const char *prefix)
+{
+    char *colpos;
+
+    if (prefix == NULL)
+        prefix = "";
+    snprintf(device, deviceSize, "%s", prefix);
+    if ((colpos = strchr(device, ':')) != NULL)
+        *(colpos + 1) = '\0';
+}
 
 char *configGetDir(void)
 {
@@ -274,22 +286,33 @@ char *configGetDir(void)
     // detected. Blind substitution stamped getmcID()'s -1 (0xFF) -- or a probe-time other-card digit --
     // over a CONCRETE "mc0:"/"mc1:" prefix from an appdir-on-MC boot, so the "Settings saved to %s"
     // toast rendered a garbage byte or the wrong card. Legacy "mc?:" homes keep today's behaviour.
-    if (!strncmp(cfgDevice, "mc", 2) && cfgDevice[2] == '?' && getmcID() >= 0) {
+    if (!strncmp(cfgDevice, "mc", 2) && cfgDevice[2] == '?' && getmcID() >= 0)
         cfgDevice[2] = getmcID();
-    }
 
-    char *path = cfgDevice;
-    return path;
+    return cfgDevice;
+}
+
+char *configGetLoadDir(void)
+{
+    if (!strncmp(cfgLoadDevice, "mc", 2) && cfgLoadDevice[2] == '?' && getmcID() >= 0)
+        cfgLoadDevice[2] = getmcID();
+
+    return cfgLoadDevice[0] != '\0' ? cfgLoadDevice : cfgDevice;
 }
 
 void configPrepareNotifications(char *prefix)
 {
-    char *colpos;
+    configPrepareDevice(cfgDevice, sizeof(cfgDevice), prefix);
+}
 
-    snprintf(cfgDevice, sizeof(cfgDevice), "%s", prefix); // prefix is caller/config data, never a format string
-
-    if ((colpos = strchr(cfgDevice, ':')) != NULL)
-        *(colpos + 1) = '\0';
+static void configPrepareLoadNotification(const char *path)
+{
+    // pfs0: is OPL's transient mount name. When it backs the known persistent APA home, report
+    // the physical HDD owner instead so "loaded from" names the device that actually supplied it.
+    if (path != NULL && !strncmp(path, "pfs0:", 5) && gOPLPart[0] != '\0')
+        configPrepareDevice(cfgLoadDevice, sizeof(cfgLoadDevice), gOPLPart);
+    else
+        configPrepareDevice(cfgLoadDevice, sizeof(cfgLoadDevice), path);
 }
 
 static void configBuildPath(char *out, size_t outSize, const char *prefix, const char *filename)
@@ -1388,8 +1411,13 @@ int configReadMulti(int types)
 
         if (configSet->type & types) {
             configClear(configSet);
-            if (configRead(configSet))
+            if (configRead(configSet)) {
                 result |= configSet->type;
+                // Record the file source BEFORE higher-level recovery re-homes the live config sets
+                // for a future save. Load notifications must describe evidence, not ownership policy.
+                if (configSet->type == CONFIG_OPL)
+                    configPrepareLoadNotification(configSet->filename);
+            }
         }
     }
 

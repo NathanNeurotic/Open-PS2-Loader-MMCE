@@ -1380,3 +1380,13 @@ Previously that state returned success without creating the destination file -- 
 files remain on the no-write fast path, empty optional sets are not created, and the raw-APA write
 firewall still runs before any actual O_CREAT. `conf_hdd.cfg` remains an optional pre-existing HDD
 home redirect; RiptOPL's master settings file is `settings_riptopl.cfg`.
+
+### Step 212 APA config-source/save-home correction
+Hardware on the stacked Step-212 artifact exposed a paired state bug: config recovery could read an
+existing master config from MC/USB, then re-home the live sets to the raw `hdd0:` APA launch identity.
+The load toast therefore claimed `hdd0:` even though no HDD settings file existed, and the next explicit
+Save reached the raw-APA firewall and failed with EACCES / error 13. Load-source reporting is now tracked
+separately from future save ownership, failed recovery preserves an already-mounted safe PFS home, and
+every non-custom APA save resolves the existing-PFS chain (`conf_hdd.cfg` target -> `__common/OPL`) before
+`configWrite()`. If no safe PFS home exists it fails visibly with ENODEV; it never creates/formats/repairs
+APA metadata.
