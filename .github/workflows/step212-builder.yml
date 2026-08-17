@@ -18,4 +18,4 @@ jobs:
         with:
           fetch-depth: 0
       - run: bash .github/scripts/step212-coverflow.sh
-        # Close VCD publication, Info latest-wins, favourite-ID and autolaunch teardown races.
+        # Exact clang-format correction after review hardening.
