@@ -1772,7 +1772,11 @@ static void restoreRecoverySaveHome(const char *recoveredHome)
     } else if (gBootDir[0] != '\0') {
         configSetMove(gBootDir);
     } else {
-        configSetMove(NULL);
+        // A bare launch has no independent boot owner to restore. The existing config home that
+        // recovery actually found is therefore the strongest safe ownership signal; keep that
+        // concrete MC/USB home so the next explicit save can persist instead of falling into an
+        // unreachable mc?:OPL wildcard. Recovery still performs no write by itself.
+        configSetMove((char *)recoveredHome);
     }
 }
 
