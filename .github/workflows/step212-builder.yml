@@ -18,4 +18,4 @@ jobs:
         with:
           fetch-depth: 0
       - run: bash .github/scripts/step212-coverflow.sh
-        # Exact clang-format correction after review hardening.
+        # Close remaining ETH favourite and HDL live-list publication gaps.
