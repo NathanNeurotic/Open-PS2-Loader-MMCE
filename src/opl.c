@@ -363,10 +363,17 @@ static void itemExecSelect(struct menu_item *curMenu)
                     return;
                 }
                 config_set_t *configSet = menuLoadConfig();
-                // Flash the GameID barcode (Pixel FX/RetroGEM HDMI auto-profile) before handoff; this
-                // single menu chokepoint covers both the Neutrino and OPL-native cores. No-op when off.
-                guiShowGameID(support->itemGetStartup(support, curMenu->current->item.id));
-                support->itemLaunch(support, curMenu->current->item.id, configSet);
+                if (curMenu->current == NULL)
+                    return; // a deferred source refresh replaced the row while config IO was pending
+                int launchId = curMenu->current->item.id;
+                char gameIdStartup[128] = {0};
+                char *startup = support->itemGetStartup(support, launchId);
+                if (startup != NULL)
+                    snprintf(gameIdStartup, sizeof(gameIdStartup), "%s", startup);
+                // Flash the GameID barcode (Pixel FX/RetroGEM HDMI auto-profile) before handoff. Use
+                // the stack copy: the hold renders/unlocks for many frames while source lists may refresh.
+                guiShowGameID(gameIdStartup);
+                support->itemLaunch(support, launchId, configSet);
             }
         } else {
             // If we're trying to enable BDM support we need to enable it for all BDM menu slots.
@@ -4079,6 +4086,7 @@ static void autoLaunchHDDGame(char *argv[])
     if (configSet == NULL) {
         free(gAutoLaunchGame);
         gAutoLaunchGame = NULL;
+        miniDeinit(NULL);
         return;
     }
 

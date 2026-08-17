@@ -1452,3 +1452,16 @@ Hardware regression emphasis: APA/FHDB save/reboot with and without MC inserted;
   completed scan.
 - With this change the HDL APA walk, POPS APA-partition walk, and VCD directory walk all reject
   incomplete enumeration rather than publishing it as authoritative. No ATA/DEV9 behavior changed.
+
+## Step 212 follow-up — review hardening after transactional enumeration
+
+- HDD VCD backing-array publication is serialized with `guiLock`: games pointer, partition pointer,
+  count, cache latch, and old-array retirement move as one GUI-reader-safe handoff. Direct VCD launch
+  copies the parallel name/partition fields before any blocking work; GameID likewise receives a stack
+  copy of startup instead of holding a mutable list pointer across its multi-frame display.
+- Info `#Size` admission remains single-worker but is now latest-wins: same-row repeats dedupe, while
+  a different row replaces the target and is processed before the worker exits.
+- VCD favourites no longer require their intentionally-nonstable numeric id for absolute theme-image
+  fallback; their text/name identity remains authoritative.
+- HDD autolaunch allocation failure now calls `miniDeinit(NULL)` to unwind `miniInit(HDD_MODE)`.
+- No ATA/DEV9 readiness behavior changed.

@@ -743,7 +743,8 @@ static int favGetImage(item_list_t *itemList, char *folder, int isRelative, char
         for (int i = 0; i < favCount; i++) {
             item_list_t ownerView;
             item_list_t *o = favOwnerView(i, &ownerView);
-            if (o == NULL || o->itemGetImage == NULL || !favOwnerHasId(o, favArray[i].id))
+            if (o == NULL || o->itemGetImage == NULL ||
+                (!favArray[i].isVcd && !favOwnerHasId(o, favArray[i].id)))
                 continue;
             int r = o->itemGetImage(o, folder, isRelative, value, suffix, resultTex, psm);
             if (r != -1)

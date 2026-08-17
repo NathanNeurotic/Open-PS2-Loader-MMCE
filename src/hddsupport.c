@@ -503,14 +503,26 @@ void hddVcdInvalidateCache(void)
     hddVcdListBuilt = 0;
 }
 
+static void hddPublishVcdGameList(base_game_info_t *games, char (*parts)[APA_IDMAX + 1], int count, int built)
+{
+    base_game_info_t *oldGames;
+    char (*oldParts)[APA_IDMAX + 1];
+
+    guiLock();
+    oldGames = hddVcdGames;
+    oldParts = hddVcdParts;
+    hddVcdGames = games;
+    hddVcdParts = parts;
+    hddVcdGameCount = count;
+    hddVcdListBuilt = built;
+    free(oldGames);
+    free(oldParts);
+    guiUnlock();
+}
+
 static void hddFreeVcdGameList(void)
 {
-    free(hddVcdGames);
-    hddVcdGames = NULL;
-    free(hddVcdParts);
-    hddVcdParts = NULL;
-    hddVcdGameCount = 0;
-    hddVcdListBuilt = 0;
+    hddPublishVcdGameList(NULL, NULL, 0, 0);
 }
 
 // Build the HDD VCD game list from both supported APA/PFS shapes. Exact __.POPS / __.POPS0..9
@@ -668,15 +680,9 @@ static int hddBuildVcdGameList(void)
         return hddVcdGameCount;
     }
 
-    free(hddVcdGames);
-    free(hddVcdParts);
-    hddVcdGames = newGames;
-    hddVcdParts = newParts;
-    hddVcdGameCount = total;
-
     // A first-ever incomplete scan may still expose the entries it proved readable, but it is never
     // latched as complete. A fully successful zero/nonzero scan is latched unless invalidated mid-run.
-    hddVcdListBuilt = !scanIncomplete && (genAtEntry == hddVcdCacheGen);
+    hddPublishVcdGameList(newGames, newParts, total, !scanIncomplete && (genAtEntry == hddVcdCacheGen));
     return total;
 }
 
@@ -960,7 +966,7 @@ static void hddLaunchVcd(item_list_t *itemList, const char *vcdName, config_set_
         snprintf(resolvedName, sizeof(resolvedName), "%s", hddVcdGames[idx].name);
         snprintf(resolvedPart, sizeof(resolvedPart), "%s", hddVcdParts[idx]);
     }
-    ioBlockOps(0);
+    ioBlockOps(0); // resolvedName/resolvedPart are now independent of the mutable backing arrays
     if (idx < 0) {
         guiMsgBox(_l(_STR_POPSTARTER_NOT_FOUND), 0, NULL);
         return;
@@ -1083,10 +1089,20 @@ void hddLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
     // selector/partition contract is hardware-testable -- POPSLoader proved the shape with a vendored
     // loader; we use the stock ps2sdk loader, the same one the shipping USB/MMCE/SMB VCD launch uses.
     if (gAutoLaunchGame == NULL && vcdListViewActive(itemList)) {
+        char vcdName[VCD_NAME_MAX];
+        char vcdPart[APA_IDMAX + 1];
+
+        guiLock();
         base_game_info_t *vcd = hddActiveVcd(id);
-        if (vcd == &hddEmptyVcd)
-            return; // stale id in the L3 toggle window -> nothing to launch (hddVcdParts[id] would also OOB)
-        hddDoLaunchVcd(itemList, vcd->name, hddVcdParts[id]);
+        if (vcd == &hddEmptyVcd) {
+            guiUnlock();
+            return; // stale id in the L3 toggle window -> nothing to launch
+        }
+        snprintf(vcdName, sizeof(vcdName), "%s", vcd->name);
+        snprintf(vcdPart, sizeof(vcdPart), "%s", hddVcdParts[id]);
+        guiUnlock();
+
+        hddDoLaunchVcd(itemList, vcdName, vcdPart);
         return;
     }
 

@@ -76,10 +76,13 @@ static config_set_t *itemConfig;
 // list, so (id == id) across two tabs is not the same game/config. This also lets X/Triangle safely
 // reuse the browse-prefetched config instead of forcing a second device read.
 static item_list_t *itemConfigList;
-// One Info/#Size resolve at a time. Repeated enter/back/enter used to enqueue duplicate CFG+stat
-// reads for the same row on the single IO worker, multiplying storage contention without producing
-// any additional state. Keep the request latched until its worker pass finishes or is abandoned.
-static unsigned char infoSizeRequestPending;
+// One Info/#Size worker at a time, with a latest-wins target. Repeated enter/back/enter on the
+// SAME row does not queue duplicate CFG+stat reads; moving to another row while one is active replaces
+// the requested target and the worker loops to that newest row before releasing its latch.
+static unsigned char infoSizeWorkerPending;
+static item_list_t *infoSizeRequestList;
+static int infoSizeRequestId = -1;
+static unsigned int infoSizeRequestGeneration;
 
 static u8 parentalLockCheckEnabled = 1;
 
@@ -249,104 +252,117 @@ static void _menuLoadConfigAsync()
         configFree(loadedConfig); // lost the race -- drop it, never publish another row's config
 }
 
-static void menuInfoSizeComplete(void)
-{
-    WaitSema(menuSemaId);
-    infoSizeRequestPending = 0;
-    SignalSema(menuSemaId);
-}
-
-// Opening the info screen needs #Size, which the scroll-time config load deliberately skips
-// (sbConfigStatSize off -> no slow per-game stat while browsing). Rebuild the current item's
-// config once with the size resolved and swap it in, but only if the selection is unchanged --
-// the user may have scrolled away before this IO request ran. game->sizeMB is cached afterwards,
-// so subsequent scrolls/info views show the size with no further stat.
+// Opening the info screen needs #Size, which the scroll-time config load deliberately skips.
+// The worker is single-instance but the TARGET is replaceable: if the user opens Info for B while A
+// is still resolving, A is discarded when stale and the same worker immediately processes B.
 static void _menuResolveInfoSize()
 {
-    item_list_t *list = NULL;
-    config_set_t *loadedConfig = NULL;
-    int configId = -1;
+    for (;;) {
+        item_list_t *list = NULL;
+        config_set_t *loadedConfig = NULL;
+        int configId = -1;
+        unsigned int generation = 0;
 
-    WaitSema(menuSemaId);
-    if (selected_item != NULL && selected_item->item != NULL && selected_item->item->current != NULL &&
-        itemConfigId >= 0 && itemConfigId == selected_item->item->current->item.id &&
-        itemConfigList == selected_item->item->userdata) {
-        list = selected_item->item->userdata;
-        configId = itemConfigId;
-    }
-    SignalSema(menuSemaId);
-
-    if (list == NULL || configId < 0) {
-        menuInfoSizeComplete();
-        return;
-    }
-
-    // #Size is cosmetic/discretionary IO. ART already yields when BGM reserve is critical, but this
-    // path did not: repeatedly entering Info on USB could still make a CFG+stat compete with the
-    // decoder until audio stopped. Wait in short sleeps, and abandon the work entirely if the user
-    // has moved away while audio refills. BGM does its own file IO, so sleeping the general IO worker
-    // here does not prevent the reserve from recovering.
-    while (!bgmDiscretionaryIoAllowed()) {
-        int stillWanted;
-        DelayThread(10 * 1000);
         WaitSema(menuSemaId);
-        stillWanted = selected_item != NULL && selected_item->item != NULL &&
-                      selected_item->item->current != NULL && itemConfigId == configId &&
-                      itemConfigList == list && itemConfigId == selected_item->item->current->item.id &&
-                      selected_item->item->userdata == list;
+        list = infoSizeRequestList;
+        configId = infoSizeRequestId;
+        generation = infoSizeRequestGeneration;
         SignalSema(menuSemaId);
-        if (!stillWanted) {
-            menuInfoSizeComplete();
+
+        if (list == NULL || configId < 0)
+            goto complete_request;
+
+        // #Size is cosmetic/discretionary IO. Wait for BGM reserve, but stop waiting on a target that
+        // has already been superseded or a selection the user left; the next loop takes the newest.
+        while (!bgmDiscretionaryIoAllowed()) {
+            int stillWanted;
+            DelayThread(10 * 1000);
+            WaitSema(menuSemaId);
+            stillWanted = infoSizeRequestGeneration == generation && infoSizeRequestList == list &&
+                          infoSizeRequestId == configId && selected_item != NULL &&
+                          selected_item->item != NULL && selected_item->item->current != NULL &&
+                          selected_item->item->userdata == list &&
+                          selected_item->item->current->item.id == configId;
+            SignalSema(menuSemaId);
+            if (!stillWanted)
+                goto complete_request;
+        }
+
+        // itemGetConfig runs outside menuSemaId: it is the slow CFG+stat operation.
+        sbSetConfigStatSize(1);
+        loadedConfig = list->itemGetConfig(list, configId);
+        sbSetConfigStatSize(0);
+
+        // Publish only if this request is STILL the newest target and the same row is selected.
+        WaitSema(menuSemaId);
+        if (loadedConfig != NULL && infoSizeRequestGeneration == generation &&
+            infoSizeRequestList == list && infoSizeRequestId == configId && selected_item != NULL &&
+            selected_item->item != NULL && selected_item->item->current != NULL &&
+            selected_item->item->userdata == list && selected_item->item->current->item.id == configId) {
+            if (itemConfig != NULL)
+                configFree(itemConfig);
+            itemConfig = loadedConfig;
+            itemConfigId = configId;
+            itemConfigList = list;
+            loadedConfig = NULL;
+        }
+        SignalSema(menuSemaId);
+
+        if (loadedConfig != NULL)
+            configFree(loadedConfig);
+
+complete_request:
+        WaitSema(menuSemaId);
+        if (infoSizeRequestGeneration == generation) {
+            // Nobody replaced this target while it ran: the queue is drained.
+            infoSizeRequestList = NULL;
+            infoSizeRequestId = -1;
+            infoSizeWorkerPending = 0;
+            SignalSema(menuSemaId);
             return;
         }
+        // A newer target arrived while this one ran. Leave the worker latch set and loop directly;
+        // no second IO request is needed and the newest request cannot be lost behind a queue failure.
+        SignalSema(menuSemaId);
     }
-
-    // itemGetConfig runs OUTSIDE the semaphore on purpose: it is the slow call (a CFG read plus the
-    // ISO stat this whole mechanism exists to defer), and holding menuSemaId across it would block
-    // the GUI thread for exactly as long as the stat we are trying to keep off the scroll path.
-    sbSetConfigStatSize(1);
-    loadedConfig = list->itemGetConfig(list, configId);
-    sbSetConfigStatSize(0);
-
-    if (loadedConfig == NULL) {
-        menuInfoSizeComplete();
-        return;
-    }
-
-    // Re-check the selection under the sema: if the user scrolled away while the stat ran, the
-    // freshly loaded config belongs to a row that is no longer current -- drop it rather than
-    // publish someone else's #Size.
-    WaitSema(menuSemaId);
-    if (selected_item != NULL && selected_item->item != NULL && selected_item->item->current != NULL &&
-        itemConfigId == configId && itemConfigList == list && itemConfigId == selected_item->item->current->item.id &&
-        selected_item->item->userdata == list) {
-        if (itemConfig != NULL)
-            configFree(itemConfig);
-        itemConfig = loadedConfig;
-        itemConfigList = list;
-        loadedConfig = NULL;
-    }
-    SignalSema(menuSemaId);
-
-    if (loadedConfig != NULL)
-        configFree(loadedConfig);
-
-    menuInfoSizeComplete();
 }
 
-// Queued when the info screen opens: resolve #Size for the current item without blocking the UI.
+// Queued when the info screen opens: resolve #Size without blocking the UI. Same-row repeats dedupe;
+// a different row replaces the target even when the worker is already active.
 void menuRequestInfoSize(void)
 {
+    int queueWorker = 0;
+
     WaitSema(menuSemaId);
-    if (infoSizeRequestPending) {
+    if (selected_item == NULL || selected_item->item == NULL || selected_item->item->current == NULL) {
         SignalSema(menuSemaId);
         return;
     }
-    infoSizeRequestPending = 1;
+
+    item_list_t *list = selected_item->item->userdata;
+    int configId = selected_item->item->current->item.id;
+
+    if (infoSizeWorkerPending && infoSizeRequestList == list && infoSizeRequestId == configId) {
+        SignalSema(menuSemaId);
+        return; // exact same work is already active/queued
+    }
+
+    infoSizeRequestList = list;
+    infoSizeRequestId = configId;
+    infoSizeRequestGeneration++;
+    if (!infoSizeWorkerPending) {
+        infoSizeWorkerPending = 1;
+        queueWorker = 1;
+    }
     SignalSema(menuSemaId);
 
-    if (ioPutRequest(IO_CUSTOM_SIMPLEACTION, &_menuResolveInfoSize) != IO_OK)
-        menuInfoSizeComplete();
+    if (queueWorker && ioPutRequest(IO_CUSTOM_SIMPLEACTION, &_menuResolveInfoSize) != IO_OK) {
+        WaitSema(menuSemaId);
+        infoSizeWorkerPending = 0;
+        infoSizeRequestList = NULL;
+        infoSizeRequestId = -1;
+        SignalSema(menuSemaId);
+    }
 }
 
 static void _menuSaveConfig()
@@ -543,7 +559,10 @@ void menuInit()
     itemConfigId = -1;
     itemConfig = NULL;
     itemConfigList = NULL;
-    infoSizeRequestPending = 0;
+    infoSizeWorkerPending = 0;
+    infoSizeRequestList = NULL;
+    infoSizeRequestId = -1;
+    infoSizeRequestGeneration = 0;
     mainMenu = NULL;
     mainMenuCurrent = NULL;
     gameMenu = NULL;
