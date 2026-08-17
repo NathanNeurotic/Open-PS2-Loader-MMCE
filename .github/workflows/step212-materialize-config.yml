@@ -1,0 +1,48 @@
+name: Step 212 materialize moved configs
+
+on:
+  push:
+    branches:
+      - rebuild/step-212-apa-boot-and-bgm-resilience
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: rebuild/step-212-apa-boot-and-bgm-resilience
+          fetch-depth: 0
+      - name: Apply persistence fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p = Path('src/config.c')
+          s = p.read_text()
+          old = '''int configWrite(config_set_t *configSet)\n{\n    if (configSet->modified) {\n'''
+          new = '''int configWrite(config_set_t *configSet)\n{\n    // A config can be re-homed after it was read (legacy migration, missing-config recovery,\n    // boot-home self-migration). configMove/configSetMove intentionally preserve the in-memory\n    // values and their modified flag, so an unchanged set may now point at a destination file that\n    // does not exist. Returning the normal \"unmodified = success\" result in that state is a false\n    // positive: the UI reports Saved, but nothing was materialized at the new home. If a populated\n    // set is clean yet its CURRENT filename is absent, make this explicit save create it. Existing\n    // files stay on the zero-write fast path; empty sets are not manufactured merely because their\n    // optional file is absent. This is filesystem-only and never bypasses the raw-APA firewall below.\n    if (!configSet->modified && configSet->filename != NULL && configSet->head != NULL) {\n        iox_stat_t stat;\n        if (fileXioGetStat(configSet->filename, &stat) < 0) {\n            LOG("CONFIG current save destination %s is absent; materializing populated config\\n", configSet->filename);\n            configSet->modified = 1;\n        }\n    }\n\n    if (configSet->modified) {\n'''
+          if old not in s:
+              raise SystemExit('configWrite entry not found')
+          p.write_text(s.replace(old, new, 1))
+
+          p = Path('HANDOFF.md')
+          s = p.read_text()
+          marker = '''owner (`hdd0:__common/OPL` or the configured existing partition) so testers can locate the files.\n'''
+          addition = marker + '''A final persistence guard in `configWrite()` also materializes a populated config when recovery or\nself-migration moved its filename to a new save home but the in-memory values remained unmodified.\nPreviously that state returned success without creating the destination file -- a hardware-visible\n\"Settings saved\" toast with no `settings_riptopl.cfg` on the resolved HDD/MC/USB home. Existing\nfiles remain on the no-write fast path, empty optional sets are not created, and the raw-APA write\nfirewall still runs before any actual O_CREAT. `conf_hdd.cfg` remains an optional pre-existing HDD\nhome redirect; RiptOPL's master settings file is `settings_riptopl.cfg`.\n'''
+          if marker not in s:
+              raise SystemExit('handoff persistence marker not found')
+          p.write_text(s.replace(marker, addition, 1))
+          PY
+          git diff --check
+          git add src/config.c HANDOFF.md
+          git commit -m "rebuild-212: materialize configs after save-home migration"
+          git rm .github/workflows/step212-materialize-config.yml
+          git commit -m "chore: remove Step 212 materialize helper"
+          git push origin HEAD:rebuild/step-212-apa-boot-and-bgm-resilience
