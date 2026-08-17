@@ -18,4 +18,4 @@ jobs:
         with:
           fetch-depth: 0
       - run: bash .github/scripts/step212-coverflow.sh
-        # Formatting-only follow-up for the consolidated Step-212 hardware head.
+        # Hardware follow-up: Favourites view isolation + safe APA/PFS settings aliases.
