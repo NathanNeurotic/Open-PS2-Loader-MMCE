@@ -1465,3 +1465,14 @@ Hardware regression emphasis: APA/FHDB save/reboot with and without MC inserted;
   fallback; their text/name identity remains authoritative.
 - HDD autolaunch allocation failure now calls `miniDeinit(NULL)` to unwind `miniInit(HDD_MODE)`.
 - No ATA/DEV9 readiness behavior changed.
+
+## Step 212 follow-up — close remaining backing-list publication gaps
+
+- ETH ISO favourites resolved while the live ETH page is in VCD view now keep using the private
+  `ethFavIsoGames` snapshot for every id-based read/config/launch accessor. `viewOverride=FORCE_ISO`
+  can no longer validate against the snapshot and then apply that numeric id to live VCD-backed
+  `ethGames`; an invalidated snapshot fails closed until normal favourite resolution rebuilds it.
+- HDL live-list replacement now mirrors the VCD publication contract: pointer, count, candidate
+  ownership transfer, and retirement of the old array occur under `guiLock()`. A GUI frame cannot
+  pass an old count check and then dereference a freed `hddGames.games` allocation during refresh.
+- No ATA/DEV9 readiness behavior and no APA write/create/format policy changed.

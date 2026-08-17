@@ -678,35 +678,73 @@ int ethResolveIsoFavourite(int id, const char *name, int *outId)
     return 1;
 }
 
+static base_game_info_t *ethBackingForView(item_list_t *itemList, int *count)
+{
+    // A Favourites ISO owner is a stack-local copy with FORCE_ISO. If the visible ETH page currently
+    // owns the VCD array, the resolved favourite ID belongs to ethFavIsoGames instead. Never fall back
+    // to live ethGames when that snapshot was invalidated: returning an empty view is safer than using
+    // the same numeric ID against the wrong backing list, and the normal favourite rebuild will resolve
+    // it again after the ETH mutation/reconnect that invalidated the snapshot.
+    if (itemList != NULL && itemList->viewOverride == ITEM_VIEW_FORCE_ISO && vcdViewActive(ETH_MODE)) {
+        if (!ethFavIsoValid || ethFavIsoGames == NULL) {
+            if (count != NULL)
+                *count = 0;
+            return NULL;
+        }
+        if (count != NULL)
+            *count = ethFavIsoGameCount;
+        return ethFavIsoGames;
+    }
+
+    if (count != NULL)
+        *count = ethGameCount;
+    return ethGames;
+}
+
+static base_game_info_t *ethGameForView(item_list_t *itemList, int id)
+{
+    int count = 0;
+    base_game_info_t *games = ethBackingForView(itemList, &count);
+    if (games == NULL || id < 0 || id >= count)
+        return NULL;
+    return &games[id];
+}
+
 static int ethGetGameCount(item_list_t *itemList)
 {
-    return ethGameCount;
+    int count = 0;
+    ethBackingForView(itemList, &count);
+    return count;
 }
 
 static void *ethGetGame(item_list_t *itemList, int id)
 {
-    return (void *)&ethGames[id];
+    return (void *)ethGameForView(itemList, id);
 }
 
 static char *ethGetGameName(item_list_t *itemList, int id)
 {
-    return ethGames[id].name;
+    base_game_info_t *game = ethGameForView(itemList, id);
+    return game != NULL ? game->name : "";
 }
 
 static int ethGetGameNameLength(item_list_t *itemList, int id)
 {
-    if (ethGames[id].format != GAME_FORMAT_USBLD)
-        return ISO_GAME_NAME_MAX + 1;
-    else
-        return UL_GAME_NAME_MAX + 1;
+    base_game_info_t *game = ethGameForView(itemList, id);
+    if (game == NULL)
+        return 0;
+    return game->format != GAME_FORMAT_USBLD ? ISO_GAME_NAME_MAX + 1 : UL_GAME_NAME_MAX + 1;
 }
 
 static char *ethGetGameStartup(item_list_t *itemList, int id)
 {
+    base_game_info_t *game = ethGameForView(itemList, id);
+    if (game == NULL)
+        return "";
     // VCD view keys per-game data (CFG/art) off the VCD filename, not a disc ID (see sbPopulateConfig).
     if (vcdListViewActive(itemList))
-        return ethGames[id].name;
-    return ethGames[id].startup;
+        return game->name;
+    return game->startup;
 }
 
 static void ethDeleteGame(item_list_t *itemList, int id)
@@ -760,8 +798,11 @@ static void ethLaunchGame(item_list_t *itemList, int id, config_set_t *configSet
     int EnablePS2Logo = 0;
     int result;
     char filename[32], partname[256];
-    base_game_info_t *game = &ethGames[id];
+    base_game_info_t *game = ethGameForView(itemList, id);
     struct cdvdman_settings_smb *settings;
+
+    if (game == NULL)
+        return;
     u32 layer1_start, layer1_offset;
     unsigned short int layer1_part;
 
@@ -937,7 +978,8 @@ static void ethLaunchGame(item_list_t *itemList, int id, config_set_t *configSet
 
 static config_set_t *ethGetConfig(item_list_t *itemList, int id)
 {
-    return sbPopulateConfig(&ethGames[id], ethPrefix, "\\");
+    base_game_info_t *game = ethGameForView(itemList, id);
+    return game != NULL ? sbPopulateConfig(game, ethPrefix, "\\") : NULL;
 }
 
 static int ethGetImage(item_list_t *itemList, char *folder, int isRelative, char *value, char *suffix, GSTEXTURE *resultTex, short psm)

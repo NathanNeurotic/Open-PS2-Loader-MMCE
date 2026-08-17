@@ -525,6 +525,22 @@ static void hddFreeVcdGameList(void)
     hddPublishVcdGameList(NULL, NULL, 0, 0);
 }
 
+static void hddPublishHdlGameList(hdl_games_list_t *replacement)
+{
+    hdl_games_list_t old;
+
+    if (replacement == NULL)
+        return;
+
+    guiLock();
+    old = hddGames;
+    hddGames = *replacement;
+    replacement->games = NULL;
+    replacement->count = 0;
+    hddFreeHDLGamelist(&old);
+    guiUnlock();
+}
+
 // Build the HDD VCD game list from both supported APA/PFS shapes. Exact __.POPS / __.POPS0..9
 // containers contribute every root *.VCD; PP.<name> / __.<name> candidates contribute one entry each.
 // A one-game candidate whose label carries a STRICT PS1 disc-ID (PP.SLUS_005.51.Name -- the
@@ -748,26 +764,17 @@ static int hddUpdateGameList(item_list_t *itemList)
     // Force a live APA scan when the cache is absent/bad, a prior build requested a refresh, or the
     // cache is empty. Otherwise the initial boot may use the valid games.bin exactly as before.
     if (cacheRet == 0 && !hddForceUpdate && cachedGames.count > 0) {
-        hddFreeHDLGamelist(&hddGames);
-        hddGames = cachedGames;
-        cachedGames.games = NULL;
-        cachedGames.count = 0;
+        hddPublishHdlGameList(&cachedGames);
     } else {
         scanRet = hddGetHDLGamelist(&hddGamesNew);
         if (scanRet == 0) {
             hddUpdateGameListCache(&cachedGames, &hddGamesNew);
-            hddFreeHDLGamelist(&hddGames);
-            hddGames = hddGamesNew;
-            hddGamesNew.games = NULL;
-            hddGamesNew.count = 0;
+            hddPublishHdlGameList(&hddGamesNew);
         } else {
             // Keep the last-good live list. On a first entry with no live list yet, a valid cache is
             // still a safer fallback than turning a transient scan failure into an empty page.
-            if (hddGames.count == 0 && cachedGames.count > 0) {
-                hddGames = cachedGames;
-                cachedGames.games = NULL;
-                cachedGames.count = 0;
-            }
+            if (hddGames.count == 0 && cachedGames.count > 0)
+                hddPublishHdlGameList(&cachedGames);
             LOG("HDDSUPPORT HDL refresh failed (%d); preserving %u last-good game(s)\n", scanRet, hddGames.count);
         }
     }
