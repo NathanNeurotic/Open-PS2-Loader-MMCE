@@ -1524,56 +1524,30 @@ static int prepareCustomApaSettingsPath(char *path, int pathLen)
     char canonical[64] = {0};
     const char *p = path;
     const char *unit = "hdd0";
+    int isPfsAlias = 0;
     size_t i = 0;
     DIR *dir;
     int n;
 
-    if (!strncmp(path, "pfs", 3)) {
-        if (path[3] == ':')
-            p = path + 4;
-        else if (path[3] == '0' && path[4] == ':')
-            p = path + 5;
-        else {
-            gLastSaveErrno = ENODEV;
-            return -1; // pfs1: is transient HDD scan space, not a settings home.
-        }
-
-        if (!hddLoadModulesReady()) {
-            gLastSaveErrno = ENODEV;
-            return -1;
-        }
-        hddLoadSupportModules();
-        if (gOPLPart[0] == '\0' || gHDDPrefix == NULL) {
-            gLastSaveErrno = ENODEV;
-            return -1;
-        }
-
-        while (*p == '/' || *p == '\\')
-            p++;
-        if (*p != '\0')
-            n = snprintf(canonical, sizeof(canonical), "pfs0:%s", p);
-        else
-            n = snprintf(canonical, sizeof(canonical), "pfs0:");
-        if (n < 0 || n >= (int)sizeof(canonical) || n >= pathLen) {
-            gLastSaveErrno = ENODEV;
-            return -1;
-        }
-
-        // A custom settings target is a directory. Validate the actual requested directory now
-        // instead of letting configWrite fail later after appending settings_riptopl.cfg.
-        dir = opendir(canonical);
-        if (dir == NULL) {
-            LOG("CONFIG PFS settings directory %s does not exist\n", canonical);
-            gLastSaveErrno = ENOENT;
-            return -1;
-        }
-        closedir(dir);
-
-        snprintf(path, pathLen, "%s", canonical);
-        return 1;
+    if (path == NULL || path[0] == '\0') {
+        gLastSaveErrno = ENODEV;
+        return -1;
     }
 
-    if (path[0] == '+') {
+    // Accept both pfs: and pfs0: as user-facing aliases for OPL's already-mounted persistent
+    // data home. pfs1: remains reserved for transient HDD scanning and is never a settings home.
+    if (!strncmp(path, "pfs", 3)) {
+        if (path[3] == ':') {
+            p = path + 4;
+            isPfsAlias = 1;
+        } else if (path[3] == '0' && path[4] == ':') {
+            p = path + 5;
+            isPfsAlias = 1;
+        } else {
+            gLastSaveErrno = ENODEV;
+            return -1;
+        }
+    } else if (path[0] == '+') {
         p = path;
     } else {
         if (strncmp(path, "hdd", 3) != 0 || (path[3] != '0' && path[3] != '1') || path[4] != ':') {
@@ -1584,59 +1558,87 @@ static int prepareCustomApaSettingsPath(char *path, int pathLen)
         if (path[3] == '1')
             unit = "hdd1";
         p = path + 5;
-        while (*p == '/' || *p == ':')
+        while (*p == '/' || *p == ':' || *p == '\\')
             p++;
     }
-
-    while (*p != '\0' && *p != '/' && *p != ':' && i < sizeof(targetPart) - 6) {
-        subfolder[i++] = *p++;
-    }
-    subfolder[i] = '\0';
-    if (subfolder[0] == '\0') {
-        gLastSaveErrno = ENODEV;
-        return -1;
-    }
-    snprintf(targetPart, sizeof(targetPart), "%s:%s", unit, subfolder);
-
-    // Launchers use both `:pfs:` and `/pfs:` spellings. Strip separators first, then
-    // consume the pseudo-filesystem token so neither spelling leaks `pfs:` into the directory name.
-    while (*p != '\0') {
-        while (*p == ':' || *p == '/' || *p == '\\')
-            p++;
-        if (!strncmp(p, "pfs:", 4)) {
-            p += 4;
-            continue;
-        }
-        break;
-    }
-
-    i = 0;
-    while (*p != '\0' && i < sizeof(subfolder) - 1) {
-        subfolder[i++] = (*p == '\\') ? '/' : *p;
-        p++;
-    }
-    subfolder[i] = '\0';
-    while (i > 0 && subfolder[i - 1] == '/')
-        subfolder[--i] = '\0';
 
     if (!hddLoadModulesReady()) {
         gLastSaveErrno = ENODEV;
         return -1;
     }
     hddLoadSupportModules();
-    if (gOPLPart[0] == '\0' || gHDDPrefix == NULL) {
+    if (gOPLPart[0] == '\0' || gHDDPrefix == NULL || gHDDPrefix[0] == '\0') {
         gLastSaveErrno = ENODEV;
         return -1;
     }
 
-    if (strcmp(targetPart, gOPLPart) != 0) {
-        LOG("CONFIG APA settings partition %s rejected; active OPL data partition is %s\n", targetPart, gOPLPart);
-        gLastSaveErrno = ENODEV;
-        return -1;
+    const char *activeLabel = strchr(gOPLPart, ':');
+    activeLabel = activeLabel ? activeLabel + 1 : gOPLPart;
+    int commonStyleHome = (activeLabel[0] != '+');
+
+    if (isPfsAlias) {
+        // Compatibility spellings seen on hardware include pfs0:, pfs:/__common/OPL and
+        // pfs0:/OPL. They all mean the ACTIVE already-mounted data home; never reinterpret a
+        // pfs alias as permission to mount another APA partition.
+        while (*p == '/' || *p == ':' || *p == '\\')
+            p++;
+
+        size_t labelLen = strlen(activeLabel);
+        if (labelLen > 0 && !strncmp(p, activeLabel, labelLen) &&
+            (p[labelLen] == '\0' || p[labelLen] == '/' || p[labelLen] == ':' || p[labelLen] == '\\')) {
+            p += labelLen;
+            while (*p == '/' || *p == ':' || *p == '\\')
+                p++;
+        } else if ((*p == '+' || !strncmp(p, "__", 2)) && *p != '\0') {
+            LOG("CONFIG PFS settings alias %s names a non-active APA partition\n", path);
+            gLastSaveErrno = ENODEV;
+            return -1;
+        }
+    } else {
+        i = 0;
+        while (*p != '\0' && *p != '/' && *p != ':' && *p != '\\' && i < sizeof(subfolder) - 1)
+            subfolder[i++] = *p++;
+        subfolder[i] = '\0';
+        if (subfolder[0] == '\0') {
+            gLastSaveErrno = ENODEV;
+            return -1;
+        }
+        snprintf(targetPart, sizeof(targetPart), "%s:%s", unit, subfolder);
+        if (strcmp(targetPart, gOPLPart) != 0) {
+            LOG("CONFIG APA settings partition %s rejected; active OPL data partition is %s\n", targetPart, gOPLPart);
+            gLastSaveErrno = ENODEV;
+            return -1;
+        }
+
+        while (*p != '\0') {
+            while (*p == ':' || *p == '/' || *p == '\\')
+                p++;
+            if (!strncmp(p, "pfs:", 4)) {
+                p += 4;
+                continue;
+            }
+            break;
+        }
     }
 
-    // HDD notation is relative to OPL's ACTIVE data home, not blindly to the PFS root.
-    // For +OPL that home is `pfs0:`; for the legacy __common layout it is `pfs0:OPL/`.
+    // __common's data home is already pfs0:OPL/. Consume one redundant OPL component from
+    // hdd0:/__common/OPL and pfs:/__common/OPL instead of producing pfs0:OPL/OPL.
+    if (commonStyleHome && !strncmp(p, "OPL", 3) &&
+        (p[3] == '\0' || p[3] == '/' || p[3] == ':' || p[3] == '\\')) {
+        p += 3;
+        while (*p == ':' || *p == '/' || *p == '\\')
+            p++;
+    }
+
+    i = 0;
+    while (*p != '\0' && i < sizeof(subfolder) - 1) {
+        char c = *p++;
+        subfolder[i++] = (c == '\\') ? '/' : c;
+    }
+    subfolder[i] = '\0';
+    while (i > 0 && subfolder[i - 1] == '/')
+        subfolder[--i] = '\0';
+
     if (subfolder[0] != '\0') {
         size_t prefixLen = strlen(gHDDPrefix);
         if (prefixLen > 0 && (gHDDPrefix[prefixLen - 1] == ':' || gHDDPrefix[prefixLen - 1] == '/'))
@@ -1659,6 +1661,7 @@ static int prepareCustomApaSettingsPath(char *path, int pathLen)
         return -1;
     }
     closedir(dir);
+
     snprintf(path, pathLen, "%s", canonical);
     LOG("CONFIG APA settings path -> %s (OPL part %s)\n", path, gOPLPart);
     return 1;
