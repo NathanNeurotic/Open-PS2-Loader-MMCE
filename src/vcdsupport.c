@@ -759,6 +759,17 @@ int vcdViewActive(int mode)
     return vcdView[mode]; // GAME_VIEW_BOTH: per-device L3 toggle (defaults to ISO)
 }
 
+int vcdListViewActive(const item_list_t *itemList)
+{
+    if (itemList == NULL)
+        return 0;
+    if (itemList->viewOverride == ITEM_VIEW_FORCE_ISO)
+        return 0;
+    if (itemList->viewOverride == ITEM_VIEW_FORCE_VCD)
+        return 1;
+    return vcdViewActive(itemList->mode);
+}
+
 void vcdToggleView(int mode)
 {
     if (mode < 0 || mode >= MODE_COUNT)

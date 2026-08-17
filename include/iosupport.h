@@ -160,6 +160,16 @@ typedef struct _item_list_t
     /// view. NULL for devices without a VCD view (checklist item 12). Used by the Favourites tab to
     /// launch a VCD favourite while its source device page may be in ISO view.
     void (*itemLaunchVcd)(item_list_t *itemList, const char *vcdName, config_set_t *configSet);
+
+    /// Optional view override for a shallow proxy of this support. Zero keeps the support's native
+    /// per-mode L3 state; Favourites uses the forced values so an ISO/VCD favourite can proxy its
+    /// source without mutating the real source page's independent view. Appended last so all legacy
+    /// positional item_list_t initializers default safely to native behavior.
+    unsigned char viewOverride;
 } item_list_t;
+
+#define ITEM_VIEW_NATIVE    0
+#define ITEM_VIEW_FORCE_ISO 1
+#define ITEM_VIEW_FORCE_VCD 2
 
 #endif

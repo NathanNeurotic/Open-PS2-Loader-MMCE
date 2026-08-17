@@ -80,6 +80,9 @@ int vcdLoadPopsCover(const char *scanPrefix, const char *value, const char *suff
 int vcdModeSupported(int mode);
 // Is the given device mode currently showing its VCD list (vs its disc list)?
 int vcdViewActive(int mode);
+// Same query for an item-list instance. A normal source delegates to vcdViewActive(mode); a
+// Favourites shallow proxy may force ISO or VCD without changing the source page's own L3 state.
+int vcdListViewActive(const item_list_t *itemList);
 // Display-only: strip a leading PS1 game-ID prefix from a VCD list name when the gVcdHideGameId
 // setting is on and `mode` is a VCD view; returns `text` unchanged otherwise. COSMETIC -- the
 // result is for on-screen text only, never for launch/art/favourites/config lookups.

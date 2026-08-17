@@ -526,7 +526,7 @@ static int ethNeedsUpdate(item_list_t *itemList)
     // toggle only (skip disc heuristics). With no share yet, fall through so the share list updates.
     if (vcdConsumeDirty(itemList->mode))
         return 1;
-    if (gPCShareName[0] && vcdViewActive(itemList->mode))
+    if (gPCShareName[0] && vcdListViewActive(itemList))
         return 0;
 
     if (ethULSizePrev == -2)
@@ -565,7 +565,7 @@ static int ethUpdateGameList(item_list_t *itemList)
         if (gNetworkStartup != 0)
             return 0;
 
-        if (vcdViewActive(itemList->mode)) {
+        if (vcdListViewActive(itemList)) {
             int r = vcdFillGameList(ethPrefix, &ethGames);
             if (r >= 0) // r < 0: transient scan failure -> preserve the last-good list
                 ethGameCount = r;
@@ -645,7 +645,7 @@ static int ethGetGameNameLength(item_list_t *itemList, int id)
 static char *ethGetGameStartup(item_list_t *itemList, int id)
 {
     // VCD view keys per-game data (CFG/art) off the VCD filename, not a disc ID (see sbPopulateConfig).
-    if (vcdViewActive(itemList->mode))
+    if (vcdListViewActive(itemList))
         return ethGames[id].name;
     return ethGames[id].startup;
 }
@@ -705,7 +705,7 @@ static void ethLaunchGame(item_list_t *itemList, int id, config_set_t *configSet
     unsigned short int layer1_part;
 
     // VCD view (SMB): hand off to POPSTARTER by name, only once a share is selected.
-    if (gPCShareName[0] && game != NULL && vcdViewActive(itemList->mode)) {
+    if (gPCShareName[0] && game != NULL && vcdListViewActive(itemList)) {
         ethLaunchVcd(itemList, game->name, configSet);
         return;
     }
@@ -892,7 +892,7 @@ static int ethGetImage(item_list_t *itemList, char *folder, int isRelative, char
     int r = texDiscoverLoad(resultTex, path, -1);
     // On a VCD (PS1) genuine miss, fall back to the POPSLoader-style suffixless cover next to the .VCD.
     // ethPrefix ends in '\\', so vcdLoadPopsCover auto-detects the SMB separator. Cover/icon, VCD view only.
-    if (r == ERR_BAD_FILE && isRelative && vcdViewActive(itemList->mode))
+    if (r == ERR_BAD_FILE && isRelative && vcdListViewActive(itemList))
         r = vcdLoadPopsCover(ethPrefix, value, suffix, resultTex);
     return r;
 }

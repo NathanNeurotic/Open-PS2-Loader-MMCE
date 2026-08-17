@@ -642,7 +642,7 @@ static int hddNeedsUpdate(item_list_t *itemList)
        Hence any update request would be issued by the user, which should be taken as an explicit request to re-scan the HDD. */
     if (vcdConsumeDirty(itemList->mode))
         return 1; // L3 toggle / default-view change -> rebuild the submenu (the ARRAY may be cached)
-    if (vcdViewActive(itemList->mode))
+    if (vcdListViewActive(itemList))
         return 0; // in VCD view: skip the HDL re-scan churn
     return 1;
 }
@@ -672,7 +672,7 @@ static int hddUpdateGameList(item_list_t *itemList)
     if (!hddSupportModulesLoaded)
         return 0;
 
-    if (vcdViewActive(itemList->mode))
+    if (vcdListViewActive(itemList))
         // Reuse the session's built list on view flips; hddBuildVcdGameList runs only when never
         // built, invalidated (first-disc-only change), or freed by teardown (hddFreeVcdGameList).
         return hddVcdListBuilt ? hddVcdGameCount : hddBuildVcdGameList();
@@ -701,7 +701,7 @@ static int hddUpdateGameList(item_list_t *itemList)
 
 static int hddGetGameCount(item_list_t *itemList)
 {
-    return vcdViewActive(itemList->mode) ? hddVcdGameCount : (int)hddGames.count;
+    return vcdListViewActive(itemList) ? hddVcdGameCount : (int)hddGames.count;
 }
 
 // Toggle-window guard (Codex/Fable audit), mirroring mmceActiveGame. HDD_MODE is vcdModeSupported, so the L3
@@ -728,28 +728,28 @@ static hdl_game_info_t *hddActiveHdl(int id)
 
 static void *hddGetGame(item_list_t *itemList, int id)
 {
-    return vcdViewActive(itemList->mode) ? (void *)hddActiveVcd(id) : (void *)hddActiveHdl(id);
+    return vcdListViewActive(itemList) ? (void *)hddActiveVcd(id) : (void *)hddActiveHdl(id);
 }
 
 static char *hddGetGameName(item_list_t *itemList, int id)
 {
-    return vcdViewActive(itemList->mode) ? hddActiveVcd(id)->name : hddActiveHdl(id)->name;
+    return vcdListViewActive(itemList) ? hddActiveVcd(id)->name : hddActiveHdl(id)->name;
 }
 
 static int hddGetGameNameLength(item_list_t *itemList, int id)
 {
-    return vcdViewActive(itemList->mode) ? VCD_NAME_MAX : (HDL_GAME_NAME_MAX + 1);
+    return vcdListViewActive(itemList) ? VCD_NAME_MAX : (HDL_GAME_NAME_MAX + 1);
 }
 
 static char *hddGetGameStartup(item_list_t *itemList, int id)
 {
     // VCD view keys per-game CFG/art off the VCD filename (game->name), not a disc id.
-    return vcdViewActive(itemList->mode) ? hddActiveVcd(id)->name : hddActiveHdl(id)->startup;
+    return vcdListViewActive(itemList) ? hddActiveVcd(id)->name : hddActiveHdl(id)->startup;
 }
 
 static void hddDeleteGame(item_list_t *itemList, int id)
 {
-    if (vcdViewActive(itemList->mode))
+    if (vcdListViewActive(itemList))
         return; // a VCD is not an HDL partition -- no delete in VCD view
     hdl_game_info_t *game = hddActiveHdl(id);
     if (game == &hddEmptyHdl)
@@ -760,7 +760,7 @@ static void hddDeleteGame(item_list_t *itemList, int id)
 
 static void hddRenameGame(item_list_t *itemList, int id, char *newName)
 {
-    if (vcdViewActive(itemList->mode))
+    if (vcdListViewActive(itemList))
         return; // a VCD is not an HDL partition -- no rename in VCD view
     hdl_game_info_t *game = hddActiveHdl(id);
     if (game == &hddEmptyHdl)
@@ -1008,7 +1008,7 @@ void hddLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
     // POPSTARTER self-mounts it after the loader's IOP reset. HW-VALIDATE: POPSTARTER's exact HDD
     // selector/partition contract is hardware-testable -- POPSLoader proved the shape with a vendored
     // loader; we use the stock ps2sdk loader, the same one the shipping USB/MMCE/SMB VCD launch uses.
-    if (gAutoLaunchGame == NULL && vcdViewActive(itemList->mode)) {
+    if (gAutoLaunchGame == NULL && vcdListViewActive(itemList)) {
         base_game_info_t *vcd = hddActiveVcd(id);
         if (vcd == &hddEmptyVcd)
             return; // stale id in the L3 toggle window -> nothing to launch (hddVcdParts[id] would also OOB)
@@ -1220,7 +1220,7 @@ static config_set_t *hddGetConfig(item_list_t *itemList, int id)
     // VCD (PS1) view: `id` indexes hddVcdGames, NOT hddGames. The list itself is discoverable from
     // APA even when the persistent config/art PFS home is temporarily unavailable. In that state
     // return a runtime-only config instead of dereferencing a NULL prefix or hiding the whole list.
-    if (vcdViewActive(itemList->mode)) {
+    if (vcdListViewActive(itemList)) {
         base_game_info_t *g = hddActiveVcd(id);
         if (gHDDPrefix != NULL)
             return sbPopulateConfig(g, gHDDPrefix, "/");

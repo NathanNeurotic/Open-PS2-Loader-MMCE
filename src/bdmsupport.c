@@ -722,7 +722,7 @@ static int bdmNeedsUpdate(item_list_t *itemList)
     // VCD view: while this device shows its VCD list, skip the disc-folder heuristics (it refreshes on
     // L3 toggle / manual refresh only). The toggle's forced rescan is consumed ABOVE the device-tick
     // gate (see vcdConsumeDirty near the top) so the per-generation cache can't swallow it.
-    if (vcdViewActive(itemList->mode))
+    if (vcdListViewActive(itemList))
         return 0;
 
     snprintf(path, sizeof(path), "%sCD", pDeviceData->bdmPrefix);
@@ -769,7 +769,7 @@ static int bdmUpdateGameList(item_list_t *itemList)
     // bdmGames, so a VCD scan reporting failure (r < 0) left the ISO list published under the VCD
     // view -- the L3 toggle then "never changed the list" (Nathan, HW, ATA/HDD_BD), and a device with
     // no POPS folder hit that on every single toggle.
-    if (vcdViewActive(itemList->mode)) {
+    if (vcdListViewActive(itemList)) {
         char vcdPrefix[BDM_DEVICE_ROOT_MAX + 2];
         bdmBuildVcdPrefix(vcdPrefix, sizeof(vcdPrefix), itemList->mode); // device root, NOT gBDMPrefix
         int r = vcdFillGameList(vcdPrefix, &pDeviceData->bdmVcdGames);
@@ -785,7 +785,7 @@ static int bdmGetGameCount(item_list_t *itemList)
 {
     bdm_device_data_t *pDeviceData = (bdm_device_data_t *)itemList->priv;
 
-    return vcdViewActive(itemList->mode) ? pDeviceData->bdmVcdGameCount : pDeviceData->bdmGameCount;
+    return vcdListViewActive(itemList) ? pDeviceData->bdmVcdGameCount : pDeviceData->bdmGameCount;
 }
 
 // Toggle-window guard (mirrors mmceActiveGame). The L3 toggle flips vcdViewActive() SYNCHRONOUSLY
@@ -800,7 +800,7 @@ static base_game_info_t bdmEmptyGame = {0};
 static base_game_info_t *bdmActiveGame(item_list_t *itemList, int id)
 {
     bdm_device_data_t *pDeviceData = (bdm_device_data_t *)itemList->priv;
-    int vcd = vcdViewActive(itemList->mode);
+    int vcd = vcdListViewActive(itemList);
     base_game_info_t *arr = vcd ? pDeviceData->bdmVcdGames : pDeviceData->bdmGames;
     int count = vcd ? pDeviceData->bdmVcdGameCount : pDeviceData->bdmGameCount;
 
@@ -832,7 +832,7 @@ static char *bdmGetGameStartup(item_list_t *itemList, int id)
 
     // VCD view: identity is the filename, not a disc ID -> per-game data (CFG/art) keys off the
     // VCD name (matches sbPopulateConfig).
-    if (vcdViewActive(itemList->mode))
+    if (vcdListViewActive(itemList))
         return g->name;
     return g->startup;
 }
@@ -841,7 +841,7 @@ static void bdmDeleteGame(item_list_t *itemList, int id)
 {
     bdm_device_data_t *pDeviceData = (bdm_device_data_t *)itemList->priv;
 
-    if (vcdViewActive(itemList->mode))
+    if (vcdListViewActive(itemList))
         return; // #120: a VCD is not an ISO game -- no delete in VCD view (mirrors mmceDeleteGame)
     if (bdmActiveGame(itemList, id) == &bdmEmptyGame)
         return;                                   // stale id in the toggle window: sbDelete does NOT bounds-check -> avoid an OOB/wrong unlink
@@ -855,7 +855,7 @@ static void bdmRenameGame(item_list_t *itemList, int id, char *newName)
 {
     bdm_device_data_t *pDeviceData = (bdm_device_data_t *)itemList->priv;
 
-    if (vcdViewActive(itemList->mode))
+    if (vcdListViewActive(itemList))
         return; // #120: no rename in VCD view
     if (bdmActiveGame(itemList, id) == &bdmEmptyGame)
         return;                                   // stale id in the toggle window (see bdmDeleteGame) -> avoid sbRename OOB
@@ -1168,7 +1168,7 @@ void bdmLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
     // disc / Neutrino path below (which is entirely disc-specific). The BDM_TYPE_ATA internal exFAT HDD
     // still launches off the live massN: prefix, NOT ata0:/ (OPL never mounts an ata0: filesystem -- a
     // re-point there made LoadELFFromFile fail into an already-deinit'd OPL = black-screen freeze).
-    if (gAutoLaunchBDMGame == NULL && game != NULL && vcdViewActive(itemList->mode)) {
+    if (gAutoLaunchBDMGame == NULL && game != NULL && vcdListViewActive(itemList)) {
         bdmLaunchVcd(itemList, game->name, configSet);
         return;
     }
@@ -1521,7 +1521,7 @@ static int bdmGetImage(item_list_t *itemList, char *folder, int isRelative, char
     // On a VCD (PS1) genuine miss, fall back to the POPSLoader-style suffixless cover next to the .VCD --
     // ROOT-anchored (bdmBuildVcdPrefix), the SAME prefix the VCD scan uses, since the POPS layout lives at
     // the device root, outside gBDMPrefix. Cover/icon only, VCD view only.
-    if (r == ERR_BAD_FILE && isRelative && vcdViewActive(itemList->mode)) {
+    if (r == ERR_BAD_FILE && isRelative && vcdListViewActive(itemList)) {
         char vcdPrefix[BDM_DEVICE_ROOT_MAX + 2];
         bdmBuildVcdPrefix(vcdPrefix, sizeof(vcdPrefix), itemList->mode);
         r = vcdLoadPopsCover(vcdPrefix, value, suffix, resultTex);
