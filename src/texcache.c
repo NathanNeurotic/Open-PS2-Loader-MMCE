@@ -1389,8 +1389,8 @@ GSTEXTURE *cacheGetTextureEx(image_cache_t *cache, item_list_t *list, int *cache
         req->value = (char *)req + sizeof(load_image_request_t);
         strcpy(req->value, value);
         req->cacheUID = cache->nextUID;
-        req->epoch = gArtEpoch;         // the view this cover belongs to; see cacheDropQueuedArt()
-        req->failEpoch = gArtFailEpoch; // the generation an "absent" answer would belong to
+        req->epoch = gArtEpoch;           // the view this cover belongs to; see cacheDropQueuedArt()
+        req->failEpoch = gArtFailEpoch;   // the generation an "absent" answer would belong to
         req->focusEpoch = gArtFocusEpoch; // selected-game neighborhood this speculative read serves
         req->abortRequested = 0;
         req->next = NULL;
