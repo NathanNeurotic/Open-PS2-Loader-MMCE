@@ -1399,21 +1399,27 @@ static int mcConfigPathRedirect(char *out, int outLen)
 
 static int configPathRedirectLocation(char *out, int outLen)
 {
+    const char *home = gBootDir;
+
+    // APA launch identity and config ownership are separate. A delayed HDD mount can leave
+    // gBootDir as raw hddN:, but once the EXISTING persistent PFS home is mounted, config.path
+    // belongs there. This is the only APA override; every other boot class keeps gBootDir.
+    if (gBootHomeApa && gHDDPrefix != NULL && gHDDPrefix[0] != '\0')
+        home = gHDDPrefix;
+
     // Never compose a writable bootstrap file in raw APA space. hddN: is a partition
     // namespace, not a PFS filesystem; any file-like O_CREAT there is unsafe by definition.
-    if (!strncmp(gBootDir, "hdd", 3)) {
+    if (!strncmp(home, "hdd", 3)) {
         out[0] = '\0';
         return 0;
     }
 
-    // With a known local/network boot identity, anchor config.path absolutely to that home
-    // instead of trusting the process CWD. APA boots have already been rewritten to pfs0:.
-    if (gBootDir[0] != '\0') {
-        size_t len = strlen(gBootDir);
-        if (len > 0 && (gBootDir[len - 1] == ':' || gBootDir[len - 1] == '/' || gBootDir[len - 1] == '\\'))
-            snprintf(out, outLen, "%s%s", gBootDir, configPathRedirectFile);
+    if (home[0] != '\0') {
+        size_t len = strlen(home);
+        if (len > 0 && (home[len - 1] == ':' || home[len - 1] == '/' || home[len - 1] == '\\'))
+            snprintf(out, outLen, "%s%s", home, configPathRedirectFile);
         else
-            snprintf(out, outLen, "%s/%s", gBootDir, configPathRedirectFile);
+            snprintf(out, outLen, "%s/%s", home, configPathRedirectFile);
     } else {
         // Read-only legacy discovery may still inspect a relative redirect. Writers reject this
         // case below because an unknown CWD could itself be raw hddN: space.
@@ -1621,9 +1627,9 @@ static int prepareCustomApaSettingsPath(char *path, int pathLen)
         }
     }
 
-    // __common's data home is already pfs0:OPL/. Consume one redundant OPL component from
-    // hdd0:/__common/OPL and pfs:/__common/OPL instead of producing pfs0:OPL/OPL.
-    if (commonStyleHome && !strncmp(p, "OPL", 3) &&
+    // __common's HDD-notation data home is already pfs0:OPL/. Consume one redundant OPL
+    // component from hdd0:/__common/OPL. Direct pfs0: syntax remains direct PFS syntax.
+    if (!isPfsAlias && commonStyleHome && !strncmp(p, "OPL", 3) &&
         (p[3] == '\0' || p[3] == '/' || p[3] == ':' || p[3] == '\\')) {
         p += 3;
         while (*p == ':' || *p == '/' || *p == '\\')
@@ -1639,7 +1645,15 @@ static int prepareCustomApaSettingsPath(char *path, int pathLen)
     while (i > 0 && subfolder[i - 1] == '/')
         subfolder[--i] = '\0';
 
-    if (subfolder[0] != '\0') {
+    if (isPfsAlias) {
+        // pfs:/pfs0: names the already-mounted filesystem ROOT. Preserve that syntax exactly:
+        // pfs0:/CFG -> pfs0:CFG, not pfs0:OPL/CFG. A redundant physical partition label was
+        // consumed above only when it matched gOPLPart.
+        if (subfolder[0] != '\0')
+            n = snprintf(canonical, sizeof(canonical), "pfs0:%s", subfolder);
+        else
+            n = snprintf(canonical, sizeof(canonical), "pfs0:");
+    } else if (subfolder[0] != '\0') {
         size_t prefixLen = strlen(gHDDPrefix);
         if (prefixLen > 0 && (gHDDPrefix[prefixLen - 1] == ':' || gHDDPrefix[prefixLen - 1] == '/'))
             n = snprintf(canonical, sizeof(canonical), "%s%s", gHDDPrefix, subfolder);
@@ -1857,6 +1871,15 @@ static int tryAlternateDevice(int types)
     int value;
     DIR *dir;
 
+    // APA has one deterministic ownership chain. If the first boot-time mount missed while the
+    // drive was settling, retry the EXISTING-PFS resolver before reading config.path. This adds no
+    // new device class or fallback; checkLoadConfigHDD already performed the same synchronous HDD
+    // work below, only too late to expose a PFS-hosted redirect.
+    if (gBootHomeApa && (gHDDPrefix == NULL || gHDDPrefix[0] == '\0')) {
+        if (hddLoadModulesReady())
+            hddLoadSupportModules();
+    }
+
     // The user's Custom Settings Path, if one was set, takes precedence over every discovery probe
     // below -- it is an explicit instruction, not a guess.
     if (readConfigPathRedirect(redirectPath, sizeof(redirectPath))) {
@@ -1881,30 +1904,30 @@ static int tryAlternateDevice(int types)
         }
     }
 
-    // APA/PFS boot identity is authoritative. If the first early mount missed because the disk was
-    // still settling, retry the existing-partition resolver before broad read-only recovery.
+    // APA/PFS boot identity is authoritative. After an explicit redirect misses, ONLY the
+    // existing HDD ownership chain is eligible: conf_hdd.cfg's existing target, otherwise
+    // __common/OPL. Never import an unrelated MC/USB master config into an FHDB/APA session; that
+    // can resurrect stale Custom Settings Path state and makes the next save destination depend on
+    // whichever removable device happened to be inserted.
     if (gBootHomeApa) {
         value = checkLoadConfigHDD(types);
         if (value & CONFIG_OPL)
             return value;
-    }
 
-    // No redirect (or a stale redirect) must not strand an otherwise valid install. Search existing
-    // conventional homes read-only: both MC slots first, then USB. A known boot home is restored as
-    // the save destination after the read, so discovery cannot silently scatter future writes.
-    value = tryMissingConfigPathRecovery(types);
-    if (value & CONFIG_OPL)
-        return value;
-
-    // An APA launch that still has no config fails closed here. Never overwrite a valid mounted
-    // PFS notification/home with the raw hddN: launch identity merely because no settings file exists.
-    // If no PFS home is mounted, the explicit-save gate below retries the safe ownership chain.
-    if (gBootHomeApa) {
+        // No master config yet is a valid first-run state. Keep defaults homed to the mounted safe
+        // PFS target so the first explicit Save materializes them there. If PFS is still unavailable,
+        // leave the raw APA launch identity only as a fail-closed marker; _saveConfig retries this
+        // same safe chain and config.c blocks every raw hddN: config write as defense in depth.
         if (gHDDPrefix != NULL && gHDDPrefix[0] != '\0')
             configSetMove(gHDDPrefix);
         showCfgPopup = 0;
         return 0;
     }
+
+    // Non-APA missing/stale redirect recovery retains the existing read-only MC/USB behavior.
+    value = tryMissingConfigPathRecovery(types);
+    if (value & CONFIG_OPL)
+        return value;
 
     // If OPL was booted from a valid CWD/boot directory (gBootDir is set, e.g. "mc0:/OPL" or "mc0:"),
     // settings are strictly homed to gBootDir. Never probe alternate devices (mass0:/hdd0:) or hijack
