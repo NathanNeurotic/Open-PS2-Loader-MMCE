@@ -669,8 +669,12 @@ static int hddUpdateGameList(item_list_t *itemList)
     // long-lived pfs0: data home. Step 211 accidentally returned an empty page whenever that home
     // was unavailable even though the APA/PFS support modules were healthy. Require only the support
     // stack here; config/art accessors below remain NULL-safe and fail closed independently.
+    // The combined support latch includes PS2FS/PFS readiness, but the PS2 list itself is an
+    // APA-table read and must not disappear merely because the persistent PFS side is still settling.
+    // Retry above, then let each read-only scanner prove what is actually available. HDL enumeration
+    // fails harmlessly if hdd0: is not ready; the VCD builder likewise skips mounts it cannot open.
     if (!hddSupportModulesLoaded)
-        return 0;
+        LOG("HDDSUPPORT UpdateGameList: PFS support incomplete; attempting read-only APA enumeration anyway\n");
 
     if (vcdListViewActive(itemList))
         // Reuse the session's built list on view flips; hddBuildVcdGameList runs only when never
