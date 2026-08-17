@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-repo="NathanNeurotic/Open-PS2-Loader"
 prod_branch="rebuild/step-212-apa-boot-and-bgm-resilience"
-expected_head="11725ba7b3b4a461c1f205e2919121799d5c8a39"
+expected_head="1908aa0cdc9a43902a355327be0b106b2f6d70c0"
 
 git fetch origin "$prod_branch"
 actual_head="$(git rev-parse "origin/$prod_branch")"
@@ -18,98 +17,379 @@ python3 - <<'PY'
 from pathlib import Path
 
 
-def read_text(path):
+def load(path):
     p = Path(path)
     raw = p.read_bytes()
     crlf = b"\r\n" in raw
-    text = raw.decode("utf-8").replace("\r\n", "\n")
-    return p, text, crlf
+    return p, raw.decode("utf-8").replace("\r\n", "\n"), crlf
 
 
-def write_text(p, text, crlf):
+def save(p, text, crlf):
     if crlf:
         text = text.replace("\n", "\r\n")
     p.write_bytes(text.encode("utf-8"))
 
 
+def replace_between(path, start, end, replacement):
+    p, text, crlf = load(path)
+    a = text.find(start)
+    if a < 0:
+        raise SystemExit(f"{path}: start marker not found")
+    b = text.find(end, a)
+    if b < 0:
+        raise SystemExit(f"{path}: end marker not found")
+    text = text[:a] + replacement + text[b:]
+    save(p, text, crlf)
+
+
 def replace_once(path, old, new):
-    p, text, crlf = read_text(path)
-    count = text.count(old)
-    if count != 1:
-        raise SystemExit(f"{path}: expected one match, got {count}")
-    text = text.replace(old, new, 1)
-    write_text(p, text, crlf)
+    p, text, crlf = load(path)
+    if text.count(old) != 1:
+        raise SystemExit(f"{path}: expected one match, got {text.count(old)}")
+    save(p, text.replace(old, new, 1), crlf)
 
+hdl_func = r'''int hddGetHDLGamelist(hdl_games_list_t *game_list)
+{
+    struct GameDataEntry *head = NULL, *current = NULL, *next, *pGameEntry;
+    unsigned int count = 0, i;
+    iox_dirent_t dirent;
+    int fd, ret = 0, readResult = 0;
 
-def replace_n(path, old, new, expected):
-    p, text, crlf = read_text(path)
-    count = text.count(old)
-    if count != expected:
-        raise SystemExit(f"{path}: expected {expected} matches, got {count}")
-    text = text.replace(old, new)
-    write_text(p, text, crlf)
+    hddFreeHDLGamelist(game_list);
 
-# --- HDD view/update lifecycle -------------------------------------------------
+    fd = fileXioDopen("hdd0:");
+    if (fd < 0)
+        return fd;
+
+    while ((readResult = fileXioDread(fd, &dirent)) > 0) {
+        if (dirent.stat.mode != HDL_FS_MAGIC)
+            continue;
+
+        pGameEntry = GetGameListRecord(head, dirent.name);
+        if (pGameEntry == NULL) {
+            struct GameDataEntry *newEntry = malloc(sizeof(struct GameDataEntry));
+            if (newEntry == NULL) {
+                ret = -ENOMEM;
+                break;
+            }
+
+            if (head == NULL)
+                head = newEntry;
+            else
+                current->next = newEntry;
+            current = newEntry;
+
+            strncpy(current->id, dirent.name, APA_IDMAX);
+            current->id[APA_IDMAX] = '\0';
+            current->next = NULL;
+            current->size = 0;
+            current->lba = 0;
+            count++;
+            pGameEntry = current;
+        }
+
+        if (!(dirent.stat.attr & APA_FLAG_SUB)) {
+            // Note: The APA specification states that there is a 4KB area used for storing the
+            // partition's information, before the extended attribute area.
+            pGameEntry->lba = dirent.stat.private_5 + (HDL_GAME_DATA_OFFSET + 4096) / 512;
+        }
+
+        pGameEntry->size += (dirent.stat.size / 4); // HDD sectors * (512 / 2048) = 0.25x
+    }
+
+    fileXioDclose(fd);
+
+    // A directory read error is not "end of APA table". Returning success here used to publish a
+    // partial list and made games disappear after a refresh. The caller now builds into a candidate
+    // list, so propagating the failure preserves the last-good live array.
+    if (ret == 0 && readResult < 0)
+        ret = readResult;
+
+    if (ret == 0 && head != NULL) {
+        game_list->games = malloc(sizeof(hdl_game_info_t) * count);
+        if (game_list->games != NULL) {
+            memset(game_list->games, 0, sizeof(hdl_game_info_t) * count);
+
+            for (i = 0, current = head; i < count; i++, current = current->next) {
+                if ((ret = hddGetHDLGameInfo(current, &game_list->games[i])) != 0)
+                    break;
+            }
+
+            if (ret != 0) {
+                free(game_list->games);
+                game_list->games = NULL;
+            } else {
+                game_list->count = count;
+            }
+        } else {
+            ret = -ENOMEM;
+        }
+    }
+
+    for (current = head; current != NULL; current = next) {
+        next = current->next;
+        free(current);
+    }
+
+    return ret;
+}
+
+//-------------------------------------------------------------------------
+'''
+replace_between("src/hdd.c", "int hddGetHDLGamelist(hdl_games_list_t *game_list)\n", "void hddFreeHDLGamelist", hdl_func)
+
+pops_func = r'''int hddGetPopsPartitionList(hdd_pops_list_t *list)
+{
+    iox_dirent_t dirent;
+    int fd, i, count = 0, readResult = 0, ret = 0;
+    char(*names)[APA_IDMAX + 1] = NULL;
+
+    list->count = 0;
+    list->names = NULL;
+
+    fd = fileXioDopen("hdd0:");
+    if (fd < 0)
+        return fd; // distinguish an enumeration failure from a valid zero-candidate disk
+
+    while ((readResult = fileXioDread(fd, &dirent)) > 0) {
+        if (dirent.stat.attr != HDD_APA_ATTR_MAIN_PARTITION || dirent.stat.mode != HDD_APA_FS_TYPE_PFS)
+            continue; // skip APA sub-partitions and HDL/raw/system formats
+        if (!hddIsPopsContainerName(dirent.name) && !hddIsPopsPartitionGame(dirent.name))
+            continue; // not an HDD-resident PS1/VCD source
+
+        int dup = 0;
+        for (i = 0; i < count; i++) {
+            if (!strncmp(names[i], dirent.name, APA_IDMAX)) {
+                dup = 1;
+                break;
+            }
+        }
+        if (dup)
+            continue;
+
+        char(*grown)[APA_IDMAX + 1] = realloc(names, (count + 1) * sizeof(*names));
+        if (grown == NULL) {
+            ret = -ENOMEM;
+            break;
+        }
+        names = grown;
+        strncpy(names[count], dirent.name, APA_IDMAX);
+        names[count][APA_IDMAX] = '\0';
+        count++;
+    }
+    fileXioDclose(fd);
+
+    if (ret == 0 && readResult < 0)
+        ret = readResult;
+    if (ret < 0) {
+        free(names);
+        return ret; // never publish a partial APA partition walk as a complete candidate set
+    }
+
+    if (count == 0) {
+        free(names);
+        return 0; // successful enumeration, no POPS candidates
+    }
+
+    qsort(names, count, sizeof(*names), hddPopsNameCompare);
+
+    list->names = names;
+    list->count = count;
+    return count;
+}
+
+//-------------------------------------------------------------------------
+'''
+replace_between("src/hdd.c", "int hddGetPopsPartitionList(hdd_pops_list_t *list)\n", "void hddFreePopsPartitionList", pops_func)
+
 replace_once(
     "src/hddsupport.c",
-    '''static int hddNeedsUpdate(item_list_t *itemList)\n{ /* Auto refresh is disabled by setting HDD_MODE_UPDATE_DELAY to MENU_UPD_DELAY_NOUPDATE, within hddsupport.h.\n       Hence any update request would be issued by the user, which should be taken as an explicit request to re-scan the HDD. */\n    if (vcdConsumeDirty(itemList->mode))\n        return 1; // L3 toggle / default-view change -> rebuild the submenu (the ARRAY may be cached)\n    if (vcdListViewActive(itemList))\n        return 0; // in VCD view: skip the HDL re-scan churn\n    return 1;\n}\n''',
-    '''static int hddNeedsUpdate(item_list_t *itemList)\n{ /* Auto refresh is disabled by setting HDD_MODE_UPDATE_DELAY to MENU_UPD_DELAY_NOUPDATE, within hddsupport.h.\n       Hence any update request would be issued by the user, which should be taken as an explicit request to re-scan the HDD. */\n    if (vcdConsumeDirty(itemList->mode))\n        return 1; // L3 toggle / default-view change -> rebuild the submenu (the ARRAY may be cached)\n    if (vcdListViewActive(itemList))\n        // The locked-to-VCD startup path also receives the normal initial deferred update, but no\n        // toggle dirtied the view first. Build once when the VCD backing list does not exist yet.\n        // A manual HDD/VCD refresh invalidates this latch before posting the same deferred update.\n        return !hddVcdListBuilt;\n    return 1;\n}\n''')
+    '''// (not hddVcdGames != NULL) so a drive whose candidates scanned to ZERO VCDs is also remembered. The\n// no-candidates early return deliberately does NOT latch: hddGetPopsPartitionList returns 0 for a\n// transient hdd0: dopen failure too, and that walk is one mount-free APA pass -- cheap to repeat.\n''',
+    '''// (not hddVcdGames != NULL) so a drive whose candidates scanned to ZERO VCDs is also remembered.\n// hddGetPopsPartitionList distinguishes a successful zero-candidate walk from a failed APA walk;\n// only the former may replace/latch the current VCD list.\n''')
 
-replace_once(
-    "src/hddsupport.c",
-    '''    hdl_games_list_t hddGamesNew;\n    int ret;\n\n    // Force a live APA scan not only when the cache fails to load (ret != 0) or a prior build asked for it\n    // (hddForceUpdate), but ALSO when the cache loaded EMPTY (count 0). A missing/empty/stale games.bin\n    // otherwise left the first HDD page blank until a second manual refresh (provato's HW report).\n    if (((ret = hddLoadGameListCache(&hddGames)) != 0) || (hddForceUpdate) || (hddGames.count == 0)) {\n        hddGamesNew.count = 0;\n        hddGamesNew.games = NULL;\n        ret = hddGetHDLGamelist(&hddGamesNew);\n        if (ret == 0) {\n            hddUpdateGameListCache(&hddGames, &hddGamesNew);\n            hddFreeHDLGamelist(&hddGames);\n            hddGames = hddGamesNew;\n        }\n    }\n\n    hddForceUpdate = 1; // Subsequent refresh operations will cause the HDD to be scanned.\n\n    return (ret == 0 ? hddGames.count : 0);\n''',
-    '''    hdl_games_list_t cachedGames = {0};\n    hdl_games_list_t hddGamesNew = {0};\n    int cacheRet, scanRet = 0;\n\n    // TRANSACTIONAL REFRESH. hddGames is the LIVE backing array used by the menu. The old path\n    // passed it directly to hddLoadGameListCache(), whose first action is hddFreeHDLGamelist(): a\n    // missing/corrupt games.bin therefore destroyed a perfectly good live list BEFORE the fallback\n    // APA scan had proved it could replace it. If that scan failed, VCD -> HDL returned to a blank\n    // PS2 page even though the previous HDL list had been valid. Build cache/live candidates off to\n    // the side and publish only a successful replacement.\n    cacheRet = hddLoadGameListCache(&cachedGames);\n\n    // Force a live APA scan when the cache is absent/bad, a prior build requested a refresh, or the\n    // cache is empty. Otherwise the initial boot may use the valid games.bin exactly as before.\n    if (cacheRet == 0 && !hddForceUpdate && cachedGames.count > 0) {\n        hddFreeHDLGamelist(&hddGames);\n        hddGames = cachedGames;\n        cachedGames.games = NULL;\n        cachedGames.count = 0;\n    } else {\n        scanRet = hddGetHDLGamelist(&hddGamesNew);\n        if (scanRet == 0) {\n            hddUpdateGameListCache(&cachedGames, &hddGamesNew);\n            hddFreeHDLGamelist(&hddGames);\n            hddGames = hddGamesNew;\n            hddGamesNew.games = NULL;\n            hddGamesNew.count = 0;\n        } else {\n            // Keep the last-good live list. On a first entry with no live list yet, a valid cache is\n            // still a safer fallback than turning a transient scan failure into an empty page.\n            if (hddGames.count == 0 && cachedGames.count > 0) {\n                hddGames = cachedGames;\n                cachedGames.games = NULL;\n                cachedGames.count = 0;\n            }\n            LOG("HDDSUPPORT HDL refresh failed (%d); preserving %u last-good game(s)\\n", scanRet, hddGames.count);\n        }\n    }\n\n    hddFreeHDLGamelist(&cachedGames);\n    hddFreeHDLGamelist(&hddGamesNew);\n    hddForceUpdate = 1; // Subsequent refresh operations will cause the HDD to be scanned.\n\n    return hddGames.count;\n''')
+vcd_func = r'''static int hddBuildVcdGameList(void)
+{
+    hdd_pops_list_t parts;
+    base_game_info_t *newGames = NULL;
+    char(*newParts)[APA_IDMAX + 1] = NULL;
+    int total = 0;
+    int scanIncomplete = 0;
+    unsigned int genAtEntry = hddVcdCacheGen; // re-latch below only if no invalidation raced this build
 
-# --- Manual refresh and Info-screen admission ---------------------------------
-replace_once(
-    "src/opl.c",
-    '''static void itemExecRefresh(struct menu_item *curMenu)\n{\n    item_list_t *support = curMenu->userdata;\n\n    if (support && support->enabled) {\n        // Fork shape verbatim. FAV has no device to rescan: loadFavourites() re-reads\n        // favourites.bin and schedules its own rebuild. Everything else posts the deferred\n        // update and lets the device's own NeedsUpdate logic decide what a refresh means.\n        if (support->mode == FAV_MODE)\n            loadFavourites();\n        else\n            ioPutRequest(IO_MENU_UPDATE_DEFFERED, &support->mode);\n        sfxPlay(SFX_CONFIRM);\n    }\n}\n''',
-    '''static void itemExecRefresh(struct menu_item *curMenu)\n{\n    item_list_t *support = curMenu->userdata;\n\n    if (support && support->enabled) {\n        // FAV has no device to rescan: loadFavourites() re-reads favourites.bin and schedules its\n        // own rebuild. HDD's VCD view is intentionally cached across ordinary L3 flips, so an\n        // explicit user Refresh must invalidate that cache before posting the deferred update.\n        if (support->mode == FAV_MODE) {\n            loadFavourites();\n        } else {\n            if (support->mode == HDD_MODE && vcdListViewActive(support))\n                hddVcdInvalidateCache();\n            ioPutRequest(IO_MENU_UPDATE_DEFFERED, &support->mode);\n        }\n        sfxPlay(SFX_CONFIRM);\n    }\n}\n''')
+    // Best-effort cleanup from an interrupted prior scan. This never touches pfs0:, which remains the
+    // live OPL data mount used by both PS2 and VCD config/art lookups.
+    fileXioUmount("pfs1:");
 
-replace_once(
-    "src/opl.c",
-    '''        item_list_t *support = curMenu->userdata;\n        if (support == NULL || !vcdViewActive(support->mode))\n            menuRequestInfoSize();\n        guiSwitchScreen(GUI_SCREEN_INFO);\n''',
-    '''        item_list_t *support = curMenu->userdata;\n        // Direct HDD/HDL rows already carry their size in APA metadata (total_size_in_kb), so the\n        // generic CFG+stat pass is redundant there. VCD rows likewise have no meaningful #Size.\n        // Avoid putting either no-op read onto the shared IO worker merely for opening Info.\n        if (support == NULL || (!vcdListViewActive(support) && support->mode != HDD_MODE))\n            menuRequestInfoSize();\n        guiSwitchScreen(GUI_SCREEN_INFO);\n''')
+    int partCount = hddGetPopsPartitionList(&parts);
+    if (partCount < 0) {
+        // TRANSACTIONAL LIST OWNERSHIP: a failed APA table walk is not an empty VCD library. Keep the
+        // last-good arrays exactly as they are and leave the cache unlatched so a later explicit
+        // refresh can retry.
+        LOG("HDD VCD: APA partition enumeration failed (%d); preserving %d last-good game(s)\n", partCount, hddVcdGameCount);
+        hddVcdListBuilt = 0;
+        return hddVcdGameCount;
+    }
+    if (partCount == 0) {
+        // This time zero is authoritative: hdd0: opened and the complete APA walk found no candidates.
+        hddFreeVcdGameList();
+        hddVcdListBuilt = (genAtEntry == hddVcdCacheGen);
+        return 0;
+    }
 
-# --- Info request dedupe --------------------------------------------------------
-replace_once(
-    "src/menusys.c",
-    '''static item_list_t *itemConfigList;\n\nstatic u8 parentalLockCheckEnabled = 1;\n''',
-    '''static item_list_t *itemConfigList;\n// One Info/#Size resolve at a time. Repeated enter/back/enter used to enqueue duplicate CFG+stat\n// reads for the same row on the single IO worker, multiplying storage contention without producing\n// any additional state. Keep the request latched until its worker pass finishes or is abandoned.\nstatic unsigned char infoSizeRequestPending;\n\nstatic u8 parentalLockCheckEnabled = 1;\n''')
+    for (int p = 0; p < parts.count; p++) {
+        char mountSrc[64];
+        snprintf(mountSrc, sizeof(mountSrc), "hdd0:%s", parts.names[p]);
 
-old_info = '''// Opening the info screen needs #Size, which the scroll-time config load deliberately skips\n// (sbConfigStatSize off -> no slow per-game stat while browsing). Rebuild the current item's\n// config once with the size resolved and swap it in, but only if the selection is unchanged --\n// the user may have scrolled away before this IO request ran. game->sizeMB is cached afterwards,\n// so subsequent scrolls/info views show the size with no further stat.\nstatic void _menuResolveInfoSize()\n{\n    item_list_t *list = NULL;\n    config_set_t *loadedConfig = NULL;\n    int configId = -1;\n\n    WaitSema(menuSemaId);\n    if (selected_item != NULL && selected_item->item != NULL && selected_item->item->current != NULL &&\n        itemConfigId >= 0 && itemConfigId == selected_item->item->current->item.id &&\n        itemConfigList == selected_item->item->userdata) {\n        list = selected_item->item->userdata;\n        configId = itemConfigId;\n    }\n    SignalSema(menuSemaId);\n\n    if (list == NULL || configId < 0)\n        return;\n\n    // #Size is cosmetic/discretionary IO. ART already yields when BGM reserve is critical, but this\n    // path did not: repeatedly entering Info on USB could still make a CFG+stat compete with the\n    // decoder until audio stopped. Wait in short sleeps, and abandon the work entirely if the user\n    // has moved away while audio refills. BGM does its own file IO, so sleeping the general IO worker\n    // here does not prevent the reserve from recovering.\n    while (!bgmDiscretionaryIoAllowed()) {\n        int stillWanted;\n        DelayThread(10 * 1000);\n        WaitSema(menuSemaId);\n        stillWanted = selected_item != NULL && selected_item->item != NULL &&\n                      selected_item->item->current != NULL && itemConfigId == configId &&\n                      itemConfigList == list && itemConfigId == selected_item->item->current->item.id &&\n                      selected_item->item->userdata == list;\n        SignalSema(menuSemaId);\n        if (!stillWanted)\n            return;\n    }\n\n    // itemGetConfig runs OUTSIDE the semaphore on purpose: it is the slow call (a CFG read plus the\n    // ISO stat this whole mechanism exists to defer), and holding menuSemaId across it would block\n    // the GUI thread for exactly as long as the stat we are trying to keep off the scroll path.\n    sbSetConfigStatSize(1);\n    loadedConfig = list->itemGetConfig(list, configId);\n    sbSetConfigStatSize(0);\n\n    if (loadedConfig == NULL)\n        return;\n\n    // Re-check the selection under the sema: if the user scrolled away while the stat ran, the\n    // freshly loaded config belongs to a row that is no longer current -- drop it rather than\n    // publish someone else's #Size.\n    WaitSema(menuSemaId);\n    if (selected_item != NULL && selected_item->item != NULL && selected_item->item->current != NULL &&\n        itemConfigId == configId && itemConfigList == list && itemConfigId == selected_item->item->current->item.id &&\n        selected_item->item->userdata == list) {\n        if (itemConfig != NULL)\n            configFree(itemConfig);\n        itemConfig = loadedConfig;\n        itemConfigList = list;\n        loadedConfig = NULL;\n    }\n    SignalSema(menuSemaId);\n\n    if (loadedConfig != NULL)\n        configFree(loadedConfig);\n}\n\n// Queued when the info screen opens: resolve #Size for the current item without blocking the UI.\nvoid menuRequestInfoSize(void)\n{\n    ioPutRequest(IO_CUSTOM_SIMPLEACTION, &_menuResolveInfoSize);\n}\n'''
+        // PP.<name> / __.<name> one-game install: display the label without its three-character
+        // prefix and retain the FULL label for launch. The name predicate excludes the exact
+        // __.POPS[0-9]? pooled containers handled below.
+        if (hddIsPopsPartitionGame(parts.names[p])) {
+            char discId[12]; // validation only -- the entry keys off the full label, never the ID
+            if (!vcdExtractGameId(parts.names[p] + 3, discId, sizeof(discId))) {
+                // ID-less label (e.g. PP.CASTLEVANIA): require ONE exact IMAGE0.VCD at the partition
+                // root. A mount failure means this refresh was incomplete; an open miss AFTER a
+                // successful mount is authoritative and simply identifies a non-POPS HDDOSD app.
+                if (fileXioMount("pfs1:", mountSrc, FIO_MT_RDONLY) < 0) {
+                    scanIncomplete = 1;
+                    continue;
+                }
+                int imgfd = open("pfs1:/IMAGE0.VCD", O_RDONLY);
+                if (imgfd >= 0)
+                    close(imgfd); // close before unmount; ps2fs may reject an unmount with a live fd
+                fileXioUmount("pfs1:");
+                if (imgfd < 0)
+                    continue;
+            }
 
-new_info = '''static void menuInfoSizeComplete(void)\n{\n    WaitSema(menuSemaId);\n    infoSizeRequestPending = 0;\n    SignalSema(menuSemaId);\n}\n\n// Opening the info screen needs #Size, which the scroll-time config load deliberately skips\n// (sbConfigStatSize off -> no slow per-game stat while browsing). Rebuild the current item's\n// config once with the size resolved and swap it in, but only if the selection is unchanged --\n// the user may have scrolled away before this IO request ran. game->sizeMB is cached afterwards,\n// so subsequent scrolls/info views show the size with no further stat.\nstatic void _menuResolveInfoSize()\n{\n    item_list_t *list = NULL;\n    config_set_t *loadedConfig = NULL;\n    int configId = -1;\n\n    WaitSema(menuSemaId);\n    if (selected_item != NULL && selected_item->item != NULL && selected_item->item->current != NULL &&\n        itemConfigId >= 0 && itemConfigId == selected_item->item->current->item.id &&\n        itemConfigList == selected_item->item->userdata) {\n        list = selected_item->item->userdata;\n        configId = itemConfigId;\n    }\n    SignalSema(menuSemaId);\n\n    if (list == NULL || configId < 0) {\n        menuInfoSizeComplete();\n        return;\n    }\n\n    // #Size is cosmetic/discretionary IO. ART already yields when BGM reserve is critical, but this\n    // path did not: repeatedly entering Info on USB could still make a CFG+stat compete with the\n    // decoder until audio stopped. Wait in short sleeps, and abandon the work entirely if the user\n    // has moved away while audio refills. BGM does its own file IO, so sleeping the general IO worker\n    // here does not prevent the reserve from recovering.\n    while (!bgmDiscretionaryIoAllowed()) {\n        int stillWanted;\n        DelayThread(10 * 1000);\n        WaitSema(menuSemaId);\n        stillWanted = selected_item != NULL && selected_item->item != NULL &&\n                      selected_item->item->current != NULL && itemConfigId == configId &&\n                      itemConfigList == list && itemConfigId == selected_item->item->current->item.id &&\n                      selected_item->item->userdata == list;\n        SignalSema(menuSemaId);\n        if (!stillWanted) {\n            menuInfoSizeComplete();\n            return;\n        }\n    }\n\n    // itemGetConfig runs OUTSIDE the semaphore on purpose: it is the slow call (a CFG read plus the\n    // ISO stat this whole mechanism exists to defer), and holding menuSemaId across it would block\n    // the GUI thread for exactly as long as the stat we are trying to keep off the scroll path.\n    sbSetConfigStatSize(1);\n    loadedConfig = list->itemGetConfig(list, configId);\n    sbSetConfigStatSize(0);\n\n    if (loadedConfig == NULL) {\n        menuInfoSizeComplete();\n        return;\n    }\n\n    // Re-check the selection under the sema: if the user scrolled away while the stat ran, the\n    // freshly loaded config belongs to a row that is no longer current -- drop it rather than\n    // publish someone else's #Size.\n    WaitSema(menuSemaId);\n    if (selected_item != NULL && selected_item->item != NULL && selected_item->item->current != NULL &&\n        itemConfigId == configId && itemConfigList == list && itemConfigId == selected_item->item->current->item.id &&\n        selected_item->item->userdata == list) {\n        if (itemConfig != NULL)\n            configFree(itemConfig);\n        itemConfig = loadedConfig;\n        itemConfigList = list;\n        loadedConfig = NULL;\n    }\n    SignalSema(menuSemaId);\n\n    if (loadedConfig != NULL)\n        configFree(loadedConfig);\n\n    menuInfoSizeComplete();\n}\n\n// Queued when the info screen opens: resolve #Size for the current item without blocking the UI.\nvoid menuRequestInfoSize(void)\n{\n    WaitSema(menuSemaId);\n    if (infoSizeRequestPending) {\n        SignalSema(menuSemaId);\n        return;\n    }\n    infoSizeRequestPending = 1;\n    SignalSema(menuSemaId);\n\n    if (ioPutRequest(IO_CUSTOM_SIMPLEACTION, &_menuResolveInfoSize) != IO_OK)\n        menuInfoSizeComplete();\n}\n'''
-replace_once("src/menusys.c", old_info, new_info)
+            base_game_info_t *grownGames = realloc(newGames, (total + 1) * sizeof(base_game_info_t));
+            if (grownGames == NULL) {
+                scanIncomplete = 1;
+                break;
+            }
+            newGames = grownGames;
+            char(*grownParts)[APA_IDMAX + 1] = realloc(newParts, (total + 1) * sizeof(*newParts));
+            if (grownParts == NULL) {
+                scanIncomplete = 1;
+                break;
+            }
+            newParts = grownParts;
 
-replace_once(
-    "src/menusys.c",
-    '''    itemConfig = NULL;\n    itemConfigList = NULL;\n    mainMenu = NULL;\n''',
-    '''    itemConfig = NULL;\n    itemConfigList = NULL;\n    infoSizeRequestPending = 0;\n    mainMenu = NULL;\n''')
+            base_game_info_t *g = &newGames[total];
+            memset(g, 0, sizeof(base_game_info_t));
+            snprintf(g->name, sizeof(g->name), "%s", parts.names[p] + 3); // strip PP. / __. for display
+            snprintf(g->startup, sizeof(g->startup), "%s", g->name);      // keep VCD identity = name
+            snprintf(g->extension, sizeof(g->extension), ".VCD");
+            g->parts = 1;
+            g->format = GAME_FORMAT_ISO;                                  // VCD flag gates launch
+            snprintf(newParts[total], APA_IDMAX + 1, "%s", parts.names[p]); // case-preserved label
+            total++;
+            continue;
+        }
 
-# --- VCD one-slot request failure contract -------------------------------------
-replace_once(
-    "src/vcdsupport.c",
-    '''    ioPutRequest(IO_CUSTOM_SIMPLEACTION, &vcdResolveQueuedDisplayId);\n}\n''',
-    '''    if (ioPutRequest(IO_CUSTOM_SIMPLEACTION, &vcdResolveQueuedDisplayId) != IO_OK) {\n        // No worker owns the one-slot request when enqueue fails. Release the latch immediately or\n        // every future cosmetic ID request is suppressed for the rest of the session.\n        DIntr();\n        gVcdIdReqPending = 0;\n        EIntr();\n    }\n}\n''')
+        // __.POPS[0-9]? pooled container: mount and scan its root for *.VCD entries.
+        if (fileXioMount("pfs1:", mountSrc, FIO_MT_RDONLY) < 0) {
+            scanIncomplete = 1;
+            continue;
+        }
 
-# --- Artwork focus-generation adoption ----------------------------------------
-old_art = '''                    if (isPriority) {\n                        load_image_request_t *req = (load_image_request_t *)entry->qr;\n                        if (req != NULL) {\n                            // A warmed neighbor can become the selected row while still queued/in-flight.\n                            // Adopt that exact request into the new focus generation instead of throwing it away.\n                            req->focusEpoch = gArtFocusEpoch;\n                            if (!(req->sio2 && gArtNavActive))\n                                artPromote(req);\n                        }\n                    }\n'''
-new_art = '''                    load_image_request_t *req = (load_image_request_t *)entry->qr;\n                    if (req != NULL) {\n                        // Any pending cover touched by THIS frame is still useful to the new\n                        // selection neighborhood. Adopt it into the current generation even when\n                        // it is merely a neighbour; only the highlighted cover gets queue promotion.\n                        // Without this, overlapping lookahead (+2 becomes +1 after one step) kept\n                        // the OLD generation and the worker discarded work the new frame still wanted.\n                        req->focusEpoch = gArtFocusEpoch;\n                        if (isPriority && !(req->sio2 && gArtNavActive))\n                            artPromote(req);\n                    }\n'''
-replace_n("src/texcache.c", old_art, new_art, 2)
+        vcd_entry_t *vcds = NULL;
+        int n = vcdScanDirRoot("pfs1:/", &vcds);
+        fileXioUmount("pfs1:");
+        if (n < 0) {
+            free(vcds);
+            scanIncomplete = 1;
+            continue;
+        }
+        if (n == 0) {
+            free(vcds);
+            continue;
+        }
 
-# --- Handoff note ---------------------------------------------------------------
-p, handoff, crlf = read_text("HANDOFF.md")
-note = '''\n## Step 212 follow-up — transactional HDD refresh / metadata dedupe / art overlap\n\n- Do not treat the current HDL backing list as scratch space for `games.bin`: cache and live APA\n  candidates are built separately and only a successful replacement is published. A failed refresh\n  preserves the last-good HDL list; a valid cache may rescue a first-entry live-scan failure.\n- Locked-to-VCD startup performs its initial HDD VCD build even without an L3 dirty bit. Explicit\n  Refresh in HDD VCD view invalidates the session VCD cache before rebuilding.\n- Direct HDD/HDL Info does not queue the generic CFG+stat size pass (APA metadata already owns size);\n  generic Info size resolution is one-at-a-time so repeated enter/back cannot stack duplicate reads.\n- A failed VCD cosmetic-ID enqueue releases its one-slot pending latch.\n- Pending cover requests that are touched by the new frame adopt the new focus generation even when\n  they remain neighbours; only the selected request is promoted. This keeps overlapping Coverflow/List\n  lookahead instead of dropping and rereading it after every navigation step.\n- This follow-up deliberately does NOT change ATA/DEV9 readiness: working HDD VCD enumeration proves\n  the relevant APA/PFS stack is resident for the reported HDL-list symptom.\n'''
-if "## Step 212 follow-up — transactional HDD refresh / metadata dedupe / art overlap" not in handoff:
-    handoff = handoff.rstrip("\n") + "\n" + note
-write_text(p, handoff, crlf)
+        base_game_info_t *grownGames = realloc(newGames, (total + n) * sizeof(base_game_info_t));
+        if (grownGames == NULL) {
+            free(vcds);
+            scanIncomplete = 1;
+            break;
+        }
+        newGames = grownGames;
+        char(*grownParts)[APA_IDMAX + 1] = realloc(newParts, (total + n) * sizeof(*newParts));
+        if (grownParts == NULL) {
+            free(vcds);
+            scanIncomplete = 1;
+            break;
+        }
+        newParts = grownParts;
+
+        int kept = 0;
+        for (int i = 0; i < n; i++) {
+            if (gVcdFirstDiscOnly && vcdIsHiddenDisc(vcds[i].name))
+                continue;
+            base_game_info_t *g = &newGames[total + kept];
+            memset(g, 0, sizeof(base_game_info_t));
+            snprintf(g->name, sizeof(g->name), "%s", vcds[i].name);
+            snprintf(g->startup, sizeof(g->startup), "%s", vcds[i].name);
+            snprintf(g->extension, sizeof(g->extension), ".VCD");
+            g->parts = 1;
+            g->format = GAME_FORMAT_ISO;
+            snprintf(newParts[total + kept], APA_IDMAX + 1, "%s", parts.names[p]);
+            kept++;
+        }
+        free(vcds);
+        total += kept;
+    }
+
+    hddFreePopsPartitionList(&parts);
+    fileXioUmount("pfs1:");
+
+    // If a refresh could not inspect every candidate, a non-empty last-good list has more authority
+    // than a newly-built partial one. This is the VCD twin of the transactional HDL refresh above.
+    if (scanIncomplete && hddVcdGameCount > 0) {
+        free(newGames);
+        free(newParts);
+        hddVcdListBuilt = 0;
+        LOG("HDD VCD: incomplete refresh; preserving %d last-good game(s)\n", hddVcdGameCount);
+        return hddVcdGameCount;
+    }
+
+    free(hddVcdGames);
+    free(hddVcdParts);
+    hddVcdGames = newGames;
+    hddVcdParts = newParts;
+    hddVcdGameCount = total;
+
+    // A first-ever incomplete scan may still expose the entries it proved readable, but it is never
+    // latched as complete. A fully successful zero/nonzero scan is latched unless invalidated mid-run.
+    hddVcdListBuilt = !scanIncomplete && (genAtEntry == hddVcdCacheGen);
+    return total;
+}
+
+'''
+replace_between("src/hddsupport.c", "static int hddBuildVcdGameList(void)\n", "static int hddNeedsUpdate", vcd_func)
+
+p, text, crlf = load("HANDOFF.md")
+note = r'''
+## Step 212 follow-up — APA enumerators publish only complete walks
+
+- `hddGetHDLGamelist()` now treats a negative `fileXioDread()` and any record-allocation failure as
+  scan failure; it never turns a truncated APA table walk into a successful partial HDL list.
+- `hddGetPopsPartitionList()` now distinguishes a successful zero-candidate APA walk from failure and
+  rejects partial walks on dopen/dread/OOM errors.
+- HDD VCD rebuilds are transactional. A failed APA walk or incomplete candidate scan preserves a
+  non-empty last-good VCD list instead of clearing it first; a successful zero-candidate walk may
+  authoritatively clear/latch the list. A first-ever incomplete scan may expose only entries actually
+  proven readable, but remains unlatched so an explicit refresh can retry.
+- These are enumeration/list-lifetime corrections above the transport layer. No ATA/DEV9 readiness
+  policy changed.
+'''
+if "## Step 212 follow-up — APA enumerators publish only complete walks" not in text:
+    text = text.rstrip("\n") + "\n" + note
+save(p, text, crlf)
 PY
 
 git diff --check
 
 git config user.name "NathanNeurotic Step 212 helper"
 git config user.email "109461996+NathanNeurotic@users.noreply.github.com"
-git add src/hddsupport.c src/opl.c src/menusys.c src/vcdsupport.c src/texcache.c HANDOFF.md
-git commit -m "rebuild-212: harden list refresh and art reuse"
+git add src/hdd.c src/hddsupport.c HANDOFF.md
+git commit -m "rebuild-212: make APA list scans transactional"
 git push origin HEAD:"$prod_branch"
