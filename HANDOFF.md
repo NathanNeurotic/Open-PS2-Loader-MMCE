@@ -1382,6 +1382,7 @@ firewall still runs before any actual O_CREAT. `conf_hdd.cfg` remains an optiona
 home redirect; RiptOPL's master settings file is `settings_riptopl.cfg`.
 
 ### Step 212 APA config-source/save-home correction
+
 Hardware on the stacked Step-212 artifact exposed a paired state bug: config recovery could read an
 existing master config from MC/USB, then re-home the live sets to the raw `hdd0:` APA launch identity.
 The load toast therefore claimed `hdd0:` even though no HDD settings file existed, and the next explicit
@@ -1390,3 +1391,17 @@ separately from future save ownership, failed recovery preserves an already-moun
 every non-custom APA save resolves the existing-PFS chain (`conf_hdd.cfg` target -> `__common/OPL`) before
 `configWrite()`. If no safe PFS home exists it fails visibly with ENODEV; it never creates/formats/repairs
 APA metadata.
+
+
+### Step 212 follow-up — deterministic APA config ownership and review closure
+
+Milker_Myers hardware feedback exposed that an APA/FHDB boot could still fall through the generic missing-`config.path` recovery scan and import an older MC/USB master config. That is now prohibited for APA-origin boots. APA configuration ownership is deterministic: mount existing PFS support, honor `__common/OPL/conf_hdd.cfg` when it names an existing mountable target, otherwise use existing `__common/OPL/`, honor a valid explicit `config.path` from that mounted home, and otherwise keep defaults homed to that safe PFS location for the first explicit save. No APA partition is created, formatted, resized, repaired, or opened with a file-style `O_CREAT`.
+
+The same follow-up closes the current CodeRabbit findings without broad device rewrites:
+
+- list-only APA sessions skip NULL HDD prefixes in legacy APPS discovery and HDD argv autolaunch uses metadata-only defaults when no persistent PFS home exists;
+- ETH ISO favourites use an ETH-private read-only ISO backing probe only when the live ETH page is showing VCD, leaving every other device's view handling unchanged;
+- List neighbour warming uses every available cache slot (`count - 1`) while the existing per-cache admission counter and BGM low-water gate still bound storage work;
+- direct `pfs:` / `pfs0:` custom paths remain direct mounted-PFS syntax; HDD notation continues to resolve relative to the active configured data home.
+
+Hardware regression emphasis: APA/FHDB save/reboot with and without MC inserted; existing `conf_hdd.cfg -> +OPL`; missing master config first-save creation under `__common/OPL`; explicit HDD custom path fallback; MC0/MC1 boot ownership; USB/MMCE/MX4SIO/ETH normal save/load; ETH ISO favourites while the source page is in VCD view; and BGM/art stress after the List cache-budget correction.
