@@ -808,8 +808,12 @@ static int hddResolveHddPopstarter(char *elfOut, int elfLen)
     // APA session may legitimately have no persistent data home, in which case there is nothing
     // truthful to remount and an empty gOPLPart must never be passed to fileXioMount.
     fileXioUmount(hddPrefix);
-    if (gOPLPart[0] != '\0')
-        fileXioMount(hddPrefix, gOPLPart, FIO_MT_RDWR);
+    if (gOPLPart[0] != '\0' && fileXioMount(hddPrefix, gOPLPart, FIO_MT_RDWR) < 0) {
+        // The restore mount is part of the persistent-home invariant. Never leave a non-NULL
+        // prefix advertising an unmounted pfs0: after POPSTARTER discovery borrowed the slot.
+        gHDDPrefix = NULL;
+        gOPLPart[0] = '\0';
+    }
     return 0;
 }
 
