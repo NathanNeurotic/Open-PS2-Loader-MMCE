@@ -18,4 +18,4 @@ jobs:
         with:
           fetch-depth: 0
       - run: bash .github/scripts/step212-coverflow.sh
-        # Hardware follow-up rerun: Favourites view isolation + safe APA/PFS settings aliases.
+        # Mechanical cleanup: preserve bdmsupport CRLF while retaining the nine intended view substitutions.
