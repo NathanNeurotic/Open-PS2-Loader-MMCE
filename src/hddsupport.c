@@ -597,7 +597,7 @@ static int hddBuildVcdGameList(void)
             snprintf(g->startup, sizeof(g->startup), "%s", g->name);      // keep VCD identity = name
             snprintf(g->extension, sizeof(g->extension), ".VCD");
             g->parts = 1;
-            g->format = GAME_FORMAT_ISO;                                  // VCD flag gates launch
+            g->format = GAME_FORMAT_ISO;                                    // VCD flag gates launch
             snprintf(newParts[total], APA_IDMAX + 1, "%s", parts.names[p]); // case-preserved label
             total++;
             continue;

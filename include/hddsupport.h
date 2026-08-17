@@ -84,7 +84,8 @@ void hddFreeHDLGamelist(hdl_games_list_t *game_list);
 // container names. Matching is case-sensitive, like POPSTARTER's partition selector.
 int hddIsPopsPartitionGame(const char *name);
 // Enumerate the present classic-container and one-game APA/PFS partitions. Fills a sorted, deduped
-// list; returns the count (0 on none/error). Free via hddFreePopsPartitionList.
+// list; returns the count, 0 on a complete walk with none, or a negative error for an incomplete walk.
+// Free via hddFreePopsPartitionList.
 int hddGetPopsPartitionList(hdd_pops_list_t *list);
 void hddFreePopsPartitionList(hdd_pops_list_t *list);
 int hddSetHDLGameInfo(hdl_game_info_t *ginfo);
