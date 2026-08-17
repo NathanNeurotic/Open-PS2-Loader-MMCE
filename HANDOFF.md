@@ -1429,3 +1429,16 @@ Hardware regression emphasis: APA/FHDB save/reboot with and without MC inserted;
   lookahead instead of dropping and rereading it after every navigation step.
 - This follow-up deliberately does NOT change ATA/DEV9 readiness: working HDD VCD enumeration proves
   the relevant APA/PFS stack is resident for the reported HDL-list symptom.
+
+## Step 212 follow-up — APA enumerators publish only complete walks
+
+- `hddGetHDLGamelist()` now treats a negative `fileXioDread()` and any record-allocation failure as
+  scan failure; it never turns a truncated APA table walk into a successful partial HDL list.
+- `hddGetPopsPartitionList()` now distinguishes a successful zero-candidate APA walk from failure and
+  rejects partial walks on dopen/dread/OOM errors.
+- HDD VCD rebuilds are transactional. A failed APA walk or incomplete candidate scan preserves a
+  non-empty last-good VCD list instead of clearing it first; a successful zero-candidate walk may
+  authoritatively clear/latch the list. A first-ever incomplete scan may expose only entries actually
+  proven readable, but remains unlatched so an explicit refresh can retry.
+- These are enumeration/list-lifetime corrections above the transport layer. No ATA/DEV9 readiness
+  policy changed.
