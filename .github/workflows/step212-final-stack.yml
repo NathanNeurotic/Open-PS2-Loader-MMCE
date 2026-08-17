@@ -1,0 +1,136 @@
+name: Step 212 final stacked fixes
+
+on:
+  push:
+    branches:
+      - rebuild/step-212-apa-boot-and-bgm-resilience
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: rebuild/step-212-apa-boot-and-bgm-resilience
+          fetch-depth: 0
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Restore cache-sized cover warming
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p = Path('src/themes.c')
+          s = p.read_text()
+
+          start = s.index('// How many rows either side of the SELECTED row may be warmed.')
+          end = s.index('// Extra idle frames a per-game BACKGROUND waits', start)
+          s = s[:start] + '''// Cover warming is derived from each resolved COV cache's actual capacity. The selected cover\n// always claims the first slot; the remaining slots are walked center-out on both sides. This\n// restores the pre-2587 "already waiting for you" behavior without a fixed +/-2 cap, while the\n// BGM low-water gate in texcache.c remains the device-level safety valve under real contention.\n''' + s[end:]
+
+          start = s.index('        // List admission now mirrors Coverflow\'s useful property:')
+          end = s.index('        submenu_list_t *ps = menu->item->pagestart;', start)
+          block = '''        // List admission mirrors Coverflow: selected first, then center-out warming sized by\n        // the actual resolved cover cache. Merely being visible is not enough to start a read; the\n        // warm radius is bounded by cache capacity, so the selected cover keeps a reserved slot and\n        // loose PNG users regain the deep lookahead older fast builds provided. Games, APPS,\n        // Favourites and VCD all pass through this one scheduler.\n        image_cache_t *selectedCache = NULL;\n        if (itemsList->decoratorImage != NULL && !item->item.isFolder) {\n            selectedCache = itemsList->decoratorImage->cache;\n            getGameImageTextureEx(selectedCache, menu->item->userdata, &item->item, 1);\n        } else if (itemsList->coverElem != NULL && !item->item.isFolder) {\n            mutable_image_t *selImg = (mutable_image_t *)thmGetElemForItem(menu, item, itemsList->coverElem)->extended;\n            if (selImg != NULL && selImg->cache != NULL) {\n                selectedCache = selImg->cache;\n                getGameImageTextureEx(selectedCache, menu->item->userdata, &item->item, 1);\n            }\n        }\n\n        int warmRadius = (selectedCache != NULL && selectedCache->count > 1) ? (selectedCache->count - 1) / 2 : 0;\n        struct\n        {\n            image_cache_t *cache;\n            int left;\n        } listWarm[2] = {{NULL, 0}, {NULL, 0}};\n        submenu_list_t *walkSide[2] = {item, item}; // [0] next, [1] previous\n        for (int step = 0; step < warmRadius; step++) {\n            for (int side = 0; side < 2; side++) {\n                submenu_list_t *walk = walkSide[side];\n                submenu_list_t *next = side ? walk->prev : walk->next;\n                if (next == NULL || next == walk)\n                    continue;\n                walkSide[side] = next;\n                if (next->item.isFolder)\n                    continue;\n\n                image_cache_t *warmCache = NULL;\n                if (itemsList->decoratorImage != NULL) {\n                    warmCache = itemsList->decoratorImage->cache;\n                } else if (itemsList->coverElem != NULL) {\n                    mutable_image_t *warmImg = (mutable_image_t *)thmGetElemForItem(menu, next, itemsList->coverElem)->extended;\n                    if (warmImg != NULL)\n                        warmCache = warmImg->cache;\n                }\n                if (warmCache == NULL || warmCache->count < 2)\n                    continue;\n                if (step >= (warmCache->count - 1) / 2)\n                    continue;\n\n                int b;\n                for (b = 0; b < 2 && listWarm[b].cache != NULL && listWarm[b].cache != warmCache; b++)\n                    ;\n                if (b == 2)\n                    continue;\n                if (listWarm[b].cache == NULL) {\n                    listWarm[b].cache = warmCache;\n                    listWarm[b].left = warmCache->count - 1; // selected's slot remains reserved\n                }\n                if (listWarm[b].left > 0) {\n                    listWarm[b].left--;\n                    getGameImageTexture(warmCache, list, &next->item);\n                }\n            }\n        }\n\n'''
+          s = s[:start] + block + s[end:]
+
+          old = '''    int warmRadius = (elemImg != NULL && elemImg->cache != NULL) ? (elemImg->cache->count - 1) / 2 : 0;\n    if (warmRadius > 2)\n        warmRadius = 2; // Tame lookahead burst: warm at most 2 immediate neighbours on each side\n'''
+          new = '''    int warmRadius = (elemImg != NULL && elemImg->cache != NULL) ? (elemImg->cache->count - 1) / 2 : 0;\n'''
+          if old not in s:
+              raise SystemExit('Coverflow +/-2 cap block not found')
+          s = s.replace(old, new, 1)
+
+          p.write_text(s)
+          PY
+          git diff --check
+          git add src/themes.c
+          git commit -m "rebuild-212: restore cache-sized cover warming"
+
+      - name: Accept CodeRabbit HDD remount invariant
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('src/hddsupport.c')
+          s = p.read_text()
+          old = '''    fileXioUmount(hddPrefix);\n    if (gOPLPart[0] != '\\0')\n        fileXioMount(hddPrefix, gOPLPart, FIO_MT_RDWR);\n    return 0;\n'''
+          new = '''    fileXioUmount(hddPrefix);\n    if (gOPLPart[0] != '\\0' && fileXioMount(hddPrefix, gOPLPart, FIO_MT_RDWR) < 0) {\n        // The restore mount is part of the persistent-home invariant. Never leave a non-NULL\n        // prefix advertising an unmounted pfs0: after POPSTARTER discovery borrowed the slot.\n        gHDDPrefix = NULL;\n        gOPLPart[0] = '\\0';\n    }\n    return 0;\n'''
+          if old not in s:
+              raise SystemExit('HDD restore mount block not found')
+          p.write_text(s.replace(old, new, 1))
+          PY
+          git diff --check
+          git add src/hddsupport.c
+          git commit -m "rebuild-212: clear stale HDD home after remount failure"
+
+      - name: Accept CodeRabbit bare recovery ownership
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('src/opl.c')
+          s = p.read_text()
+          old = '''    } else if (gBootDir[0] != '\\0') {\n        configSetMove(gBootDir);\n    } else {\n        configSetMove(NULL);\n    }\n}\n'''
+          new = '''    } else if (gBootDir[0] != '\\0') {\n        configSetMove(gBootDir);\n    } else {\n        // A bare launch has no independent boot owner to restore. The existing config home that\n        // recovery actually found is therefore the strongest safe ownership signal; keep that\n        // concrete MC/USB home so the next explicit save can persist instead of falling into an\n        // unreachable mc?:OPL wildcard. Recovery still performs no write by itself.\n        configSetMove((char *)recoveredHome);\n    }\n}\n'''
+          if old not in s:
+              raise SystemExit('Bare recovery restore block not found')
+          p.write_text(s.replace(old, new, 1))
+          PY
+          git diff --check
+          git add src/opl.c
+          git commit -m "rebuild-212: preserve bare recovered config ownership"
+
+      - name: Report resolved HDD save destination
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('src/opl.c')
+          s = p.read_text()
+          old = '''            char *path = configGetDir();\n\n            // Boot fallback state only describes an HDD save when this save actually landed on PFS.\n            if (gHddSettingsFallbackNotice ||\n                (gBootHddCommonFallback && path != NULL && !strncmp(path, "pfs", 3))) {\n                const char *displayHome = path;\n                if (!strcmp(gOPLPart, "hdd0:__common"))\n                    displayHome = "hdd0:__common/OPL";\n                else if (gOPLPart[0] != '\\0')\n                    displayHome = gOPLPart;\n                snprintf(notification, sizeof(notification), _l(_STR_SETTINGS_HDD_FALLBACK), displayHome);\n            } else {\n                snprintf(notification, sizeof(notification), _l(_STR_SETTINGS_SAVED), path);\n            }\n'''
+          new = '''            char *path = configGetDir();\n            const char *displayHome = path;\n            int savedOnHddHome = path != NULL && !strncmp(path, "pfs", 3) && gOPLPart[0] != '\\0';\n\n            // pfs0: is only the transient mount name. For every successful HDD save, show the\n            // physical APA/PFS owner the user can actually find in a partition browser.\n            if (savedOnHddHome) {\n                if (!strcmp(gOPLPart, "hdd0:__common"))\n                    displayHome = "hdd0:__common/OPL";\n                else\n                    displayHome = gOPLPart;\n            }\n\n            if (gHddSettingsFallbackNotice || (gBootHddCommonFallback && savedOnHddHome))\n                snprintf(notification, sizeof(notification), _l(_STR_SETTINGS_HDD_FALLBACK), displayHome);\n            else\n                snprintf(notification, sizeof(notification), _l(_STR_SETTINGS_SAVED), displayHome);\n'''
+          if old not in s:
+              raise SystemExit('HDD save notification block not found')
+          p.write_text(s.replace(old, new, 1))
+          PY
+          git diff --check
+          git add src/opl.c
+          git commit -m "rebuild-212: report the resolved HDD settings home"
+
+      - name: Refresh Step 212 handoff
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('HANDOFF.md')
+          s = p.read_text()
+          old = '''returns to the immediate path. List mode is unchanged. This preserves BGM priority and the dedicated\nart-worker design while ordering USB device work around what the user is visibly waiting for.\n'''
+          new = '''returns to the immediate path. The later hardware pass extends the same selected-first discipline to\nList/APPS/Favourites/VCD with cache-sized center-out warming. This preserves BGM priority and the\ndedicated art-worker design while ordering device work around what the user is visibly waiting for.\n'''
+          if old not in s:
+              raise SystemExit('Stale List unchanged handoff text not found')
+          s = s.replace(old, new, 1)
+
+          old = '''- **List art admission is bounded around the cursor.** The generic List renderer (Games, APPS,\n  Favourites and VCD) requests the selected cover first and only +/-2 neighbours; farther visible\n  rows draw resident art without starting new loose-PNG reads. This brings List request pressure in\n  line with Coverflow rather than making viewport height equal I/O queue depth.\n'''
+          new = '''- **List art admission is cache-sized around the cursor.** The generic List renderer (Games, APPS,\n  Favourites and VCD) requests the selected cover first, then walks outward using the resolved COV\n  cache capacity instead of a fixed +/-2 cap. Farther visible rows draw resident art without starting\n  reads. Coverflow uses the same cache-sized rule again, restoring the older deep lookahead that made\n  loose covers feel preloaded while BGM low-water admission remains the device-level safety valve.\n'''
+          if old not in s:
+              raise SystemExit('Old +/-2 handoff bullet not found')
+          s = s.replace(old, new, 1)
+
+          marker = '''Hardware acceptance should explicitly cover: APA PS2 + VCD pages with/without the persistent PFS\nhome, mc0 and mc1 boots with both cards inserted, loose-PNG List/Coverflow on USB, APPS/Favourites\nmissing-art navigation, a VCD theme with no ItemText (zero deep image reads), and one with ItemText\n(the ID may pop in opportunistically without starving art/audio). VCD favourite persistence remains\npart of the regression matrix.\n'''
+          addition = marker + '''\nFinal review polish in the same Step-212 PR also accepts CodeRabbit's persistent-home remount finding\n(clear `gHDDPrefix`/`gOPLPart` if the post-POPS restore mount fails) and bare-launch recovery finding\n(when there is no boot identity, the already-existing recovered MC/USB config home remains the save\nowner). Normal successful HDD-save notifications now translate transient `pfs0:` back to the physical\nowner (`hdd0:__common/OPL` or the configured existing partition) so testers can locate the files.\n'''
+          if marker not in s:
+              raise SystemExit('Hardware acceptance handoff marker not found')
+          s = s.replace(marker, addition, 1)
+          p.write_text(s)
+          PY
+          git diff --check
+          git add HANDOFF.md
+          git commit -m "rebuild-212: refresh stacked hardware handoff"
+
+      - name: Remove helper workflow and push stack
+        run: |
+          git rm .github/workflows/step212-final-stack.yml
+          git commit -m "chore: remove Step 212 helper workflow"
+          git push origin HEAD:rebuild/step-212-apa-boot-and-bgm-resilience
