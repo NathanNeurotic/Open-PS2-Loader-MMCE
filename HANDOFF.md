@@ -1405,3 +1405,11 @@ The same follow-up closes the current CodeRabbit findings without broad device r
 - direct `pfs:` / `pfs0:` custom paths remain direct mounted-PFS syntax; HDD notation continues to resolve relative to the active configured data home.
 
 Hardware regression emphasis: APA/FHDB save/reboot with and without MC inserted; existing `conf_hdd.cfg -> +OPL`; missing master config first-save creation under `__common/OPL`; explicit HDD custom path fallback; MC0/MC1 boot ownership; USB/MMCE/MX4SIO/ETH normal save/load; ETH ISO favourites while the source page is in VCD view; and BGM/art stress after the List cache-budget correction.
+
+### Step 212 hardware follow-up — APA lists, rolling art focus, config latency
+
+- APA HDL/VCD enumeration no longer hard-stops solely because the combined persistent-PFS support latch is incomplete; the read-only scanners get a chance to report actual availability after the normal support retry.
+- Cache-sized cover prefetch remains aggressive, but queued requests now carry a selected-game focus generation. Moving the cursor discards the old speculative neighborhood before another read; a warmed request that becomes selected is adopted into the new generation.
+- Native OPL game selection reuses a browse-prefetched per-game config when the exact list+row is already resident instead of invalidating and rereading it just to enter/launch.
+- Info-screen #Size resolution is discretionary storage IO and waits for BGM reserve to recover, abandoning stale work if the user navigates away.
+- Hardware retest priorities: APA HDL + HDD VCD visibility; long loose-PNG scrolling without batch stalls; USB BGM while repeatedly entering Info; native-core X/Triangle config latency on settled vs immediate selections.
