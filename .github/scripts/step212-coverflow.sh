@@ -14,8 +14,6 @@ test "$(git rev-parse HEAD)" = "9a961663338083901974822db4feabee434127a1"
 python3 - <<'PY'
 from pathlib import Path
 
-# item_list_t gets an opt-in view override at the END so every existing positional
-# initializer remains source-compatible and zero means native behavior.
 p = Path('include/iosupport.h')
 text = p.read_text()
 old = '''    /// Launch a VCD (PS1/POPSTARTER) item by its stored name, regardless of the device's current\n    /// view. NULL for devices without a VCD view (checklist item 12). Used by the Favourites tab to\n    /// launch a VCD favourite while its source device page may be in ISO view.\n    void (*itemLaunchVcd)(item_list_t *itemList, const char *vcdName, config_set_t *configSet);\n} item_list_t;\n'''
@@ -24,8 +22,6 @@ if text.count(old) != 1:
     raise SystemExit('iosupport.h: item_list tail did not match exactly once')
 p.write_text(text.replace(old, new, 1))
 
-# Public helper used by support callbacks. Normal supports remain byte-for-byte equivalent;
-# only shallow FAV proxies set viewOverride.
 p = Path('include/vcdsupport.h')
 text = p.read_text()
 old = '''// Is the given device mode currently showing its VCD list (vs its disc list)?\nint vcdViewActive(int mode);\n'''
@@ -34,10 +30,9 @@ if text.count(old) != 1:
     raise SystemExit('vcdsupport.h: vcdViewActive declaration did not match exactly once')
 p.write_text(text.replace(old, new, 1))
 
-# Make the support implementations honor a per-instance override. Exclude vcdsupport.c itself
-# so the helper implementation below cannot be accidentally rewritten into recursion.
 changed = 0
-for name in ['src/bdmsupport.c', 'src/hddsupport.c', 'src/ethsupport.c', 'src/mmcesupport.c', 'src/udpfssupport.c']:
+# MMCE is currently the reserved/stub mode in this rebuild and has no src/mmcesupport.c.
+for name in ['src/bdmsupport.c', 'src/hddsupport.c', 'src/ethsupport.c', 'src/udpfssupport.c']:
     p = Path(name)
     text = p.read_text()
     count = text.count('vcdViewActive(itemList->mode)')
@@ -57,14 +52,9 @@ if text.count(needle) != 1:
     raise SystemExit('vcdsupport.c: vcdViewActive implementation did not match exactly once')
 p.write_text(text.replace(needle, replacement, 1))
 
-# Favourites: resolve ISO records through a forced-ISO shallow support view, and proxy every
-# later source callback through the record's own family. This fixes the asymmetry where VCD
-# favourites were already view-independent but ISO favourites disappeared whenever their source
-# page happened to be left in VCD mode.
 p = Path('src/favsupport.c')
 text = p.read_text()
 
-# Existing per-record proxy sites: use a stack-local shallow view derived from the live source.
 old_i = '        item_list_t *o = favArray[i].owner;\n'
 new_i = '        item_list_t ownerView;\n        item_list_t *o = favOwnerView(i, &ownerView);\n'
 count_i = text.count(old_i)
@@ -79,16 +69,12 @@ if count_id < 4:
     raise SystemExit(f'favsupport.c: expected multiple current-record owner proxy sites, got {count_id}')
 text = text.replace(old_id, new_id)
 
-# Insert the view-proxy helper immediately after the index guard, before the rewritten call sites.
 needle = '''static int favValidIndex(int id) { return (favArray != NULL && id >= 0 && id < favCount); }\n'''
 insert = needle + '''\n// Build a stack-local view of a favourite's LIVE source support. Only viewOverride changes; priv,\n// callbacks, flags and owner all come from the current source object. This lets Favourites keep its\n// ISO/VCD split independent from the source page's own L3 state without copying or mutating device\n// state. The returned pointer is valid only as long as `view` remains in scope.\nstatic item_list_t *favOwnerView(int id, item_list_t *view)\n{\n    if (!favValidIndex(id) || view == NULL || favArray[id].owner == NULL)\n        return NULL;\n\n    *view = *favArray[id].owner;\n    view->viewOverride = favArray[id].isVcd ? ITEM_VIEW_FORCE_VCD : ITEM_VIEW_FORCE_ISO;\n    return view;\n}\n'''
 if text.count(needle) != 1:
     raise SystemExit('favsupport.c: favValidIndex marker did not match exactly once')
 text = text.replace(needle, insert, 1)
 
-# Replace favResolve and add a view-specific stored-id validator. VCD favourites retain their
-# existing name-based resolution; ISO favourites validate against the source's retained ISO array
-# even if the visible source submenu is currently VCD.
 start = text.index('static item_list_t *favResolve(')
 end = text.index('// ---- item_list_t callbacks', start)
 new_resolve = r'''static int favResolveStoredId(item_list_t *source, int id, const char *text, int isVcd, int *outId)
@@ -203,7 +189,7 @@ p.write_text(text)
 PY
 
 git diff --check
-git add include/iosupport.h include/vcdsupport.h src/vcdsupport.c src/bdmsupport.c src/hddsupport.c src/ethsupport.c src/mmcesupport.c src/udpfssupport.c src/favsupport.c
+git add include/iosupport.h include/vcdsupport.h src/vcdsupport.c src/bdmsupport.c src/hddsupport.c src/ethsupport.c src/udpfssupport.c src/favsupport.c
 git commit -m "rebuild-212: isolate Favourites ISO and VCD source views"
 
 # -----------------------------------------------------------------------------
@@ -289,14 +275,11 @@ new_func = r'''static int prepareCustomApaSettingsPath(char *path, int pathLen)
             while (*p == '/' || *p == ':' || *p == '\\')
                 p++;
         } else if ((*p == '+' || !strncmp(p, "__", 2)) && *p != '\0') {
-            // A partition-looking token that is NOT the active partition is not a directory alias.
             LOG("CONFIG PFS settings alias %s names a non-active APA partition\n", path);
             gLastSaveErrno = ENODEV;
             return -1;
         }
     } else {
-        // Parse the partition token from hddN:<partition>... or bare +OPL... and require it to be
-        // exactly the partition the HDD owner already selected. This function never mounts another.
         i = 0;
         while (*p != '\0' && *p != '/' && *p != ':' && *p != '\\' && i < sizeof(subfolder) - 1)
             subfolder[i++] = *p++;
@@ -312,8 +295,6 @@ new_func = r'''static int prepareCustomApaSettingsPath(char *path, int pathLen)
             return -1;
         }
 
-        // Launchers use both :pfs: and /pfs: spellings. Strip separators first, then consume the
-        // pseudo-filesystem token so it cannot leak into the directory name.
         while (*p != '\0') {
             while (*p == ':' || *p == '/' || *p == '\\')
                 p++;
@@ -325,9 +306,8 @@ new_func = r'''static int prepareCustomApaSettingsPath(char *path, int pathLen)
         }
     }
 
-    // __common's persistent data home is already pfs0:OPL/. Users naturally spell the physical
-    // target as hdd0:/__common/OPL or pfs:/__common/OPL; consume that one redundant OPL component
-    // rather than producing the broken pfs0:OPL/OPL path seen on hardware. +OPL uses pfs0: directly.
+    // __common's data home is already pfs0:OPL/. Consume one redundant OPL component from
+    // hdd0:/__common/OPL and pfs:/__common/OPL instead of producing pfs0:OPL/OPL.
     if (commonStyleHome && !strncmp(p, "OPL", 3) &&
         (p[3] == '\0' || p[3] == '/' || p[3] == ':' || p[3] == '\\')) {
         p += 3;
@@ -344,8 +324,6 @@ new_func = r'''static int prepareCustomApaSettingsPath(char *path, int pathLen)
     while (i > 0 && subfolder[i - 1] == '/')
         subfolder[--i] = '\0';
 
-    // Every accepted spelling lands under the active data home. For __common that is pfs0:OPL/;
-    // for +OPL it is pfs0:. Bare pfs0: therefore means the safe data home, not the root of __common.
     if (subfolder[0] != '\0') {
         size_t prefixLen = strlen(gHDDPrefix);
         if (prefixLen > 0 && (gHDDPrefix[prefixLen - 1] == ':' || gHDDPrefix[prefixLen - 1] == '/'))
