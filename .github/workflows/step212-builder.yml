@@ -18,4 +18,5 @@ jobs:
         with:
           fetch-depth: 0
       - run: bash .github/scripts/step212-coverflow.sh
-        # Patch script validates the exact production head before writing.
+        # Patch script validates exact production head before writing.
+        # Consolidated hardware follow-up: APA lists, MC1, List art, APP metadata, BGM, VCD ID.
