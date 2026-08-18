@@ -26,7 +26,7 @@ Nathan's side and his testers' side must look identical across a handover. These
 
 **BRANCHES.** Never commit to `master`, `rebuild/main`, or any existing `rebuild/step-*` branch.
 Every change goes on a NEW branch you create, `rebuild/step-NNN-<slug>`, branched from the current
-tip. **Next number: 201. Current tip: `rebuild/step-200-fix-null-deref-and-apa-pfs-prefix-resolution`.** One focused change
+tip. **Next number: 202. Current tip: `rebuild/step-201-fix-mx4sio-game-launch-hang`.** One focused change
 per step, with a long explanatory commit message -- what changed, why, what evidence drove it, and
 what it does NOT fix. Those messages are this project's real documentation. Never force-push, never
 rewrite history, never merge to `master` without asking. (`rebuild/main` moves only as the
@@ -1205,4 +1205,19 @@ it), not a re-derivation of (a).
    - In `src/config.c`, added `configBuildPath()` to cleanly format paths with `pfs0:` prefixes without double slashes (`pfs0:conf_opl.cfg` and `pfs0:OPL/conf_opl.cfg`).
 4. **Safe PFS Mount on Save**:
    - In `src/opl.c:trySaveConfigHDD()`, ensured `hddLoadSupportModules()` mounts `pfs0:` before writing.
+
+# 31. STEP-201: Fix MX4SIO Game Launching Hang on Game-Side IOP Reset (2026-08-17)
+
+### Root Cause:
+- In `ee_core/src/iopmgr.c:ResetIopSpecial()`, `BDM_M4S_MODE` guarded `LoadOPLModule(OPL_MODULE_ID_MX4SIOBD)` with `if (LoadOPLModule(OPL_MODULE_ID_SIO2MAN, 0, 0, NULL) > 0)`.
+- When `sio2man` (`freesio2.irx`) initializes successfully as resident in IOP memory, its entry point returns `MODULE_RESIDENT_END` (`0`).
+- Because `0 > 0` evaluates to `false`, `mx4sio_bd.irx` was NEVER loaded on any launch.
+- `cdvdman` then blocked indefinitely on `bdm_io_sema` waiting for the `sdc` block device, freezing the console on the last rendered buffer ("Loading config...").
+
+### What was changed:
+1. **Unconditional Game-Side MX4SIO Driver Chain**:
+   - In `ee_core/src/iopmgr.c:ResetIopSpecial()`, removed the faulty `> 0` guard, loading `OPL_MODULE_ID_SIO2MAN` and `OPL_MODULE_ID_MX4SIOBD` in sequence (matching `BDM_ILK_MODE`).
+2. **Documentation Contract**:
+   - Updated `docs/MX4SIO.md` to reflect sequential module loading without the invalid positive-ID assumption.
+
 

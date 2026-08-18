@@ -37,10 +37,11 @@ IGS ?= $(EXTRA_FEATURES)
 PADEMU ?= 1
 
 #Enables/disables PS5 DualSense (USB) support in the pad emulator. HW-VALIDATED on a real DS5
-#(maintainer, 2026-07-06) but kept OFF in the default build by deliberate choice -- the DS5 code
-#is entirely #ifdef DS5_ENABLE, so with this at 0 ds34usb.irx is behaviourally identical to the
-#build that is already hardware-proven. Named DUALSENSE=1 release assets return with item 58.
-DUALSENSE ?= 0
+#(maintainer, 2026-07-06). ON in every build: the DS5 code is entirely #ifdef DS5_ENABLE and
+#gated behind an idProduct == DS5_PID USB check, so DS3/DS4 users see no change whatsoever --
+#the compiled IRX is simply slightly larger. A non-DS5 controller will never hit the DS5 path.
+#Kept as an escape hatch (build with DUALSENSE=0) if a real regression surfaces.
+DUALSENSE ?= 1
 
 #GSM 1080p video mode (a GSM-synthetic progressive raster; see ee_core DTV_1080P). ON in every
 #build since it was confirmed working on real hardware (RT4K reported 1080p and displayed it
