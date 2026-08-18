@@ -189,12 +189,9 @@ static void menuDeleteGame(submenu_list_t **submenu)
         guiMsgBox("NULL Support object. Please report", 0, NULL);
 }
 
-// Waited-on load (the DIALOG path: menuLoadConfig / gameMenuLoadConfig). Deliberately keeps the
-// original shape -- the read runs UNDER menuSemaId -- because a caller is blocked in
-// guiHandleDeferedIO on actionStatus and will hand whatever this publishes straight to
-// itemLaunch()/guiGameLoadConfig(), neither of which tolerates a NULL config_set_t. Publishing
-// unconditionally is what makes that safe, and the caller already shows a "loading settings"
-// overlay, so the brief freeze here is by design and pre-existing.
+// Waited-on load for the game-settings dialog path (gameMenuLoadConfig). Launch-time
+// menuLoadConfig deliberately bypasses ioman below so foreground launch configuration can never
+// sit behind queued device/list work. This queued variant stays for settings UI transitions.
 static void _menuLoadConfig()
 {
     WaitSema(menuSemaId);
@@ -450,13 +447,68 @@ static config_set_t *menuGetCachedCurrentConfig(void)
 
 config_set_t *menuLoadConfig()
 {
-    config_set_t *cached = menuGetCachedCurrentConfig();
-    if (cached != NULL)
-        return cached; // browse-time prefetch already paid the device read
+    item_list_t *list = NULL;
+    config_set_t *loadedConfig = NULL;
+    config_set_t *result = NULL;
+    int configId = -1;
 
-    actionStatus = 1;
-    guiHandleDeferedIO(&actionStatus, _l(_STR_LOADING_SETTINGS), IO_CUSTOM_SIMPLEACTION, &_menuRequestConfig, OPL_DEFERRED_IO_TIMEOUT_MS);
-    return itemConfig;
+    // Launch configuration is foreground work. Sending it through the single ioman FIFO makes a
+    // game launch wait behind unrelated device/list rescans and browse-time metadata; on MX4SIO
+    // that can pin the UI at "Loading config..." before the game-side IOP reset is even reached.
+    WaitSema(menuSemaId);
+    if (selected_item != NULL && selected_item->item != NULL && selected_item->item->current != NULL) {
+        list = selected_item->item->userdata;
+        configId = selected_item->item->current->item.id;
+
+        if (itemConfig != NULL && itemConfigId == configId && itemConfigList == list) {
+            result = itemConfig; // browse-time prefetch already paid the device read
+        } else {
+            if (itemConfig != NULL) {
+                configFree(itemConfig);
+                itemConfig = NULL;
+            }
+            itemConfigId = configId;
+            itemConfigList = list;
+        }
+    } else {
+        if (itemConfig != NULL) {
+            configFree(itemConfig);
+            itemConfig = NULL;
+        }
+        itemConfigId = -1;
+        itemConfigList = NULL;
+    }
+    actionStatus = 0;
+    SignalSema(menuSemaId);
+
+    if (result != NULL || list == NULL || configId < 0)
+        return result;
+
+    // Launch owns the storage path now. Drop speculative art before the foreground CFG read. A
+    // zero wait requests cancellation but never kills or waits on an in-flight fileXio/SIO2 RPC;
+    // that transaction is allowed to finish cleanly while no new queued art can get in front.
+    if (list->mode == MMCE_MODE)
+        (void)cacheAbortMmceImageLoadsTimed(0);
+    else
+        (void)cacheCancelPendingImageLoadsTimed(0);
+
+    loadedConfig = list->itemGetConfig(list, configId);
+
+    // A browse-time load may have completed while the direct read was running. Publish only if this
+    // selection still owns the cache; otherwise free the duplicate/stale result.
+    WaitSema(menuSemaId);
+    if (itemConfig == NULL && itemConfigId == configId && itemConfigList == list) {
+        itemConfig = loadedConfig;
+        loadedConfig = NULL;
+    }
+    if (itemConfigId == configId && itemConfigList == list)
+        result = itemConfig;
+    SignalSema(menuSemaId);
+
+    if (loadedConfig != NULL)
+        configFree(loadedConfig);
+
+    return result;
 }
 
 // we don't want a pop up when transitioning to or refreshing Game Menu gui.
