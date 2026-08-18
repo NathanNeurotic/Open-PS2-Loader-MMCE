@@ -1132,6 +1132,51 @@ static int configPathIsRawApa(const char *path)
     return path != NULL && !strncmp(path, "hdd", 3) && path[3] >= '0' && path[3] <= '9' && path[4] == ':';
 }
 
+// Single-shot fast path for small configs (issue #500). Small CFG files (few KB)
+// are common for per-game configs. Reading the whole file in one IOP transaction
+// avoids the 4KB buffered refill loop and the extra BOM probe in openFileBuffer.
+// Falls back to the established 4KB buffered path on any error/OOM/oversize.
+// Keeps the 4096 buffer size; no gratuitous 8KB expansion without measurement.
+static file_buffer_t *configOpenSingleShot(const char *path)
+{
+    if (path == NULL)
+        return NULL;
+
+    int fd = openFile((char *)path, O_RDONLY);
+    if (fd < 0)
+        return NULL;
+
+    int sz = getFileSize(fd);
+    // Only single-shot when size is known, positive and fits in one 4KB buffer.
+    // Zero-byte, malformed (sz<0) and oversized (>4096) fall back to buffered.
+    if (sz <= 0 || sz > 4096) {
+        close(fd);
+        return NULL;
+    }
+
+    char *buf = (char *)malloc(sz);
+    if (buf == NULL) {
+        close(fd);
+        return NULL;
+    }
+
+    int rd = read(fd, buf, sz);
+    close(fd);
+    if (rd != sz) {
+        free(buf);
+        return NULL;
+    }
+
+    // Strip UTF-8 BOM if present (openFileBuffer does the same via 3-byte probe).
+    int off = 0;
+    if (sz >= 3 && (unsigned char)buf[0] == 0xEF && (unsigned char)buf[1] == 0xBB && (unsigned char)buf[2] == 0xBF)
+        off = 3;
+
+    file_buffer_t *fb = openFileBufferBuffer(0, buf + off, sz - off);
+    free(buf);
+    return fb;
+}
+
 int configRead(config_set_t *configSet)
 {
     if (configSet != NULL && configPathIsRawApa(configSet->filename)) {
@@ -1139,13 +1184,17 @@ int configRead(config_set_t *configSet)
         return 0;
     }
     int ret;
-    file_buffer_t *fileBuffer = openFileBuffer(configSet->filename, O_RDONLY, 0, 4096);
+    file_buffer_t *fileBuffer = configOpenSingleShot(configSet->filename);
+    if (fileBuffer == NULL)
+        fileBuffer = openFileBuffer(configSet->filename, O_RDONLY, 0, 4096);
 
     if (fileBuffer == NULL && configSet->filename != NULL) {
         // Our name is absent -- wOPL may have moved this file's data to its own name (see above).
         char woplPath[256];
         if (configBuildWoplPath(configSet->filename, woplPath, sizeof(woplPath))) {
-            fileBuffer = openFileBuffer(woplPath, O_RDONLY, 0, 4096);
+            fileBuffer = configOpenSingleShot(woplPath);
+            if (fileBuffer == NULL)
+                fileBuffer = openFileBuffer(woplPath, O_RDONLY, 0, 4096);
             if (fileBuffer != NULL) {
                 LOG("CONFIG %s absent; reading wOPL's %s instead\n", configSet->filename, woplPath);
                 // Point the set at the file we actually read, so a later save updates THAT file rather
@@ -1162,7 +1211,9 @@ int configRead(config_set_t *configSet)
         // new name. configSet->filename stays the new name, so configWrite migrates transparently.
         char legacyPath[256];
         configBuildLegacyOplPath(configSet->filename, legacyPath, sizeof(legacyPath));
-        fileBuffer = openFileBuffer(legacyPath, O_RDONLY, 0, 4096);
+        fileBuffer = configOpenSingleShot(legacyPath);
+        if (fileBuffer == NULL)
+            fileBuffer = openFileBuffer(legacyPath, O_RDONLY, 0, 4096);
         if (fileBuffer != NULL)
             LOG("CONFIG migrating settings from legacy %s\n", legacyPath);
     }
