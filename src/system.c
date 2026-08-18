@@ -358,8 +358,10 @@ int sysGetDiscID(char *hexDiscID)
     if (sceCdStatus() == SCECdErOPENS) // If tray is open, error
         return -1;
 
-    while (sceCdGetDiskType() == SCECdDETCT) {
-        ;
+    {
+        int detecting = 0;
+        while (sceCdGetDiskType() == SCECdDETCT && detecting++ < 50)
+            DelayThread(20 * 1000); // ~1 s cap, yields (issue #465: bound DETCT, preserve NODISC budget)
     }
     if (sceCdGetDiskType() == SCECdNODISC)
         return -1;
@@ -464,8 +466,11 @@ int sysLaunchDisc(void)
     if (sceCdStatus() == SCECdErOPENS) // tray open
         return -1;
 
-    while (sceCdGetDiskType() == SCECdDETCT) // wait for the drive to identify the disc
-        ;
+    {
+        int detecting = 0;
+        while (sceCdGetDiskType() == SCECdDETCT && detecting++ < 50)
+            DelayThread(20 * 1000); // ~1 s cap, yields (issue #465: bound DETCT, preserve 4 s NODISC re-detect)
+    }
 
     type = sceCdGetDiskType();
     // An idle drive spins the disc DOWN and then reports NODISC even with a game disc loaded.
