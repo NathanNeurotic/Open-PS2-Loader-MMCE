@@ -34,6 +34,25 @@
 #include "include/retrogem.h"
 
 
+// Recognized documented POPSTARTER prefixes:
+// XX. = USB / MX4SIO / iLink (local block devices)
+// SB. = SMB / ETH (network shares)
+// EL. = ELF launcher prefix (embedded / custom launcher)
+// SM. = SMB alternate prefix
+static int vcdSkipPopstarterPrefix(const char *name)
+{
+    if (name == NULL || strlen(name) < 3)
+        return 0;
+
+    if ((!strncasecmp(name, "XX.", 3)) ||
+        (!strncasecmp(name, "SB.", 3)) ||
+        (!strncasecmp(name, "EL.", 3)) ||
+        (!strncasecmp(name, "SM.", 3)))
+        return 3;
+
+    return 0;
+}
+
 int vcdExtractGameId(const char *name, char *idOut, int idSize)
 {
     int i;
@@ -45,10 +64,8 @@ int vcdExtractGameId(const char *name, char *idOut, int idSize)
     if (name == NULL)
         return 0;
 
-    // Skip POPSTARTER 3-character prefixes (e.g. "XX.", "SB.", "EL.", "SM.", or any "??.")
-    if (p[0] != '\0' && p[1] != '\0' && p[2] == '.') {
-        p += 3;
-    }
+    // Skip documented POPSTARTER prefixes (XX., SB., EL., SM.)
+    p += vcdSkipPopstarterPrefix(p);
 
     if (strlen(p) < 11)
         return 0;
@@ -103,14 +120,10 @@ int vcdGetArtGameId(const char *name, char *outId, int outSize)
 // (optionally preceded by a POPSTARTER prefix like "XX.") followed by a '.' or '_' separator.
 static int vcdGameIdPrefixLen(const char *name)
 {
-    const char *p = name;
-    int prefixLen = 0;
     if (name == NULL)
         return 0;
-    if (p[0] != '\0' && p[1] != '\0' && p[2] == '.') {
-        p += 3;
-        prefixLen += 3;
-    }
+    int prefixLen = vcdSkipPopstarterPrefix(name);
+    const char *p = name + prefixLen;
     char gameId[VCD_ID_MAX];
     if (vcdExtractGameId(p, gameId, sizeof(gameId))) {
         if (p[11] == '.' || p[11] == '_' || p[11] == ' ' || p[11] == '-')
@@ -191,6 +204,7 @@ static int vcdEntryCmp(const void *a, const void *b)
 //      The remainder resolve on later builds, a few at a time.
 #define VCD_ID_PROBE_BUDGET 8   // discs opened per scan
 #define VCD_ID_MEMO_MAX     512 // ids remembered for the session
+#define VCD_ID_MAX_RETRIES  3   // transient read attempts before marking absent
 
 typedef enum {
     VCD_ID_UNREQUESTED = 0,
@@ -206,6 +220,7 @@ typedef struct vcd_id_memo
     char id[VCD_ID_MAX];     // resolved disc id; empty once absent
     char *dir;               // directory this VCD was scanned from -- the ONLY correct path source
     unsigned char state;     // vcd_id_state_t
+    unsigned char retries;   // count of failed read attempts before transitioning to ABSENT
     unsigned int retryFrame; // guiFrameId when deferred retry is next permitted
     char name[];             // flexible: VCD basenames run long, most are far short of the cap
 } vcd_id_memo_t;
@@ -239,6 +254,7 @@ void vcdNoteScanDir(const char *name, const char *dirPath)
             free(m->dir); // same name on a different device: re-point, and re-ask the disc
             m->dir = strdup(dirPath);
             m->state = VCD_ID_UNREQUESTED;
+            m->retries = 0;
             m->retryFrame = 0;
             m->id[0] = '\0';
         }
@@ -255,6 +271,7 @@ void vcdNoteScanDir(const char *name, const char *dirPath)
     memcpy(m->name, name, len + 1);
     m->id[0] = '\0';
     m->state = VCD_ID_UNREQUESTED;
+    m->retries = 0;
     m->retryFrame = 0;
     m->dir = strdup(dirPath);
     m->next = gVcdIdMemo;
@@ -372,11 +389,20 @@ int vcdResolveDisplayId(const char *name, char *idOut, int idSize)
         snprintf(m->id, sizeof(m->id), "%s", store);
         snprintf(idOut, idSize, "%s", store);
         m->state = VCD_ID_RESOLVED;
+        m->retries = 0;
         return 1;
     }
 
-    m->state = VCD_ID_ABSENT;
-    m->id[0] = '\0';
+    // Distinguish transient device-read / contention failures from genuine absence:
+    // allow bounded retries with backoff before marking the disc ID permanently absent.
+    if (m->retries < VCD_ID_MAX_RETRIES) {
+        m->retries++;
+        m->state = VCD_ID_DEFERRED;
+        m->retryFrame = guiFrameId + 120; // 2s backoff on read failure
+    } else {
+        m->state = VCD_ID_ABSENT;
+        m->id[0] = '\0';
+    }
     return 0;
 }
 
