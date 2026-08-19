@@ -145,12 +145,12 @@ int vcdEquipBdma(int source, int mode, char *diag, int diagSize);
 int vcdReadBdmaMode(void);
 // Validate whether the MC environment matches the requested BDMA family (marker + complete pair signature).
 int vcdBdmaEnvironmentValid(int mode);
-// Auto-equip the BDMA variant matching the game's device (source/mode) before a VCD launch,
-// verifying environment integrity. Returns 0 on success/ready, <0 on failure.
-int vcdEnsureBdmaForLaunch(int source, int mode);
+// Auto-equip the BDMA variant matching the game's device (source/mode) before a VCD launch.
+// BDMA prep is card preparation, never a POPSTARTER launch gate: failure toasts in passing, never blocks.
+void vcdEnsureBdmaForLaunch(int source, int mode);
 // Explicit per-launch USB mode pick (the fat32/exFAT dialog on USB VCD launches).
-// Returns 0 on success/ready, <0 on failure.
-int vcdApplyUsbModeForLaunch(int mode);
+// BDMA prep is card preparation, never a POPSTARTER launch gate: failure toasts in passing, never blocks.
+void vcdApplyUsbModeForLaunch(int mode);
 
 // Install POPSTARTER's missing MC-side externals from the VCD device's direct POPS/ folder.
 // Existing card files always win. This copies only the SMB/utility IRX, .icn and icon.sys files;

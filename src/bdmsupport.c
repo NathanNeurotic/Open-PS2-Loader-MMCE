@@ -8,6 +8,7 @@
 #include "include/util.h"
 #include "include/themes.h"
 #include "include/textures.h"
+#include "include/texcache.h"
 #include "include/ioman.h"
 #include "include/system.h"
 #include "include/ethsupport.h"   // ethGetModulesLoaded() for the UDPBD<->SMB NIC interlock
@@ -933,28 +934,34 @@ static void bdmLaunchVcd(item_list_t *itemList, const char *vcdName, config_set_
     // Present preparation indicator before potentially expensive memory-card file IO
     guiRenderTextScreen(_l(_STR_PLEASE_WAIT));
 
-    // Populate mc?:/POPSTARTER from this game's own direct POPS/ folder.
+    // MMCE artwork must be quiesced before VCD card I/O because MMCE and MX4SIO share the SIO2/fileXio path.
+    if (pDeviceData->bdmDeviceType == BDM_TYPE_SDC) {
+        if (!cacheAbortMmceImageLoadsTimed(500)) {
+            guiWarning(_l(_STR_ERR_FILE_INVALID), 8);
+            return;
+        }
+    }
+
+    // Populate mc?:/POPSTARTER from this game's own direct POPS/ folder. Best effort: local VCD
+    // launches keep their existing handoff behavior when optional files are absent or the card is full.
     (void)vcdInstallPopstarterMc(vcdPrefix);
 
-    // Equip the device-matching BDMAssault variant and verify environment integrity.
-    int bdmaOk = 0;
+    // Best-effort card prep: POPSTARTER reloads its block-device driver pair from the MC after its OWN
+    // IOP reset, so equip the device-matching BDMAssault variant. NEVER a launch gate -- the handoff
+    // below always proceeds (POPSTARTER owns everything past the exec); a failed equip just toasts its
+    // diagnostic in passing. iLink/UDPBD/unknown have no BDMA variant and are left as-is.
     switch (pDeviceData->bdmDeviceType) {
         case BDM_TYPE_USB:
-            bdmaOk = vcdApplyUsbModeForLaunch(usbBdmaVariant); // decided above, before anything was written
+            vcdApplyUsbModeForLaunch(usbBdmaVariant); // decided above, before anything was written
             break;
         case BDM_TYPE_SDC:
-            bdmaOk = vcdEnsureBdmaForLaunch(VCD_BDMA_SRC_MX4SIO, VCD_BDMA_MX4SIO);
+            vcdEnsureBdmaForLaunch(VCD_BDMA_SRC_MX4SIO, VCD_BDMA_MX4SIO);
             break;
         case BDM_TYPE_ATA:
-            bdmaOk = vcdEnsureBdmaForLaunch(VCD_BDMA_SRC_HDD, VCD_BDMA_ATA);
+            vcdEnsureBdmaForLaunch(VCD_BDMA_SRC_HDD, VCD_BDMA_ATA);
             break;
         default:
             break;
-    }
-
-    if (bdmaOk < 0) {
-        guiMsgBox(_l(_STR_BDMA_ERR_SRC), 0, NULL);
-        return;
     }
 
     char vcdFullPath[256];

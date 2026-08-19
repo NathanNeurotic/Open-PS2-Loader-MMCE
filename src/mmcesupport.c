@@ -700,23 +700,27 @@ static void mmceLaunchVcd(item_list_t *itemList, const char *vcdName, config_set
 
     if (vcdName == NULL || vcdName[0] == '\0' || !strcasecmp(vcdName, "POPSTARTER")) // reserved-name belt: the scanner no longer lists it (#154); strcasecmp -- FAT is case-insensitive
         return;
+
+    // Present preparation indicator before potentially expensive memory-card file IO
+    guiRenderTextScreen(_l(_STR_PLEASE_WAIT));
+
+    // Quiesce in-flight MMCE art reads before touching the card. MMCE artwork and VCD prep share the SIO2 bus.
+    if (!cacheAbortMmceImageLoadsTimed(MMCE_ART_ABORT_WAIT_TICKS)) {
+        guiWarning(_l(_STR_ERR_FILE_INVALID), 8);
+        return;
+    }
+
     if (!vcdResolvePopstarter(mmcePrefix, vcdElf, sizeof(vcdElf))) {
         guiMsgBox(_l(_STR_POPSTARTER_NOT_FOUND), 0, NULL);
         return;
     }
     vcdBuildSelector(mmcePrefix, VCD_PREFIX_MASS, vcdName, vcdSelector, sizeof(vcdSelector));
 
-    // Present preparation indicator before potentially expensive memory-card file IO
-    guiRenderTextScreen(_l(_STR_PLEASE_WAIT));
-
     // Source MC-side externals from this MMCE card's direct POPS/ folder; never overwrite card files.
     (void)vcdInstallPopstarterMc(mmcePrefix);
 
-    // Equip the .mmce BDMAssault variant and verify environment integrity.
-    if (vcdEnsureBdmaForLaunch(VCD_BDMA_SRC_MMCE, VCD_BDMA_MMCE) < 0) {
-        guiMsgBox(_l(_STR_BDMA_ERR_SRC), 0, NULL);
-        return;
-    }
+    // Best-effort card prep: BDMA prep is card preparation, never a POPSTARTER launch gate.
+    vcdEnsureBdmaForLaunch(VCD_BDMA_SRC_MMCE, VCD_BDMA_MMCE);
 
     char vcdFullPath[256];
     snprintf(vcdFullPath, sizeof(vcdFullPath), "%sPOPS/%s.VCD", mmcePrefix, vcdName);

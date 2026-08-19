@@ -1611,66 +1611,67 @@ static int vcdBdmaManualPairMatches(int mode)
     return 0;
 }
 
-// Auto-equip the device-matching BDMA driver before a VCD launch (POPSLoader's ApplyBdmaMode parity),
-// verifying complete environment integrity. Returns 0 on success/ready, <0 on failure.
-int vcdEnsureBdmaForLaunch(int source, int mode)
+// Best-effort auto-equip of the device-matching BDMA driver before a VCD launch (POPSLoader's
+// ApplyBdmaMode parity), verifying environment integrity.
+//
+// BDMA prep is card preparation, never a POPSTARTER launch gate. The VCD launch itself is a simple
+// handoff -- resolve POPSTARTER.ELF, hand it the argv[0] selector (XX. / SB. / bare), exec -- and
+// POPSTARTER owns everything after that (maintainer contract, issues #56 review, PR #93).
+// On any equip failure, it toasts a diagnostic in passing, and the launch proceeds.
+void vcdEnsureBdmaForLaunch(int source, int mode)
 {
     char diag[160];
 
     if (mode <= VCD_BDMA_FAT32 || mode >= VCD_BDMA_MODE_COUNT)
-        return 0; // FAT32 / invalid -> POPSTARTER's built-in driver, nothing to equip
+        return; // FAT32 / invalid -> POPSTARTER's built-in driver, nothing to equip
 
     // 1. Fast path: check if the card already contains a strictly valid environment for this mode
     if (vcdBdmaEnvironmentValid(mode) || vcdBdmaManualPairMatches(mode))
-        return 0;
+        return;
 
     if (!gBdmaApplyOnLaunch) {
         LOG("[BDMA] manual BDMA management is on, but card environment is invalid for mode %d (%s)\n",
             mode, vcdBdmaSuffix[mode]);
-        return -1;
+        return;
     }
 
     // 2. Perform transactional equip
     int er = vcdEquipBdma(source, mode, diag, sizeof(diag));
     if (er == 0 && vcdBdmaEnvironmentValid(mode))
-        return 0;
+        return;
 
-    LOG("VCD BDMA equip failed (%d: %s) -- environment is not ready for %s\n", er, diag, vcdBdmaSuffix[mode]);
+    LOG("VCD BDMA equip failed (%d: %s) -- launching as-is (card keeps its current driver pair)\n", er, diag);
     if (er == -4)
         guiWarning(_l(_STR_BDMA_ERR_SRC), 6);
     else if (er == -2)
         guiWarning(_l(_STR_BDMA_ERR_SPACE), 6);
     else
         guiWarning(_l(_STR_BDMA_ERR_IO), 6);
-
-    return -1;
 }
 
 // Explicit USB mode application for the per-launch fat32/exFAT dialog (bdmLaunchVcd, USB devices).
-// Returns 0 on success/ready, <0 on failure.
-int vcdApplyUsbModeForLaunch(int mode)
+// BDMA prep is card preparation, never a POPSTARTER launch gate: failure toasts in passing, never blocks.
+void vcdApplyUsbModeForLaunch(int mode)
 {
     char diag[160];
 
     if (mode != VCD_BDMA_FAT32 && mode != VCD_BDMA_USBEXFAT)
-        return 0; // the USB dialog only offers these two
+        return; // the USB dialog only offers these two
 
     if (vcdBdmaEnvironmentValid(mode) || (mode == VCD_BDMA_USBEXFAT && vcdBdmaManualPairMatches(mode)))
-        return 0;
+        return;
 
     int er = vcdEquipBdma(VCD_BDMA_SRC_USB, mode, diag, sizeof(diag));
     if (er == 0 && vcdBdmaEnvironmentValid(mode))
-        return 0;
+        return;
 
-    LOG("VCD USB-mode equip failed (%d: %s)\n", er, diag);
+    LOG("VCD USB-mode equip failed (%d: %s) -- launching as-is (card keeps its current driver pair)\n", er, diag);
     if (er == -4)
         guiWarning(_l(_STR_BDMA_ERR_SRC), 6);
     else if (er == -2)
         guiWarning(_l(_STR_BDMA_ERR_SPACE), 6);
     else
         guiWarning(_l(_STR_BDMA_ERR_IO), 6);
-
-    return -1;
 }
 
 // ---- POPSTARTER memory-card externals -----------------------------------------------
