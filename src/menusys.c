@@ -43,8 +43,8 @@ enum MENU_IDs {
     MENU_SAVE_CHANGES,
     MENU_EXIT,
     MENU_POWER_OFF,
-    MENU_LAUNCH_PS2_DISC
-    // NOTE(rebuild): MENU_POPSTARTER (items 12-20) and MENU_MMCE (item 1) join here with their steps.
+    MENU_LAUNCH_PS2_DISC,
+    MENU_MMCE
 };
 
 enum GAME_MENU_IDs {
@@ -552,6 +552,7 @@ static void menuInitMainMenu(void)
     submenuAppendItem(&mainMenu, -1, NULL, MENU_AUDIO, _STR_MENU_AUDIO);
     submenuAppendItem(&mainMenu, -1, NULL, MENU_SECURITY, _STR_SECURITY_SETTINGS);
     submenuAppendItem(&mainMenu, -1, NULL, MENU_ADVANCED, _STR_ADVANCED_SETTINGS);
+    submenuAppendItem(&mainMenu, -1, NULL, MENU_MMCE, _STR_MMCE);
     submenuAppendItem(&mainMenu, -1, NULL, MENU_TOOLS, _STR_TOOLS);
     submenuAppendItem(&mainMenu, -1, NULL, MENU_ABOUT, _STR_ABOUT);
     submenuAppendItem(&mainMenu, -1, NULL, MENU_SAVE_CHANGES, _STR_SAVE_CHANGES);
@@ -1331,6 +1332,9 @@ void menuHandleInputMenu()
         } else if (id == MENU_ADVANCED) {
             if (menuCheckParentalLock() == 0)
                 guiShowAdvancedConfig();
+        } else if (id == MENU_MMCE) {
+            if (menuCheckParentalLock() == 0)
+                guiShowMmceConfig();
         } else if (id == MENU_TOOLS) {
             if (menuCheckParentalLock() == 0)
                 guiShowToolsConfig();
@@ -1382,9 +1386,7 @@ void menuHandleInputMenu()
         // gFAVStartMode was missing, so a Favourites-only setup could not escape at all.
         // bdmEffectiveStartMode() rather than raw gBDMStartMode: UDPBD floors the BDM start mode, so
         // a UDPBD-only rig has rows while gBDMStartMode itself is still disabled.
-        // NOTE(rebuild): the fork also ORs gMMCEStartMode here; that global arrives with checklist
-        // item 1, and until then no MMCE tab can hold rows, so omitting it changes nothing.
-        if (gAPPStartMode || gETHStartMode || bdmEffectiveStartMode() || gHDDStartMode || gFAVStartMode) {
+        if (gAPPStartMode || gETHStartMode || bdmEffectiveStartMode() || gHDDStartMode || gFAVStartMode || gMMCEStartMode) {
             guiSwitchScreen(GUI_SCREEN_MAIN);
             refreshMenuPosition();
         }

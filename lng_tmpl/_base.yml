@@ -1058,3 +1058,37 @@ gui_strings:
   string: Ask
 - label: SETTINGS_HDD_FALLBACK
   string: "HDD settings used the safe fallback home: %s"
+- label: GENERAL_SETTINGS
+  string: General Settings
+- label: DEVICE_SETTINGS
+  string: Device Settings
+- label: MMCE_GAMES
+  string: MMCE Games
+- label: MMCE_ADVANCED
+  string: Advanced
+- label: MMCE_SETTINGS
+  string: MMCE Settings
+- label: MMCE_SEMA
+  string: Lock Sema Enqueuing Method
+- label: HINT_MMCE_SEMA
+  string: THFIFO may help with compatibility but worsen performance
+- label: WRITE_POPSTARTER_NET
+  string: Write POPSTARTER Network Config
+- label: HINT_WRITE_POPSTARTER_NET
+  string: Also save these IP + SMB share values to POPSTARTER's own IPCONFIG.DAT / SMBCONFIG.DAT on the memory card (for VCD-over-SMB).
+- label: NEUTRINO_PATH
+  string: Neutrino ELF Path
+- label: HINT_NEUTRINO_PATH
+  string: Full path to neutrino.elf (e.g. mc0:NEUTRINO/neutrino.elf). Blank = auto-detect on mc0/mc1.
+- label: BOOT_SCANNING_MC
+  string: Scanning memory cards...
+- label: BOOT_ARMING_MMCE
+  string: Arming MMCE game-ID...
+- label: UDPFS_MODE
+  string: UDPFS Access
+- label: MMCE_GAMEID_NEUTRINO_SKIP
+  string: MMCE GameID not applied -- neutrino.elf is on this card (switching it would unload Neutrino).
+- label: HDD_BACKEND_RECONCILED
+  string: APA and exFAT internal HDD were both enabled -- one was disabled automatically (check Device Settings).
+- label: VCD_SETTINGS
+  string: VCD Settings

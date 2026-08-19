@@ -20,6 +20,7 @@
 #include "include/ioman.h"
 #include "include/ioprp.h"
 #include "include/bdmsupport.h"
+#include "include/mmcesupport.h"
 #include "include/OSDHistory.h"
 #include "include/renderman.h"
 #include "include/extern_irx.h"
@@ -549,7 +550,31 @@ int sysLaunchDisc(void)
 
     LOG("[DISC] booting %s\n", path);
 
-    // NOTE(rebuild): the MMCE GameID send that belongs here returns with checklist item 3.
+    // Tell the MMCE which game is about to boot (#183). EVERY other launch path already does this --
+    // only Launch Disc was missing it. Without this, physical disc launches on a console with a
+    // PSX MemCard Gen2 / MMCE never switched to the game's folder and the user simply could not save
+    // or load from their card.
+    // Disc paths are "cdrom0:\SLUS_123.45;1" (see path[] above) -- strip the prefix and semicolon so
+    // we pass the pure id. A naive strchr(';') would also match the ";1" if there is NO slash
+    // (a leading slash the MMCE would never match) instead of a clean id. Take whichever separator
+    // comes last.
+    {
+        const char *slash = strrchr(path, '\\');
+        if (slash == NULL)
+            slash = strrchr(path, '/');
+        const char *idStart = (slash != NULL) ? slash + 1 : path;
+        char gameid[32];
+        int i = 0;
+        while (idStart[i] != '\0' && idStart[i] != ';' && i < (int)sizeof(gameid) - 1) {
+            gameid[i] = idStart[i];
+            i++;
+        }
+        gameid[i] = '\0';
+        if (gameid[0] != '\0') {
+            LOG("[DISC] sending game id '%s' to MMCE\n", gameid);
+            mmceSendGameID(gameid, NULL, 0);
+        }
+    }
 
     deinit(NO_EXCEPTION, IO_MODE_SELECTED_ALL); // tear OPL down (mirrors sysExecExit)
 
@@ -568,6 +593,7 @@ int sysLaunchDisc(void)
 #define CORE_IRX_DECI2  0x40
 #define CORE_IRX_ILINK  0x80
 #define CORE_IRX_MX4SIO 0x100
+#define CORE_IRX_MMCE   0x200
 
 typedef struct
 {
@@ -653,6 +679,8 @@ static unsigned int sendIrxKernelRAM(const char *startup, const char *mode_str, 
         modules |= CORE_IRX_HDD;
     else if (!strcmp(mode_str, "ETH_MODE"))
         modules |= CORE_IRX_ETH | CORE_IRX_SMB;
+    else if (!strcmp(mode_str, "MMCE_MODE"))
+        modules |= CORE_IRX_MMCE;
     else
         modules |= CORE_IRX_HDD;
 
@@ -721,9 +749,20 @@ static unsigned int sendIrxKernelRAM(const char *startup, const char *mode_str, 
         irxptr_tab[modcount++].ptr = (void *)&smbinit_irx;
     }
 
+    //Load MMCEIGR module (~1.4KB) on reset if bootcard switch is enabled for either slot
+    if (gMMCEIGRSlot != 0) {
+        irxptr_tab[modcount].info = size_mmceigr_irx | SET_OPL_MOD_ID(OPL_MODULE_ID_MMCEIGR);
+        irxptr_tab[modcount++].ptr = (void *)&mmceigr_irx;
+    }
+
     if (modules & CORE_IRX_VMC) {
         irxptr_tab[modcount].info = size_mcemu_irx | SET_OPL_MOD_ID(OPL_MODULE_ID_MCEMU);
         irxptr_tab[modcount++].ptr = (void *)mcemu_irx;
+    }
+
+    if ((modules & CORE_IRX_MMCE) || gMMCEIGRSlot != 0) {
+        irxptr_tab[modcount].info = size_mmcedrv_irx | SET_OPL_MOD_ID(OPL_MODULE_ID_MMCEDRV);
+        irxptr_tab[modcount++].ptr = (void *)&mmcedrv_irx;
     }
 
 #ifdef PADEMU
@@ -1637,6 +1676,9 @@ void sysLaunchLoaderElf(const char *filename, const char *mode_str, int size_cdv
     strncpy(config->GameID, filename, CORE_GAME_ID_MAX_LEN);
 
     config->_CompatMask = compatflags;
+
+    //MMCEIGR Settings
+    config->MMCEIGRSettings = gMMCEIGRSlot;
 
 #ifdef __DEBUG
 

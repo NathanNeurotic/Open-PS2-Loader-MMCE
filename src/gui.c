@@ -19,6 +19,7 @@
 #include "include/util.h"
 #include "include/config.h"
 #include "include/system.h"
+#include "include/mmcesupport.h"
 #include "include/ethsupport.h"
 #include "include/udpfssupport.h" // udpfsGetModulesLoaded() -- network-protocol restart-notice check
 #include "include/artindex.h"
@@ -29,6 +30,7 @@
 #include "include/cheatman.h"
 #include "include/sound.h"
 #include "include/guigame.h"
+#include "include/texcache.h"
 #include "include/appsupport.h" // appGetObject() -- push a live Art Delay change onto the APPS list
 #include "include/tar.h"        // tarInvalidate -- re-arm the .tar probe when the toggle flips
 
@@ -677,10 +679,10 @@ void guiShowDeviceConfig(void)
     diaSetEnum(diaDeviceConfig, CFG_NETSTART, deviceModes);
     diaSetInt(diaDeviceConfig, CFG_NETSTART, gNetStartMode);
 
-    // NOTE(rebuild): MMCE returns with checklist item 1 -- show its row greyed at Off until then.
+    // MMCE Start Mode
     diaSetEnum(diaDeviceConfig, CFG_MMCEMODE, deviceModes);
-    diaSetInt(diaDeviceConfig, CFG_MMCEMODE, START_MODE_DISABLED);
-    diaSetEnabled(diaDeviceConfig, CFG_MMCEMODE, 0);
+    diaSetInt(diaDeviceConfig, CFG_MMCEMODE, gMMCEStartMode);
+    diaSetEnabled(diaDeviceConfig, CFG_MMCEMODE, 1);
 
     int ret = diaExecuteDialog(diaDeviceConfig, -1, 1, NULL);
     if (ret) {
@@ -690,6 +692,7 @@ void guiShowDeviceConfig(void)
         diaGetInt(diaDeviceConfig, CFG_BDMMODE, &gBDMStartMode);
         diaGetInt(diaDeviceConfig, CFG_HDDMODE, &gHDDStartMode);
         diaGetInt(diaDeviceConfig, CFG_APPMODE, &gAPPStartMode);
+        diaGetInt(diaDeviceConfig, CFG_MMCEMODE, &gMMCEStartMode);
         diaGetInt(diaDeviceConfig, CFG_FAVMODE, &gFAVStartMode);
 
         diaGetInt(diaDeviceConfig, CFG_ENABLEUSB, &gEnableUSB);
@@ -735,6 +738,73 @@ void guiShowDeviceConfig(void)
         // without a physical replug.
         bdmForceDeviceRefresh();
 
+        applyConfig(-1, -1, 0);
+        menuReinitMainMenu();
+    }
+}
+
+// MMCE page (settings-layout restructure, was MMCE Settings): SD2PSX / MemCard PRO2 basics (memory-
+// card slot, IGR slot, GameID push). Communication tuning and the path prefix are chained
+// sub-dialogs; CFG ids shared with the old rows.
+void guiShowMmceConfig(void)
+{
+    const char *deviceSlots[] = {"0", "1", _l(_STR_AUTO), NULL};
+    const char *deviceIGRSlots[] = {"NONE", "0", "1", "BOTH", NULL};
+
+    diaSetEnum(diaMmceConfig, CFG_MMCESLOT, deviceSlots);
+    diaSetInt(diaMmceConfig, CFG_MMCESLOT, gMMCESlot);
+    diaSetEnum(diaMmceConfig, CFG_MMCEIGRSLOT, deviceIGRSlots);
+    diaSetInt(diaMmceConfig, CFG_MMCEIGRSLOT, gMMCEIGRSlot);
+    diaSetInt(diaMmceConfig, CFG_MMCEGAMEID, gMMCEEnableGameID);
+
+    int ret;
+reshow_mmce:
+    ret = diaExecuteDialog(diaMmceConfig, -1, 1, NULL);
+    if (ret == MMCE_COMM_BUTTON) {
+        guiShowMmceCommConfig();
+        goto reshow_mmce;
+    }
+    if (ret == MMCE_PATH_BUTTON) {
+        guiShowMmcePathConfig();
+        goto reshow_mmce;
+    }
+    if (ret) {
+        diaGetInt(diaMmceConfig, CFG_MMCESLOT, &gMMCESlot);
+        diaGetInt(diaMmceConfig, CFG_MMCEIGRSLOT, &gMMCEIGRSlot);
+        diaGetInt(diaMmceConfig, CFG_MMCEGAMEID, &gMMCEEnableGameID);
+        applyConfig(-1, -1, 0);
+        menuReinitMainMenu();
+    }
+}
+
+// MMCE -> Communication Settings (SIO2 ack-wait pacing, alarm usage).
+void guiShowMmceCommConfig(void)
+{
+    const char *deviceAckWaitCycles[] = {"0", "1", "2", "3", "4", "5", NULL};
+    const char *deviceOnOff[] = {"OFF", "ON", NULL};
+
+    diaSetEnum(diaMmceCommConfig, CFG_MMCE_WAIT_CYCLES, deviceAckWaitCycles);
+    diaSetInt(diaMmceCommConfig, CFG_MMCE_WAIT_CYCLES, gMMCEAckWaitCycles);
+    diaSetEnum(diaMmceCommConfig, CFG_MMCE_USE_ALARMS, deviceOnOff);
+    diaSetInt(diaMmceCommConfig, CFG_MMCE_USE_ALARMS, gMMCEUseAlarms);
+
+    int ret = diaExecuteDialog(diaMmceCommConfig, -1, 1, NULL);
+    if (ret) {
+        diaGetInt(diaMmceCommConfig, CFG_MMCE_WAIT_CYCLES, &gMMCEAckWaitCycles);
+        diaGetInt(diaMmceCommConfig, CFG_MMCE_USE_ALARMS, &gMMCEUseAlarms);
+        applyConfig(-1, -1, 0);
+        menuReinitMainMenu();
+    }
+}
+
+// MMCE -> Path Settings (MMCE library prefix).
+void guiShowMmcePathConfig(void)
+{
+    diaSetString(diaMmcePathConfig, CFG_MMCEPREFIX, gMMCEPrefix);
+
+    int ret = diaExecuteDialog(diaMmcePathConfig, -1, 1, NULL);
+    if (ret) {
+        diaGetString(diaMmcePathConfig, CFG_MMCEPREFIX, gMMCEPrefix, sizeof(gMMCEPrefix));
         applyConfig(-1, -1, 0);
         menuReinitMainMenu();
     }
@@ -1746,12 +1816,8 @@ void guiShowArtworkConfig(void)
         diaGetInt(diaArtworkConfig, UICFG_ART_DELAY, &artDelayIdx);
         if (artDelayIdx >= 0 && artDelayIdx < 4) {
             gArtDelay = artDelayValues[artDelayIdx];
-            // Push the new delay onto the already-built lists so it takes effect without a re-init.
-            // NOTE(rebuild): the fork also updates mmceGetObject(1) here -- that joins with item 1.
-            // BDM lists are absent from this list in the fork too: bdmsupport seeds itemList->delay in
-            // bdmInit, so a BDM tab keeps its previous delay until the device is re-initialised.
-            item_list_t *lists[] = {appGetObject(1), hddGetObject(1), ethGetObject(1), udpfsGetObject(1), favGetObject(1)};
-            for (int i = 0; i < 5; i++) {
+            item_list_t *lists[] = {appGetObject(1), hddGetObject(1), ethGetObject(1), mmceGetObject(1), udpfsGetObject(1), favGetObject(1)};
+            for (int i = 0; i < 6; i++) {
                 if (lists[i] != NULL)
                     lists[i]->delay = gArtDelay;
             }
@@ -3087,6 +3153,27 @@ void guiHandleDeferedIO(int *ptr, const char *message, int type, void *data, int
     // GUI thread only: every libpad call in pad.c is, and applyConfig() is NOT a safe home for
     // this because _loadConfig() reaches it from the IO worker.
     padRumbleFlush();
+
+    // Free the shared IOP/fileXio channel before running the deferred IO. The
+    // cover-art worker's queued and in-flight reads otherwise tie up that single
+    // channel, so a config write (e.g. the last-played save on game launch) queues
+    // behind them and the screen freezes on "Saving config..." after browsing the
+    // list (issue #45 -- confirmed on hardware: disabling cover art avoids it).
+    // Cancel queued cover loads, abort a slow in-flight MMCE read, and drain. The
+    // drain returns as soon as the art queue is empty (cacheWaitForAllRequestsTimed
+    // early-exits when nothing is queued/active), so this adds no delay in the
+    // common case; the timeout only bounds a genuinely stuck read.
+    int abortOk = cacheAbortMmceImageLoadsTimed(500);
+    int cancelOk = cacheCancelPendingImageLoadsTimed(500);
+    if (!abortOk || !cancelOk) {
+        // A cover-art read did not drain within the timeout -- most likely a slow
+        // (not dead) storage device. We still issue the deferred IO below: bailing
+        // here would silently drop a valid config save on a merely-slow card, and
+        // could not unwedge a genuinely stuck IOP RPC channel anyway. Logged so a
+        // true hardware hang is diagnosable rather than a silent freeze on the
+        // unbounded wait below (Codex audit, Medium 1).
+        LOG("guiHandleDeferedIO: art drain timed out; deferred IO may stall on stuck storage\n");
+    }
 
     // A rejected request never runs, so nothing will ever clear *ptr -- without this the loop below
     // would spin forever on a queue-full/failed put. Clear it here so the caller falls into its

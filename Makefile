@@ -111,22 +111,22 @@ endif
 
 FRONTEND_OBJS = pad.o xparam.o fntsys.o renderman.o menusys.o OSDHistory.o system.o elfldr_noreset.o elfldr.o lang.o lang_internal.o config.o hdd.o dialogs.o favsupport.o \
 		dia.o ioman.o texcache.o themes.o supportbase.o bdmsupport.o ethsupport.o udpfssupport.o hddsupport.o zso.o lz4.o \
-		appsupport.o artindex.o vcdsupport.o retrogem.o folderbrowse.o gui.o guigame.o vmc_groups.o textures.o opl.o atlas.o nbns.o httpclient.o gsm.o cheatman.o sound.o ps2cnf.o tar.o
+		appsupport.o mmcesupport.o artindex.o vcdsupport.o retrogem.o folderbrowse.o gui.o guigame.o vmc_groups.o textures.o opl.o atlas.o nbns.o httpclient.o gsm.o cheatman.o sound.o ps2cnf.o tar.o
 
 IOP_OBJS =	iomanx.o filexio.o ps2fs.o usbd.o bdmevent.o \
 		bdm.o bdmfs_fatfs.o usbmass_bd.o iLinkman.o IEEE1394_bd.o mx4sio_bd.o \
 		ps2atad.o hdpro_atad.o poweroff.o ps2hdd.o xhdd.o genvmc.o lwnbdsvr.o \
 		ps2dev9.o smsutils.o ps2ip.o smap.o smap_udpbd.o udpfs_smap.o udpfs_ministack.o udpfs_bd.o udpfs_ioman.o isofs.o nbns-iop.o \
-		sio2man.o padman.o mcman.o mcserv.o \
+		sio2man.o padman.o mcman.o mcserv.o mmceman.o mmcedrv.o mmceigr.o \
 		httpclient-iop.o netman.o ps2ips.o \
-		bdm_mcemu.o hdd_mcemu.o smb_mcemu.o \
+		bdm_mcemu.o mmce_mcemu.o hdd_mcemu.o smb_mcemu.o \
 		iremsndpatch.o apemodpatch.o f2techioppatch.o cleareffects.o resetspu.o \
 		libsd.o audsrv.o
 
 EECORE_OBJS = ee_core.o ioprp.o util.o \
 		udnl.o imgdrv.o eesync.o \
 		bdm_cdvdman.o bdm_ata_cdvdman.o IOPRP_img.o smb_cdvdman.o \
-		hdd_cdvdman.o hdd_hdpro_cdvdman.o cdvdfsv.o \
+		hdd_cdvdman.o mmce_cdvdman.o hdd_hdpro_cdvdman.o cdvdfsv.o \
 		ingame_smstcpip.o smap_ingame.o smbman.o smbinit.o
 
 PNG_ASSETS = load0 load1 load2 load3 load4 load5 load6 load7 usb usb_bd ilk_bd \
@@ -169,6 +169,13 @@ LNG_FORK_DIR = lng_fork/
 LNG_TMPL_DIR = lng_tmpl/
 LNG_DIR = lng/
 PNG_ASSETS_DIR = gfx/
+
+# Source the MMCE driver from the PS2SDK (as wOPL does) instead of downloading the rolling
+# ps2-mmce/mmceman "latest". The SDK's mmceman is versioned in lockstep with the SDK's sio2man,
+# so it never drifts out of sync -- the independent rolling release refactored its sio2man hook
+# on 2026-06-14 and froze native MMCE launches on the pinned SDK. wOPL never hit this because
+# it always took the coordinated SDK-bundled driver.
+MMCE_ASSETS_DIR = $(PS2SDK)/iop/irx
 
 MAPFILE = opl.map
 EE_LDFLAGS += -Wl,-Map,$(MAPFILE)
@@ -334,6 +341,7 @@ clean:	download_lwNBD
 	echo " -cdvdman"
 	$(MAKE) -C modules/iopcore/cdvdman USE_BDM=1 clean
 	$(MAKE) -C modules/iopcore/cdvdman USE_BDM_ATA=1 clean
+	$(MAKE) -C modules/iopcore/cdvdman USE_MMCE=1 clean
 	$(MAKE) -C modules/iopcore/cdvdman USE_SMB=1 clean
 	$(MAKE) -C modules/iopcore/cdvdman USE_HDD=1 clean
 	$(MAKE) -C modules/iopcore/cdvdman USE_HDPRO=1 clean
@@ -379,6 +387,7 @@ clean:	download_lwNBD
 	$(MAKE) -C modules/hdd/xhdd clean
 	echo " -mcemu"
 	$(MAKE) -C modules/mcemu USE_BDM=1 clean
+	$(MAKE) -C modules/mcemu USE_MMCE=1 clean
 	$(MAKE) -C modules/mcemu USE_HDD=1 clean
 	$(MAKE) -C modules/mcemu USE_SMB=1 clean
 	echo " -genvmc"
@@ -468,6 +477,15 @@ $(EE_ASM_DIR)elfldr.c: elfldr/elfldr.elf | $(EE_ASM_DIR)
 $(EE_ASM_DIR)udnl.c: $(UDNL_OUT) | $(EE_ASM_DIR)
 	$(BIN2C) $(UDNL_OUT) $@ udnl_irx
 
+$(EE_ASM_DIR)mmceman.c: $(MMCE_ASSETS_DIR)/mmceman.irx | $(EE_ASM_DIR)
+	$(BIN2C) $< $@ $(*F)_irx
+
+$(EE_ASM_DIR)mmcedrv.c: $(MMCE_ASSETS_DIR)/mmcedrv.irx | $(EE_ASM_DIR)
+	$(BIN2C) $< $@ $(*F)_irx
+
+$(EE_ASM_DIR)mmceigr.c: $(MMCE_ASSETS_DIR)/mmceigr.irx | $(EE_ASM_DIR)
+	$(BIN2C) $< $@ $(*F)_irx
+
 modules/iopcore/imgdrv/imgdrv.irx: modules/iopcore/imgdrv
 	$(MAKE) -C $<
 
@@ -488,6 +506,12 @@ modules/iopcore/cdvdman/bdm_ata_cdvdman.irx: modules/iopcore/cdvdman
 
 $(EE_ASM_DIR)bdm_ata_cdvdman.c: modules/iopcore/cdvdman/bdm_ata_cdvdman.irx | $(EE_ASM_DIR)
 	$(BIN2C) $< $@ bdm_ata_cdvdman_irx
+
+modules/iopcore/cdvdman/mmce_cdvdman.irx: modules/iopcore/cdvdman
+	$(MAKE) $(CDVDMAN_PS2LOGO_FLAGS) $(CDVDMAN_DEBUG_FLAGS) USE_MMCE=1 -C $< all
+
+$(EE_ASM_DIR)mmce_cdvdman.c: modules/iopcore/cdvdman/mmce_cdvdman.irx | $(EE_ASM_DIR)
+	$(BIN2C) $< $@ $(*F)_irx
 
 modules/iopcore/cdvdman/smb_cdvdman.irx: modules/iopcore/cdvdman
 	$(MAKE) $(CDVDMAN_PS2LOGO_FLAGS) $(CDVDMAN_DEBUG_FLAGS) USE_SMB=1 -C $< all
@@ -547,6 +571,12 @@ modules/mcemu/bdm_mcemu.irx: modules/mcemu
 	$(MAKE) $(MCEMU_DEBUG_FLAGS) $(PADEMU_FLAGS) USE_BDM=1 -C $< all
 
 $(EE_ASM_DIR)bdm_mcemu.c: modules/mcemu/bdm_mcemu.irx
+	$(BIN2C) $< $@ $(*F)_irx
+
+modules/mcemu/mmce_mcemu.irx: modules/mcemu
+	$(MAKE) $(MCEMU_DEBUG_FLAGS) $(PADEMU_FLAGS) USE_MMCE=1 -C $< all
+
+$(EE_ASM_DIR)mmce_mcemu.c: modules/mcemu/mmce_mcemu.irx
 	$(BIN2C) $< $@ $(*F)_irx
 
 modules/mcemu/hdd_mcemu.irx: modules/mcemu

@@ -164,6 +164,12 @@ int gBDMStartMode;
 int gHDDStartMode;
 int gETHStartMode;
 int gAPPStartMode;
+int gMMCEStartMode;
+int gMMCEIGRSlot;
+int gMMCESlot;
+int gMMCEAckWaitCycles;
+int gMMCEUseAlarms;
+int gMMCEEnableGameID;
 int bdmCacheSize;
 int hddCacheSize;
 int smbCacheSize;
@@ -244,6 +250,7 @@ int gDefaultDevice;
 int gEnableWrite;
 char gBDMPrefix[32];
 char gETHPrefix[32];
+char gMMCEPrefix[32];
 int gRememberLastPlayed;
 int KeyPressedOnce;
 int gAutoStartLastPlayed;
@@ -338,7 +345,7 @@ static void itemInitSupport(item_list_t *support)
     support->itemInit(support);
     moduleUpdateMenuInternal((opl_io_module_t *)support->owner, 0, 0);
     // Manual refreshing can only be done if either auto refresh is disabled or auto refresh is disabled for the item.
-    if (!gAutoRefresh || (support->updateDelay == MENU_UPD_DELAY_NOUPDATE))
+    if (!gAutoRefresh || (support->updateDelay == MENU_UPD_DELAY_NOUPDATE) || support->mode == MMCE_MODE)
         ioPutRequest(IO_MENU_UPDATE_DEFFERED, &support->mode);
 }
 
@@ -645,6 +652,8 @@ void initSupport(item_list_t *itemList, int mode, int force_reinit)
         // boot, Manual defers it to tab-entry. Live only while its protocol is the selected one, so
         // exactly one network tab is ever enabled.
         startMode = (gNetworkProtocol == NET_PROTO_UDPFS) ? gNetStartMode : START_MODE_DISABLED;
+    else if (mode == MMCE_MODE)
+        startMode = gMMCEStartMode;
 
     if (startMode) {
         if (!mod->support) {
@@ -714,6 +723,18 @@ static void initAllSupport(int force_reinit)
     initSupport(hddGetObject(0), HDD_MODE, force_reinit);
     initSupport(appGetObject(0), APP_MODE, force_reinit);
     initSupport(favGetObject(0), FAV_MODE, force_reinit);
+    LOG("BOOT scan: bdmEnumerateDevices() done; MMCE initSupport begin\n");
+    // Distinct banner for the MMCE init phase so a frozen boot screen LOCALIZES a scan-hang to this
+    // step. Helps distinguish between the 4-probe presence check against a genuinely empty card slot
+    // on a FAT console and the exact culprit (slow ATA/dev9 probe in bdmEnumerateDevices vs the MMCE
+    // presence poll in mmceman).
+    initSupport(mmceGetObject(0), MMCE_MODE, force_reinit);
+    LOG("BOOT scan: MMCE initSupport done\n");
+
+    // Arm the MMCE GameID transport at boot and on every settings apply -- instead
+    // of deferring it to itemLaunchMMCE.
+    if (gMMCEEnableGameID && !gBootInProgress)
+        mmceArmGameIDTransport();
 }
 
 static void deinitAllSupport(int exception, int modeSelected)
@@ -1282,6 +1303,38 @@ static int lscret = 0;
 static char gLastSaveTarget[sizeof(gCustomSettingsPath)];
 static int gHddSettingsFallbackNotice = 0;
 static int gBootHddCommonFallback = 0;
+
+static int checkLoadConfigMMCE(int types)
+{
+    int value;
+    DIR *dir = opendir("mmce0:");
+    if (dir != NULL) {
+        closedir(dir);
+        configEnd();
+        configInit("mmce0:");
+        value = configReadMulti(types);
+        if (value & CONFIG_OPL) {
+            config_set_t *configOPL = configGetByType(CONFIG_OPL);
+            configSetInt(configOPL, CONFIG_OPL_MMCE_MODE, START_MODE_AUTO);
+            return value;
+        }
+    }
+
+    dir = opendir("mmce1:");
+    if (dir != NULL) {
+        closedir(dir);
+        configEnd();
+        configInit("mmce1:");
+        value = configReadMulti(types);
+        if (value & CONFIG_OPL) {
+            config_set_t *configOPL = configGetByType(CONFIG_OPL);
+            configSetInt(configOPL, CONFIG_OPL_MMCE_MODE, START_MODE_AUTO);
+            return value;
+        }
+    }
+
+    return 0;
+}
 
 static int checkLoadConfigBDM(int types)
 {
@@ -2305,6 +2358,25 @@ static void _loadConfig()
                 gHDDStartMode = START_MODE_AUTO;
             configGetInt(configOPL, CONFIG_OPL_ETH_MODE, &gETHStartMode);
             configGetInt(configOPL, CONFIG_OPL_APP_MODE, &gAPPStartMode);
+            configGetStrCopy(configOPL, CONFIG_OPL_MMCE_PREFIX, gMMCEPrefix, sizeof(gMMCEPrefix));
+            configGetInt(configOPL, CONFIG_OPL_MMCE_MODE, &gMMCEStartMode);
+            configGetInt(configOPL, CONFIG_OPL_MMCE_SLOT, &gMMCESlot);
+            configGetInt(configOPL, CONFIG_OPL_MMCEIGR_SLOT, &gMMCEIGRSlot);
+            configGetInt(configOPL, CONFIG_OPL_MMCE_GAMEID, &gMMCEEnableGameID);
+            configGetInt(configOPL, CONFIG_OPL_MMCE_WAIT_CYCLES, &gMMCEAckWaitCycles);
+            configGetInt(configOPL, CONFIG_OPL_MMCE_USE_ALARMS, &gMMCEUseAlarms);
+            // SIO2 pacing migration: silently upgrade the 0/0 defaults to 5/1
+            {
+                int pacingMigrated = 0;
+                configGetInt(configOPL, CONFIG_OPL_MMCE_PACING_MIGR, &pacingMigrated);
+                if (!pacingMigrated) {
+                    if (gMMCEAckWaitCycles == 0 && gMMCEUseAlarms == 0) {
+                        gMMCEAckWaitCycles = 5;
+                        gMMCEUseAlarms = 1;
+                    }
+                    configSetInt(configOPL, CONFIG_OPL_MMCE_PACING_MIGR, 1);
+                }
+            }
             configGetInt(configOPL, CONFIG_OPL_ENABLE_USB, &gEnableUSB);
             configGetInt(configOPL, CONFIG_OPL_FAV_MODE, &gFAVStartMode);
             configGetInt(configOPL, CONFIG_OPL_APPLY_GAMEID, &gApplyGameID);
@@ -2554,6 +2626,25 @@ static void _loadConfig()
     showCfgPopup = (result & CONFIG_OPL) ? 1 : 0;
 }
 
+static int trySaveConfigMMCE(int types)
+{
+    DIR *dir = opendir("mmce0:");
+    if (dir != NULL) {
+        closedir(dir);
+        configSetMove("mmce0:");
+        return configWriteMulti(types);
+    }
+
+    dir = opendir("mmce1:");
+    if (dir != NULL) {
+        closedir(dir);
+        configSetMove("mmce1:");
+        return configWriteMulti(types);
+    }
+
+    return -ENOENT;
+}
+
 static int trySaveConfigBDM(int types)
 {
     char path[64];
@@ -2615,6 +2706,9 @@ static int trySaveAlternateDevice(int types)
     } else if (!strncmp(pwd, "mass", 4) && (pwd[4] == ':' || pwd[5] == ':')) {
         if ((value = trySaveConfigBDM(types)) > 0)
             return value;
+    } else if (!strncmp(pwd, "mmce", 4) && (pwd[4] == ':' || pwd[5] == ':')) {
+        if ((value = trySaveConfigMMCE(types)) > 0)
+            return value;
     }
 
     // Config was not saved to the boot device. Try all supported devices.
@@ -2623,6 +2717,9 @@ static int trySaveAlternateDevice(int types)
         if ((value = trySaveConfigMC(types)) > 0)
             return value;
     }
+    // Try MMCE
+    if ((value = trySaveConfigMMCE(types)) > 0)
+        return value;
     // Try a USB device
     if ((value = trySaveConfigBDM(types)) > 0)
         return value;
@@ -2697,6 +2794,14 @@ static void _saveConfig()
         configSetInt(configOPL, CONFIG_OPL_HDD_MODE, gHDDStartMode);
         configSetInt(configOPL, CONFIG_OPL_ETH_MODE, gETHStartMode);
         configSetInt(configOPL, CONFIG_OPL_APP_MODE, gAPPStartMode);
+        configSetStr(configOPL, CONFIG_OPL_MMCE_PREFIX, gMMCEPrefix);
+        configSetInt(configOPL, CONFIG_OPL_MMCE_MODE, gMMCEStartMode);
+        configSetInt(configOPL, CONFIG_OPL_MMCE_SLOT, gMMCESlot);
+        configSetInt(configOPL, CONFIG_OPL_MMCEIGR_SLOT, gMMCEIGRSlot);
+        configSetInt(configOPL, CONFIG_OPL_MMCE_GAMEID, gMMCEEnableGameID);
+        configSetInt(configOPL, CONFIG_OPL_MMCE_WAIT_CYCLES, gMMCEAckWaitCycles);
+        configSetInt(configOPL, CONFIG_OPL_MMCE_USE_ALARMS, gMMCEUseAlarms);
+        configSetInt(configOPL, CONFIG_OPL_MMCE_PACING_MIGR, 1);
         configSetInt(configOPL, CONFIG_OPL_BDM_CACHE, bdmCacheSize);
         configSetInt(configOPL, CONFIG_OPL_HDD_CACHE, hddCacheSize);
         configSetInt(configOPL, CONFIG_OPL_SMB_CACHE, smbCacheSize);
@@ -2938,14 +3043,12 @@ void applyConfig(int themeID, int langID, int skipDeviceRefresh)
     // dead with its picker entry, its enum value and its config key all present. Data half without
     // the code half, again.
     if (gDefaultDevice < 0 || gDefaultDevice > FAV_MODE)
-        gDefaultDevice = APP_MODE;
+        gDefaultDevice = MMCE_MODE;
     // Favourites is a valid startup page only while the FAV tab is enabled; otherwise a stale
     // choice would boot into a hidden tab with no way back to a visible one.
     if (gDefaultDevice == FAV_MODE && !gFAVStartMode)
-        gDefaultDevice = APP_MODE;
-    // MMCE is checklist item 1 and its support module is a stub here, so it has no page to land on.
-    // The fork falls back TO MMCE_MODE; that target is wrong for this tree until item 1 lands.
-    if (gDefaultDevice == MMCE_MODE)
+        gDefaultDevice = MMCE_MODE;
+    if (gDefaultDevice == MMCE_MODE && gMMCEStartMode == START_MODE_DISABLED)
         gDefaultDevice = APP_MODE;
 
     guiUpdateScrollSpeed();
@@ -3778,6 +3881,7 @@ static void setDefaults(void)
     gRememberLastPlayed = 0;
     gAutoStartLastPlayed = 9;
     gSelectButton = KEY_CIRCLE; // Default to Japan.
+    gMMCEPrefix[0] = '\0';
     gBDMPrefix[0] = '\0';
     gETHPrefix[0] = '\0';
     gEnableNotifications = 1;
@@ -3798,9 +3902,16 @@ static void setDefaults(void)
     gHDDStartMode = START_MODE_DISABLED;
     gETHStartMode = START_MODE_DISABLED;
     gAPPStartMode = START_MODE_DISABLED;
+    gMMCEStartMode = START_MODE_DISABLED;
+    gFAVStartMode = START_MODE_DISABLED;
+
+    gMMCESlot = 2; // Default to first Auto slot
+    gMMCEIGRSlot = 3;
+    gMMCEEnableGameID = 0;
+    gMMCEAckWaitCycles = 5;
+    gMMCEUseAlarms = 1;
 
     gEnableUSB = 0; // USB block device is opt-in, like the other BDM transports
-    gFAVStartMode = START_MODE_DISABLED;
     // Visual GameID barcode ships OFF, matching fork commit cc2cdfed ("GameID defaults OFF"): the
     // HDMI auto-profile latch is only verifiable on real GameID hardware, so it stays opt-in.
     gApplyGameID = 0;
@@ -3928,6 +4039,9 @@ static void deferredInit(void)
     if (id)
         guiDeferUpdate(id);
 
+    if (gMMCEEnableGameID)
+        ioPutRequest(IO_CUSTOM_SIMPLEACTION, &mmceArmGameIDTransport);
+
     // Boot onto the configured Default Menu -- but if that mode has no registered support (its
     // device never initialised, or the config named a mode this build defers), fall through to a
     // registered one, mirroring applyConfig's clamp. Only when NOTHING is registered is there no
@@ -3935,7 +4049,9 @@ static void deferredInit(void)
     // silently parked every boot on the start menu with no explanation.
     int bootMode = gDefaultDevice;
     if (list_support[bootMode].support == NULL) {
-        if (list_support[APP_MODE].support != NULL)
+        if (list_support[MMCE_MODE].support != NULL)
+            bootMode = MMCE_MODE;
+        else if (list_support[APP_MODE].support != NULL)
             bootMode = APP_MODE;
         else {
             bootMode = -1;
