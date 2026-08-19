@@ -70,7 +70,10 @@ diff --git a/src/mmcesupport.c b/src/mmcesupport.c
 +    guiRenderTextScreen(_l(_STR_PLEASE_WAIT));
      // Source MC-side externals from this MMCE card's direct POPS/ folder; never overwrite card files.
      (void)vcdInstallPopstarterMc(mmcePrefix);
-@@ -930,6 +942,7 @@ static void bdmLaunchVcd(item_list_t *itemList, const char *vcdName, config_set_t *configSet)
+*** Update File: src/bdmsupport.c
+--- a/src/bdmsupport.c
++++ b/src/bdmsupport.c
+@@ -930,6 +930,8 @@ static void bdmLaunchVcd(item_list_t *itemList, const char *vcdName, config_set_t *configSet)
              else
                  return; // dialog cancelled -- nothing written, nothing prepared, nothing displayed
          }
@@ -80,7 +83,10 @@ diff --git a/src/mmcesupport.c b/src/mmcesupport.c
  
      // Populate mc?:/POPSTARTER from this game's own direct POPS/ folder. Best effort: local VCD
      // launches keep their existing handoff behavior when optional files are absent or the card is full.
-@@ -1517,30 +1531,72 @@ static int vcdBdmaManualPairPresent(void)
+*** Update File: src/vcdsupport.c
+--- a/src/vcdsupport.c
++++ b/src/vcdsupport.c
+@@ -1517,30 +1517,73 @@ static int vcdBdmaManualPairPresent(void)
 -// 1.0.1-style fast path for the launch equip: a card with NO marker but BOTH driver modules present is
 -// a pair the user (or an install predating the marker file) manages MANUALLY. vcdReadBdmaMode()
 -// collapses "marker absent" into VCD_BDMA_FAT32, so before this check every launch on such a card read
@@ -195,8 +201,8 @@ diff --git a/src/mmcesupport.c b/src/mmcesupport.c
 +        default:
 +            return 0;
 +    }
- }
-@@ -1563,19 +1609,13 @@ void vcdEnsureBdmaForLaunch(int source, int mode)
++}
+@@ -1563,19 +1606,12 @@ void vcdEnsureBdmaForLaunch(int source, int mode)
      if (!gBdmaApplyOnLaunch)
          return; // user opted to manage the BDMA driver manually (General Settings -> BDMA Source/Mode)
      if (mode <= VCD_BDMA_FAT32 || mode >= VCD_BDMA_MODE_COUNT)
@@ -208,25 +214,17 @@ diff --git a/src/mmcesupport.c b/src/mmcesupport.c
 -        // loudly (HW batch follow-up: this skip silently ate an expected ATA equip on a card left
 -        // over from manual testing) -- a Settings-screen equip writes the marker once and restores
 -        // auto-correction; deleting the stray pair does the same.
+-        LOG("[BDMA] unmarked manual pair on the card -- NOT equipping the %s variant (Settings equip once to take over)\n",
+-            vcdBdmaSuffix[mode]);
 +    if (vcdBdmaPairMatchesMode(mode) || vcdBdmaManualPairMatches(mode))
-+        return;
-+
-+    // Any markerless pair that did not positively match the requested family is stale for this launch;
-+    // fall through to the existing transactional equip rather than handing POPSTARTER a poisoned pair.
-+    if (vcdBdmaManualPairMatches(mode))
-         LOG("[BDMA] unmarked manual pair on the card -- NOT equipping the %s variant (Settings equip once to take over)\n",
-             vcdBdmaSuffix[mode]);
--        return;
+         return;
 -    }
  
-@@ -1585,7 +1625,6 @@ void vcdEnsureBdmaForLaunch(int source, int mode)
+@@ -1585,7 +1621,6 @@ void vcdEnsureBdmaForLaunch(int source, int mode)
      // diagnostic family the Settings-screen equip uses (so a failed prep is no longer a silent mystery), and launch anyway.
 -    guiRenderTextScreen(_l(_STR_BDMA_EQUIPPING));
  
-     int er = vcdEquipBdma(source, mode, diag, sizeof(diag));
-@@ -1609,17 +1648,12 @@ void vcdApplyUsbModeForLaunch(int mode)
-     char diag[160];
- 
+@@ -1609,17 +1644,10 @@ void vcdApplyUsbModeForLaunch(int mode)
      if (mode != VCD_BDMA_FAT32 && mode != VCD_BDMA_USBEXFAT)
          return; // the USB dialog only offers these two
 -    if (vcdReadBdmaMode() == mode)
@@ -240,5 +238,4 @@ diff --git a/src/mmcesupport.c b/src/mmcesupport.c
 -
 -    guiRenderTextScreen(_l(_STR_BDMA_EQUIPPING)); // same reasoning as vcdEnsureBdmaForLaunch above
  
-     int er = vcdEquipBdma(VCD_BDMA_SRC_USB, mode, diag, sizeof(diag));
 *** End Patch
