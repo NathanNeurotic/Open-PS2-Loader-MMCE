@@ -1,7 +1,7 @@
 name: Apply staged VCD PR patch
 
 on:
-  pull_request:
+  pull_request_target:
     types: [opened, synchronize]
 
 permissions:
@@ -15,6 +15,7 @@ jobs:
       - name: Checkout PR head
         uses: actions/checkout@v4
         with:
+          repository: ${{ github.repository }}
           ref: ${{ github.event.pull_request.head.ref }}
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
