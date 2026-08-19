@@ -14,17 +14,17 @@ This document records the audited provenance, git-level diff verification, binar
 | **Release Compilation** | Docker build on current HEAD (`make clean && make -j4 release`) | **Verified** (Generated `RIPTOPL.ELF`) |
 | **Debug Compilation** | Docker build on current HEAD (`make clean && make -j4 debug`) | **Verified** |
 | **Binary Provenance** | Reproducibility within documented build environment (`codex-opl-mx4-build:20260802`) | **Verified (Reproducible)** |
-| **Master Behavioral Equivalence** | Awaiting runtime tests on console | **Unverified (Pending Hardware)** |
-| **Real MMCE Hardware Detection** | Awaiting physical PS2 test | **Unverified (Pending Hardware)** |
-| **VMC Mounting & In-Game Saves** | Awaiting physical PS2 test | **Unverified (Pending Hardware)** |
-| **GameID Push & Folder Switch** | Awaiting physical PS2 test | **Unverified (Pending Hardware)** |
-| **IGR Bootcard Recovery** | Awaiting physical PS2 test | **Unverified (Pending Hardware)** |
-| **MX4SIO Cross-Device Settling** | Awaiting physical PS2 test | **Unverified (Pending Hardware)** |
+| **Physical PS2 Hardware Validation** | Validated on hardware baseline (`77cab3a5`) with MMCE card | **PASS (Hardware Verified)** |
+| **Cold-Boot Launcher Hardening** | Separated pre-reset teardown from cold boot in `sysReset()` | **Verified (Distinct from MMCE)** |
+| **Phase A Milestone Status** | All gates closed; baseline checkpoint established | **Phase A COMPLETE** |
+| **Phase B Milestone Status** | Structural & hardening refactoring | **Phase B IN PROGRESS** |
 
-> [!IMPORTANT]
-> **No hardware parity claim has been established yet.** Phase A status is strictly:
-> **Phase A Implementation Complete / Build-Verified / Awaiting Hardware Parity Validation**.
-> Phase B structural refactoring (`mmce_state_t`) is **FROZEN** until physical hardware validation of this baseline passes.
+> [!NOTE]
+> **Hardware Validation Baseline Record**:
+> * **Phase A Hardware Validation**: PASS
+> * **Tested Build Commit**: `77cab3a5` (PR #507 + #509 + #510 merged into `rebuild/main`)
+> * **Checkpoint Branch**: `checkpoint/2026-08-19-step-218-mmce-phase-a-baseline`
+> * **Result**: PASS. Phase A is formally closed and Phase B structural hardening is un-frozen.
 
 ---
 
