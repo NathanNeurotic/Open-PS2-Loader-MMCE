@@ -930,26 +930,31 @@ static void bdmLaunchVcd(item_list_t *itemList, const char *vcdName, config_set_
         }
     }
 
-    // Populate mc?:/POPSTARTER from this game's own direct POPS/ folder. Best effort: local VCD
-    // launches keep their existing handoff behavior when optional files are absent or the card is full.
+    // Present preparation indicator before potentially expensive memory-card file IO
+    guiRenderTextScreen(_l(_STR_PLEASE_WAIT));
+
+    // Populate mc?:/POPSTARTER from this game's own direct POPS/ folder.
     (void)vcdInstallPopstarterMc(vcdPrefix);
 
-    // Best-effort card prep: POPSTARTER reloads its block-device driver pair from the MC after its OWN
-    // IOP reset, so equip the device-matching BDMAssault variant. NEVER a launch gate -- the handoff
-    // below always proceeds (POPSTARTER owns everything past the exec); a failed equip just toasts its
-    // diagnostic in passing. iLink/UDPBD/unknown have no BDMA variant and are left as-is.
+    // Equip the device-matching BDMAssault variant and verify environment integrity.
+    int bdmaOk = 0;
     switch (pDeviceData->bdmDeviceType) {
         case BDM_TYPE_USB:
-            vcdApplyUsbModeForLaunch(usbBdmaVariant); // decided above, before anything was written
+            bdmaOk = vcdApplyUsbModeForLaunch(usbBdmaVariant); // decided above, before anything was written
             break;
         case BDM_TYPE_SDC:
-            vcdEnsureBdmaForLaunch(VCD_BDMA_SRC_MX4SIO, VCD_BDMA_MX4SIO);
+            bdmaOk = vcdEnsureBdmaForLaunch(VCD_BDMA_SRC_MX4SIO, VCD_BDMA_MX4SIO);
             break;
         case BDM_TYPE_ATA:
-            vcdEnsureBdmaForLaunch(VCD_BDMA_SRC_HDD, VCD_BDMA_ATA);
+            bdmaOk = vcdEnsureBdmaForLaunch(VCD_BDMA_SRC_HDD, VCD_BDMA_ATA);
             break;
         default:
             break;
+    }
+
+    if (bdmaOk < 0) {
+        guiMsgBox(_l(_STR_BDMA_ERR_SRC), 0, NULL);
+        return;
     }
 
     char vcdFullPath[256];
@@ -1511,26 +1516,15 @@ static int bdmGetImage(item_list_t *itemList, char *folder, int isRelative, char
 
     bdm_device_data_t *pDeviceData = (bdm_device_data_t *)itemList->priv;
 
-    // 1. Primary lookup: ART/<name>_<suffix>.png
     if (isRelative)
         snprintf(path, sizeof(path), "%s%s/%s_%s", pDeviceData->bdmPrefix, folder, value, suffix);
     else
         snprintf(path, sizeof(path), "%s%s_%s", folder, value, suffix);
     int r = texDiscoverLoad(resultTex, path, -1);
-
-    // 2. VCD secondary lookup: ART/<discID>_<suffix>.png (extracted from filename or cached disc ID)
     if (r == ERR_BAD_FILE && isRelative && vcdListViewActive(itemList)) {
-        char discId[VCD_ID_MAX];
-        if (vcdGetArtGameId(value, discId, sizeof(discId)) && strcmp(discId, value) != 0) {
-            snprintf(path, sizeof(path), "%s%s/%s_%s", pDeviceData->bdmPrefix, folder, discId, suffix);
-            r = texDiscoverLoad(resultTex, path, -1);
-        }
-        // 3. Fallback: POPSLoader-style suffixless cover next to .VCD
-        if (r == ERR_BAD_FILE) {
-            char vcdPrefix[BDM_DEVICE_ROOT_MAX + 2];
-            bdmBuildVcdPrefix(vcdPrefix, sizeof(vcdPrefix), itemList->mode);
-            r = vcdLoadPopsCover(vcdPrefix, value, suffix, resultTex);
-        }
+        char vcdPrefix[BDM_DEVICE_ROOT_MAX + 2];
+        bdmBuildVcdPrefix(vcdPrefix, sizeof(vcdPrefix), itemList->mode);
+        r = vcdLoadPopsCover(vcdPrefix, value, suffix, resultTex);
     }
     return r;
 }
