@@ -1082,13 +1082,19 @@ static config_set_t *mmceGetConfig(item_list_t *itemList, int id)
 
 static int mmceGetImage(item_list_t *itemList, char *folder, int isRelative, char *value, char *suffix, GSTEXTURE *resultTex, short psm)
 {
-    // OPL's own ART/<name>_COV.png is the PRIMARY lookup (same path PS2 uses; the cache also retries once
-    // with a strict PS1 ID). On a VCD (PS1) genuine miss, fall back to the POPSLoader-style suffixless
-    // cover named exactly like the .VCD, next to it in the POPS/ folder (mmceArtPrimary IS the VCD scan
-    // prefix). Cover/icon only, VCD view only -- a PS2 list and any hit never pay the extra probe.
+    // 1. Primary lookup: ART/<name>_<suffix>.png
     int r = mmceTryLoadImage(mmceArtPrimary, folder, isRelative, value, suffix, resultTex);
-    if (r == ERR_BAD_FILE && isRelative && vcdViewActive(itemList->mode))
-        r = vcdLoadPopsCover(mmceArtPrimary, value, suffix, resultTex);
+
+    // 2. VCD secondary lookup: ART/<discID>_<suffix>.png (extracted from filename or cached disc ID)
+    if (r == ERR_BAD_FILE && isRelative && vcdViewActive(itemList->mode)) {
+        char discId[VCD_ID_MAX];
+        if (vcdGetArtGameId(value, discId, sizeof(discId)) && strcmp(discId, value) != 0)
+            r = mmceTryLoadImage(mmceArtPrimary, folder, isRelative, discId, suffix, resultTex);
+
+        // 3. Fallback: POPSLoader-style suffixless cover next to .VCD
+        if (r == ERR_BAD_FILE)
+            r = vcdLoadPopsCover(mmceArtPrimary, value, suffix, resultTex);
+    }
     return r;
 }
 

@@ -1511,20 +1511,26 @@ static int bdmGetImage(item_list_t *itemList, char *folder, int isRelative, char
 
     bdm_device_data_t *pDeviceData = (bdm_device_data_t *)itemList->priv;
 
-    // OPL's own ART/<name>_COV.png is the PRIMARY lookup (same path PS2 uses; the cache also retries once
-    // with a strict PS1 ID).
+    // 1. Primary lookup: ART/<name>_<suffix>.png
     if (isRelative)
         snprintf(path, sizeof(path), "%s%s/%s_%s", pDeviceData->bdmPrefix, folder, value, suffix);
     else
         snprintf(path, sizeof(path), "%s%s_%s", folder, value, suffix);
     int r = texDiscoverLoad(resultTex, path, -1);
-    // On a VCD (PS1) genuine miss, fall back to the POPSLoader-style suffixless cover next to the .VCD --
-    // ROOT-anchored (bdmBuildVcdPrefix), the SAME prefix the VCD scan uses, since the POPS layout lives at
-    // the device root, outside gBDMPrefix. Cover/icon only, VCD view only.
+
+    // 2. VCD secondary lookup: ART/<discID>_<suffix>.png (extracted from filename or cached disc ID)
     if (r == ERR_BAD_FILE && isRelative && vcdListViewActive(itemList)) {
-        char vcdPrefix[BDM_DEVICE_ROOT_MAX + 2];
-        bdmBuildVcdPrefix(vcdPrefix, sizeof(vcdPrefix), itemList->mode);
-        r = vcdLoadPopsCover(vcdPrefix, value, suffix, resultTex);
+        char discId[VCD_ID_MAX];
+        if (vcdGetArtGameId(value, discId, sizeof(discId)) && strcmp(discId, value) != 0) {
+            snprintf(path, sizeof(path), "%s%s/%s_%s", pDeviceData->bdmPrefix, folder, discId, suffix);
+            r = texDiscoverLoad(resultTex, path, -1);
+        }
+        // 3. Fallback: POPSLoader-style suffixless cover next to .VCD
+        if (r == ERR_BAD_FILE) {
+            char vcdPrefix[BDM_DEVICE_ROOT_MAX + 2];
+            bdmBuildVcdPrefix(vcdPrefix, sizeof(vcdPrefix), itemList->mode);
+            r = vcdLoadPopsCover(vcdPrefix, value, suffix, resultTex);
+        }
     }
     return r;
 }
