@@ -488,6 +488,18 @@ static void bdmLoadBlockDeviceModules(void)
     // called after SignalSema so it never runs under bdmLoadModuleLock.
     if (modsNow != modsWere && !wasFirstPass)
         bdmForceDeviceRefresh();
+
+    // MX4SIO initial discovery ("double tap"): the SIO2 SD card may still be completing its
+    // internal power-up / SPI handshake after mx4sio_bd_irx links. If MX4SIO is enabled and loaded,
+    // check if it was immediately found. If not, perform one bounded settle (~600ms) on this IO worker
+    // thread and issue exactly one second refresh.
+    if (gEnableMX4SIO && mx4sioModLoaded) {
+        char sdcRoot[16];
+        if (!bdmGetDeviceRootByType(BDM_TYPE_SDC, sdcRoot, sizeof(sdcRoot))) {
+            DelayThread(600 * 1000); // bounded settle for SIO2 SPI init
+            bdmForceDeviceRefresh(); // exactly one second probe
+        }
+    }
 }
 
 void bdmLoadModules(void)

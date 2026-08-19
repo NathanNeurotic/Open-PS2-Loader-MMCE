@@ -545,22 +545,7 @@ static int vcdScanOpenDir(const char *dirPath, vcd_entry_t **outList)
 
     int count = 0;
     struct dirent *de;
-    while (count < VCD_MAX_ITEMS) {
-        // POSIX readdir() uses the same NULL result for clean end-of-directory and for an error.
-        // Clear errno immediately before each call so a nonzero value on NULL belongs to this read,
-        // not to earlier work in the loop. Publishing the entries collected before a read failure
-        // as a complete list would undo the transactional list ownership in every caller.
-        errno = 0;
-        de = readdir(dir);
-        if (de == NULL) {
-            if (errno != 0) {
-                closedir(dir);
-                free(list);
-                return -1; // incomplete scan: caller preserves its last-good backing list
-            }
-            break; // clean end-of-directory
-        }
-
+    while (count < VCD_MAX_ITEMS && (de = readdir(dir)) != NULL) {
         int len = (int)strlen(de->d_name);
         if (len < 5 || strcasecmp(de->d_name + len - 4, ".VCD") != 0)
             continue;          // keep only "*.VCD" (case-insensitive)
@@ -589,6 +574,7 @@ static int vcdScanOpenDir(const char *dirPath, vcd_entry_t **outList)
         count++;
     }
     closedir(dir);
+    LOG("[VCD] scanned '%s': found %d entries\n", dirPath, count);
 
     if (count == 0) {
         free(list);
