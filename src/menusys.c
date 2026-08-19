@@ -481,16 +481,19 @@ config_set_t *menuLoadConfig()
     actionStatus = 0;
     SignalSema(menuSemaId);
 
-    if (result != NULL || list == NULL || configId < 0)
+    if (list == NULL || configId < 0)
         return result;
 
-    // Launch owns the storage path now. Drop speculative art before the foreground CFG read. A
-    // zero wait requests cancellation but never kills or waits on an in-flight fileXio/SIO2 RPC;
+    // Launch owns the storage path now. Drop speculative art before any launch I/O or cached return.
+    // A zero wait requests cancellation but never kills or waits on an in-flight fileXio/SIO2 RPC;
     // that transaction is allowed to finish cleanly while no new queued art can get in front.
     if (list->mode == MMCE_MODE)
         (void)cacheAbortMmceImageLoadsTimed(0);
     else
         (void)cacheCancelPendingImageLoadsTimed(0);
+
+    if (result != NULL)
+        return result;
 
     loadedConfig = list->itemGetConfig(list, configId);
 
