@@ -1525,11 +1525,11 @@ typedef struct
 
 // Canonical BDMAssault driver pair byte lengths (from modules/bdmassault/PROVENANCE.md).
 static const bdma_pair_sig_t vcdBdmaPairSig[VCD_BDMA_MODE_COUNT] = {
-    {0, 0},             // FAT32 (built-in, no external pair)
-    {48500, 34508},     // usbexfat
-    {48500, 14993},     // mx4sio
-    {11841, 19733},     // mmce
-    {42749, 21837}      // ata
+    {0, 0},         // FAT32 (built-in, no external pair)
+    {48500, 34508}, // usbexfat
+    {48500, 14993}, // mx4sio
+    {11841, 19733}, // mmce
+    {42749, 21837}  // ata
 };
 
 // Returns file size in bytes, or -1 if absent / unreadable.
