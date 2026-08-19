@@ -381,21 +381,18 @@ void mmceLoadModules(void)
     sysLoadModuleBuffer(&mmceman_irx, size_mmceman_irx, 0, NULL);
 }
 
-static int sGameIdTransportArmed = 0;
-
 // Δ4 (NHDDL parity): arm the GameID transport OUTSIDE the launch path. NHDDL loads mmceman once at
 // boot; RiptOPL used to self-arm inside mmceSendGameID -- an IRX load/start at the launch's most
 // fragile moment (issue #51's fix, right intent, wrong timing). Called from initAllSupport (boot +
 // every settings apply) via the IO worker, so a wedged load is a harmless LOG at menu time instead
-// of a dead launch. Idempotent (mmceLoadModules latches); no-op when the GameID feature is off.
+// of a dead launch. Idempotent (derived from mmceModLoaded); no-op when the GameID feature is off.
 void mmceArmGameIDTransport(void)
 {
-    if (!gMMCEEnableGameID || sGameIdTransportArmed)
+    if (!gMMCEEnableGameID || mmceModLoaded)
         return;
 
     guiSetBootStatusSticky(_l(_STR_BOOT_ARMING_MMCE)); // boot-step localizer (IO thread) -- see gui.c
     mmceLoadModules();
-    sGameIdTransportArmed = 1;
     // Post-load marker (#254): the boot arm runs right after GUI_INIT_DONE; a serial log that
     // shows the arm begin without this completion line localizes a wedge to the mmceman load.
     LOG("MMCESUPPORT GameID transport armed\n");
