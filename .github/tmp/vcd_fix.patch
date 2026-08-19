@@ -1,0 +1,119 @@
+diff --git a/src/mmcesupport.c b/src/mmcesupport.c
+--- a/src/mmcesupport.c
++++ b/src/mmcesupport.c
+@@ -25,6 +25,7 @@ static char mmcePrefix[40]; // Contains the full path to the folder where all the games are.
+ static char mmceArtPrimary[40];
+ static int mmceULSizePrev = -2;
+ // VCD-scan self-heal (HW batch S6): a failed vcdFillGameList on a CONTENDED bus (-1) used to latch
+@@ -32,6 +33,7 @@ static int mmceULSizePrev = -2;
+ // only contention ever arms this budget.)
++static unsigned char mmceVcdScanned = 0;
+ static unsigned char mmceVcdScanFailed = 0;
+ static unsigned char mmceVcdScanRetries = 0;
+ #define MMCE_VCD_SCAN_RETRY_MAX 15
+@@ -398,6 +400,7 @@ void mmceInit(item_list_t *itemList)
+     mmceGameCount = 0;
+     mmceGames = NULL;
+     mmceVcdGameCount = 0;
+     mmceVcdGames = NULL;
++    mmceVcdScanned = 0;
+     mmceResolvedDevice = -1; // re-detect the Auto slot on a fresh init (tab re-enable / settings apply)
+@@ -423,6 +426,7 @@ static int mmceNeedsUpdate(item_list_t *itemList)
+         // early return fires first), so a reinserted card would inherit an exhausted retry budget
+         // and a dead VCD page (CodeRabbit review of #248, vetted). Fresh card = fresh budget.
++        mmceVcdScanned = 0;
+         mmceVcdScanFailed = 0;
+         mmceVcdScanRetries = 0;
+@@ -468,6 +472,12 @@ static int mmceNeedsUpdate(item_list_t *itemList)
+     if (folderConsumeDirty(itemList->mode))
+         return 1;
+     if (vcdViewActive(itemList->mode)) {
++        // VCD has an independent backing array and scan lifecycle. Do not inherit the ISO list's
++        // -2 sentinel: when VCD is the default view, or after a card reinsertion/rebuild, there may
++        // be no L3 dirty edge to force the first VCD scan.
++        if (!mmceVcdScanned) {
++            mmceGameList.updateDelay = MMCE_MODE_UPDATE_DELAY;
++            return 1;
++        }
+         // A contended scan left the VCD page empty (S6): keep the ~2s refresh alive until a scan
+         // succeeds or the bounded budget runs out (no endless bus churn -- #246 doctrine). Also
+@@ -590,6 +600,7 @@ static int mmceUpdateGameList(item_list_t *itemList)
+         mmceGameCount = 0;
+         mmceVcdGameCount = 0;
+         mmceULSizePrev = -2; // force a fresh scan when a card returns
++        mmceVcdScanned = 0;
+         mmceVcdScanFailed = 0;
+         mmceVcdScanRetries = 0;
+         return 0;
+@@ -602,11 +613,13 @@ static int mmceUpdateGameList(item_list_t *itemList)
+     if (vcdViewActive(itemList->mode)) {
+         int r = vcdFillGameList(mmcePrefix, &mmceVcdGames);
+         if (r >= 0) {
++            mmceVcdScanned = 1;
+             mmceVcdGameCount = r;
+             mmceVcdScanFailed = 0;
+             mmceVcdScanRetries = 0;
+         } else {
++            mmceVcdScanned = 0;
+             mmceVcdScanFailed = 1; // arm mmceNeedsUpdate's bounded retry (S6)
+         }
+         return mmceVcdGameCount;
+@@ -702,6 +715,19 @@ static void mmceLaunchVcd(item_list_t *itemList, const char *vcdName, config_set_t *configSet)
+     if (vcdName == NULL || vcdName[0] == '\0' || !strcasecmp(vcdName, "POPSTARTER")) // reserved-name belt: the scanner no longer lists it (#154); strcasecmp -- FAT is case-insensitive
+         return;
++
++    // Present the launch-preparation frame BEFORE touching the MMCE card. The VCD handoff performs
++    // POPSTARTER/BDMA file I/O on the same SIO2 path as the art worker, so an in-flight MMCE art read
++    // must be drained first or the handoff can inherit a poisoned/shared fileXio state (PR #242).
++    guiRenderTextScreen(_l(_STR_PLEASE_WAIT));
++    if (!cacheAbortMmceImageLoadsTimed(MMCE_ART_ABORT_WAIT_TICKS)) {
++        guiWarning(_l(_STR_ERR_FILE_INVALID), 8);
++        return;
++    }
++
+     if (!vcdResolvePopstarter(mmcePrefix, vcdElf, sizeof(vcdElf))) {
+         guiMsgBox(_l(_STR_POPSTARTER_NOT_FOUND), 0, NULL);
+         return;
+*** Update File: src/bdmsupport.c
+--- a/src/bdmsupport.c
++++ b/src/bdmsupport.c
+@@ -8,6 +8,7 @@
+ #include "include/util.h"
+ #include "include/themes.h"
+ #include "include/textures.h"
+ #include "include/ioman.h"
++#include "include/texcache.h"
+ #include "include/system.h"
+@@ -868,6 +869,18 @@ static void bdmLaunchVcd(item_list_t *itemList, const char *vcdName, config_set_t *configSet)
+     if (pDeviceData->bdmDeviceType == BDM_TYPE_UDPBD) {
+         guiMsgBox(_l(_STR_VCD_NOT_ON_NET), 0, NULL);
+         return;
+     }
+     bdmBuildVcdPrefix(vcdPrefix, sizeof(vcdPrefix), itemList->mode); // device root, NOT gBDMPrefix -- POPSTARTER reads <root>/POPS only
++
++    // MX4SIO shares SIO2 with the MMCE card. Before resolving POPSTARTER or preparing the MC/BDMA
++    // handoff, drain any MMCE artwork read that could still be occupying the shared fileXio/SIO2
++    // channel. PR #242 established this ordering for MMCE VCD launches; the same shared-bus invariant
++    // applies when MX4SIO is the VCD being handed off.
++    if (pDeviceData->bdmDeviceType == BDM_TYPE_SDC) {
++        guiRenderTextScreen(_l(_STR_PLEASE_WAIT));
++        if (!cacheAbortMmceImageLoadsTimed(500)) {
++            guiWarning(_l(_STR_ERR_FILE_INVALID), 8);
++            return;
++        }
++    }
++
+     if (!vcdResolvePopstarter(vcdPrefix, vcdElf, sizeof(vcdElf))) {
+         guiMsgBox(_l(_STR_POPSTARTER_NOT_FOUND), 0, NULL);
+         return;
+@@ -914,6 +927,10 @@ static void bdmLaunchVcd(item_list_t *itemList, const char *vcdName, config_set_t *configSet)
+             else
+                 return; // dialog cancelled -- nothing written, nothing prepared, nothing displayed
+         }
+     }
++
++    if (pDeviceData->bdmDeviceType != BDM_TYPE_SDC)
++        guiRenderTextScreen(_l(_STR_PLEASE_WAIT));
+ 
+     // Populate mc?:/POPSTARTER from this game's own direct POPS/ folder. Best effort: local VCD
+*** End Patch
