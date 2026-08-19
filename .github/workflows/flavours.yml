@@ -91,6 +91,9 @@ jobs:
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           git fetch --prune --unshallow || true
 
+      - name: Install menu-coherent mmceman (#254)
+        run: sh .github/scripts/install_coherent_mmce.sh
+
       - name: Compile -> make clean release (${{ matrix.flavour }})
         run: make --trace clean && make --trace LOCALVERSION=${{ matrix.flavour }} release
 
