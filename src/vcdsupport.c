@@ -37,41 +37,87 @@
 int vcdExtractGameId(const char *name, char *idOut, int idSize)
 {
     int i;
+    const char *p = name;
 
     if (idOut == NULL || idSize <= 11)
         return 0;
     idOut[0] = '\0';
-    if (name == NULL || strlen(name) < 13)
-        return 0; // require AAAA_NNN.NN plus a separator and non-empty title
-    for (i = 0; i < 4; i++)
-        if (!((name[i] >= 'A' && name[i] <= 'Z') || (name[i] >= 'a' && name[i] <= 'z') ||
-              (name[i] >= '0' && name[i] <= '9')))
-            return 0;
-    if (name[4] != '_')
-        return 0;
-    for (i = 5; i <= 7; i++)
-        if (name[i] < '0' || name[i] > '9')
-            return 0;
-    if (name[8] != '.' || name[9] < '0' || name[9] > '9' || name[10] < '0' || name[10] > '9')
-        return 0;
-    if ((name[11] != '.' && name[11] != '_') || name[12] == '\0')
+    if (name == NULL)
         return 0;
 
-    memcpy(idOut, name, 11);
+    // Skip POPSTARTER 3-character prefixes (e.g. "XX.", "SB.", "EL.", "SM.", or any "??.")
+    if (p[0] != '\0' && p[1] != '\0' && p[2] == '.') {
+        p += 3;
+    }
+
+    if (strlen(p) < 11)
+        return 0;
+
+    // Check strict AAAA_NNN.NN shape (e.g. SLUS_005.51, SLES_012.58)
+    for (i = 0; i < 4; i++) {
+        if (!((p[i] >= 'A' && p[i] <= 'Z') || (p[i] >= 'a' && p[i] <= 'z') ||
+              (p[i] >= '0' && p[i] <= '9')))
+            return 0;
+    }
+    if (p[4] != '_')
+        return 0;
+    for (i = 5; i <= 7; i++) {
+        if (p[i] < '0' || p[i] > '9')
+            return 0;
+    }
+    if (p[8] != '.' || p[9] < '0' || p[9] > '9' || p[10] < '0' || p[10] > '9')
+        return 0;
+
+    // If there is a trailing character, ensure it is a delimiter or title separator
+    if (p[11] != '\0' && p[11] != '.' && p[11] != '_' && p[11] != ' ' && p[11] != '-')
+        return 0;
+
+    for (i = 0; i < 11; i++) {
+        char c = p[i];
+        if (c >= 'a' && c <= 'z')
+            c -= ('a' - 'A'); // normalize uppercase
+        idOut[i] = c;
+    }
     idOut[11] = '\0';
     return 1;
 }
 
+// Centralized helper for VCD artwork lookup: extracts ID from filename (zero IO) or returns the
+// cached disc ID (zero IO). Returns 1 with outId filled if a disc ID is known, 0 otherwise.
+int vcdGetArtGameId(const char *name, char *outId, int outSize)
+{
+    if (name == NULL || outId == NULL || outSize <= 0)
+        return 0;
+    outId[0] = '\0';
+
+    // 1. Cheap filename parse first (zero IO)
+    if (vcdExtractGameId(name, outId, outSize))
+        return 1;
+
+    // 2. Fallback to cached disc ID from background resolver (zero IO)
+    return vcdDisplayIdCached(name, outId, outSize);
+}
+
 // Display-only prefix hider (aesthetic setting gVcdHideGameId). Returns the number of leading
 // characters to skip when `name` begins with a STRICT PS1 retail game-ID prefix AAAA_NNN.NN
-// followed by a '.' or '_' separator (= 12 chars, e.g. "SLUS_005.51." / "SCUS_941.63."), and only
-// when there is a non-empty title after it. Returns 0 otherwise, so clean titles are never cut.
-// The strict character checks prevent a false positive from eating a real title and short-circuit
-// safely on names shorter than 12 characters.
+// (optionally preceded by a POPSTARTER prefix like "XX.") followed by a '.' or '_' separator.
 static int vcdGameIdPrefixLen(const char *name)
 {
+    const char *p = name;
+    int prefixLen = 0;
+    if (name == NULL)
+        return 0;
+    if (p[0] != '\0' && p[1] != '\0' && p[2] == '.') {
+        p += 3;
+        prefixLen += 3;
+    }
     char gameId[VCD_ID_MAX];
-    return vcdExtractGameId(name, gameId, sizeof(gameId)) ? 12 : 0;
+    if (vcdExtractGameId(p, gameId, sizeof(gameId))) {
+        if (p[11] == '.' || p[11] == '_' || p[11] == ' ' || p[11] == '-')
+            return prefixLen + 12;
+        return prefixLen + 11;
+    }
+    return 0;
 }
 
 // Render-time display name for the VCD list. PURELY COSMETIC: returns a pointer PAST a leading
@@ -146,13 +192,22 @@ static int vcdEntryCmp(const void *a, const void *b)
 #define VCD_ID_PROBE_BUDGET 8   // discs opened per scan
 #define VCD_ID_MEMO_MAX     512 // ids remembered for the session
 
+typedef enum {
+    VCD_ID_UNREQUESTED = 0,
+    VCD_ID_QUEUED,
+    VCD_ID_DEFERRED,
+    VCD_ID_RESOLVED,
+    VCD_ID_ABSENT
+} vcd_id_state_t;
+
 typedef struct vcd_id_memo
 {
     struct vcd_id_memo *next;
-    char id[VCD_ID_MAX]; // resolved disc id; empty once `asked` is set means the disc carries none
-    char *dir;           // directory this VCD was scanned from -- the ONLY correct path source
-    unsigned char asked; // 1 once the disc has been read, so a "no id" answer is not re-read
-    char name[];         // flexible: VCD basenames run long, most are far short of the cap
+    char id[VCD_ID_MAX];     // resolved disc id; empty once absent
+    char *dir;               // directory this VCD was scanned from -- the ONLY correct path source
+    unsigned char state;     // vcd_id_state_t
+    unsigned int retryFrame; // guiFrameId when deferred retry is next permitted
+    char name[];             // flexible: VCD basenames run long, most are far short of the cap
 } vcd_id_memo_t;
 
 static vcd_id_memo_t *gVcdIdMemo = NULL;
@@ -183,7 +238,8 @@ void vcdNoteScanDir(const char *name, const char *dirPath)
         if (m->dir == NULL || strcmp(m->dir, dirPath) != 0) {
             free(m->dir); // same name on a different device: re-point, and re-ask the disc
             m->dir = strdup(dirPath);
-            m->asked = 0;
+            m->state = VCD_ID_UNREQUESTED;
+            m->retryFrame = 0;
             m->id[0] = '\0';
         }
         return;
@@ -198,7 +254,8 @@ void vcdNoteScanDir(const char *name, const char *dirPath)
         return;
     memcpy(m->name, name, len + 1);
     m->id[0] = '\0';
-    m->asked = 0;
+    m->state = VCD_ID_UNREQUESTED;
+    m->retryFrame = 0;
     m->dir = strdup(dirPath);
     m->next = gVcdIdMemo;
     gVcdIdMemo = m;
@@ -277,10 +334,6 @@ static int vcdCanonDisplayId(const char *idIn, char *idOut, int idSize)
 // shows the id pays one disc read per game per session, and a theme that does not pays nothing --
 // exactly how #Size behaves, and exactly what Nathan asked for: it may arrive late, it must never
 // hold anything up.
-//
-// It is emphatically NOT identity. Art, per-game CFG and the launch all key off the VCD FILENAME
-// (bdmGetGameStartup returns g->name for the VCD view). Feeding a disc-derived id into those would
-// point art lookups at a name the files on disk are not called.
 int vcdResolveDisplayId(const char *name, char *idOut, int idSize)
 {
     if (name == NULL || idOut == NULL || idSize <= 0)
@@ -291,21 +344,22 @@ int vcdResolveDisplayId(const char *name, char *idOut, int idSize)
     if (m == NULL || m->dir == NULL)
         return 0; // never scanned (or the table was full): caller falls back to the filename
 
-    if (m->asked) {
-        if (m->id[0] == '\0')
-            return 0; // asked already, this disc carries no id
+    if (m->state == VCD_ID_RESOLVED) {
         snprintf(idOut, idSize, "%s", m->id);
         return 1;
     }
+    if (m->state == VCD_ID_ABSENT)
+        return 0;
 
     char vcdPath[256];
     char discId[RETROGEM_GAMEID_MAX];
     size_t dl = strlen(m->dir);
     const char *sep = (dl > 0 && m->dir[dl - 1] == '/') ? "" : "/";
 
-    m->asked = 1; // one attempt per game per session, success or not
-    if (snprintf(vcdPath, sizeof(vcdPath), "%s%s%s.VCD", m->dir, sep, name) >= (int)sizeof(vcdPath))
+    if (snprintf(vcdPath, sizeof(vcdPath), "%s%s%s.VCD", m->dir, sep, name) >= (int)sizeof(vcdPath)) {
+        m->state = VCD_ID_ABSENT;
         return 0;
+    }
 
     // The image is ground truth, and this is the SAME resolver the RetroGEM barcode uses at launch,
     // so a game reports one id to the theme and to the scanner.
@@ -317,8 +371,12 @@ int vcdResolveDisplayId(const char *name, char *idOut, int idSize)
         const char *store = vcdCanonDisplayId(discId, canon, sizeof(canon)) ? canon : discId;
         snprintf(m->id, sizeof(m->id), "%s", store);
         snprintf(idOut, idSize, "%s", store);
+        m->state = VCD_ID_RESOLVED;
         return 1;
     }
+
+    m->state = VCD_ID_ABSENT;
+    m->id[0] = '\0';
     return 0;
 }
 
@@ -338,8 +396,7 @@ int vcdResolveDisplayId(const char *name, char *idOut, int idSize)
 // config-consuming elements (rebuild-155's CFG-storm gate, menusys.c), which stays exactly as it
 // is -- and on the reporter's themes the VCD main page has none, so a resolve riding the config
 // path would never fire for him. One queued resolve per settled VCD row per session; the memo's
-// `asked` flag dedupes everything after, so merely holding a direction costs one strcmp walk per
-// frame and nothing else.
+// state dedupes everything after, so merely holding a direction costs one strcmp walk per frame.
 
 // Memo-read half for the render thread: returns the id ONLY if it is already resolved. Never
 // touches the device, never queues anything -- a miss means "not yet", and the caller falls back.
@@ -350,7 +407,7 @@ int vcdDisplayIdCached(const char *name, char *idOut, int idSize)
     idOut[0] = '\0';
 
     vcd_id_memo_t *m = vcdIdMemoFind(name);
-    if (m == NULL || !m->asked || m->id[0] == '\0')
+    if (m == NULL || m->state != VCD_ID_RESOLVED || m->id[0] == '\0')
         return 0;
     snprintf(idOut, idSize, "%s", m->id);
     return 1;
@@ -358,8 +415,7 @@ int vcdDisplayIdCached(const char *name, char *idOut, int idSize)
 
 // One outstanding resolve request: the GUI writes it, the io worker reads and clears it. Both
 // bracket with DIntr/EIntr -- EE thread preemption requires an interrupt, so that is a complete
-// guard (same pattern as the SFX dispatch ring). A settle while one is in flight is dropped; the
-// next frame re-asks, so the row the user is ON is queued within a frame of the worker freeing.
+// guard (same pattern as the SFX dispatch ring).
 static char gVcdIdReqName[256];
 static volatile int gVcdIdReqPending = 0;
 
@@ -377,11 +433,18 @@ static void vcdResolveQueuedDisplayId(void)
     gVcdIdReqPending = 0;
     EIntr();
 
+    vcd_id_memo_t *m = vcdIdMemoFind(name);
+
     // Async is not enough by itself: a device read can still starve the same USB/PFS channel
-    // used by artwork and BGM. This metadata has zero authority over those assets, so if either
-    // pipeline is busy simply abandon this attempt; the still-selected row asks again next frame.
-    if (cacheHasPendingArt() || !bgmDiscretionaryIoAllowed())
+    // used by artwork and BGM. If either pipeline is busy, transition to DEFERRED with a throttled
+    // retry frame (~1.5 s backoff) so the GUI thread does not flood the IO queue at 60 Hz.
+    if (cacheHasPendingArt() || !bgmDiscretionaryIoAllowed()) {
+        if (m != NULL && m->state == VCD_ID_QUEUED) {
+            m->state = VCD_ID_DEFERRED;
+            m->retryFrame = guiFrameId + 90;
+        }
         return;
+    }
 
     vcdResolveDisplayId(name, id, sizeof(id));
 }
@@ -393,21 +456,24 @@ void vcdRequestDisplayId(const char *name)
     if (name == NULL || name[0] == '\0')
         return;
 
-    // Filename already supplies exactly what ItemText needs: display it immediately and never pay
-    // for a deep image read merely to rediscover the same cosmetic ID.
+    // Filename already supplies exactly what ItemText needs: zero IO
     if (vcdExtractGameId(name, parsed, sizeof(parsed)))
         return;
 
     vcd_id_memo_t *m = vcdIdMemoFind(name);
-    if (m == NULL || m->asked || m->dir == NULL)
-        return; // memo full / never scanned, already resolved/attempted this session, or the dir
-                // strdup OOM'd at scan time. ALL THREE fail closed: vcdResolveDisplayId returns
-                // before setting `asked` when dir is NULL, so without this guard every settle
-                // would re-queue a request that can never succeed -- the CFG-storm shape (#155)
-                // in miniature. Recoverable: a later rescan re-points dir and re-arms the row.
+    if (m == NULL || m->dir == NULL)
+        return;
+
+    // If already resolved, marked absent, or already queued in ioman, no-op
+    if (m->state == VCD_ID_RESOLVED || m->state == VCD_ID_ABSENT || m->state == VCD_ID_QUEUED)
+        return;
+
+    // If deferred due to art/BGM activity, throttle retry attempts
+    if (m->state == VCD_ID_DEFERRED && guiFrameId < m->retryFrame)
+        return;
 
     if (strlen(name) >= sizeof(gVcdIdReqName))
-        return; // pathological basename: the resolver's own path buffer rejects it too -- leave the title
+        return; // pathological basename: leave the title
 
     DIntr();
     if (gVcdIdReqPending) {
@@ -416,13 +482,15 @@ void vcdRequestDisplayId(const char *name)
     }
     snprintf(gVcdIdReqName, sizeof(gVcdIdReqName), "%s", name);
     gVcdIdReqPending = 1;
+    m->state = VCD_ID_QUEUED;
     EIntr();
 
     if (ioPutRequest(IO_CUSTOM_SIMPLEACTION, &vcdResolveQueuedDisplayId) != IO_OK) {
-        // No worker owns the one-slot request when enqueue fails. Release the latch immediately or
-        // every future cosmetic ID request is suppressed for the rest of the session.
+        // Enqueue failed: throttle retry so we don't spam
         DIntr();
         gVcdIdReqPending = 0;
+        m->state = VCD_ID_DEFERRED;
+        m->retryFrame = guiFrameId + 60;
         EIntr();
     }
 }

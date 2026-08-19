@@ -36,9 +36,14 @@ int vcdScanDir(const char *devPrefix, vcd_entry_t **outList);
 // Like vcdScanDir but scans `dirPath` DIRECTLY (no POPS/ subfolder) -- for the APA/PFS HDD where each
 // __.POPS* partition holds its .VCD at the mounted root (e.g. dirPath = "pfs1:/").
 int vcdScanDirRoot(const char *dirPath, vcd_entry_t **outList);
-// Extract a strict leading PS1 ID from "SXXX_NNN.NN.Title" for same-folder CFG/art fallback.
+
+// Extract a strict leading PS1 ID from "SXXX_NNN.NN.Title" or "XX.SXXX_NNN.NN.Title" for same-folder CFG/art fallback.
 // Returns 1 and writes the 11-character ID on success; otherwise returns 0 and writes an empty string.
 int vcdExtractGameId(const char *name, char *idOut, int idSize);
+
+// Centralized helper for VCD artwork lookup: extracts ID from filename (zero IO) or returns the
+// cached disc ID (zero IO). Returns 1 with outId filled if a disc ID is known, 0 otherwise.
+int vcdGetArtGameId(const char *name, char *outId, int outSize);
 
 // Remember which directory a VCD was scanned from. String work only -- NO device access; the scan
 // must never block on IO. Called per entry by the scan.

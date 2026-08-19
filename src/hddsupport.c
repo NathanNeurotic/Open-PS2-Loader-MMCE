@@ -1367,13 +1367,22 @@ static int hddGetImage(item_list_t *itemList, char *folder, int isRelative, char
     if (isRelative && gHDDPrefix == NULL)
         return ERR_BAD_FILE;
 
-    // PS1 (VCD) art uses this same ART path as PS2. The cache supplies the filename first and may retry
-    // once with a strict PS1 ID after a genuine miss; pfs0: remains the current OPL data mount.
+    // 1. Primary lookup: ART/<name>_<suffix>.png
     if (isRelative)
         snprintf(path, sizeof(path), "%s%s/%s_%s", gHDDPrefix, folder, value, suffix);
     else
         snprintf(path, sizeof(path), "%s%s_%s", folder, value, suffix);
-    return texDiscoverLoad(resultTex, path, -1);
+    int r = texDiscoverLoad(resultTex, path, -1);
+
+    // 2. VCD secondary lookup: ART/<discID>_<suffix>.png (extracted from filename or cached disc ID)
+    if (r == ERR_BAD_FILE && isRelative && vcdListViewActive(itemList)) {
+        char discId[VCD_ID_MAX];
+        if (vcdGetArtGameId(value, discId, sizeof(discId)) && strcmp(discId, value) != 0) {
+            snprintf(path, sizeof(path), "%s%s/%s_%s", gHDDPrefix, folder, discId, suffix);
+            r = texDiscoverLoad(resultTex, path, -1);
+        }
+    }
+    return r;
 }
 
 static int hddGetTextId(item_list_t *itemList)

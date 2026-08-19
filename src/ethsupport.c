@@ -986,17 +986,24 @@ static int ethGetImage(item_list_t *itemList, char *folder, int isRelative, char
 {
     char path[256];
 
-    // OPL's own ART\<name>_COV.png is the PRIMARY lookup (same path PS2 uses; the cache also retries once
-    // with a strict PS1 ID).
+    // 1. Primary lookup: ART\<name>_<suffix>.png
     if (isRelative)
         snprintf(path, sizeof(path), "%s%s\\%s_%s", ethPrefix, folder, value, suffix);
     else
         snprintf(path, sizeof(path), "%s%s_%s", folder, value, suffix);
     int r = texDiscoverLoad(resultTex, path, -1);
-    // On a VCD (PS1) genuine miss, fall back to the POPSLoader-style suffixless cover next to the .VCD.
-    // ethPrefix ends in '\\', so vcdLoadPopsCover auto-detects the SMB separator. Cover/icon, VCD view only.
-    if (r == ERR_BAD_FILE && isRelative && vcdListViewActive(itemList))
-        r = vcdLoadPopsCover(ethPrefix, value, suffix, resultTex);
+
+    // 2. VCD secondary lookup: ART\<discID>_<suffix>.png (extracted from filename or cached disc ID)
+    if (r == ERR_BAD_FILE && isRelative && vcdListViewActive(itemList)) {
+        char discId[VCD_ID_MAX];
+        if (vcdGetArtGameId(value, discId, sizeof(discId)) && strcmp(discId, value) != 0) {
+            snprintf(path, sizeof(path), "%s%s\\%s_%s", ethPrefix, folder, discId, suffix);
+            r = texDiscoverLoad(resultTex, path, -1);
+        }
+        // 3. Fallback: POPSLoader-style suffixless cover next to .VCD
+        if (r == ERR_BAD_FILE)
+            r = vcdLoadPopsCover(ethPrefix, value, suffix, resultTex);
+    }
     return r;
 }
 
