@@ -187,14 +187,19 @@ void sysShutdownDev9(void)
 
 void sysReset(int modload_mask)
 {
+    static int sInitialBoot = 1;
+
+    if (!sInitialBoot) {
 #ifdef PADEMU
-    ds34usb_reset();
-    ds34bt_reset();
+        ds34usb_reset();
+        ds34bt_reset();
 #endif
-    fileXioExit();
-    SifExitIopHeap();
-    SifLoadFileExit();
-    SifExitRpc();
+        fileXioExit();
+        SifExitIopHeap();
+        SifLoadFileExit();
+        SifExitRpc();
+    }
+    sInitialBoot = 0;
 
     SifInitRpc(0);
 
