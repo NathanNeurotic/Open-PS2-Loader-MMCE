@@ -1046,10 +1046,8 @@ published) does not. This section is the state of the project now.
 ## The rolling channel is LIVE
 
 - Release: https://github.com/NathanNeurotic/Open-PS2-Loader/releases/tag/rolling —
-  **v1.2.0-Beta-2553-95a138c** (run 31745407636, built from `0127499b`). A prerelease, NOT
-  Latest: `pops-bundle` keeps the Latest badge and `rolling-alpha` (final old-lineage
-  build, archived) sits undisturbed — the "old build is still fine to use" promise made
-  structural.
+  Marked as **Latest** (`--latest`), carrying the rebuild lineage while preserving
+  `rolling-alpha` (final old-lineage build, archived) undisturbed.
 - **How it publishes:** rolling-release.yml fires on push to `rebuild/main` (also master
   and v* tags — master is the old lineage, DO NOT push it; see §0b). `rebuild/main` is the
   PHYSICAL KNOB: Nathan names a step-chain tip, it is fast-forwarded (ff-only; verify
