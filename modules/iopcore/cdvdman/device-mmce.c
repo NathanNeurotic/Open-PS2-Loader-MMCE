@@ -166,24 +166,34 @@ int DeviceReadSectors(u64 lsn, void *buffer, unsigned int sectors)
 //TODO: For VMCs
 int mmce_read_offset(int fd, unsigned int offset, unsigned int size, unsigned char *buffer)
 {
+    int ret = 0;
     DPRINTF("%s\n", __func__);
 
     WaitSema(mmce_io_sema);
-    fp_mmcedrv_lseek(fd, offset, 0);
-    fp_mmcedrv_read(fd, size, buffer);
+    if (fp_mmcedrv_lseek && fp_mmcedrv_read) {
+        if (fp_mmcedrv_lseek(fd, offset, 0) >= 0) {
+            if (fp_mmcedrv_read(fd, size, buffer) == (int)size)
+                ret = 1;
+        }
+    }
     SignalSema(mmce_io_sema);
 
-    return 1;
+    return ret;
 }
 
 int mmce_write_offset(int fd, unsigned int offset, unsigned int size, const unsigned char *buffer)
 {
+    int ret = 0;
     DPRINTF("%s\n", __func__);
 
     WaitSema(mmce_io_sema);
-    fp_mmcedrv_lseek(fd, offset, 0);
-    fp_mmcedrv_write(fd, size, buffer);
+    if (fp_mmcedrv_lseek && fp_mmcedrv_write) {
+        if (fp_mmcedrv_lseek(fd, offset, 0) >= 0) {
+            if (fp_mmcedrv_write(fd, size, (void *)buffer) == (int)size)
+                ret = 1;
+        }
+    }
     SignalSema(mmce_io_sema);
 
-    return 1;
+    return ret;
 }

@@ -318,10 +318,10 @@ int mmceDetectSlot(void)
 {
     int ret = -1;
     if (fileXioDevctl("mmce0:/", 0x1, NULL, 0, NULL, 0) != -1) {
-        sprintf(mmcePrefix, "mmce0:/%s", gMMCEPrefix);
+        snprintf(mmcePrefix, sizeof(mmcePrefix), "mmce0:/%s", gMMCEPrefix);
         ret = 2;
     } else if (fileXioDevctl("mmce1:/", 0x1, NULL, 0, NULL, 0) != -1) {
-        sprintf(mmcePrefix, "mmce1:/%s", gMMCEPrefix);
+        snprintf(mmcePrefix, sizeof(mmcePrefix), "mmce1:/%s", gMMCEPrefix);
         ret = 3;
     }
     return ret;
@@ -330,9 +330,9 @@ int mmceDetectSlot(void)
 void mmceSetPrefix(void)
 {
     if (gMMCESlot == 0)
-        sprintf(mmcePrefix, "mmce0:/%s", gMMCEPrefix);
+        snprintf(mmcePrefix, sizeof(mmcePrefix), "mmce0:/%s", gMMCEPrefix);
     else if (gMMCESlot == 1)
-        sprintf(mmcePrefix, "mmce1:/%s", gMMCEPrefix);
+        snprintf(mmcePrefix, sizeof(mmcePrefix), "mmce1:/%s", gMMCEPrefix);
     else if (gMMCESlot == 2) {
         // Auto: reuse the previously-detected slot instead of probing BOTH slots every refresh.
         // On a cache hit, a presence devctl on the resolved slot confirms the card is still there
@@ -358,7 +358,7 @@ void mmceSetPrefix(void)
                 // Still present. Rebuild mmcePrefix from the CURRENT gMMCEPrefix (a Device-Settings
                 // prefix change must apply immediately -- initSupport does not re-init an already-
                 // enabled MMCE tab) using the cached slot; we skip only the second SIO2 slot probe.
-                sprintf(mmcePrefix, "mmce%d:/%s", (mmceResolvedDevice == 2) ? 0 : 1, gMMCEPrefix);
+                snprintf(mmcePrefix, sizeof(mmcePrefix), "mmce%d:/%s", (mmceResolvedDevice == 2) ? 0 : 1, gMMCEPrefix);
             }
         }
         if (mmceResolvedDevice <= 0)
@@ -385,16 +385,17 @@ void mmceLoadModules(void)
 // boot; RiptOPL used to self-arm inside mmceSendGameID -- an IRX load/start at the launch's most
 // fragile moment (issue #51's fix, right intent, wrong timing). Called from initAllSupport (boot +
 // every settings apply) via the IO worker, so a wedged load is a harmless LOG at menu time instead
-// of a dead launch. Idempotent (mmceLoadModules latches); no-op when the GameID feature is off.
+// of a dead launch. Idempotent (derived from mmceModLoaded); no-op when the GameID feature is off.
 void mmceArmGameIDTransport(void)
 {
-    if (gMMCEEnableGameID) {
-        guiSetBootStatusSticky(_l(_STR_BOOT_ARMING_MMCE)); // boot-step localizer (IO thread) -- see gui.c
-        mmceLoadModules();
-        // Post-load marker (#254): the boot arm runs right after GUI_INIT_DONE; a serial log that
-        // shows the arm begin without this completion line localizes a wedge to the mmceman load.
-        LOG("MMCESUPPORT GameID transport armed\n");
-    }
+    if (!gMMCEEnableGameID || mmceModLoaded)
+        return;
+
+    guiSetBootStatusSticky(_l(_STR_BOOT_ARMING_MMCE)); // boot-step localizer (IO thread) -- see gui.c
+    mmceLoadModules();
+    // Post-load marker (#254): the boot arm runs right after GUI_INIT_DONE; a serial log that
+    // shows the arm begin without this completion line localizes a wedge to the mmceman load.
+    LOG("MMCESUPPORT GameID transport armed\n");
 }
 
 void mmceInit(item_list_t *itemList)
@@ -469,12 +470,12 @@ static int mmceNeedsUpdate(item_list_t *itemList)
     // session while USB's fast first try succeeded. Here every pass retries until each succeeds; the
     // cost is one dir-open per pass until then (identical to the old ISO-view retry behavior).
     if (!ThemesLoaded) {
-        sprintf(path, "%sTHM", mmcePrefix);
+        snprintf(path, sizeof(path), "%sTHM", mmcePrefix);
         if (thmAddElements(path, "/", 1) > 0)
             ThemesLoaded = 1;
     }
     if (!LanguagesLoaded) {
-        sprintf(path, "%sLNG", mmcePrefix);
+        snprintf(path, sizeof(path), "%sLNG", mmcePrefix);
         if (lngAddLanguages(path, "/", mmceGameList.mode) > 0)
             LanguagesLoaded = 1;
     }
@@ -509,7 +510,7 @@ static int mmceNeedsUpdate(item_list_t *itemList)
         result = 1;
     }
 
-    sprintf(path, "%sCD", mmcePrefix);
+    snprintf(path, sizeof(path), "%sCD", mmcePrefix);
     if (stat(path, &st) != 0)
         st.st_mtime = 0;
 
@@ -518,7 +519,7 @@ static int mmceNeedsUpdate(item_list_t *itemList)
         result = 1;
     }
 
-    sprintf(path, "%sDVD", mmcePrefix);
+    snprintf(path, sizeof(path), "%sDVD", mmcePrefix);
     if (stat(path, &st) != 0)
         st.st_mtime = 0;
 
@@ -830,7 +831,7 @@ void mmceLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
                 mmce_vmc_infos.specs.block_size = vmc_superblock.pages_per_block;
                 mmce_vmc_infos.specs.card_size = vmc_superblock.pages_per_cluster * vmc_superblock.clusters_per_card;
 
-                sprintf(vmc_path, "%sVMC/%s.bin", mmcePrefix, vmc_name);
+                snprintf(vmc_path, sizeof(vmc_path), "%sVMC/%s.bin", mmcePrefix, vmc_name);
 
                 vmc_fd = fileXioOpen(vmc_path, 0x3, 0666);
                 if (vmc_fd >= 0) {
@@ -841,7 +842,8 @@ void mmceLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
             }
         }
 
-        for (i = 0; i < size_mmce_mcemu_irx; i++) {
+        u32 max_words = size_mmce_mcemu_irx / sizeof(u32);
+        for (i = 0; i < max_words; i++) {
             if (((u32 *)&mmce_mcemu_irx)[i] == (0xC0DEFAC0 + vmc_id)) {
                 if (mmce_vmc_infos.active)
                     size_mcemu_irx = size_mmce_mcemu_irx;
