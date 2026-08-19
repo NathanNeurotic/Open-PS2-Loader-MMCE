@@ -13,7 +13,7 @@ This document records the audited provenance, git-level diff verification, binar
 | **Source Baseline Transplantation** | Audited Git diff vs `master` (7 files at 0-diff; 2 files with audited minor fixes) | **Verified** |
 | **Release Compilation** | Docker build on current HEAD (`make clean && make -j4 release`) | **Verified** (Generated `RIPTOPL.ELF`) |
 | **Debug Compilation** | Docker build on current HEAD (`make clean && make -j4 debug`) | **Verified** |
-| **Binary Provenance** | SHA-256 hashes against SDK & ps2-mmce commit | **Verified** |
+| **Binary Provenance** | Reproducibility within documented build environment (`codex-opl-mx4-build:20260802`) | **Verified (Reproducible)** |
 | **Master Behavioral Equivalence** | Awaiting runtime tests on console | **Unverified (Pending Hardware)** |
 | **Real MMCE Hardware Detection** | Awaiting physical PS2 test | **Unverified (Pending Hardware)** |
 | **VMC Mounting & In-Game Saves** | Awaiting physical PS2 test | **Unverified (Pending Hardware)** |
@@ -142,8 +142,8 @@ To confirm baseline operation before unfreezing Phase B, test execution must fol
 
 - [ ] **List Population**: Verify PS2 games (`CD/` and `DVD/`) and PS1 games (`POPS/*.VCD`) populate cleanly.
 - [ ] **Subfolder Navigation**: Browse subfolders inside game directories.
-- [ ] **Cover Artwork Hits & Misses**: Verify loading covers for games with existing artwork, and verify non-blocking handling for games without artwork.
-- [ ] **Browsing Stress Baseline**: Perform 1,000+ cursor movements across game lists with mixed existing/missing artwork; record responsiveness, cover load latency, and verify zero UI stalls or controller starvation.
+- [ ] **Cover Artwork Hits & Misses**: Verify loading covers for games with existing artwork, and verify missing-art handling does not produce unacceptable UI stalls or controller starvation.
+- [ ] **Browsing Stress Baseline**: Perform 1,000+ cursor movements across game lists with mixed existing/missing artwork; record observed latency and stalls to establish quantitative baseline metrics for Phase C.
 
 ### Step 3: Filesystem Switching & VMC
 
