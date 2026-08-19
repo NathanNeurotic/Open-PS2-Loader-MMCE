@@ -876,9 +876,9 @@ jobs:
           # can never diverge again.
           if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
             TAG="${GITHUB_REF_NAME}"; TITLE="${GITHUB_REF_NAME}"; TARGET=""
-            case "${GITHUB_REF}" in *-rc*) PREREL="--prerelease";; *) PREREL="";; esac
+            case "${GITHUB_REF}" in *-rc*) PREREL="--prerelease";; *) PREREL="--latest";; esac
           else
-            TAG="rolling"; TITLE="Rolling"; PREREL="--prerelease"; TARGET="--target $GITHUB_SHA"
+            TAG="rolling"; TITLE="Rolling"; PREREL="--prerelease --latest"; TARGET="--target $GITHUB_SHA"
           fi
           if gh release view "$TAG" >/dev/null 2>&1; then
             echo "Updating existing release: $TAG"
