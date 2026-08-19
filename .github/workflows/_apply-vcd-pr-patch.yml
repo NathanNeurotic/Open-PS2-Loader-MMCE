@@ -2,7 +2,7 @@ name: Apply staged VCD PR patch
 
 on:
   pull_request_target:
-    types: [opened, synchronize]
+    types: [opened, synchronize, ready_for_review]
 
 permissions:
   contents: write
@@ -29,7 +29,7 @@ jobs:
           fi
           git apply --check --3way .github/tmp/vcd_fix.patch
           git apply --3way .github/tmp/vcd_fix.patch
-          rm -f .github/tmp/vcd_fix.patch
+          rm -f .github/tmp/vcd_fix.patch .github/tmp/trigger.txt
 
       - name: Commit applied VCD fix
         run: |
@@ -40,6 +40,6 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add src/mmcesupport.c src/bdmsupport.c src/vcdsupport.c
-          git add -u .github/tmp/vcd_fix.patch
+          git add -u .github/tmp/vcd_fix.patch .github/tmp/trigger.txt
           git commit -m 'fix(vcd): restore MMCE scans and launch preparation'
           git push origin HEAD:${{ github.event.pull_request.head.ref }}
