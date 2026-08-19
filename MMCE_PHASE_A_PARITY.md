@@ -88,7 +88,7 @@ git diff master -- \
 |---|---|---|---|
 | **`mmcedrv.irx`** | PS2SDK stock prebuilt (`$PS2SDK/iop/irx/mmcedrv.irx`) in `codex-opl-mx4-build:20260802` | 11,337 bytes | `d9e0d476e95e1b952ddd7d11d866b77cbec0e78d6c3ba9f739de1b510a8cd517` |
 | **`mmceigr.irx`** | PS2SDK stock prebuilt (`$PS2SDK/iop/irx/mmceigr.irx`) in `codex-opl-mx4-build:20260802` | 1,369 bytes | `981323e168a1d91ba09d3021579eec6d9fc2c7b84340a1cf014dd2dd7621533c` |
-| **`mmceman.irx`** | Built from `ps2homebrew/ps2-mmce` pin `db3e93f019f2430d8eb875225439c288591ef5ae` + 3 CI patches (`close-fd-leak`, `open-enoent`, `dopen-enoent`) with `mipsel-none-elf-gcc (GCC) 14.2.0` in `codex-opl-mx4-build:20260802` | 17,049 bytes | `c63bcd2979b50e5fcf7b8e4f9ab9d7474f916d8c86f130d8794462a1840c5686` |
+| **`mmceman.irx`** | Built from `ps2homebrew/ps2-mmce` pin `db3e93f0fdbcf882f88da110cbd9b7db188ec17a` + 3 CI patches (`close-fd-leak`, `open-enoent`, `dopen-enoent`) with `mipsel-none-elf-gcc (GCC) 14.2.0` in `codex-opl-mx4-build:20260802` | 17,049 bytes | `c63bcd2979b50e5fcf7b8e4f9ab9d7474f916d8c86f130d8794462a1840c5686` |
 
 ---
 
