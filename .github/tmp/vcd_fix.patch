@@ -1,0 +1,74 @@
+diff --git a/src/mmcesupport.c b/src/mmcesupport.c
+--- a/src/mmcesupport.c
++++ b/src/mmcesupport.c
+@@ -25,8 +25,9 @@ static char mmcePrefix[40]; // Contains the full path to the folder where all the games are.
+ static char mmceArtPrimary[40];
+ static int mmceULSizePrev = -2;
+ // VCD-scan self-heal (HW batch S6): a failed vcdFillGameList on a CONTENDED bus (-1) used to latch
+ // an empty VCD page under NOUPDATE with no rescan for the session. Bounded retry, same shape as the
+ // ISO first-scan sentinel: ~15 passes at the ~2s cadence, re-armed by a fresh L3 toggle, self-
+ // quiescing on success/expiry. (The other half of the old "-1 for both" ambiguity is now split at
+ // the source: vcdScanOpenDir returns 0 for a genuinely-ABSENT POPS folder -- #154 residual -- so
+ // only contention ever arms this budget.)
++static unsigned char mmceVcdScanned = 0;
+ static unsigned char mmceVcdScanFailed = 0;
+ static unsigned char mmceVcdScanRetries = 0;
+ #define MMCE_VCD_SCAN_RETRY_MAX 15
+@@ -399,6 +400,7 @@ void mmceInit(item_list_t *itemList)
+     mmceGames = NULL;
+     mmceVcdGameCount = 0;
+     mmceVcdGames = NULL;
++    mmceVcdScanned = 0;
+     mmceResolvedDevice = -1; // re-detect the Auto slot on a fresh init (tab re-enable / settings apply)
+@@ -424,6 +426,7 @@ static int mmceNeedsUpdate(item_list_t *itemList)
+         // early return fires first), so a reinserted card would inherit an exhausted retry budget
+         // and a dead VCD page (CodeRabbit review of #248, vetted). Fresh card = fresh budget.
++        mmceVcdScanned = 0;
+         mmceVcdScanFailed = 0;
+         mmceVcdScanRetries = 0;
+@@ -469,6 +472,11 @@ static int mmceNeedsUpdate(item_list_t *itemList)
+     // Folder browsing: descend/ascend forces one rescan (consumed before the NOUPDATE latch below).
+     if (folderConsumeDirty(itemList->mode))
+         return 1;
+     if (vcdViewActive(itemList->mode)) {
++        // VCD has an independent backing array and scan lifecycle. Do not inherit the ISO list's
++        // -2 sentinel: when VCD is the default view, or after a card reinsertion/rebuild, there may
++        // be no L3 dirty edge to force the first VCD scan.
++        if (!mmceVcdScanned) {
++            mmceGameList.updateDelay = MMCE_MODE_UPDATE_DELAY;
++            return 1;
++        }
+         // A contended scan left the VCD page empty (S6): keep the ~2s refresh alive until a scan
+         // succeeds or the bounded budget runs out (no endless bus churn -- #246 doctrine). Also
+@@ -591,6 +599,7 @@ static int mmceUpdateGameList(item_list_t *itemList)
+         mmceGameCount = 0;
+         mmceVcdGameCount = 0;
+         mmceULSizePrev = -2; // force a fresh scan when a card returns
++        mmceVcdScanned = 0;
+         mmceVcdScanFailed = 0;
+         mmceVcdScanRetries = 0;
+         return 0;
+@@ -603,11 +612,13 @@ static int mmceUpdateGameList(item_list_t *itemList)
+     // can never resurrect the other view's list (see the mmceVcdGames comment at the declarations).
+     if (vcdViewActive(itemList->mode)) {
+         int r = vcdFillGameList(mmcePrefix, &mmceVcdGames);
+-        if (r >= 0) { // r < 0: transient scan failure (contended bus) -> keep the last-good VCD list
++        if (r >= 0) {
++            mmceVcdScanned = 1;
+             mmceVcdGameCount = r;
+             mmceVcdScanFailed = 0;
+             mmceVcdScanRetries = 0;
+         } else {
++            mmceVcdScanned = 0;
+             mmceVcdScanFailed = 1; // arm mmceNeedsUpdate's bounded retry (S6)
+         }
+         return mmceVcdGameCount;
+@@ -717,6 +728,7 @@ static void mmceLaunchVcd(item_list_t *itemList, const char *vcdName, config_set_t *configSet)
+         return;
+     }
+     vcdBuildSelector(mmcePrefix, VCD_PREFIX_MASS, vcdName, vcdSelector, sizeof(vcdSelector));
++    guiRenderTextScreen(_l(_STR_PLEASE_WAIT));
+     // Source MC-side externals from this MMCE card's direct POPS/ folder; never overwrite card files.
+     (void)vcdInstallPopstarterMc(mmcePrefix);
+*** Update File: src/bdmsupport.c
+*** End Patch
