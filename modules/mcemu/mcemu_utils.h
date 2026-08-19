@@ -49,6 +49,14 @@ void bdm_writeSector(u64 lba, unsigned short int nsectors, const unsigned char *
 
 #endif
 
+#ifdef MMCE_DRIVER
+void mmce_read_offset(int fd, unsigned int offset, unsigned int size, unsigned char *buffer);
+#define I_mmce_read_offset DECLARE_IMPORT(6, mmce_read_offset)
+
+void mmce_write_offset(int fd, unsigned int offset, unsigned int size, const unsigned char *buffer);
+#define I_mmce_write_offset DECLARE_IMPORT(7, mmce_write_offset)
+#endif
+
 /* ATAD Transfer Imports */
 #ifdef HDD_DRIVER
 

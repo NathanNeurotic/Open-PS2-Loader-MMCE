@@ -21,6 +21,13 @@ IOP_OBJS += device-bdm.o
 IOP_CFLAGS += -DBDM_DRIVER
 endif
 
+ifeq ($(USE_MMCE),1)
+IOP_BIN  = mmce_mcemu.irx
+IOP_OBJS_DIR = obj.mmce/
+IOP_OBJS += device-mmce.o
+IOP_CFLAGS += -DMMCE_DRIVER
+endif
+
 ifeq ($(IOPCORE_DEBUG),1)
 IOP_CFLAGS += -DDEBUG
 endif

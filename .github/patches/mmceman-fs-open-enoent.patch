@@ -1,0 +1,17 @@
+diff --git a/mmceman/src/mmce_fs.c b/mmceman/src/mmce_fs.c
+--- a/mmceman/src/mmce_fs.c
++++ b/mmceman/src/mmce_fs.c
+@@ -131,7 +131,12 @@
+     } else {
+         DPRINTF("%s ERROR: Got bad fd: %i\n", __func__, rdbuf[0x1]);
+         file->privdata = NULL;
+-        return -1;
++        // -ENOENT, not a bare -1: this is the ONLY open-failure path where the CARD ITSELF said "no
++        // such file" -- the timeouts/garbled-reply paths above stay -1 (EE sees a non-ENOENT errno)
++        // so callers can tell genuine absence from a transient bus failure. Downstream, OPL memoizes
++        // missing art per-session; before this every contended open was branded "file does not
++        // exist" and art died until reboot.
++        return -ENOENT;
+     }
+ 
+     return 0;

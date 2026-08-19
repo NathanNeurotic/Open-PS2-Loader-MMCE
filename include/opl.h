@@ -133,6 +133,12 @@ extern int gBDMStartMode;
 extern int gHDDStartMode;
 extern int gETHStartMode;
 extern int gAPPStartMode;
+extern int gMMCEStartMode;
+extern int gMMCESlot;
+extern int gMMCEIGRSlot;
+extern int gMMCEEnableGameID;
+extern int gMMCEAckWaitCycles;
+extern int gMMCEUseAlarms;
 extern int bdmCacheSize;
 extern int hddCacheSize;
 extern int smbCacheSize;
@@ -303,6 +309,7 @@ extern int gEnableWrite;
 // These prefixes are relative to the device's name (meaning that they do not include the device name).
 extern char gBDMPrefix[32];
 extern char gETHPrefix[32];
+extern char gMMCEPrefix[32];
 
 extern int gRememberLastPlayed;
 
