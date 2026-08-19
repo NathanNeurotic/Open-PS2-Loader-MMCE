@@ -10,11 +10,13 @@
 #include "include/ioman.h"
 #include "include/extern_irx.h"
 
+#if defined(__DEBUG) && !defined(_DTL_T10000)
 static u8 modulesLoaded = 0;
+#endif
 
 int debugSetActive(void)
 {
-#ifndef _DTL_T10000
+#if defined(__DEBUG) && !defined(_DTL_T10000)
     int ret;
 
 #if defined(TTY_UDP) || defined(__DECI2_DEBUG)
@@ -58,16 +60,16 @@ int debugSetActive(void)
     if (ret < 0)
         return -9;
 #endif
-#endif
 
     modulesLoaded = 1;
+#endif
 
     return 0;
 }
 
 void debugApplyConfig(void)
 {
-#ifndef _DTL_T10000
+#if defined(__DEBUG) && !defined(_DTL_T10000)
     if (modulesLoaded)
         ethApplyConfig();
 #endif

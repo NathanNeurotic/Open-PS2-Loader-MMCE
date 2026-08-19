@@ -111,7 +111,7 @@ endif
 
 FRONTEND_OBJS = pad.o xparam.o fntsys.o renderman.o menusys.o OSDHistory.o system.o elfldr_noreset.o elfldr.o lang.o lang_internal.o config.o hdd.o dialogs.o favsupport.o \
 		dia.o ioman.o texcache.o themes.o supportbase.o bdmsupport.o ethsupport.o udpfssupport.o hddsupport.o zso.o lz4.o \
-		appsupport.o mmcesupport.o artindex.o vcdsupport.o retrogem.o folderbrowse.o gui.o guigame.o vmc_groups.o textures.o opl.o atlas.o nbns.o httpclient.o gsm.o cheatman.o sound.o ps2cnf.o tar.o
+		appsupport.o mmcesupport.o artindex.o vcdsupport.o retrogem.o folderbrowse.o gui.o guigame.o vmc_groups.o textures.o opl.o atlas.o nbns.o httpclient.o gsm.o cheatman.o sound.o ps2cnf.o tar.o debug.o
 
 IOP_OBJS =	iomanx.o filexio.o ps2fs.o usbd.o bdmevent.o \
 		bdm.o bdmfs_fatfs.o usbmass_bd.o iLinkman.o IEEE1394_bd.o mx4sio_bd.o \
@@ -225,13 +225,13 @@ endif
 ifeq ($(DEBUG),1)
   EE_CFLAGS += -D__DEBUG -g
   ifeq ($(DECI2_DEBUG),1)
-    EE_OBJS += debug.o drvtif_irx.o tifinet_irx.o deci2_img.o
+    EE_OBJS += drvtif_irx.o tifinet_irx.o deci2_img.o
     EE_LDFLAGS += -liopreboot
   else ifeq ($(TTY_APPROACH),UDP)
-    EE_OBJS += debug.o udptty.o ioptrap.o ps2link.o
+    EE_OBJS += udptty.o ioptrap.o ps2link.o
     EE_CFLAGS += -DTTY_UDP
   else ifeq ($(TTY_APPROACH),PPC_UART)
-    EE_OBJS += debug.o ppctty.o ioptrap.o
+    EE_OBJS += ppctty.o ioptrap.o
     EE_CFLAGS += -DTTY_PPC_UART
   else
 	$(error Unknown value for TTY_APPROACH: '$(TTY_APPROACH)')
