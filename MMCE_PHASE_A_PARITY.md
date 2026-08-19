@@ -1,16 +1,18 @@
 # MMCE Phase A Parity, Provenance & Validation Record
 
-This document records the audited provenance, git-level diff verification, binary checksums, and hardware validation protocol for Phase A MMCE transplantation into `rebuild/main` (branch `rebuild/step-216-mmce-support`).
+This document records the audited provenance, git-level diff verification, binary checksums, deferred hardening items, and hardware validation protocol for Phase A MMCE transplantation into `rebuild/main` (branch `rebuild/step-216-mmce-support`).
 
 ---
 
-## 1. Verification Status Summary
+## 1. Scope & Verification Status Summary
+
+**Phase A Definition**: **Master MMCE baseline with minimal, explicitly audited integration and correctness adaptations.**
 
 | Property | Evidence | Status |
 |---|---|---|
-| **Source Transplantation** | Audited Git diff vs `master` (0 diff on 1:1 files) | **Verified** |
-| **Release Compilation** | Docker build (`make clean && make -j4 release`) | **Verified** (Generated `RIPTOPL.ELF`) |
-| **Debug Compilation** | Docker build (`make clean && make -j4 debug`) | **Verified** |
+| **Source Baseline Transplantation** | Audited Git diff vs `master` (7 files at 0-diff; 2 files with audited minor fixes) | **Verified** |
+| **Release Compilation** | Docker build on current HEAD (`make clean && make -j4 release`) | **Verified** (Generated `RIPTOPL.ELF`) |
+| **Debug Compilation** | Docker build on current HEAD (`make clean && make -j4 debug`) | **Verified** |
 | **Binary Provenance** | SHA-256 hashes against SDK & ps2-mmce commit | **Verified** |
 | **Master Behavioral Equivalence** | Awaiting runtime tests on console | **Unverified (Pending Hardware)** |
 | **Real MMCE Hardware Detection** | Awaiting physical PS2 test | **Unverified (Pending Hardware)** |
@@ -22,13 +24,13 @@ This document records the audited provenance, git-level diff verification, binar
 > [!IMPORTANT]
 > **No hardware parity claim has been established yet.** Phase A status is strictly:
 > **Phase A Implementation Complete / Build-Verified / Awaiting Hardware Parity Validation**.
-> Phase B refactoring (`mmce_state_t`) is **FROZEN** until physical hardware validation of this baseline passes.
+> Phase B structural refactoring (`mmce_state_t`) is **FROZEN** until physical hardware validation of this baseline passes.
 
 ---
 
-## 2. 1:1 Component Git Diff Audit (Zero Differences vs `master`)
+## 2. Baseline Component Git Diff Audit vs `master`
 
-The following files were diffed directly against `master` via `git diff master -- <file>` and confirmed to have **zero differences** (bit-for-bit source parity):
+Running `git diff master -- <files>` on the 9 core MMCE baseline files reveals:
 
 ```bash
 git diff master -- \
@@ -41,8 +43,23 @@ git diff master -- \
   .github/patches/mmceman-fs-open-enoent.patch \
   .github/patches/mmceman-fs-dopen-enoent.patch \
   .github/scripts/install_coherent_mmce.sh
-# Result: 0 diff lines (clean exit 0)
 ```
+
+### A. Zero Diff (100% Bit-for-Bit Identical to `master`)
+The following 7 files have **0 diff lines** against `master`:
+1. `modules/iopcore/cdvdman/device-mmce.c`
+2. `modules/mcemu/device-mmce.c`
+3. `modules/iopcore/common/mmcedrv_config.h`
+4. `.github/patches/mmceman-fs-close-fd-leak.patch`
+5. `.github/patches/mmceman-fs-open-enoent.patch`
+6. `.github/patches/mmceman-fs-dopen-enoent.patch`
+7. `.github/scripts/install_coherent_mmce.sh`
+
+### B. Audited Phase-A Correctness Adaptations
+1. **`include/mmcesupport.h`**:
+   - `master` baseline + parameter name synchronization in `mmceLaunchGame` declaration (`fd` $\to$ `id`), matching the implementation in `src/mmcesupport.c`.
+2. **`src/mmcesupport.c`**:
+   - `master` baseline + explicit `fileXioClose(vmc_fds[0])` and `fileXioClose(vmc_fds[1])` on the `sbCheatsMissingContinue` decline path (lines 890–895) to prevent descriptor leaks upon cheat prompt cancellation.
 
 ---
 
@@ -50,13 +67,13 @@ git diff master -- \
 
 | Subsystem | Source (`master`) | Destination (`rebuild/main`) | Taxonomy Classification | Scope of Adaptation / Rationale |
 |---|---|---|---|---|
-| **MMCE Support Impl** | `src/mmcesupport.c` | `src/mmcesupport.c` | **Copied unchanged from master** | Exact source parity; zero diff vs `master:src/mmcesupport.c`. |
-| **MMCE Support Header** | `include/mmcesupport.h` | `include/mmcesupport.h` | **Copied unchanged from master** | Exact source parity; zero diff vs `master:include/mmcesupport.h`. |
-| **CDVDMAN Device** | `modules/iopcore/cdvdman/device-mmce.c` | `modules/iopcore/cdvdman/device-mmce.c` | **Copied unchanged from master** | In-game CDVD device backend and offset exports. |
-| **MCEMU Device** | `modules/mcemu/device-mmce.c` | `modules/mcemu/device-mmce.c` | **Copied unchanged from master** | In-game VMC backend. |
-| **Driver Config Header** | `modules/iopcore/common/mmcedrv_config.h` | `modules/iopcore/common/mmcedrv_config.h` | **Copied unchanged from master** | MMCE driver configuration structs. |
-| **CI Installer Script** | `.github/scripts/install_coherent_mmce.sh` | `.github/scripts/install_coherent_mmce.sh` | **Copied unchanged from master** | Builds menu-coherent `mmceman.irx` from pin `db3e93f0` + 3 patches; keeps stock in-game drivers. |
-| **Driver Patches** | `.github/patches/*.patch` | `.github/patches/*.patch` | **Copied unchanged from master** | 3 patches: `close-fd-leak`, `open-enoent`, `dopen-enoent`. |
+| **MMCE Support Impl** | `src/mmcesupport.c` | `src/mmcesupport.c` | **Copied + branch adaptation required** | `master` baseline + cheat-prompt VMC fd cleanup. |
+| **MMCE Support Header** | `include/mmcesupport.h` | `include/mmcesupport.h` | **Copied + branch adaptation required** | `master` baseline + parameter name sync (`fd` $\to$ `id`). |
+| **CDVDMAN Device** | `modules/iopcore/cdvdman/device-mmce.c` | `modules/iopcore/cdvdman/device-mmce.c` | **Copied unchanged from master** | In-game CDVD device backend and offset exports (0 diff). |
+| **MCEMU Device** | `modules/mcemu/device-mmce.c` | `modules/mcemu/device-mmce.c` | **Copied unchanged from master** | In-game VMC backend (0 diff). |
+| **Driver Config Header** | `modules/iopcore/common/mmcedrv_config.h` | `modules/iopcore/common/mmcedrv_config.h` | **Copied unchanged from master** | MMCE driver configuration structs (0 diff). |
+| **CI Installer Script** | `.github/scripts/install_coherent_mmce.sh` | `.github/scripts/install_coherent_mmce.sh` | **Copied unchanged from master** | Builds menu-coherent `mmceman.irx` from pin `db3e93f0` + 3 patches; keeps stock in-game drivers (0 diff). |
+| **Driver Patches** | `.github/patches/*.patch` | `.github/patches/*.patch` | **Copied unchanged from master** | 3 patches: `close-fd-leak`, `open-enoent`, `dopen-enoent` (0 diff). |
 | **CDVDMAN Config Header** | `modules/iopcore/common/cdvd_config.h` | `modules/iopcore/common/cdvd_config.h` | **Copied + branch adaptation required** | Added `struct cdvdman_settings_mmce` matching master. |
 | **CDVDMAN Internal Header**| `modules/iopcore/cdvdman/internal.h` | `modules/iopcore/cdvdman/internal.h` | **Copied + branch adaptation required** | Added `#elif MMCE_DRIVER` branch defining `CDVDMAN_SETTINGS_TYPE`. |
 | **CDVDMAN Exports** | `modules/iopcore/cdvdman/exports.tab` | `modules/iopcore/cdvdman/exports.tab` | **Copied + branch adaptation required** | Added `mmce_read_offset` and `mmce_write_offset` exports. |
@@ -68,15 +85,15 @@ git diff master -- \
 | **EE Core Header** | `ee_core/include/ee_core.h` | `ee_core/include/ee_core.h` | **Copied + branch adaptation required** | Added `MMCE_MODE` to `enum GAME_MODE`. |
 | **EE Core Module IDs** | `ee_core/include/modules.h` | `ee_core/include/modules.h` | **Copied + branch adaptation required** | Added `OPL_MODULE_ID_MMCEDRV` and `OPL_MODULE_ID_MMCEIGR`. |
 | **EE Core IOP Mgr** | `ee_core/src/iopmgr.c` | `ee_core/src/iopmgr.c` | **Copied + branch adaptation required** | Added `case MMCE_MODE:` loading `OPL_MODULE_ID_MMCEDRV`. |
-| **EE Core Main** | `ee_core/src/main.c` | `ee_core/src/main.c` | **Copied + branch adaptation required** | Added `"MMCE_MODE"` string matching in `eecoreInit()`. |
+| **EE Core Main** | `ee_core/src/main.c` | `ee_core/src/main.c` | **Copied + branch adaptation required** | Added `"MMCE_MODE"` string matching (9 chars) in `eecoreInit()`. |
 | **EE Core PadHook** | `ee_core/src/padhook.c` | `ee_core/src/padhook.c` | **Copied + branch adaptation required** | Added MMCE bootcard reset trigger load in `IGR_Thread()`. |
 | **EE Extern IRX** | `include/extern_irx.h` | `include/extern_irx.h` | **Copied + branch adaptation required** | Added `IMPORT_BIN2C` declarations for MMCE IRX binaries. |
 | **EE OPL Header** | `include/opl.h` | `include/opl.h` | **Copied + branch adaptation required** | Added MMCE global variables and extern declarations. |
 | **EE GUI Header** | `include/gui.h` | `include/gui.h` | **Copied + branch adaptation required** | Added MMCE config dialog function declarations. |
-| **EE OPL Core** | `src/opl.c` | `src/opl.c` | **Copied + branch adaptation required** | Config load/save, `0/0` -> `5/1` pacing migration, `deferredInit` GameID arming. |
+| **EE OPL Core** | `src/opl.c` | `src/opl.c` | **Copied + branch adaptation required** | Config load/save, `0/0` $\to$ `5/1` pacing migration, recovery / autolaunch `checkLoadConfigMMCE` wiring, `deferredInit` GameID arming. |
 | **EE GUI Core** | `src/gui.c` | `src/gui.c` | **Copied + branch adaptation required** | `CFG_MMCEMODE`, MMCE settings dialogs, timeout guards. |
 | **EE Menusys Core** | `src/menusys.c` | `src/menusys.c` | **Copied + branch adaptation required** | `MENU_MMCE` ID, main menu registration, `gMMCEStartMode` escape check (12 lines diff). |
-| **EE System Core** | `src/system.c` | `src/system.c` | **Copied + branch adaptation required** | Included `mmcesupport.h`, added `CORE_IRX_MMCE`, `sendIrxKernelRAM`, IGR config, `sysLaunchDisc` GameID push. |
+| **EE System Core** | `src/system.c` | `src/system.c` | **Copied + branch adaptation required** | Included `mmcesupport.h`, added `CORE_IRX_MMCE`, `sendIrxKernelRAM`, IGR config, `sysLaunchDisc` GameID push (with `:` strip). |
 | **Language Templates** | `lng_tmpl/_base.yml` | `lng_tmpl/_base.yml` | **Unrelated conflict resolution** | Cleanly appended 17 missing master entries (+34 lines, 0 deletions), zero formatting churn on existing keys. |
 | **Top Makefile** | `Makefile` | `Makefile` | **Copied + branch adaptation required** | Added `mmcesupport.o`, MMCE IRXs, bin2c rules, and clean targets. |
 
@@ -92,7 +109,26 @@ git diff master -- \
 
 ---
 
-## 5. Physical PS2 Hardware Validation Protocol
+## 5. Deferred Technical Debt & Hardening (Phase B / Post-Hardware Checkpoint)
+
+The following items were identified during automated code review and are **intentionally deferred to Phase B or post-hardware validation** to preserve the proven `master` behavioral baseline during Phase A:
+
+> [!NOTE]
+> **Rationale**: Deferred because Phase A is intentionally preserving `master` behavior to establish an unpolluted hardware baseline. These items are **not independently certified as harmless** and will be reviewed during Phase B refactoring once physical hardware passes.
+
+1. **`modules/iopcore/cdvdman/device-mmce.c` — Unchecked Return Values & Driver Readiness**:
+   - *Review finding*: `mmce_read_offset` and `mmce_write_offset` always return `1` and do not propagate underlying `lseek`/`read`/`write` error codes.
+   - *Deferred action*: Add driver readiness guards and error status propagation after hardware baseline validation.
+2. **`src/mmcesupport.c` — `sprintf` Bounds Hardening**:
+   - *Review finding*: `sprintf(mmcePrefix, ...)` is used when formatting prefixes into the 40-byte `mmcePrefix` buffer.
+   - *Deferred action*: Convert all remaining `sprintf` calls into bounded `snprintf(mmcePrefix, sizeof(mmcePrefix), ...)`.
+3. **`src/mmcesupport.c` — `0xC0DEFAC0` Marker Loop Bounds**:
+   - *Review finding*: The marker search loop indexes `((u32 *)&mmce_mcemu_irx)[i]` bounded by `size_mmce_mcemu_irx` (byte count) rather than `size_mmce_mcemu_irx / 4` (word count).
+   - *Deferred action*: Update loop bound to `size_mmce_mcemu_irx / 4` during Phase B structural refactor.
+
+---
+
+## 6. Physical PS2 Hardware Validation Protocol
 
 To confirm baseline operation before unfreezing Phase B, test execution must follow this structured protocol:
 
@@ -125,4 +161,3 @@ To confirm baseline operation before unfreezing Phase B, test execution must fol
 ### Step 6: Failure & Recovery
 
 - [ ] **Card Removal Mid-IO**: Remove the MMCE card during active cover browsing; reinsert and verify menu recovers without requiring a console power cycle.
-
