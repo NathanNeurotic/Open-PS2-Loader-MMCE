@@ -97,25 +97,32 @@ git diff master -- \
 To confirm baseline operation before unfreezing Phase B, test execution must follow this structured protocol:
 
 ### Step 1: Detection & Bus Pacing
+
 - [ ] **Slot 1 Cold Boot**: Boot console with MMCE card inserted in Slot 1; verify successful detection.
 - [ ] **Slot 2 Cold Boot**: Boot console with MMCE card inserted in Slot 2; verify detection and slot selection.
 - [ ] **Hot Removal/Reinsertion**: Remove card at main menu, confirm graceful notification; reinsert and confirm 3×200ms debounce redetects card.
 
 ### Step 2: Game Browsing & Stress Test
+
 - [ ] **List Population**: Verify PS2 games (`CD/` and `DVD/`) and PS1 games (`POPS/*.VCD`) populate cleanly.
 - [ ] **Subfolder Navigation**: Browse subfolders inside game directories.
 - [ ] **Cover Artwork Hits & Misses**: Verify loading covers for games with existing artwork, and verify non-blocking handling for games without artwork.
 - [ ] **Browsing Stress Baseline**: Perform 1,000+ cursor movements across game lists with mixed existing/missing artwork; record responsiveness, cover load latency, and verify zero UI stalls or controller starvation.
 
 ### Step 3: Filesystem Switching & VMC
+
 - [ ] **GameID Push & Launch**: Launch a GameID-managed game; confirm MMCE switches to the game's per-game directory.
 - [ ] **VMC Mounting & In-Game Saves**: Create/mount a VMC on MMCE; confirm the game successfully saves and loads progress.
 
 ### Step 4: In-Game Reset (IGR)
+
 - [ ] **Bootcard Restoration**: Trigger IGR from within a game; confirm MMCE receives the reset command and restores access to the bootcard rather than remaining pinned on the game folder.
 
 ### Step 5: MX4SIO Coexistence
+
 - [ ] **Cross-Device Launch**: With MMCE inserted in Slot 1 and MX4SIO in Slot 2 (or vice versa), launch a game from MX4SIO; verify the 5,000ms cross-device settle gate operates cleanly during post-reset SD enumeration.
 
 ### Step 6: Failure & Recovery
+
 - [ ] **Card Removal Mid-IO**: Remove the MMCE card during active cover browsing; reinsert and verify menu recovers without requiring a console power cycle.
+

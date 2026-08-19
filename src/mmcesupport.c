@@ -887,8 +887,13 @@ void mmceLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
     if ((result = sbLoadCheats(mmcePrefix, game->startup)) < 0) {
         // #265: let the user back out instead of sitting through the whole load. The helper does
         // the sbUnprepare itself -- see include/supportbase.h; skipping it breaks the NEXT launch.
-        if (!sbCheatsMissingContinue(&settings->common, result))
+        if (!sbCheatsMissingContinue(&settings->common, result)) {
+            if (vmc_fds[0] >= 0)
+                fileXioClose(vmc_fds[0]);
+            if (vmc_fds[1] >= 0)
+                fileXioClose(vmc_fds[1]);
             return;
+        }
     }
     sbLoadImage(mmcePrefix, game->startup);
 

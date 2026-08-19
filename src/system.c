@@ -559,10 +559,14 @@ int sysLaunchDisc(void)
     // (a leading slash the MMCE would never match) instead of a clean id. Take whichever separator
     // comes last.
     {
-        const char *slash = strrchr(path, '\\');
-        if (slash == NULL)
-            slash = strrchr(path, '/');
-        const char *idStart = (slash != NULL) ? slash + 1 : path;
+        const char *sep = strrchr(path, '\\');
+        const char *fwd = strrchr(path, '/');
+        const char *colon = strrchr(path, ':');
+        if (fwd > sep)
+            sep = fwd;
+        if (colon > sep)
+            sep = colon;
+        const char *idStart = (sep != NULL) ? sep + 1 : path;
         char gameid[32];
         int i = 0;
         while (idStart[i] != '\0' && idStart[i] != ';' && i < (int)sizeof(gameid) - 1) {

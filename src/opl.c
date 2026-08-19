@@ -1924,6 +1924,11 @@ static int tryMissingConfigPathRecovery(int types)
         }
     }
 
+    // MMCE is fourth choice (after MC and USB).
+    value = checkLoadConfigMMCE(types);
+    if (value & CONFIG_OPL)
+        return value;
+
     // Every failed probe re-homed the config_set filenames. For APA, preserve an already-mounted
     // safe PFS home instead of falling back to the raw hddN: launch namespace. Raw APA remains only
     // a fail-closed launch identity when no writable PFS owner exists at all.
@@ -4122,6 +4127,8 @@ static void miniInit(int mode)
     } else if (mode == HDD_MODE) {
         hddLoadModules();
         hddLoadSupportModules();
+    } else if (mode == MMCE_MODE) {
+        mmceLoadModules();
     }
 
     InitConsoleRegionData();
@@ -4133,6 +4140,8 @@ static void miniInit(int mode)
                 ret = checkLoadConfigBDM(CONFIG_ALL);
             else if (mode == HDD_MODE)
                 ret = checkLoadConfigHDD(CONFIG_ALL);
+            else if (mode == MMCE_MODE)
+                ret = checkLoadConfigMMCE(CONFIG_ALL);
         }
 
         if (ret & CONFIG_OPL) {
