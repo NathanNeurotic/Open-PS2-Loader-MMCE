@@ -105,13 +105,8 @@ jobs:
       - name: Mark workspace safe and fetch history
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
-          git fetch --prune --unshallow || true
-
-      # NOTE(rebuild): the fork runs a step here that is not applicable yet --
-      #   Install menu-coherent mmceman (#254)
-      # It returns with checklist items 1-3 (MMCE), which are still on WAIT. Removed rather than
-      # left to fail/WARN every single run. (GSM 1080p, item 29, has since LANDED and is now ON in
-      # EVERY build -- it needs no separate step at all.)
+      - name: Install menu-coherent mmceman (#254)
+        run: sh .github/scripts/install_coherent_mmce.sh
 
       - name: Build (make clean release)
         # LOCALVERSION brands the in-ELF version string ("-PS2DEVPINNED") so hardware reports
@@ -223,11 +218,8 @@ jobs:
         id: ver
         run: echo "version=$(make oplversion)" >> "$GITHUB_OUTPUT"
 
-      # NOTE(rebuild): the fork runs a step here that is not applicable yet --
-      #   Install menu-coherent mmceman (latest-only)
-      # It returns with checklist items 1-3 (MMCE), which are still on WAIT. Removed rather than
-      # left to fail/WARN every single run. (GSM 1080p, item 29, has since LANDED and is now ON in
-      # EVERY build -- it needs no separate step at all.)
+      - name: Install menu-coherent mmceman (#254)
+        run: sh .github/scripts/install_coherent_mmce.sh
 
       - name: Build (make clean release)
         # LOCALVERSION brands the in-ELF version string ("-PS2DEVROLLING") so hardware reports
@@ -327,9 +319,8 @@ jobs:
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           git fetch --prune --unshallow || true
 
-      # NOTE(rebuild): the fork runs a menu-coherent mmceman install here. MMCE is checklist
-      # items 1-3, on WAIT, and this tree embeds no mmceman at all -- so the step would rebuild a
-      # driver nothing loads. It returns with item 1.
+      - name: Install menu-coherent mmceman (#254)
+        run: sh .github/scripts/install_coherent_mmce.sh
 
       - name: Build (make clean release)
         # LOCALVERSION brands the in-ELF version string ("-OFFICIALROLLING") so hardware
@@ -410,6 +401,9 @@ jobs:
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           git fetch --prune --unshallow || true
+
+      - name: Install menu-coherent mmceman (#254)
+        run: sh .github/scripts/install_coherent_mmce.sh
 
       - name: Build (make clean release)
         run: make --trace clean && make --trace LOCALVERSION=OFFICIALPINNED release

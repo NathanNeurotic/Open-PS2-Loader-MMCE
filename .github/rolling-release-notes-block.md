@@ -24,10 +24,6 @@ else. New features come after parity, not before.
 what a rolling channel is for: it exists so testing can happen. If you want the most
 trustworthy RiptOPL today, that is still the old build below.
 
-**MMCE is still awaiting reimplementation.** If your games are on MMCE, this build will
-not see them yet. This line stays in every release until MMCE lands, so nobody downloads
-expecting it.
-
 **The old build is still available and still fine to use.** The final release of that
 lineage is on the releases page (*Rolling Alpha*) for exactly this reason, and the archive
 is on MEGA. If you are happy on it, stay on it — it is not going anywhere.

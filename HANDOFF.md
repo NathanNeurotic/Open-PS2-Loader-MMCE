@@ -1059,11 +1059,10 @@ published) does not. This section is the state of the project now.
   rewrite notes, and — since step-180 — RE-TARGET the tag), then MEGA archives one
   immutable zip to `/RiptOPL/Rolling/<version>/run_<n>/` (VARIANTS/DEBUG excluded).
 - **The notes are carried, not drafted:** `.github/rolling-release-notes-block.md` is
-  cat'd into every body after the header (new-lineage statement: parity goal, MMCE
-  awaiting reimplementation, old build still fine, report rules, the OrbitOPL Toolbox
-  metadata section). The flavour guidance lives ONLY in the workflow's "Get started"
-  section (all four flavours, pinned-first, Settings → About names the running one).
-  Do not re-add it to the block — one home, one copy.
+  cat'd into every body after the header (new-lineage statement: parity goal, old build
+  still fine, report rules, the OrbitOPL Toolbox metadata section). The flavour guidance
+  lives ONLY in the workflow's "Get started" section (all four flavours, pinned-first,
+  Settings → About names the running one). Do not re-add it to the block — one home, one copy.
 - **Publish procedure (every time):** ff rebuild/main → push → watch the run to green →
   INSPECT (prerelease flag, tag SHA == pushed SHA, notes rendered, four APP_RIPTOPL-*
   folders in the package zip, four ds5 assets, the ACTUAL version value from the body,
