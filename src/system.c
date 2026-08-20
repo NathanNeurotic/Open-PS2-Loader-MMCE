@@ -198,6 +198,10 @@ void sysReset(int modload_mask)
         SifExitIopHeap();
         SifLoadFileExit();
         SifExitRpc();
+    } else {
+        // Initial boot: detach inherited parent-launcher RPC/fileXio state before rebooting the IOP
+        fileXioExit();
+        SifExitRpc();
     }
     sInitialBoot = 0;
 

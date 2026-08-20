@@ -1386,7 +1386,8 @@ void menuHandleInputMenu()
         // gFAVStartMode was missing, so a Favourites-only setup could not escape at all.
         // bdmEffectiveStartMode() rather than raw gBDMStartMode: UDPBD floors the BDM start mode, so
         // a UDPBD-only rig has rows while gBDMStartMode itself is still disabled.
-        if (gAPPStartMode || gETHStartMode || bdmEffectiveStartMode() || gHDDStartMode || gFAVStartMode || gMMCEStartMode) {
+        int netActive = (gNetworkProtocol == NET_PROTO_SMB) ? gETHStartMode : (gNetworkProtocol == NET_PROTO_UDPFS ? gNetStartMode : 0);
+        if (gAPPStartMode || gETHStartMode || netActive || bdmEffectiveStartMode() || gHDDStartMode || gFAVStartMode || gMMCEStartMode) {
             guiSwitchScreen(GUI_SCREEN_MAIN);
             refreshMenuPosition();
         }
