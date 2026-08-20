@@ -1,4 +1,6 @@
-<img width="1254" height="1254" alt="image" src="https://github.com/user-attachments/assets/99d01aa1-6546-435d-9851-7006ab2274e7" />
+<p align="center">
+  <img width="400" height="92" alt="AI-Assisted-Software-Lovers-Only" src="https://github.com/user-attachments/assets/71335775-9fe3-4507-ac2c-caa851abb24c" />
+</p>
 
 ![logo](https://github.com/user-attachments/assets/bdf46f3c-a749-4128-a4c3-e0f968a31897)
 ```HAS THIS EVER HAPPENED TO YOU?```
