@@ -8,6 +8,7 @@
 #include "include/util.h"
 #include "include/themes.h"
 #include "include/textures.h"
+#include "include/texcache.h"
 #include "include/ioman.h"
 #include "include/system.h"
 #include "include/ethsupport.h"   // ethGetModulesLoaded() for the UDPBD<->SMB NIC interlock
@@ -487,6 +488,24 @@ static void bdmLoadBlockDeviceModules(void)
     // called after SignalSema so it never runs under bdmLoadModuleLock.
     if (modsNow != modsWere && !wasFirstPass)
         bdmForceDeviceRefresh();
+
+    // MX4SIO initial discovery ("double tap"): the SIO2 SD card may still be completing its
+    // internal power-up / SPI handshake after mx4sio_bd_irx links. If MX4SIO is enabled and loaded,
+    // check if it was immediately found. If not, perform one bounded settle (~600ms) on this IO worker
+    // thread and issue exactly one second refresh. Strictly one-shot so an absent card never delays later calls.
+    static int mx4sioSecondProbeDone = 0;
+    if (!gEnableMX4SIO)
+        mx4sioSecondProbeDone = 0;
+    else if (mx4sioModLoaded && !mx4sioSecondProbeDone) {
+        char sdcRoot[16];
+        if (!bdmGetDeviceRootByType(BDM_TYPE_SDC, sdcRoot, sizeof(sdcRoot))) {
+            mx4sioSecondProbeDone = 1;
+            DelayThread(600 * 1000); // bounded settle for SIO2 SPI init
+            bdmForceDeviceRefresh(); // exactly one second probe
+        } else {
+            mx4sioSecondProbeDone = 1; // found immediately -> done
+        }
+    }
 }
 
 void bdmLoadModules(void)
@@ -927,6 +946,17 @@ static void bdmLaunchVcd(item_list_t *itemList, const char *vcdName, config_set_
                 usbBdmaVariant = VCD_BDMA_USBEXFAT;
             else
                 return; // dialog cancelled -- nothing written, nothing prepared, nothing displayed
+        }
+    }
+
+    // Present preparation indicator before potentially expensive memory-card file IO
+    guiRenderTextScreen(_l(_STR_PLEASE_WAIT));
+
+    // MMCE artwork must be quiesced before VCD card I/O because MMCE and MX4SIO share the SIO2/fileXio path.
+    if (pDeviceData->bdmDeviceType == BDM_TYPE_SDC) {
+        if (!cacheAbortMmceImageLoadsTimed(500)) {
+            guiWarning(_l(_STR_ERR_FILE_INVALID), 8);
+            return;
         }
     }
 
@@ -1511,26 +1541,15 @@ static int bdmGetImage(item_list_t *itemList, char *folder, int isRelative, char
 
     bdm_device_data_t *pDeviceData = (bdm_device_data_t *)itemList->priv;
 
-    // 1. Primary lookup: ART/<name>_<suffix>.png
     if (isRelative)
         snprintf(path, sizeof(path), "%s%s/%s_%s", pDeviceData->bdmPrefix, folder, value, suffix);
     else
         snprintf(path, sizeof(path), "%s%s_%s", folder, value, suffix);
     int r = texDiscoverLoad(resultTex, path, -1);
-
-    // 2. VCD secondary lookup: ART/<discID>_<suffix>.png (extracted from filename or cached disc ID)
     if (r == ERR_BAD_FILE && isRelative && vcdListViewActive(itemList)) {
-        char discId[VCD_ID_MAX];
-        if (vcdGetArtGameId(value, discId, sizeof(discId)) && strcmp(discId, value) != 0) {
-            snprintf(path, sizeof(path), "%s%s/%s_%s", pDeviceData->bdmPrefix, folder, discId, suffix);
-            r = texDiscoverLoad(resultTex, path, -1);
-        }
-        // 3. Fallback: POPSLoader-style suffixless cover next to .VCD
-        if (r == ERR_BAD_FILE) {
-            char vcdPrefix[BDM_DEVICE_ROOT_MAX + 2];
-            bdmBuildVcdPrefix(vcdPrefix, sizeof(vcdPrefix), itemList->mode);
-            r = vcdLoadPopsCover(vcdPrefix, value, suffix, resultTex);
-        }
+        char vcdPrefix[BDM_DEVICE_ROOT_MAX + 2];
+        bdmBuildVcdPrefix(vcdPrefix, sizeof(vcdPrefix), itemList->mode);
+        r = vcdLoadPopsCover(vcdPrefix, value, suffix, resultTex);
     }
     return r;
 }

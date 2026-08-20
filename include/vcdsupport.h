@@ -41,10 +41,6 @@ int vcdScanDirRoot(const char *dirPath, vcd_entry_t **outList);
 // Returns 1 and writes the 11-character ID on success; otherwise returns 0 and writes an empty string.
 int vcdExtractGameId(const char *name, char *idOut, int idSize);
 
-// Centralized helper for VCD artwork lookup: extracts ID from filename (zero IO) or returns the
-// cached disc ID (zero IO). Returns 1 with outId filled if a disc ID is known, 0 otherwise.
-int vcdGetArtGameId(const char *name, char *outId, int outSize);
-
 // Remember which directory a VCD was scanned from. String work only -- NO device access; the scan
 // must never block on IO. Called per entry by the scan.
 void vcdNoteScanDir(const char *name, const char *dirPath);
@@ -147,17 +143,13 @@ enum {
 int vcdEquipBdma(int source, int mode, char *diag, int diagSize);
 // Read the equipped variant from mc?:/POPSTARTER/bdma_config.txt (VCD_BDMA_FAT32 if absent).
 int vcdReadBdmaMode(void);
-// Best-effort auto-equip of the BDMA variant matching the game's device (source/mode) before a VCD
-// launch, so the driver pair POPSTARTER reloads from the MC after its own IOP reset fits the drive.
-// No-op when already equipped. CARD PREP ONLY -- it never blocks the handoff: on any equip failure it
-// keeps the card's current pair (never wiped as collateral), toasts the diagnostic in passing, and the
-// launch proceeds (the VCD launch is a plain POPSTARTER.ELF + argv[0]-selector handoff; POPSTARTER
-// owns everything after the exec). See vcdsupport.c.
+// Validate whether the MC environment matches the requested BDMA family (marker + complete pair signature).
+int vcdBdmaEnvironmentValid(int mode);
+// Auto-equip the BDMA variant matching the game's device (source/mode) before a VCD launch.
+// BDMA prep is card preparation, never a POPSTARTER launch gate: failure toasts in passing, never blocks.
 void vcdEnsureBdmaForLaunch(int source, int mode);
-// Explicit per-launch USB mode pick (the fat32/exFAT dialog on USB VCD launches). Unlike
-// vcdEnsureBdmaForLaunch this HONOURS the just-made choice regardless of gBdmaApplyOnLaunch, and it
-// accepts VCD_BDMA_FAT32 (de-equip to POPSTARTER's built-in USB stack) as well as VCD_BDMA_USBEXFAT.
-// Same non-blocking contract: card prep only, a failed equip toasts in passing and the launch proceeds.
+// Explicit per-launch USB mode pick (the fat32/exFAT dialog on USB VCD launches).
+// BDMA prep is card preparation, never a POPSTARTER launch gate: failure toasts in passing, never blocks.
 void vcdApplyUsbModeForLaunch(int mode);
 
 // Install POPSTARTER's missing MC-side externals from the VCD device's direct POPS/ folder.

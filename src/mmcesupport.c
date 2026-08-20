@@ -32,6 +32,7 @@ static int mmceULSizePrev = -2;
 // quiescing on success/expiry. (The other half of the old "-1 for both" ambiguity is now split at
 // the source: vcdScanOpenDir returns 0 for a genuinely-ABSENT POPS folder -- #154 residual -- so
 // only contention ever arms this budget.)
+static unsigned char mmceVcdScanned = 0;
 static unsigned char mmceVcdScanFailed = 0;
 static unsigned char mmceVcdScanRetries = 0;
 #define MMCE_VCD_SCAN_RETRY_MAX 15
@@ -449,6 +450,7 @@ static int mmceNeedsUpdate(item_list_t *itemList)
         // Card gone with an EMPTY failed VCD list never reaches mmceUpdateGameList's resets (this
         // early return fires first), so a reinserted card would inherit an exhausted retry budget
         // and a dead VCD page (CodeRabbit review of #248, vetted). Fresh card = fresh budget.
+        mmceVcdScanned = 0;
         mmceVcdScanFailed = 0;
         mmceVcdScanRetries = 0;
         // Card gone: re-arm THM/LNG registration so a swapped-in card's assets get discovered
@@ -489,6 +491,10 @@ static int mmceNeedsUpdate(item_list_t *itemList)
     if (folderConsumeDirty(itemList->mode))
         return 1;
     if (vcdViewActive(itemList->mode)) {
+        if (!mmceVcdScanned) {
+            mmceGameList.updateDelay = MMCE_MODE_UPDATE_DELAY;
+            return 1;
+        }
         // A contended scan left the VCD page empty (S6): keep the ~2s refresh alive until a scan
         // succeeds or the bounded budget runs out (no endless bus churn -- #246 doctrine). Also
         // revives the manual-refresh button in the failed state.
@@ -596,6 +602,7 @@ static int mmceUpdateGameList(item_list_t *itemList)
         mmceGameCount = 0;
         mmceVcdGameCount = 0;
         mmceULSizePrev = -2; // force a fresh scan when a card returns
+        mmceVcdScanned = 0;
         mmceVcdScanFailed = 0;
         mmceVcdScanRetries = 0;
         return 0;
@@ -606,10 +613,12 @@ static int mmceUpdateGameList(item_list_t *itemList)
     if (vcdViewActive(itemList->mode)) {
         int r = vcdFillGameList(mmcePrefix, &mmceVcdGames);
         if (r >= 0) { // r < 0: transient scan failure (contended bus) -> keep the last-good VCD list
+            mmceVcdScanned = 1;
             mmceVcdGameCount = r;
             mmceVcdScanFailed = 0;
             mmceVcdScanRetries = 0;
         } else {
+            mmceVcdScanned = 0;
             mmceVcdScanFailed = 1; // arm mmceNeedsUpdate's bounded retry (S6)
         }
         return mmceVcdGameCount;
@@ -623,16 +632,7 @@ static int mmceGetGameCount(item_list_t *itemList)
     return vcdViewActive(itemList->mode) ? mmceVcdGameCount : mmceGameCount;
 }
 
-// Toggle-window guard (Codex/Fable audit). The L3 view toggle flips vcdViewActive() SYNCHRONOUSLY
-// (vcdToggleView) but rebuilds the submenu on the DEFERRED IO thread. On a contended MMCE bus that rebuild
-// lags, so for a window the OLD submenu's ids are still live while vcdViewActive() already reports the NEW
-// view -- and an id from the old view can index the freshly-switched other-view array, which may be NULL
-// (that view never scanned this session), shorter, or mid-scan. The direct &mmceVcdGames[id]/&mmceGames[id]
-// indexing then NULL/OOB-derefs and crashes. (The shared store the #120 split replaced could not OOB: one
-// array + one count stayed self-consistent.) Resolve every id through here: an out-of-range id returns a
-// STATIC EMPTY entry, so a stale-id READ is safe empty data instead of a crash; LAUNCH treats &mmceEmptyGame
-// as "nothing to launch" (mmceLaunchGame, below).
-static base_game_info_t mmceEmptyGame = {0};
+static base_game_info_t mmceEmptyGame;
 static base_game_info_t *mmceActiveGame(item_list_t *itemList, int id)
 {
     int vcd = vcdViewActive(itemList->mode);
@@ -700,17 +700,28 @@ static void mmceLaunchVcd(item_list_t *itemList, const char *vcdName, config_set
 
     if (vcdName == NULL || vcdName[0] == '\0' || !strcasecmp(vcdName, "POPSTARTER")) // reserved-name belt: the scanner no longer lists it (#154); strcasecmp -- FAT is case-insensitive
         return;
+
+    // Present preparation indicator before potentially expensive memory-card file IO
+    guiRenderTextScreen(_l(_STR_PLEASE_WAIT));
+
+    // Quiesce in-flight MMCE art reads before touching the card. MMCE artwork and VCD prep share the SIO2 bus.
+    if (!cacheAbortMmceImageLoadsTimed(MMCE_ART_ABORT_WAIT_TICKS)) {
+        guiWarning(_l(_STR_ERR_FILE_INVALID), 8);
+        return;
+    }
+
     if (!vcdResolvePopstarter(mmcePrefix, vcdElf, sizeof(vcdElf))) {
         guiMsgBox(_l(_STR_POPSTARTER_NOT_FOUND), 0, NULL);
         return;
     }
     vcdBuildSelector(mmcePrefix, VCD_PREFIX_MASS, vcdName, vcdSelector, sizeof(vcdSelector));
+
     // Source MC-side externals from this MMCE card's direct POPS/ folder; never overwrite card files.
     (void)vcdInstallPopstarterMc(mmcePrefix);
-    // Best-effort card prep: try to equip the .mmce BDMAssault variant so the driver pair POPSTARTER
-    // reloads from the MC fits this drive. NEVER a launch gate -- the handoff below always proceeds
-    // (POPSTARTER owns everything past the exec); a failed equip just toasts its diagnostic in passing.
+
+    // Best-effort card prep: BDMA prep is card preparation, never a POPSTARTER launch gate.
     vcdEnsureBdmaForLaunch(VCD_BDMA_SRC_MMCE, VCD_BDMA_MMCE);
+
     char vcdFullPath[256];
     snprintf(vcdFullPath, sizeof(vcdFullPath), "%sPOPS/%s.VCD", mmcePrefix, vcdName);
     vcdPrepareRetroGemBarcode(vcdFullPath);
@@ -1082,19 +1093,9 @@ static config_set_t *mmceGetConfig(item_list_t *itemList, int id)
 
 static int mmceGetImage(item_list_t *itemList, char *folder, int isRelative, char *value, char *suffix, GSTEXTURE *resultTex, short psm)
 {
-    // 1. Primary lookup: ART/<name>_<suffix>.png
     int r = mmceTryLoadImage(mmceArtPrimary, folder, isRelative, value, suffix, resultTex);
-
-    // 2. VCD secondary lookup: ART/<discID>_<suffix>.png (extracted from filename or cached disc ID)
-    if (r == ERR_BAD_FILE && isRelative && vcdViewActive(itemList->mode)) {
-        char discId[VCD_ID_MAX];
-        if (vcdGetArtGameId(value, discId, sizeof(discId)) && strcmp(discId, value) != 0)
-            r = mmceTryLoadImage(mmceArtPrimary, folder, isRelative, discId, suffix, resultTex);
-
-        // 3. Fallback: POPSLoader-style suffixless cover next to .VCD
-        if (r == ERR_BAD_FILE)
-            r = vcdLoadPopsCover(mmceArtPrimary, value, suffix, resultTex);
-    }
+    if (r == ERR_BAD_FILE && isRelative && vcdViewActive(itemList->mode))
+        r = vcdLoadPopsCover(mmceArtPrimary, value, suffix, resultTex);
     return r;
 }
 
