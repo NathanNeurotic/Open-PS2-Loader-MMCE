@@ -3049,7 +3049,7 @@ int thmSetGuiValue(int themeID, int reload)
 
             guiThemeID = themeID;
             return 1;
-        } else if (guiThemeID == 0 || guiThemeID == nThemes + 1)
+        } else if (guiThemeID == 0)
             thmSetColors(gTheme);
     }
     return 0;

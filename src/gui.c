@@ -700,13 +700,10 @@ void guiShowDeviceConfig(void)
         diaGetInt(diaDeviceConfig, CFG_ENABLEMX4SIO, &gEnableMX4SIO);
         diaGetInt(diaDeviceConfig, CFG_ENABLEBDMHDD, &gEnableBdmHDD);
 
-        // Network Start Mode read-back: Start=Off forces the protocol OFF; switching Start back on
-        // with no protocol memory (was OFF) lands on SMB, the common default. The protocol itself is
-        // picked on the Network page. Then re-derive the legacy shadows downstream consumers read.
+        // Network Start Mode read-back: Start=Off disables network start;
+        // preserve the user's configured gNetworkProtocol (defaulting to SMB only if uninitialized).
         diaGetInt(diaDeviceConfig, CFG_NETSTART, &gNetStartMode);
-        if (gNetStartMode == START_MODE_DISABLED)
-            gNetworkProtocol = NET_PROTO_OFF;
-        else if (gNetworkProtocol == NET_PROTO_OFF)
+        if (gNetworkProtocol == NET_PROTO_OFF)
             gNetworkProtocol = NET_PROTO_SMB;
         gEnableUDPBD = (gNetworkProtocol == NET_PROTO_UDPBD || gNetworkProtocol == NET_PROTO_UDPFSBD);
         gNetBootProtocol = (gNetworkProtocol == NET_PROTO_UDPFSBD) ? NET_BOOT_UDPFS : NET_BOOT_UDPBD;
@@ -1119,11 +1116,10 @@ void guiShowNetConfig(void)
         int netProtoVal2, netAccessVal2;
         diaGetInt(diaNetConfig, CFG_NETPROTOCOL, &netProtoVal2);
         diaGetInt(diaNetConfig, CFG_UDPFSMODE, &netAccessVal2);
-        gNetworkProtocol = (gNetStartMode == START_MODE_DISABLED) ? NET_PROTO_OFF :
-                           (netProtoVal2 == 0)                    ? NET_PROTO_SMB :
-                           (netProtoVal2 == 2)                    ? NET_PROTO_UDPBD :
-                           (netAccessVal2 == 1)                   ? NET_PROTO_UDPFSBD :
-                                                                    NET_PROTO_UDPFS; // UDPFS + Files
+        gNetworkProtocol = (netProtoVal2 == 0)  ? NET_PROTO_SMB :
+                           (netProtoVal2 == 2)  ? NET_PROTO_UDPBD :
+                           (netAccessVal2 == 1) ? NET_PROTO_UDPFSBD :
+                                                  NET_PROTO_UDPFS; // UDPFS + Files
         gEnableUDPBD = (gNetworkProtocol == NET_PROTO_UDPBD || gNetworkProtocol == NET_PROTO_UDPFSBD);
         gNetBootProtocol = (gNetworkProtocol == NET_PROTO_UDPFSBD) ? NET_BOOT_UDPFS : NET_BOOT_UDPBD;
         // SMB's start mode IS the network start row (Auto = boot connect, Manual = on-entry);

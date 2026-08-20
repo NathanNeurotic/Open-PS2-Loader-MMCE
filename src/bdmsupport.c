@@ -299,6 +299,16 @@ int bdmSupportIsUDPBD(item_list_t *support)
     return ((bdm_device_data_t *)support->priv)->bdmDeviceType == BDM_TYPE_UDPBD;
 }
 
+// True when this BDM mode slot is the UDPBD block device.
+int bdmModeIsUDPBD(int mode)
+{
+    if (mode < BDM_MODE || mode > BDM_MODE_LAST)
+        return 0;
+    if (bdmDeviceList[mode - BDM_MODE].priv == NULL)
+        return 0;
+    return ((bdm_device_data_t *)bdmDeviceList[mode - BDM_MODE].priv)->bdmDeviceType == BDM_TYPE_UDPBD;
+}
+
 static void bdmEventHandler(void *packet, void *opt)
 {
     BdmGeneration++;
@@ -612,8 +622,10 @@ static int bdmNeedsUpdate(item_list_t *itemList)
     opl_io_module_t *pOwner = (opl_io_module_t *)itemList->owner;
     if (pOwner != NULL && pOwner->menuItem.visible == 1) {
         // If the device page is visible but the device support is not enabled, hide the device page.
-        if (bdmTransportEnabled(pDeviceData->bdmDeviceType) == 0)
+        if (bdmTransportEnabled(pDeviceData->bdmDeviceType) == 0) {
             pOwner->menuItem.visible = 0;
+            moduleUpdateMenu(itemList->mode, 0, 0);
+        }
     }
 
     // VCD view: an L3 toggle marks the mode dirty but does NOT bump BdmGeneration or reset
@@ -1851,10 +1863,12 @@ int bdmUpdateDeviceData(item_list_t *itemList)
     // So: if this slot already knows what it is and has published a list, a reappearance restores
     // the page and nothing else. Nothing about the device changed, so there is nothing to re-read.
     if (dir >= 0 && visible == 0 &&
-        pDeviceData->bdmDeviceRoot[0] != ' ' && pDeviceData->bdmDriver[0] != ' ' &&
+        pDeviceData->bdmDeviceRoot[0] != '\0' && pDeviceData->bdmDriver[0] != '\0' &&
         pDeviceData->bdmDeviceType != BDM_TYPE_UNKNOWN && pDeviceData->bdmULSizePrev != -2) {
-        if (itemList->owner != NULL)
+        if (itemList->owner != NULL) {
             ((opl_io_module_t *)itemList->owner)->menuItem.visible = 1;
+            moduleUpdateMenu(itemList->mode, 0, 0);
+        }
         pDeviceData->bdmMissCount = 0;
         LOG("bdmUpdateDeviceData: device %d reappeared intact -- restoring page, no rescan\n", itemList->mode);
         fileXioDclose(dir);
@@ -1930,6 +1944,7 @@ int bdmUpdateDeviceData(item_list_t *itemList)
         if (itemList->owner != NULL) {
             LOG("bdmUpdateDeviceData: setting device %d visible\n", itemList->mode);
             ((opl_io_module_t *)itemList->owner)->menuItem.visible = 1;
+            moduleUpdateMenu(itemList->mode, 0, 0);
         }
 
         // Close the device handle.
@@ -1961,6 +1976,7 @@ int bdmUpdateDeviceData(item_list_t *itemList)
         if (itemList->owner != NULL) {
             LOG("bdmUpdateDeviceData: setting device %d invisible\n", itemList->mode);
             ((opl_io_module_t *)itemList->owner)->menuItem.visible = 0;
+            moduleUpdateMenu(itemList->mode, 0, 0);
         }
 
         pDeviceData->FoldersCreated = 0;
