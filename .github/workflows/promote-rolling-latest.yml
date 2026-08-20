@@ -1,0 +1,47 @@
+name: Promote Rolling Release
+
+on:
+  push:
+    branches:
+      - rebuild/main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for Rolling Release publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          run_id=""
+          for attempt in $(seq 1 120); do
+            run_id="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow "Rolling Release" --branch rebuild/main --limit 20 --json databaseId,headSha,status --jq '.[] | select(.headSha == "'"$GITHUB_SHA"'") | .databaseId' | head -n1 || true)"
+            if [ -n "$run_id" ]; then
+              echo "Found Rolling Release run $run_id for $GITHUB_SHA"
+              break
+            fi
+            sleep 10
+          done
+
+          if [ -z "$run_id" ]; then
+            echo "Timed out waiting for Rolling Release run for $GITHUB_SHA" >&2
+            exit 1
+          fi
+
+          gh run watch "$run_id" --repo "$GITHUB_REPOSITORY" --exit-status
+
+      - name: Promote rolling release to Latest
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          gh release edit rolling \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "Rolling" \
+            --prerelease=false \
+            --latest
