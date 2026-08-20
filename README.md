@@ -24,7 +24,7 @@ Based on Open PS2 Loader · Copyright 2013, Ifcaro & jimmikaelkael<br>
 Licensed under Academic Free License version 3.0<br>
 Review the LICENSE file for further details.<br><br>
 
-[![CI](https://github.com/NathanNeurotic/Open-PS2-Loader/actions/workflows/compilation.yml/badge.svg?branch=master)](https://github.com/NathanNeurotic/Open-PS2-Loader/actions/workflows/compilation.yml)
+[![CI](https://github.com/NathanNeurotic/Open-PS2-Loader/actions/workflows/flavours.yml/badge.svg?branch=rebuild/main)](https://github.com/NathanNeurotic/Open-PS2-Loader/actions/workflows/flavours.yml)
 ![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/NathanNeurotic/Open-PS2-Loader/total?style=plastic&logo=github&logoSize=auto&label=Total%20Downloads&labelColor=navy&color=skyblue)
 [![Latest release](https://img.shields.io/github/v/release/NathanNeurotic/Open-PS2-Loader?style=plastic&logo=github&label=Latest%20Release&labelColor=navy&color=skyblue&include_prereleases)](https://github.com/NathanNeurotic/Open-PS2-Loader/releases)
 [![Discord](https://img.shields.io/discord/1275875800318476381?style=flat&logo=Discord)](https://tinyurl.com/PS2SPACE)
@@ -34,6 +34,14 @@ Review the LICENSE file for further details.<br><br>
 > **What is RiptOPL?** A downstream fork of Open PS2 Loader with a built-in cover-art **Coverflow** theme (default), a **Favourites** tab, per-game **Neutrino** external-core launching, a reorganized category **settings layout**, DualSense support, and ready-to-use opinionated defaults. Its settings live in their own **`settings_riptopl.cfg`** so they never collide with official OPL or wOPL installed on the same memory card — while artwork, themes, VMCs and **favourites stay shared**. See **[This Fork's Additions](#this-forks-additions)**. For the canonical project, use [ps2homebrew/Open-PS2-Loader](https://github.com/ps2homebrew/Open-PS2-Loader).
 
 > 📖 **Full documentation & guides:** **<https://nathanneurotic.github.io/Open-PS2-Loader/>** — a complete, searchable docs site covering every storage backend, the Neutrino core, PS1/VCD, the Theme Engine (with worked examples and an annotated sample theme), a full settings reference, and troubleshooting.
+
+## External Tools & Services
+
+RiptOPL is intended to work with these maintained companion tools:
+
+- **[PS2-Servers](https://github.com/NathanNeurotic/PS2-Servers)** — all-in-one PC server launcher for **SMBv1, UDPFS and UDPBD**.
+- **[OrbitOPL Toolbox](https://github.com/Luden02/OrbitOPL-Toolbox)** — cross-platform PC library manager for importing discs, artwork/screenshots, ZSO compression, per-game settings and VMC management.
+- **[OPL PS1 AIO Converter GUI](https://github.com/shaanhomebrew-cloud/OPL-PS1-AIO-Converter-GUI)** — Windows all-in-one PS1/POPStarter preparation tool for converting BIN/CUE backups to VCDs and installing them to USB, MX4SIO, MMCE, exFAT HDD, SMB and APA internal HDD.
 
 ## Contents
 
