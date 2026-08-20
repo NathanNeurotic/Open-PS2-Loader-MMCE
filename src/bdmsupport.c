@@ -299,6 +299,16 @@ int bdmSupportIsUDPBD(item_list_t *support)
     return ((bdm_device_data_t *)support->priv)->bdmDeviceType == BDM_TYPE_UDPBD;
 }
 
+// True when this BDM mode slot is the UDPBD block device.
+int bdmModeIsUDPBD(int mode)
+{
+    if (mode < BDM_MODE || mode > BDM_MODE_LAST)
+        return 0;
+    if (bdmDeviceList[mode - BDM_MODE].priv == NULL)
+        return 0;
+    return ((bdm_device_data_t *)bdmDeviceList[mode - BDM_MODE].priv)->bdmDeviceType == BDM_TYPE_UDPBD;
+}
+
 static void bdmEventHandler(void *packet, void *opt)
 {
     BdmGeneration++;

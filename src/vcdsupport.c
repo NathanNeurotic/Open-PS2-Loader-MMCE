@@ -821,15 +821,16 @@ int vcdModeSupported(int mode)
     // FAV_MODE has its own L3 ISO<->VCD view too: the Favourites tab swaps between disc favourites and
     // PS1/.VCD favourites (favsupport filters its list by vcdViewActive(FAV_MODE)). Its vcdView slot is
     // independent of any device's, so toggling Favourites never disturbs a device page's view.
-    // UDPFS_MODE was MISSING from this list -- in the fork too (a latent bug there, masked because
-    // VCD was mostly used on BDM/HDD pages). Since this predicate is the FIRST gate in
-    // itemExecToggleView AND the L3 hint condition, its absence made the page's entire shipped VCD
-    // surface unreachable dead code: udpfssupport.c's vcdFillGameList call, the POPS cover
-    // fallback, and the POPSTARTER launch guard (which safely refuses the actual launch with a
-    // toast -- network filesystems cannot host a POPSTARTER handoff, but LISTING the library is
-    // exactly what the code was written to do). First deliberate divergence from the fork's
-    // vcdsupport.c, and it is a fix, not a drift.
-    return (mode >= BDM_MODE && mode <= BDM_MODE_LAST) || mode == MMCE_MODE || mode == ETH_MODE || mode == HDD_MODE || mode == FAV_MODE || mode == UDPFS_MODE;
+    //
+    // Supported L3 VCD pages:
+    // - USB / exFAT, MMCE, MX4SIO, SMB, ATA (BDM HDD), APA / PFS HDD, FAV_MODE
+    //
+    // Unsupported:
+    // - UDPBD, UDPFS, APPS
+    if (mode >= BDM_MODE && mode <= BDM_MODE_LAST)
+        return !bdmModeIsUDPBD(mode);
+
+    return mode == MMCE_MODE || mode == ETH_MODE || mode == HDD_MODE || mode == FAV_MODE;
 }
 
 int vcdViewActive(int mode)
