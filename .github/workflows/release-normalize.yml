@@ -1,6 +1,9 @@
 name: Normalize Release Assets
 
 on:
+  workflow_run:
+    workflows: ["Rolling Release"]
+    types: [completed]
   release:
     types: [published]
   workflow_dispatch:
@@ -14,11 +17,13 @@ permissions:
   contents: write
 
 concurrency:
-  group: release-normalize-${{ github.event.release.tag_name || inputs.tag }}
+  group: release-normalize-${{ github.event_name == 'workflow_run' && 'rolling' || github.event.release.tag_name || inputs.tag }}
   cancel-in-progress: false
 
 jobs:
   normalize:
+    if: >-
+      ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -34,6 +39,13 @@ jobs:
           set -euo pipefail
           if [[ "${{ github.event_name }}" == "release" ]]; then
             TAG="${{ github.event.release.tag_name }}"
+          elif [[ "${{ github.event_name }}" == "workflow_run" ]]; then
+            REF="${{ github.event.workflow_run.head_branch }}"
+            if [[ "$REF" == v* ]]; then
+              TAG="$REF"
+            else
+              TAG="rolling"
+            fi
           else
             TAG="${{ inputs.tag }}"
           fi
@@ -154,8 +166,6 @@ body = p.read_text(encoding='utf-8')
 banner = '''<p align="center">\n  <img width="400" height="92" alt="AI-Assisted-Software-Lovers-Only" src="https://github.com/user-attachments/assets/71335775-9fe3-4507-ac2c-caa851abb24c" />\n</p>'''
 resources = '''## External Tools & Services\n\n- **PS2-Servers** — all-in-one PC server launcher for **SMBv1, UDPFS and UDPBD**: https://github.com/NathanNeurotic/PS2-Servers\n- **OrbitOPL Toolbox** — cross-platform PC library manager for importing discs, artwork/screenshots, ZSO compression, per-game settings and VMC management: https://github.com/Luden02/OrbitOPL-Toolbox\n- **OPL PS1 AIO Converter GUI** — Windows all-in-one PS1/POPStarter preparation tool for converting BIN/CUE backups to VCDs and installing them to USB, MX4SIO, MMCE, exFAT HDD, SMB and APA internal HDD: https://github.com/shaanhomebrew-cloud/OPL-PS1-AIO-Converter-GUI\n'''
 
-# Make repeated normalization idempotent and remove references to assets that are
-# intentionally deleted from the public release (bare ELFs/manifests).
 for marker in ('## Other downloads', '## External Tools & Services'):
     if marker in body:
         body = body.split(marker, 1)[0].rstrip()
