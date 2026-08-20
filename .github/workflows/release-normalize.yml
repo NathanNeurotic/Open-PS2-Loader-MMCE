@@ -1,0 +1,177 @@
+name: Normalize Release Assets
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to normalize (for example: rolling or v1.2.0)
+        required: true
+        default: rolling
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-normalize-${{ github.event.release.tag_name || inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  normalize:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - name: Resolve release tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" == "release" ]]; then
+            TAG="${{ github.event.release.tag_name }}"
+          else
+            TAG="${{ inputs.tag }}"
+          fi
+          printf 'TAG=%s\n' "$TAG" >> "$GITHUB_ENV"
+          printf 'Normalizing release: %s\n' "$TAG"
+
+      - name: Download release assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf release-work variants-work package-work
+          mkdir -p release-work
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir release-work --clobber
+          echo 'Downloaded assets:'
+          find release-work -maxdepth 1 -type f -printf '%f\n' | sort
+
+      - name: Add external-tool shortcuts to the unified package
+        shell: bash
+        run: |
+          set -euo pipefail
+          MAIN_ZIP="$(find release-work -maxdepth 1 -type f -name 'RIPTOPL-*.zip' ! -name 'RIPTOPL-VARIANTS-*' ! -name 'RIPTOPL-DEBUG-*' ! -name 'RIPTOPL-LANGS-*' ! -name '*-src.zip' -print -quit)"
+          if [[ -z "$MAIN_ZIP" ]]; then
+            echo 'ERROR: unified RIPTOPL release package zip is missing.' >&2
+            exit 1
+          fi
+
+          rm -rf package-work
+          mkdir -p package-work
+          unzip -q "$MAIN_ZIP" -d package-work
+
+          cat > package-work/PS2-Servers.url <<'URL'
+[InternetShortcut]
+URL=https://github.com/NathanNeurotic/PS2-Servers
+URL
+          cat > package-work/OrbitOPL-Toolbox.url <<'URL'
+[InternetShortcut]
+URL=https://github.com/Luden02/OrbitOPL-Toolbox
+URL
+          cat > package-work/OPL-PS1-AIO-Converter-GUI.url <<'URL'
+[InternetShortcut]
+URL=https://github.com/shaanhomebrew-cloud/OPL-PS1-AIO-Converter-GUI
+URL
+
+          rm -f "$MAIN_ZIP"
+          (
+            cd package-work
+            zip -qr -X "../$(basename "$MAIN_ZIP")" .
+          )
+          echo "Rebuilt $(basename "$MAIN_ZIP") with all three external-tool shortcuts."
+
+      - name: Add all DS5 loaders to the variants archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          VARIANT_ZIP="$(find release-work -maxdepth 1 -type f -name 'RIPTOPL-VARIANTS-*.zip' -print -quit)"
+          if [[ -z "$VARIANT_ZIP" ]]; then
+            echo 'ERROR: RIPTOPL-VARIANTS-*.zip is missing from the release.' >&2
+            exit 1
+          fi
+
+          rm -rf variants-work
+          mkdir -p variants-work
+          unzip -q "$VARIANT_ZIP" -d variants-work
+
+          found=0
+          while IFS= read -r -d '' ds5; do
+            cp -f "$ds5" variants-work/
+            found=1
+            echo "Added $(basename "$ds5") to variants archive"
+          done < <(find release-work -maxdepth 1 -type f -name '*-ds5.ELF' -print0)
+
+          if [[ "$found" -eq 0 ]]; then
+            echo 'No top-level DS5 loaders found; variants archive already contains its existing DS5 matrix.'
+          fi
+
+          rm -f "$VARIANT_ZIP"
+          (
+            cd variants-work
+            zip -qr -X "../$(basename "$VARIANT_ZIP")" .
+          )
+          echo "Rebuilt $(basename "$VARIANT_ZIP") with DS5 loaders."
+
+      - name: Upload rebuilt unified and variants packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          for zip in release-work/RIPTOPL-*.zip; do
+            [[ -f "$zip" ]] || continue
+            case "$(basename "$zip")" in
+              *-src.zip|RIPTOPL-LANGS-*.zip|RIPTOPL-DEBUG-*.zip) continue ;;
+            esac
+            gh release upload "$TAG" "$zip" --repo "$GITHUB_REPOSITORY" --clobber
+          done
+
+      - name: Remove floating build files and manifests
+        shell: bash
+        run: |
+          set -euo pipefail
+          for f in release-work/*.ELF release-work/*MANIFEST*.txt release-work/SHA256SUMS.txt release-work/DETAILED_CHANGELOG; do
+            [[ -f "$f" ]] || continue
+            asset="$(basename "$f")"
+            echo "Removing floating release asset: $asset"
+            gh release delete-asset "$TAG" "$asset" --repo "$GITHUB_REPOSITORY" --yes || true
+          done
+
+      - name: Rewrite release notes with standard header and external tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          BODY="release-work/original-notes.md"
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json body --jq '.body' > "$BODY"
+
+          python3 - "$BODY" > release-work/notes.md <<'PY'
+import pathlib, sys
+
+p = pathlib.Path(sys.argv[1])
+body = p.read_text(encoding='utf-8')
+banner = '''<p align="center">\n  <img width="400" height="92" alt="AI-Assisted-Software-Lovers-Only" src="https://github.com/user-attachments/assets/71335775-9fe3-4507-ac2c-caa851abb24c" />\n</p>'''
+resources = '''## External Tools & Services\n\n- **PS2-Servers** — all-in-one PC server launcher for **SMBv1, UDPFS and UDPBD**: https://github.com/NathanNeurotic/PS2-Servers\n- **OrbitOPL Toolbox** — cross-platform PC library manager for importing discs, artwork/screenshots, ZSO compression, per-game settings and VMC management: https://github.com/Luden02/OrbitOPL-Toolbox\n- **OPL PS1 AIO Converter GUI** — Windows all-in-one PS1/POPStarter preparation tool for converting BIN/CUE backups to VCDs and installing them to USB, MX4SIO, MMCE, exFAT HDD, SMB and APA internal HDD: https://github.com/shaanhomebrew-cloud/OPL-PS1-AIO-Converter-GUI\n'''
+
+marker = '## External Tools & Services'
+if marker in body:
+    body = body.split(marker, 1)[0].rstrip()
+body = body.lstrip()
+print(f'{banner}\n\n{body}\n\n{resources}', end='')
+PY
+
+          gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --notes-file release-work/notes.md
+
+      - name: Verify final release asset set
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo 'Final release assets:'
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' | sort
+          echo 'Invariant checks:'
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' | grep -E '\\.ELF$|MANIFEST|SHA256SUMS|DETAILED_CHANGELOG'; then
+            echo 'ERROR: floating ELF/manifest asset remains.' >&2
+            exit 1
+          fi
+          echo 'OK: no floating ELF or manifest assets.'
