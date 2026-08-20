@@ -654,7 +654,7 @@ int readPads()
                 // which is exactly why it does not do it. The mode read is EE-local and cheap; the
                 // init behind it is the expensive part, and now it runs only when it has something
                 // to fix.
-                if (padInfoMode(pad_data[i].port, pad_data[i].slot, PAD_MODECURID, 0) == PAD_TYPE_DUALSHOCK) {
+                if (pad_data[i].actuators > 0 && padInfoMode(pad_data[i].port, pad_data[i].slot, PAD_MODECURID, 0) == PAD_TYPE_DUALSHOCK) {
                     LOG("PAD port %d reconnect: already DualShock, skipping re-init\n", pad_data[i].port);
                     break;
                 }
