@@ -244,24 +244,29 @@ static int HandleTxReqs(struct SmapDriverData *SmapDrivPrivData, void *header, u
 
 int smap_transmit(void *header, uint16_t headersize, const void *data, uint16_t datasize)
 {
+    int i, r;
+
     // Wait up to 2 seconds for autonegotiation to complete.
     if (!SmapDriverData.SmapIsInitialized) {
-        int i;
         for (i = 0; i < 2000 && !SmapDriverData.SmapIsInitialized; i++)
             DelayThread(1000);
     }
 
-    while (1) {
+    /* Bounded retry: a TX ring that stays full for ~3s means the link is down (or PHY init
+     * failed terminally and the TX MAC never came up). Return failure instead of retrying a
+     * negative HandleTxReqs result forever; the ministack caller drops the packet and the UDP
+     * layer / discovery watchdog retransmits. */
+    for (i = 0; i < 30000; i++) {
         WaitSema(tx_sema);
-        int r = HandleTxReqs(&SmapDriverData, header, headersize, data, datasize);
+        r = HandleTxReqs(&SmapDriverData, header, headersize, data, datasize);
         SignalSema(tx_sema);
         if (r >= 0)
-            break;
+            return 0;
 
         // Wait for about 1KiB (at a speed of 100Mbps)
         // FIXME! We want a blocking write, this works but it's not ideal.
         DelayThread(100);
     }
 
-    return 0;
+    return -1;
 }

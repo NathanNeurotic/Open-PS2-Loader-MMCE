@@ -125,12 +125,13 @@ static inline void RestartAutoNegotiation(volatile u8 *emac3_regbase, u16 bmsr)
 static int InitPHY(struct SmapDriverData *SmapDrivPrivData)
 {
     int i, result;
-    unsigned int LinkSpeed100M, LinkFDX, FlowControlEnabled, AutoNegoRetries;
+    unsigned int LinkSpeed100M, LinkFDX, FlowControlEnabled, AutoNegoRetries, NegoPasses;
     u32 emac3_value;
     u16 RegDump[6], value, value2;
     volatile u8 *emac3_regbase;
 
     LinkSpeed100M = 0;
+    NegoPasses = 0;
     if (EnableVerboseOutput != 0)
         M_DEBUG("smap: Resetting PHY\n");
 
@@ -169,6 +170,12 @@ static int InitPHY(struct SmapDriverData *SmapDrivPrivData)
                 break;
             if (i >= 5)
                 SmapDrivPrivData->LinkStatus = 0;
+            if (i >= 25) {
+                /* Bounded wait: 25 x 200ms = 5s with no link is a terminal failure, not an
+                 * infinite wait that leaves the driver stuck inside InitPHY forever. */
+                SmapDrivPrivData->LinkStatus = 0;
+                return -1;
+            }
         }
 
         SmapDrivPrivData->LinkStatus = 1;
@@ -268,9 +275,18 @@ static int InitPHY(struct SmapDriverData *SmapDrivPrivData)
                         break;
                 }
 
-                if (i >= 0x1E)
+                if (i >= 0x1E) {
+                    /* Bounded negotiation: one full cycle is ~17s worst case (3x3s auto-negotiation
+                     * retries + ~4s forced 100M link wait + ~4s forced 10M link wait), so two cycles
+                     * bound the total no-link wait at ~35s. Then stop retrying. Returning nonzero
+                     * makes the START-event handler leave the driver resident but inert, so UDPFS
+                     * operations keep failing fast and OPL boot continues instead of freezing. */
+                    if (++NegoPasses >= 2) {
+                        SmapDrivPrivData->LinkStatus = 0;
+                        return -1;
+                    }
                     goto RepeatAutoNegoProcess;
-                else
+                } else
                     SmapDrivPrivData->LinkStatus = 1;
             } else
                 SmapDrivPrivData->LinkStatus = 1;
