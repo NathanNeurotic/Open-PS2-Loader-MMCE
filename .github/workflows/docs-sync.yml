@@ -1,0 +1,88 @@
+name: Sync Project Links & Badges
+
+on:
+  push:
+    branches:
+      - rebuild/main
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source branch
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - name: Fetch GitHub Pages branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin gh-pages:gh-pages
+          git worktree add ../gh-pages gh-pages
+
+      - name: Update README and GitHub Pages links
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+
+          ps2_servers = "https://github.com/NathanNeurotic/PS2-Servers"
+          orbit = "https://github.com/Luden02/OrbitOPL-Toolbox"
+          ps1_converter = "https://github.com/shaanhomebrew-cloud/OPL-PS1-AIO-Converter-GUI"
+          badge = "[![CI](https://github.com/NathanNeurotic/Open-PS2-Loader/actions/workflows/flavours.yml/badge.svg?branch=rebuild/main)](https://github.com/NathanNeurotic/Open-PS2-Loader/actions/workflows/flavours.yml)"
+
+          readme = Path("README.md")
+          text = readme.read_text(encoding="utf-8")
+          text = re.sub(r'^\[!\[CI\]\([^\n]+\)\]\([^\n]+\)$', badge, text, count=1, flags=re.MULTILINE)
+          section = f'''## External Tools & Services\n\nRiptOPL is intended to work with these maintained companion tools:\n\n- **[PS2-Servers]({ps2_servers})** — all-in-one PC server launcher for **SMBv1, UDPFS and UDPBD**.\n- **[OrbitOPL Toolbox]({orbit})** — cross-platform PC library manager for importing discs, artwork/screenshots, ZSO compression, per-game settings and VMC management.\n- **[OPL PS1 AIO Converter GUI]({ps1_converter})** — Windows all-in-one PS1/POPStarter preparation tool for converting BIN/CUE backups to VCDs and installing them to USB, MX4SIO, MMCE, exFAT HDD, SMB and APA internal HDD.\n'''
+          if "## External Tools & Services" in text:
+              text = re.sub(r'## External Tools & Services\n.*?(?=\n## |\Z)', section.rstrip(), text, count=1, flags=re.DOTALL)
+          else:
+              text = text.replace("## Contents", section + "\n## Contents", 1)
+          readme.write_text(text, encoding="utf-8")
+
+          pages = Path("../gh-pages")
+          html_section = f'''<section class="callout info" id="external-tools"><div class="h">External Tools &amp; Services</div>\n<p><b><a href="{ps2_servers}">PS2-Servers</a></b> — all-in-one PC server launcher for <b>SMBv1, UDPFS and UDPBD</b>.<br>\n<b><a href="{orbit}">OrbitOPL Toolbox</a></b> — cross-platform PC library manager for importing discs, artwork/screenshots, ZSO compression, per-game settings and VMC management.<br>\n<b><a href="{ps1_converter}">OPL PS1 AIO Converter GUI</a></b> — Windows all-in-one PS1/POPStarter preparation tool for BIN/CUE → VCD conversion and installation to USB, MX4SIO, MMCE, exFAT HDD, SMB and APA internal HDD.</p></section>'''
+          for name in ("index.html", "releases.html"):
+              path = pages / name
+              html = path.read_text(encoding="utf-8")
+              if 'id="external-tools"' in html:
+                  html = re.sub(r'<section class="callout info" id="external-tools">.*?</section>', html_section, html, count=1, flags=re.DOTALL)
+              else:
+                  html = html.replace('<main class="content">', '<main class="content">\n' + html_section, 1)
+              path.write_text(html, encoding="utf-8")
+
+      - name: Commit source-branch changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add README.md
+          if ! git diff --cached --quiet; then
+            git commit -m "docs: fix CI badge and add companion tools"
+            git push origin HEAD:${GITHUB_REF_NAME}
+          else
+            echo "README already synchronized."
+          fi
+
+      - name: Commit GitHub Pages changes
+        shell: bash
+        working-directory: ../gh-pages
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html releases.html
+          if ! git diff --cached --quiet; then
+            git commit -m "docs: add companion tools"
+            git push origin gh-pages
+          else
+            echo "GitHub Pages already synchronized."
+          fi
