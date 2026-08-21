@@ -285,6 +285,23 @@ int hddLoadModules(void)
     return retStatus;
 }
 
+// Validate an APA header sector without ps2hdd: the "APA" magic plus the header checksum
+// (sum of the 127 little-endian words after the checksum word itself, per ps2sdk apaCheckSum).
+static int hddApaHeaderValid(const u8 *pSectorData)
+{
+    const u32 *pWords = (const u32 *)pSectorData;
+    u32 sum = 0;
+    int i;
+
+    if (memcmp(pSectorData + 4, "APA", 3) != 0)
+        return 0;
+
+    for (i = 1; i < 128; i++)
+        sum += pWords[i];
+
+    return sum == pWords[0];
+}
+
 // Returns 1 for MBR/GPT, 0 for APA, and -1 if an error occured
 int hddDetectNonSonyFileSystem()
 {
@@ -306,8 +323,26 @@ int hddDetectNonSonyFileSystem()
         return -1;
     }
 
-    // Check for MBR signature.
-    if (pSectorData[0x1FE] == 0x55 && pSectorData[0x1FF] == 0xAA) {
+    // Check for a valid APA header FIRST, and only treat MBR/GPT evidence as decisive when no valid
+    // APA header exists. The MBR test used to win: but a modern formatter (ps2sdk's GPT-capable
+    // ps2hdd, PC-side POPS/HDL partition tools) legitimately stamps a protective/residual 0x55AA at
+    // bytes 510-511 of the __mbr header while the sector is STILL a fully valid, checksummed APA
+    // header. Such a drive was misclassified as MBR and ps2hdd never loaded -- silently (that branch
+    // raises no error by design), leaving the APA page empty with zero HDL/PFS content while ATA
+    // itself worked fine. The checksummed APA magic is far stronger evidence than two signature
+    // bytes; a genuine exFAT/MBR/GPT drive has no valid APA header and still bails below.
+    if (memcmp((const char *)&pSectorData[4], "APA", 3) == 0) {
+        if (hddApaHeaderValid(pSectorData)) {
+            // Found APA partition type.
+            LOG("hddDetectNonSonyFileSystem: found APA partition data\n");
+            result = 0;
+        } else {
+            // APA magic with a BAD checksum: fail closed. Do not let an accompanying 0x55AA
+            // reclassify a possibly-corrupt APA drive as safe-to-ignore MBR media either.
+            LOG("hddDetectNonSonyFileSystem: APA magic present but header checksum invalid\n");
+            result = -1;
+        }
+    } else if (pSectorData[0x1FE] == 0x55 && pSectorData[0x1FF] == 0xAA) {
         // Found MBR partition type.
         LOG("hddDetectNonSonyFileSystem: found MBR partition data\n");
         result = 1;
@@ -315,10 +350,6 @@ int hddDetectNonSonyFileSystem()
         // Found GPT partition type.
         LOG("hddDetectNonSonyFileSystem: found GPT partition data\n");
         result = 1;
-    } else if (strncmp((const char *)&pSectorData[4], "APA", 3) == 0) {
-        // Found APA partition type.
-        LOG("hddDetectNonSonyFileSystem: found APA partition data\n");
-        result = 0;
     } else {
         // Even though we didn't find evidence of non-APA partition data, if we load the APA irx module
         // it will write to the drive and potentially corrupt any data that might be there.
