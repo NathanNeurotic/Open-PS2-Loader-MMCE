@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Release tag to normalize (for example: rolling or v1.2.0)
+        description: "Release tag to normalize (for example: rolling or v1.2.0)"
         required: true
         default: rolling
 
@@ -76,18 +76,9 @@ jobs:
           mkdir -p package-work
           unzip -q "$MAIN_ZIP" -d package-work
 
-          cat > package-work/PS2-Servers.url <<'URL'
-[InternetShortcut]
-URL=https://github.com/NathanNeurotic/PS2-Servers
-URL
-          cat > package-work/OrbitOPL-Toolbox.url <<'URL'
-[InternetShortcut]
-URL=https://github.com/Luden02/OrbitOPL-Toolbox
-URL
-          cat > package-work/OPL-PS1-AIO-Converter-GUI.url <<'URL'
-[InternetShortcut]
-URL=https://github.com/shaanhomebrew-cloud/OPL-PS1-AIO-Converter-GUI
-URL
+          printf '%s\r\n' '[InternetShortcut]' 'URL=https://github.com/NathanNeurotic/PS2-Servers' > package-work/PS2-Servers.url
+          printf '%s\r\n' '[InternetShortcut]' 'URL=https://github.com/Luden02/OrbitOPL-Toolbox' > package-work/OrbitOPL-Toolbox.url
+          printf '%s\r\n' '[InternetShortcut]' 'URL=https://github.com/shaanhomebrew-cloud/OPL-PS1-AIO-Converter-GUI' > package-work/OPL-PS1-AIO-Converter-GUI.url
 
           rm -f "$MAIN_ZIP"
           (
@@ -158,24 +149,7 @@ URL
           BODY="release-work/original-notes.md"
           gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json body --jq '.body' > "$BODY"
 
-          python3 - "$BODY" > release-work/notes.md <<'PY'
-import pathlib, re, sys
-
-p = pathlib.Path(sys.argv[1])
-body = p.read_text(encoding='utf-8')
-banner = '''<p align="center">\n  <img width="400" height="92" alt="AI-Assisted-Software-Lovers-Only" src="https://github.com/user-attachments/assets/71335775-9fe3-4507-ac2c-caa851abb24c" />\n</p>'''
-resources = '''## External Tools & Services\n\n- **PS2-Servers** — all-in-one PC server launcher for **SMBv1, UDPFS and UDPBD**: https://github.com/NathanNeurotic/PS2-Servers\n- **OrbitOPL Toolbox** — cross-platform PC library manager for importing discs, artwork/screenshots, ZSO compression, per-game settings and VMC management: https://github.com/Luden02/OrbitOPL-Toolbox\n- **OPL PS1 AIO Converter GUI** — Windows all-in-one PS1/POPStarter preparation tool for converting BIN/CUE backups to VCDs and installing them to USB, MX4SIO, MMCE, exFAT HDD, SMB and APA internal HDD: https://github.com/shaanhomebrew-cloud/OPL-PS1-AIO-Converter-GUI\n'''
-
-for marker in ('## Other downloads', '## External Tools & Services'):
-    if marker in body:
-        body = body.split(marker, 1)[0].rstrip()
-body = re.sub(r'\nSHA256 \(also published as SHA256SUMS\.txt\):\n```.*?```\n', '\n', body, flags=re.DOTALL)
-body = body.lstrip()
-
-downloads = '''## Release downloads\n\n- **Unified package:** the normal installable RiptOPL package containing the standard loaders, PS1/POPSTARTER files, bundled Neutrino and the three external-tool shortcuts.\n- **Variants:** alternate build configurations, including the DualSense (DS5) loaders.\n- **Debug:** diagnostic builds for troubleshooting.\n- **Languages:** additional UI language files and fonts.\n- **Source:** the exact source snapshot used to produce the release.\n\nNo bare ELF files or SDK/IRX manifests are published as release assets; they are kept inside the appropriate archives where needed.'''
-
-print(f'{banner}\n\n{body}\n\n{downloads}\n\n{resources}', end='')
-PY
+          python3 .github/scripts/normalize_release_notes.py "$BODY" > release-work/notes.md
 
           gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --notes-file release-work/notes.md
 
@@ -186,7 +160,7 @@ PY
           echo 'Final release assets:'
           gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' | sort
           echo 'Invariant checks:'
-          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' | grep -E '\\.ELF$|MANIFEST|SHA256SUMS|DETAILED_CHANGELOG'; then
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' | grep -E '\.ELF$|MANIFEST|SHA256SUMS|DETAILED_CHANGELOG'; then
             echo 'ERROR: floating ELF/manifest asset remains.' >&2
             exit 1
           fi
