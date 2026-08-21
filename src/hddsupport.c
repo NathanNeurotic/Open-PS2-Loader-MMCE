@@ -265,18 +265,15 @@ int hddLoadModules(void)
             sysShutdownDev9();
             hddModulesLoadCount = 0;
         } else {
+            retStatus = HDD_LOADMODULES_STATUS_NOERROR;
+            hddModulesLoaded = 1;
             // Settle ~1 s after a FRESH ATA-stack load before anyone probes xhdd0: or loads ps2hdd.
             // Every working reference does this: NHDDL sleeps 1 s after ata_bd ("prevents ps2hdd from
             // hanging") and POPSLoader settles 1 s around ata_bd as well. Our earliest callers run
             // seconds after power-on (APA boot-identity config resolution), so the very first
             // ATA_DEVCTL_READ_PARTITION_SECTOR probe / ps2hdd init can otherwise race a drive that is
             // still spinning up. Runs once per load generation: the dedupe branch above never gets here.
-            // The ready flag is set only AFTER the settle: DelayThread yields, and a concurrent caller
-            // that saw hddModulesLoaded already set could otherwise probe before the drive has settled.
-            // During the window the dedupe branch correctly reports BUSYLOADING (not-ready).
             DelayThread(1000 * 1000);
-            retStatus = HDD_LOADMODULES_STATUS_NOERROR;
-            hddModulesLoaded = 1;
         }
     } else {
         hddModulesLoadCount++;
