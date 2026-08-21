@@ -21,6 +21,7 @@
 #include <io_common.h>   // FIO_MT_RDWR
 
 #include <hdd-ioctl.h>
+#include <delaythread.h> // DelayThread for the post-ATAD settle in hddLoadModules
 
 #define OPL_HDD_MODE_PS2LOGO_OFFSET 0x17F8
 
@@ -266,6 +267,13 @@ int hddLoadModules(void)
         } else {
             retStatus = HDD_LOADMODULES_STATUS_NOERROR;
             hddModulesLoaded = 1;
+            // Settle ~1 s after a FRESH ATA-stack load before anyone probes xhdd0: or loads ps2hdd.
+            // Every working reference does this: NHDDL sleeps 1 s after ata_bd ("prevents ps2hdd from
+            // hanging") and POPSLoader settles 1 s around ata_bd as well. Our earliest callers run
+            // seconds after power-on (APA boot-identity config resolution), so the very first
+            // ATA_DEVCTL_READ_PARTITION_SECTOR probe / ps2hdd init can otherwise race a drive that is
+            // still spinning up. Runs once per load generation: the dedupe branch above never gets here.
+            DelayThread(1000 * 1000);
         }
     } else {
         hddModulesLoadCount++;
