@@ -256,14 +256,11 @@ int smap_transmit(void *header, uint16_t headersize, const void *data, uint16_t 
             return -1;
     }
 
-    /* Bounded retry: a TX ring that stays full for ~3s means the link is down (or PHY init
-     * failed terminally and the TX MAC never came up). Return failure instead of retrying a
-     * negative HandleTxReqs result forever; the ministack caller drops the packet and the UDP
-     * layer / discovery watchdog retransmits. */
-    for (i = 0; i < 30000; i++) {
+    while (1) {
         WaitSema(tx_sema);
         r = HandleTxReqs(&SmapDriverData, header, headersize, data, datasize);
         SignalSema(tx_sema);
+
         if (r >= 0)
             return 0;
 
@@ -271,6 +268,4 @@ int smap_transmit(void *header, uint16_t headersize, const void *data, uint16_t 
         // FIXME! We want a blocking write, this works but it's not ideal.
         DelayThread(100);
     }
-
-    return -1;
 }
