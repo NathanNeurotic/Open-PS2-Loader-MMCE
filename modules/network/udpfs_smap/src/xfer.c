@@ -250,6 +250,10 @@ int smap_transmit(void *header, uint16_t headersize, const void *data, uint16_t 
     if (!SmapDriverData.SmapIsInitialized) {
         for (i = 0; i < 2000 && !SmapDriverData.SmapIsInitialized; i++)
             DelayThread(1000);
+        // Timed out: the link never came up. Fail instead of falling through into
+        // HandleTxReqs and potentially reporting success on an uninitialized driver.
+        if (!SmapDriverData.SmapIsInitialized)
+            return -1;
     }
 
     /* Bounded retry: a TX ring that stays full for ~3s means the link is down (or PHY init
