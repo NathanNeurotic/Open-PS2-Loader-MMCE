@@ -648,8 +648,22 @@ static int hddBuildVcdGameList(void)
 
             base_game_info_t *g = &newGames[total];
             memset(g, 0, sizeof(base_game_info_t));
-            snprintf(g->name, sizeof(g->name), "%s", parts.names[p] + titleOfs); // title past .POPS.
-            snprintf(g->startup, sizeof(g->startup), "%s", g->name);             // keep VCD identity = name
+            // The title past ".POPS." is the display name AND the launch key (hddFindVcdByName and
+            // the Favourites entry point both resolve by name), so it must stay unique: two region
+            // variants like PP.SCUS-....POPS.Game / PP.SCPS-....POPS.Game would otherwise both be
+            // "Game" and always launch the first partition. On a collision fall back to the full
+            // partition label, which is unique by construction. Check every entry collected so far,
+            // pooled-container VCDs included.
+            const char *title = parts.names[p] + titleOfs;
+            int nameTaken = 0;
+            for (int i = 0; i < total; i++) {
+                if (strcmp(newGames[i].name, title) == 0) {
+                    nameTaken = 1;
+                    break;
+                }
+            }
+            snprintf(g->name, sizeof(g->name), "%s", nameTaken ? parts.names[p] : title);
+            snprintf(g->startup, sizeof(g->startup), "%s", g->name); // keep VCD identity = name
             snprintf(g->extension, sizeof(g->extension), ".VCD");
             g->parts = 1;
             g->format = GAME_FORMAT_ISO;                                    // VCD flag gates launch

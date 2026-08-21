@@ -909,7 +909,7 @@ gui_strings:
 - label: VCD_HIDE_GAMEID
   string: Hide PS1 Game ID (VCD list)
 - label: VCD_SHOW_PP_POPS
-  string: Display PP. POPS partition games (HDD)
+  string: Display PP.<ID>.POPS partition games (HDD)
 - label: VCD_USB_MODE_EXFAT
   string: exFAT
 - label: VCD_USB_MODE_FAT32
