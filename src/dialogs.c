@@ -447,6 +447,11 @@ struct UIItem diaVcdListConfig[] = {
     {UI_BOOL, CFG_VCD_FIRST_DISC_ONLY, 1, 1, _STR_HINT_VCD_FIRST_DISC, 0, 0, {.intvalue = {0, 0}}},
     {UI_BREAK},
 
+    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {NULL, _STR_VCD_SHOW_PP_POPS}}},
+    {UI_SPACER},
+    {UI_BOOL, CFG_VCD_SHOW_PP_POPS, 1, 1, _STR_HINT_VCD_SHOW_PP_POPS, 0, 0, {.intvalue = {0, 0}}},
+    {UI_BREAK},
+
     // buttons
     {UI_OK, 0, 1, 1, -1, 0, 0, {.label = {NULL, _STR_OK}}},
     {UI_BREAK},

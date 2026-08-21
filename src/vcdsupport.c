@@ -62,6 +62,54 @@ int vcdExtractGameId(const char *name, char *idOut, int idSize)
     return 1;
 }
 
+// Strict one-game POPS partition label (POPStarter HDD convention): PP.<DISC-ID>.POPS.<NAME>.
+// The literal ".POPS." marker is the discriminator that keeps ordinary ID-labelled HDDOSD/HDL
+// PP.* partitions (e.g. PP.SLUS-21025.01.BATTLEFIELD_2_H) out of the VCD list with ZERO mounts --
+// the old code accepted any strict-ID PP.* label, and mount+IMAGE0.VCD-probed the ID-less ones.
+// Two disc-ID grammars: the BatchKitManager underscore form (AAAA_NNN.NN, vcdExtractGameId's
+// strictness) and the hyphen form (AAAA-NNNNN with an optional .NN disc suffix). Returns the
+// offset of <NAME> inside the label, or 0 when the label is not a strict PP-POPS partition.
+// Pure string parsing -- no I/O.
+int vcdPopsPartitionTitleOffset(const char *label)
+{
+    const char *tail;
+    char discId[VCD_ID_MAX]; // validation only
+    size_t len;
+    int i, marker;
+
+    if (label == NULL || strncmp(label, "PP.", 3) != 0)
+        return 0;
+    tail = label + 3;
+    len = strlen(tail);
+
+    // Form A: AAAA_NNN.NN.POPS.<name> -- vcdExtractGameId validates the ID; the separator into
+    // the marker must be '.'. Shortest legal label: 12 + 5 + 1 chars.
+    if (len >= 18 && vcdExtractGameId(tail, discId, sizeof(discId)) && tail[11] == '.' &&
+        strncmp(tail + 12, "POPS.", 5) == 0 && tail[17] != '\0')
+        return (int)((tail + 17) - label);
+
+    // Form B: AAAA-NNNNN[.NN].POPS.<name>. Shortest legal label: 10 + 6 + 1 chars.
+    if (len < 17)
+        return 0;
+    for (i = 0; i < 4; i++)
+        if (!((tail[i] >= 'A' && tail[i] <= 'Z') || (tail[i] >= 'a' && tail[i] <= 'z') ||
+              (tail[i] >= '0' && tail[i] <= '9')))
+            return 0;
+    if (tail[4] != '-')
+        return 0;
+    for (i = 5; i <= 9; i++)
+        if (tail[i] < '0' || tail[i] > '9')
+            return 0;
+    marker = 10;
+    if (tail[marker] == '.' && tail[marker + 1] >= '0' && tail[marker + 1] <= '9' &&
+        tail[marker + 2] >= '0' && tail[marker + 2] <= '9')
+        marker += 3; // optional .NN disc suffix
+    if (strncmp(tail + marker, ".POPS.", 6) == 0 && tail[marker + 6] != '\0')
+        return (int)((tail + marker + 6) - label);
+
+    return 0;
+}
+
 // Display-only prefix hider (aesthetic setting gVcdHideGameId). Returns the number of leading
 // characters to skip when `name` begins with a STRICT PS1 retail game-ID prefix AAAA_NNN.NN
 // followed by a '.' or '_' separator (= 12 chars, e.g. "SLUS_005.51." / "SCUS_941.63."), and only

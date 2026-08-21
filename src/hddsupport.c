@@ -581,14 +581,12 @@ static void hddPublishHdlGameList(hdl_games_list_t *replacement)
 }
 
 // Build the HDD VCD game list from both supported APA/PFS shapes. Exact __.POPS / __.POPS0..9
-// containers contribute every root *.VCD; PP.<name> / __.<name> candidates contribute one entry each.
-// A one-game candidate whose label carries a STRICT PS1 disc-ID (PP.SLUS_005.51.Name -- the
-// POPStarter/BatchKitManager convention) is accepted from the APA table alone, ZERO mounts: every
-// documented PP.* false-positive family fails that pattern (HDDOSD apps like CodeBreaker have no
-// '_' at [4]; HDL games are mode-0x1337-filtered upstream), and the launch never needs the probe
-// (POPSTARTER boots by literal partition label). Only ID-less labels (PP.CASTLEVANIA) pay the
-// mount + IMAGE0.VCD probe that filters HDDOSD apps. This is what makes a 40-partition drive load
-// in one APA pass instead of 40 PFS mount/probe/umount cycles (~35 s on a mechanical drive).
+// containers are always mounted and contribute every root *.VCD. PP.<DISC-ID>.POPS.<NAME> one-game
+// installs (vcdPopsPartitionTitleOffset) contribute one entry each from the APA table alone, ZERO
+// mounts, gated by the enumeration-only gVcdShowPpPops setting. Every other PP.*/__.* label is
+// IGNORED with no mount and no probe: the literal ".POPS." marker is what separates a POPS
+// partition from an ordinary ID-labelled HDDOSD/HDL one (e.g. PP.SLUS-21025.01.BATTLEFIELD_2_H),
+// so a drive full of app/game partitions no longer pays a PFS mount/probe/umount cycle per label.
 // Mounts use the dedicated pfs1: scan slot; pfs0: stays on the OPL data partition throughout.
 
 static int hddBuildVcdGameList(void)
@@ -624,26 +622,13 @@ static int hddBuildVcdGameList(void)
         char mountSrc[64];
         snprintf(mountSrc, sizeof(mountSrc), "hdd0:%s", parts.names[p]);
 
-        // PP.<name> / __.<name> one-game install: display the label without its three-character
-        // prefix and retain the FULL label for launch. The name predicate excludes the exact
-        // __.POPS[0-9]? pooled containers handled below.
-        if (hddIsPopsPartitionGame(parts.names[p])) {
-            char discId[12]; // validation only -- the entry keys off the full label, never the ID
-            if (!vcdExtractGameId(parts.names[p] + 3, discId, sizeof(discId))) {
-                // ID-less label (e.g. PP.CASTLEVANIA): require ONE exact IMAGE0.VCD at the partition
-                // root. A mount failure means this refresh was incomplete; an open miss AFTER a
-                // successful mount is authoritative and simply identifies a non-POPS HDDOSD app.
-                if (fileXioMount("pfs1:", mountSrc, FIO_MT_RDONLY) < 0) {
-                    scanIncomplete = 1;
-                    continue;
-                }
-                int imgfd = open("pfs1:/IMAGE0.VCD", O_RDONLY);
-                if (imgfd >= 0)
-                    close(imgfd); // close before unmount; ps2fs may reject an unmount with a live fd
-                fileXioUmount("pfs1:");
-                if (imgfd < 0)
-                    continue;
-            }
+        // PP.<DISC-ID>.POPS.<name> one-game install: strict label match from the APA table alone,
+        // ZERO mounts. Display the title past the ".POPS." marker and retain the FULL label for
+        // launch. Enumeration-only setting: launch semantics are untouched either way.
+        int titleOfs = vcdPopsPartitionTitleOffset(parts.names[p]);
+        if (titleOfs > 0) {
+            if (!gVcdShowPpPops)
+                continue;
 
             base_game_info_t *grownGames = realloc(newGames, (total + 1) * sizeof(base_game_info_t));
             if (grownGames == NULL) {
@@ -660,8 +645,8 @@ static int hddBuildVcdGameList(void)
 
             base_game_info_t *g = &newGames[total];
             memset(g, 0, sizeof(base_game_info_t));
-            snprintf(g->name, sizeof(g->name), "%s", parts.names[p] + 3); // strip PP. / __. for display
-            snprintf(g->startup, sizeof(g->startup), "%s", g->name);      // keep VCD identity = name
+            snprintf(g->name, sizeof(g->name), "%s", parts.names[p] + titleOfs); // title past .POPS.
+            snprintf(g->startup, sizeof(g->startup), "%s", g->name);             // keep VCD identity = name
             snprintf(g->extension, sizeof(g->extension), ".VCD");
             g->parts = 1;
             g->format = GAME_FORMAT_ISO;                                    // VCD flag gates launch
@@ -669,6 +654,13 @@ static int hddBuildVcdGameList(void)
             total++;
             continue;
         }
+
+        // A loose PP.*/__.* label without the strict ".POPS." marker (app/HDL-style partitions,
+        // ID-less labels like PP.CASTLEVANIA) is not VCD content: skip with zero I/O. Only the
+        // exact __.POPS[0-9]? pooled containers below are mounted. hddIsPopsPartitionGame excludes
+        // those containers by construction, so what remains IS a container.
+        if (hddIsPopsPartitionGame(parts.names[p]))
+            continue;
 
         // __.POPS[0-9]? pooled container: mount and scan its root for *.VCD entries.
         if (fileXioMount("pfs1:", mountSrc, FIO_MT_RDONLY) < 0) {
