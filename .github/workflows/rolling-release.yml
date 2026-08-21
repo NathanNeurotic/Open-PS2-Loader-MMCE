@@ -625,8 +625,8 @@ jobs:
             echo "WARN: officialsdk build missing this run; package ships without APP_RIPTOPL-OFFICIALROLLING" >&2
           fi
           cp -f POPS/{smbman.irx,ps2ip.irx,ps2smap.irx,ps2dev9.irx,SMSUTILS.irx,poweroff.irx,del.icn,list.icn,icon.sys} "$PKG/POPSTARTER/"
-          cp -f popsmb/* "$PKG/POPSTARTER/"
-          cp -f POPS/* "$PKG/POPS/"
+          cp -rf popsmb/. "$PKG/POPSTARTER/"
+          cp -rf POPS/. "$PKG/POPS/"
           # Keep PC-side servers in their dedicated release stream. The shortcut opens the maintained
           # PS2 Servers all-in-one launcher for UDPFS, SMBv1 and UDPBD; no server binaries or source are
           # embedded in the RiptOPL install package.
