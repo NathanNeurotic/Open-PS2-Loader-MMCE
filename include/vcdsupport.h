@@ -209,6 +209,28 @@ int vcdPopsNetChanged(const vcd_popsnet_t *orig, const vcd_popsnet_t *cur);
 // the file must exist either way. Returns 0, or the first vcdSafeWriteFile error (-2/-3).
 int vcdWritePopstarterNetFiles(const vcd_popsnet_t *cfg, int writeSmb, int writeIp);
 
+// ---- POPStarter SMB auto-provisioning for mc0:/POPSTARTER/ (RiptOPL launch helper) ----
+// Ensures the two required network files for SMB VCD launches exist on mc0:/POPSTARTER/.
+// Presence wins: an existing file is never parsed or overwritten.
+// Only missing files are generated, using current RiptOPL network/SMB globals when derivable.
+// DHCP / missing static PS2 triple -> NEED_STATIC (no bogus file). SMB share/IP validation -> INVALID.
+// Destination is fixed to mc0:/POPSTARTER/ (no mc1 fallback) - POPSTARTER module provisioning
+// (vcdInstallPopstarterMc) stays dual-slot.
+typedef enum {
+    VCD_POPSNET_READY = 0,       // both DAT files exist, or were successfully created
+    VCD_POPSNET_NEED_STATIC = 1, // missing file requires static PS2 IP / mask / gateway or resolved SMB IP
+    VCD_POPSNET_IO_ERROR = 2,    // MC full (-2) or IO error (-3) - partial removed
+    VCD_POPSNET_INVALID = 3,     // SMB share/IP etc invalid and not derivable
+    VCD_POPSNET_SMB_MISSING = 4  // required SMB IRX modules not present on MC
+} vcd_popsnet_ensure_t;
+
+vcd_popsnet_ensure_t vcdEnsurePopstarterSmbConfigMc0(void);
+
+// Shared SMB POPSTARTER preparation for both ETH VCD and APPS SB.*.ELF launches.
+// Installs missing MC support from smbPrefix (ethPrefix), verifies SMB modules,
+// and ensures mc0:/POPSTARTER/*.DAT. Returns VCD_POPSNET_READY on success.
+vcd_popsnet_ensure_t vcdPreparePopstarterSmbLaunch(const char *smbPrefix);
+
 // Render the RetroGEM Game ID optical barcode immediately prior to a POPStarter VCD launch.
 void vcdPrepareRetroGemBarcode(const char *vcdPath);
 

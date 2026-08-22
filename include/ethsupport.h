@@ -27,5 +27,6 @@ item_list_t *ethGetObject(int initOnly);
 // Resolve a stored ETH ISO favourite against the ISO backing view even while the live ETH page
 // is showing VCDs. Read-only; never changes the visible ETH list or L3 view.
 int ethResolveIsoFavourite(int id, const char *name, int *outId);
+const char *ethGetSMBPrefix(void);
 
 #endif

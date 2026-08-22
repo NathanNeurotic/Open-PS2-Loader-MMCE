@@ -9,6 +9,7 @@
 
 #include "include/bdmsupport.h"
 #include "include/ethsupport.h"
+#include "include/vcdsupport.h"
 #include "include/hddsupport.h"
 #include "include/texcache.h"
 #include "include/textures.h"
@@ -99,6 +100,29 @@ static char *appGetBoot(char *device, int max, char *path)
     }
 
     return appGetELFName(path);
+}
+
+// POPSTARTER SMB selector detection for APPS: APPS -> SB.<game>.ELF
+// Uses VCD_PREFIX_SMB and existing basename helper. Returns 1 if the
+// resolved APP startup basename matches SB.*.ELF (case-insensitive).
+static int appIsPopstarterSmb(const char *startup)
+{
+    const char *base;
+    if (startup == NULL || startup[0] == '\0')
+        return 0;
+    base = appGetELFName((char *)startup);
+    if (base == NULL || base[0] == '\0')
+        return 0;
+    if (strncasecmp(base, VCD_PREFIX_SMB, strlen(VCD_PREFIX_SMB)) != 0)
+        return 0;
+    size_t len = strlen(base);
+    size_t pre = strlen(VCD_PREFIX_SMB);
+    if (len <= pre + 4)
+        return 0;
+    const char *dot = strrchr(base, '.');
+    if (dot == NULL || strcasecmp(dot, ".ELF") != 0)
+        return 0;
+    return 1;
 }
 
 static unsigned int appHashStartup(const char *value)
@@ -758,6 +782,25 @@ static void appLaunchItem(item_list_t *itemList, int id, config_set_t *configSet
 
         if (mode == HDD_MODE)
             snprintf(partition, sizeof(partition), "%s:", gOPLPart);
+
+        // POPSTARTER SMB via APPS: APPS -> SB.<game>.ELF
+        // Run the same SMB environment preparation as ETH VCD.
+        // Uses shared helper vcdPreparePopstarterSmbLaunch(ethPrefix).
+        if (appIsPopstarterSmb(filename)) {
+            vcd_popsnet_ensure_t ens = vcdPreparePopstarterSmbLaunch(ethGetSMBPrefix());
+            if (ens == VCD_POPSNET_SMB_MISSING) {
+                guiMsgBox(_l(_STR_POPSTARTER_SMB_MISSING), 0, NULL);
+                return;
+            }
+            if (ens == VCD_POPSNET_NEED_STATIC) {
+                guiMsgBox(_l(_STR_POPSTARTER_SMB_NEEDS_STATIC), 0, NULL);
+                return;
+            }
+            if (ens == VCD_POPSNET_IO_ERROR || ens == VCD_POPSNET_INVALID) {
+                guiMsgBox(_l(_STR_POPSTARTER_NET_ERR), 0, NULL);
+                return;
+            }
+        }
 
         if (configGetStr(configSet, CONFIG_ITEM_ALTSTARTUP, &argv1) != 0) {
             // Copy before deinit(): argv1 points into the config heap which

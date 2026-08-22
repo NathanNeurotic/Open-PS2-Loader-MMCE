@@ -493,6 +493,27 @@ struct UIItem diaVcdUsbMode[] = {
     // end of dialog
     {UI_TERMINATOR}};
 
+// POPSTARTER overwrite confirmation: shown when POPSTARTER Network Settings would
+// overwrite existing mc0:/POPSTARTER/*.DAT files. Keep = preserve existing files
+// (no write, return to editor); Replace = overwrite with current dialog values;
+// Cancel/Back = abort the save and return to the editor. Uses existing dialog
+// conventions - two explicit buttons plus the standard Back/Cancel.
+struct UIItem diaPopsOverwrite[] = {
+    {UI_HEADER, 0, 1, 1, -1, 0, 0, {.label = {NULL, _STR_POPS_OVERWRITE_TITLE}}},
+    {UI_SPLITTER},
+
+    {UI_LABEL, 0, 1, 1, -1, 0, 0, {.label = {NULL, _STR_POPS_OVERWRITE_MSG}}},
+    {UI_BREAK},
+    {UI_BREAK},
+
+    {UI_BUTTON, POPS_OVERWRITE_KEEP, 1, 1, -1, 0, 0, {.label = {NULL, _STR_POPS_KEEP_EXISTING}}},
+    {UI_BREAK},
+    {UI_BUTTON, POPS_OVERWRITE_REPLACE, 1, 1, -1, 0, 0, {.label = {NULL, _STR_POPS_REPLACE}}},
+    {UI_BREAK},
+
+    // end of dialog
+    {UI_TERMINATOR}};
+
 // MMCE page (settings-layout restructure, was MMCE Settings): SD2PSX / MemCard PRO2 tuning.
 // Communication tuning and the path prefix are composed inline from diaMmceCommConfig /
 // diaMmcePathConfig; CFG ids unchanged.

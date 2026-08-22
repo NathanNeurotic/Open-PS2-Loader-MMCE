@@ -1624,6 +1624,26 @@ void guiShowPopsNetConfig(void)
             if (!popsCur.ipDhcp && !popsIpComplete)
                 popsCur.ipDhcp = 1;
         }
+        // Overwrite guard: existing mc0:/POPSTARTER/*.DAT files are user-owned.
+        // Normal SMB VCD launch never overwrites (vcdEnsurePopstarterSmbConfigMc0
+        // presence wins), but an explicit Settings save must ask before replacing.
+        // Keep = preserve existing files (only create missing ones), Replace =
+        // overwrite with current dialog values, Cancel/Back = abort the save.
+        if ((writeSmb && popsOriginal.smbExists) || (writeIp && popsOriginal.ipExists)) {
+            int ov = diaExecuteDialog(diaPopsOverwrite, -1, 1, NULL);
+            if (ov == POPS_OVERWRITE_KEEP) {
+                if (popsOriginal.smbExists)
+                    writeSmb = 0;
+                if (popsOriginal.ipExists)
+                    writeIp = 0;
+            } else if (ov == POPS_OVERWRITE_REPLACE) {
+                // proceed to write as calculated
+            } else {
+                // Cancel / Back -> abort save entirely
+                writeSmb = 0;
+                writeIp = 0;
+            }
+        }
         if ((writeSmb || writeIp) && vcdWritePopstarterNetFiles(&popsCur, writeSmb, writeIp) != 0)
             guiMsgBox(_l(_STR_POPSTARTER_NET_ERR), 0, NULL);
     }

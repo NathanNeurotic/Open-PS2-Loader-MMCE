@@ -2031,6 +2031,120 @@ int vcdWritePopstarterNetFiles(const vcd_popsnet_t *cfg, int writeSmb, int write
     return 0;
 }
 
+// ---- POPStarter SMB auto-provisioning for mc0:/POPSTARTER/ ------------------
+// Presence-wins helper for SMB VCD launches. See include/vcdsupport.h for contract.
+// Only missing files are generated; existing files are never parsed or touched.
+// Uses current RiptOPL globals (ps2_ip*, pc_ip, gPCShareName, etc.) when derivable.
+// Reuses vcdBuildIpConfig / vcdBuildSmbConfig / vcdSafeWriteFile so the DAT
+// byte-shape stays single-sourced.
+#define VCD_POPS_MC0_DIR       "mc0:/POPSTARTER"
+#define VCD_POPS_MC0_IPCONFIG  "mc0:/POPSTARTER/IPCONFIG.DAT"
+#define VCD_POPS_MC0_SMBCONFIG "mc0:/POPSTARTER/SMBCONFIG.DAT"
+
+static int vcdPopsMc0Exists(const char *path)
+{
+    int fd = open(path, O_RDONLY);
+    if (fd >= 0) {
+        close(fd);
+        return 1;
+    }
+    return 0;
+}
+
+vcd_popsnet_ensure_t vcdEnsurePopstarterSmbConfigMc0(void)
+{
+    int ipExists = vcdPopsMc0Exists(VCD_POPS_MC0_IPCONFIG);
+    int smbExists = vcdPopsMc0Exists(VCD_POPS_MC0_SMBCONFIG);
+
+    if (ipExists && smbExists)
+        return VCD_POPSNET_READY;
+
+    int needIp = !ipExists;
+    int needSmb = !smbExists;
+
+    int canDeriveIp = 0;
+    int canDeriveSmb = 0;
+
+    if (needIp) {
+        if (!ps2_ip_use_dhcp &&
+            vcdQuadOk(ps2_ip) && vcdQuadOk(ps2_netmask) && vcdQuadOk(ps2_gateway) &&
+            (ps2_ip[0] | ps2_ip[1] | ps2_ip[2] | ps2_ip[3]) != 0 &&
+            (ps2_netmask[0] | ps2_netmask[1] | ps2_netmask[2] | ps2_netmask[3]) != 0 &&
+            (ps2_gateway[0] | ps2_gateway[1] | ps2_gateway[2] | ps2_gateway[3]) != 0) {
+            canDeriveIp = 1;
+        }
+        if (!canDeriveIp)
+            return VCD_POPSNET_NEED_STATIC;
+    }
+
+    if (needSmb) {
+        if (gPCShareName[0] != '\0' && vcdQuadOk(pc_ip) &&
+            (pc_ip[0] | pc_ip[1] | pc_ip[2] | pc_ip[3]) != 0 &&
+            strlen(gPCShareName) < sizeof(((vcd_popsnet_t *)0)->smbShare) &&
+            strlen(gPCUserName) < sizeof(((vcd_popsnet_t *)0)->smbUser) &&
+            strlen(gPCPassword) < sizeof(((vcd_popsnet_t *)0)->smbPass)) {
+            if (gPCPort >= 0 && gPCPort <= 65535)
+                canDeriveSmb = 1;
+        }
+        if (!canDeriveSmb) {
+            if (gPCShareName[0] != '\0' && (pc_ip[0] | pc_ip[1] | pc_ip[2] | pc_ip[3]) == 0)
+                return VCD_POPSNET_NEED_STATIC;
+            return VCD_POPSNET_INVALID;
+        }
+    }
+
+    if (needIp || needSmb) {
+        DIR *d = opendir(VCD_POPS_MC0_DIR);
+        if (d == NULL) {
+            mkdir(VCD_POPS_MC0_DIR, 0777);
+        } else {
+            closedir(d);
+        }
+    }
+
+    if (needIp) {
+        vcd_popsnet_t tmp;
+        memset(&tmp, 0, sizeof(tmp));
+        tmp.ipDhcp = 0;
+        memcpy(tmp.ps2Ip, ps2_ip, sizeof(tmp.ps2Ip));
+        memcpy(tmp.ps2Mask, ps2_netmask, sizeof(tmp.ps2Mask));
+        memcpy(tmp.ps2Gw, ps2_gateway, sizeof(tmp.ps2Gw));
+        char buf[256];
+        int len = vcdBuildIpConfig(&tmp, buf, sizeof(buf));
+        int rc = vcdSafeWriteFile(VCD_POPS_MC0_IPCONFIG, buf, len);
+        if (rc != 0)
+            return VCD_POPSNET_IO_ERROR;
+    }
+
+    if (needSmb) {
+        vcd_popsnet_t tmp;
+        memset(&tmp, 0, sizeof(tmp));
+        memcpy(tmp.smbIp, pc_ip, sizeof(tmp.smbIp));
+        tmp.smbPort = gPCPort;
+        snprintf(tmp.smbShare, sizeof(tmp.smbShare), "%s", gPCShareName);
+        snprintf(tmp.smbUser, sizeof(tmp.smbUser), "%s", gPCUserName);
+        snprintf(tmp.smbPass, sizeof(tmp.smbPass), "%s", gPCPassword);
+        char buf[256];
+        int len = vcdBuildSmbConfig(&tmp, buf, sizeof(buf));
+        int rc = vcdSafeWriteFile(VCD_POPS_MC0_SMBCONFIG, buf, len);
+        if (rc != 0)
+            return VCD_POPSNET_IO_ERROR;
+    }
+
+    return VCD_POPSNET_READY;
+}
+
+vcd_popsnet_ensure_t vcdPreparePopstarterSmbLaunch(const char *smbPrefix)
+{
+    if (smbPrefix != NULL && smbPrefix[0] != '\0') {
+        (void)vcdInstallPopstarterMc(smbPrefix);
+    }
+    if (!vcdSmbModulesPresent()) {
+        return VCD_POPSNET_SMB_MISSING;
+    }
+    return vcdEnsurePopstarterSmbConfigMc0();
+}
+
 void vcdPrepareRetroGemBarcode(const char *vcdPath)
 {
     char gameID[RETROGEM_GAMEID_MAX];

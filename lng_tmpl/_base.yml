@@ -1036,6 +1036,16 @@ gui_strings:
   string: Loaded from %s
 - label: POPSTARTER_NET_ERR
   string: Couldn't write POPSTARTER network config to the memory card.
+- label: POPSTARTER_SMB_NEEDS_STATIC
+  string: POPSTARTER SMB requires a static network configuration. Configure POPSTARTER Network Settings first.
+- label: POPS_OVERWRITE_TITLE
+  string: Replace POPSTARTER Config?
+- label: POPS_OVERWRITE_MSG
+  string: POPSTARTER network configuration already exists. Replace it with these settings?
+- label: POPS_KEEP_EXISTING
+  string: Keep Existing
+- label: POPS_REPLACE
+  string: Replace
 - label: NEUTRINO_SETTING_NA
   string: This setting is not used with the Neutrino core.
 - label: DISABLE_ALL

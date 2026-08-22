@@ -778,9 +778,20 @@ static void ethLaunchVcd(item_list_t *itemList, const char *vcdName, config_set_
     // and utility IRX even when the required network stack was already complete. SMB keeps its hard
     // gate: all four network modules must exist after this best-effort install.
     (void)vcdInstallPopstarterMc(ethPrefix);
-    if (!vcdSmbModulesPresent()) {
-        guiMsgBox(_l(_STR_POPSTARTER_SMB_MISSING), 0, NULL);
-        return;
+    {
+        vcd_popsnet_ensure_t ens = vcdPreparePopstarterSmbLaunch(ethPrefix);
+        if (ens == VCD_POPSNET_SMB_MISSING) {
+            guiMsgBox(_l(_STR_POPSTARTER_SMB_MISSING), 0, NULL);
+            return;
+        }
+        if (ens == VCD_POPSNET_NEED_STATIC) {
+            guiMsgBox(_l(_STR_POPSTARTER_SMB_NEEDS_STATIC), 0, NULL);
+            return;
+        }
+        if (ens == VCD_POPSNET_IO_ERROR || ens == VCD_POPSNET_INVALID) {
+            guiMsgBox(_l(_STR_POPSTARTER_NET_ERR), 0, NULL);
+            return;
+        }
     }
     vcdBuildSelector(ethPrefix, VCD_PREFIX_SMB, vcdName, vcdSelector, sizeof(vcdSelector));
     size_t prefixLen = strlen(ethPrefix);
@@ -1054,6 +1065,11 @@ static int ethCheckVMC(item_list_t *itemList, char *name, int createSize)
 }
 
 static char *ethGetPrefix(item_list_t *itemList)
+{
+    return ethPrefix;
+}
+
+const char *ethGetSMBPrefix(void)
 {
     return ethPrefix;
 }
