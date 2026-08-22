@@ -68,7 +68,7 @@ jobs:
             echo "Rolling has no recorded bundled Neutrino version; deferring to the next push-to-master rebuild."
           elif [ "$NEU" != "$CUR" ]; then
             echo "Neutrino changed ($CUR -> $NEU): dispatching rolling-release.yml to rebundle."
-            gh workflow run rolling-release.yml --repo "$GITHUB_REPOSITORY" --ref master
+            gh workflow run rolling-release.yml --repo "$GITHUB_REPOSITORY" --ref rebuild/main
           else
             echo "Rolling already bundles the latest Neutrino ($NEU). Nothing to do."
           fi
