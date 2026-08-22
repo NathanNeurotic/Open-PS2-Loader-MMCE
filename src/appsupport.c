@@ -103,15 +103,31 @@ static char *appGetBoot(char *device, int max, char *path)
 }
 
 // POPSTARTER SMB selector detection for APPS: APPS -> SB.<game>.ELF
-// Uses VCD_PREFIX_SMB and existing basename helper. Returns 1 if the
-// resolved APP startup basename matches SB.*.ELF (case-insensitive).
+// Uses VCD_PREFIX_SMB. Handles '/', '\\' and ':' separators locally so
+// smb0:\POPS\SB.Game.ELF is recognized without changing the generic
+// appGetELFName() semantics for other callers.
 static int appIsPopstarterSmb(const char *startup)
 {
     const char *base;
+    const char *p1;
+    const char *p2;
+    const char *p3;
+    const char *last;
+
     if (startup == NULL || startup[0] == '\0')
         return 0;
-    base = appGetELFName((char *)startup);
-    if (base == NULL || base[0] == '\0')
+
+    p1 = strrchr(startup, '/');
+    p2 = strrchr(startup, '\\');
+    p3 = strrchr(startup, ':');
+    last = p1;
+    if (p2 != NULL && (last == NULL || p2 > last))
+        last = p2;
+    if (p3 != NULL && (last == NULL || p3 > last))
+        last = p3;
+    base = (last != NULL) ? last + 1 : startup;
+
+    if (base[0] == '\0')
         return 0;
     if (strncasecmp(base, VCD_PREFIX_SMB, strlen(VCD_PREFIX_SMB)) != 0)
         return 0;
