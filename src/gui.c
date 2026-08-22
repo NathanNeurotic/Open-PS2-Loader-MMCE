@@ -1316,6 +1316,7 @@ void guiShowVcdListConfig(void)
 {
     diaSetInt(diaVcdListConfig, CFG_VCD_HIDE_GAMEID, gVcdHideGameId);
     diaSetInt(diaVcdListConfig, CFG_VCD_FIRST_DISC_ONLY, gVcdFirstDiscOnly);
+    diaSetInt(diaVcdListConfig, CFG_VCD_SHOW_PP_POPS, gVcdShowPpPops);
 
     int rebuildVcdLists = 0;
     int ret = diaExecuteDialog(diaVcdListConfig, -1, 1, NULL);
@@ -1347,6 +1348,18 @@ void guiShowVcdListConfig(void)
             if (gVcdFirstDiscOnly != previousFirstDiscOnly) {
                 vcdMarkAllDirty();
                 hddVcdInvalidateCache(); // scan-time filter changed -> the cached HDD VCD list is stale
+                rebuildVcdLists = 1;
+            }
+        }
+        {
+            // PP-POPS display changes the HDD VCD list CONTENTS (one-game partitions included or not).
+            // Same treatment as first-disc-only: it is a scan-time filter, so the cached HDD VCD list
+            // is stale the moment it flips. Enumeration-only -- launch semantics never change.
+            int previousShowPpPops = gVcdShowPpPops;
+            diaGetInt(diaVcdListConfig, CFG_VCD_SHOW_PP_POPS, &gVcdShowPpPops);
+            if (gVcdShowPpPops != previousShowPpPops) {
+                vcdMarkAllDirty();
+                hddVcdInvalidateCache();
                 rebuildVcdLists = 1;
             }
         }

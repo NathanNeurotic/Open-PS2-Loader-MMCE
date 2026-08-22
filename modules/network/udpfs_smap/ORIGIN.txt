@@ -8,3 +8,8 @@ and _retonly is defined AFTER the export table in src/exports.tab, so iopfixup d
 _retonly as a value-0 .text symbol. Same fix as smap_udpbd (commit 2139bcde). The export table
 stays POPULATED here -- udpfs_ministack and udpfs_bd import its smap_* functions, so unlike
 smap_udpbd it must NOT be emptied. Keep both on re-vendor.
+
+Local boot-hardening fix: smap_transmit() (src/xfer.c) waits up to 2 seconds for SMAP to initialize
+and returns -1 if the link never comes up, instead of entering the TX path with an uninitialized
+driver. Once SMAP is initialized, transmission retains the established blocking contract and waits
+for TX-ring space until HandleTxReqs() succeeds.

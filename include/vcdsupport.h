@@ -41,6 +41,10 @@ int vcdScanDirRoot(const char *dirPath, vcd_entry_t **outList);
 // Returns 1 and writes the 11-character ID on success; otherwise returns 0 and writes an empty string.
 int vcdExtractGameId(const char *name, char *idOut, int idSize);
 
+// Strict one-game POPS HDD partition label PP.<DISC-ID>.POPS.<NAME>: returns the offset of <NAME>
+// inside the label, or 0 when the label is not a strict PP-POPS partition. Pure string parsing.
+int vcdPopsPartitionTitleOffset(const char *label);
+
 // Remember which directory a VCD was scanned from. String work only -- NO device access; the scan
 // must never block on IO. Called per entry by the scan.
 void vcdNoteScanDir(const char *name, const char *dirPath);

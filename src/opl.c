@@ -191,6 +191,7 @@ int gBdmaMode;                     // BDMA MODE mirrored from the mc?:/POPSTARTE
 int gBdmaApplyOnLaunch;            // auto-equip the launched VCD's matching exFAT driver before boot
 int gVcdUsbBdmaMode;               // VCD_USB_BDMA_*: POPSTARTER USB driver for USB VCD launches
 int gVcdHideGameId;                // display-only: hide a leading PS1 game-ID prefix from VCD lists
+int gVcdShowPpPops;                // enumeration-only: list strict PP.<ID>.POPS.<name> one-game HDD partitions
 int gVcdFirstDiscOnly;             // hide discs 2+ of multi-disc PS1 sets
 char gBootDir[256];                // boot directory (cwd) OPL launched from; "" if undeterminable
 int gEnableILK;
@@ -2411,6 +2412,7 @@ static void _loadConfig()
                 gVcdUsbBdmaMode = VCD_USB_BDMA_ASK;
             configGetInt(configOPL, CONFIG_OPL_VCD_HIDE_GAMEID, &gVcdHideGameId);
             configGetInt(configOPL, CONFIG_OPL_VCD_FIRST_DISC_ONLY, &gVcdFirstDiscOnly);
+            configGetInt(configOPL, CONFIG_OPL_VCD_SHOW_PP_POPS, &gVcdShowPpPops);
             configReadNeutrinoGlobals(configOPL); // shared with miniInit's autolaunch path
             configGetInt(configOPL, CONFIG_OPL_ENABLE_BGART, &gEnableBGArt);
             configGetInt(configOPL, CONFIG_OPL_ENABLE_ART_TAR, &gEnableArtTar);
@@ -2822,6 +2824,7 @@ static void _saveConfig()
         configSetInt(configOPL, CONFIG_OPL_VCD_USB_BDMA, gVcdUsbBdmaMode);
         configSetInt(configOPL, CONFIG_OPL_VCD_HIDE_GAMEID, gVcdHideGameId);
         configSetInt(configOPL, CONFIG_OPL_VCD_FIRST_DISC_ONLY, gVcdFirstDiscOnly);
+        configSetInt(configOPL, CONFIG_OPL_VCD_SHOW_PP_POPS, gVcdShowPpPops);
         configSetStr(configOPL, CONFIG_OPL_NEUTRINO_ARGS, gNeutrinoArgs);
         configSetStr(configOPL, CONFIG_OPL_NEUTRINO_PATH, gNeutrinoPath);
         configSetInt(configOPL, CONFIG_OPL_DEFAULT_CORE, gDefaultCoreLoader);
@@ -3937,6 +3940,7 @@ static void setDefaults(void)
     gVcdUsbBdmaMode = VCD_USB_BDMA_ASK; // preserve the per-launch prompt as the shipped behaviour
     gVcdHideGameId = 1;                 // hide the PS1 game-ID prefix by default (display-only)
     gVcdFirstDiscOnly = 1;              // hide discs 2+ of multi-disc PS1 sets by default (POPSLoader parity)
+    gVcdShowPpPops = 1;                 // list strict PP.<ID>.POPS.<name> one-game HDD partitions by default
     // gBootDir is deliberately NOT reset here. main() resolves it (setBootDir, from argv[0] with a
     // getcwd fallback) BEFORE calling init(), and init() calls setDefaults() -- so clearing it here
     // erased the boot identity a few lines before configInit() needs it, on EVERY boot. That made

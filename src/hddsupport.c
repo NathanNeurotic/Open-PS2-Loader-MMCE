@@ -21,6 +21,7 @@
 #include <io_common.h>   // FIO_MT_RDWR
 
 #include <hdd-ioctl.h>
+#include <delaythread.h> // DelayThread for the post-ATAD settle in hddLoadModules
 
 #define OPL_HDD_MODE_PS2LOGO_OFFSET 0x17F8
 
@@ -266,6 +267,13 @@ int hddLoadModules(void)
         } else {
             retStatus = HDD_LOADMODULES_STATUS_NOERROR;
             hddModulesLoaded = 1;
+            // Settle ~1 s after a FRESH ATA-stack load before anyone probes xhdd0: or loads ps2hdd.
+            // Every working reference does this: NHDDL sleeps 1 s after ata_bd ("prevents ps2hdd from
+            // hanging") and POPSLoader settles 1 s around ata_bd as well. Our earliest callers run
+            // seconds after power-on (APA boot-identity config resolution), so the very first
+            // ATA_DEVCTL_READ_PARTITION_SECTOR probe / ps2hdd init can otherwise race a drive that is
+            // still spinning up. Runs once per load generation: the dedupe branch above never gets here.
+            DelayThread(1000 * 1000);
         }
     } else {
         hddModulesLoadCount++;
@@ -275,6 +283,23 @@ int hddLoadModules(void)
 
     LOG("HDDSUPPORT LoadModules done\n");
     return retStatus;
+}
+
+// Validate an APA header sector without ps2hdd: the "APA" magic plus the header checksum
+// (sum of the 127 little-endian words after the checksum word itself, per ps2sdk apaCheckSum).
+static int hddApaHeaderValid(const u8 *pSectorData)
+{
+    const u32 *pWords = (const u32 *)pSectorData;
+    u32 sum = 0;
+    int i;
+
+    if (memcmp(pSectorData + 4, "APA", 3) != 0)
+        return 0;
+
+    for (i = 1; i < 128; i++)
+        sum += pWords[i];
+
+    return sum == pWords[0];
 }
 
 // Returns 1 for MBR/GPT, 0 for APA, and -1 if an error occured
@@ -298,8 +323,26 @@ int hddDetectNonSonyFileSystem()
         return -1;
     }
 
-    // Check for MBR signature.
-    if (pSectorData[0x1FE] == 0x55 && pSectorData[0x1FF] == 0xAA) {
+    // Check for a valid APA header FIRST, and only treat MBR/GPT evidence as decisive when no valid
+    // APA header exists. The MBR test used to win: but a modern formatter (ps2sdk's GPT-capable
+    // ps2hdd, PC-side POPS/HDL partition tools) legitimately stamps a protective/residual 0x55AA at
+    // bytes 510-511 of the __mbr header while the sector is STILL a fully valid, checksummed APA
+    // header. Such a drive was misclassified as MBR and ps2hdd never loaded -- silently (that branch
+    // raises no error by design), leaving the APA page empty with zero HDL/PFS content while ATA
+    // itself worked fine. The checksummed APA magic is far stronger evidence than two signature
+    // bytes; a genuine exFAT/MBR/GPT drive has no valid APA header and still bails below.
+    if (memcmp((const char *)&pSectorData[4], "APA", 3) == 0) {
+        if (hddApaHeaderValid(pSectorData)) {
+            // Found APA partition type.
+            LOG("hddDetectNonSonyFileSystem: found APA partition data\n");
+            result = 0;
+        } else {
+            // APA magic with a BAD checksum: fail closed. Do not let an accompanying 0x55AA
+            // reclassify a possibly-corrupt APA drive as safe-to-ignore MBR media either.
+            LOG("hddDetectNonSonyFileSystem: APA magic present but header checksum invalid\n");
+            result = -1;
+        }
+    } else if (pSectorData[0x1FE] == 0x55 && pSectorData[0x1FF] == 0xAA) {
         // Found MBR partition type.
         LOG("hddDetectNonSonyFileSystem: found MBR partition data\n");
         result = 1;
@@ -307,10 +350,6 @@ int hddDetectNonSonyFileSystem()
         // Found GPT partition type.
         LOG("hddDetectNonSonyFileSystem: found GPT partition data\n");
         result = 1;
-    } else if (strncmp((const char *)&pSectorData[4], "APA", 3) == 0) {
-        // Found APA partition type.
-        LOG("hddDetectNonSonyFileSystem: found APA partition data\n");
-        result = 0;
     } else {
         // Even though we didn't find evidence of non-APA partition data, if we load the APA irx module
         // it will write to the drive and potentially corrupt any data that might be there.
@@ -542,14 +581,12 @@ static void hddPublishHdlGameList(hdl_games_list_t *replacement)
 }
 
 // Build the HDD VCD game list from both supported APA/PFS shapes. Exact __.POPS / __.POPS0..9
-// containers contribute every root *.VCD; PP.<name> / __.<name> candidates contribute one entry each.
-// A one-game candidate whose label carries a STRICT PS1 disc-ID (PP.SLUS_005.51.Name -- the
-// POPStarter/BatchKitManager convention) is accepted from the APA table alone, ZERO mounts: every
-// documented PP.* false-positive family fails that pattern (HDDOSD apps like CodeBreaker have no
-// '_' at [4]; HDL games are mode-0x1337-filtered upstream), and the launch never needs the probe
-// (POPSTARTER boots by literal partition label). Only ID-less labels (PP.CASTLEVANIA) pay the
-// mount + IMAGE0.VCD probe that filters HDDOSD apps. This is what makes a 40-partition drive load
-// in one APA pass instead of 40 PFS mount/probe/umount cycles (~35 s on a mechanical drive).
+// containers are always mounted and contribute every root *.VCD. PP.<DISC-ID>.POPS.<NAME> one-game
+// installs (vcdPopsPartitionTitleOffset) contribute one entry each from the APA table alone, ZERO
+// mounts, gated by the enumeration-only gVcdShowPpPops setting. Every other PP.*/__.* label is
+// IGNORED with no mount and no probe: the literal ".POPS." marker is what separates a POPS
+// partition from an ordinary ID-labelled HDDOSD/HDL one (e.g. PP.SLUS-21025.01.BATTLEFIELD_2_H),
+// so a drive full of app/game partitions no longer pays a PFS mount/probe/umount cycle per label.
 // Mounts use the dedicated pfs1: scan slot; pfs0: stays on the OPL data partition throughout.
 
 static int hddBuildVcdGameList(void)
@@ -585,26 +622,13 @@ static int hddBuildVcdGameList(void)
         char mountSrc[64];
         snprintf(mountSrc, sizeof(mountSrc), "hdd0:%s", parts.names[p]);
 
-        // PP.<name> / __.<name> one-game install: display the label without its three-character
-        // prefix and retain the FULL label for launch. The name predicate excludes the exact
-        // __.POPS[0-9]? pooled containers handled below.
-        if (hddIsPopsPartitionGame(parts.names[p])) {
-            char discId[12]; // validation only -- the entry keys off the full label, never the ID
-            if (!vcdExtractGameId(parts.names[p] + 3, discId, sizeof(discId))) {
-                // ID-less label (e.g. PP.CASTLEVANIA): require ONE exact IMAGE0.VCD at the partition
-                // root. A mount failure means this refresh was incomplete; an open miss AFTER a
-                // successful mount is authoritative and simply identifies a non-POPS HDDOSD app.
-                if (fileXioMount("pfs1:", mountSrc, FIO_MT_RDONLY) < 0) {
-                    scanIncomplete = 1;
-                    continue;
-                }
-                int imgfd = open("pfs1:/IMAGE0.VCD", O_RDONLY);
-                if (imgfd >= 0)
-                    close(imgfd); // close before unmount; ps2fs may reject an unmount with a live fd
-                fileXioUmount("pfs1:");
-                if (imgfd < 0)
-                    continue;
-            }
+        // PP.<DISC-ID>.POPS.<name> one-game install: strict label match from the APA table alone,
+        // ZERO mounts. Display the title past the ".POPS." marker and retain the FULL label for
+        // launch. Enumeration-only setting: launch semantics are untouched either way.
+        int titleOfs = vcdPopsPartitionTitleOffset(parts.names[p]);
+        if (titleOfs > 0) {
+            if (!gVcdShowPpPops)
+                continue;
 
             base_game_info_t *grownGames = realloc(newGames, (total + 1) * sizeof(base_game_info_t));
             if (grownGames == NULL) {
@@ -621,8 +645,22 @@ static int hddBuildVcdGameList(void)
 
             base_game_info_t *g = &newGames[total];
             memset(g, 0, sizeof(base_game_info_t));
-            snprintf(g->name, sizeof(g->name), "%s", parts.names[p] + 3); // strip PP. / __. for display
-            snprintf(g->startup, sizeof(g->startup), "%s", g->name);      // keep VCD identity = name
+            // The title past ".POPS." is the display name AND the launch key (hddFindVcdByName and
+            // the Favourites entry point both resolve by name), so it must stay unique: two region
+            // variants like PP.SCUS-....POPS.Game / PP.SCPS-....POPS.Game would otherwise both be
+            // "Game" and always launch the first partition. On a collision fall back to the full
+            // partition label, which is unique by construction. Check every entry collected so far,
+            // pooled-container VCDs included.
+            const char *title = parts.names[p] + titleOfs;
+            int nameTaken = 0;
+            for (int i = 0; i < total; i++) {
+                if (strcmp(newGames[i].name, title) == 0) {
+                    nameTaken = 1;
+                    break;
+                }
+            }
+            snprintf(g->name, sizeof(g->name), "%s", nameTaken ? parts.names[p] : title);
+            snprintf(g->startup, sizeof(g->startup), "%s", g->name); // keep VCD identity = name
             snprintf(g->extension, sizeof(g->extension), ".VCD");
             g->parts = 1;
             g->format = GAME_FORMAT_ISO;                                    // VCD flag gates launch
@@ -630,6 +668,13 @@ static int hddBuildVcdGameList(void)
             total++;
             continue;
         }
+
+        // A loose PP.*/__.* label without the strict ".POPS." marker (app/HDL-style partitions,
+        // ID-less labels like PP.CASTLEVANIA) is not VCD content: skip with zero I/O. Only the
+        // exact __.POPS[0-9]? pooled containers below are mounted. hddIsPopsPartitionGame excludes
+        // those containers by construction, so what remains IS a container.
+        if (hddIsPopsPartitionGame(parts.names[p]))
+            continue;
 
         // __.POPS[0-9]? pooled container: mount and scan its root for *.VCD entries.
         if (fileXioMount("pfs1:", mountSrc, FIO_MT_RDONLY) < 0) {

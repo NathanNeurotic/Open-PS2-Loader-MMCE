@@ -814,6 +814,8 @@ gui_strings:
   string: Show only Disc 1 of a multi-disc PS1 game in the device lists (POPSLoader style). Hides files named (Disc 2), (CD 2), etc. All discs stay on the card for in-game swapping; Favourites are not filtered.
 - label: HINT_VCD_HIDE_GAMEID
   string: Cosmetic only -- hide a leading game-ID prefix (e.g. SLUS_005.51.) from PS1/VCD list names. Names without an ID are shown as-is. Does not change launch, cover art, or favourites.
+- label: HINT_VCD_SHOW_PP_POPS
+  string: HDD only -- list one-game partitions named PP.<ID>.POPS.<name> (e.g. PP.SCES-01492.POPS.MEDIEVIL) as PS1 games. Enumeration only; launch is unchanged. Other PP.* partitions (apps, PS2 games) stay hidden.
 - label: HINT_VMC_SLOT_DISABLE
   string: Launch without this slot's VMC while keeping its card configured. Neutrino launches only; the game then uses the real card in that slot.
 - label: INTERFACE_SETTINGS
@@ -906,6 +908,8 @@ gui_strings:
   string: First disc only (multi-disc PS1)
 - label: VCD_HIDE_GAMEID
   string: Hide PS1 Game ID (VCD list)
+- label: VCD_SHOW_PP_POPS
+  string: Display PP.<ID>.POPS partition games (HDD)
 - label: VCD_USB_MODE_EXFAT
   string: exFAT
 - label: VCD_USB_MODE_FAT32

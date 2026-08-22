@@ -244,24 +244,28 @@ static int HandleTxReqs(struct SmapDriverData *SmapDrivPrivData, void *header, u
 
 int smap_transmit(void *header, uint16_t headersize, const void *data, uint16_t datasize)
 {
+    int i, r;
+
     // Wait up to 2 seconds for autonegotiation to complete.
     if (!SmapDriverData.SmapIsInitialized) {
-        int i;
         for (i = 0; i < 2000 && !SmapDriverData.SmapIsInitialized; i++)
             DelayThread(1000);
+        // Timed out: the link never came up. Fail instead of falling through into
+        // HandleTxReqs and potentially reporting success on an uninitialized driver.
+        if (!SmapDriverData.SmapIsInitialized)
+            return -1;
     }
 
     while (1) {
         WaitSema(tx_sema);
-        int r = HandleTxReqs(&SmapDriverData, header, headersize, data, datasize);
+        r = HandleTxReqs(&SmapDriverData, header, headersize, data, datasize);
         SignalSema(tx_sema);
+
         if (r >= 0)
-            break;
+            return 0;
 
         // Wait for about 1KiB (at a speed of 100Mbps)
         // FIXME! We want a blocking write, this works but it's not ideal.
         DelayThread(100);
     }
-
-    return 0;
 }
