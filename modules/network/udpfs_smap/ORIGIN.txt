@@ -9,10 +9,7 @@ _retonly as a value-0 .text symbol. Same fix as smap_udpbd (commit 2139bcde). Th
 stays POPULATED here -- udpfs_ministack and udpfs_bd import its smap_* functions, so unlike
 smap_udpbd it must NOT be emptied. Keep both on re-vendor.
 
-Local boot-hardening fix: InitPHY() no longer waits for a link forever. The WaitLink loop now
-fails after 5s (25 x 200ms), and the auto-negotiation restart cycle runs at most twice (one cycle
-is ~17s worst case, so ~35s total) before returning -1. On that terminal failure the START-event
-handler leaves the driver resident but inert, so a missing cable/link can never freeze OPL boot
-with Network=Auto + UDPFS; UDPFS operations keep failing fast and the watchdog keeps the EE side
-untouched. Related: smap_transmit() (src/xfer.c) now bounds its TX-ring-full retry at ~3s and
-returns -1 instead of spinning forever when the link/driver is dead.
+Local boot-hardening fix: smap_transmit() (src/xfer.c) waits up to 2 seconds for SMAP to initialize
+and returns -1 if the link never comes up, instead of entering the TX path with an uninitialized
+driver. Once SMAP is initialized, transmission retains the established blocking contract and waits
+for TX-ring space until HandleTxReqs() succeeds.
