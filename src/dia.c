@@ -17,6 +17,7 @@
 
 // UI spacing of the dialogues (pixels between consecutive items)
 #define UI_SPACING_H      10
+#define UI_SETTINGS_SPACING_H 7
 #define UI_SPACING_V      2
 // spacer ui element width (simulates tab)
 #define UI_SPACER_WIDTH   50
@@ -38,6 +39,7 @@ static int screenWidth;
 static int screenHeight;
 static struct UIItem *diaSettingsShellUI;
 static const char *diaSettingsIndicator;
+static struct UIItem *diaCenteredUI;
 
 // Utility stuff
 #define KEYB_MODE   2
@@ -478,12 +480,12 @@ static void diaDrawHint(int text_id)
 /// renders an ui item (either selected or not)
 /// sets width and height of the render into the parameters
 // The height diaRenderItem WOULD set for this item, computed without drawing. Kept byte-for-byte in
-// step with diaRenderItem's *h logic below: the default is UI_SPACING_H, UI_SPACER is 0, UI_COLOUR is
+// step with diaRenderItem's *h logic below: the default is the active spacing, UI_SPACER is 0, UI_COLOUR is
 // 17, an invisible controllable item is 0 (diaRenderItem early-returns leaving the caller's h=0), and
 // any non-zero fixedHeight overrides upward (negative = percent of screenHeight). *h never depends on
 // x/y or the text, so this is exact -- used to advance layout past a row the viewport clip skips (#195
 // scroll-bleed fix) so the on-screen rows below it keep their true positions.
-static int diaItemHeight(struct UIItem *item)
+static int diaItemHeight(struct UIItem *item, int spacingH)
 {
     int h;
 
@@ -495,7 +497,7 @@ static int diaItemHeight(struct UIItem *item)
     else if (item->type == UI_COLOUR)
         h = 17;
     else
-        h = UI_SPACING_H;
+        h = spacingH;
 
     if (item->fixedHeight != 0) {
         int newSize = (item->fixedHeight < 0) ? item->fixedHeight * screenHeight / -100 : item->fixedHeight;
@@ -505,13 +507,13 @@ static int diaItemHeight(struct UIItem *item)
     return h;
 }
 
-static void diaRenderItem(int x, int y, struct UIItem *item, int selected, int haveFocus, int *w, int *h)
+static void diaRenderItem(int x, int y, struct UIItem *item, int selected, int haveFocus, int spacingH, int *w, int *h)
 {
     // Don't draw controllable items that are not visible.
     if (!item->visible && item->type >= UI_LABEL)
         return;
 
-    *h = UI_SPACING_H;
+    *h = spacingH;
 
     // all texts are rendered up from the given point!
     u64 txtcol;
@@ -690,6 +692,11 @@ void diaSetSettingsShell(struct UIItem *ui, const char *indicator)
     diaSettingsIndicator = indicator;
 }
 
+void diaSetCenteredDialog(struct UIItem *ui)
+{
+    diaCenteredUI = ui;
+}
+
 /// renders whole ui screen (for given dialog setup)
 void diaRenderUI(struct UIItem *ui, short inMenu, struct UIItem *cur, int haveFocus)
 {
@@ -699,6 +706,7 @@ void diaRenderUI(struct UIItem *ui, short inMenu, struct UIItem *cur, int haveFo
     int x0 = 20;
     int y0 = 20;
     int settingsShell = (ui == diaSettingsShellUI && diaSettingsIndicator != NULL);
+    int spacingH = settingsShell ? UI_SETTINGS_SPACING_H : UI_SPACING_H;
 
     // render all items (shifted up by the scroll offset for tall dialogs)
     struct UIItem *rc = ui;
@@ -713,7 +721,7 @@ void diaRenderUI(struct UIItem *ui, short inMenu, struct UIItem *cur, int haveFo
             x = x0;
 
             if (hmax > 0)
-                y += hmax + UI_SPACING_H;
+                y += hmax + spacingH;
 
             hmax = 0;
         }
@@ -732,13 +740,20 @@ void diaRenderUI(struct UIItem *ui, short inMenu, struct UIItem *cur, int haveFo
         // positions and contentBottom/cursor-follow stay correct. Width is irrelevant for an unshown
         // row -- x resets on the next line break -- so w=0. The FOCUSED row is never skipped (the
         // cursor-follow clamp keeps it inside the viewport by construction), so cursor tracking is exact.
-        int rowH = diaItemHeight(rc);
+        int rowH = diaItemHeight(rc, spacingH);
         int viewBottom = gTheme->usedHeight - 40; // the same bound the scroll clamp below uses
         if (rc != cur && (y + rowH <= y0 || y >= viewBottom)) {
             w = 0;
             h = rowH;
         } else {
-            diaRenderItem(x, y, rc, rc == cur, haveFocus, &w, &h);
+            int renderX = x;
+            if (ui == diaCenteredUI && (rc->type == UI_HEADER || rc->type == UI_BUTTON)) {
+                const char *text = diaGetLocalisedText(rc->label.text, rc->label.stringId);
+                if (text == NULL || text[0] == '\0')
+                    text = _l(_STR_NOT_SET);
+                renderX = (screenWidth - fntCalcDimensions(gTheme->fonts[0], text)) >> 1;
+            }
+            diaRenderItem(renderX, y, rc, rc == cur, haveFocus, spacingH, &w, &h);
         }
 
         if (rc == cur) {
@@ -758,7 +773,7 @@ void diaRenderUI(struct UIItem *ui, short inMenu, struct UIItem *cur, int haveFo
             x = x0;
 
             if (hmax > 0)
-                y += hmax + UI_SPACING_H;
+                y += hmax + spacingH;
 
             hmax = 0;
         }

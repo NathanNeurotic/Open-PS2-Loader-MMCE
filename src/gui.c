@@ -2728,8 +2728,11 @@ static int guiSettingsShowIndex(int *page)
     int result;
 
     // Re-open the index on the current peer page when Triangle is pressed from a settings page.
-    // The initial Settings entry starts with General & System selected.
+    // The initial Settings entry starts with General & System selected. Center the index entries
+    // to match the main menu's category list while retaining the dialog's focus/navigation logic.
+    diaSetCenteredDialog(indexDialog);
     result = diaExecuteDialog(indexDialog, SETTINGS_INDEX_PAGE_BASE + *page, 1, NULL);
+    diaSetCenteredDialog(NULL);
     if (result < SETTINGS_INDEX_PAGE_BASE || result >= SETTINGS_INDEX_PAGE_BASE + SETTINGS_PAGE_COUNT)
         return 0;
 

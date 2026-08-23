@@ -146,7 +146,6 @@ struct UIItem diaNetConfig[] = {
     {UI_BUTTON, NETCFG_OK, 1, 1, -1, 0, 0, {.label = {NULL, -1}}},
     {UI_SPACER},
     {UI_BUTTON, NETCFG_RECONNECT, 1, 1, -1, 0, 0, {.label = {NULL, _STR_RECONNECT}}},
-    {UI_BREAK},
 
     // end of dialog
     {UI_TERMINATOR}};
@@ -241,7 +240,6 @@ struct UIItem diaPopsNetConfig[] = {
 
     // buttons
     {UI_OK, 0, 1, 1, -1, 0, 0, {.label = {NULL, _STR_OK}}},
-    {UI_BREAK},
 
     // end of dialog
     {UI_TERMINATOR}};
@@ -388,7 +386,6 @@ struct UIItem diaVcdConfig[] = {
 
     // buttons
     {UI_OK, 0, 1, 1, -1, 0, 0, {.label = {NULL, _STR_OK}}},
-    {UI_BREAK},
 
     // end of dialog
     {UI_TERMINATOR}};
@@ -1616,7 +1613,6 @@ struct UIItem diaAudioConfig[] = {
 
     // buttons
     {UI_OK, 0, 1, 1, -1, 0, 0, {.label = {NULL, _STR_OK}}},
-    {UI_BREAK},
     // end of dialog
     {UI_TERMINATOR}};
 
@@ -1635,7 +1631,6 @@ struct UIItem diaControllerConfig[] = {
     {UI_ENUM, CFG_SELECTBUTTON, 1, 1, -1, 0, 0, {.intvalue = {0, 0}}},
     {UI_BREAK},
 
-    {UI_BREAK},
     {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {NULL, _STR_XSENSITIVITY}}},
     {UI_SPACER},
     {UI_ENUM, CFG_XSENSITIVITY, 1, 1, -1, 0, 0, {.intvalue = {0, 0}}},
@@ -1659,7 +1654,6 @@ struct UIItem diaControllerConfig[] = {
     {UI_BOOL, CFG_RUMBLE, 1, 1, _STR_HINT_RUMBLE, 0, 0, {.intvalue = {0, 0}}},
     {UI_BREAK},
 #ifdef PADEMU
-    {UI_BREAK},
     {UI_BUTTON, PADEMU_GLOBAL_BUTTON, 1, 1, -1, 0, 0, {.label = {NULL, _STR_CONTROLLER_EMULATION}}},
     {UI_BREAK},
     {UI_BUTTON, PADMACRO_GLOBAL_BUTTON, 1, 1, -1, 0, 0, {.label = {NULL, _STR_CONTROLLER_MACROS}}},
@@ -1667,7 +1661,6 @@ struct UIItem diaControllerConfig[] = {
 #endif
     // buttons
     {UI_OK, 0, 1, 1, -1, 0, 0, {.label = {NULL, _STR_OK}}},
-    {UI_BREAK},
     // end of dialog
     {UI_TERMINATOR}};
 
