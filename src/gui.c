@@ -2166,9 +2166,9 @@ static struct UIItem *guiSettingsCompose(const struct UIItem *const *parts, int 
         }
     }
 
-    guiSettingsDialog[count++] = (struct UIItem){UI_OK, 0, 1, 1, -1, 0, 0, {.label = {NULL, _STR_OK}}};
-    guiSettingsDialog[count++] = (struct UIItem){UI_BREAK};
-    guiSettingsDialog[count] = (struct UIItem){UI_TERMINATOR};
+    guiSettingsDialog[count++] = (struct UIItem) {UI_OK, 0, 1, 1, -1, 0, 0, {.label = {NULL, _STR_OK}}};
+    guiSettingsDialog[count++] = (struct UIItem) {UI_BREAK};
+    guiSettingsDialog[count] = (struct UIItem) {UI_TERMINATOR};
     guiSettingsActiveDialog = guiSettingsDialog;
     return guiSettingsDialog;
 }
