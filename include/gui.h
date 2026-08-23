@@ -138,7 +138,7 @@ int guiShowControllerConfig(void);
 void guiShowSecurityConfig(void);
 void guiShowAdvancedConfig(void);
 void guiShowPathPrefixConfig(void);
-void guiShowMmceConfig(void);
+int guiShowMmceConfig(void);
 void guiShowMmceCommConfig(void);
 void guiShowMmcePathConfig(void);
 void guiShowStorageConfig(void);

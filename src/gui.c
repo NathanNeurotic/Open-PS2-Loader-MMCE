@@ -60,11 +60,14 @@ static int showThmPopup;
 static int showLngPopup;
 
 // The eight Settings peer screens reuse the established dialog definitions. Composite screens are
-// assembled into this buffer at entry so the existing field ids, visibility rules and temporary
+// assembled into scratch buffers at entry so the existing field ids, visibility rules and temporary
 // editor buttons remain owned by their original feature code. Values still live in the existing
-// globals/config sets; this buffer is only a view, never a second configuration store.
+// globals/config sets; these buffers are only views, never a second configuration store.
 #define SETTINGS_DIALOG_CAPACITY 256
 static struct UIItem guiSettingsDialog[SETTINGS_DIALOG_CAPACITY];
+// MMCE Settings can be opened from the composed Game Sources page. Keep its editor separate so
+// returning from that child cannot overwrite the parent's dialog contents.
+static struct UIItem guiMmceSettingsDialog[SETTINGS_DIALOG_CAPACITY];
 static struct UIItem *guiSettingsActiveDialog;
 static int guiSettingsShellActive;
 static int guiSettingsCurrentPage;
@@ -78,6 +81,9 @@ static void guiSettingsBeginDialog(struct UIItem *ui);
 static void guiSettingsEndDialog(void);
 static struct UIItem *guiSettingsCompose(const struct UIItem *const *parts, int partCount,
                                          const int *skipIDs, int skipCount, int suppressSecondaryHeaders);
+static struct UIItem *guiSettingsComposeInto(struct UIItem *dialog, const struct UIItem *const *parts,
+                                              int partCount, const int *skipIDs, int skipCount,
+                                              int suppressSecondaryHeaders);
 
 // Notification popup: START tick + how long to hold, NOT an absolute deadline. clock() is a
 // 32-bit microsecond counter, so it wraps every ~71.6 minutes; `clock() >= start + duration`
@@ -771,19 +777,24 @@ reshow_device:
 // MMCE page (settings-layout restructure, was MMCE Settings): SD2PSX / MemCard PRO2 basics plus
 // communication tuning and the library path. The legacy child definitions remain available, but
 // this entry composes their fields inline so the user does not need another navigation layer.
-void guiShowMmceConfig(void)
+int guiShowMmceConfig(void)
 {
     const struct UIItem *parts[] = {diaMmceConfig, diaMmceCommConfig, diaMmcePathConfig};
     const int skipIDs[] = {MMCE_COMM_BUTTON, MMCE_PATH_BUTTON};
-    const char *deviceSlots[] = {"0", "1", _l(_STR_AUTO), NULL};
-    const char *deviceIGRSlots[] = {"NONE", "0", "1", "BOTH", NULL};
-    const char *deviceAckWaitCycles[] = {"0", "1", "2", "3", "4", "5", NULL};
-    const char *deviceOnOff[] = {"OFF", "ON", NULL};
+    static const char *deviceSlots[] = {"0", "1", NULL, NULL};
+    static const char *deviceIGRSlots[] = {"NONE", "0", "1", "BOTH", NULL};
+    static const char *deviceAckWaitCycles[] = {"0", "1", "2", "3", "4", "5", NULL};
+    static const char *deviceOnOff[] = {"OFF", "ON", NULL};
     struct UIItem *previousActiveDialog = guiSettingsActiveDialog;
-    struct UIItem *ui = guiSettingsCompose(parts, 3, skipIDs, 2, 1);
+    struct UIItem *ui;
+
+    // diaSetEnum stores the array pointer rather than copying it. Keep the MMCE options alive for
+    // the lifetime of the dedicated child dialog, including any parent re-entry after Circle.
+    deviceSlots[2] = _l(_STR_AUTO);
+    ui = guiSettingsComposeInto(guiMmceSettingsDialog, parts, 3, skipIDs, 2, 1);
 
     if (ui == NULL)
-        return;
+        return -1;
 
     diaSetEnum(ui, CFG_MMCESLOT, deviceSlots);
     diaSetInt(ui, CFG_MMCESLOT, gMMCESlot);
@@ -797,18 +808,23 @@ void guiShowMmceConfig(void)
     diaSetString(ui, CFG_MMCEPREFIX, gMMCEPrefix);
 
     int ret = diaExecuteDialog(ui, -1, 1, NULL);
-    if (ret) {
+    if (ret == UIID_BTN_OK) {
         diaGetInt(ui, CFG_MMCESLOT, &gMMCESlot);
         diaGetInt(ui, CFG_MMCEIGRSLOT, &gMMCEIGRSlot);
         diaGetInt(ui, CFG_MMCEGAMEID, &gMMCEEnableGameID);
         diaGetInt(ui, CFG_MMCE_WAIT_CYCLES, &gMMCEAckWaitCycles);
         diaGetInt(ui, CFG_MMCE_USE_ALARMS, &gMMCEUseAlarms);
         diaGetString(ui, CFG_MMCEPREFIX, gMMCEPrefix, sizeof(gMMCEPrefix));
-        applyConfig(-1, -1, 0);
-        menuReinitMainMenu();
+        // The Settings parent commits the complete Game Sources page after this child returns.
+        // Legacy callers still own their own apply path.
+        if (!guiSettingsShellActive) {
+            applyConfig(-1, -1, 0);
+            menuReinitMainMenu();
+        }
     }
 
     guiSettingsActiveDialog = previousActiveDialog;
+    return ret;
 }
 
 // MMCE -> Communication Settings (SIO2 ack-wait pacing, alarm usage).
@@ -2288,6 +2304,14 @@ static int guiSettingsSkipID(int id, const int *skipIDs, int skipCount)
 static struct UIItem *guiSettingsCompose(const struct UIItem *const *parts, int partCount,
                                          const int *skipIDs, int skipCount, int suppressSecondaryHeaders)
 {
+    return guiSettingsComposeInto(guiSettingsDialog, parts, partCount, skipIDs, skipCount,
+                                  suppressSecondaryHeaders);
+}
+
+static struct UIItem *guiSettingsComposeInto(struct UIItem *dialog, const struct UIItem *const *parts,
+                                              int partCount, const int *skipIDs, int skipCount,
+                                              int suppressSecondaryHeaders)
+{
     int part, i, skipTrailingBreak, skipSecondarySplitter;
     int count = 0;
 
@@ -2314,8 +2338,8 @@ static struct UIItem *guiSettingsCompose(const struct UIItem *const *parts, int 
                 // Some legacy rows are represented as LABEL + SPACER + BUTTON. When the action
                 // is omitted from a composed peer page, remove that now-orphaned label as well;
                 // otherwise the page shows an empty heading before the replacement inline block.
-                if (item->type == UI_BUTTON && count >= 2 && guiSettingsDialog[count - 1].type == UI_SPACER &&
-                    guiSettingsDialog[count - 2].type == UI_LABEL)
+                if (item->type == UI_BUTTON && count >= 2 && dialog[count - 1].type == UI_SPACER &&
+                    dialog[count - 2].type == UI_LABEL)
                     count -= 2;
                 // A skipped sub-page button owns the following break in the source dialog. Once
                 // the button is omitted from a composite page, that break would become an empty
@@ -2332,30 +2356,30 @@ static struct UIItem *guiSettingsCompose(const struct UIItem *const *parts, int 
             }
             if (skipSecondarySplitter && item->type == UI_SPLITTER) {
                 skipSecondarySplitter = 0;
-                if (count == 0 || guiSettingsDialog[count - 1].type == UI_BREAK)
+                if (count == 0 || dialog[count - 1].type == UI_BREAK)
                     continue;
-                guiSettingsDialog[count++] = (struct UIItem) {UI_BREAK};
+                dialog[count++] = (struct UIItem) {UI_BREAK};
                 continue;
             }
             // Secondary settings sections already have their own colored heading. Keep the heading
             // on its own line, but omit the source dialog's redundant separator line when it is
             // composed into the peer page.
-            if (part > 0 && item->type == UI_SPLITTER && count > 0 && guiSettingsDialog[count - 1].type == UI_HEADER) {
+            if (part > 0 && item->type == UI_SPLITTER && count > 0 && dialog[count - 1].type == UI_HEADER) {
                 if (count >= SETTINGS_DIALOG_CAPACITY - 3)
                     return NULL;
-                guiSettingsDialog[count++] = (struct UIItem) {UI_BREAK};
+                dialog[count++] = (struct UIItem) {UI_BREAK};
                 continue;
             }
             if (count >= SETTINGS_DIALOG_CAPACITY - 3)
                 return NULL;
-            guiSettingsDialog[count++] = *item;
+            dialog[count++] = *item;
         }
     }
 
-    guiSettingsDialog[count++] = (struct UIItem) {UI_OK, 0, 1, 1, -1, 0, 0, {.label = {NULL, _STR_OK}}};
-    guiSettingsDialog[count] = (struct UIItem) {UI_TERMINATOR};
-    guiSettingsActiveDialog = guiSettingsDialog;
-    return guiSettingsDialog;
+    dialog[count++] = (struct UIItem) {UI_OK, 0, 1, 1, -1, 0, 0, {.label = {NULL, _STR_OK}}};
+    dialog[count] = (struct UIItem) {UI_TERMINATOR};
+    guiSettingsActiveDialog = dialog;
+    return dialog;
 }
 
 static int guiSettingsIsPeerResult(int result)
@@ -2495,8 +2519,16 @@ static int guiSettingsShowSources(void)
 reshow_sources:
     result = diaExecuteDialog(ui, -1, 1, NULL);
     if (result == MMCE_SETTINGS_BUTTON) {
-        guiShowMmceConfig();
-        goto reshow_sources;
+        // MMCE uses a separate composition buffer. Confirming the child editor finishes the
+        // Settings page and returns to the hub; Circle resumes Game Sources as the parent page.
+        int mmceResult = guiShowMmceConfig();
+        if (mmceResult != UIID_BTN_OK)
+            goto reshow_sources;
+
+        // Treat MMCE confirmation as confirmation of its parent page too. This preserves any
+        // Game Sources edits made before opening MMCE, then the normal page-result mapping returns
+        // to the Settings Index and marks the session as needing persistence.
+        result = UIID_BTN_OK;
     }
 
     if (result != UIID_BTN_CANCEL && result != -1) {
