@@ -76,6 +76,8 @@ static int guiSettingsPageResult(int result);
 static int guiSettingsPromptSave(void);
 static void guiSettingsBeginDialog(struct UIItem *ui);
 static void guiSettingsEndDialog(void);
+static struct UIItem *guiSettingsCompose(const struct UIItem *const *parts, int partCount,
+                                         const int *skipIDs, int skipCount, int suppressSecondaryHeaders);
 
 // Notification popup: START tick + how long to hold, NOT an absolute deadline. clock() is a
 // 32-bit microsecond counter, so it wraps every ~71.6 minutes; `clock() >= start + duration`
@@ -766,38 +768,47 @@ reshow_device:
     }
 }
 
-// MMCE page (settings-layout restructure, was MMCE Settings): SD2PSX / MemCard PRO2 basics (memory-
-// card slot, IGR slot, GameID push). Communication tuning and the path prefix are chained
-// sub-dialogs; CFG ids shared with the old rows.
+// MMCE page (settings-layout restructure, was MMCE Settings): SD2PSX / MemCard PRO2 basics plus
+// communication tuning and the library path. The legacy child definitions remain available, but
+// this entry composes their fields inline so the user does not need another navigation layer.
 void guiShowMmceConfig(void)
 {
+    const struct UIItem *parts[] = {diaMmceConfig, diaMmceCommConfig, diaMmcePathConfig};
+    const int skipIDs[] = {MMCE_COMM_BUTTON, MMCE_PATH_BUTTON};
     const char *deviceSlots[] = {"0", "1", _l(_STR_AUTO), NULL};
     const char *deviceIGRSlots[] = {"NONE", "0", "1", "BOTH", NULL};
+    const char *deviceAckWaitCycles[] = {"0", "1", "2", "3", "4", "5", NULL};
+    const char *deviceOnOff[] = {"OFF", "ON", NULL};
+    struct UIItem *previousActiveDialog = guiSettingsActiveDialog;
+    struct UIItem *ui = guiSettingsCompose(parts, 3, skipIDs, 2, 1);
 
-    diaSetEnum(diaMmceConfig, CFG_MMCESLOT, deviceSlots);
-    diaSetInt(diaMmceConfig, CFG_MMCESLOT, gMMCESlot);
-    diaSetEnum(diaMmceConfig, CFG_MMCEIGRSLOT, deviceIGRSlots);
-    diaSetInt(diaMmceConfig, CFG_MMCEIGRSLOT, gMMCEIGRSlot);
-    diaSetInt(diaMmceConfig, CFG_MMCEGAMEID, gMMCEEnableGameID);
+    if (ui == NULL)
+        return;
 
-    int ret;
-reshow_mmce:
-    ret = diaExecuteDialog(diaMmceConfig, -1, 1, NULL);
-    if (ret == MMCE_COMM_BUTTON) {
-        guiShowMmceCommConfig();
-        goto reshow_mmce;
-    }
-    if (ret == MMCE_PATH_BUTTON) {
-        guiShowMmcePathConfig();
-        goto reshow_mmce;
-    }
+    diaSetEnum(ui, CFG_MMCESLOT, deviceSlots);
+    diaSetInt(ui, CFG_MMCESLOT, gMMCESlot);
+    diaSetEnum(ui, CFG_MMCEIGRSLOT, deviceIGRSlots);
+    diaSetInt(ui, CFG_MMCEIGRSLOT, gMMCEIGRSlot);
+    diaSetInt(ui, CFG_MMCEGAMEID, gMMCEEnableGameID);
+    diaSetEnum(ui, CFG_MMCE_WAIT_CYCLES, deviceAckWaitCycles);
+    diaSetInt(ui, CFG_MMCE_WAIT_CYCLES, gMMCEAckWaitCycles);
+    diaSetEnum(ui, CFG_MMCE_USE_ALARMS, deviceOnOff);
+    diaSetInt(ui, CFG_MMCE_USE_ALARMS, gMMCEUseAlarms);
+    diaSetString(ui, CFG_MMCEPREFIX, gMMCEPrefix);
+
+    int ret = diaExecuteDialog(ui, -1, 1, NULL);
     if (ret) {
-        diaGetInt(diaMmceConfig, CFG_MMCESLOT, &gMMCESlot);
-        diaGetInt(diaMmceConfig, CFG_MMCEIGRSLOT, &gMMCEIGRSlot);
-        diaGetInt(diaMmceConfig, CFG_MMCEGAMEID, &gMMCEEnableGameID);
+        diaGetInt(ui, CFG_MMCESLOT, &gMMCESlot);
+        diaGetInt(ui, CFG_MMCEIGRSLOT, &gMMCEIGRSlot);
+        diaGetInt(ui, CFG_MMCEGAMEID, &gMMCEEnableGameID);
+        diaGetInt(ui, CFG_MMCE_WAIT_CYCLES, &gMMCEAckWaitCycles);
+        diaGetInt(ui, CFG_MMCE_USE_ALARMS, &gMMCEUseAlarms);
+        diaGetString(ui, CFG_MMCEPREFIX, gMMCEPrefix, sizeof(gMMCEPrefix));
         applyConfig(-1, -1, 0);
         menuReinitMainMenu();
     }
+
+    guiSettingsActiveDialog = previousActiveDialog;
 }
 
 // MMCE -> Communication Settings (SIO2 ack-wait pacing, alarm usage).
@@ -1320,11 +1331,26 @@ reshow_vcd:
 
 static void guiSetBdmaSettings(struct UIItem *ui)
 {
-    const char *bdmaSourceStrs[] = {_l(_STR_BDMA_SRC_USB), _l(_STR_BDMA_SRC_MX4SIO), _l(_STR_BDMA_SRC_MMCE), _l(_STR_BDMA_SRC_HDD), NULL};
-    const char *bdmaModeStrs[] = {_l(_STR_BDMA_MODE_FAT32), _l(_STR_BDMA_MODE_USBEXFAT), _l(_STR_BDMA_MODE_MX4SIO), _l(_STR_BDMA_MODE_MMCE), _l(_STR_BDMA_MODE_ATA), NULL};
+    static const char *bdmaSourceStrs[] = {NULL, NULL, NULL, NULL, NULL};
+    static const char *bdmaModeStrs[] = {NULL, NULL, NULL, NULL, NULL, NULL};
     // Order matches enum VCD_USB_BDMA_MODE: Ask / exFAT / fat32. The two driver labels are the ones the
     // per-launch prompt already uses, so the row and the dialog it replaces read identically.
-    const char *vcdUsbBdmaStrs[] = {_l(_STR_VCD_USB_BDMA_ASK), _l(_STR_VCD_USB_MODE_EXFAT), _l(_STR_VCD_USB_MODE_FAT32), NULL};
+    static const char *vcdUsbBdmaStrs[] = {NULL, NULL, NULL, NULL};
+
+    // diaSetEnum stores the array pointer rather than copying it. These arrays must therefore outlive
+    // this initializer, especially when the BDMA rows are composed into the POPSTARTER peer page.
+    bdmaSourceStrs[0] = _l(_STR_BDMA_SRC_USB);
+    bdmaSourceStrs[1] = _l(_STR_BDMA_SRC_MX4SIO);
+    bdmaSourceStrs[2] = _l(_STR_BDMA_SRC_MMCE);
+    bdmaSourceStrs[3] = _l(_STR_BDMA_SRC_HDD);
+    bdmaModeStrs[0] = _l(_STR_BDMA_MODE_FAT32);
+    bdmaModeStrs[1] = _l(_STR_BDMA_MODE_USBEXFAT);
+    bdmaModeStrs[2] = _l(_STR_BDMA_MODE_MX4SIO);
+    bdmaModeStrs[3] = _l(_STR_BDMA_MODE_MMCE);
+    bdmaModeStrs[4] = _l(_STR_BDMA_MODE_ATA);
+    vcdUsbBdmaStrs[0] = _l(_STR_VCD_USB_BDMA_ASK);
+    vcdUsbBdmaStrs[1] = _l(_STR_VCD_USB_MODE_EXFAT);
+    vcdUsbBdmaStrs[2] = _l(_STR_VCD_USB_MODE_FAT32);
 
     gBdmaMode = vcdReadBdmaMode();
     diaSetEnum(ui, CFG_BDMASOURCE, bdmaSourceStrs);
@@ -2584,7 +2610,9 @@ static int guiSettingsShowInterface(void)
     diaSetInt(ui, UICFG_AUTOSORT, gAutosort);
     diaSetInt(ui, UICFG_AUTOREFRESH, gAutoRefresh);
     diaSetInt(ui, UICFG_NOTIFICATIONS, gEnableNotifications);
-    diaSetVisible(ui, UICFG_COVERFLOW_BUTTON, gTheme->coverflow != NULL);
+    // Keep the editor reachable even when the current theme has no active Coverflow view; users
+    // need to be able to configure it before enabling or switching to a Coverflow-capable theme.
+    diaSetVisible(ui, UICFG_COVERFLOW_BUTTON, 1);
     diaSetInt(ui, UICFG_VMODE, gVMode);
     diaSetInt(ui, UICFG_WIDESCREEN, gWideScreen);
     diaSetInt(ui, UICFG_XOFF, gXOff);

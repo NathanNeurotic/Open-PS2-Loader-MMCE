@@ -7,16 +7,18 @@
 
 #include <stdio.h>
 
-// Network page (settings-layout restructure): Protocol/Access/SMB-Version moved here from Game
-// Sources; the POPStarter network section moved out to POPStarter -> Network Settings (diaPopsNetConfig).
+// Network page (settings-layout restructure): POPSTARTER's shared editor entry plus the
+// OPL/Neutrino transport and SMB fields live here. The POPSTARTER network state itself remains
+// owned by diaPopsNetConfig.
 struct UIItem diaNetConfig[] = {
     {UI_HEADER, 0, 1, 1, -1, 0, 0, {.label = {NULL, _STR_MENU_NETWORK}}},
     {UI_SPLITTER},
 
-    // Keep OPL's live configuration visually distinct from the shared POPSTARTER
-    // editor. The button opens the same IPCONFIG.DAT/SMBCONFIG.DAT owner used by the POPSTARTER
-    // peer page; no POPSTARTER state is duplicated here.
-    {UI_HEADER, 0, 1, 1, -1, 0, 0, {.label = {"NETWORK TRANSPORT", -1}}},
+    // This button opens the same IPCONFIG.DAT/SMBCONFIG.DAT owner used by the POPSTARTER peer
+    // page; no POPSTARTER state is duplicated here.
+    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {NULL, _STR_POPSTARTER_NETWORK_SETTINGS}}},
+    {UI_SPACER},
+    {UI_BUTTON, NETCFG_POPSTARTER_BUTTON, 1, 1, -1, 0, 0, {.label = {NULL, _STR_MODIFY}}},
     {UI_BREAK},
 
     // Unified network rows (moved from diaDeviceConfig): Protocol (SMB/UDPFS/UDPBD) and Access
@@ -45,16 +47,6 @@ struct UIItem diaNetConfig[] = {
     {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {NULL, _STR_ETH_OPMODE}}},
     {UI_SPACER},
     {UI_ENUM, NETCFG_ETHOPMODE, 1, 1, -1, 0, 0, {.intvalue = {0, 0}}},
-    {UI_BREAK},
-
-    {UI_HEADER, 0, 1, 1, -1, 0, 0, {.label = {"POPSTARTER", -1}}},
-    {UI_BREAK},
-    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {NULL, _STR_POPSTARTER_NETWORK_SETTINGS}}},
-    {UI_SPACER},
-    {UI_BUTTON, NETCFG_POPSTARTER_BUTTON, 1, 1, -1, 0, 0, {.label = {NULL, _STR_MODIFY}}},
-    {UI_BREAK},
-
-    {UI_HEADER, 0, 1, 1, -1, 0, 0, {.label = {"NETWORK ADDRESSES", -1}}},
     {UI_BREAK},
 
     // ---- IP address type ----
@@ -109,6 +101,8 @@ struct UIItem diaNetConfig[] = {
     {UI_INT, NETCFG_PS2_DNS_2, 1, 1, -1, 0, 0, {.intvalue = {0, 0, 0, 255}}},
     {UI_LABEL, 0, 1, 1, -1, 0, 0, {.label = {".", -1}}},
     {UI_INT, NETCFG_PS2_DNS_3, 1, 1, -1, 0, 0, {.intvalue = {1, 1, 0, 255}}},
+    {UI_BREAK},
+
     //  ---- SMB Server ----
     {UI_HEADER, NETCFG_LBL_SMB_SERVER, 1, 1, -1, 0, 0, {.label = {NULL, _STR_CAT_SMB_SERVER}}},
     {UI_BREAK},
@@ -500,7 +494,7 @@ struct UIItem diaVcdUsbMode[] = {
     {UI_TERMINATOR}};
 
 // MMCE page (settings-layout restructure, was MMCE Settings): SD2PSX / MemCard PRO2 tuning.
-// Communication tuning and the path prefix moved to the chained sub-dialogs diaMmceCommConfig /
+// Communication tuning and the path prefix are composed inline from diaMmceCommConfig /
 // diaMmcePathConfig; CFG ids unchanged.
 struct UIItem diaMmceConfig[] = {
     {UI_HEADER, 0, 1, 1, -1, 0, 0, {.label = {NULL, _STR_MMCE}}},
@@ -521,7 +515,7 @@ struct UIItem diaMmceConfig[] = {
     {UI_BOOL, CFG_MMCEGAMEID, 1, 1, -1, 0, 0, {.intvalue = {0, 0}}},
     {UI_BREAK},
 
-    // sub-pages
+    // Legacy action rows. The Settings page skips these and composes both editors inline below.
     {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {NULL, _STR_COMM_SETTINGS}}},
     {UI_SPACER},
     {UI_BUTTON, MMCE_COMM_BUTTON, 1, 1, -1, 0, 0, {.label = {NULL, _STR_MODIFY}}},
@@ -538,9 +532,12 @@ struct UIItem diaMmceConfig[] = {
     // end of dialog
     {UI_TERMINATOR}};
 
-// MMCE -> Communication Settings (ACK wait / alarm tuning). Rows moved out of diaMmceConfig.
+// MMCE -> Communication Settings (ACK wait / alarm tuning). Kept as a standalone definition for
+// legacy callers; the Settings shell composes these fields into MMCE Settings.
 struct UIItem diaMmceCommConfig[] = {
-    {UI_HEADER, 0, 1, 1, -1, 0, 0, {.label = {NULL, _STR_COMM_SETTINGS}}},
+    // A label keeps this section visible when composed into MMCE Settings. The standalone legacy
+    // editor remains readable without a separate peer-page title.
+    {UI_LABEL, 0, 1, 1, -1, 0, 0, {.label = {NULL, _STR_COMM_SETTINGS}}},
     {UI_SPLITTER},
 
     {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {NULL, _STR_MMCE_WAIT_CYCLES}}},
@@ -560,9 +557,12 @@ struct UIItem diaMmceCommConfig[] = {
     // end of dialog
     {UI_TERMINATOR}};
 
-// MMCE -> Path Settings (library prefix). Row moved out of the old General Settings (diaConfig).
+// MMCE -> Path Settings (library prefix). Kept as a standalone definition for legacy callers; the
+// Settings shell composes this field into MMCE Settings.
 struct UIItem diaMmcePathConfig[] = {
-    {UI_HEADER, 0, 1, 1, -1, 0, 0, {.label = {NULL, _STR_PATH_SETTINGS}}},
+    // A label keeps this section visible when composed into MMCE Settings. The standalone legacy
+    // editor remains readable without a separate peer-page title.
+    {UI_LABEL, 0, 1, 1, -1, 0, 0, {.label = {NULL, _STR_PATH_SETTINGS}}},
     {UI_SPLITTER},
 
     {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {NULL, _STR_MMCE_PREFIX}}},
@@ -750,7 +750,9 @@ struct UIItem diaDisplayConfig[] = {
     // The GLOBAL half of GSM: the $EnableGSM/$GSMVMode/... block in the global config, which every
     // game inherits unless it sets its own. Distinct from UICFG_VMODE above -- that is the video
     // mode of the OPL MENU, this is the video mode games are launched in.
-    {UI_BUTTON, DISPLAY_GSM_DEFAULTS_BUTTON, 1, 1, -1, 0, 0, {.label = {NULL, _STR_GSM_DEFAULTS}}},
+    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {NULL, _STR_GSM_DEFAULTS}}},
+    {UI_SPACER},
+    {UI_BUTTON, DISPLAY_GSM_DEFAULTS_BUTTON, 1, 1, -1, 0, 0, {.label = {NULL, _STR_MODIFY}}},
     {UI_BREAK},
 
     // buttons
@@ -776,11 +778,13 @@ struct UIItem diaLaunchConfig[] = {
     {UI_ENUM, CFG_DEFAULT_CORE, 1, 1, _STR_HINT_DEFAULT_CORE, 0, 0, {.intvalue = {0, 0}}},
     {UI_BREAK},
 
-    // Direct actions. Neutrino's actual default fields are composed below; OSD defaults retain
-    // the existing structured editor, but the page exposes it as one native action row.
+    // Modify actions. Neutrino's actual default fields are composed below; OSD defaults retain the
+    // existing structured editor, but the page exposes it as one native action row.
     {UI_BUTTON, LAUNCH_NEUTRINO_DEFAULTS_BUTTON, 1, 1, -1, 0, 0, {.label = {NULL, _STR_NEUTRINO_DEFAULTS}}},
     {UI_BREAK},
-    {UI_BUTTON, LAUNCH_OSD_DEFAULTS_BUTTON, 1, 1, -1, 0, 0, {.label = {NULL, _STR_OSD_DEFAULTS}}},
+    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {NULL, _STR_OSD_DEFAULTS}}},
+    {UI_SPACER},
+    {UI_BUTTON, LAUNCH_OSD_DEFAULTS_BUTTON, 1, 1, -1, 0, 0, {.label = {NULL, _STR_MODIFY}}},
     {UI_BREAK},
 
     // buttons
@@ -859,36 +863,36 @@ struct UIItem diaAdvancedConfig[] = {
     {UI_BOOL, CFG_DEBUG, 1, 1, -1, 0, 0, {.intvalue = {0, 0}}},
     {UI_BREAK},
 
-    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {"  BDM Prefix Path", -1}}},
+    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {"BDM Prefix Path", -1}}},
     {UI_SPACER},
     {UI_STRING, CFG_BDMPREFIX, 1, 1, -1, 0, 0, {.stringvalue = {"", "", NULL}}},
     {UI_BREAK},
-    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {"  ETH Prefix Path", -1}}},
+    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {"ETH Prefix Path", -1}}},
     {UI_SPACER},
     {UI_STRING, CFG_ETHPREFIX, 1, 1, -1, 0, 0, {.stringvalue = {"", "", NULL}}},
     {UI_BREAK},
 
-    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {"  HDD Spindown", -1}}},
+    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {"HDD Spindown", -1}}},
     {UI_SPACER},
     {UI_INT, CFG_HDDSPINDOWN, 1, 1, _STR_HINT_SPINDOWN, 0, 0, {.intvalue = {20, 20, 0, 20}}},
     {UI_BREAK},
 
-    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {"  Cache Game List (HDD)", -1}}},
+    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {"Cache Game List (HDD)", -1}}},
     {UI_SPACER},
     {UI_BOOL, CFG_HDDGAMELISTCACHE, 1, 1, -1, 0, 0, {.intvalue = {0, 0}}},
     {UI_BREAK},
 
-    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {"  BDM Cache", -1}}},
+    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {"BDM Cache", -1}}},
     {UI_SPACER},
     {UI_INT, CFG_BDMCACHE, 1, 1, -1, 0, 0, {.intvalue = {16, 8, 0, 32, NULL}}},
     {UI_BREAK},
 
-    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {"  HDD Cache", -1}}},
+    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {"HDD Cache", -1}}},
     {UI_SPACER},
     {UI_INT, CFG_HDDCACHE, 1, 1, -1, 0, 0, {.intvalue = {8, 0, 0, 32, NULL}}},
     {UI_BREAK},
 
-    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {"  SMB Cache", -1}}},
+    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {"SMB Cache", -1}}},
     {UI_SPACER},
     {UI_INT, CFG_SMBCACHE, 1, 1, -1, 0, 0, {.intvalue = {16, 4, 0, 32, NULL}}},
     {UI_BREAK},
