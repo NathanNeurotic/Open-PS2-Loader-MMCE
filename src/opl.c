@@ -1808,9 +1808,11 @@ static int prepareCustomSettingsPath(char *path, int pathLen)
 // Last-resort READ-ONLY discovery for a missing/stale config.path. This exists to recover the
 // chicken-and-egg custom-settings value from an already-existing config; it never creates a config,
 // never changes APA metadata, and never makes an arbitrary discovered device the permanent save home.
-// A known local boot self-migrates the loaded in-memory sets back to its normal boot home; if the
-// recovered config contains Custom Settings Path, _saveConfig will honor it and regenerate config.path
-// on the user's next explicit Save Changes.
+// A known non-MC local boot self-migrates the loaded in-memory sets back to its normal boot home. A
+// concrete MC boot preserves the same-card directory it recovered, so its first save cannot relocate
+// an already-working MC1 configuration to the card root or the other slot. If the recovered config
+// contains Custom Settings Path, _saveConfig will honor it and regenerate config.path on the user's
+// next explicit Save Changes.
 static int tryReadRecoveryConfigHome(int types, const char *home)
 {
     DIR *dir = opendir(home);
@@ -1826,10 +1828,19 @@ static int tryReadRecoveryConfigHome(int types, const char *home)
     return value;
 }
 
+static int sameConcreteMcSlot(const char *first, const char *second)
+{
+    return first != NULL && second != NULL &&
+           !strncmp(first, "mc", 2) && !strncmp(second, "mc", 2) &&
+           (first[2] == '0' || first[2] == '1') && first[3] == ':' &&
+           first[2] == second[2] && second[3] == ':';
+}
+
 static void restoreRecoverySaveHome(const char *recoveredHome)
 {
-    // Recovery is discovery only and never writes by itself. Known local boots return to their
-    // real boot home; a bare launch has no independent owner, so the existing config home that was
+    // Recovery is discovery only and never writes by itself. Known local boots normally return to
+    // their real boot home, but a concrete MC boot keeps the same-card directory that supplied it.
+    // A bare launch has no independent owner, so the existing config home that was
     // actually recovered becomes the next explicit-save home. A deferred network boot cannot save
     // back to its unreadable share during bootstrap, so select a concrete reachable MC home when possible.
     if (gBootHomeDeferred) {
@@ -1858,6 +1869,12 @@ static void restoreRecoverySaveHome(const char *recoveredHome)
             configSetMove((char *)mcHome);
         else
             configSetMove(NULL); // no concrete MC is reachable: keep the normal fail-visible wildcard home
+    } else if (sameConcreteMcSlot(gBootDir, recoveredHome)) {
+        // A concrete MC boot that recovered its existing settings from the same card keeps that
+        // exact directory as its save owner. In particular, a launcher that supplies only "mc1:"
+        // as the boot CWD must not move a successfully read mc1:/OPL configuration to the card
+        // root (or to mc0 when both cards are inserted).
+        configSetMove((char *)recoveredHome);
     } else if (gBootDir[0] != '\0') {
         configSetMove(gBootDir);
     } else {
@@ -2049,7 +2066,13 @@ static int tryAlternateDevice(int types)
             // already serving this config -- sysCheckMC() gated the whole branch.
             if (gBootHomeDeferred)
                 homeLeftOnCard = 1;
-            else
+            else if (sameConcreteMcSlot(gBootDir, concreteMcHome)) {
+                configSetMove(concreteMcHome); // MC legacy config remains at the exact discovered home
+                // configSetMove already made the exact MC1/MC0 home the notification/save owner.
+                // Do not overwrite that with a compact/root boot CWD below: failure reporting must
+                // name the same directory that configWriteMulti will actually use.
+                homeLeftOnCard = 1;
+            } else
                 configSetMove(gBootDir); // home (and notifications) back on the boot dir: saves self-migrate
 
             if (value & CONFIG_OPL)
@@ -4362,6 +4385,23 @@ static void autoLaunchBDMGame(char *argv[])
 }
 
 // --------------------- Main --------------------
+// Memory-card roots require an explicit slash for file creation (mc1:/FILE, not mc1:FILE).
+// Some launchers provide an equivalent compact path such as mc1:APPS/OPL.ELF or leave getcwd()
+// at mc1:. Normalize the generic device representation once, without any launcher-specific branch.
+static void normalizeMcBootDir(void)
+{
+    if (strncmp(gBootDir, "mc", 2) || (gBootDir[2] != '0' && gBootDir[2] != '1') ||
+        gBootDir[3] != ':' || gBootDir[4] == '/')
+        return;
+
+    size_t len = strlen(gBootDir);
+    if (len + 1 >= sizeof(gBootDir))
+        return;
+
+    memmove(&gBootDir[5], &gBootDir[4], len - 3);
+    gBootDir[4] = '/';
+}
+
 static void setBootDir(const char *bootPath)
 {
     gBootDir[0] = '\0';
@@ -4426,6 +4466,7 @@ int main(int argc, char *argv[])
             snprintf(gBootDir, sizeof(gBootDir), "%s", cwd);
         }
     }
+    normalizeMcBootDir();
 
     if (argc >= 5) {
         /* argv[0] boot path

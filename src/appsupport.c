@@ -799,10 +799,10 @@ static void appLaunchItem(item_list_t *itemList, int id, config_set_t *configSet
         if (mode == HDD_MODE)
             snprintf(partition, sizeof(partition), "%s:", gOPLPart);
 
-        // POPSTARTER SMB via APPS: APPS -> SB.<game>.ELF
-        // Run the same SMB environment preparation as ETH VCD.
+        // POPSTARTER SMB via APPS: only an ETH/SMB SB.<game>.ELF receives the same preparation
+        // as an ETH VCD. A local SB.* tool is an ordinary app, never an SMB launch by filename alone.
         // Uses shared helper vcdPreparePopstarterSmbLaunch(ethPrefix).
-        if (appIsPopstarterSmb(filename)) {
+        if (mode == ETH_MODE && appIsPopstarterSmb(filename)) {
             vcd_popsnet_ensure_t ens = vcdPreparePopstarterSmbLaunch(ethGetSMBPrefix());
             if (ens == VCD_POPSNET_SMB_MISSING) {
                 guiMsgBox(_l(_STR_POPSTARTER_SMB_MISSING), 0, NULL);
@@ -812,8 +812,12 @@ static void appLaunchItem(item_list_t *itemList, int id, config_set_t *configSet
                 guiMsgBox(_l(_STR_POPSTARTER_SMB_NEEDS_STATIC), 0, NULL);
                 return;
             }
-            if (ens == VCD_POPSNET_IO_ERROR || ens == VCD_POPSNET_INVALID) {
+            if (ens == VCD_POPSNET_IO_ERROR) {
                 guiMsgBox(_l(_STR_POPSTARTER_NET_ERR), 0, NULL);
+                return;
+            }
+            if (ens == VCD_POPSNET_INVALID) {
+                guiMsgBox(_l(_STR_POPSTARTER_NET_INVALID), 0, NULL);
                 return;
             }
         }

@@ -494,7 +494,7 @@ struct UIItem diaVcdUsbMode[] = {
     {UI_TERMINATOR}};
 
 // POPSTARTER overwrite confirmation: shown when POPSTARTER Network Settings would
-// overwrite existing mc0:/POPSTARTER/*.DAT files. Keep = preserve existing files
+// overwrite existing resolved mc0:/ or mc1:/POPSTARTER/*.DAT files. Keep = preserve existing files
 // (no write, return to editor); Replace = overwrite with current dialog values;
 // Cancel/Back = abort the save and return to the editor. Uses existing dialog
 // conventions - two explicit buttons plus the standard Back/Cancel.

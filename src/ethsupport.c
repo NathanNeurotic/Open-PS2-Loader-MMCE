@@ -784,8 +784,12 @@ static void ethLaunchVcd(item_list_t *itemList, const char *vcdName, config_set_
             guiMsgBox(_l(_STR_POPSTARTER_SMB_NEEDS_STATIC), 0, NULL);
             return;
         }
-        if (ens == VCD_POPSNET_IO_ERROR || ens == VCD_POPSNET_INVALID) {
+        if (ens == VCD_POPSNET_IO_ERROR) {
             guiMsgBox(_l(_STR_POPSTARTER_NET_ERR), 0, NULL);
+            return;
+        }
+        if (ens == VCD_POPSNET_INVALID) {
+            guiMsgBox(_l(_STR_POPSTARTER_NET_INVALID), 0, NULL);
             return;
         }
     }

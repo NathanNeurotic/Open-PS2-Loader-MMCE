@@ -1520,11 +1520,15 @@ static int guiPopsNetUpdater(int modified)
 void guiShowPopsNetConfig(void)
 {
     size_t i;
-    const char *ipAddrConfModes[] = {_l(_STR_IP_ADDRESS_TYPE_STATIC), _l(_STR_IP_ADDRESS_TYPE_DHCP), NULL};
     // POPStarter read-time snapshot for the change-detection save matrix, + static storage for the
     // "Loaded from %s" notice (diaSetLabel stores a RAW POINTER -- it must outlive the dialog).
     static vcd_popsnet_t popsOriginal;
     static char popsNotice[128];
+    static const char *ipAddrConfModes[3];
+
+    ipAddrConfModes[0] = _l(_STR_IP_ADDRESS_TYPE_STATIC);
+    ipAddrConfModes[1] = _l(_STR_IP_ADDRESS_TYPE_DHCP);
+    ipAddrConfModes[2] = NULL;
     diaSetEnum(diaPopsNetConfig, NETCFG_POPS_IPTYPE, ipAddrConfModes); // same Static/DHCP index convention
 
     vcdReadPopstarterNet(&popsOriginal);
@@ -1544,17 +1548,18 @@ void guiShowPopsNetConfig(void)
     diaSetString(diaPopsNetConfig, NETCFG_POPS_SMB_USER, popsOriginal.smbUser);
     diaSetString(diaPopsNetConfig, NETCFG_POPS_SMB_PASS, popsOriginal.smbPass);
 
-    if (popsOriginal.smbExists || popsOriginal.ipExists) {
+    if (popsOriginal.smbInvalid || popsOriginal.ipInvalid) {
+        diaSetLabel(diaPopsNetConfig, NETCFG_POPS_NOTICE, _l(_STR_POPSTARTER_NET_INVALID));
+    } else if (popsOriginal.smbExists || popsOriginal.ipExists) {
         snprintf(popsNotice, sizeof(popsNotice), _l(_STR_POPS_LOADED_FROM),
-                 popsOriginal.smbExists ? popsOriginal.smbDir : popsOriginal.ipDir);
+                 popsOriginal.home);
         diaSetLabel(diaPopsNetConfig, NETCFG_POPS_NOTICE, popsNotice);
     } else {
         diaSetLabel(diaPopsNetConfig, NETCFG_POPS_NOTICE, _l(_STR_POPS_NONE_DETECTED));
     }
 
-    int result;
-    do {
-        result = diaExecuteDialog(diaPopsNetConfig, -1, 1, &guiPopsNetUpdater);
+    for (;;) {
+        int result = diaExecuteDialog(diaPopsNetConfig, -1, 1, &guiPopsNetUpdater);
         if (result == NETCFG_POPS_IMPORT) {
             // IMPORT: the ONE sanctioned path that copies OPL's saved Network Settings into the
             // POPStarter fields. Pressing the button exits the dialog with its id; the dialog
@@ -1586,16 +1591,16 @@ void guiShowPopsNetConfig(void)
             diaSetString(diaPopsNetConfig, NETCFG_POPS_SMB_USER, s);
             snprintf(s, sizeof(s), "%s", gPCPassword);
             diaSetString(diaPopsNetConfig, NETCFG_POPS_SMB_PASS, s);
+            continue;
         }
-    } while (result == NETCFG_POPS_IMPORT);
 
-    if (result) {
+        if (result != UIID_BTN_OK)
+            return;
+
         // POPStarter save matrix (POPSLoader parity): compare the dialog's POPStarter fields against
-        // the read-time snapshot and write ONLY what actually changed -- and only when the file
-        // already exists (overwrite at its origin dir) or the user supplied complete values (create
-        // at createDir). Blank/incomplete fields with no existing file create NOTHING: absence must
-        // never turn into a fabricated configuration.
-        vcd_popsnet_t popsCur = popsOriginal; // carries the origin dirs + exists flags over
+        // the read-time snapshot and write ONLY actual changes. The resolved home from the snapshot
+        // remains attached to popsCur, so a valid MC1 setup never causes a new MC0 shadow file.
+        vcd_popsnet_t popsCur = popsOriginal;
         diaGetInt(diaPopsNetConfig, NETCFG_POPS_IPTYPE, &popsCur.ipDhcp);
         for (i = 0; i < 4; ++i) {
             diaGetInt(diaPopsNetConfig, NETCFG_POPS_IP_0 + i, &popsCur.ps2Ip[i]);
@@ -1609,43 +1614,43 @@ void guiShowPopsNetConfig(void)
         diaGetString(diaPopsNetConfig, NETCFG_POPS_SMB_PASS, popsCur.smbPass, sizeof(popsCur.smbPass));
 
         int popsMask = vcdPopsNetChanged(&popsOriginal, &popsCur);
-        int popsSmbComplete = popsCur.smbShare[0] != '\0' &&
-                              (popsCur.smbIp[0] | popsCur.smbIp[1] | popsCur.smbIp[2] | popsCur.smbIp[3]) != 0;
-        int popsIpComplete = (popsCur.ps2Ip[0] | popsCur.ps2Ip[1] | popsCur.ps2Ip[2] | popsCur.ps2Ip[3]) != 0 &&
-                             (popsCur.ps2Mask[0] | popsCur.ps2Mask[1] | popsCur.ps2Mask[2] | popsCur.ps2Mask[3]) != 0 &&
-                             (popsCur.ps2Gw[0] | popsCur.ps2Gw[1] | popsCur.ps2Gw[2] | popsCur.ps2Gw[3]) != 0;
+        int popsSmbComplete = vcdPopsNetValuesValid(&popsCur, 1, 0);
+        int popsIpComplete = !popsCur.ipDhcp && vcdPopsNetValuesValid(&popsCur, 0, 1);
         int writeSmb = (popsMask & 1) && (popsOriginal.smbExists || popsSmbComplete);
-        int writeIp = (popsMask & 2) && (popsOriginal.ipExists || popsCur.ipDhcp || popsIpComplete);
-        // Creating a fresh SMBCONFIG.DAT with no IPCONFIG.DAT anywhere: create the pair -- POPStarter
-        // expects IPCONFIG.DAT to exist even when blank (DHCP). An incomplete static entry becomes a
-        // BLANK file (never garbage); the user can complete it later and it will overwrite.
+        // A malformed IPCONFIG.DAT initially displays as DHCP because no static triple can be
+        // trusted. Treat an OK as an explicit repair candidate too, so Replace can rewrite it as
+        // the valid blank-DHCP file instead of forcing the user through an unrelated static edit.
+        int writeIp = ((popsMask & 2) || popsOriginal.ipInvalid) &&
+                      (popsOriginal.ipExists || popsCur.ipDhcp || popsIpComplete);
+
+        // Creating a fresh SMBCONFIG.DAT also creates IPCONFIG.DAT. DHCP deliberately serializes
+        // as a blank file; an incomplete static entry is never serialized as malformed text.
         if (writeSmb && !popsOriginal.smbExists && !popsOriginal.ipExists) {
             writeIp = 1;
             if (!popsCur.ipDhcp && !popsIpComplete)
                 popsCur.ipDhcp = 1;
         }
-        // Overwrite guard: existing mc0:/POPSTARTER/*.DAT files are user-owned.
-        // Normal SMB VCD launch never overwrites (vcdEnsurePopstarterSmbConfigMc0
-        // presence wins), but an explicit Settings save must ask before replacing.
-        // Keep = preserve existing files (only create missing ones), Replace =
-        // overwrite with current dialog values, Cancel/Back = abort the save.
+
+        if (!writeSmb && !writeIp)
+            return;
+        if (!vcdPopsNetValuesValid(&popsCur, writeSmb, writeIp)) {
+            guiMsgBox(_l(_STR_POPSTARTER_NET_INVALID), 0, NULL);
+            continue;
+        }
+
+        // Existing files are user-owned. Keep and Cancel deliberately re-open the SAME editor:
+        // diaPopsNetConfig retains its typed fields, while popsOriginal remains the read snapshot.
         if ((writeSmb && popsOriginal.smbExists) || (writeIp && popsOriginal.ipExists)) {
             int ov = diaExecuteDialog(diaPopsOverwrite, -1, 1, NULL);
-            if (ov == POPS_OVERWRITE_KEEP) {
-                if (popsOriginal.smbExists)
-                    writeSmb = 0;
-                if (popsOriginal.ipExists)
-                    writeIp = 0;
-            } else if (ov == POPS_OVERWRITE_REPLACE) {
-                // proceed to write as calculated
-            } else {
-                // Cancel / Back -> abort save entirely
-                writeSmb = 0;
-                writeIp = 0;
-            }
+            if (ov != POPS_OVERWRITE_REPLACE)
+                continue;
         }
-        if ((writeSmb || writeIp) && vcdWritePopstarterNetFiles(&popsCur, writeSmb, writeIp) != 0)
+
+        if (vcdWritePopstarterNetFiles(&popsCur, writeSmb, writeIp) != 0) {
             guiMsgBox(_l(_STR_POPSTARTER_NET_ERR), 0, NULL);
+            continue;
+        }
+        return;
     }
 }
 

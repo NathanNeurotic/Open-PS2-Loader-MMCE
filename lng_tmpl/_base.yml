@@ -1036,6 +1036,8 @@ gui_strings:
   string: Loaded from %s
 - label: POPSTARTER_NET_ERR
   string: Couldn't write POPSTARTER network config to the memory card.
+- label: POPSTARTER_NET_INVALID
+  string: POPSTARTER network configuration is invalid. Correct it in POPSTARTER Network Settings.
 - label: POPSTARTER_SMB_NEEDS_STATIC
   string: POPSTARTER SMB requires a static network configuration. Configure POPSTARTER Network Settings first.
 - label: POPS_OVERWRITE_TITLE
