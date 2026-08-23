@@ -2175,7 +2175,9 @@ int vcdWritePopstarterNetFiles(const vcd_popsnet_t *cfg, int writeSmb, int write
 {
     char buf[256];
     char path[128];
+    char smbPath[128];
     const char *dir;
+    int createdSmb = 0;
     int rc;
 
     if (cfg == NULL)
@@ -2192,10 +2194,11 @@ int vcdWritePopstarterNetFiles(const vcd_popsnet_t *cfg, int writeSmb, int write
     if (writeSmb) {
         int len = vcdBuildSmbConfig(cfg, buf, sizeof(buf));
 
-        snprintf(path, sizeof(path), "%s/SMBCONFIG.DAT", dir);
-        rc = vcdSafeWriteFile(path, buf, len);
+        snprintf(smbPath, sizeof(smbPath), "%s/SMBCONFIG.DAT", dir);
+        rc = vcdSafeWriteFile(smbPath, buf, len);
         if (rc != 0)
             return rc;
+        createdSmb = !cfg->smbExists;
     }
 
     if (writeIp) {
@@ -2203,8 +2206,13 @@ int vcdWritePopstarterNetFiles(const vcd_popsnet_t *cfg, int writeSmb, int write
 
         snprintf(path, sizeof(path), "%s/IPCONFIG.DAT", dir);
         rc = vcdSafeWriteFile(path, buf, len);
-        if (rc != 0)
+        if (rc != 0) {
+            // Pair creation must not leave a newly generated SMB configuration behind when its
+            // companion IPCONFIG.DAT cannot be committed. Existing SMB files are user-owned.
+            if (createdSmb)
+                unlink(smbPath);
             return rc;
+        }
     }
 
     return 0;
