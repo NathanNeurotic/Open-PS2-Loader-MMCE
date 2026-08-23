@@ -66,6 +66,13 @@ static int showLngPopup;
 #define SETTINGS_DIALOG_CAPACITY 256
 static struct UIItem guiSettingsDialog[SETTINGS_DIALOG_CAPACITY];
 static struct UIItem *guiSettingsActiveDialog;
+static int guiSettingsShellActive;
+static int guiSettingsCurrentPage;
+static char guiSettingsPageIndicator[32];
+
+static int guiSettingsIsShellResult(int result);
+static void guiSettingsBeginDialog(struct UIItem *ui);
+static void guiSettingsEndDialog(void);
 
 // Notification popup: START tick + how long to hold, NOT an absolute deadline. clock() is a
 // 32-bit microsecond counter, so it wraps every ~71.6 minutes; `clock() >= start + duration`
@@ -1093,6 +1100,7 @@ int guiShowNetConfig(void)
         diaSetVisible(diaNetConfig, NETCFG_RECONNECT, 0);
     }
 
+    guiSettingsBeginDialog(diaNetConfig);
     int result;
 reshow_network:
     result = diaExecuteDialog(diaNetConfig, -1, 1, &netConfigUpdater);
@@ -1177,7 +1185,8 @@ reshow_network:
         applyConfig(-1, -1, 0);
     }
 
-    return (result == DIA_RESULT_PREV || result == DIA_RESULT_NEXT) ? result : 0;
+    guiSettingsEndDialog();
+    return guiSettingsIsShellResult(result) ? result : 0;
 }
 
 // POPStarter page live-updater: reveal the free-text POPSTARTER.ELF Path field only when the
@@ -2085,8 +2094,10 @@ int guiShowAudioConfig(void)
     diaSetString(diaAudioConfig, CFG_DEFAULT_BGM_PATH, gDefaultBGMPath);
     diaSetShowDefaultWhenEmpty(diaAudioConfig, CFG_DEFAULT_BGM_PATH, 1); // blank -> the theme's own bgm
 
+    guiSettingsBeginDialog(diaAudioConfig);
     int result = diaExecuteDialog(diaAudioConfig, -1, 1, guiAudioUpdater);
-    return (result == DIA_RESULT_PREV || result == DIA_RESULT_NEXT) ? result : 0;
+    guiSettingsEndDialog();
+    return guiSettingsIsShellResult(result) ? result : 0;
 }
 
 int guiShowControllerConfig(void)
@@ -2109,6 +2120,7 @@ int guiShowControllerConfig(void)
     diaSetInt(diaControllerConfig, CFG_YSENSITIVITY, gYSensitivity);
     diaSetInt(diaControllerConfig, CFG_RUMBLE, gEnableRumble);
 
+    guiSettingsBeginDialog(diaControllerConfig);
     int result = diaExecuteDialog(diaControllerConfig, -1, 1, NULL);
     if (result) {
         diaGetInt(diaControllerConfig, UICFG_SCROLL, &gScrollSpeed);
@@ -2132,7 +2144,8 @@ int guiShowControllerConfig(void)
         applyConfig(-1, -1, 1);
     }
 
-    return (result == DIA_RESULT_PREV || result == DIA_RESULT_NEXT) ? result : 0;
+    guiSettingsEndDialog();
+    return guiSettingsIsShellResult(result) ? result : 0;
 }
 
 static int guiSettingsSkipID(int id, const int *skipIDs, int skipCount)
@@ -2178,6 +2191,25 @@ static int guiSettingsIsPeerResult(int result)
     return result == DIA_RESULT_PREV || result == DIA_RESULT_NEXT;
 }
 
+static int guiSettingsIsShellResult(int result)
+{
+    return guiSettingsIsPeerResult(result) || result == DIA_RESULT_INDEX;
+}
+
+static void guiSettingsBeginDialog(struct UIItem *ui)
+{
+    if (!guiSettingsShellActive)
+        return;
+
+    snprintf(guiSettingsPageIndicator, sizeof(guiSettingsPageIndicator), "SETTINGS %d/8", guiSettingsCurrentPage + 1);
+    diaSetSettingsShell(ui, guiSettingsPageIndicator);
+}
+
+static void guiSettingsEndDialog(void)
+{
+    diaSetSettingsShell(NULL, NULL);
+}
+
 static int guiSettingsGeneralUpdater(int modified)
 {
     int showAutoStartLast;
@@ -2210,6 +2242,7 @@ static int guiSettingsShowGeneral(void)
     diaSetVisible(ui, CFG_LBL_AUTOSTARTLAST, gRememberLastPlayed);
     diaSetInt(ui, CFG_ENWRITEOP, gEnableWrite);
     diaSetInt(ui, CFG_DEBUG, gEnableDebug);
+    guiSettingsBeginDialog(ui);
 
 reshow_general:
     result = diaExecuteDialog(ui, -1, 1, &guiSettingsGeneralUpdater);
@@ -2240,8 +2273,9 @@ reshow_general:
         menuReinitMainMenu();
     }
 
+    guiSettingsEndDialog();
     guiSettingsActiveDialog = NULL;
-    return guiSettingsIsPeerResult(result) ? result : 0;
+    return guiSettingsIsShellResult(result) ? result : 0;
 }
 
 static int guiSettingsShowSources(void)
@@ -2285,6 +2319,7 @@ static int guiSettingsShowSources(void)
     diaSetEnum(ui, CFG_MMCEIGRSLOT, deviceIGRSlots);
     diaSetInt(ui, CFG_MMCEIGRSLOT, gMMCEIGRSlot);
     diaSetInt(ui, CFG_MMCEGAMEID, gMMCEEnableGameID);
+    guiSettingsBeginDialog(ui);
 
 reshow_sources:
     result = diaExecuteDialog(ui, -1, 1, NULL);
@@ -2336,8 +2371,9 @@ reshow_sources:
         menuReinitMainMenu();
     }
 
+    guiSettingsEndDialog();
     guiSettingsActiveDialog = NULL;
-    return guiSettingsIsPeerResult(result) ? result : 0;
+    return guiSettingsIsShellResult(result) ? result : 0;
 }
 
 static int guiSettingsDisplayUpdater(int modified)
@@ -2414,6 +2450,7 @@ static int guiSettingsShowInterface(void)
     diaSetInt(ui, UICFG_YOFF, gYOff);
     diaSetInt(ui, UICFG_OVERSCAN, gOverscan);
     diaSetInt(ui, CFG_APPLYGAMEID, gApplyGameID);
+    guiSettingsBeginDialog(ui);
 reshow_interface:
     result = diaExecuteDialog(ui, -1, 1, &guiSettingsDisplayUpdater);
     if (result == UICFG_ARTWORK_BUTTON) {
@@ -2473,8 +2510,9 @@ reshow_interface:
 
     guiFreeNameList(themeNamesSnap);
     guiFreeNameList(langNamesSnap);
+    guiSettingsEndDialog();
     guiSettingsActiveDialog = NULL;
-    return guiSettingsIsPeerResult(result) ? result : 0;
+    return guiSettingsIsShellResult(result) ? result : 0;
 }
 
 static int guiSettingsLaunchUpdater(int modified)
@@ -2512,6 +2550,7 @@ static int guiSettingsShowLaunch(void)
     diaSetEnum(ui, CFG_NEUTRINO_GSMCOMP, neutrinoGsmCompDefStrs);
     diaSetInt(ui, CFG_NEUTRINO_GSMCOMP, gNeutrinoGsmCompDefault);
     diaSetEnabled(ui, CFG_NEUTRINO_GSMCOMP, gNeutrinoVideoDefault != 0);
+    guiSettingsBeginDialog(ui);
 
 reshow_launch:
     result = diaExecuteDialog(ui, -1, 1, &guiSettingsLaunchUpdater);
@@ -2534,8 +2573,9 @@ reshow_launch:
         menuReinitMainMenu();
     }
 
+    guiSettingsEndDialog();
     guiSettingsActiveDialog = NULL;
-    return guiSettingsIsPeerResult(result) ? result : 0;
+    return guiSettingsIsShellResult(result) ? result : 0;
 }
 
 static int guiSettingsVcdUpdater(int modified)
@@ -2571,6 +2611,7 @@ static int guiSettingsShowPopstarter(void)
     diaSetInt(ui, CFG_VCD_HIDE_GAMEID, gVcdHideGameId);
     diaSetInt(ui, CFG_VCD_FIRST_DISC_ONLY, gVcdFirstDiscOnly);
     diaSetInt(ui, CFG_VCD_SHOW_PP_POPS, gVcdShowPpPops);
+    guiSettingsBeginDialog(ui);
 
 reshow_popstarter:
     result = diaExecuteDialog(ui, -1, 1, &guiSettingsVcdUpdater);
@@ -2620,8 +2661,9 @@ reshow_popstarter:
             oplQueueVcdDeviceUpdates();
     }
 
+    guiSettingsEndDialog();
     guiSettingsActiveDialog = NULL;
-    return guiSettingsIsPeerResult(result) ? result : 0;
+    return guiSettingsIsShellResult(result) ? result : 0;
 }
 
 enum gui_settings_page {
@@ -2636,12 +2678,53 @@ enum gui_settings_page {
     SETTINGS_PAGE_COUNT
 };
 
+#define SETTINGS_INDEX_PAGE_ID 1000
+
+static int guiSettingsShowIndex(int *page)
+{
+    const char *pageNames[] = {
+        "General & System",
+        _l(_STR_GAME_SOURCES),
+        _l(_STR_MENU_NETWORK),
+        _l(_STR_INTERFACE_SETTINGS),
+        _l(_STR_GAME_LAUNCHING),
+        _l(_STR_POPSTARTER),
+        _l(_STR_CONTROLLER_SETTINGS),
+        _l(_STR_AUDIO_SETTINGS),
+        NULL,
+    };
+    struct UIItem indexDialog[] = {
+        {UI_HEADER, 0, 1, 1, -1, 0, 0, {.label = {"SETTINGS INDEX", -1}}},
+        {UI_SPLITTER},
+        {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {"PAGE", -1}}},
+        {UI_SPACER},
+        {UI_ENUM, SETTINGS_INDEX_PAGE_ID, 1, 1, -1, 0, 0, {.intvalue = {0, 0, 0, SETTINGS_PAGE_COUNT - 1, pageNames}}},
+        {UI_BREAK},
+        {UI_OK, 0, 1, 1, -1, 0, 0, {.label = {NULL, _STR_OK}}},
+        {UI_BREAK},
+        {UI_TERMINATOR},
+    };
+    int result;
+    int selectedPage;
+
+    diaSetInt(indexDialog, SETTINGS_INDEX_PAGE_ID, *page);
+    result = diaExecuteDialog(indexDialog, -1, 1, NULL);
+    if (result != UIID_BTN_OK)
+        return 0;
+
+    diaGetInt(indexDialog, SETTINGS_INDEX_PAGE_ID, &selectedPage);
+    *page = selectedPage;
+    return 1;
+}
+
 void guiShowSettings(void)
 {
     int page = SETTINGS_GENERAL;
     int result;
 
+    guiSettingsShellActive = 1;
     while (1) {
+        guiSettingsCurrentPage = page;
         switch (page) {
             case SETTINGS_GENERAL:
                 result = guiSettingsShowGeneral();
@@ -2668,15 +2751,20 @@ void guiShowSettings(void)
                 result = guiShowAudioConfig();
                 break;
             default:
+                guiSettingsShellActive = 0;
                 return;
         }
 
-        if (result == DIA_RESULT_NEXT)
+        if (result == DIA_RESULT_INDEX) {
+            guiSettingsShowIndex(&page);
+        } else if (result == DIA_RESULT_NEXT) {
             page = (page + 1) % SETTINGS_PAGE_COUNT;
-        else if (result == DIA_RESULT_PREV)
+        } else if (result == DIA_RESULT_PREV) {
             page = (page + SETTINGS_PAGE_COUNT - 1) % SETTINGS_PAGE_COUNT;
-        else
+        } else {
+            guiSettingsShellActive = 0;
             return;
+        }
     }
 }
 

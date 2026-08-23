@@ -36,6 +36,8 @@
 
 static int screenWidth;
 static int screenHeight;
+static struct UIItem *diaSettingsShellUI;
+static const char *diaSettingsIndicator;
 
 // Utility stuff
 #define KEYB_MODE   2
@@ -682,6 +684,12 @@ static struct UIItem *diaGetFirstControl(struct UIItem *ui);
 
 static int diaScrollOffset = 0;
 
+void diaSetSettingsShell(struct UIItem *ui, const char *indicator)
+{
+    diaSettingsShellUI = ui;
+    diaSettingsIndicator = indicator;
+}
+
 /// renders whole ui screen (for given dialog setup)
 void diaRenderUI(struct UIItem *ui, short inMenu, struct UIItem *cur, int haveFocus)
 {
@@ -690,6 +698,12 @@ void diaRenderUI(struct UIItem *ui, short inMenu, struct UIItem *cur, int haveFo
 
     int x0 = 20;
     int y0 = 20;
+    int settingsShell = (ui == diaSettingsShellUI && diaSettingsIndicator != NULL);
+
+    if (settingsShell) {
+        fntRenderString(gTheme->fonts[0], x0, y0, ALIGN_NONE, 0, 0, diaSettingsIndicator, gTheme->selTextColor);
+        y0 += UI_SPACING_H;
+    }
 
     // render all items (shifted up by the scroll offset for tall dialogs)
     struct UIItem *rc = ui;
@@ -791,14 +805,26 @@ void diaRenderUI(struct UIItem *ui, short inMenu, struct UIItem *cur, int haveFo
         diaDrawHint(cur->hintId);
     }
 
-    int uiHints[2] = {_STR_SELECT, _STR_BACK};
-    int uiIcons[2] = {CIRCLE_ICON, CROSS_ICON};
     int uiY = gTheme->usedHeight - 32;
-    int uiX = guiAlignSubMenuHints(2, uiHints, uiIcons, gTheme->fonts[0], 12, 2);
+    if (settingsShell) {
+        int uiHints[3] = {_STR_SELECT, _STR_BACK, _STR_OPTIONS};
+        int uiIcons[3] = {CIRCLE_ICON, CROSS_ICON, TRIANGLE_ICON};
+        int uiX = guiAlignSubMenuHints(3, uiHints, uiIcons, gTheme->fonts[0], 12, 2);
 
-    uiX = guiDrawIconAndText(gSelectButton == KEY_CIRCLE ? uiIcons[0] : uiIcons[1], uiHints[0], gTheme->fonts[0], uiX, uiY, gTheme->textColor);
-    uiX += 12;
-    uiX = guiDrawIconAndText(gSelectButton == KEY_CIRCLE ? uiIcons[1] : uiIcons[0], uiHints[1], gTheme->fonts[0], uiX, uiY, gTheme->textColor);
+        uiX = guiDrawIconAndText(gSelectButton == KEY_CIRCLE ? uiIcons[0] : uiIcons[1], uiHints[0], gTheme->fonts[0], uiX, uiY, gTheme->textColor);
+        uiX += 12;
+        uiX = guiDrawIconAndText(gSelectButton == KEY_CIRCLE ? uiIcons[1] : uiIcons[0], uiHints[1], gTheme->fonts[0], uiX, uiY, gTheme->textColor);
+        uiX += 12;
+        guiDrawIconAndText(uiIcons[2], uiHints[2], gTheme->fonts[0], uiX, uiY, gTheme->textColor);
+    } else {
+        int uiHints[2] = {_STR_SELECT, _STR_BACK};
+        int uiIcons[2] = {CIRCLE_ICON, CROSS_ICON};
+        int uiX = guiAlignSubMenuHints(2, uiHints, uiIcons, gTheme->fonts[0], 12, 2);
+
+        uiX = guiDrawIconAndText(gSelectButton == KEY_CIRCLE ? uiIcons[0] : uiIcons[1], uiHints[0], gTheme->fonts[0], uiX, uiY, gTheme->textColor);
+        uiX += 12;
+        guiDrawIconAndText(gSelectButton == KEY_CIRCLE ? uiIcons[1] : uiIcons[0], uiHints[1], gTheme->fonts[0], uiX, uiY, gTheme->textColor);
+    }
 }
 
 /// sets the ui item value to the default again
@@ -1118,6 +1144,12 @@ int diaExecuteDialog(struct UIItem *ui, int uiId, short inMenu, int (*updater)(i
             // every peer screen retains the same focus, scrolling and modal-editor behavior as
             // existing dialogs. Ordinary dialogs never see these results unless their caller opts
             // into handling them.
+            if (diaSettingsShellUI == ui && getKeyOn(KEY_TRIANGLE)) {
+                diaRestoreScrollSpeed();
+                sfxPlay(SFX_CURSOR);
+                return DIA_RESULT_INDEX;
+            }
+
             if (getKeyOn(KEY_L1)) {
                 diaRestoreScrollSpeed();
                 sfxPlay(SFX_CURSOR);
