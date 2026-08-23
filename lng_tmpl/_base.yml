@@ -890,6 +890,16 @@ gui_strings:
   string: POPSTARTER.ELF Path
 - label: POPSTARTER_RETROGEM_GAMEID
   string: RetroGEM Game ID
+- label: POPSTARTER_NETWORK_SETTINGS
+  string: POPSTARTER Network Settings
+- label: GAMEID_MODE_ALL
+  string: On (All)
+- label: GAMEID_MODE_POPSTARTER
+  string: On (POPSTARTER only)
+- label: GAMEID_MODE_PS2
+  string: On (PS2 only)
+- label: GAMEID_MODE_OFF
+  string: Off
 - label: POPS_IMPORT
   string: Import POPSLoader Settings
 - label: POPS_NONE_DETECTED

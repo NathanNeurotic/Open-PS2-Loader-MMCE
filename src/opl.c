@@ -2493,19 +2493,21 @@ static void _loadConfig()
                 else
                     gNetStartMode = START_MODE_AUTO; // UDPFSBD / UDPBD block
             }
-            // Reconcile the two persisted halves; a hand-edited/stale config can disagree either way:
-            //  - Protocol Off + a live start row is contradictory the OTHER direction: the dialog would
-            //    show that start mode against its SMB fallback protocol, so accepting ANY change would
-            //    silently enable SMB. Off wins -- it is the authoritative "network is off".
-            //  - A live protocol with an Off row (or a value outside the enum -- an out-of-range int can
-            //    reach here from a hand-edited file) must start: floor it to Manual.
-            if (gNetworkProtocol == NET_PROTO_OFF)
+            // Reconcile the two persisted halves; Network Start Mode is the user's explicit gate.
+            // A disabled start row must not be promoted to Manual merely because an older protocol
+            // key still says SMB. Conversely, Protocol Off keeps the start row disabled so opening
+            // the dialog cannot silently revive a transport.
+            if (gNetStartMode == START_MODE_DISABLED || gNetworkProtocol == NET_PROTO_OFF) {
+                gNetworkProtocol = NET_PROTO_OFF;
                 gNetStartMode = START_MODE_DISABLED;
-            else if (gNetStartMode < START_MODE_MANUAL || gNetStartMode > START_MODE_AUTO)
+            } else if (gNetStartMode < START_MODE_MANUAL || gNetStartMode > START_MODE_AUTO) {
                 gNetStartMode = START_MODE_MANUAL;
-            // Keep the SMB start-mode shadow in lockstep with the authoritative row.
-            if (gNetworkProtocol == NET_PROTO_SMB)
-                gETHStartMode = gNetStartMode;
+            }
+            // Re-derive the legacy shadows after reconciliation, because the gate may have changed
+            // a stale live protocol to OFF.
+            gEnableUDPBD = (gNetworkProtocol == NET_PROTO_UDPBD || gNetworkProtocol == NET_PROTO_UDPFSBD);
+            gNetBootProtocol = (gNetworkProtocol == NET_PROTO_UDPFSBD) ? NET_BOOT_UDPFS : NET_BOOT_UDPBD;
+            gETHStartMode = (gNetworkProtocol == NET_PROTO_SMB) ? gNetStartMode : START_MODE_DISABLED;
             configGetInt(configOPL, CONFIG_OPL_SFX, &gEnableSFX);
             configGetInt(configOPL, CONFIG_OPL_RUMBLE, &gEnableRumble);
             configGetInt(configOPL, CONFIG_OPL_BOOT_SND, &gEnableBootSND);
@@ -3895,13 +3897,13 @@ static void setDefaults(void)
     gEnableNotifications = 1;
     gEnableArt = 1;
     gWideScreen = 1;
-    gEnableSFX = 1;    // safe now: sfxPlay dispatches asynchronously (#340)
-    gEnableRumble = 0; // opt-in: haptics are a taste thing, and a worn motor is loud
+    gEnableSFX = 1; // safe now: sfxPlay dispatches asynchronously (#340)
+    gEnableRumble = 1;
     gEnableBootSND = 1;
     gEnableBGM = 1; // inert without a bgm.ogg on the card
-    gSFXVolume = 80;
-    gBootSndVolume = 80;
-    gBGMVolume = 70;
+    gSFXVolume = 90;
+    gBootSndVolume = 90;
+    gBGMVolume = 90;
     gDefaultBGMPath[0] = '\0';
     gXSensitivity = 1;
     gYSensitivity = 1;

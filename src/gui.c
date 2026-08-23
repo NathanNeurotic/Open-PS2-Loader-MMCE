@@ -702,7 +702,13 @@ void guiShowDeviceConfig(void)
     diaSetInt(diaDeviceConfig, CFG_MMCEMODE, gMMCEStartMode);
     diaSetEnabled(diaDeviceConfig, CFG_MMCEMODE, 1);
 
-    int ret = diaExecuteDialog(diaDeviceConfig, -1, 1, NULL);
+    int ret;
+reshow_device:
+    ret = diaExecuteDialog(diaDeviceConfig, -1, 1, NULL);
+    if (ret == MMCE_SETTINGS_BUTTON) {
+        guiShowMmceConfig();
+        goto reshow_device;
+    }
     if (ret) {
         int netProtocolWas = gNetworkProtocol;
         diaGetInt(diaDeviceConfig, CFG_DEFDEVICE, &deviceModeIndex);
@@ -721,7 +727,9 @@ void guiShowDeviceConfig(void)
         // Network Start Mode read-back: Start=Off disables network start;
         // preserve the user's configured gNetworkProtocol (defaulting to SMB only if uninitialized).
         diaGetInt(diaDeviceConfig, CFG_NETSTART, &gNetStartMode);
-        if (gNetworkProtocol == NET_PROTO_OFF)
+        if (gNetStartMode == START_MODE_DISABLED)
+            gNetworkProtocol = NET_PROTO_OFF;
+        else if (gNetworkProtocol == NET_PROTO_OFF)
             gNetworkProtocol = NET_PROTO_SMB;
         gEnableUDPBD = (gNetworkProtocol == NET_PROTO_UDPBD || gNetworkProtocol == NET_PROTO_UDPFSBD);
         gNetBootProtocol = (gNetworkProtocol == NET_PROTO_UDPFSBD) ? NET_BOOT_UDPFS : NET_BOOT_UDPBD;
@@ -925,6 +933,10 @@ reshow_ui:
         guiShowColorsConfig();
         goto reshow_ui;
     }
+    if (ret == UICFG_GAME_LIST_BUTTON) {
+        guiShowVcdListConfig();
+        goto reshow_ui;
+    }
 
     // Play out the confirm bump the dialog just armed, before applyConfig() below tears down and
     // rebuilds the GS (rmSetMode), reloads the theme and its textures, and holds guiLock over a
@@ -971,7 +983,7 @@ reshow_ui:
 
 static int netConfigUpdater(int modified)
 {
-    int showAdvancedOptions, isNetBIOS, isDHCPEnabled, netProto, i;
+    int showAdvancedOptions, isNetBIOS, isDHCPEnabled, netProto, isSMB, i;
 
     if (modified) {
         diaGetInt(diaNetConfig, NETCFG_SHOW_ADVANCED_OPTS, &showAdvancedOptions);
@@ -979,10 +991,24 @@ static int netConfigUpdater(int modified)
         diaGetInt(diaNetConfig, NETCFG_PS2_IP_ADDR_TYPE, &isDHCPEnabled);
         diaGetInt(diaNetConfig, NETCFG_SHARE_ADDR_TYPE, &isNetBIOS);
         diaGetInt(diaNetConfig, CFG_NETPROTOCOL, &netProto);
+        isSMB = netProto == 0;
         diaSetVisible(diaNetConfig, NETCFG_SHARE_NB_ADDR, isNetBIOS);
 
+        // SMB server fields belong to OPL's SMB consumer. UDPFS/UDPBD are the Neutrino-facing
+        // transports, so do not present SMB-only options as if they applied to those protocols.
+        diaSetVisible(diaNetConfig, NETCFG_LBL_SMB_SERVER, isSMB);
+        diaSetVisible(diaNetConfig, NETCFG_LBL_SHARE_ADDR_TYPE, isSMB);
+        diaSetVisible(diaNetConfig, NETCFG_LBL_SHARE_ADDRESS, isSMB);
+        diaSetVisible(diaNetConfig, NETCFG_LBL_SHARE_PORT, isSMB);
+        diaSetVisible(diaNetConfig, NETCFG_LBL_SHARE_NAME, isSMB);
+        diaSetVisible(diaNetConfig, NETCFG_LBL_SHARE_USER, isSMB);
+        diaSetVisible(diaNetConfig, NETCFG_LBL_SHARE_PASSWORD, isSMB);
+        diaSetVisible(diaNetConfig, NETCFG_LBL_SMBDIALECT, isSMB);
+        diaSetVisible(diaNetConfig, NETCFG_SHARE_ADDR_TYPE, isSMB);
+        diaSetVisible(diaNetConfig, NETCFG_SHARE_NB_ADDR, isSMB && isNetBIOS);
+
         for (i = 0; i < 4; i++) {
-            diaSetVisible(diaNetConfig, NETCFG_SHARE_IP_ADDR_0 + i, !isNetBIOS);
+            diaSetVisible(diaNetConfig, NETCFG_SHARE_IP_ADDR_0 + i, isSMB && !isNetBIOS);
 
             diaSetEnabled(diaNetConfig, NETCFG_PS2_IP_ADDR_0 + i, !isDHCPEnabled);
             diaSetEnabled(diaNetConfig, NETCFG_PS2_NETMASK_0 + i, !isDHCPEnabled);
@@ -991,10 +1017,14 @@ static int netConfigUpdater(int modified)
         }
 
         for (i = 0; i < 3; i++)
-            diaSetVisible(diaNetConfig, NETCFG_SHARE_IP_ADDR_DOT_0 + i, !isNetBIOS);
+            diaSetVisible(diaNetConfig, NETCFG_SHARE_IP_ADDR_DOT_0 + i, isSMB && !isNetBIOS);
 
-        diaSetEnabled(diaNetConfig, NETCFG_SHARE_PORT, showAdvancedOptions);
+        diaSetEnabled(diaNetConfig, NETCFG_SHARE_PORT, isSMB && showAdvancedOptions);
         diaSetEnabled(diaNetConfig, NETCFG_ETHOPMODE, showAdvancedOptions);
+        diaSetVisible(diaNetConfig, NETCFG_SHARE_PORT, isSMB);
+        diaSetVisible(diaNetConfig, NETCFG_SHARE_NAME, isSMB);
+        diaSetVisible(diaNetConfig, NETCFG_SHARE_USERNAME, isSMB);
+        diaSetVisible(diaNetConfig, NETCFG_SHARE_PASSWORD, isSMB);
 
         // Protocol: lock Access to Files for SMB and to IMG for UDPBD (only UDPFS offers the free
         // toggle) -- snap the value so a stale IMG left over from UDPFS can never mis-derive to
@@ -1002,6 +1032,7 @@ static int netConfigUpdater(int modified)
         // NOTE(rebuild): the SMB Version row stays greyed at SMBv1 until item 4 lands (the fork
         // enables it while SMB is the selected protocol).
         diaSetEnabled(diaNetConfig, CFG_SMBDIALECT, 0);
+        diaSetVisible(diaNetConfig, CFG_SMBDIALECT, isSMB);
         if (netProto == 0) { // SMB -> Files, locked
             diaSetInt(diaNetConfig, CFG_UDPFSMODE, 0);
             diaSetEnabled(diaNetConfig, CFG_UDPFSMODE, 0);
@@ -1090,6 +1121,7 @@ int guiShowNetConfig(void)
     // netConfigUpdater, so without this the first frame flashes every row enabled.
     diaSetEnabled(diaNetConfig, CFG_UDPFSMODE, netProtoVal == 1);
     diaSetEnabled(diaNetConfig, CFG_SMBDIALECT, 0); // NOTE(rebuild): greyed until item 4
+    netConfigUpdater(1);
 
     // Update the spacer item between the OK and reconnect buttons (See dialogs.c).
     if (gNetworkStartup == 0) {
@@ -1143,10 +1175,13 @@ reshow_network:
         int netProtoVal2, netAccessVal2;
         diaGetInt(diaNetConfig, CFG_NETPROTOCOL, &netProtoVal2);
         diaGetInt(diaNetConfig, CFG_UDPFSMODE, &netAccessVal2);
-        gNetworkProtocol = (netProtoVal2 == 0)  ? NET_PROTO_SMB :
-                           (netProtoVal2 == 2)  ? NET_PROTO_UDPBD :
-                           (netAccessVal2 == 1) ? NET_PROTO_UDPFSBD :
-                                                  NET_PROTO_UDPFS; // UDPFS + Files
+        if (gNetStartMode == START_MODE_DISABLED)
+            gNetworkProtocol = NET_PROTO_OFF;
+        else
+            gNetworkProtocol = (netProtoVal2 == 0)  ? NET_PROTO_SMB :
+                               (netProtoVal2 == 2)  ? NET_PROTO_UDPBD :
+                               (netAccessVal2 == 1) ? NET_PROTO_UDPFSBD :
+                                                      NET_PROTO_UDPFS; // UDPFS + Files
         gEnableUDPBD = (gNetworkProtocol == NET_PROTO_UDPBD || gNetworkProtocol == NET_PROTO_UDPFSBD);
         gNetBootProtocol = (gNetworkProtocol == NET_PROTO_UDPFSBD) ? NET_BOOT_UDPFS : NET_BOOT_UDPBD;
         // SMB's start mode IS the network start row (Auto = boot connect, Manual = on-entry);
@@ -1938,6 +1973,19 @@ static int guiDisplayUpdater(int modified)
 
     return 0;
 }
+static int guiGameIdModeFromGlobals(void)
+{
+    if (gApplyGameID)
+        return gPopstarterRetroGemGameID ? 0 : 2; // All / PS2 only
+    return gPopstarterRetroGemGameID ? 1 : 3;     // POPSTARTER only / Off
+}
+
+static void guiApplyGameIdMode(int mode)
+{
+    gApplyGameID = mode == 0 || mode == 2;
+    gPopstarterRetroGemGameID = mode == 0 || mode == 1;
+}
+
 void guiShowDisplayConfig(void)
 {
     // clang-format off
@@ -1957,18 +2005,21 @@ void guiShowDisplayConfig(void)
         , "NTSC 640x224p @60Hz 24bit"
         , NULL};
     // clang-format on
+    const char *gameIDModes[] = {_l(_STR_GAMEID_MODE_ALL), _l(_STR_GAMEID_MODE_POPSTARTER),
+                                 _l(_STR_GAMEID_MODE_PS2), _l(_STR_GAMEID_MODE_OFF), NULL};
     int previousVMode;
     int ret;
 
 reselect_video_mode:
     previousVMode = gVMode;
     diaSetEnum(diaDisplayConfig, UICFG_VMODE, vmodeNames);
+    diaSetEnum(diaDisplayConfig, CFG_APPLYGAMEID, gameIDModes);
     diaSetInt(diaDisplayConfig, UICFG_VMODE, gVMode);
     diaSetInt(diaDisplayConfig, UICFG_WIDESCREEN, gWideScreen);
     diaSetInt(diaDisplayConfig, UICFG_XOFF, gXOff);
     diaSetInt(diaDisplayConfig, UICFG_YOFF, gYOff);
     diaSetInt(diaDisplayConfig, UICFG_OVERSCAN, gOverscan);
-    diaSetInt(diaDisplayConfig, CFG_APPLYGAMEID, gApplyGameID); // RetroGEM/Pixel FX GameID barcode
+    diaSetInt(diaDisplayConfig, CFG_APPLYGAMEID, guiGameIdModeFromGlobals());
 
 reshow_display:
     ret = diaExecuteDialog(diaDisplayConfig, -1, 1, guiDisplayUpdater);
@@ -1987,7 +2038,9 @@ reshow_display:
         diaGetInt(diaDisplayConfig, UICFG_XOFF, &gXOff);
         diaGetInt(diaDisplayConfig, UICFG_YOFF, &gYOff);
         diaGetInt(diaDisplayConfig, UICFG_OVERSCAN, &gOverscan);
-        diaGetInt(diaDisplayConfig, CFG_APPLYGAMEID, &gApplyGameID);
+        int gameIDMode;
+        diaGetInt(diaDisplayConfig, CFG_APPLYGAMEID, &gameIDMode);
+        guiApplyGameIdMode(gameIDMode);
 
         // Same #172 contract as _guiShowUIConfig above: play out the confirm bump before the GS
         // teardown/rebuild below, on the GUI thread -- never inside applyConfig itself.
@@ -2164,13 +2217,14 @@ static int guiSettingsSkipID(int id, const int *skipIDs, int skipCount)
 }
 
 static struct UIItem *guiSettingsCompose(const struct UIItem *const *parts, int partCount,
-                                         const int *skipIDs, int skipCount)
+                                         const int *skipIDs, int skipCount, int suppressSecondaryHeaders)
 {
-    int part, i, skipTrailingBreak;
+    int part, i, skipTrailingBreak, skipSecondarySplitter;
     int count = 0;
 
     for (part = 0; part < partCount; part++) {
         skipTrailingBreak = 0;
+        skipSecondarySplitter = 0;
         for (i = 0; parts[part][i].type != UI_TERMINATOR; i++) {
             const struct UIItem *item = &parts[part][i];
 
@@ -2193,6 +2247,19 @@ static struct UIItem *guiSettingsCompose(const struct UIItem *const *parts, int 
                 // row with no visual or navigation purpose.
                 if (item->type == UI_BUTTON)
                     skipTrailingBreak = 1;
+                continue;
+            }
+            if (suppressSecondaryHeaders && part > 0 && item->type == UI_HEADER) {
+                // The peer page title already supplies the context. Keep the fields and actions,
+                // but do not repeat each chained dialog's title as a second hierarchy level.
+                skipSecondarySplitter = 1;
+                continue;
+            }
+            if (skipSecondarySplitter && item->type == UI_SPLITTER) {
+                skipSecondarySplitter = 0;
+                if (count == 0 || guiSettingsDialog[count - 1].type == UI_BREAK)
+                    continue;
+                guiSettingsDialog[count++] = (struct UIItem) {UI_BREAK};
                 continue;
             }
             // Secondary settings sections already have their own colored heading. Keep the heading
@@ -2268,7 +2335,7 @@ static int guiSettingsGeneralUpdater(int modified)
 static int guiSettingsShowGeneral(void)
 {
     const struct UIItem *parts[] = {diaConfig, diaSecurityConfig, diaAdvancedConfig};
-    struct UIItem *ui = guiSettingsCompose(parts, 3, NULL, 0);
+    struct UIItem *ui = guiSettingsCompose(parts, 3, NULL, 0, 1);
     int result;
 
     if (ui == NULL)
@@ -2323,12 +2390,10 @@ reshow_general:
 
 static int guiSettingsShowSources(void)
 {
-    const struct UIItem *parts[] = {diaDeviceConfig, diaMmceConfig};
+    const struct UIItem *parts[] = {diaDeviceConfig};
     const char *deviceNames[] = {_l(_STR_BDM_GAMES), _l(_STR_NET_GAMES), _l(_STR_HDD_GAMES), _l(_STR_APPS), _l(_STR_MMCE), _l(_STR_FAV), NULL};
     const char *deviceModes[] = {_l(_STR_OFF), _l(_STR_MANUAL), _l(_STR_AUTO), NULL};
-    const char *deviceSlots[] = {"0", "1", _l(_STR_AUTO), NULL};
-    const char *deviceIGRSlots[] = {"NONE", "0", "1", "BOTH", NULL};
-    struct UIItem *ui = guiSettingsCompose(parts, 2, NULL, 0);
+    struct UIItem *ui = guiSettingsCompose(parts, 1, NULL, 0, 0);
     int deviceModeIndex;
     int result;
 
@@ -2357,21 +2422,12 @@ static int guiSettingsShowSources(void)
     diaSetEnum(ui, CFG_MMCEMODE, deviceModes);
     diaSetInt(ui, CFG_MMCEMODE, gMMCEStartMode);
     diaSetEnabled(ui, CFG_MMCEMODE, 1);
-    diaSetEnum(ui, CFG_MMCESLOT, deviceSlots);
-    diaSetInt(ui, CFG_MMCESLOT, gMMCESlot);
-    diaSetEnum(ui, CFG_MMCEIGRSLOT, deviceIGRSlots);
-    diaSetInt(ui, CFG_MMCEIGRSLOT, gMMCEIGRSlot);
-    diaSetInt(ui, CFG_MMCEGAMEID, gMMCEEnableGameID);
     guiSettingsBeginDialog(ui);
 
 reshow_sources:
     result = diaExecuteDialog(ui, -1, 1, NULL);
-    if (result == MMCE_COMM_BUTTON) {
-        guiShowMmceCommConfig();
-        goto reshow_sources;
-    }
-    if (result == MMCE_PATH_BUTTON) {
-        guiShowMmcePathConfig();
+    if (result == MMCE_SETTINGS_BUTTON) {
+        guiShowMmceConfig();
         goto reshow_sources;
     }
 
@@ -2390,11 +2446,9 @@ reshow_sources:
         diaGetInt(ui, CFG_ENABLEMX4SIO, &gEnableMX4SIO);
         diaGetInt(ui, CFG_ENABLEBDMHDD, &gEnableBdmHDD);
         diaGetInt(ui, CFG_NETSTART, &gNetStartMode);
-        diaGetInt(ui, CFG_MMCESLOT, &gMMCESlot);
-        diaGetInt(ui, CFG_MMCEIGRSLOT, &gMMCEIGRSlot);
-        diaGetInt(ui, CFG_MMCEGAMEID, &gMMCEEnableGameID);
-
-        if (gNetworkProtocol == NET_PROTO_OFF)
+        if (gNetStartMode == START_MODE_DISABLED)
+            gNetworkProtocol = NET_PROTO_OFF;
+        else if (gNetworkProtocol == NET_PROTO_OFF)
             gNetworkProtocol = NET_PROTO_SMB;
         gEnableUDPBD = (gNetworkProtocol == NET_PROTO_UDPBD || gNetworkProtocol == NET_PROTO_UDPFSBD);
         gNetBootProtocol = (gNetworkProtocol == NET_PROTO_UDPFSBD) ? NET_BOOT_UDPFS : NET_BOOT_UDPBD;
@@ -2460,7 +2514,7 @@ static int guiSettingsShowInterface(void)
                                 "EDTV 704x480p @60Hz 24bit (HIRES)", "EDTV 704x576p @50Hz 24bit (HIRES)",
                                 "HDTV 1280x720p @60Hz 16bit (HIRES)", "HDTV 1920x1080i @60Hz 16bit (HIRES)",
                                 "PAL 640x256p @50Hz 24bit", "NTSC 640x224p @60Hz 24bit", NULL};
-    struct UIItem *ui = guiSettingsCompose(parts, 2, NULL, 0);
+    struct UIItem *ui = guiSettingsCompose(parts, 2, NULL, 0, 1);
     const char **themeNamesSnap = NULL;
     const char **langNamesSnap = NULL;
     int themeID, langID, previousTheme, previousVMode, result;
@@ -2494,7 +2548,10 @@ static int guiSettingsShowInterface(void)
     diaSetInt(ui, UICFG_XOFF, gXOff);
     diaSetInt(ui, UICFG_YOFF, gYOff);
     diaSetInt(ui, UICFG_OVERSCAN, gOverscan);
-    diaSetInt(ui, CFG_APPLYGAMEID, gApplyGameID);
+    const char *gameIDModes[] = {_l(_STR_GAMEID_MODE_ALL), _l(_STR_GAMEID_MODE_POPSTARTER),
+                                 _l(_STR_GAMEID_MODE_PS2), _l(_STR_GAMEID_MODE_OFF), NULL};
+    diaSetEnum(ui, CFG_APPLYGAMEID, gameIDModes);
+    diaSetInt(ui, CFG_APPLYGAMEID, guiGameIdModeFromGlobals());
     guiSettingsBeginDialog(ui);
 reshow_interface:
     result = diaExecuteDialog(ui, -1, 1, &guiSettingsDisplayUpdater);
@@ -2508,6 +2565,10 @@ reshow_interface:
     }
     if (result == UICFG_COLORS_BUTTON) {
         guiShowColorsConfig();
+        goto reshow_interface;
+    }
+    if (result == UICFG_GAME_LIST_BUTTON) {
+        guiShowVcdListConfig();
         goto reshow_interface;
     }
     if (result == DISPLAY_GSM_DEFAULTS_BUTTON) {
@@ -2534,7 +2595,11 @@ reshow_interface:
         diaGetInt(ui, UICFG_XOFF, &gXOff);
         diaGetInt(ui, UICFG_YOFF, &gYOff);
         diaGetInt(ui, UICFG_OVERSCAN, &gOverscan);
-        diaGetInt(ui, CFG_APPLYGAMEID, &gApplyGameID);
+        {
+            int gameIDMode;
+            diaGetInt(ui, CFG_APPLYGAMEID, &gameIDMode);
+            guiApplyGameIdMode(gameIDMode);
+        }
 
         if (previousTheme != themeID && isBgmPlaying())
             bgmStop();
@@ -2579,7 +2644,7 @@ static int guiSettingsShowLaunch(void)
     const char *neutrinoDevStrs[] = {_l(_STR_AUTO), "Memory Card", "USB", "MX4SIO", "MMCE", "HDD (exFAT)", "HDD (APA)", _l(_STR_GAMES_DEVICE), NULL};
     static const char *neutrinoVideoDefStrs[] = {"Off", "240p", "480p", "1080i x1", "1080i x2", "1080i x3", NULL};
     static const char *neutrinoGsmCompDefStrs[] = {"Off", "Type 1 (GSM/OPL)", "Type 2", "Type 3", NULL};
-    struct UIItem *ui = guiSettingsCompose(parts, 2, skipIDs, 1);
+    struct UIItem *ui = guiSettingsCompose(parts, 2, skipIDs, 1, 1);
     int result;
 
     if (ui == NULL)
@@ -2640,7 +2705,7 @@ static int guiSettingsShowPopstarter(void)
     const struct UIItem *parts[] = {diaVcdConfig, diaVcdListConfig};
     const int skipIDs[] = {VCD_LIST_BUTTON};
     const char *popsDevStrs[] = {_l(_STR_DEFAULT), "Memory Card", "USB", "MX4SIO", "MMCE", "HDD (exFAT)", "HDD (APA)", "Custom", _l(_STR_GAMES_DEVICE), NULL};
-    struct UIItem *ui = guiSettingsCompose(parts, 2, skipIDs, 1);
+    struct UIItem *ui = guiSettingsCompose(parts, 2, skipIDs, 1, 1);
     int result;
 
     if (ui == NULL)
@@ -2699,7 +2764,6 @@ reshow_popstarter:
             hddVcdInvalidateCache();
             rebuildVcdLists = 1;
         }
-
         applyConfig(-1, -1, 0);
         menuReinitMainMenu();
         if (rebuildVcdLists)

@@ -13,10 +13,10 @@ struct UIItem diaNetConfig[] = {
     {UI_HEADER, 0, 1, 1, -1, 0, 0, {.label = {NULL, _STR_MENU_NETWORK}}},
     {UI_SPLITTER},
 
-    // Keep OPL/Neutrino's live configuration visually distinct from the shared POPSTARTER
+    // Keep OPL's live configuration visually distinct from the shared POPSTARTER
     // editor. The button opens the same IPCONFIG.DAT/SMBCONFIG.DAT owner used by the POPSTARTER
     // peer page; no POPSTARTER state is duplicated here.
-    {UI_HEADER, 0, 1, 1, -1, 0, 0, {.label = {"OPL / NEUTRINO", -1}}},
+    {UI_HEADER, 0, 1, 1, -1, 0, 0, {.label = {"NETWORK TRANSPORT", -1}}},
     {UI_BREAK},
 
     // Unified network rows (moved from diaDeviceConfig): Protocol (SMB/UDPFS/UDPBD) and Access
@@ -32,7 +32,7 @@ struct UIItem diaNetConfig[] = {
     {UI_ENUM, CFG_UDPFSMODE, 1, 1, -1, 0, 0, {.intvalue = {0, 0}}},
     {UI_BREAK},
 
-    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {"SMB Version", -1}}},
+    {UI_LABEL, NETCFG_LBL_SMBDIALECT, 1, 1, -1, -40, 0, {.label = {"SMB Version", -1}}},
     {UI_SPACER},
     {UI_ENUM, CFG_SMBDIALECT, 1, 1, -1, 0, 0, {.intvalue = {0, 0}}},
     {UI_BREAK},
@@ -49,10 +49,12 @@ struct UIItem diaNetConfig[] = {
 
     {UI_HEADER, 0, 1, 1, -1, 0, 0, {.label = {"POPSTARTER", -1}}},
     {UI_BREAK},
-    {UI_BUTTON, NETCFG_POPSTARTER_BUTTON, 1, 1, -1, 0, 0, {.label = {NULL, _STR_NETCONFIG}}},
+    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {NULL, _STR_POPSTARTER_NETWORK_SETTINGS}}},
+    {UI_SPACER},
+    {UI_BUTTON, NETCFG_POPSTARTER_BUTTON, 1, 1, -1, 0, 0, {.label = {NULL, _STR_MODIFY}}},
     {UI_BREAK},
 
-    {UI_HEADER, 0, 1, 1, -1, 0, 0, {.label = {"OPL NETWORK", -1}}},
+    {UI_HEADER, 0, 1, 1, -1, 0, 0, {.label = {"NETWORK ADDRESSES", -1}}},
     {UI_BREAK},
 
     // ---- IP address type ----
@@ -356,6 +358,11 @@ struct UIItem diaDeviceConfig[] = {
     {UI_ENUM, CFG_MMCEMODE, 1, 1, -1, 0, 0, {.intvalue = {0, 0}}},
     {UI_BREAK},
 
+    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {NULL, _STR_MMCE_SETTINGS}}},
+    {UI_SPACER},
+    {UI_BUTTON, MMCE_SETTINGS_BUTTON, 1, 1, -1, 0, 0, {.label = {NULL, _STR_MODIFY}}},
+    {UI_BREAK},
+
     // buttons
     {UI_OK, 0, 1, 1, -1, 0, 0, {.label = {NULL, _STR_OK}}},
     {UI_BREAK},
@@ -387,15 +394,15 @@ struct UIItem diaVcdConfig[] = {
 
 
     // sub-pages
-    {UI_HEADER, 0, 1, 1, -1, 0, 0, {.label = {NULL, _STR_BDMA_SETTINGS}}},
-    {UI_BREAK},
-    {UI_BUTTON, VCD_BDMA_BUTTON, 1, 1, -1, 0, 0, {.label = {NULL, _STR_CONFIGURE}}},
+    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {NULL, _STR_BDMA_SETTINGS}}},
+    {UI_SPACER},
+    {UI_BUTTON, VCD_BDMA_BUTTON, 1, 1, -1, 0, 0, {.label = {NULL, _STR_MODIFY}}},
     {UI_BREAK},
     {UI_BUTTON, VCD_LIST_BUTTON, 1, 1, -1, 0, 0, {.label = {NULL, _STR_GAME_LIST_SETTINGS}}},
     {UI_BREAK},
-    {UI_HEADER, 0, 1, 1, -1, 0, 0, {.label = {"NETWORK SETTINGS", -1}}},
-    {UI_BREAK},
-    {UI_BUTTON, VCD_NET_BUTTON, 1, 1, -1, 0, 0, {.label = {NULL, _STR_CONFIGURE}}},
+    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {NULL, _STR_POPSTARTER_NETWORK_SETTINGS}}},
+    {UI_SPACER},
+    {UI_BUTTON, VCD_NET_BUTTON, 1, 1, -1, 0, 0, {.label = {NULL, _STR_MODIFY}}},
     {UI_BREAK},
 
     // buttons
@@ -512,9 +519,13 @@ struct UIItem diaMmceConfig[] = {
     {UI_BREAK},
 
     // sub-pages
-    {UI_BUTTON, MMCE_COMM_BUTTON, 1, 1, -1, 0, 0, {.label = {NULL, _STR_COMM_SETTINGS}}},
+    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {NULL, _STR_COMM_SETTINGS}}},
+    {UI_SPACER},
+    {UI_BUTTON, MMCE_COMM_BUTTON, 1, 1, -1, 0, 0, {.label = {NULL, _STR_MODIFY}}},
     {UI_BREAK},
-    {UI_BUTTON, MMCE_PATH_BUTTON, 1, 1, -1, 0, 0, {.label = {NULL, _STR_PATH_SETTINGS}}},
+    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {NULL, _STR_PATH_SETTINGS}}},
+    {UI_SPACER},
+    {UI_BUTTON, MMCE_PATH_BUTTON, 1, 1, -1, 0, 0, {.label = {NULL, _STR_MODIFY}}},
     {UI_BREAK},
 
     // buttons
@@ -601,13 +612,21 @@ struct UIItem diaUIConfig[] = {
     {UI_BREAK},
 
     // sub-pages
-    {UI_HEADER, 0, 1, 1, -1, 0, 0, {.label = {"ARTWORK", -1}}},
+    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {NULL, _STR_ARTWORK_SETTINGS}}},
+    {UI_SPACER},
+    {UI_BUTTON, UICFG_ARTWORK_BUTTON, 1, 1, -1, 0, 0, {.label = {NULL, _STR_MODIFY}}},
     {UI_BREAK},
-    {UI_BUTTON, UICFG_ARTWORK_BUTTON, 1, 1, -1, 0, 0, {.label = {NULL, _STR_ARTWORK_SETTINGS}}},
+    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {NULL, _STR_COVERFLOW_SETTINGS}}},
+    {UI_SPACER},
+    {UI_BUTTON, UICFG_COVERFLOW_BUTTON, 1, 1, -1, 0, 0, {.label = {NULL, _STR_MODIFY}}},
     {UI_BREAK},
-    {UI_BUTTON, UICFG_COVERFLOW_BUTTON, 1, 1, -1, 0, 0, {.label = {NULL, _STR_COVERFLOW_SETTINGS}}},
+    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {NULL, _STR_COLORS_SETTINGS}}},
+    {UI_SPACER},
+    {UI_BUTTON, UICFG_COLORS_BUTTON, 1, 1, -1, 0, 0, {.label = {NULL, _STR_MODIFY}}},
     {UI_BREAK},
-    {UI_BUTTON, UICFG_COLORS_BUTTON, 1, 1, -1, 0, 0, {.label = {NULL, _STR_COLORS_SETTINGS}}},
+    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {NULL, _STR_GAME_LIST_SETTINGS}}},
+    {UI_SPACER},
+    {UI_BUTTON, UICFG_GAME_LIST_BUTTON, 1, 1, -1, 0, 0, {.label = {NULL, _STR_MODIFY}}},
     {UI_BREAK},
 
     // buttons
@@ -722,7 +741,7 @@ struct UIItem diaDisplayConfig[] = {
 
     {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {"Show GameID Barcode (Pixel FX)", -1}}},
     {UI_SPACER},
-    {UI_BOOL, CFG_APPLYGAMEID, 1, 1, -1, 0, 0, {.intvalue = {0, 0}}},
+    {UI_ENUM, CFG_APPLYGAMEID, 1, 1, -1, 0, 0, {.intvalue = {0, 0}}},
     {UI_BREAK},
 
     // The GLOBAL half of GSM: the $EnableGSM/$GSMVMode/... block in the global config, which every
@@ -757,9 +776,9 @@ struct UIItem diaLaunchConfig[] = {
     // sub-pages
     {UI_BUTTON, LAUNCH_NEUTRINO_DEFAULTS_BUTTON, 1, 1, -1, 0, 0, {.label = {NULL, _STR_NEUTRINO_DEFAULTS}}},
     {UI_BREAK},
-    {UI_HEADER, 0, 1, 1, -1, 0, 0, {.label = {NULL, _STR_OSD_DEFAULTS}}},
-    {UI_BREAK},
-    {UI_BUTTON, LAUNCH_OSD_DEFAULTS_BUTTON, 1, 1, -1, 0, 0, {.label = {NULL, _STR_CONFIGURE}}},
+    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {NULL, _STR_OSD_DEFAULTS}}},
+    {UI_SPACER},
+    {UI_BUTTON, LAUNCH_OSD_DEFAULTS_BUTTON, 1, 1, -1, 0, 0, {.label = {NULL, _STR_MODIFY}}},
     {UI_BREAK},
 
     // buttons
@@ -791,7 +810,9 @@ struct UIItem diaNeutrinoDefaults[] = {
     {UI_ENUM, CFG_NEUTRINO_GSMCOMP, 1, 1, _STR_HINT_NEUTRINO_GSM_COMP, 0, 0, {.intvalue = {0, 0}}},
     {UI_BREAK},
 
-    {UI_BUTTON, CFG_NEUTRINO_ARGS, 1, 1, _STR_HINT_NEUTRINO_ARGS, 0, 0, {.label = {NULL, _STR_ADVANCED_ARGUMENTS}}},
+    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {NULL, _STR_ADVANCED_ARGUMENTS}}},
+    {UI_SPACER},
+    {UI_BUTTON, CFG_NEUTRINO_ARGS, 1, 1, _STR_HINT_NEUTRINO_ARGS, 0, 0, {.label = {NULL, _STR_MODIFY}}},
     {UI_BREAK},
 
     // buttons
@@ -812,7 +833,9 @@ struct UIItem diaSecurityConfig[] = {
     {UI_BOOL, CFG_ENWRITEOP, 1, 1, -1, 0, 0, {.intvalue = {0, 0}}},
     {UI_BREAK},
 
-    {UI_BUTTON, SECURITY_PARENTAL_BUTTON, 1, 1, -1, 0, 0, {.label = {NULL, _STR_PARENLOCKCONFIG}}},
+    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {NULL, _STR_PARENLOCKCONFIG}}},
+    {UI_SPACER},
+    {UI_BUTTON, SECURITY_PARENTAL_BUTTON, 1, 1, -1, 0, 0, {.label = {NULL, _STR_MODIFY}}},
     {UI_BREAK},
 
     // buttons
@@ -833,9 +856,13 @@ struct UIItem diaAdvancedConfig[] = {
     {UI_BOOL, CFG_DEBUG, 1, 1, -1, 0, 0, {.intvalue = {0, 0}}},
     {UI_BREAK},
 
-    {UI_BUTTON, ADV_PREFIX_BUTTON, 1, 1, -1, 0, 0, {.label = {NULL, _STR_PATH_PREFIXES}}},
+    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {NULL, _STR_PATH_PREFIXES}}},
+    {UI_SPACER},
+    {UI_BUTTON, ADV_PREFIX_BUTTON, 1, 1, -1, 0, 0, {.label = {NULL, _STR_MODIFY}}},
     {UI_BREAK},
-    {UI_BUTTON, ADV_STORAGE_BUTTON, 1, 1, -1, 0, 0, {.label = {NULL, _STR_STORAGE_CACHE}}},
+    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {NULL, _STR_STORAGE_CACHE}}},
+    {UI_SPACER},
+    {UI_BUTTON, ADV_STORAGE_BUTTON, 1, 1, -1, 0, 0, {.label = {NULL, _STR_MODIFY}}},
     {UI_BREAK},
 
     // buttons
