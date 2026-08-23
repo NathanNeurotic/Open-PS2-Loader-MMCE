@@ -1179,13 +1179,13 @@ int diaExecuteDialog(struct UIItem *ui, int uiId, short inMenu, int (*updater)(i
                 return DIA_RESULT_INDEX;
             }
 
-            if (getKeyOn(KEY_L1)) {
+            if (settingsShell && getKeyOn(KEY_L1)) {
                 diaRestoreScrollSpeed();
                 sfxPlay(SFX_CURSOR);
                 return DIA_RESULT_PREV;
             }
 
-            if (getKeyOn(KEY_R1)) {
+            if (settingsShell && getKeyOn(KEY_R1)) {
                 diaRestoreScrollSpeed();
                 sfxPlay(SFX_CURSOR);
                 return DIA_RESULT_NEXT;

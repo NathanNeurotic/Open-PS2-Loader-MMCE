@@ -542,7 +542,7 @@ int menuSaveSettings(void)
     // SMB, UDPFS and UDPBD share the one SMAP NIC and cannot coexist -- each loader refuses to
     // start while either of the others is resident, and each loads its IOP chain once per boot.
     // Once a stack is up, a changed protocol applies after a restart.
-    if (guiNetProtocolNeedsRestart() && guiMsgBox(_l(_STR_NETBOOT_RESTART), 1, NULL))
+    if (result > 0 && guiNetProtocolNeedsRestart() && guiMsgBox(_l(_STR_NETBOOT_RESTART), 1, NULL))
         sysExecExit();
 
     return result;

@@ -2365,13 +2365,19 @@ static struct UIItem *guiSettingsComposeInto(struct UIItem *dialog, const struct
             // on its own line, but omit the source dialog's redundant separator line when it is
             // composed into the peer page.
             if (part > 0 && item->type == UI_SPLITTER && count > 0 && dialog[count - 1].type == UI_HEADER) {
-                if (count >= SETTINGS_DIALOG_CAPACITY - 3)
+                if (count >= SETTINGS_DIALOG_CAPACITY - 3) {
+                    LOG("GUI Settings: composed page exceeds SETTINGS_DIALOG_CAPACITY (%d)\n",
+                        SETTINGS_DIALOG_CAPACITY);
                     return NULL;
+                }
                 dialog[count++] = (struct UIItem) {UI_BREAK};
                 continue;
             }
-            if (count >= SETTINGS_DIALOG_CAPACITY - 3)
+            if (count >= SETTINGS_DIALOG_CAPACITY - 3) {
+                LOG("GUI Settings: composed page exceeds SETTINGS_DIALOG_CAPACITY (%d)\n",
+                    SETTINGS_DIALOG_CAPACITY);
                 return NULL;
+            }
             dialog[count++] = *item;
         }
     }
