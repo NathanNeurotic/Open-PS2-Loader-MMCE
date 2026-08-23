@@ -16,26 +16,30 @@
 #include "include/sound.h"
 
 // UI spacing of the dialogues (pixels between consecutive items)
-#define UI_SPACING_H      10
-#define UI_SPACING_V      2
+#define UI_SPACING_H          10
+#define UI_SETTINGS_SPACING_H 10
+#define UI_SPACING_V          2
 // spacer ui element width (simulates tab)
-#define UI_SPACER_WIDTH   50
+#define UI_SPACER_WIDTH       50
 // minimal pixel width of spacer
-#define UI_SPACER_MINIMAL 30
+#define UI_SPACER_MINIMAL     30
 // length of breaking line in pixels
-#define UI_BREAK_LEN      600
+#define UI_BREAK_LEN          600
 // Floor for the dialog repeat delay, in ms. Dialogs are deliberately calmer than the game list --
 // overshooting a settings row is more annoying than overshooting a game -- but that intent used to
 // be expressed as a HARDCODED 300 ms, which is exactly the "medium" main-menu value. The result was
 // that Settings ignored the user's Scroll Speed entirely: picking "fast" (100 ms) still gave 300 ms
 // in every dialog (3x slower than asked), and picking "slow" (500 ms) gave no extra slowness at all.
 // See diaScrollDelay(); medium is unchanged, so most users see no difference.
-#define DIA_SCROLL_MIN_MS 200
+#define DIA_SCROLL_MIN_MS     200
 // scroll speed (delay in ms!) when setting int value
-#define DIA_INT_SET_SPEED 100
+#define DIA_INT_SET_SPEED     100
 
 static int screenWidth;
 static int screenHeight;
+static struct UIItem *diaSettingsShellUI;
+static const char *diaSettingsIndicator;
+static int diaSettingsContext;
 
 // Utility stuff
 #define KEYB_MODE   2
@@ -476,12 +480,12 @@ static void diaDrawHint(int text_id)
 /// renders an ui item (either selected or not)
 /// sets width and height of the render into the parameters
 // The height diaRenderItem WOULD set for this item, computed without drawing. Kept byte-for-byte in
-// step with diaRenderItem's *h logic below: the default is UI_SPACING_H, UI_SPACER is 0, UI_COLOUR is
+// step with diaRenderItem's *h logic below: the default is the active spacing, UI_SPACER is 0, UI_COLOUR is
 // 17, an invisible controllable item is 0 (diaRenderItem early-returns leaving the caller's h=0), and
 // any non-zero fixedHeight overrides upward (negative = percent of screenHeight). *h never depends on
 // x/y or the text, so this is exact -- used to advance layout past a row the viewport clip skips (#195
 // scroll-bleed fix) so the on-screen rows below it keep their true positions.
-static int diaItemHeight(struct UIItem *item)
+static int diaItemHeight(struct UIItem *item, int spacingH)
 {
     int h;
 
@@ -493,7 +497,7 @@ static int diaItemHeight(struct UIItem *item)
     else if (item->type == UI_COLOUR)
         h = 17;
     else
-        h = UI_SPACING_H;
+        h = spacingH;
 
     if (item->fixedHeight != 0) {
         int newSize = (item->fixedHeight < 0) ? item->fixedHeight * screenHeight / -100 : item->fixedHeight;
@@ -503,13 +507,13 @@ static int diaItemHeight(struct UIItem *item)
     return h;
 }
 
-static void diaRenderItem(int x, int y, struct UIItem *item, int selected, int haveFocus, int *w, int *h)
+static void diaRenderItem(int x, int y, struct UIItem *item, int selected, int haveFocus, int spacingH, int *w, int *h)
 {
     // Don't draw controllable items that are not visible.
     if (!item->visible && item->type >= UI_LABEL)
         return;
 
-    *h = UI_SPACING_H;
+    *h = spacingH;
 
     // all texts are rendered up from the given point!
     u64 txtcol;
@@ -682,6 +686,17 @@ static struct UIItem *diaGetFirstControl(struct UIItem *ui);
 
 static int diaScrollOffset = 0;
 
+void diaSetSettingsShell(struct UIItem *ui, const char *indicator)
+{
+    diaSettingsShellUI = ui;
+    diaSettingsIndicator = indicator;
+}
+
+void diaSetSettingsContext(int enabled)
+{
+    diaSettingsContext = enabled;
+}
+
 /// renders whole ui screen (for given dialog setup)
 void diaRenderUI(struct UIItem *ui, short inMenu, struct UIItem *cur, int haveFocus)
 {
@@ -690,6 +705,9 @@ void diaRenderUI(struct UIItem *ui, short inMenu, struct UIItem *cur, int haveFo
 
     int x0 = 20;
     int y0 = 20;
+    int settingsShell = (ui == diaSettingsShellUI && diaSettingsIndicator != NULL);
+    int settingsContext = settingsShell || diaSettingsContext;
+    int spacingH = settingsContext ? UI_SETTINGS_SPACING_H : UI_SPACING_H;
 
     // render all items (shifted up by the scroll offset for tall dialogs)
     struct UIItem *rc = ui;
@@ -704,7 +722,7 @@ void diaRenderUI(struct UIItem *ui, short inMenu, struct UIItem *cur, int haveFo
             x = x0;
 
             if (hmax > 0)
-                y += hmax + UI_SPACING_H;
+                y += hmax + spacingH;
 
             hmax = 0;
         }
@@ -723,13 +741,14 @@ void diaRenderUI(struct UIItem *ui, short inMenu, struct UIItem *cur, int haveFo
         // positions and contentBottom/cursor-follow stay correct. Width is irrelevant for an unshown
         // row -- x resets on the next line break -- so w=0. The FOCUSED row is never skipped (the
         // cursor-follow clamp keeps it inside the viewport by construction), so cursor tracking is exact.
-        int rowH = diaItemHeight(rc);
+        int rowH = diaItemHeight(rc, spacingH);
         int viewBottom = gTheme->usedHeight - 40; // the same bound the scroll clamp below uses
         if (rc != cur && (y + rowH <= y0 || y >= viewBottom)) {
             w = 0;
             h = rowH;
         } else {
-            diaRenderItem(x, y, rc, rc == cur, haveFocus, &w, &h);
+            int renderX = x;
+            diaRenderItem(renderX, y, rc, rc == cur, haveFocus, spacingH, &w, &h);
         }
 
         if (rc == cur) {
@@ -749,7 +768,7 @@ void diaRenderUI(struct UIItem *ui, short inMenu, struct UIItem *cur, int haveFo
             x = x0;
 
             if (hmax > 0)
-                y += hmax + UI_SPACING_H;
+                y += hmax + spacingH;
 
             hmax = 0;
         }
@@ -791,14 +810,44 @@ void diaRenderUI(struct UIItem *ui, short inMenu, struct UIItem *cur, int haveFo
         diaDrawHint(cur->hintId);
     }
 
-    int uiHints[2] = {_STR_SELECT, _STR_BACK};
-    int uiIcons[2] = {CIRCLE_ICON, CROSS_ICON};
     int uiY = gTheme->usedHeight - 32;
-    int uiX = guiAlignSubMenuHints(2, uiHints, uiIcons, gTheme->fonts[0], 12, 2);
+    if (settingsContext) {
+        int uiHints[3] = {_STR_SELECT, _STR_BACK, _STR_SETTINGS};
+        int uiIcons[3] = {CROSS_ICON, CIRCLE_ICON, TRIANGLE_ICON};
+        int uiX = guiAlignSubMenuHints(3, uiHints, uiIcons, gTheme->fonts[0], 12, 2);
 
-    uiX = guiDrawIconAndText(gSelectButton == KEY_CIRCLE ? uiIcons[0] : uiIcons[1], uiHints[0], gTheme->fonts[0], uiX, uiY, gTheme->textColor);
-    uiX += 12;
-    uiX = guiDrawIconAndText(gSelectButton == KEY_CIRCLE ? uiIcons[1] : uiIcons[0], uiHints[1], gTheme->fonts[0], uiX, uiY, gTheme->textColor);
+        if (settingsShell) {
+            // Use the same controller button textures as the rest of OPL. Do not introduce a
+            // text-only [L1]/[R1] language for Settings; disk themes can override these embedded
+            // defaults. Child editors stay in the Settings context but do not show page controls.
+            int pageX = x0;
+            GSTEXTURE *l1Tex = thmGetTexture(L1_ICON);
+            GSTEXTURE *r1Tex = thmGetTexture(R1_ICON);
+            int l1W = l1Tex ? (l1Tex->Width * 20) / l1Tex->Height : 0;
+            int r1W = r1Tex ? (r1Tex->Width * 20) / r1Tex->Height : 0;
+
+            if (l1Tex && l1Tex->Mem)
+                rmDrawPixmap(l1Tex, pageX, uiY + 10, ALIGN_VCENTER, l1W, 20, SCALING_RATIO, gDefaultCol, 0);
+            pageX += rmWideScale(l1W) + 8;
+            pageX = fntRenderString(gTheme->fonts[0], pageX, uiY + 10, ALIGN_VCENTER, 0, 0, diaSettingsIndicator, gTheme->textColor);
+            pageX += 8;
+            if (r1Tex && r1Tex->Mem)
+                rmDrawPixmap(r1Tex, pageX, uiY + 10, ALIGN_VCENTER, r1W, 20, SCALING_RATIO, gDefaultCol, 0);
+        }
+        uiX = guiDrawIconAndText(uiIcons[0], uiHints[0], gTheme->fonts[0], uiX, uiY, gTheme->textColor);
+        uiX += 12;
+        uiX = guiDrawIconAndText(uiIcons[1], uiHints[1], gTheme->fonts[0], uiX, uiY, gTheme->textColor);
+        uiX += 12;
+        guiDrawIconAndText(uiIcons[2], uiHints[2], gTheme->fonts[0], uiX, uiY, gTheme->textColor);
+    } else {
+        int uiHints[2] = {_STR_SELECT, _STR_BACK};
+        int uiIcons[2] = {CIRCLE_ICON, CROSS_ICON};
+        int uiX = guiAlignSubMenuHints(2, uiHints, uiIcons, gTheme->fonts[0], 12, 2);
+
+        uiX = guiDrawIconAndText(gSelectButton == KEY_CIRCLE ? uiIcons[0] : uiIcons[1], uiHints[0], gTheme->fonts[0], uiX, uiY, gTheme->textColor);
+        uiX += 12;
+        guiDrawIconAndText(gSelectButton == KEY_CIRCLE ? uiIcons[1] : uiIcons[0], uiHints[1], gTheme->fonts[0], uiX, uiY, gTheme->textColor);
+    }
 }
 
 /// sets the ui item value to the default again
@@ -820,17 +869,20 @@ static void diaResetValue(struct UIItem *item)
     }
 }
 
-static int diaHandleInput(struct UIItem *item, int *modified)
+static int diaHandleInput(struct UIItem *item, int *modified, int settingsContext)
 {
+    int selectButton = settingsContext ? KEY_CROSS : gSelectButton;
+    int cancelButton = settingsContext ? KEY_CIRCLE : (gSelectButton == KEY_CIRCLE ? KEY_CROSS : KEY_CIRCLE);
+
     // circle loses focus, sets old values first
-    if (getKeyOn(gSelectButton == KEY_CIRCLE ? KEY_CROSS : KEY_CIRCLE)) {
+    if (getKeyOn(cancelButton)) {
         diaResetValue(item);
         sfxPlay(SFX_CONFIRM);
         return 0;
     }
 
     // cross loses focus without setting default
-    if (getKeyOn(gSelectButton)) {
+    if (getKeyOn(selectButton)) {
         sfxPlay(SFX_CONFIRM);
         *modified = 0;
         return 0;
@@ -1086,6 +1138,9 @@ int diaExecuteDialog(struct UIItem *ui, int uiId, short inMenu, int (*updater)(i
 
     diaStoreScrollSpeed();
 
+    int settingsShell = diaSettingsShellUI == ui && diaSettingsIndicator != NULL;
+    int settingsContext = settingsShell || diaSettingsContext;
+
     // slower controls for dialogs
     setButtonDelay(KEY_UP, diaScrollDelay());
     setButtonDelay(KEY_DOWN, diaScrollDelay());
@@ -1104,7 +1159,7 @@ int diaExecuteDialog(struct UIItem *ui, int uiId, short inMenu, int (*updater)(i
 
         if (haveFocus) {
             modified = 1;
-            haveFocus = diaHandleInput(cur, &modified);
+            haveFocus = diaHandleInput(cur, &modified, settingsContext);
 
             if (!haveFocus) {
                 setButtonDelay(KEY_UP, diaScrollDelay());
@@ -1113,6 +1168,28 @@ int diaExecuteDialog(struct UIItem *ui, int uiId, short inMenu, int (*updater)(i
         } else {
             modified = 0;
             struct UIItem *newf = cur;
+
+            // Settings uses L1/R1 as peer-screen navigation. Keep this in the dialog layer so
+            // every peer screen retains the same focus, scrolling and modal-editor behavior as
+            // existing dialogs. Ordinary dialogs never see these results unless their caller opts
+            // into handling them.
+            if (settingsShell && getKeyOn(KEY_TRIANGLE)) {
+                diaRestoreScrollSpeed();
+                sfxPlay(SFX_CURSOR);
+                return DIA_RESULT_INDEX;
+            }
+
+            if (settingsShell && getKeyOn(KEY_L1)) {
+                diaRestoreScrollSpeed();
+                sfxPlay(SFX_CURSOR);
+                return DIA_RESULT_PREV;
+            }
+
+            if (settingsShell && getKeyOn(KEY_R1)) {
+                diaRestoreScrollSpeed();
+                sfxPlay(SFX_CURSOR);
+                return DIA_RESULT_NEXT;
+            }
 
             if (getKey(KEY_LEFT)) {
                 newf = diaGetPrevControl(cur, ui);
@@ -1145,14 +1222,14 @@ int diaExecuteDialog(struct UIItem *ui, int uiId, short inMenu, int (*updater)(i
             }
 
             // Cancel button breaks focus or exits with false result
-            if (getKeyOn(gSelectButton == KEY_CIRCLE ? KEY_CROSS : KEY_CIRCLE)) {
+            if (getKeyOn(settingsContext ? KEY_CIRCLE : (gSelectButton == KEY_CIRCLE ? KEY_CROSS : KEY_CIRCLE))) {
                 diaRestoreScrollSpeed();
                 sfxPlay(SFX_CANCEL);
                 return UIID_BTN_CANCEL;
             }
 
             // see what key events we have
-            if (getKeyOn(gSelectButton)) {
+            if (getKeyOn(settingsContext ? KEY_CROSS : gSelectButton)) {
                 haveFocus = 1;
                 sfxPlay(SFX_CONFIRM);
 

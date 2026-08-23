@@ -28,16 +28,6 @@
 
 enum MENU_IDs {
     MENU_SETTINGS = 0,
-    MENU_GAME_SOURCES,
-    MENU_INTERFACE,
-    MENU_DISPLAY,
-    MENU_GAME_LAUNCHING,
-    MENU_POPSTARTER, // NOTE(rebuild): MENU_MMCE joins with checklist item 1
-    MENU_NETWORK,
-    MENU_CONTROLLER,
-    MENU_AUDIO,
-    MENU_SECURITY,
-    MENU_ADVANCED,
     MENU_TOOLS,
     MENU_ABOUT,
     MENU_SAVE_CHANGES,
@@ -534,6 +524,30 @@ int menuSaveConfig()
     return menuSaveResult;
 }
 
+int menuSaveSettings(void)
+{
+    int result;
+
+    if (menuCheckParentalLock() != 0)
+        return 0;
+
+    guiGameSaveOSDLanguageGlobalConfig(configGetByType(CONFIG_GAME));
+#ifdef PADEMU
+    guiGameSavePadEmuGlobalConfig(configGetByType(CONFIG_GAME));
+    guiGameSavePadMacroGlobalConfig(configGetByType(CONFIG_GAME));
+#endif
+    result = saveConfig(CONFIG_OPL | CONFIG_NETWORK | CONFIG_GAME, 1);
+    menuSetParentalLockCheckState(1); // Re-enable parental lock check.
+
+    // SMB, UDPFS and UDPBD share the one SMAP NIC and cannot coexist -- each loader refuses to
+    // start while either of the others is resident, and each loads its IOP chain once per boot.
+    // Once a stack is up, a changed protocol applies after a restart.
+    if (result > 0 && guiNetProtocolNeedsRestart() && guiMsgBox(_l(_STR_NETBOOT_RESTART), 1, NULL))
+        sysExecExit();
+
+    return result;
+}
+
 static void menuInitMainMenu(void)
 {
     if (mainMenu)
@@ -542,20 +556,8 @@ static void menuInitMainMenu(void)
     // initialize the menu
     submenuAppendItem(&mainMenu, -1, NULL, MENU_LAUNCH_PS2_DISC, _STR_LAUNCH_PS2_DISC);
     submenuAppendItem(&mainMenu, -1, NULL, MENU_SETTINGS, _STR_SETTINGS);
-    submenuAppendItem(&mainMenu, -1, NULL, MENU_GAME_SOURCES, _STR_GAME_SOURCES);
-    submenuAppendItem(&mainMenu, -1, NULL, MENU_INTERFACE, _STR_INTERFACE_SETTINGS);
-    submenuAppendItem(&mainMenu, -1, NULL, MENU_DISPLAY, _STR_DISPLAY_SETTINGS);
-    submenuAppendItem(&mainMenu, -1, NULL, MENU_GAME_LAUNCHING, _STR_GAME_LAUNCHING);
-    submenuAppendItem(&mainMenu, -1, NULL, MENU_POPSTARTER, _STR_POPSTARTER);
-    submenuAppendItem(&mainMenu, -1, NULL, MENU_NETWORK, _STR_MENU_NETWORK);
-    submenuAppendItem(&mainMenu, -1, NULL, MENU_CONTROLLER, _STR_MENU_CONTROLLER);
-    submenuAppendItem(&mainMenu, -1, NULL, MENU_AUDIO, _STR_MENU_AUDIO);
-    submenuAppendItem(&mainMenu, -1, NULL, MENU_SECURITY, _STR_SECURITY_SETTINGS);
-    submenuAppendItem(&mainMenu, -1, NULL, MENU_ADVANCED, _STR_ADVANCED_SETTINGS);
-    submenuAppendItem(&mainMenu, -1, NULL, MENU_MMCE, _STR_MMCE);
     submenuAppendItem(&mainMenu, -1, NULL, MENU_TOOLS, _STR_TOOLS);
     submenuAppendItem(&mainMenu, -1, NULL, MENU_ABOUT, _STR_ABOUT);
-    submenuAppendItem(&mainMenu, -1, NULL, MENU_SAVE_CHANGES, _STR_SAVE_CHANGES);
     submenuAppendItem(&mainMenu, -1, NULL, MENU_EXIT, _STR_EXIT);
     submenuAppendItem(&mainMenu, -1, NULL, MENU_POWER_OFF, _STR_POWEROFF);
 
@@ -1301,73 +1303,14 @@ void menuHandleInputMenu()
                 guiMsgBox(_l(_STR_DISC_LAUNCH_ERR), 0, NULL);
         } else if (id == MENU_SETTINGS) {
             if (menuCheckParentalLock() == 0)
-                guiShowConfig();
-        } else if (id == MENU_GAME_SOURCES) {
-            if (menuCheckParentalLock() == 0)
-                guiShowDeviceConfig();
-        } else if (id == MENU_INTERFACE) {
-            if (menuCheckParentalLock() == 0)
-                guiShowUIConfig();
-        } else if (id == MENU_DISPLAY) {
-            if (menuCheckParentalLock() == 0)
-                guiShowDisplayConfig();
-        } else if (id == MENU_GAME_LAUNCHING) {
-            if (menuCheckParentalLock() == 0)
-                guiShowLaunchConfig();
-        } else if (id == MENU_POPSTARTER) {
-            if (menuCheckParentalLock() == 0)
-                guiShowVcdConfig();
-        } else if (id == MENU_NETWORK) {
-            if (menuCheckParentalLock() == 0)
-                guiShowNetConfig();
-        } else if (id == MENU_CONTROLLER) {
-            if (menuCheckParentalLock() == 0)
-                guiShowControllerConfig();
-        } else if (id == MENU_AUDIO) {
-            if (menuCheckParentalLock() == 0)
-                guiShowAudioConfig();
-        } else if (id == MENU_SECURITY) {
-            if (menuCheckParentalLock() == 0)
-                guiShowSecurityConfig();
-        } else if (id == MENU_ADVANCED) {
-            if (menuCheckParentalLock() == 0)
-                guiShowAdvancedConfig();
-        } else if (id == MENU_MMCE) {
-            if (menuCheckParentalLock() == 0)
-                guiShowMmceConfig();
+                guiShowSettings();
         } else if (id == MENU_TOOLS) {
             if (menuCheckParentalLock() == 0)
                 guiShowToolsConfig();
         } else if (id == MENU_ABOUT) {
             guiShowAbout();
         } else if (id == MENU_SAVE_CHANGES) {
-            if (menuCheckParentalLock() == 0) {
-                guiGameSaveOSDLanguageGlobalConfig(configGetByType(CONFIG_GAME));
-#ifdef PADEMU
-                guiGameSavePadEmuGlobalConfig(configGetByType(CONFIG_GAME));
-                guiGameSavePadMacroGlobalConfig(configGetByType(CONFIG_GAME));
-#endif
-                saveConfig(CONFIG_OPL | CONFIG_NETWORK | CONFIG_GAME, 1);
-                menuSetParentalLockCheckState(1); // Re-enable parental lock check.
-
-                // SMB, UDPFS and UDPBD share the one SMAP NIC and cannot coexist -- each loader
-                // refuses to start while either of the others is resident, and each loads its IOP
-                // chain once per boot with no unload path. So once a stack is up, choosing a different
-                // protocol changes the CONFIG and nothing else: the NIC keeps running whatever it
-                // started with, for the rest of the session.
-                //
-                // The choice has just been written, which makes this the first moment it is safe to
-                // act on. Offer to leave OPL so the user can start it again on the protocol they
-                // picked. Doing this from the picker instead would have torn OPL down before Save
-                // Changes ever ran and thrown the choice away -- those dialogs only touch RAM.
-                //
-                // sysExecExit is the Exit menu item's own path (deinit + exit), deliberately not a new
-                // one: OPL has no in-place relaunch, and inventing an ELF-reload + IOP-reset path
-                // underneath a settings screen would be a brand-new way to reach a black screen.
-                // Declining costs nothing -- the saved protocol applies at the user's next launch.
-                if (guiNetProtocolNeedsRestart() && guiMsgBox(_l(_STR_NETBOOT_RESTART), 1, NULL))
-                    sysExecExit();
-            }
+            menuSaveSettings();
         } else if (id == MENU_EXIT) {
             if (guiMsgBox(_l(_STR_CONFIRMATION_EXIT), 1, NULL))
                 sysExecExit();

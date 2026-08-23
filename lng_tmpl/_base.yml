@@ -883,13 +883,23 @@ gui_strings:
 - label: PLASCOLOR
   string: Plasma Blend Color
 - label: POPSTARTER
-  string: POPStarter
+  string: POPSTARTER
 - label: POPSTARTER_DEVICE
   string: POPSTARTER.ELF Device
 - label: POPSTARTER_PATH
   string: POPSTARTER.ELF Path
 - label: POPSTARTER_RETROGEM_GAMEID
   string: RetroGEM Game ID
+- label: POPSTARTER_NETWORK_SETTINGS
+  string: POPSTARTER Network Settings
+- label: GAMEID_MODE_ALL
+  string: On (All)
+- label: GAMEID_MODE_POPSTARTER
+  string: On (POPSTARTER only)
+- label: GAMEID_MODE_PS2
+  string: On (PS2 only)
+- label: GAMEID_MODE_OFF
+  string: 'Off'
 - label: POPS_IMPORT
   string: Import POPSLoader Settings
 - label: POPS_NONE_DETECTED
@@ -1096,3 +1106,17 @@ gui_strings:
   string: APA and exFAT internal HDD were both enabled -- one was disabled automatically (check Device Settings).
 - label: VCD_SETTINGS
   string: VCD Settings
+- label: SETTINGS_SAVE_PROMPT
+  string: SAVE SETTINGS?
+- label: SETTINGS_SAVE_PROMPT_LINE1
+  string: Your changes are currently active.
+- label: SETTINGS_SAVE_PROMPT_LINE2
+  string: Would you like to save them for future launches?
+- label: SETTINGS_SAVE
+  string: Save Settings
+- label: SETTINGS_EXIT_WITHOUT_SAVING
+  string: Exit Without Saving
+- label: SETTINGS_CONTINUE_EDITING
+  string: Continue Editing
+- label: CONFIGURE
+  string: Configure

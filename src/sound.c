@@ -287,6 +287,17 @@ static void sfxRumble(int id)
         return;
 
     switch (id) {
+        case SFX_CURSOR: {
+            // Cursor sounds are emitted for every navigation step, including held buttons. Keep the
+            // prompt responsive without turning a long scroll into a continuous motor buzz.
+            static u32 lastCursorRumbleTicks;
+            u32 now = cpu_ticks();
+            if (lastCursorRumbleTicks != 0 && (now - lastCursorRumbleTicks) / SFX_CLOCKS_PER_MS < 80)
+                return;
+            lastCursorRumbleTicks = now;
+            padRumble(35, 64);
+            break;
+        }
         case SFX_CONFIRM:
             padRumble(120, 160);
             break;
@@ -298,6 +309,12 @@ static void sfxRumble(int id)
             break;
         case SFX_TRANSITION:
             padRumble(150, 200);
+            break;
+        case SFX_BD_CONNECT:
+            padRumble(100, 128);
+            break;
+        case SFX_BD_DISCONNECT:
+            padRumble(75, 96);
             break;
         default:
             break;

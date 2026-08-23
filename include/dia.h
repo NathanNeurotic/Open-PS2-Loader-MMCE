@@ -3,6 +3,13 @@
 
 #include "include/opl.h"
 
+// Results returned by diaExecuteDialog when the caller opts into Settings peer navigation.
+// They are deliberately outside the normal UI item-id range so existing dialogs keep their
+// current button semantics.
+#define DIA_RESULT_PREV  (-2)
+#define DIA_RESULT_NEXT  (-3)
+#define DIA_RESULT_INDEX (-4)
+
 // UI dialog item definition
 typedef enum {
     // terminates the definition of dialog. Mandatory
@@ -92,6 +99,10 @@ struct UIItem
 /// Dialog display
 int diaExecuteDialog(struct UIItem *ui, int uiId, short inMenu, int (*updater)(int modified));
 void diaRenderUI(struct UIItem *ui, short inMenu, struct UIItem *cur, int haveFocus);
+void diaSetSettingsShell(struct UIItem *ui, const char *indicator);
+// Marks ordinary child editors opened from a Settings page so they keep Settings' controller
+// semantics and footer wording without opting into peer-screen L1/R1 navigation.
+void diaSetSettingsContext(int enabled);
 int diaShowKeyb(char *text, int maxLen, int hide_text, const char *title);
 void diaSetEnabled(struct UIItem *ui, int id, int enabled);
 void diaSetShowDefaultWhenEmpty(struct UIItem *ui, int id, int show);

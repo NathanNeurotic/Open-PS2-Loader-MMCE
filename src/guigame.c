@@ -1081,7 +1081,7 @@ static void guiGameConfirmGSM1080p(void)
 
 // Commits the GSM rows straight into the GLOBAL config set. Used only by the Display Settings
 // defaults page: the per-game page is read back by guiGameSaveConfig() instead. Deliberately NOT
-// driven off the statics at MENU_SAVE_CHANGES time -- statics left over from a game's settings visit
+// driven off the statics at Save Settings time -- statics left over from a game's settings visit
 // (or never loaded at all on a fresh boot) would silently overwrite the global block with zeros.
 static void guiGameSaveGSMGlobalConfig(config_set_t *configGame)
 {

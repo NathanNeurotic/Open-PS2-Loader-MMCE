@@ -59,6 +59,32 @@ static int showPartPopup = 0;
 static int showThmPopup;
 static int showLngPopup;
 
+// The eight Settings peer screens reuse the established dialog definitions. Composite screens are
+// assembled into scratch buffers at entry so the existing field ids, visibility rules and temporary
+// editor buttons remain owned by their original feature code. Values still live in the existing
+// globals/config sets; these buffers are only views, never a second configuration store.
+#define SETTINGS_DIALOG_CAPACITY 256
+static struct UIItem guiSettingsDialog[SETTINGS_DIALOG_CAPACITY];
+// MMCE Settings can be opened from the composed Game Sources page. Keep its editor separate so
+// returning from that child cannot overwrite the parent's dialog contents.
+static struct UIItem guiMmceSettingsDialog[SETTINGS_DIALOG_CAPACITY];
+static struct UIItem *guiSettingsActiveDialog;
+static int guiSettingsShellActive;
+static int guiSettingsCurrentPage;
+static int guiSettingsSavePending;
+static char guiSettingsPageIndicator[32];
+
+static int guiSettingsIsShellResult(int result);
+static int guiSettingsPageResult(int result);
+static int guiSettingsPromptSave(void);
+static void guiSettingsBeginDialog(struct UIItem *ui);
+static void guiSettingsEndDialog(void);
+static struct UIItem *guiSettingsCompose(const struct UIItem *const *parts, int partCount,
+                                         const int *skipIDs, int skipCount, int suppressSecondaryHeaders);
+static struct UIItem *guiSettingsComposeInto(struct UIItem *dialog, const struct UIItem *const *parts,
+                                             int partCount, const int *skipIDs, int skipCount,
+                                             int suppressSecondaryHeaders);
+
 // Notification popup: START tick + how long to hold, NOT an absolute deadline. clock() is a
 // 32-bit microsecond counter, so it wraps every ~71.6 minutes; `clock() >= start + duration`
 // silently becomes false-for-71-minutes whenever the sum crosses the wrap. The (clock() - start)
@@ -684,7 +710,13 @@ void guiShowDeviceConfig(void)
     diaSetInt(diaDeviceConfig, CFG_MMCEMODE, gMMCEStartMode);
     diaSetEnabled(diaDeviceConfig, CFG_MMCEMODE, 1);
 
-    int ret = diaExecuteDialog(diaDeviceConfig, -1, 1, NULL);
+    int ret;
+reshow_device:
+    ret = diaExecuteDialog(diaDeviceConfig, -1, 1, NULL);
+    if (ret == MMCE_SETTINGS_BUTTON) {
+        guiShowMmceConfig();
+        goto reshow_device;
+    }
     if (ret) {
         int netProtocolWas = gNetworkProtocol;
         diaGetInt(diaDeviceConfig, CFG_DEFDEVICE, &deviceModeIndex);
@@ -703,7 +735,9 @@ void guiShowDeviceConfig(void)
         // Network Start Mode read-back: Start=Off disables network start;
         // preserve the user's configured gNetworkProtocol (defaulting to SMB only if uninitialized).
         diaGetInt(diaDeviceConfig, CFG_NETSTART, &gNetStartMode);
-        if (gNetworkProtocol == NET_PROTO_OFF)
+        if (gNetStartMode == START_MODE_DISABLED)
+            gNetworkProtocol = NET_PROTO_OFF;
+        else if (gNetworkProtocol == NET_PROTO_OFF)
             gNetworkProtocol = NET_PROTO_SMB;
         gEnableUDPBD = (gNetworkProtocol == NET_PROTO_UDPBD || gNetworkProtocol == NET_PROTO_UDPFSBD);
         gNetBootProtocol = (gNetworkProtocol == NET_PROTO_UDPFSBD) ? NET_BOOT_UDPFS : NET_BOOT_UDPBD;
@@ -740,38 +774,57 @@ void guiShowDeviceConfig(void)
     }
 }
 
-// MMCE page (settings-layout restructure, was MMCE Settings): SD2PSX / MemCard PRO2 basics (memory-
-// card slot, IGR slot, GameID push). Communication tuning and the path prefix are chained
-// sub-dialogs; CFG ids shared with the old rows.
-void guiShowMmceConfig(void)
+// MMCE page (settings-layout restructure, was MMCE Settings): SD2PSX / MemCard PRO2 basics plus
+// communication tuning and the library path. The legacy child definitions remain available, but
+// this entry composes their fields inline so the user does not need another navigation layer.
+int guiShowMmceConfig(void)
 {
-    const char *deviceSlots[] = {"0", "1", _l(_STR_AUTO), NULL};
-    const char *deviceIGRSlots[] = {"NONE", "0", "1", "BOTH", NULL};
+    const struct UIItem *parts[] = {diaMmceConfig, diaMmceCommConfig, diaMmcePathConfig};
+    const int skipIDs[] = {MMCE_COMM_BUTTON, MMCE_PATH_BUTTON};
+    static const char *deviceSlots[] = {"0", "1", NULL, NULL};
+    static const char *deviceIGRSlots[] = {"NONE", "0", "1", "BOTH", NULL};
+    static const char *deviceAckWaitCycles[] = {"0", "1", "2", "3", "4", "5", NULL};
+    static const char *deviceOnOff[] = {"OFF", "ON", NULL};
+    struct UIItem *previousActiveDialog = guiSettingsActiveDialog;
+    struct UIItem *ui;
 
-    diaSetEnum(diaMmceConfig, CFG_MMCESLOT, deviceSlots);
-    diaSetInt(diaMmceConfig, CFG_MMCESLOT, gMMCESlot);
-    diaSetEnum(diaMmceConfig, CFG_MMCEIGRSLOT, deviceIGRSlots);
-    diaSetInt(diaMmceConfig, CFG_MMCEIGRSLOT, gMMCEIGRSlot);
-    diaSetInt(diaMmceConfig, CFG_MMCEGAMEID, gMMCEEnableGameID);
+    // diaSetEnum stores the array pointer rather than copying it. Keep the MMCE options alive for
+    // the lifetime of the dedicated child dialog, including any parent re-entry after Circle.
+    deviceSlots[2] = _l(_STR_AUTO);
+    ui = guiSettingsComposeInto(guiMmceSettingsDialog, parts, 3, skipIDs, 2, 1);
 
-    int ret;
-reshow_mmce:
-    ret = diaExecuteDialog(diaMmceConfig, -1, 1, NULL);
-    if (ret == MMCE_COMM_BUTTON) {
-        guiShowMmceCommConfig();
-        goto reshow_mmce;
+    if (ui == NULL)
+        return -1;
+
+    diaSetEnum(ui, CFG_MMCESLOT, deviceSlots);
+    diaSetInt(ui, CFG_MMCESLOT, gMMCESlot);
+    diaSetEnum(ui, CFG_MMCEIGRSLOT, deviceIGRSlots);
+    diaSetInt(ui, CFG_MMCEIGRSLOT, gMMCEIGRSlot);
+    diaSetInt(ui, CFG_MMCEGAMEID, gMMCEEnableGameID);
+    diaSetEnum(ui, CFG_MMCE_WAIT_CYCLES, deviceAckWaitCycles);
+    diaSetInt(ui, CFG_MMCE_WAIT_CYCLES, gMMCEAckWaitCycles);
+    diaSetEnum(ui, CFG_MMCE_USE_ALARMS, deviceOnOff);
+    diaSetInt(ui, CFG_MMCE_USE_ALARMS, gMMCEUseAlarms);
+    diaSetString(ui, CFG_MMCEPREFIX, gMMCEPrefix);
+
+    int ret = diaExecuteDialog(ui, -1, 1, NULL);
+    if (ret == UIID_BTN_OK) {
+        diaGetInt(ui, CFG_MMCESLOT, &gMMCESlot);
+        diaGetInt(ui, CFG_MMCEIGRSLOT, &gMMCEIGRSlot);
+        diaGetInt(ui, CFG_MMCEGAMEID, &gMMCEEnableGameID);
+        diaGetInt(ui, CFG_MMCE_WAIT_CYCLES, &gMMCEAckWaitCycles);
+        diaGetInt(ui, CFG_MMCE_USE_ALARMS, &gMMCEUseAlarms);
+        diaGetString(ui, CFG_MMCEPREFIX, gMMCEPrefix, sizeof(gMMCEPrefix));
+        // The Settings parent commits the complete Game Sources page after this child returns.
+        // Legacy callers still own their own apply path.
+        if (!guiSettingsShellActive) {
+            applyConfig(-1, -1, 0);
+            menuReinitMainMenu();
+        }
     }
-    if (ret == MMCE_PATH_BUTTON) {
-        guiShowMmcePathConfig();
-        goto reshow_mmce;
-    }
-    if (ret) {
-        diaGetInt(diaMmceConfig, CFG_MMCESLOT, &gMMCESlot);
-        diaGetInt(diaMmceConfig, CFG_MMCEIGRSLOT, &gMMCEIGRSlot);
-        diaGetInt(diaMmceConfig, CFG_MMCEGAMEID, &gMMCEEnableGameID);
-        applyConfig(-1, -1, 0);
-        menuReinitMainMenu();
-    }
+
+    guiSettingsActiveDialog = previousActiveDialog;
+    return ret;
 }
 
 // MMCE -> Communication Settings (SIO2 ack-wait pacing, alarm usage).
@@ -907,6 +960,10 @@ reshow_ui:
         guiShowColorsConfig();
         goto reshow_ui;
     }
+    if (ret == UICFG_GAME_LIST_BUTTON) {
+        guiShowVcdListConfig();
+        goto reshow_ui;
+    }
 
     // Play out the confirm bump the dialog just armed, before applyConfig() below tears down and
     // rebuilds the GS (rmSetMode), reloads the theme and its textures, and holds guiLock over a
@@ -953,7 +1010,7 @@ reshow_ui:
 
 static int netConfigUpdater(int modified)
 {
-    int showAdvancedOptions, isNetBIOS, isDHCPEnabled, netProto, i;
+    int showAdvancedOptions, isNetBIOS, isDHCPEnabled, netProto, isSMB, i;
 
     if (modified) {
         diaGetInt(diaNetConfig, NETCFG_SHOW_ADVANCED_OPTS, &showAdvancedOptions);
@@ -961,10 +1018,24 @@ static int netConfigUpdater(int modified)
         diaGetInt(diaNetConfig, NETCFG_PS2_IP_ADDR_TYPE, &isDHCPEnabled);
         diaGetInt(diaNetConfig, NETCFG_SHARE_ADDR_TYPE, &isNetBIOS);
         diaGetInt(diaNetConfig, CFG_NETPROTOCOL, &netProto);
+        isSMB = netProto == 0;
         diaSetVisible(diaNetConfig, NETCFG_SHARE_NB_ADDR, isNetBIOS);
 
+        // SMB server fields belong to OPL's SMB consumer. UDPFS/UDPBD are the Neutrino-facing
+        // transports, so do not present SMB-only options as if they applied to those protocols.
+        diaSetVisible(diaNetConfig, NETCFG_LBL_SMB_SERVER, isSMB);
+        diaSetVisible(diaNetConfig, NETCFG_LBL_SHARE_ADDR_TYPE, isSMB);
+        diaSetVisible(diaNetConfig, NETCFG_LBL_SHARE_ADDRESS, isSMB);
+        diaSetVisible(diaNetConfig, NETCFG_LBL_SHARE_PORT, isSMB);
+        diaSetVisible(diaNetConfig, NETCFG_LBL_SHARE_NAME, isSMB);
+        diaSetVisible(diaNetConfig, NETCFG_LBL_SHARE_USER, isSMB);
+        diaSetVisible(diaNetConfig, NETCFG_LBL_SHARE_PASSWORD, isSMB);
+        diaSetVisible(diaNetConfig, NETCFG_LBL_SMBDIALECT, isSMB);
+        diaSetVisible(diaNetConfig, NETCFG_SHARE_ADDR_TYPE, isSMB);
+        diaSetVisible(diaNetConfig, NETCFG_SHARE_NB_ADDR, isSMB && isNetBIOS);
+
         for (i = 0; i < 4; i++) {
-            diaSetVisible(diaNetConfig, NETCFG_SHARE_IP_ADDR_0 + i, !isNetBIOS);
+            diaSetVisible(diaNetConfig, NETCFG_SHARE_IP_ADDR_0 + i, isSMB && !isNetBIOS);
 
             diaSetEnabled(diaNetConfig, NETCFG_PS2_IP_ADDR_0 + i, !isDHCPEnabled);
             diaSetEnabled(diaNetConfig, NETCFG_PS2_NETMASK_0 + i, !isDHCPEnabled);
@@ -973,10 +1044,14 @@ static int netConfigUpdater(int modified)
         }
 
         for (i = 0; i < 3; i++)
-            diaSetVisible(diaNetConfig, NETCFG_SHARE_IP_ADDR_DOT_0 + i, !isNetBIOS);
+            diaSetVisible(diaNetConfig, NETCFG_SHARE_IP_ADDR_DOT_0 + i, isSMB && !isNetBIOS);
 
-        diaSetEnabled(diaNetConfig, NETCFG_SHARE_PORT, showAdvancedOptions);
+        diaSetEnabled(diaNetConfig, NETCFG_SHARE_PORT, isSMB && showAdvancedOptions);
         diaSetEnabled(diaNetConfig, NETCFG_ETHOPMODE, showAdvancedOptions);
+        diaSetVisible(diaNetConfig, NETCFG_SHARE_PORT, isSMB);
+        diaSetVisible(diaNetConfig, NETCFG_SHARE_NAME, isSMB);
+        diaSetVisible(diaNetConfig, NETCFG_SHARE_USERNAME, isSMB);
+        diaSetVisible(diaNetConfig, NETCFG_SHARE_PASSWORD, isSMB);
 
         // Protocol: lock Access to Files for SMB and to IMG for UDPBD (only UDPFS offers the free
         // toggle) -- snap the value so a stale IMG left over from UDPFS can never mis-derive to
@@ -984,6 +1059,7 @@ static int netConfigUpdater(int modified)
         // NOTE(rebuild): the SMB Version row stays greyed at SMBv1 until item 4 lands (the fork
         // enables it while SMB is the selected protocol).
         diaSetEnabled(diaNetConfig, CFG_SMBDIALECT, 0);
+        diaSetVisible(diaNetConfig, CFG_SMBDIALECT, isSMB);
         if (netProto == 0) { // SMB -> Files, locked
             diaSetInt(diaNetConfig, CFG_UDPFSMODE, 0);
             diaSetEnabled(diaNetConfig, CFG_UDPFSMODE, 0);
@@ -998,7 +1074,7 @@ static int netConfigUpdater(int modified)
     return 0;
 }
 
-void guiShowNetConfig(void)
+int guiShowNetConfig(void)
 {
     size_t i;
     const char *ethOpModes[] = {_l(_STR_AUTO), _l(_STR_ETH_100MFDX), _l(_STR_ETH_100MHDX), _l(_STR_ETH_10MFDX), _l(_STR_ETH_10MHDX), NULL};
@@ -1072,6 +1148,7 @@ void guiShowNetConfig(void)
     // netConfigUpdater, so without this the first frame flashes every row enabled.
     diaSetEnabled(diaNetConfig, CFG_UDPFSMODE, netProtoVal == 1);
     diaSetEnabled(diaNetConfig, CFG_SMBDIALECT, 0); // NOTE(rebuild): greyed until item 4
+    netConfigUpdater(1);
 
     // Update the spacer item between the OK and reconnect buttons (See dialogs.c).
     if (gNetworkStartup == 0) {
@@ -1085,7 +1162,16 @@ void guiShowNetConfig(void)
         diaSetVisible(diaNetConfig, NETCFG_RECONNECT, 0);
     }
 
-    int result = diaExecuteDialog(diaNetConfig, -1, 1, &netConfigUpdater);
+    guiSettingsBeginDialog(diaNetConfig);
+    int result;
+reshow_network:
+    result = diaExecuteDialog(diaNetConfig, -1, 1, &netConfigUpdater);
+    if (result == NETCFG_POPSTARTER_BUTTON) {
+        // This is the shared POPSTARTER network editor. It owns IPCONFIG.DAT / SMBCONFIG.DAT;
+        // the Network page only provides a second entry point and never mirrors that state.
+        guiShowPopsNetConfig();
+        goto reshow_network;
+    }
     if (result) {
         // Store values
         diaGetInt(diaNetConfig, NETCFG_PS2_IP_ADDR_TYPE, &ps2_ip_use_dhcp);
@@ -1116,10 +1202,13 @@ void guiShowNetConfig(void)
         int netProtoVal2, netAccessVal2;
         diaGetInt(diaNetConfig, CFG_NETPROTOCOL, &netProtoVal2);
         diaGetInt(diaNetConfig, CFG_UDPFSMODE, &netAccessVal2);
-        gNetworkProtocol = (netProtoVal2 == 0)  ? NET_PROTO_SMB :
-                           (netProtoVal2 == 2)  ? NET_PROTO_UDPBD :
-                           (netAccessVal2 == 1) ? NET_PROTO_UDPFSBD :
-                                                  NET_PROTO_UDPFS; // UDPFS + Files
+        if (gNetStartMode == START_MODE_DISABLED)
+            gNetworkProtocol = NET_PROTO_OFF;
+        else
+            gNetworkProtocol = (netProtoVal2 == 0)  ? NET_PROTO_SMB :
+                               (netProtoVal2 == 2)  ? NET_PROTO_UDPBD :
+                               (netAccessVal2 == 1) ? NET_PROTO_UDPFSBD :
+                                                      NET_PROTO_UDPFS; // UDPFS + Files
         gEnableUDPBD = (gNetworkProtocol == NET_PROTO_UDPBD || gNetworkProtocol == NET_PROTO_UDPFSBD);
         gNetBootProtocol = (gNetworkProtocol == NET_PROTO_UDPFSBD) ? NET_BOOT_UDPFS : NET_BOOT_UDPBD;
         // SMB's start mode IS the network start row (Auto = boot connect, Manual = on-entry);
@@ -1150,8 +1239,8 @@ void guiShowNetConfig(void)
         // Each network transport loads its IOP module chain once per boot (the load latch is not cleared
         // live). If a stack is already up and the user picked a protocol other than the one actually
         // running, the switch takes effect only after a restart -- say so instead of silently doing
-        // nothing. The OFFER to restart lives on the SAVE path (see guiNetProtocolNeedsRestart), since
-        // this dialog only touches RAM and Save Changes is a separate menu action.
+        // nothing. The OFFER to restart lives on the Save Settings path (see guiNetProtocolNeedsRestart),
+        // since this dialog only touches RAM.
         if (gNetworkProtocol != netProtocolWas && guiNetProtocolNeedsRestart())
             guiMsgBox(_l(_STR_NETBOOT_RESTART), 0, NULL);
 
@@ -1160,18 +1249,22 @@ void guiShowNetConfig(void)
 
         applyConfig(-1, -1, 0);
     }
+
+    guiSettingsEndDialog();
+    return guiSettingsPageResult(result);
 }
 
 // POPStarter page live-updater: reveal the free-text POPSTARTER.ELF Path field only when the
 // device picker is "Custom".
 static int guiVcdUpdater(int modified)
 {
+    struct UIItem *ui = guiSettingsActiveDialog != NULL ? guiSettingsActiveDialog : diaVcdConfig;
     int popsDev;
 
     if (modified) {
-        diaGetInt(diaVcdConfig, CFG_POPSTARTER_DEVICE, &popsDev);
-        diaSetVisible(diaVcdConfig, CFG_LBL_POPSTARTER_PATH, popsDev == POPS_DEV_CUSTOM);
-        diaSetVisible(diaVcdConfig, CFG_POPSTARTER_PATH, popsDev == POPS_DEV_CUSTOM);
+        diaGetInt(ui, CFG_POPSTARTER_DEVICE, &popsDev);
+        diaSetVisible(ui, CFG_LBL_POPSTARTER_PATH, popsDev == POPS_DEV_CUSTOM);
+        diaSetVisible(ui, CFG_POPSTARTER_PATH, popsDev == POPS_DEV_CUSTOM);
     }
     return 0;
 }
@@ -1180,14 +1273,15 @@ static int guiVcdUpdater(int modified)
 // Launch" is ON (it auto-equips); re-reveal them live when toggled off.
 static int guiBdmaUpdater(int modified)
 {
+    struct UIItem *ui = guiSettingsActiveDialog != NULL ? guiSettingsActiveDialog : diaBdmaConfig;
     int bdmaApply;
 
     if (modified) {
-        diaGetInt(diaBdmaConfig, CFG_BDMA_APPLY, &bdmaApply);
-        diaSetVisible(diaBdmaConfig, CFG_LBL_BDMASOURCE, !bdmaApply);
-        diaSetVisible(diaBdmaConfig, CFG_BDMASOURCE, !bdmaApply);
-        diaSetVisible(diaBdmaConfig, CFG_LBL_BDMAMODE, !bdmaApply);
-        diaSetVisible(diaBdmaConfig, CFG_BDMAMODE, !bdmaApply);
+        diaGetInt(ui, CFG_BDMA_APPLY, &bdmaApply);
+        diaSetVisible(ui, CFG_LBL_BDMASOURCE, !bdmaApply);
+        diaSetVisible(ui, CFG_BDMASOURCE, !bdmaApply);
+        diaSetVisible(ui, CFG_LBL_BDMAMODE, !bdmaApply);
+        diaSetVisible(ui, CFG_BDMAMODE, !bdmaApply);
     }
     return 0;
 }
@@ -1251,62 +1345,90 @@ reshow_vcd:
     }
 }
 
+static void guiSetBdmaSettings(struct UIItem *ui)
+{
+    static const char *bdmaSourceStrs[] = {NULL, NULL, NULL, NULL, NULL};
+    static const char *bdmaModeStrs[] = {NULL, NULL, NULL, NULL, NULL, NULL};
+    // Order matches enum VCD_USB_BDMA_MODE: Ask / exFAT / fat32. The two driver labels are the ones the
+    // per-launch prompt already uses, so the row and the dialog it replaces read identically.
+    static const char *vcdUsbBdmaStrs[] = {NULL, NULL, NULL, NULL};
+
+    // diaSetEnum stores the array pointer rather than copying it. These arrays must therefore outlive
+    // this initializer, especially when the BDMA rows are composed into the POPSTARTER peer page.
+    bdmaSourceStrs[0] = _l(_STR_BDMA_SRC_USB);
+    bdmaSourceStrs[1] = _l(_STR_BDMA_SRC_MX4SIO);
+    bdmaSourceStrs[2] = _l(_STR_BDMA_SRC_MMCE);
+    bdmaSourceStrs[3] = _l(_STR_BDMA_SRC_HDD);
+    bdmaModeStrs[0] = _l(_STR_BDMA_MODE_FAT32);
+    bdmaModeStrs[1] = _l(_STR_BDMA_MODE_USBEXFAT);
+    bdmaModeStrs[2] = _l(_STR_BDMA_MODE_MX4SIO);
+    bdmaModeStrs[3] = _l(_STR_BDMA_MODE_MMCE);
+    bdmaModeStrs[4] = _l(_STR_BDMA_MODE_ATA);
+    vcdUsbBdmaStrs[0] = _l(_STR_VCD_USB_BDMA_ASK);
+    vcdUsbBdmaStrs[1] = _l(_STR_VCD_USB_MODE_EXFAT);
+    vcdUsbBdmaStrs[2] = _l(_STR_VCD_USB_MODE_FAT32);
+
+    gBdmaMode = vcdReadBdmaMode();
+    diaSetEnum(ui, CFG_BDMASOURCE, bdmaSourceStrs);
+    diaSetEnum(ui, CFG_BDMAMODE, bdmaModeStrs);
+    diaSetEnum(ui, CFG_VCD_USB_BDMA, vcdUsbBdmaStrs);
+    diaSetInt(ui, CFG_BDMASOURCE, gBdmaSource);
+    diaSetInt(ui, CFG_BDMAMODE, gBdmaMode);
+    diaSetInt(ui, CFG_VCD_USB_BDMA, gVcdUsbBdmaMode);
+    diaSetInt(ui, CFG_BDMA_APPLY, gBdmaApplyOnLaunch);
+    // "VCD BDMA Apply on Launch" ON auto-equips, so hide the manual SOURCE/MODE pickers
+    // (guiBdmaUpdater re-reveals them live when toggled off).
+    diaSetVisible(ui, CFG_LBL_BDMASOURCE, !gBdmaApplyOnLaunch);
+    diaSetVisible(ui, CFG_BDMASOURCE, !gBdmaApplyOnLaunch);
+    diaSetVisible(ui, CFG_LBL_BDMAMODE, !gBdmaApplyOnLaunch);
+    diaSetVisible(ui, CFG_BDMAMODE, !gBdmaApplyOnLaunch);
+}
+
+// Save the BDMA preference and equip changed modules. The helper deliberately does not call
+// applyConfig so a composed Settings page can commit all of its fields together.
+static void guiSaveBdmaSettings(struct UIItem *ui)
+{
+    diaGetInt(ui, CFG_BDMA_APPLY, &gBdmaApplyOnLaunch);
+    // Read BEFORE the equip block below: that block can re-enter vcdEquipBdma and toast, and this
+    // row must be taken from the dialog regardless of how the equip turns out (it governs the
+    // per-launch USB prompt, not the card's equipped state).
+    diaGetInt(ui, CFG_VCD_USB_BDMA, &gVcdUsbBdmaMode);
+    {
+        // Equip BDMA modules only when SOURCE or MODE actually changed (the equip copies files to
+        // the memory card). vcdEquipBdma is free-space-gated + truncation-safe, so a failure never
+        // corrupts the card; report it and resync MODE to what's really equipped.
+        int oldSrc = gBdmaSource, oldMode = gBdmaMode; // baselines (MODE = card's actual state)
+        int newSrc = oldSrc, newMode = oldMode;
+        diaGetInt(ui, CFG_BDMASOURCE, &newSrc);
+        diaGetInt(ui, CFG_BDMAMODE, &newMode);
+        // Re-equip on any MODE change, and on a SOURCE change only when MODE installs modules. FAT32
+        // ignores the source, so a SOURCE-only move while already FAT32 must NOT re-run the pointless work.
+        if (newMode != oldMode || (newMode != VCD_BDMA_FAT32 && newSrc != oldSrc)) {
+            char bdmaDiag[160];
+            int er = vcdEquipBdma(newSrc, newMode, bdmaDiag, sizeof(bdmaDiag));
+            if (er == -4) {
+                char msg[256];
+                snprintf(msg, sizeof(msg), "%s\n%s", _l(_STR_BDMA_ERR_SRC), bdmaDiag);
+                guiMsgBox(msg, 0, NULL);
+            } else if (er == -2)
+                guiMsgBox(_l(_STR_BDMA_ERR_SPACE), 0, NULL);
+            else if (er == -3)
+                guiMsgBox(_l(_STR_BDMA_ERR_IO), 0, NULL);
+            gBdmaMode = vcdReadBdmaMode(); // MODE = what is now actually equipped
+        }
+        gBdmaSource = newSrc; // remember the source preference regardless of equip outcome
+    }
+}
+
 // POPStarter -> BDMA Settings (BDMAssault exFAT-driver equip). MODE reflects what's ACTUALLY on the
 // card (marker read), so the page is honest even if POPSLoader or a prior session set it.
 void guiShowBdmaConfig(void)
 {
-    const char *bdmaSourceStrs[] = {_l(_STR_BDMA_SRC_USB), _l(_STR_BDMA_SRC_MX4SIO), _l(_STR_BDMA_SRC_MMCE), _l(_STR_BDMA_SRC_HDD), NULL};
-    const char *bdmaModeStrs[] = {_l(_STR_BDMA_MODE_FAT32), _l(_STR_BDMA_MODE_USBEXFAT), _l(_STR_BDMA_MODE_MX4SIO), _l(_STR_BDMA_MODE_MMCE), _l(_STR_BDMA_MODE_ATA), NULL};
-    // Order matches enum VCD_USB_BDMA_MODE: Ask / exFAT / fat32. The two driver labels are the ones the
-    // per-launch prompt already uses, so the row and the dialog it replaces read identically.
-    const char *vcdUsbBdmaStrs[] = {_l(_STR_VCD_USB_BDMA_ASK), _l(_STR_VCD_USB_MODE_EXFAT), _l(_STR_VCD_USB_MODE_FAT32), NULL};
-    gBdmaMode = vcdReadBdmaMode();
-    diaSetEnum(diaBdmaConfig, CFG_BDMASOURCE, bdmaSourceStrs);
-    diaSetEnum(diaBdmaConfig, CFG_BDMAMODE, bdmaModeStrs);
-    diaSetEnum(diaBdmaConfig, CFG_VCD_USB_BDMA, vcdUsbBdmaStrs);
-    diaSetInt(diaBdmaConfig, CFG_BDMASOURCE, gBdmaSource);
-    diaSetInt(diaBdmaConfig, CFG_BDMAMODE, gBdmaMode);
-    diaSetInt(diaBdmaConfig, CFG_VCD_USB_BDMA, gVcdUsbBdmaMode);
-    diaSetInt(diaBdmaConfig, CFG_BDMA_APPLY, gBdmaApplyOnLaunch);
-    // "VCD BDMA Apply on Launch" ON auto-equips, so hide the manual SOURCE/MODE pickers
-    // (guiBdmaUpdater re-reveals them live when toggled off).
-    diaSetVisible(diaBdmaConfig, CFG_LBL_BDMASOURCE, !gBdmaApplyOnLaunch);
-    diaSetVisible(diaBdmaConfig, CFG_BDMASOURCE, !gBdmaApplyOnLaunch);
-    diaSetVisible(diaBdmaConfig, CFG_LBL_BDMAMODE, !gBdmaApplyOnLaunch);
-    diaSetVisible(diaBdmaConfig, CFG_BDMAMODE, !gBdmaApplyOnLaunch);
+    guiSetBdmaSettings(diaBdmaConfig);
 
     int ret = diaExecuteDialog(diaBdmaConfig, -1, 1, &guiBdmaUpdater);
     if (ret) {
-        diaGetInt(diaBdmaConfig, CFG_BDMA_APPLY, &gBdmaApplyOnLaunch);
-        // Read BEFORE the equip block below: that block can re-enter vcdEquipBdma and toast, and this
-        // row must be taken from the dialog regardless of how the equip turns out (it governs the
-        // per-launch USB prompt, not the card's equipped state).
-        diaGetInt(diaBdmaConfig, CFG_VCD_USB_BDMA, &gVcdUsbBdmaMode);
-        {
-            // Equip BDMA modules only when SOURCE or MODE actually changed (the equip copies files to
-            // the memory card). vcdEquipBdma is free-space-gated + truncation-safe, so a failure never
-            // corrupts the card; report it and resync MODE to what's really equipped.
-            int oldSrc = gBdmaSource, oldMode = gBdmaMode; // baselines (MODE = card's actual state)
-            int newSrc = oldSrc, newMode = oldMode;
-            diaGetInt(diaBdmaConfig, CFG_BDMASOURCE, &newSrc);
-            diaGetInt(diaBdmaConfig, CFG_BDMAMODE, &newMode);
-            // Re-equip on any MODE change, and on a SOURCE change only when MODE installs modules. FAT32
-            // ignores the source, so a SOURCE-only move while already FAT32 must NOT re-run the pointless work.
-            if (newMode != oldMode || (newMode != VCD_BDMA_FAT32 && newSrc != oldSrc)) {
-                char bdmaDiag[160];
-                int er = vcdEquipBdma(newSrc, newMode, bdmaDiag, sizeof(bdmaDiag));
-                if (er == -4) {
-                    char msg[256];
-                    snprintf(msg, sizeof(msg), "%s\n%s", _l(_STR_BDMA_ERR_SRC), bdmaDiag);
-                    guiMsgBox(msg, 0, NULL);
-                } else if (er == -2)
-                    guiMsgBox(_l(_STR_BDMA_ERR_SPACE), 0, NULL);
-                else if (er == -3)
-                    guiMsgBox(_l(_STR_BDMA_ERR_IO), 0, NULL);
-                gBdmaMode = vcdReadBdmaMode(); // MODE = what is now actually equipped
-            }
-            gBdmaSource = newSrc; // remember the source preference regardless of equip outcome
-        }
+        guiSaveBdmaSettings(diaBdmaConfig);
         applyConfig(-1, -1, 0);
     }
 }
@@ -1507,35 +1629,71 @@ void guiShowPopsNetConfig(void)
     }
 }
 
-void guiShowParentalLockConfig(void)
+static void guiSetParentalLockValue(struct UIItem *ui)
 {
-    int result;
     char password[CONFIG_KEY_VALUE_LEN];
     config_set_t *configOPL = configGetByType(CONFIG_OPL);
 
-    // Set current values
-    configGetStrCopy(configOPL, CONFIG_OPL_PARENTAL_LOCK_PWD, password, CONFIG_KEY_VALUE_LEN); // This will return the current password, or a blank string if it is not set.
-    diaSetString(diaParentalLockConfig, CFG_PARENLOCK_PASSWORD, password);
+    configGetStrCopy(configOPL, CONFIG_OPL_PARENTAL_LOCK_PWD, password, sizeof(password));
+    diaSetString(ui, CFG_PARENLOCK_PASSWORD, password);
+}
 
-    result = diaExecuteDialog(diaParentalLockConfig, -1, 1, NULL);
-    if (result) {
-        diaGetString(diaParentalLockConfig, CFG_PARENLOCK_PASSWORD, password, CONFIG_KEY_VALUE_LEN);
+static void guiSaveParentalLockValue(struct UIItem *ui)
+{
+    char oldPassword[CONFIG_KEY_VALUE_LEN];
+    char password[CONFIG_KEY_VALUE_LEN];
+    config_set_t *configOPL = configGetByType(CONFIG_OPL);
 
-        if (strlen(password) > 0) {
-            if (strncmp(OPL_PARENTAL_LOCK_MASTER_PASS, password, CONFIG_KEY_VALUE_LEN) != 0) {
-                // Store password
-                configSetStr(configOPL, CONFIG_OPL_PARENTAL_LOCK_PWD, password);
-            } else {
-                // Password not acceptable (i.e. master password entered).
-                guiMsgBox(_l(_STR_PARENLOCK_INVALID_PASSWORD), 0, NULL);
-            }
-        } else {
-            configRemoveKey(configOPL, CONFIG_OPL_PARENTAL_LOCK_PWD);
+    configGetStrCopy(configOPL, CONFIG_OPL_PARENTAL_LOCK_PWD, oldPassword, sizeof(oldPassword));
+    diaGetString(ui, CFG_PARENLOCK_PASSWORD, password, sizeof(password));
+    if (strcmp(oldPassword, password) == 0)
+        return;
 
-            guiMsgBox(_l(_STR_PARENLOCK_DISABLE_WARNING), 0, diaParentalLockConfig);
+    if (strlen(password) > 0) {
+        if (strncmp(OPL_PARENTAL_LOCK_MASTER_PASS, password, sizeof(password)) != 0)
+            configSetStr(configOPL, CONFIG_OPL_PARENTAL_LOCK_PWD, password);
+        else {
+            diaSetString(ui, CFG_PARENLOCK_PASSWORD, oldPassword);
+            guiMsgBox(_l(_STR_PARENLOCK_INVALID_PASSWORD), 0, NULL);
+            return;
         }
+    } else {
+        configRemoveKey(configOPL, CONFIG_OPL_PARENTAL_LOCK_PWD);
+        guiMsgBox(_l(_STR_PARENLOCK_DISABLE_WARNING), 0, ui);
+    }
 
-        menuSetParentalLockCheckState(1);
+    menuSetParentalLockCheckState(1);
+}
+
+static void guiSetAdvancedSettings(struct UIItem *ui)
+{
+    diaSetString(ui, CFG_BDMPREFIX, gBDMPrefix);
+    diaSetString(ui, CFG_ETHPREFIX, gETHPrefix);
+    diaSetInt(ui, CFG_HDDSPINDOWN, gHDDSpindown);
+    diaSetInt(ui, CFG_HDDGAMELISTCACHE, gHDDGameListCache);
+    diaSetInt(ui, CFG_BDMCACHE, bdmCacheSize);
+    diaSetInt(ui, CFG_HDDCACHE, hddCacheSize);
+    diaSetInt(ui, CFG_SMBCACHE, smbCacheSize);
+}
+
+static void guiSaveAdvancedSettings(struct UIItem *ui)
+{
+    diaGetString(ui, CFG_BDMPREFIX, gBDMPrefix, sizeof(gBDMPrefix));
+    diaGetString(ui, CFG_ETHPREFIX, gETHPrefix, sizeof(gETHPrefix));
+    diaGetInt(ui, CFG_HDDSPINDOWN, &gHDDSpindown);
+    diaGetInt(ui, CFG_HDDGAMELISTCACHE, &gHDDGameListCache);
+    diaGetInt(ui, CFG_BDMCACHE, &bdmCacheSize);
+    diaGetInt(ui, CFG_HDDCACHE, &hddCacheSize);
+    diaGetInt(ui, CFG_SMBCACHE, &smbCacheSize);
+}
+
+void guiShowParentalLockConfig(void)
+{
+    guiSetParentalLockValue(diaParentalLockConfig);
+
+    int result = diaExecuteDialog(diaParentalLockConfig, -1, 1, NULL);
+    if (result) {
+        guiSaveParentalLockValue(diaParentalLockConfig);
     }
 }
 // Neutrino Defaults live-updater: the ":c" comp half is only ever emitted alongside a video mode
@@ -1696,16 +1854,12 @@ reshow_launch:
 void guiShowSecurityConfig(void)
 {
     diaSetInt(diaSecurityConfig, CFG_ENWRITEOP, gEnableWrite);
+    guiSetParentalLockValue(diaSecurityConfig);
 
-    int ret;
-reshow_security:
-    ret = diaExecuteDialog(diaSecurityConfig, -1, 1, NULL);
-    if (ret == SECURITY_PARENTAL_BUTTON) {
-        guiShowParentalLockConfig();
-        goto reshow_security;
-    }
+    int ret = diaExecuteDialog(diaSecurityConfig, -1, 1, NULL);
     if (ret) {
         diaGetInt(diaSecurityConfig, CFG_ENWRITEOP, &gEnableWrite);
+        guiSaveParentalLockValue(diaSecurityConfig);
 
         applyConfig(-1, -1, 0);
         menuReinitMainMenu();
@@ -1715,20 +1869,12 @@ reshow_security:
 void guiShowAdvancedConfig(void)
 {
     diaSetInt(diaAdvancedConfig, CFG_DEBUG, gEnableDebug);
+    guiSetAdvancedSettings(diaAdvancedConfig);
 
-    int ret;
-reshow_advanced:
-    ret = diaExecuteDialog(diaAdvancedConfig, -1, 1, NULL);
-    if (ret == ADV_PREFIX_BUTTON) {
-        guiShowPathPrefixConfig();
-        goto reshow_advanced;
-    }
-    if (ret == ADV_STORAGE_BUTTON) {
-        guiShowStorageConfig();
-        goto reshow_advanced;
-    }
+    int ret = diaExecuteDialog(diaAdvancedConfig, -1, 1, NULL);
     if (ret) {
         diaGetInt(diaAdvancedConfig, CFG_DEBUG, &gEnableDebug);
+        guiSaveAdvancedSettings(diaAdvancedConfig);
 
         applyConfig(-1, -1, 0);
         menuReinitMainMenu();
@@ -1908,6 +2054,19 @@ static int guiDisplayUpdater(int modified)
 
     return 0;
 }
+static int guiGameIdModeFromGlobals(void)
+{
+    if (gApplyGameID)
+        return gPopstarterRetroGemGameID ? 0 : 2; // All / PS2 only
+    return gPopstarterRetroGemGameID ? 1 : 3;     // POPSTARTER only / Off
+}
+
+static void guiApplyGameIdMode(int mode)
+{
+    gApplyGameID = mode == 0 || mode == 2;
+    gPopstarterRetroGemGameID = mode == 0 || mode == 1;
+}
+
 void guiShowDisplayConfig(void)
 {
     // clang-format off
@@ -1927,18 +2086,21 @@ void guiShowDisplayConfig(void)
         , "NTSC 640x224p @60Hz 24bit"
         , NULL};
     // clang-format on
+    const char *gameIDModes[] = {_l(_STR_GAMEID_MODE_ALL), _l(_STR_GAMEID_MODE_POPSTARTER),
+                                 _l(_STR_GAMEID_MODE_PS2), _l(_STR_GAMEID_MODE_OFF), NULL};
     int previousVMode;
     int ret;
 
 reselect_video_mode:
     previousVMode = gVMode;
     diaSetEnum(diaDisplayConfig, UICFG_VMODE, vmodeNames);
+    diaSetEnum(diaDisplayConfig, CFG_APPLYGAMEID, gameIDModes);
     diaSetInt(diaDisplayConfig, UICFG_VMODE, gVMode);
     diaSetInt(diaDisplayConfig, UICFG_WIDESCREEN, gWideScreen);
     diaSetInt(diaDisplayConfig, UICFG_XOFF, gXOff);
     diaSetInt(diaDisplayConfig, UICFG_YOFF, gYOff);
     diaSetInt(diaDisplayConfig, UICFG_OVERSCAN, gOverscan);
-    diaSetInt(diaDisplayConfig, CFG_APPLYGAMEID, gApplyGameID); // RetroGEM/Pixel FX GameID barcode
+    diaSetInt(diaDisplayConfig, CFG_APPLYGAMEID, guiGameIdModeFromGlobals());
 
 reshow_display:
     ret = diaExecuteDialog(diaDisplayConfig, -1, 1, guiDisplayUpdater);
@@ -1957,7 +2119,9 @@ reshow_display:
         diaGetInt(diaDisplayConfig, UICFG_XOFF, &gXOff);
         diaGetInt(diaDisplayConfig, UICFG_YOFF, &gYOff);
         diaGetInt(diaDisplayConfig, UICFG_OVERSCAN, &gOverscan);
-        diaGetInt(diaDisplayConfig, CFG_APPLYGAMEID, &gApplyGameID);
+        int gameIDMode;
+        diaGetInt(diaDisplayConfig, CFG_APPLYGAMEID, &gameIDMode);
+        guiApplyGameIdMode(gameIDMode);
 
         // Same #172 contract as _guiShowUIConfig above: play out the confirm bump before the GS
         // teardown/rebuild below, on the GUI thread -- never inside applyConfig itself.
@@ -2050,13 +2214,14 @@ static void guiSetAudioSettingsState(void)
 static int guiAudioUpdater(int modified)
 {
     if (modified) {
+        guiSettingsSavePending = 1;
         guiSetAudioSettingsState();
     }
 
     return 0;
 }
 
-void guiShowAudioConfig(void)
+int guiShowAudioConfig(void)
 {
     diaSetInt(diaAudioConfig, CFG_SFX, gEnableSFX);
     diaSetInt(diaAudioConfig, CFG_BOOT_SND, gEnableBootSND);
@@ -2067,10 +2232,13 @@ void guiShowAudioConfig(void)
     diaSetString(diaAudioConfig, CFG_DEFAULT_BGM_PATH, gDefaultBGMPath);
     diaSetShowDefaultWhenEmpty(diaAudioConfig, CFG_DEFAULT_BGM_PATH, 1); // blank -> the theme's own bgm
 
-    diaExecuteDialog(diaAudioConfig, -1, 1, guiAudioUpdater);
+    guiSettingsBeginDialog(diaAudioConfig);
+    int result = diaExecuteDialog(diaAudioConfig, -1, 1, guiAudioUpdater);
+    guiSettingsEndDialog();
+    return guiSettingsPageResult(result);
 }
 
-void guiShowControllerConfig(void)
+int guiShowControllerConfig(void)
 {
     int value;
 
@@ -2090,7 +2258,10 @@ void guiShowControllerConfig(void)
     diaSetInt(diaControllerConfig, CFG_YSENSITIVITY, gYSensitivity);
     diaSetInt(diaControllerConfig, CFG_RUMBLE, gEnableRumble);
 
-    int result = diaExecuteDialog(diaControllerConfig, -1, 1, NULL);
+    guiSettingsBeginDialog(diaControllerConfig);
+    int result;
+reshow_controller:
+    result = diaExecuteDialog(diaControllerConfig, -1, 1, NULL);
     if (result) {
         diaGetInt(diaControllerConfig, UICFG_SCROLL, &gScrollSpeed);
         diaGetInt(diaControllerConfig, CFG_XSENSITIVITY, &gXSensitivity);
@@ -2106,11 +2277,820 @@ void guiShowControllerConfig(void)
 #ifdef PADEMU
         if (result == PADEMU_GLOBAL_BUTTON) {
             guiGameShowPadEmuConfig(1);
+            goto reshow_controller;
         } else if (result == PADMACRO_GLOBAL_BUTTON) {
             guiGameShowPadMacroConfig(1);
+            goto reshow_controller;
         }
 #endif
         applyConfig(-1, -1, 1);
+    }
+
+    guiSettingsEndDialog();
+    return guiSettingsPageResult(result);
+}
+
+static int guiSettingsSkipID(int id, const int *skipIDs, int skipCount)
+{
+    int i;
+
+    for (i = 0; i < skipCount; i++) {
+        if (id == skipIDs[i])
+            return 1;
+    }
+    return 0;
+}
+
+static struct UIItem *guiSettingsCompose(const struct UIItem *const *parts, int partCount,
+                                         const int *skipIDs, int skipCount, int suppressSecondaryHeaders)
+{
+    return guiSettingsComposeInto(guiSettingsDialog, parts, partCount, skipIDs, skipCount,
+                                  suppressSecondaryHeaders);
+}
+
+static struct UIItem *guiSettingsComposeInto(struct UIItem *dialog, const struct UIItem *const *parts,
+                                             int partCount, const int *skipIDs, int skipCount,
+                                             int suppressSecondaryHeaders)
+{
+    int part, i, skipTrailingBreak, skipSecondarySplitter;
+    int count = 0;
+
+    for (part = 0; part < partCount; part++) {
+        skipTrailingBreak = 0;
+        skipSecondarySplitter = 0;
+        for (i = 0; parts[part][i].type != UI_TERMINATOR; i++) {
+            const struct UIItem *item = &parts[part][i];
+
+            // Each source definition owns its own OK row. A composite screen has one shared
+            // commit point, while feature buttons and section headings remain intact.
+            if (item->type == UI_OK) {
+                // The source dialog also has a trailing UI_BREAK after its OK. That break is useful
+                // when the source is shown alone, but becomes an empty row in a composite page.
+                skipTrailingBreak = 1;
+                continue;
+            }
+            if (skipTrailingBreak) {
+                skipTrailingBreak = 0;
+                if (item->type == UI_BREAK)
+                    continue;
+            }
+            if (guiSettingsSkipID(item->id, skipIDs, skipCount)) {
+                // Some legacy rows are represented as LABEL + SPACER + BUTTON. When the action
+                // is omitted from a composed peer page, remove that now-orphaned label as well;
+                // otherwise the page shows an empty heading before the replacement inline block.
+                if (item->type == UI_BUTTON && count >= 2 && dialog[count - 1].type == UI_SPACER &&
+                    dialog[count - 2].type == UI_LABEL)
+                    count -= 2;
+                // A skipped sub-page button owns the following break in the source dialog. Once
+                // the button is omitted from a composite page, that break would become an empty
+                // row with no visual or navigation purpose.
+                if (item->type == UI_BUTTON)
+                    skipTrailingBreak = 1;
+                continue;
+            }
+            if (suppressSecondaryHeaders && part > 0 && item->type == UI_HEADER) {
+                // The peer page title already supplies the context. Keep the fields and actions,
+                // but do not repeat each chained dialog's title as a second hierarchy level.
+                skipSecondarySplitter = 1;
+                continue;
+            }
+            if (skipSecondarySplitter && item->type == UI_SPLITTER) {
+                skipSecondarySplitter = 0;
+                if (count == 0 || dialog[count - 1].type == UI_BREAK)
+                    continue;
+                dialog[count++] = (struct UIItem) {UI_BREAK};
+                continue;
+            }
+            // Secondary settings sections already have their own colored heading. Keep the heading
+            // on its own line, but omit the source dialog's redundant separator line when it is
+            // composed into the peer page.
+            if (part > 0 && item->type == UI_SPLITTER && count > 0 && dialog[count - 1].type == UI_HEADER) {
+                if (count >= SETTINGS_DIALOG_CAPACITY - 3) {
+                    LOG("GUI Settings: composed page exceeds SETTINGS_DIALOG_CAPACITY (%d)\n",
+                        SETTINGS_DIALOG_CAPACITY);
+                    return NULL;
+                }
+                dialog[count++] = (struct UIItem) {UI_BREAK};
+                continue;
+            }
+            if (count >= SETTINGS_DIALOG_CAPACITY - 3) {
+                LOG("GUI Settings: composed page exceeds SETTINGS_DIALOG_CAPACITY (%d)\n",
+                    SETTINGS_DIALOG_CAPACITY);
+                return NULL;
+            }
+            dialog[count++] = *item;
+        }
+    }
+
+    dialog[count++] = (struct UIItem) {UI_OK, 0, 1, 1, -1, 0, 0, {.label = {NULL, _STR_OK}}};
+    dialog[count] = (struct UIItem) {UI_TERMINATOR};
+    guiSettingsActiveDialog = dialog;
+    return dialog;
+}
+
+static int guiSettingsIsPeerResult(int result)
+{
+    return result == DIA_RESULT_PREV || result == DIA_RESULT_NEXT;
+}
+
+static int guiSettingsIsShellResult(int result)
+{
+    return guiSettingsIsPeerResult(result) || result == DIA_RESULT_INDEX;
+}
+
+static int guiSettingsPageResult(int result)
+{
+    if (result == UIID_BTN_OK || guiSettingsIsShellResult(result))
+        guiSettingsSavePending = 1;
+
+    if (guiSettingsIsShellResult(result))
+        return result;
+
+    // Both confirmation and cancel finish the current peer page at the Settings Index. Circle
+    // from the Index itself is handled by guiSettingsShowIndex and returns to the main menu.
+    return (result == UIID_BTN_OK || result == UIID_BTN_CANCEL) ? DIA_RESULT_INDEX : 0;
+}
+
+static void guiSettingsBeginDialog(struct UIItem *ui)
+{
+    if (!guiSettingsShellActive)
+        return;
+
+    snprintf(guiSettingsPageIndicator, sizeof(guiSettingsPageIndicator), "%d/8", guiSettingsCurrentPage + 1);
+    diaSetSettingsShell(ui, guiSettingsPageIndicator);
+    diaSetSettingsContext(1);
+}
+
+static void guiSettingsEndDialog(void)
+{
+    diaSetSettingsShell(NULL, NULL);
+    diaSetSettingsContext(0);
+}
+
+static int guiSettingsGeneralUpdater(int modified)
+{
+    int showAutoStartLast;
+
+    if (modified) {
+        diaGetInt(guiSettingsActiveDialog, CFG_LASTPLAYED, &showAutoStartLast);
+        diaSetVisible(guiSettingsActiveDialog, CFG_LBL_AUTOSTARTLAST, showAutoStartLast);
+        diaSetVisible(guiSettingsActiveDialog, CFG_AUTOSTARTLAST, showAutoStartLast);
+    }
+    return 0;
+}
+
+static int guiSettingsShowGeneral(void)
+{
+    const struct UIItem *parts[] = {diaConfig, diaSecurityConfig, diaAdvancedConfig};
+    struct UIItem *ui = guiSettingsCompose(parts, 3, NULL, 0, 1);
+    int result;
+
+    if (ui == NULL)
+        return 0;
+
+    diaSetShowDefaultWhenEmpty(ui, CFG_EXITTO, 1);
+    diaSetString(ui, CFG_EXITTO, gExitPath);
+    diaSetShowDefaultWhenEmpty(ui, CFG_CUSTOMCFGPATH, 1);
+    diaSetString(ui, CFG_CUSTOMCFGPATH, gCustomSettingsPath);
+    diaSetInt(ui, CFG_LASTPLAYED, gRememberLastPlayed);
+    diaSetInt(ui, CFG_FOLDERNAV, gEnableFolderNav);
+    diaSetInt(ui, CFG_AUTOSTARTLAST, gAutoStartLastPlayed);
+    diaSetVisible(ui, CFG_AUTOSTARTLAST, gRememberLastPlayed);
+    diaSetVisible(ui, CFG_LBL_AUTOSTARTLAST, gRememberLastPlayed);
+    diaSetInt(ui, CFG_ENWRITEOP, gEnableWrite);
+    diaSetInt(ui, CFG_DEBUG, gEnableDebug);
+    guiSetParentalLockValue(ui);
+    guiSetAdvancedSettings(ui);
+    guiSettingsBeginDialog(ui);
+
+    result = diaExecuteDialog(ui, -1, 1, &guiSettingsGeneralUpdater);
+
+    if (result != UIID_BTN_CANCEL && result != -1) {
+        diaGetString(ui, CFG_EXITTO, gExitPath, sizeof(gExitPath));
+        diaGetString(ui, CFG_CUSTOMCFGPATH, gCustomSettingsPath, sizeof(gCustomSettingsPath));
+        diaGetInt(ui, CFG_LASTPLAYED, &gRememberLastPlayed);
+        diaGetInt(ui, CFG_FOLDERNAV, &gEnableFolderNav);
+        diaGetInt(ui, CFG_AUTOSTARTLAST, &gAutoStartLastPlayed);
+        diaGetInt(ui, CFG_ENWRITEOP, &gEnableWrite);
+        diaGetInt(ui, CFG_DEBUG, &gEnableDebug);
+        guiSaveParentalLockValue(ui);
+        guiSaveAdvancedSettings(ui);
+
+        DisableCron = 1;
+        applyConfig(-1, -1, 0);
+        menuReinitMainMenu();
+    }
+
+    guiSettingsEndDialog();
+    guiSettingsActiveDialog = NULL;
+    return guiSettingsPageResult(result);
+}
+
+static int guiSettingsShowSources(void)
+{
+    const struct UIItem *parts[] = {diaDeviceConfig};
+    const char *deviceNames[] = {_l(_STR_BDM_GAMES), _l(_STR_NET_GAMES), _l(_STR_HDD_GAMES), _l(_STR_APPS), _l(_STR_MMCE), _l(_STR_FAV), NULL};
+    const char *deviceModes[] = {_l(_STR_OFF), _l(_STR_MANUAL), _l(_STR_AUTO), NULL};
+    struct UIItem *ui = guiSettingsCompose(parts, 1, NULL, 0, 0);
+    int deviceModeIndex;
+    int result;
+
+    if (ui == NULL)
+        return 0;
+
+    diaSetEnum(ui, CFG_DEFDEVICE, deviceNames);
+    diaSetEnum(ui, CFG_BDMMODE, deviceModes);
+    diaSetEnum(ui, CFG_HDDMODE, deviceModes);
+    diaSetEnum(ui, CFG_APPMODE, deviceModes);
+    diaSetEnum(ui, CFG_FAVMODE, deviceModes);
+    deviceModeIndex = guiIoModeToDeviceType(gDefaultDevice);
+    diaSetInt(ui, CFG_DEFDEVICE, deviceModeIndex);
+    diaSetInt(ui, CFG_BDMMODE, gBDMStartMode);
+    diaSetInt(ui, CFG_HDDMODE, gHDDStartMode);
+    diaSetInt(ui, CFG_APPMODE, gAPPStartMode);
+    diaSetInt(ui, CFG_FAVMODE, gFAVStartMode);
+    diaSetInt(ui, CFG_ENABLEUSB, gEnableUSB);
+    diaSetInt(ui, CFG_ENABLEILK, gEnableILK);
+    diaSetInt(ui, CFG_ENABLEMX4SIO, gEnableMX4SIO);
+    diaSetInt(ui, CFG_ENABLEBDMHDD, gEnableBdmHDD);
+    diaSetEnabled(ui, CFG_ENABLEBDMHDD, 1);
+    diaSetEnabled(ui, CFG_HDDMODE, 1);
+    diaSetEnum(ui, CFG_NETSTART, deviceModes);
+    diaSetInt(ui, CFG_NETSTART, gNetStartMode);
+    diaSetEnum(ui, CFG_MMCEMODE, deviceModes);
+    diaSetInt(ui, CFG_MMCEMODE, gMMCEStartMode);
+    diaSetEnabled(ui, CFG_MMCEMODE, 1);
+    guiSettingsBeginDialog(ui);
+
+reshow_sources:
+    result = diaExecuteDialog(ui, -1, 1, NULL);
+    if (result == MMCE_SETTINGS_BUTTON) {
+        // MMCE uses a separate composition buffer. Confirming the child editor finishes the
+        // Settings page and returns to the hub; Circle resumes Game Sources as the parent page.
+        int mmceResult = guiShowMmceConfig();
+        if (mmceResult != UIID_BTN_OK)
+            goto reshow_sources;
+
+        // Treat MMCE confirmation as confirmation of its parent page too. This preserves any
+        // Game Sources edits made before opening MMCE, then the normal page-result mapping returns
+        // to the Settings Index and marks the session as needing persistence.
+        result = UIID_BTN_OK;
+    }
+
+    if (result != UIID_BTN_CANCEL && result != -1) {
+        int netProtocolWas = gNetworkProtocol;
+
+        diaGetInt(ui, CFG_DEFDEVICE, &deviceModeIndex);
+        gDefaultDevice = guiDeviceTypeToIoMode(deviceModeIndex);
+        diaGetInt(ui, CFG_BDMMODE, &gBDMStartMode);
+        diaGetInt(ui, CFG_HDDMODE, &gHDDStartMode);
+        diaGetInt(ui, CFG_APPMODE, &gAPPStartMode);
+        diaGetInt(ui, CFG_MMCEMODE, &gMMCEStartMode);
+        diaGetInt(ui, CFG_FAVMODE, &gFAVStartMode);
+        diaGetInt(ui, CFG_ENABLEUSB, &gEnableUSB);
+        diaGetInt(ui, CFG_ENABLEILK, &gEnableILK);
+        diaGetInt(ui, CFG_ENABLEMX4SIO, &gEnableMX4SIO);
+        diaGetInt(ui, CFG_ENABLEBDMHDD, &gEnableBdmHDD);
+        diaGetInt(ui, CFG_NETSTART, &gNetStartMode);
+        if (gNetStartMode == START_MODE_DISABLED)
+            gNetworkProtocol = NET_PROTO_OFF;
+        else if (gNetworkProtocol == NET_PROTO_OFF)
+            gNetworkProtocol = NET_PROTO_SMB;
+        gEnableUDPBD = (gNetworkProtocol == NET_PROTO_UDPBD || gNetworkProtocol == NET_PROTO_UDPFSBD);
+        gNetBootProtocol = (gNetworkProtocol == NET_PROTO_UDPFSBD) ? NET_BOOT_UDPFS : NET_BOOT_UDPBD;
+        gETHStartMode = (gNetworkProtocol == NET_PROTO_SMB) ? gNetStartMode : START_MODE_DISABLED;
+
+        if (gNetworkProtocol != netProtocolWas) {
+            if (gNetworkProtocol == NET_PROTO_UDPFS)
+                guiMsgBox(_l(_STR_NET_UDPFS_TAB_HINT), 0, NULL);
+            else if (gNetworkProtocol == NET_PROTO_UDPFSBD || gNetworkProtocol == NET_PROTO_UDPBD)
+                guiMsgBox(_l(_STR_NET_UDPBD_TAB_HINT), 0, NULL);
+        }
+        if (gNetworkProtocol != netProtocolWas && guiNetProtocolNeedsRestart())
+            guiMsgBox(_l(_STR_NETBOOT_RESTART), 0, NULL);
+
+        bdmForceDeviceRefresh();
+        applyConfig(-1, -1, 0);
+        menuReinitMainMenu();
+    }
+
+    guiSettingsEndDialog();
+    guiSettingsActiveDialog = NULL;
+    return guiSettingsPageResult(result);
+}
+
+static int guiSettingsDisplayUpdater(int modified)
+{
+    int temp, x, y;
+
+    if (!modified)
+        return 0;
+
+    guiSettingsSavePending = 1;
+
+    diaGetInt(guiSettingsActiveDialog, UICFG_XOFF, &x);
+    diaGetInt(guiSettingsActiveDialog, UICFG_YOFF, &y);
+    if (x != gXOff || y != gYOff) {
+        gXOff = x;
+        gYOff = y;
+        rmSetDisplayOffset(x, y);
+    }
+    diaGetInt(guiSettingsActiveDialog, UICFG_OVERSCAN, &temp);
+    if (temp != gOverscan) {
+        gOverscan = temp;
+        rmSetOverscan(gOverscan);
+        guiUpdateScreenScale();
+    }
+    diaGetInt(guiSettingsActiveDialog, UICFG_WIDESCREEN, &temp);
+    if (temp != gWideScreen) {
+        gWideScreen = temp;
+        rmSetAspectRatio((gWideScreen == 0) ? RM_ARATIO_4_3 : RM_ARATIO_16_9);
+        guiUpdateScreenScale();
+    }
+    return 0;
+}
+
+static int guiSettingsShowInterface(void)
+{
+    const struct UIItem *parts[] = {diaUIConfig, diaDisplayConfig};
+    const char *gameViewNames[] = {"Both", "ISO", "VCD", NULL};
+    const char *vmodeNames[] = {_l(_STR_AUTO), "PAL 640x512i @50Hz 24bit", "NTSC 640x448i @60Hz 24bit",
+                                "EDTV 640x448p @60Hz 24bit", "EDTV 640x512p @50Hz 24bit", "VGA 640x480p @60Hz 24bit",
+                                "PAL 704x576i @50Hz 24bit (HIRES)", "NTSC 704x480i @60Hz 24bit (HIRES)",
+                                "EDTV 704x480p @60Hz 24bit (HIRES)", "EDTV 704x576p @50Hz 24bit (HIRES)",
+                                "HDTV 1280x720p @60Hz 16bit (HIRES)", "HDTV 1920x1080i @60Hz 16bit (HIRES)",
+                                "PAL 640x256p @50Hz 24bit", "NTSC 640x224p @60Hz 24bit", NULL};
+    struct UIItem *ui = guiSettingsCompose(parts, 2, NULL, 0, 1);
+    const char **themeNamesSnap = NULL;
+    const char **langNamesSnap = NULL;
+    int themeID, langID, previousTheme, previousVMode, result;
+    int gameViewChanged = 0;
+
+    if (ui == NULL)
+        return 0;
+
+    showCfgPopup = 0;
+    guiResetNotifications();
+    previousTheme = thmGetGuiValue();
+    previousVMode = gVMode;
+
+    guiLock();
+    themeNamesSnap = guiCopyNameList((const char **)thmGetGuiList());
+    langNamesSnap = guiCopyNameList((const char **)lngGetGuiList());
+    guiUnlock();
+    diaSetEnum(ui, UICFG_THEME, themeNamesSnap != NULL ? themeNamesSnap : (const char **)thmGetGuiList());
+    diaSetEnum(ui, UICFG_LANG, langNamesSnap != NULL ? langNamesSnap : (const char **)lngGetGuiList());
+    diaSetEnum(ui, UICFG_GAMEVIEW, gameViewNames);
+    diaSetEnum(ui, UICFG_VMODE, vmodeNames);
+    diaSetInt(ui, UICFG_THEME, thmGetGuiValue());
+    diaSetInt(ui, UICFG_LANG, lngGetGuiValue());
+    diaSetInt(ui, UICFG_GAMEVIEW, gDefaultGameView);
+    diaSetInt(ui, UICFG_AUTOSORT, gAutosort);
+    diaSetInt(ui, UICFG_AUTOREFRESH, gAutoRefresh);
+    diaSetInt(ui, UICFG_NOTIFICATIONS, gEnableNotifications);
+    // Keep the editor reachable even when the current theme has no active Coverflow view; users
+    // need to be able to configure it before enabling or switching to a Coverflow-capable theme.
+    diaSetVisible(ui, UICFG_COVERFLOW_BUTTON, 1);
+    diaSetInt(ui, UICFG_VMODE, gVMode);
+    diaSetInt(ui, UICFG_WIDESCREEN, gWideScreen);
+    diaSetInt(ui, UICFG_XOFF, gXOff);
+    diaSetInt(ui, UICFG_YOFF, gYOff);
+    diaSetInt(ui, UICFG_OVERSCAN, gOverscan);
+    const char *gameIDModes[] = {_l(_STR_GAMEID_MODE_ALL), _l(_STR_GAMEID_MODE_POPSTARTER),
+                                 _l(_STR_GAMEID_MODE_PS2), _l(_STR_GAMEID_MODE_OFF), NULL};
+    diaSetEnum(ui, CFG_APPLYGAMEID, gameIDModes);
+    diaSetInt(ui, CFG_APPLYGAMEID, guiGameIdModeFromGlobals());
+    guiSettingsBeginDialog(ui);
+reshow_interface:
+    result = diaExecuteDialog(ui, -1, 1, &guiSettingsDisplayUpdater);
+    if (result == UICFG_ARTWORK_BUTTON) {
+        guiShowArtworkConfig();
+        goto reshow_interface;
+    }
+    if (result == UICFG_COVERFLOW_BUTTON) {
+        guiShowCoverflowConfig();
+        goto reshow_interface;
+    }
+    if (result == UICFG_COLORS_BUTTON) {
+        guiShowColorsConfig();
+        goto reshow_interface;
+    }
+    if (result == UICFG_GAME_LIST_BUTTON) {
+        guiShowVcdListConfig();
+        goto reshow_interface;
+    }
+    if (result == DISPLAY_GSM_DEFAULTS_BUTTON) {
+        guiGameShowGSConfig(1);
+        goto reshow_interface;
+    }
+
+    padRumbleFlush();
+    if (result != UIID_BTN_CANCEL && result != -1) {
+        diaGetInt(ui, UICFG_LANG, &langID);
+        diaGetInt(ui, UICFG_THEME, &themeID);
+        diaGetInt(ui, UICFG_AUTOSORT, &gAutosort);
+        diaGetInt(ui, UICFG_AUTOREFRESH, &gAutoRefresh);
+        diaGetInt(ui, UICFG_NOTIFICATIONS, &gEnableNotifications);
+        {
+            int previousGameView = gDefaultGameView;
+            diaGetInt(ui, UICFG_GAMEVIEW, &gDefaultGameView);
+            gameViewChanged = gDefaultGameView != previousGameView;
+            if (gameViewChanged)
+                vcdMarkAllDirty();
+        }
+        diaGetInt(ui, UICFG_VMODE, &gVMode);
+        diaGetInt(ui, UICFG_WIDESCREEN, &gWideScreen);
+        diaGetInt(ui, UICFG_XOFF, &gXOff);
+        diaGetInt(ui, UICFG_YOFF, &gYOff);
+        diaGetInt(ui, UICFG_OVERSCAN, &gOverscan);
+        {
+            int gameIDMode;
+            diaGetInt(ui, CFG_APPLYGAMEID, &gameIDMode);
+            guiApplyGameIdMode(gameIDMode);
+        }
+
+        if (previousTheme != themeID && isBgmPlaying())
+            bgmStop();
+        applyConfig(themeID, langID, 1);
+        if (gameViewChanged) {
+            oplQueueVcdDeviceUpdates();
+            loadFavourites();
+        }
+        sfxInit(0);
+        if (gEnableBGM && !isBgmPlaying())
+            bgmStart();
+
+        if (previousVMode != gVMode && guiConfirmVideoMode() == 0) {
+            gVMode = previousVMode;
+            applyConfig(-1, -1, 1);
+        }
+    }
+
+    guiFreeNameList(themeNamesSnap);
+    guiFreeNameList(langNamesSnap);
+    guiSettingsEndDialog();
+    guiSettingsActiveDialog = NULL;
+    return guiSettingsPageResult(result);
+}
+
+static int guiSettingsLaunchUpdater(int modified)
+{
+    int neutrinoVideoDef;
+
+    if (modified) {
+        diaGetInt(guiSettingsActiveDialog, CFG_NEUTRINO_VIDEO, &neutrinoVideoDef);
+        diaSetEnabled(guiSettingsActiveDialog, CFG_NEUTRINO_GSMCOMP, neutrinoVideoDef != 0);
+    }
+    return 0;
+}
+
+static int guiSettingsShowLaunch(void)
+{
+    const struct UIItem *parts[] = {diaLaunchConfig, diaNeutrinoDefaults};
+    const int skipIDs[] = {LAUNCH_NEUTRINO_DEFAULTS_BUTTON};
+    const char *defaultCoreStrs[] = {"<OPL>", "Neutrino", NULL};
+    const char *neutrinoDevStrs[] = {_l(_STR_AUTO), "Memory Card", "USB", "MX4SIO", "MMCE", "HDD (exFAT)", "HDD (APA)", _l(_STR_GAMES_DEVICE), NULL};
+    static const char *neutrinoVideoDefStrs[] = {"Off", "240p", "480p", "1080i x1", "1080i x2", "1080i x3", NULL};
+    static const char *neutrinoGsmCompDefStrs[] = {"Off", "Type 1 (GSM/OPL)", "Type 2", "Type 3", NULL};
+    struct UIItem *ui = guiSettingsCompose(parts, 2, skipIDs, 1, 1);
+    int result;
+
+    if (ui == NULL)
+        return 0;
+
+    diaSetEnum(ui, CFG_DEFAULT_CORE, defaultCoreStrs);
+    diaSetInt(ui, CFG_DEFAULT_CORE, gDefaultCoreLoader);
+    diaSetInt(ui, CFG_PS2LOGO, gPS2Logo);
+    diaSetEnum(ui, CFG_NEUTRINO_DEVICE, neutrinoDevStrs);
+    diaSetInt(ui, CFG_NEUTRINO_DEVICE, gNeutrinoDevice);
+    diaSetEnum(ui, CFG_NEUTRINO_VIDEO, neutrinoVideoDefStrs);
+    diaSetInt(ui, CFG_NEUTRINO_VIDEO, gNeutrinoVideoDefault);
+    diaSetEnum(ui, CFG_NEUTRINO_GSMCOMP, neutrinoGsmCompDefStrs);
+    diaSetInt(ui, CFG_NEUTRINO_GSMCOMP, gNeutrinoGsmCompDefault);
+    diaSetEnabled(ui, CFG_NEUTRINO_GSMCOMP, gNeutrinoVideoDefault != 0);
+    guiSettingsBeginDialog(ui);
+
+reshow_launch:
+    result = diaExecuteDialog(ui, -1, 1, &guiSettingsLaunchUpdater);
+    if (result == LAUNCH_OSD_DEFAULTS_BUTTON) {
+        guiGameShowOSDLanguageConfig(1);
+        goto reshow_launch;
+    }
+    if (result == CFG_NEUTRINO_ARGS) {
+        guiShowNeutrinoArgsConfig(gNeutrinoArgs, sizeof(gNeutrinoArgs));
+        goto reshow_launch;
+    }
+
+    if (result != UIID_BTN_CANCEL && result != -1) {
+        diaGetInt(ui, CFG_DEFAULT_CORE, &gDefaultCoreLoader);
+        diaGetInt(ui, CFG_PS2LOGO, &gPS2Logo);
+        diaGetInt(ui, CFG_NEUTRINO_DEVICE, &gNeutrinoDevice);
+        diaGetInt(ui, CFG_NEUTRINO_VIDEO, &gNeutrinoVideoDefault);
+        diaGetInt(ui, CFG_NEUTRINO_GSMCOMP, &gNeutrinoGsmCompDefault);
+        applyConfig(-1, -1, 0);
+        menuReinitMainMenu();
+    }
+
+    guiSettingsEndDialog();
+    guiSettingsActiveDialog = NULL;
+    return guiSettingsPageResult(result);
+}
+
+static int guiSettingsPopstarterUpdater(int modified)
+{
+    guiVcdUpdater(modified);
+    guiBdmaUpdater(modified);
+    return 0;
+}
+
+static int guiSettingsShowPopstarter(void)
+{
+    const struct UIItem *parts[] = {diaVcdConfig, diaBdmaConfig, diaVcdListConfig};
+    const int skipIDs[] = {VCD_BDMA_BUTTON, VCD_LIST_BUTTON};
+    const char *popsDevStrs[] = {_l(_STR_DEFAULT), "Memory Card", "USB", "MX4SIO", "MMCE", "HDD (exFAT)", "HDD (APA)", "Custom", _l(_STR_GAMES_DEVICE), NULL};
+    struct UIItem *ui = guiSettingsCompose(parts, 3, skipIDs, 2, 1);
+    int result;
+
+    if (ui == NULL)
+        return 0;
+
+    diaSetEnum(ui, CFG_POPSTARTER_DEVICE, popsDevStrs);
+    diaSetInt(ui, CFG_POPSTARTER_DEVICE, gPopstarterDevice);
+    diaSetString(ui, CFG_POPSTARTER_PATH, gPopstarterPath);
+    diaSetShowDefaultWhenEmpty(ui, CFG_POPSTARTER_PATH, 1);
+    diaSetInt(ui, CFG_POPSTARTER_RETROGEM_GAMEID, gPopstarterRetroGemGameID);
+    diaSetVisible(ui, CFG_LBL_POPSTARTER_PATH, gPopstarterDevice == POPS_DEV_CUSTOM);
+    diaSetVisible(ui, CFG_POPSTARTER_PATH, gPopstarterDevice == POPS_DEV_CUSTOM);
+    diaSetInt(ui, CFG_VCD_HIDE_GAMEID, gVcdHideGameId);
+    diaSetInt(ui, CFG_VCD_FIRST_DISC_ONLY, gVcdFirstDiscOnly);
+    diaSetInt(ui, CFG_VCD_SHOW_PP_POPS, gVcdShowPpPops);
+    guiSetBdmaSettings(ui);
+    guiSettingsBeginDialog(ui);
+
+reshow_popstarter:
+    result = diaExecuteDialog(ui, -1, 1, &guiSettingsPopstarterUpdater);
+    if (result == VCD_NET_BUTTON) {
+        guiShowPopsNetConfig();
+        goto reshow_popstarter;
+    }
+
+    if (result != UIID_BTN_CANCEL && result != -1) {
+        int rebuildVcdLists = 0;
+        int previousHideGameId = gVcdHideGameId;
+        int previousFirstDiscOnly = gVcdFirstDiscOnly;
+        int previousShowPpPops = gVcdShowPpPops;
+        char tmpPop[sizeof(gPopstarterPath)];
+
+        diaGetInt(ui, CFG_POPSTARTER_DEVICE, &gPopstarterDevice);
+        diaGetInt(ui, CFG_POPSTARTER_RETROGEM_GAMEID, &gPopstarterRetroGemGameID);
+        diaGetString(ui, CFG_POPSTARTER_PATH, tmpPop, sizeof(tmpPop));
+        if (strncmp(tmpPop, gPopstarterPath, 31) != 0)
+            snprintf(gPopstarterPath, sizeof(gPopstarterPath), "%s", tmpPop);
+        diaGetInt(ui, CFG_VCD_HIDE_GAMEID, &gVcdHideGameId);
+        diaGetInt(ui, CFG_VCD_FIRST_DISC_ONLY, &gVcdFirstDiscOnly);
+        diaGetInt(ui, CFG_VCD_SHOW_PP_POPS, &gVcdShowPpPops);
+        guiSaveBdmaSettings(ui);
+
+        if (gVcdHideGameId != previousHideGameId) {
+            vcdMarkAllDirty();
+            rebuildVcdLists = 1;
+        }
+        if (gVcdFirstDiscOnly != previousFirstDiscOnly) {
+            vcdMarkAllDirty();
+            hddVcdInvalidateCache();
+            rebuildVcdLists = 1;
+        }
+        if (gVcdShowPpPops != previousShowPpPops) {
+            vcdMarkAllDirty();
+            hddVcdInvalidateCache();
+            rebuildVcdLists = 1;
+        }
+        applyConfig(-1, -1, 0);
+        menuReinitMainMenu();
+        if (rebuildVcdLists)
+            oplQueueVcdDeviceUpdates();
+    }
+
+    guiSettingsEndDialog();
+    guiSettingsActiveDialog = NULL;
+    return guiSettingsPageResult(result);
+}
+
+enum gui_settings_page {
+    SETTINGS_GENERAL = 0,
+    SETTINGS_SOURCES,
+    SETTINGS_NETWORK,
+    SETTINGS_INTERFACE,
+    SETTINGS_LAUNCH,
+    SETTINGS_POPSTARTER,
+    SETTINGS_CONTROLLERS,
+    SETTINGS_AUDIO,
+    SETTINGS_PAGE_COUNT
+};
+
+enum gui_settings_prompt_result {
+    SETTINGS_PROMPT_SAVE = 1,
+    SETTINGS_PROMPT_EXIT,
+    SETTINGS_PROMPT_CONTINUE
+};
+
+static int guiSettingsPromptSave(void)
+{
+    int promptHints[3] = {_STR_SETTINGS_SAVE, _STR_SETTINGS_EXIT_WITHOUT_SAVING, _STR_SETTINGS_CONTINUE_EDITING};
+    int promptIcons[3] = {CROSS_ICON, CIRCLE_ICON, TRIANGLE_ICON};
+
+    sfxPlay(SFX_MESSAGE);
+    while (1) {
+        int x, y;
+
+        guiStartFrame();
+        if (guiDrawBGSettings() == 0)
+            guiDrawBGPlasma();
+
+        rmDrawRect(0, 0, screenWidth, screenHeight, gColDarker);
+        rmDrawLine(50, 75, screenWidth - 50, 75, gColWhite);
+        rmDrawLine(50, 410, screenWidth - 50, 410, gColWhite);
+        fntRenderString(gTheme->fonts[0], screenWidth >> 1, 150, ALIGN_CENTER, 0, 0,
+                        _l(_STR_SETTINGS_SAVE_PROMPT), gTheme->selTextColor);
+        fntRenderString(gTheme->fonts[0], screenWidth >> 1, 205, ALIGN_CENTER, 0, 0,
+                        _l(_STR_SETTINGS_SAVE_PROMPT_LINE1), gTheme->textColor);
+        fntRenderString(gTheme->fonts[0], screenWidth >> 1, 230, ALIGN_CENTER, 0, 0,
+                        _l(_STR_SETTINGS_SAVE_PROMPT_LINE2), gTheme->textColor);
+
+        x = guiAlignSubMenuHints(3, promptHints, promptIcons, gTheme->fonts[0], 12, 1);
+        y = gTheme->usedHeight - 32;
+        x = guiDrawIconAndText(promptIcons[0], promptHints[0], gTheme->fonts[0], x, y, gTheme->textColor);
+        x += 12;
+        x = guiDrawIconAndText(promptIcons[1], promptHints[1], gTheme->fonts[0], x, y, gTheme->textColor);
+        x += 12;
+        guiDrawIconAndText(promptIcons[2], promptHints[2], gTheme->fonts[0], x, y, gTheme->textColor);
+        guiEndFrame();
+
+        readPads();
+        if (getKeyOn(KEY_CROSS)) {
+            sfxPlay(SFX_CONFIRM);
+            return SETTINGS_PROMPT_SAVE;
+        }
+        if (getKeyOn(KEY_CIRCLE)) {
+            sfxPlay(SFX_CANCEL);
+            return SETTINGS_PROMPT_EXIT;
+        }
+        if (getKeyOn(KEY_TRIANGLE)) {
+            sfxPlay(SFX_CURSOR);
+            return SETTINGS_PROMPT_CONTINUE;
+        }
+    }
+}
+
+static void guiDrawSettingsIndexHints(void)
+{
+    int hints[2] = {_STR_SELECT, _STR_BACK};
+    int icons[2] = {CROSS_ICON, CIRCLE_ICON};
+    int x = guiAlignSubMenuHints(2, hints, icons, gTheme->fonts[0], 12, 2);
+    int y = gTheme->usedHeight - 32;
+
+    x = guiDrawIconAndText(icons[0], hints[0], gTheme->fonts[0], x, y, gTheme->textColor);
+    x += 12;
+    guiDrawIconAndText(icons[1], hints[1], gTheme->fonts[0], x, y, gTheme->textColor);
+}
+
+static int guiSettingsShowIndex(int *page)
+{
+    const char *labels[SETTINGS_PAGE_COUNT + 1] = {
+        "General & System",
+        _l(_STR_GAME_SOURCES),
+        _l(_STR_MENU_NETWORK),
+        _l(_STR_INTERFACE_SETTINGS),
+        _l(_STR_GAME_LAUNCHING),
+        _l(_STR_POPSTARTER),
+        _l(_STR_CONTROLLER_SETTINGS),
+        _l(_STR_AUDIO_SETTINGS),
+        _l(_STR_SAVE_CHANGES),
+    };
+    int selected = *page;
+    const int itemCount = SETTINGS_PAGE_COUNT + 1;
+    int spacing = 25;
+    int y;
+
+    if (selected < SETTINGS_GENERAL || selected >= SETTINGS_PAGE_COUNT)
+        selected = SETTINGS_GENERAL;
+
+    // This is intentionally rendered with the same geometry and highlight treatment as the main
+    // menu. The Index is the Settings hub, not another dialog with a focus box around each row.
+    while (1) {
+        guiStartFrame();
+        if (guiDrawBGSettings() == 0)
+            guiDrawBGPlasma();
+
+        fntRenderString(gTheme->fonts[0], screenWidth >> 1, 50, ALIGN_CENTER, 0, 0, "SETTINGS INDEX", gTheme->textColor);
+
+        y = (gTheme->usedHeight >> 1) - (spacing * (itemCount >> 1));
+        for (int i = 0; i < itemCount; i++) {
+            fntRenderString(gTheme->fonts[0], screenWidth >> 1, y, ALIGN_CENTER, 0, 0, labels[i], (i == selected) ? gTheme->selTextColor : gTheme->textColor);
+            y += spacing;
+            if (i == SETTINGS_PAGE_COUNT - 1)
+                y += spacing / 2;
+        }
+
+        guiDrawSettingsIndexHints();
+        guiEndFrame();
+
+        readPads();
+        if (getKey(KEY_UP)) {
+            sfxPlay(SFX_CURSOR);
+            selected = (selected + itemCount - 1) % itemCount;
+        } else if (getKey(KEY_DOWN)) {
+            sfxPlay(SFX_CURSOR);
+            selected = (selected + 1) % itemCount;
+        } else if (getKeyOn(KEY_CROSS)) {
+            sfxPlay(SFX_CONFIRM);
+            if (selected == SETTINGS_PAGE_COUNT) {
+                if (menuSaveSettings() > 0)
+                    guiSettingsSavePending = 0;
+            } else {
+                *page = selected;
+                return 1;
+            }
+        } else if (getKeyOn(KEY_START) || getKeyOn(KEY_CIRCLE)) {
+            sfxPlay(SFX_CANCEL);
+            if (!guiSettingsSavePending)
+                return 0;
+
+            int promptResult = guiSettingsPromptSave();
+            if (promptResult == SETTINGS_PROMPT_SAVE) {
+                if (menuSaveSettings() > 0) {
+                    guiSettingsSavePending = 0;
+                    return 0;
+                }
+            } else if (promptResult == SETTINGS_PROMPT_EXIT) {
+                guiSettingsSavePending = 0;
+                return 0;
+            }
+        }
+    }
+}
+
+void guiShowSettings(void)
+{
+    int page = SETTINGS_GENERAL;
+    int result;
+
+    guiSettingsShellActive = 1;
+    guiSettingsSavePending = 0;
+    if (!guiSettingsShowIndex(&page)) {
+        guiSettingsShellActive = 0;
+        guiSettingsSavePending = 0;
+        return;
+    }
+
+    while (1) {
+        guiSettingsCurrentPage = page;
+        switch (page) {
+            case SETTINGS_GENERAL:
+                result = guiSettingsShowGeneral();
+                break;
+            case SETTINGS_SOURCES:
+                result = guiSettingsShowSources();
+                break;
+            case SETTINGS_NETWORK:
+                result = guiShowNetConfig();
+                break;
+            case SETTINGS_INTERFACE:
+                result = guiSettingsShowInterface();
+                break;
+            case SETTINGS_LAUNCH:
+                result = guiSettingsShowLaunch();
+                break;
+            case SETTINGS_POPSTARTER:
+                result = guiSettingsShowPopstarter();
+                break;
+            case SETTINGS_CONTROLLERS:
+                result = guiShowControllerConfig();
+                break;
+            case SETTINGS_AUDIO:
+                result = guiShowAudioConfig();
+                break;
+            default:
+                guiSettingsShellActive = 0;
+                guiSettingsSavePending = 0;
+                return;
+        }
+
+        if (result == DIA_RESULT_INDEX) {
+            if (!guiSettingsShowIndex(&page)) {
+                guiSettingsShellActive = 0;
+                guiSettingsSavePending = 0;
+                return;
+            }
+        } else if (result == DIA_RESULT_NEXT) {
+            page = (page + 1) % SETTINGS_PAGE_COUNT;
+        } else if (result == DIA_RESULT_PREV) {
+            page = (page + SETTINGS_PAGE_COUNT - 1) % SETTINGS_PAGE_COUNT;
+        } else {
+            guiSettingsShellActive = 0;
+            guiSettingsSavePending = 0;
+            return;
+        }
     }
 }
 
