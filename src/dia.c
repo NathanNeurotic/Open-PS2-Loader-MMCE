@@ -700,10 +700,10 @@ void diaRenderUI(struct UIItem *ui, short inMenu, struct UIItem *cur, int haveFo
     int y0 = 20;
     int settingsShell = (ui == diaSettingsShellUI && diaSettingsIndicator != NULL);
 
-    if (settingsShell) {
-        fntRenderString(gTheme->fonts[0], x0, y0, ALIGN_NONE, 0, 0, diaSettingsIndicator, gTheme->selTextColor);
-        y0 += UI_SPACING_H;
-    }
+    // Keep the peer-page indicator on the title line so the shell does not spend a row on
+    // navigation chrome. The dialog's own UI_HEADER remains the page title at x0.
+    if (settingsShell)
+        fntRenderString(gTheme->fonts[0], screenWidth - x0, y0, ALIGN_RIGHT, 0, 0, diaSettingsIndicator, gTheme->selTextColor);
 
     // render all items (shifted up by the scroll offset for tall dialogs)
     struct UIItem *rc = ui;

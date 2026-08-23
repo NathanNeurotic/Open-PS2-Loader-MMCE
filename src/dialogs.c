@@ -41,8 +41,6 @@ struct UIItem diaNetConfig[] = {
     {UI_ENUM, NETCFG_ETHOPMODE, 1, 1, -1, 0, 0, {.intvalue = {0, 0}}},
     {UI_BREAK},
 
-    {UI_BREAK},
-
     {UI_LABEL, 0, 1, 1, -1, 0, 0, {.label = {"- PS2 -", -1}}},
     {UI_BREAK},
 
@@ -124,8 +122,6 @@ struct UIItem diaNetConfig[] = {
     {UI_LABEL, NETCFG_LBL_SHARE_PORT, 1, 1, -1, -40, 0, {.label = {NULL, _STR_PORT}}},
     {UI_SPACER},
     {UI_INT, NETCFG_SHARE_PORT, 1, 1, -1, 0, 0, {.intvalue = {1111, 1111, 0, 65535}}}, // RiptOPL default SMB port 1111 (non-privileged; was 445)
-    {UI_BREAK},
-
     {UI_BREAK},
 
     //  ---- SMB share name ----

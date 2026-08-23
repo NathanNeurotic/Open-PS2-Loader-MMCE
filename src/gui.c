@@ -2162,16 +2162,28 @@ static int guiSettingsSkipID(int id, const int *skipIDs, int skipCount)
 static struct UIItem *guiSettingsCompose(const struct UIItem *const *parts, int partCount,
                                          const int *skipIDs, int skipCount)
 {
-    int part, i;
+    int part, i, skipTrailingBreak;
     int count = 0;
 
     for (part = 0; part < partCount; part++) {
+        skipTrailingBreak = 0;
         for (i = 0; parts[part][i].type != UI_TERMINATOR; i++) {
             const struct UIItem *item = &parts[part][i];
 
             // Each source definition owns its own OK row. A composite screen has one shared
             // commit point, while feature buttons and section headings remain intact.
-            if (item->type == UI_OK || guiSettingsSkipID(item->id, skipIDs, skipCount))
+            if (item->type == UI_OK) {
+                // The source dialog also has a trailing UI_BREAK after its OK. That break is useful
+                // when the source is shown alone, but becomes an empty row in a composite page.
+                skipTrailingBreak = 1;
+                continue;
+            }
+            if (skipTrailingBreak) {
+                skipTrailingBreak = 0;
+                if (item->type == UI_BREAK)
+                    continue;
+            }
+            if (guiSettingsSkipID(item->id, skipIDs, skipCount))
                 continue;
             if (count >= SETTINGS_DIALOG_CAPACITY - 3)
                 return NULL;
@@ -2180,7 +2192,6 @@ static struct UIItem *guiSettingsCompose(const struct UIItem *const *parts, int 
     }
 
     guiSettingsDialog[count++] = (struct UIItem) {UI_OK, 0, 1, 1, -1, 0, 0, {.label = {NULL, _STR_OK}}};
-    guiSettingsDialog[count++] = (struct UIItem) {UI_BREAK};
     guiSettingsDialog[count] = (struct UIItem) {UI_TERMINATOR};
     guiSettingsActiveDialog = guiSettingsDialog;
     return guiSettingsDialog;

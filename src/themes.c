@@ -960,16 +960,8 @@ static void drawGameImage(struct menu_list *menu, struct submenu_list *item, con
         }
 
         if (!texture || !texture->Mem) {
-            // #2: on the Favourites page a COVER element with no real art must not draw the embedded
-            // placeholder wrapped in the case frame (the hollow grey "empty tray" box). Suppress the
-            // COVER only -- keyed on the cache suffix AND excluding Background elements (a theme may
-            // bind a COV pattern to its Background; that must keep its defaultTexture/plasma fallback)
-            // -- so info-page screenshots (SCR/SCR2) and backgrounds keep their placeholders. Only
-            // while Cover Art is ON: with gEnableArt off every favourite reads as "no art" and the
-            // suppression would blank the whole tab (Games/Apps show placeholders there; match them).
-            int isCover = gameImage->cache != NULL && gameImage->cache->suffix != NULL && strcmp(gameImage->cache->suffix, "COV") == 0;
-            if (gEnableArt && isCover && elem->type != ELEM_TYPE_BACKGROUND && list != NULL && list->mode == FAV_MODE)
-                return; // no real art -> draw nothing (no empty case frame) for a Favourites cover
+            // Keep the configured/default cover visible when art is absent. This is also the
+            // placeholder path for Favorites, so all list views keep the same no-art affordance.
             if (gameImage->defaultTexture)
                 texture = &gameImage->defaultTexture->source;
             else {
@@ -1315,13 +1307,6 @@ static void drawCoverFlow(struct menu_list *menu, struct submenu_list *item, con
 
         GSTEXTURE *texture = getGameImageTexture(cimg->cache, sourceList, &covers[i]->item);
         int hasArt = (texture && texture->Mem);
-        // #2 (Nadwislanski): a no-art Favourites entry (a favourited app / PS1 title / game with no
-        // ART/<id>_COV.png) must NOT draw the embedded cover placeholder wrapped in the two-layer case
-        // frame -- that reads as a hollow grey "empty tray" box. Skip the whole cover instead (draw
-        // nothing), leaving the games/apps pages and real-art favourites untouched. Only while Cover
-        // Art is ON: with gEnableArt off every favourite is "no art" and the carousel would go blank.
-        if (gEnableArt && !hasArt && sourceList != NULL && sourceList->mode == FAV_MODE)
-            continue;
         if (!hasArt)
             texture = cimg->defaultTexture ? &cimg->defaultTexture->source : thmGetTexture(COVER_DEFAULT);
         if (!texture || !texture->Mem)
