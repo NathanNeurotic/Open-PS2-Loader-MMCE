@@ -16,24 +16,24 @@
 #include "include/sound.h"
 
 // UI spacing of the dialogues (pixels between consecutive items)
-#define UI_SPACING_H      10
+#define UI_SPACING_H          10
 #define UI_SETTINGS_SPACING_H 7
-#define UI_SPACING_V      2
+#define UI_SPACING_V          2
 // spacer ui element width (simulates tab)
-#define UI_SPACER_WIDTH   50
+#define UI_SPACER_WIDTH       50
 // minimal pixel width of spacer
-#define UI_SPACER_MINIMAL 30
+#define UI_SPACER_MINIMAL     30
 // length of breaking line in pixels
-#define UI_BREAK_LEN      600
+#define UI_BREAK_LEN          600
 // Floor for the dialog repeat delay, in ms. Dialogs are deliberately calmer than the game list --
 // overshooting a settings row is more annoying than overshooting a game -- but that intent used to
 // be expressed as a HARDCODED 300 ms, which is exactly the "medium" main-menu value. The result was
 // that Settings ignored the user's Scroll Speed entirely: picking "fast" (100 ms) still gave 300 ms
 // in every dialog (3x slower than asked), and picking "slow" (500 ms) gave no extra slowness at all.
 // See diaScrollDelay(); medium is unchanged, so most users see no difference.
-#define DIA_SCROLL_MIN_MS 200
+#define DIA_SCROLL_MIN_MS     200
 // scroll speed (delay in ms!) when setting int value
-#define DIA_INT_SET_SPEED 100
+#define DIA_INT_SET_SPEED     100
 
 static int screenWidth;
 static int screenHeight;
