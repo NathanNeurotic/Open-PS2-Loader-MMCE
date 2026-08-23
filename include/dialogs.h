@@ -166,6 +166,7 @@ enum UI_ITEMS {
     NETCFG_POPS_IMPORT,
     NETCFG_ETHOPMODE,
     NETCFG_RECONNECT,
+    NETCFG_POPSTARTER_BUTTON,
     NETCFG_OK,
     // Section labels for the SMB-only block, so it can be hidden whole when the selected network
     // protocol is not SMB. Appended here to keep the NETCFG_*_0..N consecutive runs above intact.

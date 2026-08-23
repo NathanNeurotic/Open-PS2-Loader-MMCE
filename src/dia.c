@@ -1114,6 +1114,22 @@ int diaExecuteDialog(struct UIItem *ui, int uiId, short inMenu, int (*updater)(i
             modified = 0;
             struct UIItem *newf = cur;
 
+            // Settings uses L1/R1 as peer-screen navigation. Keep this in the dialog layer so
+            // every peer screen retains the same focus, scrolling and modal-editor behavior as
+            // existing dialogs. Ordinary dialogs never see these results unless their caller opts
+            // into handling them.
+            if (getKeyOn(KEY_L1)) {
+                diaRestoreScrollSpeed();
+                sfxPlay(SFX_CURSOR);
+                return DIA_RESULT_PREV;
+            }
+
+            if (getKeyOn(KEY_R1)) {
+                diaRestoreScrollSpeed();
+                sfxPlay(SFX_CURSOR);
+                return DIA_RESULT_NEXT;
+            }
+
             if (getKey(KEY_LEFT)) {
                 newf = diaGetPrevControl(cur, ui);
                 if (newf == cur)

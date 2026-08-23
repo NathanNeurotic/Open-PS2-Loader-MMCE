@@ -59,6 +59,14 @@ static int showPartPopup = 0;
 static int showThmPopup;
 static int showLngPopup;
 
+// The eight Settings peer screens reuse the established dialog definitions. Composite screens are
+// assembled into this buffer at entry so the existing field ids, visibility rules and temporary
+// editor buttons remain owned by their original feature code. Values still live in the existing
+// globals/config sets; this buffer is only a view, never a second configuration store.
+#define SETTINGS_DIALOG_CAPACITY 256
+static struct UIItem guiSettingsDialog[SETTINGS_DIALOG_CAPACITY];
+static struct UIItem *guiSettingsActiveDialog;
+
 // Notification popup: START tick + how long to hold, NOT an absolute deadline. clock() is a
 // 32-bit microsecond counter, so it wraps every ~71.6 minutes; `clock() >= start + duration`
 // silently becomes false-for-71-minutes whenever the sum crosses the wrap. The (clock() - start)
@@ -998,7 +1006,7 @@ static int netConfigUpdater(int modified)
     return 0;
 }
 
-void guiShowNetConfig(void)
+int guiShowNetConfig(void)
 {
     size_t i;
     const char *ethOpModes[] = {_l(_STR_AUTO), _l(_STR_ETH_100MFDX), _l(_STR_ETH_100MHDX), _l(_STR_ETH_10MFDX), _l(_STR_ETH_10MHDX), NULL};
@@ -1085,7 +1093,15 @@ void guiShowNetConfig(void)
         diaSetVisible(diaNetConfig, NETCFG_RECONNECT, 0);
     }
 
-    int result = diaExecuteDialog(diaNetConfig, -1, 1, &netConfigUpdater);
+    int result;
+reshow_network:
+    result = diaExecuteDialog(diaNetConfig, -1, 1, &netConfigUpdater);
+    if (result == NETCFG_POPSTARTER_BUTTON) {
+        // This is the shared POPSTARTER network editor. It owns IPCONFIG.DAT / SMBCONFIG.DAT;
+        // the Network page only provides a second entry point and never mirrors that state.
+        guiShowPopsNetConfig();
+        goto reshow_network;
+    }
     if (result) {
         // Store values
         diaGetInt(diaNetConfig, NETCFG_PS2_IP_ADDR_TYPE, &ps2_ip_use_dhcp);
@@ -1160,6 +1176,8 @@ void guiShowNetConfig(void)
 
         applyConfig(-1, -1, 0);
     }
+
+    return (result == DIA_RESULT_PREV || result == DIA_RESULT_NEXT) ? result : 0;
 }
 
 // POPStarter page live-updater: reveal the free-text POPSTARTER.ELF Path field only when the
@@ -2056,7 +2074,7 @@ static int guiAudioUpdater(int modified)
     return 0;
 }
 
-void guiShowAudioConfig(void)
+int guiShowAudioConfig(void)
 {
     diaSetInt(diaAudioConfig, CFG_SFX, gEnableSFX);
     diaSetInt(diaAudioConfig, CFG_BOOT_SND, gEnableBootSND);
@@ -2067,10 +2085,11 @@ void guiShowAudioConfig(void)
     diaSetString(diaAudioConfig, CFG_DEFAULT_BGM_PATH, gDefaultBGMPath);
     diaSetShowDefaultWhenEmpty(diaAudioConfig, CFG_DEFAULT_BGM_PATH, 1); // blank -> the theme's own bgm
 
-    diaExecuteDialog(diaAudioConfig, -1, 1, guiAudioUpdater);
+    int result = diaExecuteDialog(diaAudioConfig, -1, 1, guiAudioUpdater);
+    return (result == DIA_RESULT_PREV || result == DIA_RESULT_NEXT) ? result : 0;
 }
 
-void guiShowControllerConfig(void)
+int guiShowControllerConfig(void)
 {
     int value;
 
@@ -2111,6 +2130,553 @@ void guiShowControllerConfig(void)
         }
 #endif
         applyConfig(-1, -1, 1);
+    }
+
+    return (result == DIA_RESULT_PREV || result == DIA_RESULT_NEXT) ? result : 0;
+}
+
+static int guiSettingsSkipID(int id, const int *skipIDs, int skipCount)
+{
+    int i;
+
+    for (i = 0; i < skipCount; i++) {
+        if (id == skipIDs[i])
+            return 1;
+    }
+    return 0;
+}
+
+static struct UIItem *guiSettingsCompose(const struct UIItem *const *parts, int partCount,
+                                         const int *skipIDs, int skipCount)
+{
+    int part, i;
+    int count = 0;
+
+    for (part = 0; part < partCount; part++) {
+        for (i = 0; parts[part][i].type != UI_TERMINATOR; i++) {
+            const struct UIItem *item = &parts[part][i];
+
+            // Each source definition owns its own OK row. A composite screen has one shared
+            // commit point, while feature buttons and section headings remain intact.
+            if (item->type == UI_OK || guiSettingsSkipID(item->id, skipIDs, skipCount))
+                continue;
+            if (count >= SETTINGS_DIALOG_CAPACITY - 3)
+                return NULL;
+            guiSettingsDialog[count++] = *item;
+        }
+    }
+
+    guiSettingsDialog[count++] = (struct UIItem){UI_OK, 0, 1, 1, -1, 0, 0, {.label = {NULL, _STR_OK}}};
+    guiSettingsDialog[count++] = (struct UIItem){UI_BREAK};
+    guiSettingsDialog[count] = (struct UIItem){UI_TERMINATOR};
+    guiSettingsActiveDialog = guiSettingsDialog;
+    return guiSettingsDialog;
+}
+
+static int guiSettingsIsPeerResult(int result)
+{
+    return result == DIA_RESULT_PREV || result == DIA_RESULT_NEXT;
+}
+
+static int guiSettingsGeneralUpdater(int modified)
+{
+    int showAutoStartLast;
+
+    if (modified) {
+        diaGetInt(guiSettingsActiveDialog, CFG_LASTPLAYED, &showAutoStartLast);
+        diaSetVisible(guiSettingsActiveDialog, CFG_LBL_AUTOSTARTLAST, showAutoStartLast);
+        diaSetVisible(guiSettingsActiveDialog, CFG_AUTOSTARTLAST, showAutoStartLast);
+    }
+    return 0;
+}
+
+static int guiSettingsShowGeneral(void)
+{
+    const struct UIItem *parts[] = {diaConfig, diaSecurityConfig, diaAdvancedConfig};
+    struct UIItem *ui = guiSettingsCompose(parts, 3, NULL, 0);
+    int result;
+
+    if (ui == NULL)
+        return 0;
+
+    diaSetShowDefaultWhenEmpty(ui, CFG_EXITTO, 1);
+    diaSetString(ui, CFG_EXITTO, gExitPath);
+    diaSetShowDefaultWhenEmpty(ui, CFG_CUSTOMCFGPATH, 1);
+    diaSetString(ui, CFG_CUSTOMCFGPATH, gCustomSettingsPath);
+    diaSetInt(ui, CFG_LASTPLAYED, gRememberLastPlayed);
+    diaSetInt(ui, CFG_FOLDERNAV, gEnableFolderNav);
+    diaSetInt(ui, CFG_AUTOSTARTLAST, gAutoStartLastPlayed);
+    diaSetVisible(ui, CFG_AUTOSTARTLAST, gRememberLastPlayed);
+    diaSetVisible(ui, CFG_LBL_AUTOSTARTLAST, gRememberLastPlayed);
+    diaSetInt(ui, CFG_ENWRITEOP, gEnableWrite);
+    diaSetInt(ui, CFG_DEBUG, gEnableDebug);
+
+reshow_general:
+    result = diaExecuteDialog(ui, -1, 1, &guiSettingsGeneralUpdater);
+    if (result == SECURITY_PARENTAL_BUTTON) {
+        guiShowParentalLockConfig();
+        goto reshow_general;
+    }
+    if (result == ADV_PREFIX_BUTTON) {
+        guiShowPathPrefixConfig();
+        goto reshow_general;
+    }
+    if (result == ADV_STORAGE_BUTTON) {
+        guiShowStorageConfig();
+        goto reshow_general;
+    }
+
+    if (result != UIID_BTN_CANCEL && result != -1) {
+        diaGetString(ui, CFG_EXITTO, gExitPath, sizeof(gExitPath));
+        diaGetString(ui, CFG_CUSTOMCFGPATH, gCustomSettingsPath, sizeof(gCustomSettingsPath));
+        diaGetInt(ui, CFG_LASTPLAYED, &gRememberLastPlayed);
+        diaGetInt(ui, CFG_FOLDERNAV, &gEnableFolderNav);
+        diaGetInt(ui, CFG_AUTOSTARTLAST, &gAutoStartLastPlayed);
+        diaGetInt(ui, CFG_ENWRITEOP, &gEnableWrite);
+        diaGetInt(ui, CFG_DEBUG, &gEnableDebug);
+
+        DisableCron = 1;
+        applyConfig(-1, -1, 0);
+        menuReinitMainMenu();
+    }
+
+    guiSettingsActiveDialog = NULL;
+    return guiSettingsIsPeerResult(result) ? result : 0;
+}
+
+static int guiSettingsShowSources(void)
+{
+    const struct UIItem *parts[] = {diaDeviceConfig, diaMmceConfig};
+    const char *deviceNames[] = {_l(_STR_BDM_GAMES), _l(_STR_NET_GAMES), _l(_STR_HDD_GAMES), _l(_STR_APPS), _l(_STR_MMCE), _l(_STR_FAV), NULL};
+    const char *deviceModes[] = {_l(_STR_OFF), _l(_STR_MANUAL), _l(_STR_AUTO), NULL};
+    const char *deviceSlots[] = {"0", "1", _l(_STR_AUTO), NULL};
+    const char *deviceIGRSlots[] = {"NONE", "0", "1", "BOTH", NULL};
+    struct UIItem *ui = guiSettingsCompose(parts, 2, NULL, 0);
+    int deviceModeIndex;
+    int result;
+
+    if (ui == NULL)
+        return 0;
+
+    diaSetEnum(ui, CFG_DEFDEVICE, deviceNames);
+    diaSetEnum(ui, CFG_BDMMODE, deviceModes);
+    diaSetEnum(ui, CFG_HDDMODE, deviceModes);
+    diaSetEnum(ui, CFG_APPMODE, deviceModes);
+    diaSetEnum(ui, CFG_FAVMODE, deviceModes);
+    deviceModeIndex = guiIoModeToDeviceType(gDefaultDevice);
+    diaSetInt(ui, CFG_DEFDEVICE, deviceModeIndex);
+    diaSetInt(ui, CFG_BDMMODE, gBDMStartMode);
+    diaSetInt(ui, CFG_HDDMODE, gHDDStartMode);
+    diaSetInt(ui, CFG_APPMODE, gAPPStartMode);
+    diaSetInt(ui, CFG_FAVMODE, gFAVStartMode);
+    diaSetInt(ui, CFG_ENABLEUSB, gEnableUSB);
+    diaSetInt(ui, CFG_ENABLEILK, gEnableILK);
+    diaSetInt(ui, CFG_ENABLEMX4SIO, gEnableMX4SIO);
+    diaSetInt(ui, CFG_ENABLEBDMHDD, gEnableBdmHDD);
+    diaSetEnabled(ui, CFG_ENABLEBDMHDD, 1);
+    diaSetEnabled(ui, CFG_HDDMODE, 1);
+    diaSetEnum(ui, CFG_NETSTART, deviceModes);
+    diaSetInt(ui, CFG_NETSTART, gNetStartMode);
+    diaSetEnum(ui, CFG_MMCEMODE, deviceModes);
+    diaSetInt(ui, CFG_MMCEMODE, gMMCEStartMode);
+    diaSetEnabled(ui, CFG_MMCEMODE, 1);
+    diaSetEnum(ui, CFG_MMCESLOT, deviceSlots);
+    diaSetInt(ui, CFG_MMCESLOT, gMMCESlot);
+    diaSetEnum(ui, CFG_MMCEIGRSLOT, deviceIGRSlots);
+    diaSetInt(ui, CFG_MMCEIGRSLOT, gMMCEIGRSlot);
+    diaSetInt(ui, CFG_MMCEGAMEID, gMMCEEnableGameID);
+
+reshow_sources:
+    result = diaExecuteDialog(ui, -1, 1, NULL);
+    if (result == MMCE_COMM_BUTTON) {
+        guiShowMmceCommConfig();
+        goto reshow_sources;
+    }
+    if (result == MMCE_PATH_BUTTON) {
+        guiShowMmcePathConfig();
+        goto reshow_sources;
+    }
+
+    if (result != UIID_BTN_CANCEL && result != -1) {
+        int netProtocolWas = gNetworkProtocol;
+
+        diaGetInt(ui, CFG_DEFDEVICE, &deviceModeIndex);
+        gDefaultDevice = guiDeviceTypeToIoMode(deviceModeIndex);
+        diaGetInt(ui, CFG_BDMMODE, &gBDMStartMode);
+        diaGetInt(ui, CFG_HDDMODE, &gHDDStartMode);
+        diaGetInt(ui, CFG_APPMODE, &gAPPStartMode);
+        diaGetInt(ui, CFG_MMCEMODE, &gMMCEStartMode);
+        diaGetInt(ui, CFG_FAVMODE, &gFAVStartMode);
+        diaGetInt(ui, CFG_ENABLEUSB, &gEnableUSB);
+        diaGetInt(ui, CFG_ENABLEILK, &gEnableILK);
+        diaGetInt(ui, CFG_ENABLEMX4SIO, &gEnableMX4SIO);
+        diaGetInt(ui, CFG_ENABLEBDMHDD, &gEnableBdmHDD);
+        diaGetInt(ui, CFG_NETSTART, &gNetStartMode);
+        diaGetInt(ui, CFG_MMCESLOT, &gMMCESlot);
+        diaGetInt(ui, CFG_MMCEIGRSLOT, &gMMCEIGRSlot);
+        diaGetInt(ui, CFG_MMCEGAMEID, &gMMCEEnableGameID);
+
+        if (gNetworkProtocol == NET_PROTO_OFF)
+            gNetworkProtocol = NET_PROTO_SMB;
+        gEnableUDPBD = (gNetworkProtocol == NET_PROTO_UDPBD || gNetworkProtocol == NET_PROTO_UDPFSBD);
+        gNetBootProtocol = (gNetworkProtocol == NET_PROTO_UDPFSBD) ? NET_BOOT_UDPFS : NET_BOOT_UDPBD;
+        gETHStartMode = (gNetworkProtocol == NET_PROTO_SMB) ? gNetStartMode : START_MODE_DISABLED;
+
+        if (gNetworkProtocol != netProtocolWas) {
+            if (gNetworkProtocol == NET_PROTO_UDPFS)
+                guiMsgBox(_l(_STR_NET_UDPFS_TAB_HINT), 0, NULL);
+            else if (gNetworkProtocol == NET_PROTO_UDPFSBD || gNetworkProtocol == NET_PROTO_UDPBD)
+                guiMsgBox(_l(_STR_NET_UDPBD_TAB_HINT), 0, NULL);
+        }
+        if (gNetworkProtocol != netProtocolWas && guiNetProtocolNeedsRestart())
+            guiMsgBox(_l(_STR_NETBOOT_RESTART), 0, NULL);
+
+        bdmForceDeviceRefresh();
+        applyConfig(-1, -1, 0);
+        menuReinitMainMenu();
+    }
+
+    guiSettingsActiveDialog = NULL;
+    return guiSettingsIsPeerResult(result) ? result : 0;
+}
+
+static int guiSettingsDisplayUpdater(int modified)
+{
+    int temp, x, y;
+
+    if (!modified)
+        return 0;
+
+    diaGetInt(guiSettingsActiveDialog, UICFG_XOFF, &x);
+    diaGetInt(guiSettingsActiveDialog, UICFG_YOFF, &y);
+    if (x != gXOff || y != gYOff) {
+        gXOff = x;
+        gYOff = y;
+        rmSetDisplayOffset(x, y);
+    }
+    diaGetInt(guiSettingsActiveDialog, UICFG_OVERSCAN, &temp);
+    if (temp != gOverscan) {
+        gOverscan = temp;
+        rmSetOverscan(gOverscan);
+        guiUpdateScreenScale();
+    }
+    diaGetInt(guiSettingsActiveDialog, UICFG_WIDESCREEN, &temp);
+    if (temp != gWideScreen) {
+        gWideScreen = temp;
+        rmSetAspectRatio((gWideScreen == 0) ? RM_ARATIO_4_3 : RM_ARATIO_16_9);
+        guiUpdateScreenScale();
+    }
+    return 0;
+}
+
+static int guiSettingsShowInterface(void)
+{
+    const struct UIItem *parts[] = {diaUIConfig, diaDisplayConfig};
+    const char *gameViewNames[] = {"Both", "ISO", "VCD", NULL};
+    const char *vmodeNames[] = {_l(_STR_AUTO), "PAL 640x512i @50Hz 24bit", "NTSC 640x448i @60Hz 24bit",
+                                "EDTV 640x448p @60Hz 24bit", "EDTV 640x512p @50Hz 24bit", "VGA 640x480p @60Hz 24bit",
+                                "PAL 704x576i @50Hz 24bit (HIRES)", "NTSC 704x480i @60Hz 24bit (HIRES)",
+                                "EDTV 704x480p @60Hz 24bit (HIRES)", "EDTV 704x576p @50Hz 24bit (HIRES)",
+                                "HDTV 1280x720p @60Hz 16bit (HIRES)", "HDTV 1920x1080i @60Hz 16bit (HIRES)",
+                                "PAL 640x256p @50Hz 24bit", "NTSC 640x224p @60Hz 24bit", NULL};
+    struct UIItem *ui = guiSettingsCompose(parts, 2, NULL, 0);
+    const char **themeNamesSnap = NULL;
+    const char **langNamesSnap = NULL;
+    int themeID, langID, previousTheme, previousVMode, result;
+    int gameViewChanged = 0;
+
+    if (ui == NULL)
+        return 0;
+
+    showCfgPopup = 0;
+    guiResetNotifications();
+    previousTheme = thmGetGuiValue();
+    previousVMode = gVMode;
+
+    guiLock();
+    themeNamesSnap = guiCopyNameList((const char **)thmGetGuiList());
+    langNamesSnap = guiCopyNameList((const char **)lngGetGuiList());
+    guiUnlock();
+    diaSetEnum(ui, UICFG_THEME, themeNamesSnap != NULL ? themeNamesSnap : (const char **)thmGetGuiList());
+    diaSetEnum(ui, UICFG_LANG, langNamesSnap != NULL ? langNamesSnap : (const char **)lngGetGuiList());
+    diaSetEnum(ui, UICFG_GAMEVIEW, gameViewNames);
+    diaSetEnum(ui, UICFG_VMODE, vmodeNames);
+    diaSetInt(ui, UICFG_THEME, thmGetGuiValue());
+    diaSetInt(ui, UICFG_LANG, lngGetGuiValue());
+    diaSetInt(ui, UICFG_GAMEVIEW, gDefaultGameView);
+    diaSetInt(ui, UICFG_AUTOSORT, gAutosort);
+    diaSetInt(ui, UICFG_AUTOREFRESH, gAutoRefresh);
+    diaSetInt(ui, UICFG_NOTIFICATIONS, gEnableNotifications);
+    diaSetVisible(ui, UICFG_COVERFLOW_BUTTON, gTheme->coverflow != NULL);
+    diaSetInt(ui, UICFG_VMODE, gVMode);
+    diaSetInt(ui, UICFG_WIDESCREEN, gWideScreen);
+    diaSetInt(ui, UICFG_XOFF, gXOff);
+    diaSetInt(ui, UICFG_YOFF, gYOff);
+    diaSetInt(ui, UICFG_OVERSCAN, gOverscan);
+    diaSetInt(ui, CFG_APPLYGAMEID, gApplyGameID);
+reshow_interface:
+    result = diaExecuteDialog(ui, -1, 1, &guiSettingsDisplayUpdater);
+    if (result == UICFG_ARTWORK_BUTTON) {
+        guiShowArtworkConfig();
+        goto reshow_interface;
+    }
+    if (result == UICFG_COVERFLOW_BUTTON) {
+        guiShowCoverflowConfig();
+        goto reshow_interface;
+    }
+    if (result == UICFG_COLORS_BUTTON) {
+        guiShowColorsConfig();
+        goto reshow_interface;
+    }
+    if (result == DISPLAY_GSM_DEFAULTS_BUTTON) {
+        guiGameShowGSConfig(1);
+        goto reshow_interface;
+    }
+
+    padRumbleFlush();
+    if (result != UIID_BTN_CANCEL && result != -1) {
+        diaGetInt(ui, UICFG_LANG, &langID);
+        diaGetInt(ui, UICFG_THEME, &themeID);
+        diaGetInt(ui, UICFG_AUTOSORT, &gAutosort);
+        diaGetInt(ui, UICFG_AUTOREFRESH, &gAutoRefresh);
+        diaGetInt(ui, UICFG_NOTIFICATIONS, &gEnableNotifications);
+        {
+            int previousGameView = gDefaultGameView;
+            diaGetInt(ui, UICFG_GAMEVIEW, &gDefaultGameView);
+            gameViewChanged = gDefaultGameView != previousGameView;
+            if (gameViewChanged)
+                vcdMarkAllDirty();
+        }
+        diaGetInt(ui, UICFG_VMODE, &gVMode);
+        diaGetInt(ui, UICFG_WIDESCREEN, &gWideScreen);
+        diaGetInt(ui, UICFG_XOFF, &gXOff);
+        diaGetInt(ui, UICFG_YOFF, &gYOff);
+        diaGetInt(ui, UICFG_OVERSCAN, &gOverscan);
+        diaGetInt(ui, CFG_APPLYGAMEID, &gApplyGameID);
+
+        if (previousTheme != themeID && isBgmPlaying())
+            bgmStop();
+        applyConfig(themeID, langID, 1);
+        if (gameViewChanged) {
+            oplQueueVcdDeviceUpdates();
+            loadFavourites();
+        }
+        sfxInit(0);
+        if (gEnableBGM && !isBgmPlaying())
+            bgmStart();
+
+        if (previousVMode != gVMode && guiConfirmVideoMode() == 0) {
+            gVMode = previousVMode;
+            applyConfig(-1, -1, 1);
+        }
+    }
+
+    guiFreeNameList(themeNamesSnap);
+    guiFreeNameList(langNamesSnap);
+    guiSettingsActiveDialog = NULL;
+    return guiSettingsIsPeerResult(result) ? result : 0;
+}
+
+static int guiSettingsLaunchUpdater(int modified)
+{
+    int neutrinoVideoDef;
+
+    if (modified) {
+        diaGetInt(guiSettingsActiveDialog, CFG_NEUTRINO_VIDEO, &neutrinoVideoDef);
+        diaSetEnabled(guiSettingsActiveDialog, CFG_NEUTRINO_GSMCOMP, neutrinoVideoDef != 0);
+    }
+    return 0;
+}
+
+static int guiSettingsShowLaunch(void)
+{
+    const struct UIItem *parts[] = {diaLaunchConfig, diaNeutrinoDefaults};
+    const int skipIDs[] = {LAUNCH_NEUTRINO_DEFAULTS_BUTTON};
+    const char *defaultCoreStrs[] = {"<OPL>", "Neutrino", NULL};
+    const char *neutrinoDevStrs[] = {_l(_STR_AUTO), "Memory Card", "USB", "MX4SIO", "MMCE", "HDD (exFAT)", "HDD (APA)", _l(_STR_GAMES_DEVICE), NULL};
+    static const char *neutrinoVideoDefStrs[] = {"Off", "240p", "480p", "1080i x1", "1080i x2", "1080i x3", NULL};
+    static const char *neutrinoGsmCompDefStrs[] = {"Off", "Type 1 (GSM/OPL)", "Type 2", "Type 3", NULL};
+    struct UIItem *ui = guiSettingsCompose(parts, 2, skipIDs, 1);
+    int result;
+
+    if (ui == NULL)
+        return 0;
+
+    diaSetEnum(ui, CFG_DEFAULT_CORE, defaultCoreStrs);
+    diaSetInt(ui, CFG_DEFAULT_CORE, gDefaultCoreLoader);
+    diaSetInt(ui, CFG_PS2LOGO, gPS2Logo);
+    diaSetEnum(ui, CFG_NEUTRINO_DEVICE, neutrinoDevStrs);
+    diaSetInt(ui, CFG_NEUTRINO_DEVICE, gNeutrinoDevice);
+    diaSetEnum(ui, CFG_NEUTRINO_VIDEO, neutrinoVideoDefStrs);
+    diaSetInt(ui, CFG_NEUTRINO_VIDEO, gNeutrinoVideoDefault);
+    diaSetEnum(ui, CFG_NEUTRINO_GSMCOMP, neutrinoGsmCompDefStrs);
+    diaSetInt(ui, CFG_NEUTRINO_GSMCOMP, gNeutrinoGsmCompDefault);
+    diaSetEnabled(ui, CFG_NEUTRINO_GSMCOMP, gNeutrinoVideoDefault != 0);
+
+reshow_launch:
+    result = diaExecuteDialog(ui, -1, 1, &guiSettingsLaunchUpdater);
+    if (result == LAUNCH_OSD_DEFAULTS_BUTTON) {
+        guiGameShowOSDLanguageConfig(1);
+        goto reshow_launch;
+    }
+    if (result == CFG_NEUTRINO_ARGS) {
+        guiShowNeutrinoArgsConfig(gNeutrinoArgs, sizeof(gNeutrinoArgs));
+        goto reshow_launch;
+    }
+
+    if (result != UIID_BTN_CANCEL && result != -1) {
+        diaGetInt(ui, CFG_DEFAULT_CORE, &gDefaultCoreLoader);
+        diaGetInt(ui, CFG_PS2LOGO, &gPS2Logo);
+        diaGetInt(ui, CFG_NEUTRINO_DEVICE, &gNeutrinoDevice);
+        diaGetInt(ui, CFG_NEUTRINO_VIDEO, &gNeutrinoVideoDefault);
+        diaGetInt(ui, CFG_NEUTRINO_GSMCOMP, &gNeutrinoGsmCompDefault);
+        applyConfig(-1, -1, 0);
+        menuReinitMainMenu();
+    }
+
+    guiSettingsActiveDialog = NULL;
+    return guiSettingsIsPeerResult(result) ? result : 0;
+}
+
+static int guiSettingsVcdUpdater(int modified)
+{
+    int popsDev;
+
+    if (modified) {
+        diaGetInt(guiSettingsActiveDialog, CFG_POPSTARTER_DEVICE, &popsDev);
+        diaSetVisible(guiSettingsActiveDialog, CFG_LBL_POPSTARTER_PATH, popsDev == POPS_DEV_CUSTOM);
+        diaSetVisible(guiSettingsActiveDialog, CFG_POPSTARTER_PATH, popsDev == POPS_DEV_CUSTOM);
+    }
+    return 0;
+}
+
+static int guiSettingsShowPopstarter(void)
+{
+    const struct UIItem *parts[] = {diaVcdConfig, diaVcdListConfig};
+    const int skipIDs[] = {VCD_LIST_BUTTON};
+    const char *popsDevStrs[] = {_l(_STR_DEFAULT), "Memory Card", "USB", "MX4SIO", "MMCE", "HDD (exFAT)", "HDD (APA)", "Custom", _l(_STR_GAMES_DEVICE), NULL};
+    struct UIItem *ui = guiSettingsCompose(parts, 2, skipIDs, 1);
+    int result;
+
+    if (ui == NULL)
+        return 0;
+
+    diaSetEnum(ui, CFG_POPSTARTER_DEVICE, popsDevStrs);
+    diaSetInt(ui, CFG_POPSTARTER_DEVICE, gPopstarterDevice);
+    diaSetString(ui, CFG_POPSTARTER_PATH, gPopstarterPath);
+    diaSetShowDefaultWhenEmpty(ui, CFG_POPSTARTER_PATH, 1);
+    diaSetInt(ui, CFG_POPSTARTER_RETROGEM_GAMEID, gPopstarterRetroGemGameID);
+    diaSetVisible(ui, CFG_LBL_POPSTARTER_PATH, gPopstarterDevice == POPS_DEV_CUSTOM);
+    diaSetVisible(ui, CFG_POPSTARTER_PATH, gPopstarterDevice == POPS_DEV_CUSTOM);
+    diaSetInt(ui, CFG_VCD_HIDE_GAMEID, gVcdHideGameId);
+    diaSetInt(ui, CFG_VCD_FIRST_DISC_ONLY, gVcdFirstDiscOnly);
+    diaSetInt(ui, CFG_VCD_SHOW_PP_POPS, gVcdShowPpPops);
+
+reshow_popstarter:
+    result = diaExecuteDialog(ui, -1, 1, &guiSettingsVcdUpdater);
+    if (result == VCD_BDMA_BUTTON) {
+        guiShowBdmaConfig();
+        goto reshow_popstarter;
+    }
+    if (result == VCD_NET_BUTTON) {
+        guiShowPopsNetConfig();
+        goto reshow_popstarter;
+    }
+
+    if (result != UIID_BTN_CANCEL && result != -1) {
+        int rebuildVcdLists = 0;
+        int previousHideGameId = gVcdHideGameId;
+        int previousFirstDiscOnly = gVcdFirstDiscOnly;
+        int previousShowPpPops = gVcdShowPpPops;
+        char tmpPop[sizeof(gPopstarterPath)];
+
+        diaGetInt(ui, CFG_POPSTARTER_DEVICE, &gPopstarterDevice);
+        diaGetInt(ui, CFG_POPSTARTER_RETROGEM_GAMEID, &gPopstarterRetroGemGameID);
+        diaGetString(ui, CFG_POPSTARTER_PATH, tmpPop, sizeof(tmpPop));
+        if (strncmp(tmpPop, gPopstarterPath, 31) != 0)
+            snprintf(gPopstarterPath, sizeof(gPopstarterPath), "%s", tmpPop);
+        diaGetInt(ui, CFG_VCD_HIDE_GAMEID, &gVcdHideGameId);
+        diaGetInt(ui, CFG_VCD_FIRST_DISC_ONLY, &gVcdFirstDiscOnly);
+        diaGetInt(ui, CFG_VCD_SHOW_PP_POPS, &gVcdShowPpPops);
+
+        if (gVcdHideGameId != previousHideGameId) {
+            vcdMarkAllDirty();
+            rebuildVcdLists = 1;
+        }
+        if (gVcdFirstDiscOnly != previousFirstDiscOnly) {
+            vcdMarkAllDirty();
+            hddVcdInvalidateCache();
+            rebuildVcdLists = 1;
+        }
+        if (gVcdShowPpPops != previousShowPpPops) {
+            vcdMarkAllDirty();
+            hddVcdInvalidateCache();
+            rebuildVcdLists = 1;
+        }
+
+        applyConfig(-1, -1, 0);
+        menuReinitMainMenu();
+        if (rebuildVcdLists)
+            oplQueueVcdDeviceUpdates();
+    }
+
+    guiSettingsActiveDialog = NULL;
+    return guiSettingsIsPeerResult(result) ? result : 0;
+}
+
+enum gui_settings_page {
+    SETTINGS_GENERAL = 0,
+    SETTINGS_SOURCES,
+    SETTINGS_NETWORK,
+    SETTINGS_INTERFACE,
+    SETTINGS_LAUNCH,
+    SETTINGS_POPSTARTER,
+    SETTINGS_CONTROLLERS,
+    SETTINGS_AUDIO,
+    SETTINGS_PAGE_COUNT
+};
+
+void guiShowSettings(void)
+{
+    int page = SETTINGS_GENERAL;
+    int result;
+
+    while (1) {
+        switch (page) {
+            case SETTINGS_GENERAL:
+                result = guiSettingsShowGeneral();
+                break;
+            case SETTINGS_SOURCES:
+                result = guiSettingsShowSources();
+                break;
+            case SETTINGS_NETWORK:
+                result = guiShowNetConfig();
+                break;
+            case SETTINGS_INTERFACE:
+                result = guiSettingsShowInterface();
+                break;
+            case SETTINGS_LAUNCH:
+                result = guiSettingsShowLaunch();
+                break;
+            case SETTINGS_POPSTARTER:
+                result = guiSettingsShowPopstarter();
+                break;
+            case SETTINGS_CONTROLLERS:
+                result = guiShowControllerConfig();
+                break;
+            case SETTINGS_AUDIO:
+                result = guiShowAudioConfig();
+                break;
+            default:
+                return;
+        }
+
+        if (result == DIA_RESULT_NEXT)
+            page = (page + 1) % SETTINGS_PAGE_COUNT;
+        else if (result == DIA_RESULT_PREV)
+            page = (page + SETTINGS_PAGE_COUNT - 1) % SETTINGS_PAGE_COUNT;
+        else
+            return;
     }
 }
 

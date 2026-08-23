@@ -129,11 +129,12 @@ void guiShowNetCompatUpdateSingle(int id, item_list_t *support, config_set_t *co
 void guiShowAbout();
 void guiShowConfig();
 void guiShowUIConfig();
+void guiShowSettings(void);
 // Settings-layout category pages (rebuild step 06)
 void guiShowDeviceConfig(void);
 void guiShowDisplayConfig(void);
 void guiShowLaunchConfig(void);
-void guiShowControllerConfig(void);
+int guiShowControllerConfig(void);
 void guiShowSecurityConfig(void);
 void guiShowAdvancedConfig(void);
 void guiShowPathPrefixConfig(void);
@@ -150,9 +151,8 @@ int guiDeviceTypeToIoMode(int deviceType);
 int guiIoModeToDeviceType(int ioMode);
 void guiShowNeutrinoDefaults(void);
 void guiShowNeutrinoArgsConfig(char *argsBuf, int bufSize);
-void guiShowAudioConfig();
-void guiShowControllerConfig();
-void guiShowNetConfig();
+int guiShowAudioConfig(void);
+int guiShowNetConfig(void);
 
 // The network protocol the NIC is ACTUALLY running right now, as a NET_PROTO_* value, derived from
 // which IOP stack is resident -- NET_PROTO_OFF when none is. gNetworkProtocol is only ever written
