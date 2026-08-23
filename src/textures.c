@@ -44,11 +44,11 @@ extern void *start_png;
 /* currently unused.
 extern void *up_png;
 extern void *down_png;
-extern void *L1_png;
 extern void *L2_png;
-extern void *R1_png;
 extern void *R2_png; */
+extern void *L1_png;
 extern void *L3_png;
+extern void *R1_png;
 extern void *R3_png;
 extern void *fav_png;
 extern void *fav_mark_png;
@@ -187,13 +187,6 @@ static texture_t internalDefault[TEXTURES_COUNT] = {
     {SQUARE_ICON, "square", &square_png},
     {SELECT_ICON, "select", &select_png},
     {START_ICON, "start", &start_png},
-    /* currently unused.
-    {UP_ICON, "up", &up_png},
-    {DOWN_ICON, "down", &down_png},
-    {L1_ICON, "L1", &L1_png},
-    {L2_ICON, "L2", &L2_png},
-    {R1_ICON, "R1", &R1_png},
-    {R2_ICON, "R2", &R2_png}, */
     {L3_ICON, "L3", &L3_png},
     {R3_ICON, "R3", &R3_png},
     {FAV_ICON, "fav", &fav_png},
@@ -275,6 +268,8 @@ static texture_t internalDefault[TEXTURES_COUNT] = {
     {PS2_SYSTEM, "PS2", &PS2_png},
     {CASE_OVERLAY2, "case_overlay", &case_overlay_png}, // b2 foliage layer (two-layer frame)
     {UDPFS_ICON, "udp_fs", &udp_fs_png},
+    {L1_ICON, "L1", &L1_png},
+    {R1_ICON, "R1", &R1_png},
 };
 
 int texLookupInternalTexId(const char *name)

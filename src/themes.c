@@ -2845,6 +2845,11 @@ static int thmLoad(const char *themePath)
     for (i = L3_ICON; i <= FAV_MARK; i++)
         thmLoadResource(&newT->textures[i], i, themePath, GS_PSM_CT32, newT->useDefault);
 
+    // L1/R1 are used by the Settings peer-page footer. They are kept outside the L3..FAV_MARK
+    // range so the existing texture IDs and theme loading range remain stable.
+    thmLoadResource(&newT->textures[L1_ICON], L1_ICON, themePath, GS_PSM_CT32, newT->useDefault);
+    thmLoadResource(&newT->textures[R1_ICON], R1_ICON, themePath, GS_PSM_CT32, newT->useDefault);
+
     // Embedded attribute glyphs (#Format/#Media/Aspect/Rating/Scan/Vmode values): BUILT-IN theme
     // ONLY. a1ae5e5e decoded these for every theme so badges could fall back to them on disk themes
     // -- but the fallback fires on every frame BEFORE the theme's own glyph PNG has loaded off the

@@ -118,6 +118,8 @@ enum INTERNAL_TEXTURE {
     CASE_OVERLAY2,
     // UDPFS network-boot device icon (theme override "udp_fs", embedded udp_fs_png); UDPBD uses UDP_ICON
     UDPFS_ICON,
+    L1_ICON, // Settings peer-page navigation hint
+    R1_ICON, // Settings peer-page navigation hint
 
     TEXTURES_COUNT
 };

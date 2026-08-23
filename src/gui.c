@@ -2192,6 +2192,11 @@ static struct UIItem *guiSettingsCompose(const struct UIItem *const *parts, int 
                     skipTrailingBreak = 1;
                 continue;
             }
+            // Secondary settings sections already have their own colored heading. The source
+            // dialog's title underline is useful when shown alone, but becomes a redundant empty
+            // row when the section is composed into the Settings peer page.
+            if (part > 0 && item->type == UI_SPLITTER && count > 0 && guiSettingsDialog[count - 1].type == UI_HEADER)
+                continue;
             if (count >= SETTINGS_DIALOG_CAPACITY - 3)
                 return NULL;
             guiSettingsDialog[count++] = *item;
@@ -2220,7 +2225,7 @@ static int guiSettingsPageResult(int result)
         return result;
 
     // Both confirmation and cancel finish the current peer page at the Settings Index. Circle
-    // from the Index itself still returns to the main menu because the Index has its own dialog.
+    // from the Index itself is handled by guiSettingsShowIndex and returns to the main menu.
     return (result == UIID_BTN_OK || result == UIID_BTN_CANCEL) ? DIA_RESULT_INDEX : 0;
 }
 
@@ -2706,44 +2711,57 @@ enum gui_settings_page {
     SETTINGS_PAGE_COUNT
 };
 
-#define SETTINGS_INDEX_PAGE_BASE 1000
-
 static int guiSettingsShowIndex(int *page)
 {
-    struct UIItem indexDialog[] = {
-        {UI_HEADER, 0, 1, 1, -1, 0, 0, {.label = {"SETTINGS INDEX", -1}}},
-        {UI_SPLITTER},
-        {UI_BUTTON, SETTINGS_INDEX_PAGE_BASE + SETTINGS_GENERAL, 1, 1, -1, 0, 0, {.label = {"General & System", -1}}},
-        {UI_BREAK},
-        {UI_BUTTON, SETTINGS_INDEX_PAGE_BASE + SETTINGS_SOURCES, 1, 1, -1, 0, 0, {.label = {NULL, _STR_GAME_SOURCES}}},
-        {UI_BREAK},
-        {UI_BUTTON, SETTINGS_INDEX_PAGE_BASE + SETTINGS_NETWORK, 1, 1, -1, 0, 0, {.label = {NULL, _STR_MENU_NETWORK}}},
-        {UI_BREAK},
-        {UI_BUTTON, SETTINGS_INDEX_PAGE_BASE + SETTINGS_INTERFACE, 1, 1, -1, 0, 0, {.label = {NULL, _STR_INTERFACE_SETTINGS}}},
-        {UI_BREAK},
-        {UI_BUTTON, SETTINGS_INDEX_PAGE_BASE + SETTINGS_LAUNCH, 1, 1, -1, 0, 0, {.label = {NULL, _STR_GAME_LAUNCHING}}},
-        {UI_BREAK},
-        {UI_BUTTON, SETTINGS_INDEX_PAGE_BASE + SETTINGS_POPSTARTER, 1, 1, -1, 0, 0, {.label = {NULL, _STR_POPSTARTER}}},
-        {UI_BREAK},
-        {UI_BUTTON, SETTINGS_INDEX_PAGE_BASE + SETTINGS_CONTROLLERS, 1, 1, -1, 0, 0, {.label = {NULL, _STR_CONTROLLER_SETTINGS}}},
-        {UI_BREAK},
-        {UI_BUTTON, SETTINGS_INDEX_PAGE_BASE + SETTINGS_AUDIO, 1, 1, -1, 0, 0, {.label = {NULL, _STR_AUDIO_SETTINGS}}},
-        {UI_BREAK},
-        {UI_TERMINATOR},
+    const char *labels[SETTINGS_PAGE_COUNT] = {
+        "General & System",
+        _l(_STR_GAME_SOURCES),
+        _l(_STR_MENU_NETWORK),
+        _l(_STR_INTERFACE_SETTINGS),
+        _l(_STR_GAME_LAUNCHING),
+        _l(_STR_POPSTARTER),
+        _l(_STR_CONTROLLER_SETTINGS),
+        _l(_STR_AUDIO_SETTINGS),
     };
-    int result;
+    int selected = *page;
+    int spacing = 25;
+    int y;
 
-    // Re-open the index on the current peer page when Triangle is pressed from a settings page.
-    // The initial Settings entry starts with General & System selected. Center the index entries
-    // to match the main menu's category list while retaining the dialog's focus/navigation logic.
-    diaSetCenteredDialog(indexDialog);
-    result = diaExecuteDialog(indexDialog, SETTINGS_INDEX_PAGE_BASE + *page, 1, NULL);
-    diaSetCenteredDialog(NULL);
-    if (result < SETTINGS_INDEX_PAGE_BASE || result >= SETTINGS_INDEX_PAGE_BASE + SETTINGS_PAGE_COUNT)
-        return 0;
+    // This is intentionally rendered with the same geometry and highlight treatment as the main
+    // menu. The Index is the Settings hub, not another dialog with a focus box around each row.
+    while (1) {
+        guiStartFrame();
+        if (guiDrawBGSettings() == 0)
+            guiDrawBGPlasma();
 
-    *page = result - SETTINGS_INDEX_PAGE_BASE;
-    return 1;
+        fntRenderString(gTheme->fonts[0], screenWidth >> 1, 50, ALIGN_CENTER, 0, 0, "SETTINGS INDEX", gTheme->textColor);
+
+        y = (gTheme->usedHeight >> 1) - (spacing * (SETTINGS_PAGE_COUNT >> 1));
+        for (int i = 0; i < SETTINGS_PAGE_COUNT; i++) {
+            fntRenderString(gTheme->fonts[0], screenWidth >> 1, y, ALIGN_CENTER, 0, 0, labels[i], (i == selected) ? gTheme->selTextColor : gTheme->textColor);
+            y += spacing;
+        }
+
+        // Keep the same Select / Games List prompt and icon ordering as the native Main Menu.
+        guiDrawSubMenuHints();
+        guiEndFrame();
+
+        readPads();
+        if (getKey(KEY_UP)) {
+            sfxPlay(SFX_CURSOR);
+            selected = (selected + SETTINGS_PAGE_COUNT - 1) % SETTINGS_PAGE_COUNT;
+        } else if (getKey(KEY_DOWN)) {
+            sfxPlay(SFX_CURSOR);
+            selected = (selected + 1) % SETTINGS_PAGE_COUNT;
+        } else if (getKeyOn(gSelectButton)) {
+            sfxPlay(SFX_CONFIRM);
+            *page = selected;
+            return 1;
+        } else if (getKeyOn(KEY_START) || getKeyOn(gSelectButton == KEY_CIRCLE ? KEY_CROSS : KEY_CIRCLE)) {
+            sfxPlay(SFX_CANCEL);
+            return 0;
+        }
+    }
 }
 
 void guiShowSettings(void)
@@ -2790,7 +2808,10 @@ void guiShowSettings(void)
         }
 
         if (result == DIA_RESULT_INDEX) {
-            guiSettingsShowIndex(&page);
+            if (!guiSettingsShowIndex(&page)) {
+                guiSettingsShellActive = 0;
+                return;
+            }
         } else if (result == DIA_RESULT_NEXT) {
             page = (page + 1) % SETTINGS_PAGE_COUNT;
         } else if (result == DIA_RESULT_PREV) {

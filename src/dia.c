@@ -17,7 +17,7 @@
 
 // UI spacing of the dialogues (pixels between consecutive items)
 #define UI_SPACING_H          10
-#define UI_SETTINGS_SPACING_H 8
+#define UI_SETTINGS_SPACING_H 10
 #define UI_SPACING_V          2
 // spacer ui element width (simulates tab)
 #define UI_SPACER_WIDTH       50
@@ -39,7 +39,6 @@ static int screenWidth;
 static int screenHeight;
 static struct UIItem *diaSettingsShellUI;
 static const char *diaSettingsIndicator;
-static struct UIItem *diaCenteredUI;
 
 // Utility stuff
 #define KEYB_MODE   2
@@ -692,11 +691,6 @@ void diaSetSettingsShell(struct UIItem *ui, const char *indicator)
     diaSettingsIndicator = indicator;
 }
 
-void diaSetCenteredDialog(struct UIItem *ui)
-{
-    diaCenteredUI = ui;
-}
-
 /// renders whole ui screen (for given dialog setup)
 void diaRenderUI(struct UIItem *ui, short inMenu, struct UIItem *cur, int haveFocus)
 {
@@ -707,42 +701,6 @@ void diaRenderUI(struct UIItem *ui, short inMenu, struct UIItem *cur, int haveFo
     int y0 = 20;
     int settingsShell = (ui == diaSettingsShellUI && diaSettingsIndicator != NULL);
     int spacingH = settingsShell ? UI_SETTINGS_SPACING_H : UI_SPACING_H;
-
-    // The Settings Index is a menu-like dialog. Center its complete content block vertically so
-    // its category list occupies the same visual area as the main menu instead of being pinned to
-    // the dialog's top edge. The normal dialog layout remains unchanged.
-    if (ui == diaCenteredUI) {
-        int measureY = y0;
-        int measureHmax = 0;
-        struct UIItem *measure = ui;
-
-        while (measure->type != UI_TERMINATOR) {
-            if (diaShouldBreakLine(measure)) {
-                if (measureHmax > 0)
-                    measureY += measureHmax + spacingH;
-                measureHmax = 0;
-            }
-
-            int measureH = diaItemHeight(measure, spacingH);
-            if (measureH > measureHmax)
-                measureHmax = measureH;
-
-            if (diaShouldBreakLineAfter(measure)) {
-                if (measureHmax > 0)
-                    measureY += measureHmax + spacingH;
-                measureHmax = 0;
-            }
-
-            measure++;
-        }
-
-        int measureBottom = measureY + measureHmax;
-        if (measureBottom > y0) {
-            int centeredY = (gTheme->usedHeight - (measureBottom - y0)) >> 1;
-            if (centeredY > y0)
-                y0 = centeredY;
-        }
-    }
 
     // render all items (shifted up by the scroll offset for tall dialogs)
     struct UIItem *rc = ui;
@@ -783,12 +741,6 @@ void diaRenderUI(struct UIItem *ui, short inMenu, struct UIItem *cur, int haveFo
             h = rowH;
         } else {
             int renderX = x;
-            if (ui == diaCenteredUI && (rc->type == UI_HEADER || rc->type == UI_BUTTON)) {
-                const char *text = diaGetLocalisedText(rc->label.text, rc->label.stringId);
-                if (text == NULL || text[0] == '\0')
-                    text = _l(_STR_NOT_SET);
-                renderX = (screenWidth - fntCalcDimensions(gTheme->fonts[0], text)) >> 1;
-            }
             diaRenderItem(renderX, y, rc, rc == cur, haveFocus, spacingH, &w, &h);
         }
 
@@ -857,14 +809,21 @@ void diaRenderUI(struct UIItem *ui, short inMenu, struct UIItem *cur, int haveFo
         int uiIcons[3] = {CIRCLE_ICON, CROSS_ICON, TRIANGLE_ICON};
         int uiX = guiAlignSubMenuHints(3, uiHints, uiIcons, gTheme->fonts[0], 12, 2);
 
-        // L1/R1 glyph assets are not part of the available internal texture set, so use compact
-        // controller labels beside the page count instead of adding a new texture dependency.
+        // Use the same controller button textures as the rest of OPL. Do not introduce a text-only
+        // [L1]/[R1] language for Settings; disk themes can override these embedded defaults.
         int pageX = x0;
-        pageX = fntRenderString(gTheme->fonts[0], pageX, uiY + 10, ALIGN_VCENTER, 0, 0, "[L1]", gTheme->textColor);
-        pageX += 12;
+        GSTEXTURE *l1Tex = thmGetTexture(L1_ICON);
+        GSTEXTURE *r1Tex = thmGetTexture(R1_ICON);
+        int l1W = l1Tex ? (l1Tex->Width * 20) / l1Tex->Height : 0;
+        int r1W = r1Tex ? (r1Tex->Width * 20) / r1Tex->Height : 0;
+
+        if (l1Tex && l1Tex->Mem)
+            rmDrawPixmap(l1Tex, pageX, uiY + 10, ALIGN_VCENTER, l1W, 20, SCALING_RATIO, gDefaultCol, 0);
+        pageX += rmWideScale(l1W) + 8;
         pageX = fntRenderString(gTheme->fonts[0], pageX, uiY + 10, ALIGN_VCENTER, 0, 0, diaSettingsIndicator, gTheme->textColor);
-        pageX += 12;
-        fntRenderString(gTheme->fonts[0], pageX, uiY + 10, ALIGN_VCENTER, 0, 0, "[R1]", gTheme->textColor);
+        pageX += 8;
+        if (r1Tex && r1Tex->Mem)
+            rmDrawPixmap(r1Tex, pageX, uiY + 10, ALIGN_VCENTER, r1W, 20, SCALING_RATIO, gDefaultCol, 0);
         uiX = guiDrawIconAndText(gSelectButton == KEY_CIRCLE ? uiIcons[0] : uiIcons[1], uiHints[0], gTheme->fonts[0], uiX, uiY, gTheme->textColor);
         uiX += 12;
         uiX = guiDrawIconAndText(gSelectButton == KEY_CIRCLE ? uiIcons[1] : uiIcons[0], uiHints[1], gTheme->fonts[0], uiX, uiY, gTheme->textColor);

@@ -13,6 +13,19 @@ struct UIItem diaNetConfig[] = {
     {UI_HEADER, 0, 1, 1, -1, 0, 0, {.label = {NULL, _STR_MENU_NETWORK}}},
     {UI_SPLITTER},
 
+    // Keep OPL/Neutrino's live configuration visually distinct from the shared POPSTARTER
+    // editor. The button opens the same IPCONFIG.DAT/SMBCONFIG.DAT owner used by the POPSTARTER
+    // peer page; no POPSTARTER state is duplicated here.
+    {UI_HEADER, 0, 1, 1, -1, 0, 0, {.label = {"OPL / NEUTRINO", -1}}},
+    {UI_SPACER},
+    {UI_HEADER, 0, 1, 1, -1, 0, 0, {.label = {"POPSTARTER", -1}}},
+    {UI_BREAK},
+
+    {UI_LABEL, 0, 1, 1, -1, 0, 0, {.label = {NULL, _STR_NETCONFIG}}},
+    {UI_SPACER},
+    {UI_BUTTON, NETCFG_POPSTARTER_BUTTON, 1, 1, -1, 0, 0, {.label = {NULL, _STR_NETCONFIG}}},
+    {UI_BREAK},
+
     // Unified network rows (moved from diaDeviceConfig): Protocol (SMB/UDPFS/UDPBD) and Access
     // (Files/IMG) qualify the Game Sources "Network Start Mode" row. netConfigUpdater greys Access
     // for SMB and locks it to IMG for UDPBD (same rules guiDeviceUpdater used to apply).
@@ -41,7 +54,7 @@ struct UIItem diaNetConfig[] = {
     {UI_ENUM, NETCFG_ETHOPMODE, 1, 1, -1, 0, 0, {.intvalue = {0, 0}}},
     {UI_BREAK},
 
-    {UI_LABEL, 0, 1, 1, -1, 0, 0, {.label = {"- PS2 -", -1}}},
+    {UI_HEADER, 0, 1, 1, -1, 0, 0, {.label = {"OPL Network", -1}}},
     {UI_BREAK},
 
     // ---- IP address type ----
@@ -96,10 +109,8 @@ struct UIItem diaNetConfig[] = {
     {UI_INT, NETCFG_PS2_DNS_2, 1, 1, -1, 0, 0, {.intvalue = {0, 0, 0, 255}}},
     {UI_LABEL, 0, 1, 1, -1, 0, 0, {.label = {".", -1}}},
     {UI_INT, NETCFG_PS2_DNS_3, 1, 1, -1, 0, 0, {.intvalue = {1, 1, 0, 255}}},
-    {UI_SPLITTER},
-
     //  ---- SMB Server ----
-    {UI_LABEL, NETCFG_LBL_SMB_SERVER, 1, 1, -1, 0, 0, {.label = {NULL, _STR_CAT_SMB_SERVER}}},
+    {UI_HEADER, NETCFG_LBL_SMB_SERVER, 1, 1, -1, 0, 0, {.label = {NULL, _STR_CAT_SMB_SERVER}}},
     {UI_BREAK},
 
     {UI_LABEL, NETCFG_LBL_SHARE_ADDR_TYPE, 1, 1, -1, -40, 0, {.label = {NULL, _STR_ADDRESS_TYPE}}},
@@ -141,8 +152,6 @@ struct UIItem diaNetConfig[] = {
     {UI_BREAK},
 
     // buttons
-    {UI_BUTTON, NETCFG_POPSTARTER_BUTTON, 1, 1, -1, 0, 0, {.label = {NULL, _STR_POPSTARTER}}},
-    {UI_BREAK},
     {UI_BUTTON, NETCFG_OK, 1, 1, -1, 0, 0, {.label = {NULL, -1}}},
     {UI_SPACER},
     {UI_BUTTON, NETCFG_RECONNECT, 1, 1, -1, 0, 0, {.label = {NULL, _STR_RECONNECT}}},
@@ -317,7 +326,7 @@ struct UIItem diaDeviceConfig[] = {
     {UI_BOOL, CFG_ENABLEMX4SIO, 1, 1, -1, 0, 0, {.intvalue = {0, 0}}},
     {UI_BREAK},
 
-    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {"  HDD (GPT/MBR)", -1}}},
+    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {"  Internal HDD", -1}}},
     {UI_SPACER},
     {UI_BOOL, CFG_ENABLEBDMHDD, 1, 1, _STR_HDD_HINT, 0, 0, {.intvalue = {0, 0}}},
     {UI_BREAK},
