@@ -308,25 +308,25 @@ struct UIItem diaDeviceConfig[] = {
     {UI_ENUM, CFG_BDMMODE, 1, 1, _STR_HINT_BDM_START, 0, 0, {.intvalue = {0, 0}}},
     {UI_BREAK},
 
-    {UI_HEADER, 0, 1, 1, -1, 0, 0, {.label = {"BDM Devices", -1}}},
+    {UI_LABEL, 0, 1, 1, -1, 0, 0, {.label = {"  BDM Devices", -1}}},
     {UI_BREAK},
 
-    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {"  USB", -1}}},
+    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {"    USB", -1}}},
     {UI_SPACER},
     {UI_BOOL, CFG_ENABLEUSB, 1, 1, -1, 0, 0, {.intvalue = {0, 0}}},
     {UI_BREAK},
 
-    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {"  iLink", -1}}},
+    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {"    iLink", -1}}},
     {UI_SPACER},
     {UI_BOOL, CFG_ENABLEILK, 1, 1, -1, 0, 0, {.intvalue = {0, 0}}},
     {UI_BREAK},
 
-    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {"  MX4SIO", -1}}},
+    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {"    MX4SIO", -1}}},
     {UI_SPACER},
     {UI_BOOL, CFG_ENABLEMX4SIO, 1, 1, -1, 0, 0, {.intvalue = {0, 0}}},
     {UI_BREAK},
 
-    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {"  Internal HDD", -1}}},
+    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {"    Internal HDD", -1}}},
     {UI_SPACER},
     {UI_BOOL, CFG_ENABLEBDMHDD, 1, 1, _STR_HDD_HINT, 0, 0, {.intvalue = {0, 0}}},
     {UI_BREAK},
@@ -358,7 +358,7 @@ struct UIItem diaDeviceConfig[] = {
     {UI_ENUM, CFG_MMCEMODE, 1, 1, -1, 0, 0, {.intvalue = {0, 0}}},
     {UI_BREAK},
 
-    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {NULL, _STR_MMCE_SETTINGS}}},
+    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {"  MMCE Settings", -1}}},
     {UI_SPACER},
     {UI_BUTTON, MMCE_SETTINGS_BUTTON, 1, 1, -1, 0, 0, {.label = {NULL, _STR_MODIFY}}},
     {UI_BREAK},
@@ -393,7 +393,8 @@ struct UIItem diaVcdConfig[] = {
     {UI_BREAK},
 
 
-    // sub-pages
+    // Legacy sub-pages remain callable outside the Settings shell; the peer page skips this row
+    // and composes the BDMA fields inline below.
     {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {NULL, _STR_BDMA_SETTINGS}}},
     {UI_SPACER},
     {UI_BUTTON, VCD_BDMA_BUTTON, 1, 1, -1, 0, 0, {.label = {NULL, _STR_MODIFY}}},
@@ -413,7 +414,9 @@ struct UIItem diaVcdConfig[] = {
 
 // POPStarter -> BDMA Settings (BDMAssault exFAT-driver equip). Rows moved out of diaVcdConfig.
 struct UIItem diaBdmaConfig[] = {
-    {UI_HEADER, 0, 1, 1, -1, 0, 0, {.label = {NULL, _STR_BDMA_SETTINGS}}},
+    // A label keeps the section visible when this block is composed into POPSTARTER. The
+    // standalone legacy editor still has a readable title without making BDMA a peer page.
+    {UI_LABEL, 0, 1, 1, -1, 0, 0, {.label = {NULL, _STR_BDMA_SETTINGS}}},
     {UI_SPLITTER},
 
     {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {NULL, _STR_BDMA_APPLY}}},
@@ -773,12 +776,11 @@ struct UIItem diaLaunchConfig[] = {
     {UI_ENUM, CFG_DEFAULT_CORE, 1, 1, _STR_HINT_DEFAULT_CORE, 0, 0, {.intvalue = {0, 0}}},
     {UI_BREAK},
 
-    // sub-pages
+    // Direct actions. Neutrino's actual default fields are composed below; OSD defaults retain
+    // the existing structured editor, but the page exposes it as one native action row.
     {UI_BUTTON, LAUNCH_NEUTRINO_DEFAULTS_BUTTON, 1, 1, -1, 0, 0, {.label = {NULL, _STR_NEUTRINO_DEFAULTS}}},
     {UI_BREAK},
-    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {NULL, _STR_OSD_DEFAULTS}}},
-    {UI_SPACER},
-    {UI_BUTTON, LAUNCH_OSD_DEFAULTS_BUTTON, 1, 1, -1, 0, 0, {.label = {NULL, _STR_MODIFY}}},
+    {UI_BUTTON, LAUNCH_OSD_DEFAULTS_BUTTON, 1, 1, -1, 0, 0, {.label = {NULL, _STR_OSD_DEFAULTS}}},
     {UI_BREAK},
 
     // buttons
@@ -822,8 +824,9 @@ struct UIItem diaNeutrinoDefaults[] = {
     // end of dialog
     {UI_TERMINATOR}};
 
-// Security page (settings-layout restructure): write-operations gate + the Parental Lock password
-// as a chained sub-dialog. Rows moved out of the old General Settings (diaConfig).
+// Security page (settings-layout restructure): write-operations gate + the Parental Lock password.
+// These remain direct controls when composed into General & System; the separate password editor is
+// retained for legacy callers.
 struct UIItem diaSecurityConfig[] = {
     {UI_HEADER, 0, 1, 1, -1, 0, 0, {.label = {NULL, _STR_SECURITY_SETTINGS}}},
     {UI_SPLITTER},
@@ -833,9 +836,9 @@ struct UIItem diaSecurityConfig[] = {
     {UI_BOOL, CFG_ENWRITEOP, 1, 1, -1, 0, 0, {.intvalue = {0, 0}}},
     {UI_BREAK},
 
-    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {NULL, _STR_PARENLOCKCONFIG}}},
+    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {NULL, _STR_PARENLOCK_PASSWORD}}},
     {UI_SPACER},
-    {UI_BUTTON, SECURITY_PARENTAL_BUTTON, 1, 1, -1, 0, 0, {.label = {NULL, _STR_MODIFY}}},
+    {UI_PASSWORD, CFG_PARENLOCK_PASSWORD, 1, 1, _STR_PARENLOCK_PASSWORD_HINT, 0, 0, {.stringvalue = {"", "", NULL}}},
     {UI_BREAK},
 
     // buttons
@@ -845,8 +848,8 @@ struct UIItem diaSecurityConfig[] = {
     // end of dialog
     {UI_TERMINATOR}};
 
-// Advanced page (settings-layout restructure): debug display + path prefixes and storage/cache as
-// chained sub-dialogs. Rows moved out of the old General Settings (diaConfig).
+// Advanced page (settings-layout restructure): debug display, path prefixes and storage/cache as
+// direct controls. The separate legacy editors remain available to older callers.
 struct UIItem diaAdvancedConfig[] = {
     {UI_HEADER, 0, 1, 1, -1, 0, 0, {.label = {NULL, _STR_ADVANCED_SETTINGS}}},
     {UI_SPLITTER},
@@ -856,13 +859,38 @@ struct UIItem diaAdvancedConfig[] = {
     {UI_BOOL, CFG_DEBUG, 1, 1, -1, 0, 0, {.intvalue = {0, 0}}},
     {UI_BREAK},
 
-    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {NULL, _STR_PATH_PREFIXES}}},
+    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {"  BDM Prefix Path", -1}}},
     {UI_SPACER},
-    {UI_BUTTON, ADV_PREFIX_BUTTON, 1, 1, -1, 0, 0, {.label = {NULL, _STR_MODIFY}}},
+    {UI_STRING, CFG_BDMPREFIX, 1, 1, -1, 0, 0, {.stringvalue = {"", "", NULL}}},
     {UI_BREAK},
-    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {NULL, _STR_STORAGE_CACHE}}},
+    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {"  ETH Prefix Path", -1}}},
     {UI_SPACER},
-    {UI_BUTTON, ADV_STORAGE_BUTTON, 1, 1, -1, 0, 0, {.label = {NULL, _STR_MODIFY}}},
+    {UI_STRING, CFG_ETHPREFIX, 1, 1, -1, 0, 0, {.stringvalue = {"", "", NULL}}},
+    {UI_BREAK},
+
+    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {"  HDD Spindown", -1}}},
+    {UI_SPACER},
+    {UI_INT, CFG_HDDSPINDOWN, 1, 1, _STR_HINT_SPINDOWN, 0, 0, {.intvalue = {20, 20, 0, 20}}},
+    {UI_BREAK},
+
+    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {"  Cache Game List (HDD)", -1}}},
+    {UI_SPACER},
+    {UI_BOOL, CFG_HDDGAMELISTCACHE, 1, 1, -1, 0, 0, {.intvalue = {0, 0}}},
+    {UI_BREAK},
+
+    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {"  BDM Cache", -1}}},
+    {UI_SPACER},
+    {UI_INT, CFG_BDMCACHE, 1, 1, -1, 0, 0, {.intvalue = {16, 8, 0, 32, NULL}}},
+    {UI_BREAK},
+
+    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {"  HDD Cache", -1}}},
+    {UI_SPACER},
+    {UI_INT, CFG_HDDCACHE, 1, 1, -1, 0, 0, {.intvalue = {8, 0, 0, 32, NULL}}},
+    {UI_BREAK},
+
+    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {"  SMB Cache", -1}}},
+    {UI_SPACER},
+    {UI_INT, CFG_SMBCACHE, 1, 1, -1, 0, 0, {.intvalue = {16, 4, 0, 32, NULL}}},
     {UI_BREAK},
 
     // buttons

@@ -39,6 +39,7 @@ static int screenWidth;
 static int screenHeight;
 static struct UIItem *diaSettingsShellUI;
 static const char *diaSettingsIndicator;
+static int diaSettingsContext;
 
 // Utility stuff
 #define KEYB_MODE   2
@@ -691,6 +692,11 @@ void diaSetSettingsShell(struct UIItem *ui, const char *indicator)
     diaSettingsIndicator = indicator;
 }
 
+void diaSetSettingsContext(int enabled)
+{
+    diaSettingsContext = enabled;
+}
+
 /// renders whole ui screen (for given dialog setup)
 void diaRenderUI(struct UIItem *ui, short inMenu, struct UIItem *cur, int haveFocus)
 {
@@ -700,7 +706,8 @@ void diaRenderUI(struct UIItem *ui, short inMenu, struct UIItem *cur, int haveFo
     int x0 = 20;
     int y0 = 20;
     int settingsShell = (ui == diaSettingsShellUI && diaSettingsIndicator != NULL);
-    int spacingH = settingsShell ? UI_SETTINGS_SPACING_H : UI_SPACING_H;
+    int settingsContext = settingsShell || diaSettingsContext;
+    int spacingH = settingsContext ? UI_SETTINGS_SPACING_H : UI_SPACING_H;
 
     // render all items (shifted up by the scroll offset for tall dialogs)
     struct UIItem *rc = ui;
@@ -804,26 +811,29 @@ void diaRenderUI(struct UIItem *ui, short inMenu, struct UIItem *cur, int haveFo
     }
 
     int uiY = gTheme->usedHeight - 32;
-    if (settingsShell) {
-        int uiHints[3] = {_STR_SELECT, _STR_BACK, _STR_OPTIONS};
+    if (settingsContext) {
+        int uiHints[3] = {_STR_SELECT, _STR_BACK, _STR_SETTINGS};
         int uiIcons[3] = {CROSS_ICON, CIRCLE_ICON, TRIANGLE_ICON};
         int uiX = guiAlignSubMenuHints(3, uiHints, uiIcons, gTheme->fonts[0], 12, 2);
 
-        // Use the same controller button textures as the rest of OPL. Do not introduce a text-only
-        // [L1]/[R1] language for Settings; disk themes can override these embedded defaults.
-        int pageX = x0;
-        GSTEXTURE *l1Tex = thmGetTexture(L1_ICON);
-        GSTEXTURE *r1Tex = thmGetTexture(R1_ICON);
-        int l1W = l1Tex ? (l1Tex->Width * 20) / l1Tex->Height : 0;
-        int r1W = r1Tex ? (r1Tex->Width * 20) / r1Tex->Height : 0;
+        if (settingsShell) {
+            // Use the same controller button textures as the rest of OPL. Do not introduce a
+            // text-only [L1]/[R1] language for Settings; disk themes can override these embedded
+            // defaults. Child editors stay in the Settings context but do not show page controls.
+            int pageX = x0;
+            GSTEXTURE *l1Tex = thmGetTexture(L1_ICON);
+            GSTEXTURE *r1Tex = thmGetTexture(R1_ICON);
+            int l1W = l1Tex ? (l1Tex->Width * 20) / l1Tex->Height : 0;
+            int r1W = r1Tex ? (r1Tex->Width * 20) / r1Tex->Height : 0;
 
-        if (l1Tex && l1Tex->Mem)
-            rmDrawPixmap(l1Tex, pageX, uiY + 10, ALIGN_VCENTER, l1W, 20, SCALING_RATIO, gDefaultCol, 0);
-        pageX += rmWideScale(l1W) + 8;
-        pageX = fntRenderString(gTheme->fonts[0], pageX, uiY + 10, ALIGN_VCENTER, 0, 0, diaSettingsIndicator, gTheme->textColor);
-        pageX += 8;
-        if (r1Tex && r1Tex->Mem)
-            rmDrawPixmap(r1Tex, pageX, uiY + 10, ALIGN_VCENTER, r1W, 20, SCALING_RATIO, gDefaultCol, 0);
+            if (l1Tex && l1Tex->Mem)
+                rmDrawPixmap(l1Tex, pageX, uiY + 10, ALIGN_VCENTER, l1W, 20, SCALING_RATIO, gDefaultCol, 0);
+            pageX += rmWideScale(l1W) + 8;
+            pageX = fntRenderString(gTheme->fonts[0], pageX, uiY + 10, ALIGN_VCENTER, 0, 0, diaSettingsIndicator, gTheme->textColor);
+            pageX += 8;
+            if (r1Tex && r1Tex->Mem)
+                rmDrawPixmap(r1Tex, pageX, uiY + 10, ALIGN_VCENTER, r1W, 20, SCALING_RATIO, gDefaultCol, 0);
+        }
         uiX = guiDrawIconAndText(uiIcons[0], uiHints[0], gTheme->fonts[0], uiX, uiY, gTheme->textColor);
         uiX += 12;
         uiX = guiDrawIconAndText(uiIcons[1], uiHints[1], gTheme->fonts[0], uiX, uiY, gTheme->textColor);
@@ -859,10 +869,10 @@ static void diaResetValue(struct UIItem *item)
     }
 }
 
-static int diaHandleInput(struct UIItem *item, int *modified, int settingsShell)
+static int diaHandleInput(struct UIItem *item, int *modified, int settingsContext)
 {
-    int selectButton = settingsShell ? KEY_CROSS : gSelectButton;
-    int cancelButton = settingsShell ? KEY_CIRCLE : (gSelectButton == KEY_CIRCLE ? KEY_CROSS : KEY_CIRCLE);
+    int selectButton = settingsContext ? KEY_CROSS : gSelectButton;
+    int cancelButton = settingsContext ? KEY_CIRCLE : (gSelectButton == KEY_CIRCLE ? KEY_CROSS : KEY_CIRCLE);
 
     // circle loses focus, sets old values first
     if (getKeyOn(cancelButton)) {
@@ -1129,6 +1139,7 @@ int diaExecuteDialog(struct UIItem *ui, int uiId, short inMenu, int (*updater)(i
     diaStoreScrollSpeed();
 
     int settingsShell = diaSettingsShellUI == ui && diaSettingsIndicator != NULL;
+    int settingsContext = settingsShell || diaSettingsContext;
 
     // slower controls for dialogs
     setButtonDelay(KEY_UP, diaScrollDelay());
@@ -1148,7 +1159,7 @@ int diaExecuteDialog(struct UIItem *ui, int uiId, short inMenu, int (*updater)(i
 
         if (haveFocus) {
             modified = 1;
-            haveFocus = diaHandleInput(cur, &modified, settingsShell);
+            haveFocus = diaHandleInput(cur, &modified, settingsContext);
 
             if (!haveFocus) {
                 setButtonDelay(KEY_UP, diaScrollDelay());
@@ -1162,7 +1173,7 @@ int diaExecuteDialog(struct UIItem *ui, int uiId, short inMenu, int (*updater)(i
             // every peer screen retains the same focus, scrolling and modal-editor behavior as
             // existing dialogs. Ordinary dialogs never see these results unless their caller opts
             // into handling them.
-            if (diaSettingsShellUI == ui && getKeyOn(KEY_TRIANGLE)) {
+            if (settingsShell && getKeyOn(KEY_TRIANGLE)) {
                 diaRestoreScrollSpeed();
                 sfxPlay(SFX_CURSOR);
                 return DIA_RESULT_INDEX;
@@ -1211,14 +1222,14 @@ int diaExecuteDialog(struct UIItem *ui, int uiId, short inMenu, int (*updater)(i
             }
 
             // Cancel button breaks focus or exits with false result
-            if (getKeyOn(settingsShell ? KEY_CIRCLE : (gSelectButton == KEY_CIRCLE ? KEY_CROSS : KEY_CIRCLE))) {
+            if (getKeyOn(settingsContext ? KEY_CIRCLE : (gSelectButton == KEY_CIRCLE ? KEY_CROSS : KEY_CIRCLE))) {
                 diaRestoreScrollSpeed();
                 sfxPlay(SFX_CANCEL);
                 return UIID_BTN_CANCEL;
             }
 
             // see what key events we have
-            if (getKeyOn(settingsShell ? KEY_CROSS : gSelectButton)) {
+            if (getKeyOn(settingsContext ? KEY_CROSS : gSelectButton)) {
                 haveFocus = 1;
                 sfxPlay(SFX_CONFIRM);
 

@@ -1231,12 +1231,13 @@ reshow_network:
 // device picker is "Custom".
 static int guiVcdUpdater(int modified)
 {
+    struct UIItem *ui = guiSettingsActiveDialog != NULL ? guiSettingsActiveDialog : diaVcdConfig;
     int popsDev;
 
     if (modified) {
-        diaGetInt(diaVcdConfig, CFG_POPSTARTER_DEVICE, &popsDev);
-        diaSetVisible(diaVcdConfig, CFG_LBL_POPSTARTER_PATH, popsDev == POPS_DEV_CUSTOM);
-        diaSetVisible(diaVcdConfig, CFG_POPSTARTER_PATH, popsDev == POPS_DEV_CUSTOM);
+        diaGetInt(ui, CFG_POPSTARTER_DEVICE, &popsDev);
+        diaSetVisible(ui, CFG_LBL_POPSTARTER_PATH, popsDev == POPS_DEV_CUSTOM);
+        diaSetVisible(ui, CFG_POPSTARTER_PATH, popsDev == POPS_DEV_CUSTOM);
     }
     return 0;
 }
@@ -1245,14 +1246,15 @@ static int guiVcdUpdater(int modified)
 // Launch" is ON (it auto-equips); re-reveal them live when toggled off.
 static int guiBdmaUpdater(int modified)
 {
+    struct UIItem *ui = guiSettingsActiveDialog != NULL ? guiSettingsActiveDialog : diaBdmaConfig;
     int bdmaApply;
 
     if (modified) {
-        diaGetInt(diaBdmaConfig, CFG_BDMA_APPLY, &bdmaApply);
-        diaSetVisible(diaBdmaConfig, CFG_LBL_BDMASOURCE, !bdmaApply);
-        diaSetVisible(diaBdmaConfig, CFG_BDMASOURCE, !bdmaApply);
-        diaSetVisible(diaBdmaConfig, CFG_LBL_BDMAMODE, !bdmaApply);
-        diaSetVisible(diaBdmaConfig, CFG_BDMAMODE, !bdmaApply);
+        diaGetInt(ui, CFG_BDMA_APPLY, &bdmaApply);
+        diaSetVisible(ui, CFG_LBL_BDMASOURCE, !bdmaApply);
+        diaSetVisible(ui, CFG_BDMASOURCE, !bdmaApply);
+        diaSetVisible(ui, CFG_LBL_BDMAMODE, !bdmaApply);
+        diaSetVisible(ui, CFG_BDMAMODE, !bdmaApply);
     }
     return 0;
 }
@@ -1316,62 +1318,75 @@ reshow_vcd:
     }
 }
 
-// POPStarter -> BDMA Settings (BDMAssault exFAT-driver equip). MODE reflects what's ACTUALLY on the
-// card (marker read), so the page is honest even if POPSLoader or a prior session set it.
-void guiShowBdmaConfig(void)
+static void guiSetBdmaSettings(struct UIItem *ui)
 {
     const char *bdmaSourceStrs[] = {_l(_STR_BDMA_SRC_USB), _l(_STR_BDMA_SRC_MX4SIO), _l(_STR_BDMA_SRC_MMCE), _l(_STR_BDMA_SRC_HDD), NULL};
     const char *bdmaModeStrs[] = {_l(_STR_BDMA_MODE_FAT32), _l(_STR_BDMA_MODE_USBEXFAT), _l(_STR_BDMA_MODE_MX4SIO), _l(_STR_BDMA_MODE_MMCE), _l(_STR_BDMA_MODE_ATA), NULL};
     // Order matches enum VCD_USB_BDMA_MODE: Ask / exFAT / fat32. The two driver labels are the ones the
     // per-launch prompt already uses, so the row and the dialog it replaces read identically.
     const char *vcdUsbBdmaStrs[] = {_l(_STR_VCD_USB_BDMA_ASK), _l(_STR_VCD_USB_MODE_EXFAT), _l(_STR_VCD_USB_MODE_FAT32), NULL};
+
     gBdmaMode = vcdReadBdmaMode();
-    diaSetEnum(diaBdmaConfig, CFG_BDMASOURCE, bdmaSourceStrs);
-    diaSetEnum(diaBdmaConfig, CFG_BDMAMODE, bdmaModeStrs);
-    diaSetEnum(diaBdmaConfig, CFG_VCD_USB_BDMA, vcdUsbBdmaStrs);
-    diaSetInt(diaBdmaConfig, CFG_BDMASOURCE, gBdmaSource);
-    diaSetInt(diaBdmaConfig, CFG_BDMAMODE, gBdmaMode);
-    diaSetInt(diaBdmaConfig, CFG_VCD_USB_BDMA, gVcdUsbBdmaMode);
-    diaSetInt(diaBdmaConfig, CFG_BDMA_APPLY, gBdmaApplyOnLaunch);
+    diaSetEnum(ui, CFG_BDMASOURCE, bdmaSourceStrs);
+    diaSetEnum(ui, CFG_BDMAMODE, bdmaModeStrs);
+    diaSetEnum(ui, CFG_VCD_USB_BDMA, vcdUsbBdmaStrs);
+    diaSetInt(ui, CFG_BDMASOURCE, gBdmaSource);
+    diaSetInt(ui, CFG_BDMAMODE, gBdmaMode);
+    diaSetInt(ui, CFG_VCD_USB_BDMA, gVcdUsbBdmaMode);
+    diaSetInt(ui, CFG_BDMA_APPLY, gBdmaApplyOnLaunch);
     // "VCD BDMA Apply on Launch" ON auto-equips, so hide the manual SOURCE/MODE pickers
     // (guiBdmaUpdater re-reveals them live when toggled off).
-    diaSetVisible(diaBdmaConfig, CFG_LBL_BDMASOURCE, !gBdmaApplyOnLaunch);
-    diaSetVisible(diaBdmaConfig, CFG_BDMASOURCE, !gBdmaApplyOnLaunch);
-    diaSetVisible(diaBdmaConfig, CFG_LBL_BDMAMODE, !gBdmaApplyOnLaunch);
-    diaSetVisible(diaBdmaConfig, CFG_BDMAMODE, !gBdmaApplyOnLaunch);
+    diaSetVisible(ui, CFG_LBL_BDMASOURCE, !gBdmaApplyOnLaunch);
+    diaSetVisible(ui, CFG_BDMASOURCE, !gBdmaApplyOnLaunch);
+    diaSetVisible(ui, CFG_LBL_BDMAMODE, !gBdmaApplyOnLaunch);
+    diaSetVisible(ui, CFG_BDMAMODE, !gBdmaApplyOnLaunch);
+}
+
+// Save the BDMA preference and equip changed modules. The helper deliberately does not call
+// applyConfig so a composed Settings page can commit all of its fields together.
+static void guiSaveBdmaSettings(struct UIItem *ui)
+{
+    diaGetInt(ui, CFG_BDMA_APPLY, &gBdmaApplyOnLaunch);
+    // Read BEFORE the equip block below: that block can re-enter vcdEquipBdma and toast, and this
+    // row must be taken from the dialog regardless of how the equip turns out (it governs the
+    // per-launch USB prompt, not the card's equipped state).
+    diaGetInt(ui, CFG_VCD_USB_BDMA, &gVcdUsbBdmaMode);
+    {
+        // Equip BDMA modules only when SOURCE or MODE actually changed (the equip copies files to
+        // the memory card). vcdEquipBdma is free-space-gated + truncation-safe, so a failure never
+        // corrupts the card; report it and resync MODE to what's really equipped.
+        int oldSrc = gBdmaSource, oldMode = gBdmaMode; // baselines (MODE = card's actual state)
+        int newSrc = oldSrc, newMode = oldMode;
+        diaGetInt(ui, CFG_BDMASOURCE, &newSrc);
+        diaGetInt(ui, CFG_BDMAMODE, &newMode);
+        // Re-equip on any MODE change, and on a SOURCE change only when MODE installs modules. FAT32
+        // ignores the source, so a SOURCE-only move while already FAT32 must NOT re-run the pointless work.
+        if (newMode != oldMode || (newMode != VCD_BDMA_FAT32 && newSrc != oldSrc)) {
+            char bdmaDiag[160];
+            int er = vcdEquipBdma(newSrc, newMode, bdmaDiag, sizeof(bdmaDiag));
+            if (er == -4) {
+                char msg[256];
+                snprintf(msg, sizeof(msg), "%s\n%s", _l(_STR_BDMA_ERR_SRC), bdmaDiag);
+                guiMsgBox(msg, 0, NULL);
+            } else if (er == -2)
+                guiMsgBox(_l(_STR_BDMA_ERR_SPACE), 0, NULL);
+            else if (er == -3)
+                guiMsgBox(_l(_STR_BDMA_ERR_IO), 0, NULL);
+            gBdmaMode = vcdReadBdmaMode(); // MODE = what is now actually equipped
+        }
+        gBdmaSource = newSrc; // remember the source preference regardless of equip outcome
+    }
+}
+
+// POPStarter -> BDMA Settings (BDMAssault exFAT-driver equip). MODE reflects what's ACTUALLY on the
+// card (marker read), so the page is honest even if POPSLoader or a prior session set it.
+void guiShowBdmaConfig(void)
+{
+    guiSetBdmaSettings(diaBdmaConfig);
 
     int ret = diaExecuteDialog(diaBdmaConfig, -1, 1, &guiBdmaUpdater);
     if (ret) {
-        diaGetInt(diaBdmaConfig, CFG_BDMA_APPLY, &gBdmaApplyOnLaunch);
-        // Read BEFORE the equip block below: that block can re-enter vcdEquipBdma and toast, and this
-        // row must be taken from the dialog regardless of how the equip turns out (it governs the
-        // per-launch USB prompt, not the card's equipped state).
-        diaGetInt(diaBdmaConfig, CFG_VCD_USB_BDMA, &gVcdUsbBdmaMode);
-        {
-            // Equip BDMA modules only when SOURCE or MODE actually changed (the equip copies files to
-            // the memory card). vcdEquipBdma is free-space-gated + truncation-safe, so a failure never
-            // corrupts the card; report it and resync MODE to what's really equipped.
-            int oldSrc = gBdmaSource, oldMode = gBdmaMode; // baselines (MODE = card's actual state)
-            int newSrc = oldSrc, newMode = oldMode;
-            diaGetInt(diaBdmaConfig, CFG_BDMASOURCE, &newSrc);
-            diaGetInt(diaBdmaConfig, CFG_BDMAMODE, &newMode);
-            // Re-equip on any MODE change, and on a SOURCE change only when MODE installs modules. FAT32
-            // ignores the source, so a SOURCE-only move while already FAT32 must NOT re-run the pointless work.
-            if (newMode != oldMode || (newMode != VCD_BDMA_FAT32 && newSrc != oldSrc)) {
-                char bdmaDiag[160];
-                int er = vcdEquipBdma(newSrc, newMode, bdmaDiag, sizeof(bdmaDiag));
-                if (er == -4) {
-                    char msg[256];
-                    snprintf(msg, sizeof(msg), "%s\n%s", _l(_STR_BDMA_ERR_SRC), bdmaDiag);
-                    guiMsgBox(msg, 0, NULL);
-                } else if (er == -2)
-                    guiMsgBox(_l(_STR_BDMA_ERR_SPACE), 0, NULL);
-                else if (er == -3)
-                    guiMsgBox(_l(_STR_BDMA_ERR_IO), 0, NULL);
-                gBdmaMode = vcdReadBdmaMode(); // MODE = what is now actually equipped
-            }
-            gBdmaSource = newSrc; // remember the source preference regardless of equip outcome
-        }
+        guiSaveBdmaSettings(diaBdmaConfig);
         applyConfig(-1, -1, 0);
     }
 }
@@ -1572,35 +1587,71 @@ void guiShowPopsNetConfig(void)
     }
 }
 
-void guiShowParentalLockConfig(void)
+static void guiSetParentalLockValue(struct UIItem *ui)
 {
-    int result;
     char password[CONFIG_KEY_VALUE_LEN];
     config_set_t *configOPL = configGetByType(CONFIG_OPL);
 
-    // Set current values
-    configGetStrCopy(configOPL, CONFIG_OPL_PARENTAL_LOCK_PWD, password, CONFIG_KEY_VALUE_LEN); // This will return the current password, or a blank string if it is not set.
-    diaSetString(diaParentalLockConfig, CFG_PARENLOCK_PASSWORD, password);
+    configGetStrCopy(configOPL, CONFIG_OPL_PARENTAL_LOCK_PWD, password, sizeof(password));
+    diaSetString(ui, CFG_PARENLOCK_PASSWORD, password);
+}
 
-    result = diaExecuteDialog(diaParentalLockConfig, -1, 1, NULL);
-    if (result) {
-        diaGetString(diaParentalLockConfig, CFG_PARENLOCK_PASSWORD, password, CONFIG_KEY_VALUE_LEN);
+static void guiSaveParentalLockValue(struct UIItem *ui)
+{
+    char oldPassword[CONFIG_KEY_VALUE_LEN];
+    char password[CONFIG_KEY_VALUE_LEN];
+    config_set_t *configOPL = configGetByType(CONFIG_OPL);
 
-        if (strlen(password) > 0) {
-            if (strncmp(OPL_PARENTAL_LOCK_MASTER_PASS, password, CONFIG_KEY_VALUE_LEN) != 0) {
-                // Store password
-                configSetStr(configOPL, CONFIG_OPL_PARENTAL_LOCK_PWD, password);
-            } else {
-                // Password not acceptable (i.e. master password entered).
-                guiMsgBox(_l(_STR_PARENLOCK_INVALID_PASSWORD), 0, NULL);
-            }
-        } else {
-            configRemoveKey(configOPL, CONFIG_OPL_PARENTAL_LOCK_PWD);
+    configGetStrCopy(configOPL, CONFIG_OPL_PARENTAL_LOCK_PWD, oldPassword, sizeof(oldPassword));
+    diaGetString(ui, CFG_PARENLOCK_PASSWORD, password, sizeof(password));
+    if (strcmp(oldPassword, password) == 0)
+        return;
 
-            guiMsgBox(_l(_STR_PARENLOCK_DISABLE_WARNING), 0, diaParentalLockConfig);
+    if (strlen(password) > 0) {
+        if (strncmp(OPL_PARENTAL_LOCK_MASTER_PASS, password, sizeof(password)) != 0)
+            configSetStr(configOPL, CONFIG_OPL_PARENTAL_LOCK_PWD, password);
+        else {
+            diaSetString(ui, CFG_PARENLOCK_PASSWORD, oldPassword);
+            guiMsgBox(_l(_STR_PARENLOCK_INVALID_PASSWORD), 0, NULL);
+            return;
         }
+    } else {
+        configRemoveKey(configOPL, CONFIG_OPL_PARENTAL_LOCK_PWD);
+        guiMsgBox(_l(_STR_PARENLOCK_DISABLE_WARNING), 0, ui);
+    }
 
-        menuSetParentalLockCheckState(1);
+    menuSetParentalLockCheckState(1);
+}
+
+static void guiSetAdvancedSettings(struct UIItem *ui)
+{
+    diaSetString(ui, CFG_BDMPREFIX, gBDMPrefix);
+    diaSetString(ui, CFG_ETHPREFIX, gETHPrefix);
+    diaSetInt(ui, CFG_HDDSPINDOWN, gHDDSpindown);
+    diaSetInt(ui, CFG_HDDGAMELISTCACHE, gHDDGameListCache);
+    diaSetInt(ui, CFG_BDMCACHE, bdmCacheSize);
+    diaSetInt(ui, CFG_HDDCACHE, hddCacheSize);
+    diaSetInt(ui, CFG_SMBCACHE, smbCacheSize);
+}
+
+static void guiSaveAdvancedSettings(struct UIItem *ui)
+{
+    diaGetString(ui, CFG_BDMPREFIX, gBDMPrefix, sizeof(gBDMPrefix));
+    diaGetString(ui, CFG_ETHPREFIX, gETHPrefix, sizeof(gETHPrefix));
+    diaGetInt(ui, CFG_HDDSPINDOWN, &gHDDSpindown);
+    diaGetInt(ui, CFG_HDDGAMELISTCACHE, &gHDDGameListCache);
+    diaGetInt(ui, CFG_BDMCACHE, &bdmCacheSize);
+    diaGetInt(ui, CFG_HDDCACHE, &hddCacheSize);
+    diaGetInt(ui, CFG_SMBCACHE, &smbCacheSize);
+}
+
+void guiShowParentalLockConfig(void)
+{
+    guiSetParentalLockValue(diaParentalLockConfig);
+
+    int result = diaExecuteDialog(diaParentalLockConfig, -1, 1, NULL);
+    if (result) {
+        guiSaveParentalLockValue(diaParentalLockConfig);
     }
 }
 // Neutrino Defaults live-updater: the ":c" comp half is only ever emitted alongside a video mode
@@ -1761,16 +1812,12 @@ reshow_launch:
 void guiShowSecurityConfig(void)
 {
     diaSetInt(diaSecurityConfig, CFG_ENWRITEOP, gEnableWrite);
+    guiSetParentalLockValue(diaSecurityConfig);
 
-    int ret;
-reshow_security:
-    ret = diaExecuteDialog(diaSecurityConfig, -1, 1, NULL);
-    if (ret == SECURITY_PARENTAL_BUTTON) {
-        guiShowParentalLockConfig();
-        goto reshow_security;
-    }
+    int ret = diaExecuteDialog(diaSecurityConfig, -1, 1, NULL);
     if (ret) {
         diaGetInt(diaSecurityConfig, CFG_ENWRITEOP, &gEnableWrite);
+        guiSaveParentalLockValue(diaSecurityConfig);
 
         applyConfig(-1, -1, 0);
         menuReinitMainMenu();
@@ -1780,20 +1827,12 @@ reshow_security:
 void guiShowAdvancedConfig(void)
 {
     diaSetInt(diaAdvancedConfig, CFG_DEBUG, gEnableDebug);
+    guiSetAdvancedSettings(diaAdvancedConfig);
 
-    int ret;
-reshow_advanced:
-    ret = diaExecuteDialog(diaAdvancedConfig, -1, 1, NULL);
-    if (ret == ADV_PREFIX_BUTTON) {
-        guiShowPathPrefixConfig();
-        goto reshow_advanced;
-    }
-    if (ret == ADV_STORAGE_BUTTON) {
-        guiShowStorageConfig();
-        goto reshow_advanced;
-    }
+    int ret = diaExecuteDialog(diaAdvancedConfig, -1, 1, NULL);
     if (ret) {
         diaGetInt(diaAdvancedConfig, CFG_DEBUG, &gEnableDebug);
+        guiSaveAdvancedSettings(diaAdvancedConfig);
 
         applyConfig(-1, -1, 0);
         menuReinitMainMenu();
@@ -2178,7 +2217,9 @@ int guiShowControllerConfig(void)
     diaSetInt(diaControllerConfig, CFG_RUMBLE, gEnableRumble);
 
     guiSettingsBeginDialog(diaControllerConfig);
-    int result = diaExecuteDialog(diaControllerConfig, -1, 1, NULL);
+    int result;
+reshow_controller:
+    result = diaExecuteDialog(diaControllerConfig, -1, 1, NULL);
     if (result) {
         diaGetInt(diaControllerConfig, UICFG_SCROLL, &gScrollSpeed);
         diaGetInt(diaControllerConfig, CFG_XSENSITIVITY, &gXSensitivity);
@@ -2194,8 +2235,10 @@ int guiShowControllerConfig(void)
 #ifdef PADEMU
         if (result == PADEMU_GLOBAL_BUTTON) {
             guiGameShowPadEmuConfig(1);
+            goto reshow_controller;
         } else if (result == PADMACRO_GLOBAL_BUTTON) {
             guiGameShowPadMacroConfig(1);
+            goto reshow_controller;
         }
 #endif
         applyConfig(-1, -1, 1);
@@ -2242,6 +2285,12 @@ static struct UIItem *guiSettingsCompose(const struct UIItem *const *parts, int 
                     continue;
             }
             if (guiSettingsSkipID(item->id, skipIDs, skipCount)) {
+                // Some legacy rows are represented as LABEL + SPACER + BUTTON. When the action
+                // is omitted from a composed peer page, remove that now-orphaned label as well;
+                // otherwise the page shows an empty heading before the replacement inline block.
+                if (item->type == UI_BUTTON && count >= 2 && guiSettingsDialog[count - 1].type == UI_SPACER &&
+                    guiSettingsDialog[count - 2].type == UI_LABEL)
+                    count -= 2;
                 // A skipped sub-page button owns the following break in the source dialog. Once
                 // the button is omitted from a composite page, that break would become an empty
                 // row with no visual or navigation purpose.
@@ -2313,11 +2362,13 @@ static void guiSettingsBeginDialog(struct UIItem *ui)
 
     snprintf(guiSettingsPageIndicator, sizeof(guiSettingsPageIndicator), "%d/8", guiSettingsCurrentPage + 1);
     diaSetSettingsShell(ui, guiSettingsPageIndicator);
+    diaSetSettingsContext(1);
 }
 
 static void guiSettingsEndDialog(void)
 {
     diaSetSettingsShell(NULL, NULL);
+    diaSetSettingsContext(0);
 }
 
 static int guiSettingsGeneralUpdater(int modified)
@@ -2352,22 +2403,11 @@ static int guiSettingsShowGeneral(void)
     diaSetVisible(ui, CFG_LBL_AUTOSTARTLAST, gRememberLastPlayed);
     diaSetInt(ui, CFG_ENWRITEOP, gEnableWrite);
     diaSetInt(ui, CFG_DEBUG, gEnableDebug);
+    guiSetParentalLockValue(ui);
+    guiSetAdvancedSettings(ui);
     guiSettingsBeginDialog(ui);
 
-reshow_general:
     result = diaExecuteDialog(ui, -1, 1, &guiSettingsGeneralUpdater);
-    if (result == SECURITY_PARENTAL_BUTTON) {
-        guiShowParentalLockConfig();
-        goto reshow_general;
-    }
-    if (result == ADV_PREFIX_BUTTON) {
-        guiShowPathPrefixConfig();
-        goto reshow_general;
-    }
-    if (result == ADV_STORAGE_BUTTON) {
-        guiShowStorageConfig();
-        goto reshow_general;
-    }
 
     if (result != UIID_BTN_CANCEL && result != -1) {
         diaGetString(ui, CFG_EXITTO, gExitPath, sizeof(gExitPath));
@@ -2377,6 +2417,8 @@ reshow_general:
         diaGetInt(ui, CFG_AUTOSTARTLAST, &gAutoStartLastPlayed);
         diaGetInt(ui, CFG_ENWRITEOP, &gEnableWrite);
         diaGetInt(ui, CFG_DEBUG, &gEnableDebug);
+        guiSaveParentalLockValue(ui);
+        guiSaveAdvancedSettings(ui);
 
         DisableCron = 1;
         applyConfig(-1, -1, 0);
@@ -2688,24 +2730,19 @@ reshow_launch:
     return guiSettingsPageResult(result);
 }
 
-static int guiSettingsVcdUpdater(int modified)
+static int guiSettingsPopstarterUpdater(int modified)
 {
-    int popsDev;
-
-    if (modified) {
-        diaGetInt(guiSettingsActiveDialog, CFG_POPSTARTER_DEVICE, &popsDev);
-        diaSetVisible(guiSettingsActiveDialog, CFG_LBL_POPSTARTER_PATH, popsDev == POPS_DEV_CUSTOM);
-        diaSetVisible(guiSettingsActiveDialog, CFG_POPSTARTER_PATH, popsDev == POPS_DEV_CUSTOM);
-    }
+    guiVcdUpdater(modified);
+    guiBdmaUpdater(modified);
     return 0;
 }
 
 static int guiSettingsShowPopstarter(void)
 {
-    const struct UIItem *parts[] = {diaVcdConfig, diaVcdListConfig};
-    const int skipIDs[] = {VCD_LIST_BUTTON};
+    const struct UIItem *parts[] = {diaVcdConfig, diaBdmaConfig, diaVcdListConfig};
+    const int skipIDs[] = {VCD_BDMA_BUTTON, VCD_LIST_BUTTON};
     const char *popsDevStrs[] = {_l(_STR_DEFAULT), "Memory Card", "USB", "MX4SIO", "MMCE", "HDD (exFAT)", "HDD (APA)", "Custom", _l(_STR_GAMES_DEVICE), NULL};
-    struct UIItem *ui = guiSettingsCompose(parts, 2, skipIDs, 1, 1);
+    struct UIItem *ui = guiSettingsCompose(parts, 3, skipIDs, 2, 1);
     int result;
 
     if (ui == NULL)
@@ -2721,14 +2758,11 @@ static int guiSettingsShowPopstarter(void)
     diaSetInt(ui, CFG_VCD_HIDE_GAMEID, gVcdHideGameId);
     diaSetInt(ui, CFG_VCD_FIRST_DISC_ONLY, gVcdFirstDiscOnly);
     diaSetInt(ui, CFG_VCD_SHOW_PP_POPS, gVcdShowPpPops);
+    guiSetBdmaSettings(ui);
     guiSettingsBeginDialog(ui);
 
 reshow_popstarter:
-    result = diaExecuteDialog(ui, -1, 1, &guiSettingsVcdUpdater);
-    if (result == VCD_BDMA_BUTTON) {
-        guiShowBdmaConfig();
-        goto reshow_popstarter;
-    }
+    result = diaExecuteDialog(ui, -1, 1, &guiSettingsPopstarterUpdater);
     if (result == VCD_NET_BUTTON) {
         guiShowPopsNetConfig();
         goto reshow_popstarter;
@@ -2749,6 +2783,7 @@ reshow_popstarter:
         diaGetInt(ui, CFG_VCD_HIDE_GAMEID, &gVcdHideGameId);
         diaGetInt(ui, CFG_VCD_FIRST_DISC_ONLY, &gVcdFirstDiscOnly);
         diaGetInt(ui, CFG_VCD_SHOW_PP_POPS, &gVcdShowPpPops);
+        guiSaveBdmaSettings(ui);
 
         if (gVcdHideGameId != previousHideGameId) {
             vcdMarkAllDirty();
