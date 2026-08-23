@@ -806,8 +806,14 @@ void diaRenderUI(struct UIItem *ui, short inMenu, struct UIItem *cur, int haveFo
         int uiIcons[3] = {CIRCLE_ICON, CROSS_ICON, TRIANGLE_ICON};
         int uiX = guiAlignSubMenuHints(3, uiHints, uiIcons, gTheme->fonts[0], 12, 2);
 
-        // Keep the page indicator in the footer, away from the theme-controlled title width.
-        fntRenderString(gTheme->fonts[0], x0, uiY, ALIGN_NONE, 0, 0, diaSettingsIndicator, gTheme->textColor);
+        // L1/R1 glyph assets are not part of the available internal texture set, so use compact
+        // controller labels beside the page count instead of adding a new texture dependency.
+        int pageX = x0;
+        pageX = fntRenderString(gTheme->fonts[0], pageX, uiY + 10, ALIGN_VCENTER, 0, 0, "[L1]", gTheme->textColor);
+        pageX += 12;
+        pageX = fntRenderString(gTheme->fonts[0], pageX, uiY + 10, ALIGN_VCENTER, 0, 0, diaSettingsIndicator, gTheme->textColor);
+        pageX += 12;
+        fntRenderString(gTheme->fonts[0], pageX, uiY + 10, ALIGN_VCENTER, 0, 0, "[R1]", gTheme->textColor);
         uiX = guiDrawIconAndText(gSelectButton == KEY_CIRCLE ? uiIcons[0] : uiIcons[1], uiHints[0], gTheme->fonts[0], uiX, uiY, gTheme->textColor);
         uiX += 12;
         uiX = guiDrawIconAndText(gSelectButton == KEY_CIRCLE ? uiIcons[1] : uiIcons[0], uiHints[1], gTheme->fonts[0], uiX, uiY, gTheme->textColor);

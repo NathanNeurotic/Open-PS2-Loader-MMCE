@@ -141,7 +141,6 @@ struct UIItem diaNetConfig[] = {
     {UI_BREAK},
 
     // buttons
-    {UI_BREAK},
     {UI_BUTTON, NETCFG_POPSTARTER_BUTTON, 1, 1, -1, 0, 0, {.label = {NULL, _STR_POPSTARTER}}},
     {UI_BREAK},
     {UI_BUTTON, NETCFG_OK, 1, 1, -1, 0, 0, {.label = {NULL, -1}}},
@@ -588,7 +587,7 @@ struct UIItem diaUIConfig[] = {
     {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {NULL, _STR_ENABLE_NOTIFICATIONS}}},
     {UI_SPACER},
     {UI_BOOL, UICFG_NOTIFICATIONS, 1, 1, -1, 0, 0, {.intvalue = {0, 0}}},
-    {UI_SPLITTER},
+    {UI_BREAK},
 
     // sub-pages
     {UI_BUTTON, UICFG_ARTWORK_BUTTON, 1, 1, -1, 0, 0, {.label = {NULL, _STR_ARTWORK_SETTINGS}}},

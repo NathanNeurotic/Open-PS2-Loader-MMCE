@@ -2716,7 +2716,9 @@ static int guiSettingsShowIndex(int *page)
     };
     int result;
 
-    result = diaExecuteDialog(indexDialog, -1, 1, NULL);
+    // Re-open the index on the current peer page when Triangle is pressed from a settings page.
+    // The initial Settings entry starts with General & System selected.
+    result = diaExecuteDialog(indexDialog, SETTINGS_INDEX_PAGE_BASE + *page, 1, NULL);
     if (result < SETTINGS_INDEX_PAGE_BASE || result >= SETTINGS_INDEX_PAGE_BASE + SETTINGS_PAGE_COUNT)
         return 0;
 
@@ -2730,6 +2732,11 @@ void guiShowSettings(void)
     int result;
 
     guiSettingsShellActive = 1;
+    if (!guiSettingsShowIndex(&page)) {
+        guiSettingsShellActive = 0;
+        return;
+    }
+
     while (1) {
         guiSettingsCurrentPage = page;
         switch (page) {
