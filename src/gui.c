@@ -2184,8 +2184,14 @@ static struct UIItem *guiSettingsCompose(const struct UIItem *const *parts, int 
                 if (item->type == UI_BREAK)
                     continue;
             }
-            if (guiSettingsSkipID(item->id, skipIDs, skipCount))
+            if (guiSettingsSkipID(item->id, skipIDs, skipCount)) {
+                // A skipped sub-page button owns the following break in the source dialog. Once
+                // the button is omitted from a composite page, that break would become an empty
+                // row with no visual or navigation purpose.
+                if (item->type == UI_BUTTON)
+                    skipTrailingBreak = 1;
                 continue;
+            }
             if (count >= SETTINGS_DIALOG_CAPACITY - 3)
                 return NULL;
             guiSettingsDialog[count++] = *item;
@@ -2213,9 +2219,9 @@ static int guiSettingsPageResult(int result)
     if (guiSettingsIsShellResult(result))
         return result;
 
-    // OK finishes the current peer page and returns to the Settings Index. Circle keeps its
-    // existing cancel/exit behavior and therefore remains a normal shell exit result.
-    return result == UIID_BTN_OK ? DIA_RESULT_INDEX : 0;
+    // Both confirmation and cancel finish the current peer page at the Settings Index. Circle
+    // from the Index itself still returns to the main menu because the Index has its own dialog.
+    return (result == UIID_BTN_OK || result == UIID_BTN_CANCEL) ? DIA_RESULT_INDEX : 0;
 }
 
 static void guiSettingsBeginDialog(struct UIItem *ui)

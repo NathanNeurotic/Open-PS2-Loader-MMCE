@@ -17,7 +17,7 @@
 
 // UI spacing of the dialogues (pixels between consecutive items)
 #define UI_SPACING_H          10
-#define UI_SETTINGS_SPACING_H 7
+#define UI_SETTINGS_SPACING_H 8
 #define UI_SPACING_V          2
 // spacer ui element width (simulates tab)
 #define UI_SPACER_WIDTH       50
@@ -707,6 +707,42 @@ void diaRenderUI(struct UIItem *ui, short inMenu, struct UIItem *cur, int haveFo
     int y0 = 20;
     int settingsShell = (ui == diaSettingsShellUI && diaSettingsIndicator != NULL);
     int spacingH = settingsShell ? UI_SETTINGS_SPACING_H : UI_SPACING_H;
+
+    // The Settings Index is a menu-like dialog. Center its complete content block vertically so
+    // its category list occupies the same visual area as the main menu instead of being pinned to
+    // the dialog's top edge. The normal dialog layout remains unchanged.
+    if (ui == diaCenteredUI) {
+        int measureY = y0;
+        int measureHmax = 0;
+        struct UIItem *measure = ui;
+
+        while (measure->type != UI_TERMINATOR) {
+            if (diaShouldBreakLine(measure)) {
+                if (measureHmax > 0)
+                    measureY += measureHmax + spacingH;
+                measureHmax = 0;
+            }
+
+            int measureH = diaItemHeight(measure, spacingH);
+            if (measureH > measureHmax)
+                measureHmax = measureH;
+
+            if (diaShouldBreakLineAfter(measure)) {
+                if (measureHmax > 0)
+                    measureY += measureHmax + spacingH;
+                measureHmax = 0;
+            }
+
+            measure++;
+        }
+
+        int measureBottom = measureY + measureHmax;
+        if (measureBottom > y0) {
+            int centeredY = (gTheme->usedHeight - (measureBottom - y0)) >> 1;
+            if (centeredY > y0)
+                y0 = centeredY;
+        }
+    }
 
     // render all items (shifted up by the scroll offset for tall dialogs)
     struct UIItem *rc = ui;

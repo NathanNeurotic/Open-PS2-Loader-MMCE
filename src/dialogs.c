@@ -299,22 +299,25 @@ struct UIItem diaDeviceConfig[] = {
     {UI_ENUM, CFG_BDMMODE, 1, 1, _STR_HINT_BDM_START, 0, 0, {.intvalue = {0, 0}}},
     {UI_BREAK},
 
-    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {"USB", -1}}},
+    {UI_HEADER, 0, 1, 1, -1, 0, 0, {.label = {"BDM Devices", -1}}},
+    {UI_BREAK},
+
+    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {"  USB", -1}}},
     {UI_SPACER},
     {UI_BOOL, CFG_ENABLEUSB, 1, 1, -1, 0, 0, {.intvalue = {0, 0}}},
     {UI_BREAK},
 
-    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {"iLink", -1}}},
+    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {"  iLink", -1}}},
     {UI_SPACER},
     {UI_BOOL, CFG_ENABLEILK, 1, 1, -1, 0, 0, {.intvalue = {0, 0}}},
     {UI_BREAK},
 
-    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {"MX4SIO", -1}}},
+    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {"  MX4SIO", -1}}},
     {UI_SPACER},
     {UI_BOOL, CFG_ENABLEMX4SIO, 1, 1, -1, 0, 0, {.intvalue = {0, 0}}},
     {UI_BREAK},
 
-    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {"HDD (GPT/MBR)", -1}}},
+    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {"  HDD (GPT/MBR)", -1}}},
     {UI_SPACER},
     {UI_BOOL, CFG_ENABLEBDMHDD, 1, 1, _STR_HDD_HINT, 0, 0, {.intvalue = {0, 0}}},
     {UI_BREAK},
