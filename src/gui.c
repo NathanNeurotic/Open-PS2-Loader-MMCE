@@ -2212,7 +2212,7 @@ static void guiSettingsBeginDialog(struct UIItem *ui)
     if (!guiSettingsShellActive)
         return;
 
-    snprintf(guiSettingsPageIndicator, sizeof(guiSettingsPageIndicator), "SETTINGS %d/8", guiSettingsCurrentPage + 1);
+    snprintf(guiSettingsPageIndicator, sizeof(guiSettingsPageIndicator), "%d/8", guiSettingsCurrentPage + 1);
     diaSetSettingsShell(ui, guiSettingsPageIndicator);
 }
 
@@ -2689,42 +2689,38 @@ enum gui_settings_page {
     SETTINGS_PAGE_COUNT
 };
 
-#define SETTINGS_INDEX_PAGE_ID 1000
+#define SETTINGS_INDEX_PAGE_BASE 1000
 
 static int guiSettingsShowIndex(int *page)
 {
-    const char *pageNames[] = {
-        "General & System",
-        _l(_STR_GAME_SOURCES),
-        _l(_STR_MENU_NETWORK),
-        _l(_STR_INTERFACE_SETTINGS),
-        _l(_STR_GAME_LAUNCHING),
-        _l(_STR_POPSTARTER),
-        _l(_STR_CONTROLLER_SETTINGS),
-        _l(_STR_AUDIO_SETTINGS),
-        NULL,
-    };
     struct UIItem indexDialog[] = {
         {UI_HEADER, 0, 1, 1, -1, 0, 0, {.label = {"SETTINGS INDEX", -1}}},
         {UI_SPLITTER},
-        {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {"PAGE", -1}}},
-        {UI_SPACER},
-        {UI_ENUM, SETTINGS_INDEX_PAGE_ID, 1, 1, -1, 0, 0, {.intvalue = {0, 0, 0, SETTINGS_PAGE_COUNT - 1, pageNames}}},
+        {UI_BUTTON, SETTINGS_INDEX_PAGE_BASE + SETTINGS_GENERAL, 1, 1, -1, 0, 0, {.label = {"General & System", -1}}},
         {UI_BREAK},
-        {UI_OK, 0, 1, 1, -1, 0, 0, {.label = {NULL, _STR_OK}}},
+        {UI_BUTTON, SETTINGS_INDEX_PAGE_BASE + SETTINGS_SOURCES, 1, 1, -1, 0, 0, {.label = {NULL, _STR_GAME_SOURCES}}},
+        {UI_BREAK},
+        {UI_BUTTON, SETTINGS_INDEX_PAGE_BASE + SETTINGS_NETWORK, 1, 1, -1, 0, 0, {.label = {NULL, _STR_MENU_NETWORK}}},
+        {UI_BREAK},
+        {UI_BUTTON, SETTINGS_INDEX_PAGE_BASE + SETTINGS_INTERFACE, 1, 1, -1, 0, 0, {.label = {NULL, _STR_INTERFACE_SETTINGS}}},
+        {UI_BREAK},
+        {UI_BUTTON, SETTINGS_INDEX_PAGE_BASE + SETTINGS_LAUNCH, 1, 1, -1, 0, 0, {.label = {NULL, _STR_GAME_LAUNCHING}}},
+        {UI_BREAK},
+        {UI_BUTTON, SETTINGS_INDEX_PAGE_BASE + SETTINGS_POPSTARTER, 1, 1, -1, 0, 0, {.label = {NULL, _STR_POPSTARTER}}},
+        {UI_BREAK},
+        {UI_BUTTON, SETTINGS_INDEX_PAGE_BASE + SETTINGS_CONTROLLERS, 1, 1, -1, 0, 0, {.label = {NULL, _STR_CONTROLLER_SETTINGS}}},
+        {UI_BREAK},
+        {UI_BUTTON, SETTINGS_INDEX_PAGE_BASE + SETTINGS_AUDIO, 1, 1, -1, 0, 0, {.label = {NULL, _STR_AUDIO_SETTINGS}}},
         {UI_BREAK},
         {UI_TERMINATOR},
     };
     int result;
-    int selectedPage;
 
-    diaSetInt(indexDialog, SETTINGS_INDEX_PAGE_ID, *page);
     result = diaExecuteDialog(indexDialog, -1, 1, NULL);
-    if (result != UIID_BTN_OK)
+    if (result < SETTINGS_INDEX_PAGE_BASE || result >= SETTINGS_INDEX_PAGE_BASE + SETTINGS_PAGE_COUNT)
         return 0;
 
-    diaGetInt(indexDialog, SETTINGS_INDEX_PAGE_ID, &selectedPage);
-    *page = selectedPage;
+    *page = result - SETTINGS_INDEX_PAGE_BASE;
     return 1;
 }
 

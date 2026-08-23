@@ -700,11 +700,6 @@ void diaRenderUI(struct UIItem *ui, short inMenu, struct UIItem *cur, int haveFo
     int y0 = 20;
     int settingsShell = (ui == diaSettingsShellUI && diaSettingsIndicator != NULL);
 
-    // Keep the peer-page indicator on the title line so the shell does not spend a row on
-    // navigation chrome. The dialog's own UI_HEADER remains the page title at x0.
-    if (settingsShell)
-        fntRenderString(gTheme->fonts[0], screenWidth - x0, y0, ALIGN_RIGHT, 0, 0, diaSettingsIndicator, gTheme->selTextColor);
-
     // render all items (shifted up by the scroll offset for tall dialogs)
     struct UIItem *rc = ui;
     int x = x0, y = y0 - diaScrollOffset, hmax = 0;
@@ -811,6 +806,8 @@ void diaRenderUI(struct UIItem *ui, short inMenu, struct UIItem *cur, int haveFo
         int uiIcons[3] = {CIRCLE_ICON, CROSS_ICON, TRIANGLE_ICON};
         int uiX = guiAlignSubMenuHints(3, uiHints, uiIcons, gTheme->fonts[0], 12, 2);
 
+        // Keep the page indicator in the footer, away from the theme-controlled title width.
+        fntRenderString(gTheme->fonts[0], x0, uiY, ALIGN_NONE, 0, 0, diaSettingsIndicator, gTheme->textColor);
         uiX = guiDrawIconAndText(gSelectButton == KEY_CIRCLE ? uiIcons[0] : uiIcons[1], uiHints[0], gTheme->fonts[0], uiX, uiY, gTheme->textColor);
         uiX += 12;
         uiX = guiDrawIconAndText(gSelectButton == KEY_CIRCLE ? uiIcons[1] : uiIcons[0], uiHints[1], gTheme->fonts[0], uiX, uiY, gTheme->textColor);
