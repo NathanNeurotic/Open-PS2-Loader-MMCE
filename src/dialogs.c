@@ -17,13 +17,6 @@ struct UIItem diaNetConfig[] = {
     // editor. The button opens the same IPCONFIG.DAT/SMBCONFIG.DAT owner used by the POPSTARTER
     // peer page; no POPSTARTER state is duplicated here.
     {UI_HEADER, 0, 1, 1, -1, 0, 0, {.label = {"OPL / NEUTRINO", -1}}},
-    {UI_SPACER},
-    {UI_HEADER, 0, 1, 1, -1, 0, 0, {.label = {"POPSTARTER", -1}}},
-    {UI_BREAK},
-
-    {UI_LABEL, 0, 1, 1, -1, 0, 0, {.label = {NULL, _STR_NETCONFIG}}},
-    {UI_SPACER},
-    {UI_BUTTON, NETCFG_POPSTARTER_BUTTON, 1, 1, -1, 0, 0, {.label = {NULL, _STR_NETCONFIG}}},
     {UI_BREAK},
 
     // Unified network rows (moved from diaDeviceConfig): Protocol (SMB/UDPFS/UDPBD) and Access
@@ -42,7 +35,7 @@ struct UIItem diaNetConfig[] = {
     {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {"SMB Version", -1}}},
     {UI_SPACER},
     {UI_ENUM, CFG_SMBDIALECT, 1, 1, -1, 0, 0, {.intvalue = {0, 0}}},
-    {UI_SPLITTER},
+    {UI_BREAK},
 
     {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {NULL, _STR_SHOW_ADVANCED_OPTS}}},
     {UI_SPACER},
@@ -54,7 +47,12 @@ struct UIItem diaNetConfig[] = {
     {UI_ENUM, NETCFG_ETHOPMODE, 1, 1, -1, 0, 0, {.intvalue = {0, 0}}},
     {UI_BREAK},
 
-    {UI_HEADER, 0, 1, 1, -1, 0, 0, {.label = {"OPL Network", -1}}},
+    {UI_HEADER, 0, 1, 1, -1, 0, 0, {.label = {"POPSTARTER", -1}}},
+    {UI_BREAK},
+    {UI_BUTTON, NETCFG_POPSTARTER_BUTTON, 1, 1, -1, 0, 0, {.label = {NULL, _STR_NETCONFIG}}},
+    {UI_BREAK},
+
+    {UI_HEADER, 0, 1, 1, -1, 0, 0, {.label = {"OPL NETWORK", -1}}},
     {UI_BREAK},
 
     // ---- IP address type ----
@@ -389,11 +387,15 @@ struct UIItem diaVcdConfig[] = {
 
 
     // sub-pages
-    {UI_BUTTON, VCD_BDMA_BUTTON, 1, 1, -1, 0, 0, {.label = {NULL, _STR_BDMA_SETTINGS}}},
+    {UI_HEADER, 0, 1, 1, -1, 0, 0, {.label = {NULL, _STR_BDMA_SETTINGS}}},
+    {UI_BREAK},
+    {UI_BUTTON, VCD_BDMA_BUTTON, 1, 1, -1, 0, 0, {.label = {NULL, _STR_CONFIGURE}}},
     {UI_BREAK},
     {UI_BUTTON, VCD_LIST_BUTTON, 1, 1, -1, 0, 0, {.label = {NULL, _STR_GAME_LIST_SETTINGS}}},
     {UI_BREAK},
-    {UI_BUTTON, VCD_NET_BUTTON, 1, 1, -1, 0, 0, {.label = {NULL, _STR_NETCONFIG}}},
+    {UI_HEADER, 0, 1, 1, -1, 0, 0, {.label = {"NETWORK SETTINGS", -1}}},
+    {UI_BREAK},
+    {UI_BUTTON, VCD_NET_BUTTON, 1, 1, -1, 0, 0, {.label = {NULL, _STR_CONFIGURE}}},
     {UI_BREAK},
 
     // buttons
@@ -599,6 +601,8 @@ struct UIItem diaUIConfig[] = {
     {UI_BREAK},
 
     // sub-pages
+    {UI_HEADER, 0, 1, 1, -1, 0, 0, {.label = {"ARTWORK", -1}}},
+    {UI_BREAK},
     {UI_BUTTON, UICFG_ARTWORK_BUTTON, 1, 1, -1, 0, 0, {.label = {NULL, _STR_ARTWORK_SETTINGS}}},
     {UI_BREAK},
     {UI_BUTTON, UICFG_COVERFLOW_BUTTON, 1, 1, -1, 0, 0, {.label = {NULL, _STR_COVERFLOW_SETTINGS}}},
@@ -748,12 +752,14 @@ struct UIItem diaLaunchConfig[] = {
     {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {NULL, _STR_DEFAULT_CORE}}},
     {UI_SPACER},
     {UI_ENUM, CFG_DEFAULT_CORE, 1, 1, _STR_HINT_DEFAULT_CORE, 0, 0, {.intvalue = {0, 0}}},
-    {UI_SPLITTER},
+    {UI_BREAK},
 
     // sub-pages
     {UI_BUTTON, LAUNCH_NEUTRINO_DEFAULTS_BUTTON, 1, 1, -1, 0, 0, {.label = {NULL, _STR_NEUTRINO_DEFAULTS}}},
     {UI_BREAK},
-    {UI_BUTTON, LAUNCH_OSD_DEFAULTS_BUTTON, 1, 1, -1, 0, 0, {.label = {NULL, _STR_OSD_DEFAULTS}}},
+    {UI_HEADER, 0, 1, 1, -1, 0, 0, {.label = {NULL, _STR_OSD_DEFAULTS}}},
+    {UI_BREAK},
+    {UI_BUTTON, LAUNCH_OSD_DEFAULTS_BUTTON, 1, 1, -1, 0, 0, {.label = {NULL, _STR_CONFIGURE}}},
     {UI_BREAK},
 
     // buttons

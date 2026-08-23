@@ -68,10 +68,12 @@ static struct UIItem guiSettingsDialog[SETTINGS_DIALOG_CAPACITY];
 static struct UIItem *guiSettingsActiveDialog;
 static int guiSettingsShellActive;
 static int guiSettingsCurrentPage;
+static int guiSettingsSavePending;
 static char guiSettingsPageIndicator[32];
 
 static int guiSettingsIsShellResult(int result);
 static int guiSettingsPageResult(int result);
+static int guiSettingsPromptSave(void);
 static void guiSettingsBeginDialog(struct UIItem *ui);
 static void guiSettingsEndDialog(void);
 
@@ -1175,8 +1177,8 @@ reshow_network:
         // Each network transport loads its IOP module chain once per boot (the load latch is not cleared
         // live). If a stack is already up and the user picked a protocol other than the one actually
         // running, the switch takes effect only after a restart -- say so instead of silently doing
-        // nothing. The OFFER to restart lives on the SAVE path (see guiNetProtocolNeedsRestart), since
-        // this dialog only touches RAM and Save Changes is a separate menu action.
+        // nothing. The OFFER to restart lives on the Save Settings path (see guiNetProtocolNeedsRestart),
+        // since this dialog only touches RAM.
         if (gNetworkProtocol != netProtocolWas && guiNetProtocolNeedsRestart())
             guiMsgBox(_l(_STR_NETBOOT_RESTART), 0, NULL);
 
@@ -2078,6 +2080,7 @@ static void guiSetAudioSettingsState(void)
 static int guiAudioUpdater(int modified)
 {
     if (modified) {
+        guiSettingsSavePending = 1;
         guiSetAudioSettingsState();
     }
 
@@ -2192,11 +2195,15 @@ static struct UIItem *guiSettingsCompose(const struct UIItem *const *parts, int 
                     skipTrailingBreak = 1;
                 continue;
             }
-            // Secondary settings sections already have their own colored heading. The source
-            // dialog's title underline is useful when shown alone, but becomes a redundant empty
-            // row when the section is composed into the Settings peer page.
-            if (part > 0 && item->type == UI_SPLITTER && count > 0 && guiSettingsDialog[count - 1].type == UI_HEADER)
+            // Secondary settings sections already have their own colored heading. Keep the heading
+            // on its own line, but omit the source dialog's redundant separator line when it is
+            // composed into the peer page.
+            if (part > 0 && item->type == UI_SPLITTER && count > 0 && guiSettingsDialog[count - 1].type == UI_HEADER) {
+                if (count >= SETTINGS_DIALOG_CAPACITY - 3)
+                    return NULL;
+                guiSettingsDialog[count++] = (struct UIItem) {UI_BREAK};
                 continue;
+            }
             if (count >= SETTINGS_DIALOG_CAPACITY - 3)
                 return NULL;
             guiSettingsDialog[count++] = *item;
@@ -2221,6 +2228,9 @@ static int guiSettingsIsShellResult(int result)
 
 static int guiSettingsPageResult(int result)
 {
+    if (result == UIID_BTN_OK || guiSettingsIsShellResult(result))
+        guiSettingsSavePending = 1;
+
     if (guiSettingsIsShellResult(result))
         return result;
 
@@ -2415,6 +2425,8 @@ static int guiSettingsDisplayUpdater(int modified)
 
     if (!modified)
         return 0;
+
+    guiSettingsSavePending = 1;
 
     diaGetInt(guiSettingsActiveDialog, UICFG_XOFF, &x);
     diaGetInt(guiSettingsActiveDialog, UICFG_YOFF, &y);
@@ -2711,9 +2723,75 @@ enum gui_settings_page {
     SETTINGS_PAGE_COUNT
 };
 
+enum gui_settings_prompt_result {
+    SETTINGS_PROMPT_SAVE = 1,
+    SETTINGS_PROMPT_EXIT,
+    SETTINGS_PROMPT_CONTINUE
+};
+
+static int guiSettingsPromptSave(void)
+{
+    int promptHints[3] = {_STR_SETTINGS_SAVE, _STR_SETTINGS_EXIT_WITHOUT_SAVING, _STR_SETTINGS_CONTINUE_EDITING};
+    int promptIcons[3] = {CROSS_ICON, CIRCLE_ICON, TRIANGLE_ICON};
+
+    sfxPlay(SFX_MESSAGE);
+    while (1) {
+        int x, y;
+
+        guiStartFrame();
+        if (guiDrawBGSettings() == 0)
+            guiDrawBGPlasma();
+
+        rmDrawRect(0, 0, screenWidth, screenHeight, gColDarker);
+        rmDrawLine(50, 75, screenWidth - 50, 75, gColWhite);
+        rmDrawLine(50, 410, screenWidth - 50, 410, gColWhite);
+        fntRenderString(gTheme->fonts[0], screenWidth >> 1, 150, ALIGN_CENTER, 0, 0,
+                        _l(_STR_SETTINGS_SAVE_PROMPT), gTheme->selTextColor);
+        fntRenderString(gTheme->fonts[0], screenWidth >> 1, 205, ALIGN_CENTER, 0, 0,
+                        _l(_STR_SETTINGS_SAVE_PROMPT_LINE1), gTheme->textColor);
+        fntRenderString(gTheme->fonts[0], screenWidth >> 1, 230, ALIGN_CENTER, 0, 0,
+                        _l(_STR_SETTINGS_SAVE_PROMPT_LINE2), gTheme->textColor);
+
+        x = guiAlignSubMenuHints(3, promptHints, promptIcons, gTheme->fonts[0], 12, 1);
+        y = gTheme->usedHeight - 32;
+        x = guiDrawIconAndText(promptIcons[0], promptHints[0], gTheme->fonts[0], x, y, gTheme->textColor);
+        x += 12;
+        x = guiDrawIconAndText(promptIcons[1], promptHints[1], gTheme->fonts[0], x, y, gTheme->textColor);
+        x += 12;
+        guiDrawIconAndText(promptIcons[2], promptHints[2], gTheme->fonts[0], x, y, gTheme->textColor);
+        guiEndFrame();
+
+        readPads();
+        if (getKeyOn(KEY_CROSS)) {
+            sfxPlay(SFX_CONFIRM);
+            return SETTINGS_PROMPT_SAVE;
+        }
+        if (getKeyOn(KEY_CIRCLE)) {
+            sfxPlay(SFX_CANCEL);
+            return SETTINGS_PROMPT_EXIT;
+        }
+        if (getKeyOn(KEY_TRIANGLE)) {
+            sfxPlay(SFX_CURSOR);
+            return SETTINGS_PROMPT_CONTINUE;
+        }
+    }
+}
+
+static void guiDrawSettingsIndexHints(void)
+{
+    int hints[2] = {_STR_SELECT, _STR_BACK};
+    int icons[2] = {CROSS_ICON, CIRCLE_ICON};
+    int x = guiAlignSubMenuHints(2, hints, icons, gTheme->fonts[0], 12, 2);
+    int y = gTheme->usedHeight - 32;
+
+    x = guiDrawIconAndText(icons[0], hints[0], gTheme->fonts[0], x, y, gTheme->textColor);
+    x += 12;
+    guiDrawIconAndText(icons[1], hints[1], gTheme->fonts[0], x, y, gTheme->textColor);
+}
+
 static int guiSettingsShowIndex(int *page)
 {
-    const char *labels[SETTINGS_PAGE_COUNT] = {
+    const char *labels[SETTINGS_PAGE_COUNT + 1] = {
         "General & System",
         _l(_STR_GAME_SOURCES),
         _l(_STR_MENU_NETWORK),
@@ -2722,10 +2800,15 @@ static int guiSettingsShowIndex(int *page)
         _l(_STR_POPSTARTER),
         _l(_STR_CONTROLLER_SETTINGS),
         _l(_STR_AUDIO_SETTINGS),
+        _l(_STR_SAVE_CHANGES),
     };
     int selected = *page;
+    const int itemCount = SETTINGS_PAGE_COUNT + 1;
     int spacing = 25;
     int y;
+
+    if (selected < SETTINGS_GENERAL || selected >= SETTINGS_PAGE_COUNT)
+        selected = SETTINGS_GENERAL;
 
     // This is intentionally rendered with the same geometry and highlight treatment as the main
     // menu. The Index is the Settings hub, not another dialog with a focus box around each row.
@@ -2736,30 +2819,48 @@ static int guiSettingsShowIndex(int *page)
 
         fntRenderString(gTheme->fonts[0], screenWidth >> 1, 50, ALIGN_CENTER, 0, 0, "SETTINGS INDEX", gTheme->textColor);
 
-        y = (gTheme->usedHeight >> 1) - (spacing * (SETTINGS_PAGE_COUNT >> 1));
-        for (int i = 0; i < SETTINGS_PAGE_COUNT; i++) {
+        y = (gTheme->usedHeight >> 1) - (spacing * (itemCount >> 1));
+        for (int i = 0; i < itemCount; i++) {
             fntRenderString(gTheme->fonts[0], screenWidth >> 1, y, ALIGN_CENTER, 0, 0, labels[i], (i == selected) ? gTheme->selTextColor : gTheme->textColor);
             y += spacing;
+            if (i == SETTINGS_PAGE_COUNT - 1)
+                y += spacing / 2;
         }
 
-        // Keep the same Select / Games List prompt and icon ordering as the native Main Menu.
-        guiDrawSubMenuHints();
+        guiDrawSettingsIndexHints();
         guiEndFrame();
 
         readPads();
         if (getKey(KEY_UP)) {
             sfxPlay(SFX_CURSOR);
-            selected = (selected + SETTINGS_PAGE_COUNT - 1) % SETTINGS_PAGE_COUNT;
+            selected = (selected + itemCount - 1) % itemCount;
         } else if (getKey(KEY_DOWN)) {
             sfxPlay(SFX_CURSOR);
-            selected = (selected + 1) % SETTINGS_PAGE_COUNT;
-        } else if (getKeyOn(gSelectButton)) {
+            selected = (selected + 1) % itemCount;
+        } else if (getKeyOn(KEY_CROSS)) {
             sfxPlay(SFX_CONFIRM);
-            *page = selected;
-            return 1;
-        } else if (getKeyOn(KEY_START) || getKeyOn(gSelectButton == KEY_CIRCLE ? KEY_CROSS : KEY_CIRCLE)) {
+            if (selected == SETTINGS_PAGE_COUNT) {
+                if (menuSaveSettings() > 0)
+                    guiSettingsSavePending = 0;
+            } else {
+                *page = selected;
+                return 1;
+            }
+        } else if (getKeyOn(KEY_START) || getKeyOn(KEY_CIRCLE)) {
             sfxPlay(SFX_CANCEL);
-            return 0;
+            if (!guiSettingsSavePending)
+                return 0;
+
+            int promptResult = guiSettingsPromptSave();
+            if (promptResult == SETTINGS_PROMPT_SAVE) {
+                if (menuSaveSettings() > 0) {
+                    guiSettingsSavePending = 0;
+                    return 0;
+                }
+            } else if (promptResult == SETTINGS_PROMPT_EXIT) {
+                guiSettingsSavePending = 0;
+                return 0;
+            }
         }
     }
 }
@@ -2770,8 +2871,10 @@ void guiShowSettings(void)
     int result;
 
     guiSettingsShellActive = 1;
+    guiSettingsSavePending = 0;
     if (!guiSettingsShowIndex(&page)) {
         guiSettingsShellActive = 0;
+        guiSettingsSavePending = 0;
         return;
     }
 
@@ -2804,12 +2907,14 @@ void guiShowSettings(void)
                 break;
             default:
                 guiSettingsShellActive = 0;
+                guiSettingsSavePending = 0;
                 return;
         }
 
         if (result == DIA_RESULT_INDEX) {
             if (!guiSettingsShowIndex(&page)) {
                 guiSettingsShellActive = 0;
+                guiSettingsSavePending = 0;
                 return;
             }
         } else if (result == DIA_RESULT_NEXT) {
@@ -2818,6 +2923,7 @@ void guiShowSettings(void)
             page = (page + SETTINGS_PAGE_COUNT - 1) % SETTINGS_PAGE_COUNT;
         } else {
             guiSettingsShellActive = 0;
+            guiSettingsSavePending = 0;
             return;
         }
     }

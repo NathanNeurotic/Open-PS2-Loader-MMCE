@@ -806,7 +806,7 @@ void diaRenderUI(struct UIItem *ui, short inMenu, struct UIItem *cur, int haveFo
     int uiY = gTheme->usedHeight - 32;
     if (settingsShell) {
         int uiHints[3] = {_STR_SELECT, _STR_BACK, _STR_OPTIONS};
-        int uiIcons[3] = {CIRCLE_ICON, CROSS_ICON, TRIANGLE_ICON};
+        int uiIcons[3] = {CROSS_ICON, CIRCLE_ICON, TRIANGLE_ICON};
         int uiX = guiAlignSubMenuHints(3, uiHints, uiIcons, gTheme->fonts[0], 12, 2);
 
         // Use the same controller button textures as the rest of OPL. Do not introduce a text-only
@@ -824,9 +824,9 @@ void diaRenderUI(struct UIItem *ui, short inMenu, struct UIItem *cur, int haveFo
         pageX += 8;
         if (r1Tex && r1Tex->Mem)
             rmDrawPixmap(r1Tex, pageX, uiY + 10, ALIGN_VCENTER, r1W, 20, SCALING_RATIO, gDefaultCol, 0);
-        uiX = guiDrawIconAndText(gSelectButton == KEY_CIRCLE ? uiIcons[0] : uiIcons[1], uiHints[0], gTheme->fonts[0], uiX, uiY, gTheme->textColor);
+        uiX = guiDrawIconAndText(uiIcons[0], uiHints[0], gTheme->fonts[0], uiX, uiY, gTheme->textColor);
         uiX += 12;
-        uiX = guiDrawIconAndText(gSelectButton == KEY_CIRCLE ? uiIcons[1] : uiIcons[0], uiHints[1], gTheme->fonts[0], uiX, uiY, gTheme->textColor);
+        uiX = guiDrawIconAndText(uiIcons[1], uiHints[1], gTheme->fonts[0], uiX, uiY, gTheme->textColor);
         uiX += 12;
         guiDrawIconAndText(uiIcons[2], uiHints[2], gTheme->fonts[0], uiX, uiY, gTheme->textColor);
     } else {
@@ -859,17 +859,20 @@ static void diaResetValue(struct UIItem *item)
     }
 }
 
-static int diaHandleInput(struct UIItem *item, int *modified)
+static int diaHandleInput(struct UIItem *item, int *modified, int settingsShell)
 {
+    int selectButton = settingsShell ? KEY_CROSS : gSelectButton;
+    int cancelButton = settingsShell ? KEY_CIRCLE : (gSelectButton == KEY_CIRCLE ? KEY_CROSS : KEY_CIRCLE);
+
     // circle loses focus, sets old values first
-    if (getKeyOn(gSelectButton == KEY_CIRCLE ? KEY_CROSS : KEY_CIRCLE)) {
+    if (getKeyOn(cancelButton)) {
         diaResetValue(item);
         sfxPlay(SFX_CONFIRM);
         return 0;
     }
 
     // cross loses focus without setting default
-    if (getKeyOn(gSelectButton)) {
+    if (getKeyOn(selectButton)) {
         sfxPlay(SFX_CONFIRM);
         *modified = 0;
         return 0;
@@ -1125,6 +1128,8 @@ int diaExecuteDialog(struct UIItem *ui, int uiId, short inMenu, int (*updater)(i
 
     diaStoreScrollSpeed();
 
+    int settingsShell = diaSettingsShellUI == ui && diaSettingsIndicator != NULL;
+
     // slower controls for dialogs
     setButtonDelay(KEY_UP, diaScrollDelay());
     setButtonDelay(KEY_DOWN, diaScrollDelay());
@@ -1143,7 +1148,7 @@ int diaExecuteDialog(struct UIItem *ui, int uiId, short inMenu, int (*updater)(i
 
         if (haveFocus) {
             modified = 1;
-            haveFocus = diaHandleInput(cur, &modified);
+            haveFocus = diaHandleInput(cur, &modified, settingsShell);
 
             if (!haveFocus) {
                 setButtonDelay(KEY_UP, diaScrollDelay());
@@ -1206,14 +1211,14 @@ int diaExecuteDialog(struct UIItem *ui, int uiId, short inMenu, int (*updater)(i
             }
 
             // Cancel button breaks focus or exits with false result
-            if (getKeyOn(gSelectButton == KEY_CIRCLE ? KEY_CROSS : KEY_CIRCLE)) {
+            if (getKeyOn(settingsShell ? KEY_CIRCLE : (gSelectButton == KEY_CIRCLE ? KEY_CROSS : KEY_CIRCLE))) {
                 diaRestoreScrollSpeed();
                 sfxPlay(SFX_CANCEL);
                 return UIID_BTN_CANCEL;
             }
 
             // see what key events we have
-            if (getKeyOn(gSelectButton)) {
+            if (getKeyOn(settingsShell ? KEY_CROSS : gSelectButton)) {
                 haveFocus = 1;
                 sfxPlay(SFX_CONFIRM);
 
