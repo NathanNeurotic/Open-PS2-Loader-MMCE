@@ -899,7 +899,7 @@ gui_strings:
 - label: GAMEID_MODE_PS2
   string: On (PS2 only)
 - label: GAMEID_MODE_OFF
-  string: Off
+  string: 'Off'
 - label: POPS_IMPORT
   string: Import POPSLoader Settings
 - label: POPS_NONE_DETECTED
