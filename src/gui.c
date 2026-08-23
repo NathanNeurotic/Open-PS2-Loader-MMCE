@@ -71,6 +71,7 @@ static int guiSettingsCurrentPage;
 static char guiSettingsPageIndicator[32];
 
 static int guiSettingsIsShellResult(int result);
+static int guiSettingsPageResult(int result);
 static void guiSettingsBeginDialog(struct UIItem *ui);
 static void guiSettingsEndDialog(void);
 
@@ -1186,7 +1187,7 @@ reshow_network:
     }
 
     guiSettingsEndDialog();
-    return guiSettingsIsShellResult(result) ? result : 0;
+    return guiSettingsPageResult(result);
 }
 
 // POPStarter page live-updater: reveal the free-text POPSTARTER.ELF Path field only when the
@@ -2097,7 +2098,7 @@ int guiShowAudioConfig(void)
     guiSettingsBeginDialog(diaAudioConfig);
     int result = diaExecuteDialog(diaAudioConfig, -1, 1, guiAudioUpdater);
     guiSettingsEndDialog();
-    return guiSettingsIsShellResult(result) ? result : 0;
+    return guiSettingsPageResult(result);
 }
 
 int guiShowControllerConfig(void)
@@ -2145,7 +2146,7 @@ int guiShowControllerConfig(void)
     }
 
     guiSettingsEndDialog();
-    return guiSettingsIsShellResult(result) ? result : 0;
+    return guiSettingsPageResult(result);
 }
 
 static int guiSettingsSkipID(int id, const int *skipIDs, int skipCount)
@@ -2205,6 +2206,16 @@ static int guiSettingsIsPeerResult(int result)
 static int guiSettingsIsShellResult(int result)
 {
     return guiSettingsIsPeerResult(result) || result == DIA_RESULT_INDEX;
+}
+
+static int guiSettingsPageResult(int result)
+{
+    if (guiSettingsIsShellResult(result))
+        return result;
+
+    // OK finishes the current peer page and returns to the Settings Index. Circle keeps its
+    // existing cancel/exit behavior and therefore remains a normal shell exit result.
+    return result == UIID_BTN_OK ? DIA_RESULT_INDEX : 0;
 }
 
 static void guiSettingsBeginDialog(struct UIItem *ui)
@@ -2286,7 +2297,7 @@ reshow_general:
 
     guiSettingsEndDialog();
     guiSettingsActiveDialog = NULL;
-    return guiSettingsIsShellResult(result) ? result : 0;
+    return guiSettingsPageResult(result);
 }
 
 static int guiSettingsShowSources(void)
@@ -2384,7 +2395,7 @@ reshow_sources:
 
     guiSettingsEndDialog();
     guiSettingsActiveDialog = NULL;
-    return guiSettingsIsShellResult(result) ? result : 0;
+    return guiSettingsPageResult(result);
 }
 
 static int guiSettingsDisplayUpdater(int modified)
@@ -2523,7 +2534,7 @@ reshow_interface:
     guiFreeNameList(langNamesSnap);
     guiSettingsEndDialog();
     guiSettingsActiveDialog = NULL;
-    return guiSettingsIsShellResult(result) ? result : 0;
+    return guiSettingsPageResult(result);
 }
 
 static int guiSettingsLaunchUpdater(int modified)
@@ -2586,7 +2597,7 @@ reshow_launch:
 
     guiSettingsEndDialog();
     guiSettingsActiveDialog = NULL;
-    return guiSettingsIsShellResult(result) ? result : 0;
+    return guiSettingsPageResult(result);
 }
 
 static int guiSettingsVcdUpdater(int modified)
@@ -2674,7 +2685,7 @@ reshow_popstarter:
 
     guiSettingsEndDialog();
     guiSettingsActiveDialog = NULL;
-    return guiSettingsIsShellResult(result) ? result : 0;
+    return guiSettingsPageResult(result);
 }
 
 enum gui_settings_page {
