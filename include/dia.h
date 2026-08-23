@@ -6,8 +6,8 @@
 // Results returned by diaExecuteDialog when the caller opts into Settings peer navigation.
 // They are deliberately outside the normal UI item-id range so existing dialogs keep their
 // current button semantics.
-#define DIA_RESULT_PREV (-2)
-#define DIA_RESULT_NEXT (-3)
+#define DIA_RESULT_PREV  (-2)
+#define DIA_RESULT_NEXT  (-3)
 #define DIA_RESULT_INDEX (-4)
 
 // UI dialog item definition
