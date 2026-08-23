@@ -82,8 +82,8 @@ static void guiSettingsEndDialog(void);
 static struct UIItem *guiSettingsCompose(const struct UIItem *const *parts, int partCount,
                                          const int *skipIDs, int skipCount, int suppressSecondaryHeaders);
 static struct UIItem *guiSettingsComposeInto(struct UIItem *dialog, const struct UIItem *const *parts,
-                                              int partCount, const int *skipIDs, int skipCount,
-                                              int suppressSecondaryHeaders);
+                                             int partCount, const int *skipIDs, int skipCount,
+                                             int suppressSecondaryHeaders);
 
 // Notification popup: START tick + how long to hold, NOT an absolute deadline. clock() is a
 // 32-bit microsecond counter, so it wraps every ~71.6 minutes; `clock() >= start + duration`
@@ -2309,8 +2309,8 @@ static struct UIItem *guiSettingsCompose(const struct UIItem *const *parts, int 
 }
 
 static struct UIItem *guiSettingsComposeInto(struct UIItem *dialog, const struct UIItem *const *parts,
-                                              int partCount, const int *skipIDs, int skipCount,
-                                              int suppressSecondaryHeaders)
+                                             int partCount, const int *skipIDs, int skipCount,
+                                             int suppressSecondaryHeaders)
 {
     int part, i, skipTrailingBreak, skipSecondarySplitter;
     int count = 0;
