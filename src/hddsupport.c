@@ -306,6 +306,11 @@ int hddLoadModules(void)
     return retStatus;
 }
 
+int hddModulesAreLoaded(void)
+{
+    return hddModulesLoaded != 0;
+}
+
 // Validate an APA header sector without ps2hdd: the "APA" magic plus the header checksum
 // (sum of the 127 little-endian words after the checksum word itself, per ps2sdk apaCheckSum).
 static int hddApaHeaderValid(const u8 *pSectorData)
@@ -991,10 +996,11 @@ int hddStageOplHomeSelection(int selection)
     if (selection != HDD_OPL_HOME_COMMON && selection != HDD_OPL_HOME_PLUS)
         return 0;
 
-    // Bring up only the APA/PFS drivers. Do not call hddLoadSupportModules here: its normal data
-    // home recovery may mount pfs0: and create OPL folders, neither of which belongs to a source
-    // selector proof.
-    if (!hddLoadModulesReady())
+    // Use only the already-resident ATA stack. The selector is a short-lived proof, not an owner
+    // of a module reference; hddLoadModulesReady() would retain one on every stage/save cycle.
+    // Do not call hddLoadSupportModules here: its normal data-home recovery may mount pfs0: and
+    // create OPL folders, neither of which belongs to a source selector proof.
+    if (!hddModulesAreLoaded())
         return 0;
     if (!hddLoadCoreSupportModules())
         return 0;
@@ -1009,7 +1015,7 @@ int hddStageOplHomeSelection(int selection)
 
 int hddCommitOplHomeSelection(void)
 {
-    config_set_t *config;
+    config_set_t *config = NULL;
     const char *path = "pfs1:OPL/conf_hdd.cfg";
     int fd;
     int exists;
@@ -1020,7 +1026,7 @@ int hddCommitOplHomeSelection(void)
 
     // Re-prove the common owner at commit time. No raw APA operation, partition creation, or pfs0:
     // remount is involved; this is only a bounded pfs1: read/write mount of an existing partition.
-    if (!hddLoadModulesReady())
+    if (!hddModulesAreLoaded())
         return 0;
     if (!hddLoadCoreSupportModules() || !hddPartitionMountableAt("pfs1:", "hdd0:__common", FIO_MT_RDWR))
         return 0;
@@ -1033,7 +1039,12 @@ int hddCommitOplHomeSelection(void)
     if (fd >= 0)
         close(fd);
 
-    config = configAlloc(0, NULL, (char *)path);
+    // A missing selector already means __common/OPL/. Keep that default fileless; only an
+    // explicit +OPL selection needs to materialize conf_hdd.cfg.
+    if (!exists && hddOplHomePending == HDD_OPL_HOME_COMMON)
+        result = 1;
+    else
+        config = configAlloc(0, NULL, (char *)path);
     if (config != NULL) {
         // A present-but-unreadable file is user data, not an invitation to replace it with a new
         // selector. A missing file is the normal common-home default and can be born only for an
@@ -1199,8 +1210,11 @@ static void hddDoLaunchVcd(item_list_t *itemList, const char *name, const char *
     // reported success. Note cacheAbortMmce* only covers SIO2 requests, so the second call (which
     // covers ALL of them) is the one that matters here and its result is the one worth honouring.
     cacheAbortMmceImageLoadsTimed(HDD_ART_QUIESCE_MS);
-    if (!cacheCancelPendingImageLoadsTimed(HDD_ART_QUIESCE_MS))
-        LOG("HDD VCD: art did not quiesce before the pfs0: remount\n");
+    if (!cacheCancelPendingImageLoadsTimed(HDD_ART_QUIESCE_MS)) {
+        LOG("HDD VCD: art did not quiesce; refusing the pfs0: remount\n");
+        guiMsgBox(_l(_STR_PLEASE_WAIT), 0, NULL);
+        return;
+    }
     ioBlockOps(1);
     if (!hddResolveHddPopstarter(vcdElf, sizeof(vcdElf))) {
         ioBlockOps(0); // resolver already restored pfs0: to the OPL data partition on failure

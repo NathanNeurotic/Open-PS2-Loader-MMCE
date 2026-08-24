@@ -1295,23 +1295,73 @@ static void errorMessageHook()
     clearErrorMessage();
 }
 
+// Language strings can choose the order of the supported substitutions, but are never handed to
+// printf directly. Unknown conversion sequences remain literal text instead of consuming an
+// argument that this caller did not provide.
+static void formatErrorMessage(const char *format, const char *path, int error, int allowPath, int allowError)
+{
+    char errorText[16];
+    size_t used = 0;
+
+    if (format == NULL) {
+        errorMessage[0] = '\0';
+        return;
+    }
+
+    snprintf(errorText, sizeof(errorText), "%d", error);
+    while (*format != '\0' && used < sizeof(errorMessage) - 1) {
+        const char *replacement = NULL;
+
+        if (*format != '%') {
+            errorMessage[used++] = *format++;
+            continue;
+        }
+
+        format++;
+        if (*format == '\0') {
+            errorMessage[used++] = '%';
+            break;
+        }
+        if (*format == '%') {
+            errorMessage[used++] = *format++;
+            continue;
+        }
+        if (*format == 's' && allowPath)
+            replacement = path ? path : "";
+        else if ((*format == 'd' || *format == 'i') && allowError)
+            replacement = errorText;
+
+        if (replacement != NULL) {
+            format++;
+            while (*replacement != '\0' && used < sizeof(errorMessage) - 1)
+                errorMessage[used++] = *replacement++;
+        } else {
+            errorMessage[used++] = '%';
+            if (used < sizeof(errorMessage) - 1)
+                errorMessage[used++] = *format;
+            format++;
+        }
+    }
+    errorMessage[used] = '\0';
+}
+
 void setErrorMessageWithCode(int strId, int error)
 {
-    snprintf(errorMessage, sizeof(errorMessage), _l(strId), error);
+    formatErrorMessage(_l(strId), NULL, error, 0, 1);
     errorMessageStringId = strId;
     guiSetFrameHook(&errorMessageHook);
 }
 
 void setErrorMessage(int strId)
 {
-    snprintf(errorMessage, sizeof(errorMessage), _l(strId));
+    formatErrorMessage(_l(strId), NULL, 0, 0, 0);
     errorMessageStringId = strId;
     guiSetFrameHook(&errorMessageHook);
 }
 
 void setErrorMessagePathCode(int strId, const char *path, int error)
 {
-    snprintf(errorMessage, sizeof(errorMessage), _l(strId), path ? path : "", error);
+    formatErrorMessage(_l(strId), path, error, 1, 1);
     errorMessageStringId = strId;
     guiSetFrameHook(&errorMessageHook);
 }

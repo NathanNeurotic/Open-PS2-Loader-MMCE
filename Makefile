@@ -146,7 +146,8 @@ GFX_OBJS = $(PNG_ASSETS:%=%_png.o) poeveticanew.o icon_sys.o icon_icn.o
 # NOTE: audio/bgm.ogg is intentionally NOT compiled into the ELF (saves ~324 KB).
 # It is kept in the repo only as a reference/default track. BGM is loaded at
 # runtime from a theme's sound/bgm.ogg, a configured BGM path, or the built-in
-# theme's conventional <OPL home>/bgm.ogg (see sound.c bgmLoad), never embedded
+# theme's <OPL boot/CWD home>/bgm.ogg on non-APA boots and <gHDDPrefix>THM/bgm.ogg
+# on APA boots (see sound.c bgmLoad), never embedded
 # -- do not add bgm.o back here.
 AUDIO_OBJS =	boot.o cancel.o confirm.o cursor.o message.o transition.o bd_connect.o bd_disconnect.o
 

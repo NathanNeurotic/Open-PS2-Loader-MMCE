@@ -1136,3 +1136,19 @@ gui_strings:
   string: '%d: HardDisk Drive unavailable.'
 - label: HDD_PFS_UNAVAILABLE_ERROR
   string: '%d: HardDisk Drive PFS support unavailable.'
+- label: POPS_LOADING_SETTINGS
+  string: Loading POPSTARTER settings...
+- label: POPS_SMB_NOT_CONNECTED
+  string: SMB is not connected.
+- label: POPS_SMB_SETTINGS_NOT_FOUND
+  string: No POPSTARTER settings found in SMB POPS directory.
+- label: HDD_OPL_PLUS_NOT_FOUND
+  string: +OPL partition not found.
+- label: HDD_OPL_PARTITION_NOT_FOUND
+  string: HDD (APA) OPL partition not found.
+- label: HDD_OPL_PARTITION_RESTART
+  string: Restart or remount HDD to use the selected OPL partition.
+- label: HDD_OPL_PARTITION_CHECKING
+  string: Checking HDD OPL partition...
+- label: GENERAL_SYSTEM
+  string: General & System

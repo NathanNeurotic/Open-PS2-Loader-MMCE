@@ -776,11 +776,11 @@ reshow_device:
             if (!guiSettingsStageOplHome(hddOplHomeChoice)) {
                 diaSetInt(diaDeviceConfig, CFG_HDDOPLPART, guiDeviceOplHomeInitial);
                 guiDeviceOplHomeTouched = 0;
-                guiMsgBox(hddOplHomeChoice == HDD_OPL_HOME_PLUS ? "+OPL partition not found." : "HDD (APA) OPL partition not found.",
+                guiMsgBox(hddOplHomeChoice == HDD_OPL_HOME_PLUS ? _l(_STR_HDD_OPL_PLUS_NOT_FOUND) : _l(_STR_HDD_OPL_PARTITION_NOT_FOUND),
                           0, NULL);
                 goto reshow_device;
             }
-            guiMsgBox("Restart or remount HDD to use the selected OPL partition.", 0, NULL);
+            guiMsgBox(_l(_STR_HDD_OPL_PARTITION_RESTART), 0, NULL);
         }
 
         diaGetInt(diaDeviceConfig, CFG_DEFDEVICE, &deviceModeIndex);
@@ -1645,7 +1645,7 @@ static int guiReadPopsNet(int source, vcd_popsnet_t *out)
             guiDrawBGPlasma();
         rmDrawRect(0, 0, screenWidth, screenHeight, gColDarker);
         fntRenderString(gTheme->fonts[0], screenWidth >> 1, gTheme->usedHeight >> 1,
-                        ALIGN_CENTER, 0, 0, "Loading POPSTARTER settings...", gTheme->textColor);
+                        ALIGN_CENTER, 0, 0, _l(_STR_POPS_LOADING_SETTINGS), gTheme->textColor);
         guiDrawOverlays();
         guiEndFrame();
 
@@ -1739,18 +1739,18 @@ void guiShowPopsNetConfig(void)
             // Do not start or reconnect SMB merely to import. Its mounted state, not the saved
             // protocol picker, is the authority for whether these files are readable.
             if (!ethIsSMBShareConnected()) {
-                guiMsgBox("SMB is not connected.", 0, NULL);
+                guiMsgBox(_l(_STR_POPS_SMB_NOT_CONNECTED), 0, NULL);
                 continue;
             }
             importResult = guiReadPopsNet(GUI_POPSNET_READ_SMB, &imported);
             if (importResult == GUI_POPSNET_READ_ABORTED)
                 return;
             if (importResult == VCD_POPSNET_SMB_IMPORT_NOT_CONNECTED) {
-                guiMsgBox("SMB is not connected.", 0, NULL);
+                guiMsgBox(_l(_STR_POPS_SMB_NOT_CONNECTED), 0, NULL);
                 continue;
             }
             if (importResult != VCD_POPSNET_SMB_IMPORT_OK) {
-                guiMsgBox("No POPSTARTER settings found in SMB POPS directory.", 0, NULL);
+                guiMsgBox(_l(_STR_POPS_SMB_SETTINGS_NOT_FOUND), 0, NULL);
                 continue;
             }
             guiSetPopsNetDialogFields(&imported);
@@ -2718,7 +2718,7 @@ static int guiSettingsStageOplHome(int selection)
     guiSourcesOplHomeStagePending = 1;
     guiSourcesOplHomeStageInFlight = 1;
     guiSourcesOplHomeStageAbandoned = 0;
-    guiHandleDeferedIO(&guiSourcesOplHomeStagePending, "Checking HDD OPL partition...",
+    guiHandleDeferedIO(&guiSourcesOplHomeStagePending, _l(_STR_HDD_OPL_PARTITION_CHECKING),
                        IO_CUSTOM_SIMPLEACTION, &guiSettingsStageOplHomeWorker, 15000);
     if (gLastDeferredTimedOut) {
         // The late worker only ever changes our staged selector; never let an abandoned wait make
@@ -2796,11 +2796,11 @@ reshow_sources:
             (guiSourcesOplHomeLegacy && guiSourcesOplHomeTouched)) {
             if (!guiSettingsStageOplHome(hddOplHomeChoice)) {
                 diaSetInt(ui, CFG_HDDOPLPART, guiSourcesOplHomeInitial);
-                guiMsgBox(hddOplHomeChoice == HDD_OPL_HOME_PLUS ? "+OPL partition not found." : "HDD (APA) OPL partition not found.",
+                guiMsgBox(hddOplHomeChoice == HDD_OPL_HOME_PLUS ? _l(_STR_HDD_OPL_PLUS_NOT_FOUND) : _l(_STR_HDD_OPL_PARTITION_NOT_FOUND),
                           0, NULL);
                 goto reshow_sources;
             }
-            guiMsgBox("Restart or remount HDD to use the selected OPL partition.", 0, NULL);
+            guiMsgBox(_l(_STR_HDD_OPL_PARTITION_RESTART), 0, NULL);
         }
 
         diaGetInt(ui, CFG_DEFDEVICE, &deviceModeIndex);
@@ -3209,7 +3209,7 @@ static int guiSettingsShowIndex(int *page)
 {
     const char *labels[SETTINGS_PAGE_COUNT + 1] = {
         _l(_STR_GAME_SOURCES),
-        "General & System",
+        _l(_STR_GENERAL_SYSTEM),
         _l(_STR_MENU_NETWORK),
         _l(_STR_INTERFACE_SETTINGS),
         _l(_STR_GAME_LAUNCHING),

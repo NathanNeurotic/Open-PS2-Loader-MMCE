@@ -98,6 +98,9 @@ void hddVcdInvalidateCache(void);
 void hddInit(item_list_t *itemList);
 item_list_t *hddGetObject(int initOnly);
 int hddLoadModules(void);
+// Non-acquiring residency check for short-lived probes. Unlike hddLoadModulesReady(), this does
+// not increment the HDD module-use count.
+int hddModulesAreLoaded(void);
 
 // Load (or confirm) the ATA stack and report residency, evaluating hddLoadModules EXACTLY ONCE.
 // A function, not a macro taking the call as its argument: the earlier HDD_LOADMODULES_OK(
