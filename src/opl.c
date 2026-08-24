@@ -1893,8 +1893,8 @@ static int isApaSettingsPath(const char *path)
 
 // Resolve the normal safe HDD settings home after an explicit HDD path cannot be used.
 // hddLoadSupportModules owns the policy: read the existing __common/OPL/conf_hdd.cfg redirect
-// first, otherwise use __common/OPL/. It never creates or formats an APA partition. This helper
-// only accepts the resulting mounted PFS namespace.
+// first, otherwise use __common/OPL/, or an existing +OPL when __common is unavailable. It never
+// creates or formats an APA partition. This helper only accepts the resulting mounted PFS namespace.
 static int prepareHddSettingsFallback(char *path, int pathLen)
 {
     DIR *dir;
@@ -3011,9 +3011,9 @@ static void _saveConfig()
     char customSettingsTarget[sizeof(gCustomSettingsPath)] = {0};
     int customSettingsExplicit = 0;
 
-    // The APA OPL-home picker is deliberately a separate, explicitly staged policy file under
-    // __common/OPL. Commit it only as part of the ordinary Save Settings operation; opening or
-    // saving an unrelated page cannot rewrite an existing legacy hdd_partition redirect.
+    // The APA OPL-home picker is deliberately a separate, explicitly staged policy file when
+    // __common owns the selector. Commit it only as part of the ordinary Save Settings operation;
+    // an automatic existing +OPL home remains fileless and unrelated pages cannot rewrite a redirect.
     if ((lscstatus & CONFIG_OPL) && hddOplHomeSelectionPending() && !hddCommitOplHomeSelection()) {
         snprintf(gLastSaveTarget, sizeof(gLastSaveTarget), "%s", "hdd0:__common/OPL/conf_hdd.cfg");
         gLastSaveErrno = EIO;

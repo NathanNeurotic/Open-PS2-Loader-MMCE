@@ -776,7 +776,7 @@ reshow_device:
             if (!guiSettingsStageOplHome(hddOplHomeChoice)) {
                 diaSetInt(diaDeviceConfig, CFG_HDDOPLPART, guiDeviceOplHomeInitial);
                 guiDeviceOplHomeTouched = 0;
-                guiMsgBox(hddOplHomeChoice == HDD_OPL_HOME_PLUS ? _l(_STR_HDD_OPL_PLUS_NOT_FOUND) : _l(_STR_HDD_OPL_PARTITION_NOT_FOUND),
+                guiMsgBox(hddOplHomeChoice == HDD_OPL_HOME_PLUS ? _l(_STR_HDD_OPL_PLUS_NOT_FOUND) : _l(_STR_HDD_OPL_COMMON_NOT_FOUND),
                           0, NULL);
                 goto reshow_device;
             }
@@ -2796,7 +2796,7 @@ reshow_sources:
             (guiSourcesOplHomeLegacy && guiSourcesOplHomeTouched)) {
             if (!guiSettingsStageOplHome(hddOplHomeChoice)) {
                 diaSetInt(ui, CFG_HDDOPLPART, guiSourcesOplHomeInitial);
-                guiMsgBox(hddOplHomeChoice == HDD_OPL_HOME_PLUS ? _l(_STR_HDD_OPL_PLUS_NOT_FOUND) : _l(_STR_HDD_OPL_PARTITION_NOT_FOUND),
+                guiMsgBox(hddOplHomeChoice == HDD_OPL_HOME_PLUS ? _l(_STR_HDD_OPL_PLUS_NOT_FOUND) : _l(_STR_HDD_OPL_COMMON_NOT_FOUND),
                           0, NULL);
                 goto reshow_sources;
             }

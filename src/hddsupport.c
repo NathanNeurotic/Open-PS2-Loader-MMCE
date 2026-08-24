@@ -43,6 +43,9 @@ static unsigned char hddSupportErrToasted = 0;
 // A Settings selection is deliberately staged until Save Settings. It never changes the active
 // pfs0: mount: a live OPL data home can have artwork/config readers using it.
 static int hddOplHomePending = -1;
+// +OPL can be the existing automatic home only when __common was unavailable during discovery.
+// Keep that distinct from an explicit conf_hdd.cfg redirect, which may fall back to __common.
+static unsigned char hddOplHomeAutoPlus = 0;
 
 static void hddClearRecoveredErrors(void)
 {
@@ -176,9 +179,10 @@ static void hddFindOPLPartition(void)
     char candidate[sizeof(gOPLPart)];
     const char *label;
 
-    // __common/OPL/conf_hdd.cfg is the one authoritative APA data-home selector. Honour it
-    // only when it names an existing mountable hdd0 PFS partition; discovery never manufactures
-    // a partition, resizes one, or writes raw hdd0: metadata.
+    // When __common is usable, its OPL/conf_hdd.cfg is the authoritative APA data-home selector.
+    // If __common itself is unavailable, an existing mountable +OPL is the legacy automatic home.
+    // Discovery never manufactures a partition, resizes one, or writes raw hdd0: metadata.
+    hddOplHomeAutoPlus = 0;
     fileXioUmount(hddPrefix);
     if (fileXioMount(hddPrefix, "hdd0:__common", FIO_MT_RDONLY) == 0) {
         config = configAlloc(0, NULL, "pfs0:OPL/conf_hdd.cfg");
@@ -215,13 +219,21 @@ static void hddFindOPLPartition(void)
             }
             LOG("HDD: configured data partition %s is unavailable; ignoring it\n", name);
         }
-    }
 
-    // A missing, stale, or invalid redirect falls back only to __common/OPL. The presence of
-    // +OPL alone is intentionally not an ownership decision.
-    if (hddPartitionMountable("hdd0:__common")) {
+        // The successful __common mount above is already the proof required for the default.
+        // Do not remount it merely to rediscover the same topology.
         snprintf(gOPLPart, sizeof(gOPLPart), "hdd0:__common");
         LOG("HDD: no usable configured data partition; using canonical __common/OPL/ fallback\n");
+        return;
+    }
+
+    // Official OPL's existing +OPL layout remains valid when a drive has no usable __common.
+    // It is an automatic effective choice, not a request to create conf_hdd.cfg or a new APA
+    // partition. +OPL owns its PFS root directly, so the mounted data prefix is pfs0:.
+    if (hddPartitionMountable("hdd0:+OPL")) {
+        snprintf(gOPLPart, sizeof(gOPLPart), "hdd0:+OPL");
+        hddOplHomeAutoPlus = 1;
+        LOG("HDD: __common unavailable; using existing +OPL data-home fallback\n");
         return;
     }
 
@@ -533,8 +545,10 @@ void hddLoadSupportModules(void)
     ret = fileXioMount(hddPrefix, gOPLPart, FIO_MT_RDWR);
 
     // A configured data partition may disappear or cease to mount. Never respond by
-    // creating/reformatting APA metadata. Fall back to the existing __common partition only.
-    if (ret < 0 && strcmp(gOPLPart, "hdd0:__common") != 0) {
+    // creating/reformatting APA metadata. An automatic +OPL home was chosen because __common
+    // was unavailable, so fail closed rather than probing it again. An explicit redirect keeps
+    // the established existing-__common fallback.
+    if (ret < 0 && strcmp(gOPLPart, "hdd0:__common") != 0 && !hddOplHomeAutoPlus) {
         LOG("HDD: could not mount %s (%d); trying existing __common/OPL/ fallback\n", gOPLPart, ret);
         fileXioUmount(hddPrefix);
         ret = fileXioMount(hddPrefix, "hdd0:__common", FIO_MT_RDWR);
@@ -1024,11 +1038,22 @@ int hddCommitOplHomeSelection(void)
     if (hddOplHomePending < 0)
         return 1;
 
-    // Re-prove the common owner at commit time. No raw APA operation, partition creation, or pfs0:
-    // remount is involved; this is only a bounded pfs1: read/write mount of an existing partition.
+    // An automatic +OPL home has no __common control file. The active pfs0: mount proves the
+    // staged effective choice, so commit it as a fileless no-op without probing or writing
+    // __common. This preserves the no-__common topology across ordinary Settings saves.
     if (!hddModulesAreLoaded())
         return 0;
-    if (!hddLoadCoreSupportModules() || !hddPartitionMountableAt("pfs1:", "hdd0:__common", FIO_MT_RDWR))
+    if (!hddLoadCoreSupportModules())
+        return 0;
+    if (hddOplHomePending == HDD_OPL_HOME_PLUS && hddOplHomeAutoPlus &&
+        !strcmp(gOPLPart, "hdd0:+OPL") && gHDDPrefix != NULL) {
+        hddOplHomePending = -1;
+        return 1;
+    }
+
+    // Re-prove the common owner at commit time. No raw APA operation, partition creation, or pfs0:
+    // remount is involved; this is only a bounded pfs1: read/write mount of an existing partition.
+    if (!hddPartitionMountableAt("pfs1:", "hdd0:__common", FIO_MT_RDWR))
         return 0;
 
     if (fileXioMount("pfs1:", "hdd0:__common", FIO_MT_RDWR) < 0)

@@ -1144,10 +1144,10 @@ gui_strings:
   string: No POPSTARTER settings found in SMB POPS directory.
 - label: HDD_OPL_PLUS_NOT_FOUND
   string: +OPL partition not found.
-- label: HDD_OPL_PARTITION_NOT_FOUND
-  string: HDD (APA) OPL partition not found.
+- label: HDD_OPL_COMMON_NOT_FOUND
+  string: __common partition not found.
 - label: HDD_OPL_PARTITION_RESTART
-  string: Restart or remount HDD to use the selected OPL partition.
+  string: Restart RiptOPL to apply the selected OPL partition.
 - label: HDD_OPL_PARTITION_CHECKING
   string: Checking HDD OPL partition...
 - label: GENERAL_SYSTEM
