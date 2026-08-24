@@ -76,6 +76,9 @@ config_set_t *oplGetLegacyAppsInfo(char *name);
 void setErrorMessage(int strId);
 void setErrorMessageWithCode(int strId, int error);
 void setErrorMessagePathCode(int strId, const char *path, int error);
+// Drop a queued error only when it is the exact condition that subsequently recovered. This avoids
+// hiding an unrelated notification merely because a later storage probe happened to succeed.
+void clearErrorMessageIf(int strId);
 int loadConfig(int types);
 int saveConfig(int types, int showUI);
 void applyConfig(int themeID, int langID, int skipDeviceRefresh);
@@ -334,6 +337,9 @@ extern base_game_info_t *gAutoLaunchBDMGame;
 extern bdm_device_data_t *gAutoLaunchDeviceData;
 extern char *gHDDPrefix;
 extern char gOPLPart[128];
+
+// Conventional built-in-theme BGM location. This is a single resolved path, not a search.
+int oplGetDefaultThemeBgmPath(char *path, int pathSize);
 
 void initSupport(item_list_t *itemList, int mode, int force_reinit);
 

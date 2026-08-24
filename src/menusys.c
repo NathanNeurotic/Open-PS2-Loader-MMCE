@@ -28,7 +28,8 @@
 
 enum MENU_IDs {
     MENU_SETTINGS = 0,
-    MENU_TOOLS,
+    MENU_NETWORK_UPDATE,
+    MENU_NBD,
     MENU_ABOUT,
     MENU_SAVE_CHANGES,
     MENU_EXIT,
@@ -556,7 +557,8 @@ static void menuInitMainMenu(void)
     // initialize the menu
     submenuAppendItem(&mainMenu, -1, NULL, MENU_LAUNCH_PS2_DISC, _STR_LAUNCH_PS2_DISC);
     submenuAppendItem(&mainMenu, -1, NULL, MENU_SETTINGS, _STR_SETTINGS);
-    submenuAppendItem(&mainMenu, -1, NULL, MENU_TOOLS, _STR_TOOLS);
+    submenuAppendItem(&mainMenu, -1, NULL, MENU_NETWORK_UPDATE, _STR_NET_UPDATE);
+    submenuAppendItem(&mainMenu, -1, NULL, MENU_NBD, _STR_STARTNBD);
     submenuAppendItem(&mainMenu, -1, NULL, MENU_ABOUT, _STR_ABOUT);
     submenuAppendItem(&mainMenu, -1, NULL, MENU_EXIT, _STR_EXIT);
     submenuAppendItem(&mainMenu, -1, NULL, MENU_POWER_OFF, _STR_POWEROFF);
@@ -1316,9 +1318,12 @@ void menuHandleInputMenu()
         } else if (id == MENU_SETTINGS) {
             if (menuCheckParentalLock() == 0)
                 guiShowSettings();
-        } else if (id == MENU_TOOLS) {
+        } else if (id == MENU_NETWORK_UPDATE) {
             if (menuCheckParentalLock() == 0)
-                guiShowToolsConfig();
+                guiShowNetCompatUpdate();
+        } else if (id == MENU_NBD) {
+            if (menuCheckParentalLock() == 0)
+                handleLwnbdSrv();
         } else if (id == MENU_ABOUT) {
             guiShowAbout();
         } else if (id == MENU_SAVE_CHANGES) {

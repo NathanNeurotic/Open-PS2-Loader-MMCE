@@ -21,6 +21,7 @@
 #include "include/system.h"      // POPS_FOLDER
 #include "include/ioman.h"       // LOG (BDMA equip probe trace)
 #include "include/bdmsupport.h"  // BDM_TYPE_* + bdmGetDeviceRootByType (BDMA source differentiation)
+#include "include/ethsupport.h"  // active mounted SMB prefix for manual POPS DAT import
 #include "include/mmcesupport.h" // mmceLoadModules (ensure mmceman for the MMCE BDMA source)
 #include "include/gui.h"         // guiWarning (passing toast on a failed launch-path BDMA equip)
 #include "include/texcache.h"    // cosmetic ID resolver yields while artwork is pending
@@ -2197,6 +2198,54 @@ int vcdReadPopstarterNet(vcd_popsnet_t *out)
         return -3;
 
     return 0;
+}
+
+vcd_popsnet_smb_import_t vcdReadPopstarterNetFromSmb(vcd_popsnet_t *out)
+{
+    char ipPath[128];
+    char smbPath[128];
+    char ipBuf[256];
+    char smbBuf[256];
+    const char *prefix;
+    int ipRead;
+    int smbRead;
+
+    if (out == NULL)
+        return VCD_POPSNET_SMB_IMPORT_NOT_CONNECTED;
+
+    memset(out, 0, sizeof(*out));
+    out->ipDhcp = 1;
+    if (!ethIsSMBShareConnected())
+        return VCD_POPSNET_SMB_IMPORT_NOT_CONNECTED;
+
+    prefix = ethGetSMBPrefix();
+    if (prefix == NULL || prefix[0] == '\0')
+        return VCD_POPSNET_SMB_IMPORT_NOT_CONNECTED;
+
+    // smbman/smb2man use the same backslash form as the active ETH/VCD paths. `prefix` already
+    // has one for a configured subfolder; at share root it is exactly `smb0:`.
+    snprintf(ipPath, sizeof(ipPath), "%sPOPS\\IPCONFIG.DAT", prefix);
+    snprintf(smbPath, sizeof(smbPath), "%sPOPS\\SMBCONFIG.DAT", prefix);
+    ipRead = vcdReadNetFile(ipPath, ipBuf, sizeof(ipBuf));
+    smbRead = vcdReadNetFile(smbPath, smbBuf, sizeof(smbBuf));
+    if (ipRead < 0 || smbRead < 0)
+        return VCD_POPSNET_SMB_IMPORT_NOT_FOUND;
+
+    out->ipExists = 1;
+    out->smbExists = 1;
+    snprintf(out->ipDir, sizeof(out->ipDir), "%sPOPS", prefix);
+    snprintf(out->smbDir, sizeof(out->smbDir), "%sPOPS", prefix);
+    if (!vcdNetTextBlank(ipBuf)) {
+        if (!vcdParseIpConfig(ipBuf, out) || !vcdStaticIpUsable(out))
+            return VCD_POPSNET_SMB_IMPORT_NOT_FOUND;
+        out->ipDhcp = 0;
+    }
+
+    vcdParseSmbConfig(smbBuf, out);
+    if (!vcdSmbConfigUsable(out))
+        return VCD_POPSNET_SMB_IMPORT_NOT_FOUND;
+
+    return VCD_POPSNET_SMB_IMPORT_OK;
 }
 
 int vcdPopsNetChanged(const vcd_popsnet_t *orig, const vcd_popsnet_t *cur)

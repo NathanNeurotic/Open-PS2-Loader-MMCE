@@ -273,8 +273,9 @@ enum UI_ITEMS {
     SECURITY_PARENTAL_BUTTON,
     ADV_PREFIX_BUTTON,
     ADV_STORAGE_BUTTON,
-    TOOLS_NET_UPDATE_BUTTON,
-    TOOLS_NBD_BUTTON,
+    CFG_HDDOPLPART,
+    GENERAL_GSM_DEFAULTS_BUTTON,
+    LAUNCH_GSM_DEFAULTS_BUTTON,
 
 #ifdef PADEMU
     PADEMU_GLOBAL_BUTTON,
@@ -375,6 +376,5 @@ extern struct UIItem diaSecurityConfig[];
 extern struct UIItem diaAdvancedConfig[];
 extern struct UIItem diaPathPrefixConfig[];
 extern struct UIItem diaStorageConfig[];
-extern struct UIItem diaToolsConfig[];
 
 #endif

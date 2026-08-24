@@ -812,9 +812,9 @@ void diaRenderUI(struct UIItem *ui, short inMenu, struct UIItem *cur, int haveFo
 
     int uiY = gTheme->usedHeight - 32;
     if (settingsContext) {
-        int uiHints[3] = {_STR_SELECT, _STR_BACK, _STR_SETTINGS};
-        int uiIcons[3] = {CROSS_ICON, CIRCLE_ICON, TRIANGLE_ICON};
-        int uiX = guiAlignSubMenuHints(3, uiHints, uiIcons, gTheme->fonts[0], 12, 2);
+        int uiHints[2] = {_STR_SELECT, _STR_BACK};
+        int uiIcons[2] = {CROSS_ICON, CIRCLE_ICON};
+        int uiX = guiAlignSubMenuHints(2, uiHints, uiIcons, gTheme->fonts[0], 12, 2);
 
         if (settingsShell) {
             // Use the same controller button textures as the rest of OPL. Do not introduce a
@@ -836,9 +836,7 @@ void diaRenderUI(struct UIItem *ui, short inMenu, struct UIItem *cur, int haveFo
         }
         uiX = guiDrawIconAndText(uiIcons[0], uiHints[0], gTheme->fonts[0], uiX, uiY, gTheme->textColor);
         uiX += 12;
-        uiX = guiDrawIconAndText(uiIcons[1], uiHints[1], gTheme->fonts[0], uiX, uiY, gTheme->textColor);
-        uiX += 12;
-        guiDrawIconAndText(uiIcons[2], uiHints[2], gTheme->fonts[0], uiX, uiY, gTheme->textColor);
+        guiDrawIconAndText(uiIcons[1], uiHints[1], gTheme->fonts[0], uiX, uiY, gTheme->textColor);
     } else {
         int uiHints[2] = {_STR_SELECT, _STR_BACK};
         int uiIcons[2] = {CIRCLE_ICON, CROSS_ICON};
@@ -1173,12 +1171,6 @@ int diaExecuteDialog(struct UIItem *ui, int uiId, short inMenu, int (*updater)(i
             // every peer screen retains the same focus, scrolling and modal-editor behavior as
             // existing dialogs. Ordinary dialogs never see these results unless their caller opts
             // into handling them.
-            if (settingsShell && getKeyOn(KEY_TRIANGLE)) {
-                diaRestoreScrollSpeed();
-                sfxPlay(SFX_CURSOR);
-                return DIA_RESULT_INDEX;
-            }
-
             if (settingsShell && getKeyOn(KEY_L1)) {
                 diaRestoreScrollSpeed();
                 sfxPlay(SFX_CURSOR);

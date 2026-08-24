@@ -551,7 +551,7 @@ gui_strings:
 - label: CFM_VMODE_CHG
   string: Confirm video mode change?
 - label: CACHE_HDD_GAME_LIST
-  string: Cache Game List (HDD)
+  string: Cache Game List (HDD APA)
 - label: ENABLE_NOTIFICATIONS
   string: Notifications
 - label: CFG_NOTIFICATION
@@ -769,7 +769,7 @@ gui_strings:
 - label: GAME_SOURCES
   string: Game Sources
 - label: HINT_BDMA_APPLY
-  string: 'On: auto-equip the launched VCD''s matching exFAT driver to the memory card before boot (recommended). Off: manage it yourself with the BDMA Source/Mode pickers below.'
+  string: 'On: before a VCD launch, prepare the needed POPSTARTER BDMA memory-card environment when possible. POPSTARTER still launches if preparation fails. Off: manage the card drivers with the Source/Mode pickers below.'
 - label: HINT_BDMA_MODE
   string: exFAT block-device driver POPSTARTER loads. Changing it copies the modules to the card; FAT32 = none (built-in driver).
 - label: HINT_BDMA_SOURCE
@@ -805,7 +805,7 @@ gui_strings:
 - label: HINT_POPSTARTER_RETROGEM_GAMEID
   string: Render optical barcode for Pixel FX / RetroGEM / PS2Digital on PS1 VCD launch
 - label: HINT_POPS_IMPORT
-  string: Copy OPL's own Network Settings values (above) into these POPStarter fields. Nothing is written until you confirm with OK.
+  string: Read POPSTARTER IPCONFIG.DAT and SMBCONFIG.DAT from the connected SMB share's POPS directory. Nothing is written until you confirm with OK.
 - label: HINT_POPS_PORT
   string: SMB port on the server -- 445 is the default. Leave at 0 (or 445) for a normal share; use 139 for older SMB1 servers.
 - label: HINT_RUMBLE
@@ -901,7 +901,7 @@ gui_strings:
 - label: GAMEID_MODE_OFF
   string: 'Off'
 - label: POPS_IMPORT
-  string: Import POPSLoader Settings
+  string: Import from SMB POPS Directory
 - label: POPS_NONE_DETECTED
   string: No existing POPStarter SMB configuration was detected. Enter the correct network settings before creating one.
 - label: POPS_SMB_SECTION
@@ -1132,3 +1132,7 @@ gui_strings:
   string: Continue Editing
 - label: CONFIGURE
   string: Configure
+- label: HDD_UNAVAILABLE_ERROR
+  string: '%d: HardDisk Drive unavailable.'
+- label: HDD_PFS_UNAVAILABLE_ERROR
+  string: '%d: HardDisk Drive PFS support unavailable.'

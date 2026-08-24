@@ -133,6 +133,7 @@ static clock_t lastBgRescan[MODE_COUNT];
 static unsigned int lastSeenBdmGeneration;
 
 static char errorMessage[256];
+static int errorMessageStringId = -1;
 
 static opl_io_module_t list_support[MODE_COUNT];
 
@@ -1284,6 +1285,7 @@ static void clearErrorMessage(void)
 {
     // reset the original frame hook
     frameCounter = 0;
+    errorMessageStringId = -1;
     guiSetFrameHook(&menuUpdateHook);
 }
 
@@ -1296,19 +1298,28 @@ static void errorMessageHook()
 void setErrorMessageWithCode(int strId, int error)
 {
     snprintf(errorMessage, sizeof(errorMessage), _l(strId), error);
+    errorMessageStringId = strId;
     guiSetFrameHook(&errorMessageHook);
 }
 
 void setErrorMessage(int strId)
 {
     snprintf(errorMessage, sizeof(errorMessage), _l(strId));
+    errorMessageStringId = strId;
     guiSetFrameHook(&errorMessageHook);
 }
 
 void setErrorMessagePathCode(int strId, const char *path, int error)
 {
     snprintf(errorMessage, sizeof(errorMessage), _l(strId), path ? path : "", error);
+    errorMessageStringId = strId;
     guiSetFrameHook(&errorMessageHook);
+}
+
+void clearErrorMessageIf(int strId)
+{
+    if (errorMessageStringId == strId)
+        clearErrorMessage();
 }
 
 // ----------------------------------------------------------
@@ -1456,6 +1467,45 @@ static int gBootDirBdmType = BDM_TYPE_UNKNOWN;
 // registering and therefore has no driver classification yet. This keeps a missing first-run file
 // on that explicit slot from triggering the legacy all-device recovery scan.
 static int gBootHomeBdm = 0;
+
+// The built-in themes have no theme directory. Their conventional BGM belongs to the normal OPL
+// data home, never POPS: `pfs0:OPL/THM/bgm.ogg` for __common/OPL and `pfs0:THM/bgm.ogg` for +OPL.
+// Every non-APA home is the exact RiptOPL working directory resolved at boot. Do not turn this into
+// a directory scan: a missing file is simply silence.
+int oplGetDefaultThemeBgmPath(char *path, int pathSize)
+{
+    int length;
+
+    if (path == NULL || pathSize <= 1)
+        return 0;
+
+    path[0] = '\0';
+    if (gBootHomeApa) {
+        if (gHDDPrefix == NULL || gHDDPrefix[0] == '\0')
+            return 0;
+
+        length = snprintf(path, pathSize, "%sTHM/bgm.ogg", gHDDPrefix);
+    } else {
+        size_t baseLength;
+
+        if (gBootDir[0] == '\0')
+            return 0;
+
+        baseLength = strlen(gBootDir);
+        if (gBootDir[baseLength - 1] == ':' || gBootDir[baseLength - 1] == '/' ||
+            gBootDir[baseLength - 1] == '\\')
+            length = snprintf(path, pathSize, "%sbgm.ogg", gBootDir);
+        else
+            length = snprintf(path, pathSize, "%s/bgm.ogg", gBootDir);
+    }
+
+    if (length < 0 || length >= pathSize) {
+        path[0] = '\0';
+        return 0;
+    }
+
+    return 1;
+}
 
 // When this function is called, the current device for loading/saving config is the memory card.
 // "Custom Settings Path" bootstrap.
@@ -2910,6 +2960,17 @@ static void _saveConfig()
     char temp[256];
     char customSettingsTarget[sizeof(gCustomSettingsPath)] = {0};
     int customSettingsExplicit = 0;
+
+    // The APA OPL-home picker is deliberately a separate, explicitly staged policy file under
+    // __common/OPL. Commit it only as part of the ordinary Save Settings operation; opening or
+    // saving an unrelated page cannot rewrite an existing legacy hdd_partition redirect.
+    if ((lscstatus & CONFIG_OPL) && hddOplHomeSelectionPending() && !hddCommitOplHomeSelection()) {
+        snprintf(gLastSaveTarget, sizeof(gLastSaveTarget), "%s", "hdd0:__common/OPL/conf_hdd.cfg");
+        gLastSaveErrno = EIO;
+        lscret = 0;
+        lscstatus = 0;
+        return;
+    }
 
     if (lscstatus & CONFIG_OPL) {
         config_set_t *configOPL = configGetByType(CONFIG_OPL);

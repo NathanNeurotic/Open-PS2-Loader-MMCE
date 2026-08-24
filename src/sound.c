@@ -508,6 +508,26 @@ static void bgmIoThread(void *arg)
     SignalSema(outSema);
 }
 
+static int bgmTryLoadPath(const char *bgmPath, const char *source)
+{
+    FILE *bgmFile = fopen(bgmPath, "rb");
+
+    if (bgmFile == NULL) {
+        LOG("BGM: %s BGM not found: %s\n", source, bgmPath);
+        return 0;
+    }
+
+    if (ov_open_callbacks(bgmFile, vorbisFile, NULL, 0, OV_CALLBACKS_DEFAULT) == 0) {
+        LOG("BGM: Loaded %s BGM %s\n", source, bgmPath);
+        return 1;
+    }
+
+    LOG("BGM: %s BGM is not a valid Ogg bitstream: %s\n", source, bgmPath);
+    fclose(bgmFile);
+    memset(vorbisFile, 0, sizeof(OggVorbis_File));
+    return 0;
+}
+
 static int bgmLoad(void)
 {
     char bgmPath[256];
@@ -521,45 +541,26 @@ static int bgmLoad(void)
 
     themeID = thmGetGuiValue();
     char *thmPath = thmGetFilePath(themeID);
-    if (thmPath != NULL) { // NULL for <OPL> + the built-in <Coverflow> -> no theme BGM folder
+    if (thmPath != NULL) { // NULL for <OPL> + the built-in <Coverflow>
         snprintf(bgmPath, sizeof(bgmPath), "%ssound/bgm.ogg", thmPath);
-        FILE *bgmFile = fopen(bgmPath, "rb");
-        if (bgmFile != NULL) {
-            if (ov_open_callbacks(bgmFile, vorbisFile, NULL, 0, OV_CALLBACKS_DEFAULT) == 0) {
-                LOG("BGM: Loaded theme BGM %s\n", bgmPath);
-                return 0;
-            }
-
-            LOG("BGM: Theme BGM is not a valid Ogg bitstream: %s\n", bgmPath);
-            fclose(bgmFile);
-            memset(vorbisFile, 0, sizeof(OggVorbis_File));
-        } else {
-            LOG("BGM: Theme BGM not found: %s\n", bgmPath);
-        }
+        if (bgmTryLoadPath(bgmPath, "theme"))
+            return 0;
     }
 
     if (gDefaultBGMPath[0] != '\0') {
-        FILE *bgmFile;
-
         snprintf(bgmPath, sizeof(bgmPath), "%s", gDefaultBGMPath);
-        bgmFile = fopen(bgmPath, "rb");
-        if (bgmFile != NULL) {
-            if (ov_open_callbacks(bgmFile, vorbisFile, NULL, 0, OV_CALLBACKS_DEFAULT) == 0) {
-                LOG("BGM: Loaded configured BGM %s\n", bgmPath);
-                return 0;
-            }
-
-            LOG("BGM: Configured BGM is not a valid Ogg bitstream: %s\n", bgmPath);
-            fclose(bgmFile);
-            memset(vorbisFile, 0, sizeof(OggVorbis_File));
-        } else {
-            LOG("BGM: Configured BGM not found: %s\n", bgmPath);
-        }
+        if (bgmTryLoadPath(bgmPath, "configured"))
+            return 0;
     }
 
-    // No embedded fallback BGM (removed to save ~324 KB); BGM plays only when a
-    // theme provides sound/bgm.ogg or a BGM path is configured.
-    LOG("BGM: No theme or configured BGM available.\n");
+    // Disk themes keep their existing sound/bgm.ogg -> configured-file priority. Only the two
+    // built-in themes fall back to this one conventional data-home file after the configured path.
+    if (thmPath == NULL && oplGetDefaultThemeBgmPath(bgmPath, sizeof(bgmPath))) {
+        if (bgmTryLoadPath(bgmPath, "built-in theme"))
+            return 0;
+    }
+
+    LOG("BGM: No usable theme, configured, or built-in BGM available.\n");
     free(vorbisFile);
     vorbisFile = NULL;
 

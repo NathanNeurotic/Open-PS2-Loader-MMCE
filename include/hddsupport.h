@@ -110,6 +110,20 @@ static inline int hddLoadModulesReady(void)
     return r == HDD_LOADMODULES_STATUS_NOERROR || r == HDD_LOADMODULES_STATUS_ALREADYLOADED;
 }
 void hddLoadSupportModules(void);
+
+// Normal APA data-home choices surfaced by Settings -> Game Sources. POPS loose files remain
+// separately owned by __common/POPS; this selector only controls OPL's regular data home.
+enum {
+    HDD_OPL_HOME_COMMON = 0,
+    HDD_OPL_HOME_PLUS = 1,
+};
+int hddGetOplHomeSelection(void);
+int hddOplHomeIsLegacy(void);
+int hddStageOplHomeSelection(int selection);
+int hddCommitOplHomeSelection(void);
+void hddDiscardOplHomeSelection(void);
+int hddOplHomeSelectionPending(void);
+
 void hddLaunchGame(item_list_t *itemList, int id, config_set_t *configSet);
 int hddIsPresent();
 

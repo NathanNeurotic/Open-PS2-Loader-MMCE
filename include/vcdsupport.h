@@ -216,6 +216,17 @@ typedef struct
 // remain user-editable. Returns 0, or -3 on a genuine mid-read IO error.
 int vcdReadPopstarterNet(vcd_popsnet_t *out);
 
+typedef enum {
+    VCD_POPSNET_SMB_IMPORT_OK = 0,
+    VCD_POPSNET_SMB_IMPORT_NOT_CONNECTED = 1,
+    VCD_POPSNET_SMB_IMPORT_NOT_FOUND = 2,
+} vcd_popsnet_smb_import_t;
+
+// Read (never write) POPS/IPCONFIG.DAT and POPS/SMBCONFIG.DAT from the active mounted SMB share.
+// This does not connect SMB or use OPL's own saved network fields. Both files must pass the same
+// strict parser/validation as local POPSTARTER configuration before values are returned.
+vcd_popsnet_smb_import_t vcdReadPopstarterNetFromSmb(vcd_popsnet_t *out);
+
 // Change detection vs the read-time snapshot, for the save matrix: bit 0 = SMB fields differ,
 // bit 1 = IP fields differ. Compares semantic content only (never the dirs/exists flags).
 int vcdPopsNetChanged(const vcd_popsnet_t *orig, const vcd_popsnet_t *cur);

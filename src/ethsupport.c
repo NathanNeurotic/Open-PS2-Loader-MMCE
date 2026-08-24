@@ -298,6 +298,11 @@ int ethGetModulesLoaded(void)
     return ethModulesLoaded;
 }
 
+int ethIsSMBShareConnected(void)
+{
+    return ethModulesLoaded && gNetworkStartup == 0 && ethPrefix[0] != '\0';
+}
+
 static int ethLoadModules(void)
 {
     LOG("ETHSUPPORT LoadModules\n");

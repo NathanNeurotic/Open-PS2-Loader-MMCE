@@ -19,7 +19,11 @@ void ethInit(item_list_t *itemList); // Full initialization (Start ETH + SMB and
 void ethDeinitModules(void);         // Module-only deinitialization, without the GUI's knowledge (for specific reasons, otherwise unused).
 int ethLoadInitModules(void);        // Initializes Ethernet and applies configuration.
 int ethGetModulesLoaded(void);       // 1 if the SMB NIC stack is loaded (UDPBD must not load on top).
-void ethDisplayErrorStatus(void);    // Displays the current error status (if any). GUI must be already initialized.
+// True only after OPENSHARE succeeded and the active smb0: prefix is usable. This is deliberately
+// stronger than "Network Protocol == SMB": callers must not turn a read-only import into a long
+// connection attempt or consume stale saved values.
+int ethIsSMBShareConnected(void);
+void ethDisplayErrorStatus(void); // Displays the current error status (if any). GUI must be already initialized.
 int ethGetNetConfig(u8 *ip_address, u8 *netmask, u8 *gateway);
 int ethApplyConfig(void);
 int ethGetDHCPStatus(void);

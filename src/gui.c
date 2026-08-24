@@ -24,6 +24,7 @@
 #include "include/udpfssupport.h" // udpfsGetModulesLoaded() -- network-protocol restart-notice check
 #include "include/artindex.h"
 #include "include/bdmsupport.h" // bdmIsUDPBDLoaded() + bdmForceDeviceRefresh()
+#include "include/hddsupport.h" // staged normal APA OPL-home selector
 #include "include/vcdsupport.h" // POPStarter pages: BDMA equip, list options, POPS net config
 #include "include/compatupd.h"
 #include "include/pggsm.h"
@@ -113,6 +114,10 @@ static const char *volatile gBootStickyLabel = NULL;
 
 // forward decl.
 static void guiShow();
+static void guiDrawOverlays(void);
+static int guiSettingsStageOplHome(int selection);
+static const char **guiCopyNameList(const char **src);
+static void guiFreeNameList(const char **list);
 
 #ifdef __DEBUG
 
@@ -605,11 +610,14 @@ int guiIoModeToDeviceType(int ioMode)
     return 0;
 }
 
-// Settings page (settings-layout restructure): the slim "Settings" category -- remember/auto-start
-// last played and Exit To. Everything else moved to the Game Sources, Display, Game Launching,
-// Security, Controller, Audio, Advanced and Tools pages.
+// Legacy standalone General editor. The Settings peer shell is the normal route, but this stays
+// functional for callers outside it and shares the same Language/GSM backends.
 void guiShowConfig()
 {
+    const char **langNamesSnap = NULL;
+    int langID;
+    int ret;
+
     // Exit To auto-resolves a built-in default when blank, so show a dim "Default" placeholder
     // rather than "<not set>" -- the empty value (and thus the fallback) is kept.
     diaSetShowDefaultWhenEmpty(diaConfig, CFG_EXITTO, 1);
@@ -625,8 +633,20 @@ void guiShowConfig()
     diaSetVisible(diaConfig, CFG_AUTOSTARTLAST, gRememberLastPlayed);
     diaSetVisible(diaConfig, CFG_LBL_AUTOSTARTLAST, gRememberLastPlayed);
 
-    int ret = diaExecuteDialog(diaConfig, -1, 1, &guiUpdater);
+    guiLock();
+    langNamesSnap = guiCopyNameList((const char **)lngGetGuiList());
+    guiUnlock();
+    diaSetEnum(diaConfig, UICFG_LANG, langNamesSnap != NULL ? langNamesSnap : (const char **)lngGetGuiList());
+    diaSetInt(diaConfig, UICFG_LANG, lngGetGuiValue());
+
+reshow_config:
+    ret = diaExecuteDialog(diaConfig, -1, 1, &guiUpdater);
+    if (ret == GENERAL_GSM_DEFAULTS_BUTTON) {
+        guiGameShowGSConfig(1);
+        goto reshow_config;
+    }
     if (ret) {
+        diaGetInt(diaConfig, UICFG_LANG, &langID);
         diaGetString(diaConfig, CFG_EXITTO, gExitPath, sizeof(gExitPath));
         diaGetString(diaConfig, CFG_CUSTOMCFGPATH, gCustomSettingsPath, sizeof(gCustomSettingsPath));
         diaGetInt(diaConfig, CFG_LASTPLAYED, &gRememberLastPlayed);
@@ -635,9 +655,11 @@ void guiShowConfig()
 
         DisableCron = 1; // Disable Auto Start Last Played counter (we don't want to call it right after enable it on GUI)
 
-        applyConfig(-1, -1, 0);
+        applyConfig(-1, langID, 0);
         menuReinitMainMenu();
     }
+
+    guiFreeNameList(langNamesSnap);
 }
 
 // Game Sources page: device start modes, the default device, and the block-device enables
@@ -673,10 +695,30 @@ int guiNetProtocolNeedsRestart(void)
     return gNetworkProtocol != resident;
 }
 
+// guiShowDeviceConfig is retained for the legacy entry point outside the Settings peer shell.
+// Keep its APA selector semantics identical to the shell: merely opening/saving another field
+// must not normalize a legacy custom hdd_partition, while an explicit selector interaction may.
+static int guiDeviceOplHomeInitial;
+static int guiDeviceOplHomeLegacy;
+static int guiDeviceOplHomeTouched;
+
+static int guiDeviceConfigUpdater(int modified)
+{
+    int selection;
+
+    if (modified) {
+        diaGetInt(diaDeviceConfig, CFG_HDDOPLPART, &selection);
+        if (selection != guiDeviceOplHomeInitial)
+            guiDeviceOplHomeTouched = 1;
+    }
+    return 0;
+}
+
 void guiShowDeviceConfig(void)
 {
     const char *deviceNames[] = {_l(_STR_BDM_GAMES), _l(_STR_NET_GAMES), _l(_STR_HDD_GAMES), _l(_STR_APPS), _l(_STR_MMCE), _l(_STR_FAV), NULL};
     const char *deviceModes[] = {_l(_STR_OFF), _l(_STR_MANUAL), _l(_STR_AUTO), NULL};
+    static const char *hddOplHomes[] = {"__common/OPL/", "+OPL/", NULL};
 
     // Devices & modes
     diaSetEnum(diaDeviceConfig, CFG_DEFDEVICE, deviceNames);
@@ -711,15 +753,36 @@ void guiShowDeviceConfig(void)
     diaSetInt(diaDeviceConfig, CFG_MMCEMODE, gMMCEStartMode);
     diaSetEnabled(diaDeviceConfig, CFG_MMCEMODE, 1);
 
+    guiDeviceOplHomeInitial = hddGetOplHomeSelection();
+    guiDeviceOplHomeLegacy = hddOplHomeIsLegacy();
+    guiDeviceOplHomeTouched = 0;
+    diaSetEnum(diaDeviceConfig, CFG_HDDOPLPART, hddOplHomes);
+    diaSetInt(diaDeviceConfig, CFG_HDDOPLPART, guiDeviceOplHomeInitial);
+
     int ret;
 reshow_device:
-    ret = diaExecuteDialog(diaDeviceConfig, -1, 1, NULL);
+    ret = diaExecuteDialog(diaDeviceConfig, -1, 1, &guiDeviceConfigUpdater);
     if (ret == MMCE_SETTINGS_BUTTON) {
         guiShowMmceConfig();
         goto reshow_device;
     }
     if (ret) {
         int netProtocolWas = gNetworkProtocol;
+        int hddOplHomeChoice;
+
+        diaGetInt(diaDeviceConfig, CFG_HDDOPLPART, &hddOplHomeChoice);
+        if (hddOplHomeChoice != guiDeviceOplHomeInitial ||
+            (guiDeviceOplHomeLegacy && guiDeviceOplHomeTouched)) {
+            if (!guiSettingsStageOplHome(hddOplHomeChoice)) {
+                diaSetInt(diaDeviceConfig, CFG_HDDOPLPART, guiDeviceOplHomeInitial);
+                guiDeviceOplHomeTouched = 0;
+                guiMsgBox(hddOplHomeChoice == HDD_OPL_HOME_PLUS ? "+OPL partition not found." : "HDD (APA) OPL partition not found.",
+                          0, NULL);
+                goto reshow_device;
+            }
+            guiMsgBox("Restart or remount HDD to use the selected OPL partition.", 0, NULL);
+        }
+
         diaGetInt(diaDeviceConfig, CFG_DEFDEVICE, &deviceModeIndex);
         gDefaultDevice = guiDeviceTypeToIoMode(deviceModeIndex);
         diaGetInt(diaDeviceConfig, CFG_BDMMODE, &gBDMStartMode);
@@ -1515,6 +1578,113 @@ void guiShowVcdListConfig(void)
     }
 }
 
+// POPSTARTER's local memory-card resolver evaluates both mc0 and mc1, including directory/file
+// RPCs. On a slow or absent card that work can take seconds. Keep it on the I/O worker and pump a
+// real runtime frame here; guiHandleDeferedIO is intentionally not used because its text screen
+// does not poll input or animate the Settings plasma.
+#define POPSNET_READ_TIMEOUT_MS  15000
+#define GUI_POPSNET_READ_ABORTED (-100)
+enum gui_popsnet_read_source {
+    GUI_POPSNET_READ_LOCAL = 0,
+    GUI_POPSNET_READ_SMB,
+};
+static int guiPopsNetReadPending;
+static int guiPopsNetReadInFlight;
+static int guiPopsNetReadAbandoned;
+static int guiPopsNetReadSource;
+static int guiPopsNetReadResult;
+static vcd_popsnet_t guiPopsNetReadData;
+
+static void guiPopsNetReadWorker(void)
+{
+    vcd_popsnet_t data;
+    int result;
+
+    if (guiPopsNetReadSource == GUI_POPSNET_READ_LOCAL)
+        result = vcdReadPopstarterNet(&data);
+    else
+        result = vcdReadPopstarterNetFromSmb(&data);
+
+    if (!guiPopsNetReadAbandoned) {
+        guiPopsNetReadData = data;
+        guiPopsNetReadResult = result;
+    }
+    guiPopsNetReadInFlight = 0;
+    guiPopsNetReadPending = 0;
+}
+
+static int guiReadPopsNet(int source, vcd_popsnet_t *out)
+{
+    clock_t startTick;
+    clock_t timeoutTicks = (clock_t)POPSNET_READ_TIMEOUT_MS * (CLOCKS_PER_SEC / 1000);
+
+    if (guiPopsNetReadInFlight) {
+        // A cancelled request still owns the static payload until its I/O RPC returns. Reopening the
+        // same editor may resume its wait, but a second source may not overwrite that payload.
+        if (guiPopsNetReadSource != source)
+            return GUI_POPSNET_READ_ABORTED;
+        guiPopsNetReadAbandoned = 0;
+    } else {
+        memset(&guiPopsNetReadData, 0, sizeof(guiPopsNetReadData));
+        guiPopsNetReadSource = source;
+        guiPopsNetReadResult = GUI_POPSNET_READ_ABORTED;
+        guiPopsNetReadAbandoned = 0;
+        guiPopsNetReadPending = 1;
+        guiPopsNetReadInFlight = 1;
+        if (ioPutRequest(IO_CUSTOM_SIMPLEACTION, &guiPopsNetReadWorker) != IO_OK) {
+            guiPopsNetReadInFlight = 0;
+            guiPopsNetReadPending = 0;
+            return GUI_POPSNET_READ_ABORTED;
+        }
+    }
+
+    startTick = clock();
+    while (guiPopsNetReadInFlight) {
+        guiStartFrame();
+        if (guiDrawBGSettings() == 0)
+            guiDrawBGPlasma();
+        rmDrawRect(0, 0, screenWidth, screenHeight, gColDarker);
+        fntRenderString(gTheme->fonts[0], screenWidth >> 1, gTheme->usedHeight >> 1,
+                        ALIGN_CENTER, 0, 0, "Loading POPSTARTER settings...", gTheme->textColor);
+        guiDrawOverlays();
+        guiEndFrame();
+
+        readPads();
+        if (getKeyOn(KEY_CIRCLE)) {
+            guiPopsNetReadAbandoned = 1;
+            return GUI_POPSNET_READ_ABORTED;
+        }
+        if ((clock() - startTick) >= timeoutTicks) {
+            guiPopsNetReadAbandoned = 1;
+            return GUI_POPSNET_READ_ABORTED;
+        }
+    }
+
+    if (out != NULL)
+        *out = guiPopsNetReadData;
+    return guiPopsNetReadResult;
+}
+
+static void guiSetPopsNetDialogFields(const vcd_popsnet_t *cfg)
+{
+    size_t i;
+
+    diaSetInt(diaPopsNetConfig, NETCFG_POPS_IPTYPE, cfg->ipDhcp);
+    for (i = 0; i < 4; ++i) {
+        diaSetInt(diaPopsNetConfig, NETCFG_POPS_IP_0 + i, cfg->ps2Ip[i]);
+        diaSetInt(diaPopsNetConfig, NETCFG_POPS_MASK_0 + i, cfg->ps2Mask[i]);
+        diaSetInt(diaPopsNetConfig, NETCFG_POPS_GW_0 + i, cfg->ps2Gw[i]);
+        diaSetInt(diaPopsNetConfig, NETCFG_POPS_SMB_IP_0 + i, cfg->smbIp[i]);
+        diaSetEnabled(diaPopsNetConfig, NETCFG_POPS_IP_0 + i, !cfg->ipDhcp);
+        diaSetEnabled(diaPopsNetConfig, NETCFG_POPS_MASK_0 + i, !cfg->ipDhcp);
+        diaSetEnabled(diaPopsNetConfig, NETCFG_POPS_GW_0 + i, !cfg->ipDhcp);
+    }
+    diaSetInt(diaPopsNetConfig, NETCFG_POPS_SMB_PORT, cfg->smbPort);
+    diaSetString(diaPopsNetConfig, NETCFG_POPS_SMB_SHARE, cfg->smbShare);
+    diaSetString(diaPopsNetConfig, NETCFG_POPS_SMB_USER, cfg->smbUser);
+    diaSetString(diaPopsNetConfig, NETCFG_POPS_SMB_PASS, cfg->smbPass);
+}
+
 // POPStarter -> Network Settings live-updater: DHCP = no static IP/mask/gateway triple.
 static int guiPopsNetUpdater(int modified)
 {
@@ -1532,17 +1702,12 @@ static int guiPopsNetUpdater(int modified)
     return 0;
 }
 
-// POPStarter -> Network Settings (VCD over SMB). Shows POPSTARTER's OWN IPCONFIG.DAT /
-// SMBCONFIG.DAT contents. Absent files leave the fields blank with the notice visible -- absence
-// means unknown/unconfigured, NEVER "use OPL's values". Only an explicit edit or the Import button
-// fills them, and only an actual change vs the read-time snapshot is written back on OK (the save
-// matrix below). Moved out of guiShowNetConfig by the settings-layout restructure; the Import
-// source is now the SAVED OPL network globals (the OPL fields no longer share this dialog).
+// POPStarter -> Network Settings (VCD over SMB). The local memory-card snapshot remains the sole
+// write owner. The explicit import path only copies valid POPS/*.DAT values into the editor, so the
+// normal change-detection/Replace flow still decides whether anything is committed to an MC.
 void guiShowPopsNetConfig(void)
 {
     size_t i;
-    // POPStarter read-time snapshot for the change-detection save matrix, + static storage for the
-    // "Loaded from %s" notice (diaSetLabel stores a RAW POINTER -- it must outlive the dialog).
     static vcd_popsnet_t popsOriginal;
     static char popsNotice[128];
     static const char *ipAddrConfModes[3];
@@ -1550,30 +1715,16 @@ void guiShowPopsNetConfig(void)
     ipAddrConfModes[0] = _l(_STR_IP_ADDRESS_TYPE_STATIC);
     ipAddrConfModes[1] = _l(_STR_IP_ADDRESS_TYPE_DHCP);
     ipAddrConfModes[2] = NULL;
-    diaSetEnum(diaPopsNetConfig, NETCFG_POPS_IPTYPE, ipAddrConfModes); // same Static/DHCP index convention
+    diaSetEnum(diaPopsNetConfig, NETCFG_POPS_IPTYPE, ipAddrConfModes);
 
-    vcdReadPopstarterNet(&popsOriginal);
-    diaSetInt(diaPopsNetConfig, NETCFG_POPS_IPTYPE, popsOriginal.ipDhcp);
-    for (i = 0; i < 4; ++i) {
-        diaSetInt(diaPopsNetConfig, NETCFG_POPS_IP_0 + i, popsOriginal.ps2Ip[i]);
-        diaSetInt(diaPopsNetConfig, NETCFG_POPS_MASK_0 + i, popsOriginal.ps2Mask[i]);
-        diaSetInt(diaPopsNetConfig, NETCFG_POPS_GW_0 + i, popsOriginal.ps2Gw[i]);
-        diaSetInt(diaPopsNetConfig, NETCFG_POPS_SMB_IP_0 + i, popsOriginal.smbIp[i]);
-
-        diaSetEnabled(diaPopsNetConfig, NETCFG_POPS_IP_0 + i, !popsOriginal.ipDhcp);
-        diaSetEnabled(diaPopsNetConfig, NETCFG_POPS_MASK_0 + i, !popsOriginal.ipDhcp);
-        diaSetEnabled(diaPopsNetConfig, NETCFG_POPS_GW_0 + i, !popsOriginal.ipDhcp);
-    }
-    diaSetInt(diaPopsNetConfig, NETCFG_POPS_SMB_PORT, popsOriginal.smbPort);
-    diaSetString(diaPopsNetConfig, NETCFG_POPS_SMB_SHARE, popsOriginal.smbShare);
-    diaSetString(diaPopsNetConfig, NETCFG_POPS_SMB_USER, popsOriginal.smbUser);
-    diaSetString(diaPopsNetConfig, NETCFG_POPS_SMB_PASS, popsOriginal.smbPass);
+    if (guiReadPopsNet(GUI_POPSNET_READ_LOCAL, &popsOriginal) == GUI_POPSNET_READ_ABORTED)
+        return;
+    guiSetPopsNetDialogFields(&popsOriginal);
 
     if (popsOriginal.smbInvalid || popsOriginal.ipInvalid) {
         diaSetLabel(diaPopsNetConfig, NETCFG_POPS_NOTICE, _l(_STR_POPSTARTER_NET_INVALID));
     } else if (popsOriginal.smbExists || popsOriginal.ipExists) {
-        snprintf(popsNotice, sizeof(popsNotice), _l(_STR_POPS_LOADED_FROM),
-                 popsOriginal.home);
+        snprintf(popsNotice, sizeof(popsNotice), _l(_STR_POPS_LOADED_FROM), popsOriginal.home);
         diaSetLabel(diaPopsNetConfig, NETCFG_POPS_NOTICE, popsNotice);
     } else {
         diaSetLabel(diaPopsNetConfig, NETCFG_POPS_NOTICE, _l(_STR_POPS_NONE_DETECTED));
@@ -1582,36 +1733,27 @@ void guiShowPopsNetConfig(void)
     for (;;) {
         int result = diaExecuteDialog(diaPopsNetConfig, -1, 1, &guiPopsNetUpdater);
         if (result == NETCFG_POPS_IMPORT) {
-            // IMPORT: the ONE sanctioned path that copies OPL's saved Network Settings into the
-            // POPStarter fields. Pressing the button exits the dialog with its id; the dialog
-            // struct keeps every field's value across the re-execution, so nothing the user typed
-            // elsewhere is lost.
-            char s[32];
+            vcd_popsnet_t imported;
+            int importResult;
 
-            diaSetInt(diaPopsNetConfig, NETCFG_POPS_IPTYPE, ps2_ip_use_dhcp);
-            for (i = 0; i < 4; ++i) {
-                diaSetInt(diaPopsNetConfig, NETCFG_POPS_IP_0 + i, ps2_ip[i]);
-                diaSetInt(diaPopsNetConfig, NETCFG_POPS_MASK_0 + i, ps2_netmask[i]);
-                diaSetInt(diaPopsNetConfig, NETCFG_POPS_GW_0 + i, ps2_gateway[i]);
-
-                diaSetEnabled(diaPopsNetConfig, NETCFG_POPS_IP_0 + i, !ps2_ip_use_dhcp);
-                diaSetEnabled(diaPopsNetConfig, NETCFG_POPS_MASK_0 + i, !ps2_ip_use_dhcp);
-                diaSetEnabled(diaPopsNetConfig, NETCFG_POPS_GW_0 + i, !ps2_ip_use_dhcp);
+            // Do not start or reconnect SMB merely to import. Its mounted state, not the saved
+            // protocol picker, is the authority for whether these files are readable.
+            if (!ethIsSMBShareConnected()) {
+                guiMsgBox("SMB is not connected.", 0, NULL);
+                continue;
             }
-
-            // A NetBIOS share name can't be turned into an IP -- leave the POPStarter server IP
-            // untouched in that case instead of importing a wrong value.
-            if (!gPCShareAddressIsNetBIOS) {
-                for (i = 0; i < 4; ++i)
-                    diaSetInt(diaPopsNetConfig, NETCFG_POPS_SMB_IP_0 + i, pc_ip[i]);
+            importResult = guiReadPopsNet(GUI_POPSNET_READ_SMB, &imported);
+            if (importResult == GUI_POPSNET_READ_ABORTED)
+                return;
+            if (importResult == VCD_POPSNET_SMB_IMPORT_NOT_CONNECTED) {
+                guiMsgBox("SMB is not connected.", 0, NULL);
+                continue;
             }
-            diaSetInt(diaPopsNetConfig, NETCFG_POPS_SMB_PORT, gPCPort);
-            snprintf(s, sizeof(s), "%s", gPCShareName);
-            diaSetString(diaPopsNetConfig, NETCFG_POPS_SMB_SHARE, s);
-            snprintf(s, sizeof(s), "%s", gPCUserName);
-            diaSetString(diaPopsNetConfig, NETCFG_POPS_SMB_USER, s);
-            snprintf(s, sizeof(s), "%s", gPCPassword);
-            diaSetString(diaPopsNetConfig, NETCFG_POPS_SMB_PASS, s);
+            if (importResult != VCD_POPSNET_SMB_IMPORT_OK) {
+                guiMsgBox("No POPSTARTER settings found in SMB POPS directory.", 0, NULL);
+                continue;
+            }
+            guiSetPopsNetDialogFields(&imported);
             continue;
         }
 
@@ -1638,14 +1780,9 @@ void guiShowPopsNetConfig(void)
         int popsSmbComplete = vcdPopsNetValuesValid(&popsCur, 1, 0);
         int popsIpComplete = !popsCur.ipDhcp && vcdPopsNetValuesValid(&popsCur, 0, 1);
         int writeSmb = (popsMask & 1) && (popsOriginal.smbExists || popsSmbComplete);
-        // A malformed IPCONFIG.DAT initially displays as DHCP because no static triple can be
-        // trusted. Treat an OK as an explicit repair candidate too, so Replace can rewrite it as
-        // the valid blank-DHCP file instead of forcing the user through an unrelated static edit.
         int writeIp = ((popsMask & 2) || popsOriginal.ipInvalid) &&
                       (popsOriginal.ipExists || popsCur.ipDhcp || popsIpComplete);
 
-        // Creating a fresh SMBCONFIG.DAT also creates IPCONFIG.DAT. DHCP deliberately serializes
-        // as a blank file; an incomplete static entry is never serialized as malformed text.
         if (writeSmb && !popsOriginal.smbExists && !popsOriginal.ipExists) {
             writeIp = 1;
             if (!popsCur.ipDhcp && !popsIpComplete)
@@ -1659,8 +1796,6 @@ void guiShowPopsNetConfig(void)
             continue;
         }
 
-        // Existing files are user-owned. Keep and Cancel deliberately re-open the SAME editor:
-        // diaPopsNetConfig retains its typed fields, while popsOriginal remains the read snapshot.
         if ((writeSmb && popsOriginal.smbExists) || (writeIp && popsOriginal.ipExists)) {
             int ov = diaExecuteDialog(diaPopsOverwrite, -1, 1, NULL);
             if (ov != POPS_OVERWRITE_REPLACE)
@@ -1958,21 +2093,6 @@ void guiShowStorageConfig(void)
         diaGetInt(diaStorageConfig, CFG_SMBCACHE, &smbCacheSize);
 
         applyConfig(-1, -1, 0);
-    }
-}
-
-void guiShowToolsConfig(void)
-{
-    int ret;
-reshow_tools:
-    ret = diaExecuteDialog(diaToolsConfig, -1, 1, NULL);
-    if (ret == TOOLS_NET_UPDATE_BUTTON) {
-        guiShowNetCompatUpdate();
-        goto reshow_tools;
-    }
-    if (ret == TOOLS_NBD_BUTTON) {
-        handleLwnbdSrv();
-        goto reshow_tools;
     }
 }
 
@@ -2491,10 +2611,21 @@ static int guiSettingsShowGeneral(void)
 {
     const struct UIItem *parts[] = {diaConfig, diaSecurityConfig, diaAdvancedConfig};
     struct UIItem *ui = guiSettingsCompose(parts, 3, NULL, 0, -1, 1);
+    const char **langNamesSnap = NULL;
+    int langID;
     int result;
 
     if (ui == NULL)
         return 0;
+
+    // The General language row is intentionally the same enum/value as Interface, not a second
+    // setting. Snapshot ownership matches Interface so deferred language discovery cannot free a
+    // list while this dialog renders it.
+    guiLock();
+    langNamesSnap = guiCopyNameList((const char **)lngGetGuiList());
+    guiUnlock();
+    diaSetEnum(ui, UICFG_LANG, langNamesSnap != NULL ? langNamesSnap : (const char **)lngGetGuiList());
+    diaSetInt(ui, UICFG_LANG, lngGetGuiValue());
 
     diaSetShowDefaultWhenEmpty(ui, CFG_EXITTO, 1);
     diaSetString(ui, CFG_EXITTO, gExitPath);
@@ -2511,9 +2642,16 @@ static int guiSettingsShowGeneral(void)
     guiSetAdvancedSettings(ui);
     guiSettingsBeginDialog(ui);
 
+reshow_general:
     result = diaExecuteDialog(ui, -1, 1, &guiSettingsGeneralUpdater);
+    if (result == GENERAL_GSM_DEFAULTS_BUTTON) {
+        if (guiGameShowGSConfig(1))
+            guiSettingsSavePending = 1;
+        goto reshow_general;
+    }
 
     if (result != UIID_BTN_CANCEL && result != -1) {
+        diaGetInt(ui, UICFG_LANG, &langID);
         diaGetString(ui, CFG_EXITTO, gExitPath, sizeof(gExitPath));
         diaGetString(ui, CFG_CUSTOMCFGPATH, gCustomSettingsPath, sizeof(gCustomSettingsPath));
         diaGetInt(ui, CFG_LASTPLAYED, &gRememberLastPlayed);
@@ -2525,13 +2663,71 @@ static int guiSettingsShowGeneral(void)
         guiSaveAdvancedSettings(ui);
 
         DisableCron = 1;
-        applyConfig(-1, -1, 0);
+        applyConfig(-1, langID, 0);
         menuReinitMainMenu();
     }
 
+    guiFreeNameList(langNamesSnap);
     guiSettingsEndDialog();
     guiSettingsActiveDialog = NULL;
     return guiSettingsPageResult(result);
+}
+
+static int guiSourcesOplHomeInitial;
+static int guiSourcesOplHomeLegacy;
+static int guiSourcesOplHomeTouched;
+static int guiSourcesOplHomeStagePending;
+static int guiSourcesOplHomeStageResult;
+static int guiSourcesOplHomeStageChoice;
+static int guiSourcesOplHomeStageInFlight;
+static int guiSourcesOplHomeStageAbandoned;
+
+static int guiSettingsSourcesUpdater(int modified)
+{
+    int selection;
+
+    if (modified) {
+        diaGetInt(guiSettingsActiveDialog, CFG_HDDOPLPART, &selection);
+        if (selection != guiSourcesOplHomeInitial)
+            guiSourcesOplHomeTouched = 1;
+    }
+    return 0;
+}
+
+static void guiSettingsStageOplHomeWorker(void)
+{
+    int result = hddStageOplHomeSelection(guiSourcesOplHomeStageChoice);
+
+    if (guiSourcesOplHomeStageAbandoned)
+        hddDiscardOplHomeSelection();
+    else
+        guiSourcesOplHomeStageResult = result;
+    guiSourcesOplHomeStageInFlight = 0;
+    guiSourcesOplHomeStagePending = 0;
+}
+
+static int guiSettingsStageOplHome(int selection)
+{
+    // Do not overwrite the static request payload after a timed-out worker. The I/O queue is
+    // single-threaded, so another request cannot begin until that worker actually returns.
+    if (guiSourcesOplHomeStageInFlight)
+        return 0;
+
+    guiSourcesOplHomeStageChoice = selection;
+    guiSourcesOplHomeStageResult = 0;
+    guiSourcesOplHomeStagePending = 1;
+    guiSourcesOplHomeStageInFlight = 1;
+    guiSourcesOplHomeStageAbandoned = 0;
+    guiHandleDeferedIO(&guiSourcesOplHomeStagePending, "Checking HDD OPL partition...",
+                       IO_CUSTOM_SIMPLEACTION, &guiSettingsStageOplHomeWorker, 15000);
+    if (gLastDeferredTimedOut) {
+        // The late worker only ever changes our staged selector; never let an abandoned wait make
+        // a later Save Settings persist a choice the user did not get to confirm.
+        guiSourcesOplHomeStageAbandoned = 1;
+        hddDiscardOplHomeSelection();
+        return 0;
+    }
+    return guiSourcesOplHomeStageResult;
 }
 
 static int guiSettingsShowSources(void)
@@ -2539,6 +2735,7 @@ static int guiSettingsShowSources(void)
     const struct UIItem *parts[] = {diaDeviceConfig};
     const char *deviceNames[] = {_l(_STR_BDM_GAMES), _l(_STR_NET_GAMES), _l(_STR_HDD_GAMES), _l(_STR_APPS), _l(_STR_MMCE), _l(_STR_FAV), NULL};
     const char *deviceModes[] = {_l(_STR_OFF), _l(_STR_MANUAL), _l(_STR_AUTO), NULL};
+    static const char *hddOplHomes[] = {"__common/OPL/", "+OPL/", NULL};
     struct UIItem *ui = guiSettingsCompose(parts, 1, NULL, 0, -1, 0);
     int deviceModeIndex;
     int result;
@@ -2568,10 +2765,15 @@ static int guiSettingsShowSources(void)
     diaSetEnum(ui, CFG_MMCEMODE, deviceModes);
     diaSetInt(ui, CFG_MMCEMODE, gMMCEStartMode);
     diaSetEnabled(ui, CFG_MMCEMODE, 1);
+    guiSourcesOplHomeInitial = hddGetOplHomeSelection();
+    guiSourcesOplHomeLegacy = hddOplHomeIsLegacy();
+    guiSourcesOplHomeTouched = 0;
+    diaSetEnum(ui, CFG_HDDOPLPART, hddOplHomes);
+    diaSetInt(ui, CFG_HDDOPLPART, guiSourcesOplHomeInitial);
     guiSettingsBeginDialog(ui);
 
 reshow_sources:
-    result = diaExecuteDialog(ui, -1, 1, NULL);
+    result = diaExecuteDialog(ui, -1, 1, &guiSettingsSourcesUpdater);
     if (result == MMCE_SETTINGS_BUTTON) {
         // MMCE uses a separate composition buffer. Confirming the child editor finishes the
         // Settings page and returns to the hub; Circle resumes Game Sources as the parent page.
@@ -2587,6 +2789,19 @@ reshow_sources:
 
     if (result != UIID_BTN_CANCEL && result != -1) {
         int netProtocolWas = gNetworkProtocol;
+        int hddOplHomeChoice;
+
+        diaGetInt(ui, CFG_HDDOPLPART, &hddOplHomeChoice);
+        if (hddOplHomeChoice != guiSourcesOplHomeInitial ||
+            (guiSourcesOplHomeLegacy && guiSourcesOplHomeTouched)) {
+            if (!guiSettingsStageOplHome(hddOplHomeChoice)) {
+                diaSetInt(ui, CFG_HDDOPLPART, guiSourcesOplHomeInitial);
+                guiMsgBox(hddOplHomeChoice == HDD_OPL_HOME_PLUS ? "+OPL partition not found." : "HDD (APA) OPL partition not found.",
+                          0, NULL);
+                goto reshow_sources;
+            }
+            guiMsgBox("Restart or remount HDD to use the selected OPL partition.", 0, NULL);
+        }
 
         diaGetInt(ui, CFG_DEFDEVICE, &deviceModeIndex);
         gDefaultDevice = guiDeviceTypeToIoMode(deviceModeIndex);
@@ -2731,7 +2946,8 @@ reshow_interface:
         goto reshow_interface;
     }
     if (result == DISPLAY_GSM_DEFAULTS_BUTTON) {
-        guiGameShowGSConfig(1);
+        if (guiGameShowGSConfig(1))
+            guiSettingsSavePending = 1;
         goto reshow_interface;
     }
 
@@ -2825,6 +3041,11 @@ reshow_launch:
     result = diaExecuteDialog(ui, -1, 1, &guiSettingsLaunchUpdater);
     if (result == LAUNCH_OSD_DEFAULTS_BUTTON) {
         guiGameShowOSDLanguageConfig(1);
+        goto reshow_launch;
+    }
+    if (result == LAUNCH_GSM_DEFAULTS_BUTTON) {
+        if (guiGameShowGSConfig(1))
+            guiSettingsSavePending = 1;
         goto reshow_launch;
     }
     if (result == CFG_NEUTRINO_ARGS) {
@@ -3053,6 +3274,7 @@ static int guiSettingsShowIndex(int *page)
                     return 0;
                 }
             } else if (promptResult == SETTINGS_PROMPT_EXIT) {
+                hddDiscardOplHomeSelection();
                 guiSettingsSavePending = 0;
                 return 0;
             }
@@ -3068,6 +3290,7 @@ void guiShowSettings(void)
     guiSettingsShellActive = 1;
     guiSettingsSavePending = 0;
     if (!guiSettingsShowIndex(&page)) {
+        hddDiscardOplHomeSelection();
         guiSettingsShellActive = 0;
         guiSettingsSavePending = 0;
         return;
@@ -3101,6 +3324,7 @@ void guiShowSettings(void)
                 result = guiShowAudioConfig();
                 break;
             default:
+                hddDiscardOplHomeSelection();
                 guiSettingsShellActive = 0;
                 guiSettingsSavePending = 0;
                 return;
@@ -3108,6 +3332,7 @@ void guiShowSettings(void)
 
         if (result == DIA_RESULT_INDEX) {
             if (!guiSettingsShowIndex(&page)) {
+                hddDiscardOplHomeSelection();
                 guiSettingsShellActive = 0;
                 guiSettingsSavePending = 0;
                 return;
@@ -3117,6 +3342,7 @@ void guiShowSettings(void)
         } else if (result == DIA_RESULT_PREV) {
             page = (page + SETTINGS_PAGE_COUNT - 1) % SETTINGS_PAGE_COUNT;
         } else {
+            hddDiscardOplHomeSelection();
             guiSettingsShellActive = 0;
             guiSettingsSavePending = 0;
             return;
@@ -3675,7 +3901,8 @@ void guiDrawSubMenuHints(void)
     guiDrawIconAndText(gSelectButton == KEY_CIRCLE ? subMenuIcons[1] : subMenuIcons[0], subMenuHints[1], gTheme->fonts[0], x, y, gTheme->textColor);
 }
 
-static int endIntro = 0; // Break intro loop and start 'Last Played Auto Start' countdown
+static int endIntro = 0;           // Break intro loop and start 'Last Played Auto Start' countdown
+static int gIntroSplashActive = 0; // The intro is a splash, never a generic I/O-spinner screen.
 static void guiDrawOverlays()
 {
     // are there any pending operations?
@@ -3692,7 +3919,7 @@ static void guiDrawOverlays()
             busyAlpha += 0x02;
     }
 
-    if (!oplIsBootInProgress() && busyAlpha > 0x00)
+    if (!oplIsBootInProgress() && !gIntroSplashActive && busyAlpha > 0x00)
         guiDrawBusy(busyAlpha);
 
 #ifdef __DEBUG
@@ -3904,6 +4131,9 @@ void guiIntroLoop(void)
     clock_t tFadeDelay = 0;
     int tFadeArmed = 0;
 
+    // oplIsBootInProgress() can become false while background startup work is still queued. That
+    // is correct for runtime overlays, but the animated greeting owns the entire intro lifecycle.
+    gIntroSplashActive = 1;
     while (!endIntro) {
         guiStartFrame();
 
@@ -3947,6 +4177,7 @@ void guiIntroLoop(void)
         if (!screenHandlerTarget && screenHandler)
             screenHandler->handleInput();
     }
+    gIntroSplashActive = 0;
 }
 
 void guiMainLoop(void)

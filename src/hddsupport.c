@@ -40,6 +40,19 @@ static unsigned char hddSupportModulesLoaded = 0;
 // while it keeps failing, and re-toasting the same error box each pass would bury the UI. Reset on
 // success so a later, different failure toasts again.
 static unsigned char hddSupportErrToasted = 0;
+// A Settings selection is deliberately staged until Save Settings. It never changes the active
+// pfs0: mount: a live OPL data home can have artwork/config readers using it.
+static int hddOplHomePending = -1;
+
+static void hddClearRecoveredErrors(void)
+{
+    // Do not blank an unrelated queued notification. These are the only messages emitted by this
+    // support path, and each call is made only after the underlying APA/PFS check succeeded.
+    clearErrorMessageIf(_STR_HDD_NOT_CONNECTED_ERROR);
+    clearErrorMessageIf(_STR_HDD_NOT_FORMATTED_ERROR);
+    clearErrorMessageIf(_STR_HDD_UNAVAILABLE_ERROR);
+    clearErrorMessageIf(_STR_HDD_PFS_UNAVAILABLE_ERROR);
+}
 
 static char *hddPrefix = "pfs0:";
 static hdl_games_list_t hddGames;
@@ -370,7 +383,10 @@ int hddDetectNonSonyFileSystem()
     return result;
 }
 
-void hddLoadSupportModules(void)
+// Bring up only the APA/PFS support needed for a read-only pfs1: probe. This intentionally does
+// not discover, mount, or create the persistent pfs0: OPL data home: Settings uses it to validate
+// an already-existing selector target without changing the live data-home state.
+static int hddLoadCoreSupportModules(void)
 {
     static char hddarg[] = "-o"
                            "\0"
@@ -414,9 +430,12 @@ void hddLoadSupportModules(void)
             setErrorMessageWithCode(_STR_HDD_NOT_CONNECTED_ERROR, ERROR_HDD_NOT_DETECTED);
             hddSupportErrToasted = 1;
         } else if (nonSony > 0) {
-            hddSupportErrToasted = 0; // probe SUCCEEDED (genuine MBR/GPT) -- a future failure is new news
+            // A recognized MBR/GPT/exFAT disk is normal BDM territory, not an APA formatting
+            // failure. It also proves a prior transient APA probe error is stale.
+            hddSupportErrToasted = 0;
+            hddClearRecoveredErrors();
         }
-        return;
+        return 0;
     }
 
     if (!hddSupportModulesLoaded) {
@@ -428,34 +447,65 @@ void hddLoadSupportModules(void)
                 setErrorMessageWithCode(_STR_HDD_NOT_CONNECTED_ERROR, ERROR_HDD_MODULE_HDD_FAILURE);
                 hddSupportErrToasted = 1;
             }
-            return;
+            return 0;
         }
 
-        // Check if a HDD unit is connected.
-        if (hddCheck() < 0) {
+        // hddCheck distinguishes a connected formatted APA disk (0), a genuinely unformatted one
+        // (1), an unusable drive (2), and no usable drive (<0). Only status 1 earns the specific
+        // "not formatted" wording; a PFS module/load or selected-data-home problem is not proof of
+        // that condition.
+        ret = hddCheck();
+        if (ret < 0) {
             LOG("HDD: No HardDisk Drive detected.\n");
             if (!hddSupportErrToasted) {
                 setErrorMessageWithCode(_STR_HDD_NOT_CONNECTED_ERROR, ERROR_HDD_NOT_DETECTED);
                 hddSupportErrToasted = 1;
             }
-            return;
+            return 0;
+        }
+        if (ret == 1) {
+            LOG("HDD: APA status reports an unformatted drive.\n");
+            if (!hddSupportErrToasted) {
+                setErrorMessageWithCode(_STR_HDD_NOT_FORMATTED_ERROR, ERROR_HDD_MODULE_PFS_FAILURE);
+                hddSupportErrToasted = 1;
+            }
+            return 0;
+        }
+        if (ret == 2) {
+            LOG("HDD: APA status reports an unavailable drive.\n");
+            if (!hddSupportErrToasted) {
+                setErrorMessageWithCode(_STR_HDD_UNAVAILABLE_ERROR, ERROR_HDD_NOT_DETECTED);
+                hddSupportErrToasted = 1;
+            }
+            return 0;
         }
 
         LOG("[PS2FS]:\n");
         ret = sysLoadModuleBuffer(&ps2fs_irx, size_ps2fs_irx, sizeof(pfsarg), pfsarg);
         if (ret < 0) {
-            LOG("HDD: HardDisk Drive not formatted (PFS).\n");
+            LOG("HDD: PFS support module failed to load.\n");
             if (!hddSupportErrToasted) {
-                setErrorMessageWithCode(_STR_HDD_NOT_FORMATTED_ERROR, ERROR_HDD_MODULE_PFS_FAILURE);
+                setErrorMessageWithCode(_STR_HDD_PFS_UNAVAILABLE_ERROR, ERROR_HDD_MODULE_PFS_FAILURE);
                 hddSupportErrToasted = 1;
             }
-            return;
+            return 0;
         }
 
         hddSupportModulesLoaded = 1;
         hddSupportErrToasted = 0;
+        hddClearRecoveredErrors();
         LOG("HDDSUPPORT modules loaded\n");
     }
+
+    return 1;
+}
+
+void hddLoadSupportModules(void)
+{
+    int ret;
+
+    if (!hddLoadCoreSupportModules())
+        return;
 
     // The modules and the persistent pfs0: data mount have separate lifetimes. If an
     // existing partition was temporarily unavailable, keep the modules loaded and retry
@@ -467,10 +517,10 @@ void hddLoadSupportModules(void)
         hddFindOPLPartition();
 
     if (gOPLPart[0] == '\0') {
-        if (!hddSupportErrToasted) {
-            setErrorMessageWithCode(_STR_HDD_NOT_FORMATTED_ERROR, ERROR_HDD_MODULE_PFS_FAILURE);
-            hddSupportErrToasted = 1;
-        }
+        // HDL/VCD enumeration can still work without a persistent OPL data home. A missing or
+        // stale redirect is not evidence that the APA disk is unformatted, so retry discovery
+        // later without poisoning the user with a false formatting warning.
+        hddSupportErrToasted = 0;
         return;
     }
 
@@ -492,14 +542,12 @@ void hddLoadSupportModules(void)
         // Force the next call to rediscover. This does not unload/reload the APA/PFS modules.
         gOPLPart[0] = '\0';
         gHDDPrefix = NULL;
-        if (!hddSupportErrToasted) {
-            setErrorMessageWithCode(_STR_HDD_NOT_FORMATTED_ERROR, ERROR_HDD_MODULE_PFS_FAILURE);
-            hddSupportErrToasted = 1;
-        }
+        hddSupportErrToasted = 0;
         return;
     }
 
     hddSupportErrToasted = 0;
+    hddClearRecoveredErrors();
     if (!strcmp(gOPLPart, "hdd0:__common")) {
         hddCheckOPLFolder(hddPrefix);
         gHDDPrefix = "pfs0:OPL/";
@@ -896,6 +944,115 @@ static void hddDeleteGame(item_list_t *itemList, int id)
         return; // stale id in the VCD->ISO toggle window -> don't delete a wrong/OOB HDL partition
     hddDeleteHDLGame(game);
     hddForceUpdate = 1;
+}
+
+// Settings probes use pfs1:, never pfs0:. The latter is the persistent OPL data-home mount and
+// remounting it under live readers is both unsafe and unnecessary just to prove an APA partition
+// already exists.
+static int hddPartitionMountableAt(const char *mountPoint, const char *partition, int flags)
+{
+    int ret;
+
+    fileXioUmount(mountPoint);
+    ret = fileXioMount(mountPoint, partition, flags);
+    if (ret == 0)
+        fileXioUmount(mountPoint);
+
+    return ret == 0;
+}
+
+int hddGetOplHomeSelection(void)
+{
+    if (hddOplHomePending >= 0)
+        return hddOplHomePending;
+    return strcmp(gOPLPart, "hdd0:+OPL") == 0 ? HDD_OPL_HOME_PLUS : HDD_OPL_HOME_COMMON;
+}
+
+int hddOplHomeIsLegacy(void)
+{
+    return gOPLPart[0] != '\0' && strcmp(gOPLPart, "hdd0:__common") != 0 &&
+           strcmp(gOPLPart, "hdd0:+OPL") != 0;
+}
+
+int hddOplHomeSelectionPending(void)
+{
+    return hddOplHomePending >= 0;
+}
+
+void hddDiscardOplHomeSelection(void)
+{
+    hddOplHomePending = -1;
+}
+
+int hddStageOplHomeSelection(int selection)
+{
+    const char *partition;
+
+    if (selection != HDD_OPL_HOME_COMMON && selection != HDD_OPL_HOME_PLUS)
+        return 0;
+
+    // Bring up only the APA/PFS drivers. Do not call hddLoadSupportModules here: its normal data
+    // home recovery may mount pfs0: and create OPL folders, neither of which belongs to a source
+    // selector proof.
+    if (!hddLoadModulesReady())
+        return 0;
+    if (!hddLoadCoreSupportModules())
+        return 0;
+
+    partition = selection == HDD_OPL_HOME_PLUS ? "hdd0:+OPL" : "hdd0:__common";
+    if (!hddPartitionMountableAt("pfs1:", partition, FIO_MT_RDONLY))
+        return 0;
+
+    hddOplHomePending = selection;
+    return 1;
+}
+
+int hddCommitOplHomeSelection(void)
+{
+    config_set_t *config;
+    const char *path = "pfs1:OPL/conf_hdd.cfg";
+    int fd;
+    int exists;
+    int result = 0;
+
+    if (hddOplHomePending < 0)
+        return 1;
+
+    // Re-prove the common owner at commit time. No raw APA operation, partition creation, or pfs0:
+    // remount is involved; this is only a bounded pfs1: read/write mount of an existing partition.
+    if (!hddLoadModulesReady())
+        return 0;
+    if (!hddLoadCoreSupportModules() || !hddPartitionMountableAt("pfs1:", "hdd0:__common", FIO_MT_RDWR))
+        return 0;
+
+    if (fileXioMount("pfs1:", "hdd0:__common", FIO_MT_RDWR) < 0)
+        return 0;
+
+    fd = open(path, O_RDONLY);
+    exists = fd >= 0;
+    if (fd >= 0)
+        close(fd);
+
+    config = configAlloc(0, NULL, (char *)path);
+    if (config != NULL) {
+        // A present-but-unreadable file is user data, not an invitation to replace it with a new
+        // selector. A missing file is the normal common-home default and can be born only for an
+        // explicit +OPL choice.
+        if (!exists || configRead(config)) {
+            if (hddOplHomePending == HDD_OPL_HOME_PLUS)
+                configSetStr(config, "hdd_partition", "+OPL");
+            else
+                configRemoveKey(config, "hdd_partition");
+
+            result = configWrite(config) > 0;
+        }
+        configFree(config);
+    }
+
+    fileXioUmount("pfs1:");
+    if (result)
+        hddOplHomePending = -1;
+    return result;
 }
 
 // A PP.<DISC-ID>.POPS.<title> VCD is the APA/PFS partition itself, not a loose .VCD file. Preserve
