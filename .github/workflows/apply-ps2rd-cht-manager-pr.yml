@@ -1,0 +1,77 @@
+name: Apply PS2RD CHT Manager PR changes
+
+on:
+  push:
+    branches:
+      - feature/add-ps2rd-cht-manager
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout feature branch
+        uses: actions/checkout@v6
+        with:
+          ref: feature/add-ps2rd-cht-manager
+          fetch-depth: 0
+
+      - name: Apply companion-tool changes
+        shell: python
+        run: |
+          from pathlib import Path
+
+          def replace_once(path, old, new):
+              p = Path(path)
+              text = p.read_text(encoding="utf-8")
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{path}: expected exactly one match, found {count}")
+              p.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+          Path("pc/PS2RD-CHT-Manager.url").write_text(
+              "[InternetShortcut]\nURL=https://github.com/TheRealNextria/PS2RD-CHT-Manager\n",
+              encoding="utf-8",
+          )
+
+          readme_anchor = "- **[OPL PS1 AIO Converter GUI](https://github.com/shaanhomebrew-cloud/OPL-PS1-AIO-Converter-GUI)** — Windows all-in-one PS1/POPStarter preparation tool for converting BIN/CUE backups to VCDs and installing them to USB, MX4SIO, MMCE, exFAT HDD, SMB and APA internal HDD.\n"
+          readme_insert = readme_anchor + "- **[PS2RD CHT Manager](https://github.com/TheRealNextria/PS2RD-CHT-Manager)** — Windows application for creating, editing and managing `.cht` cheat files for **Open PS2 Loader (OPL) / PS2RD**.\n"
+          replace_once("README.md", readme_anchor, readme_insert)
+
+          notes_anchor = "OrbitOPL Toolbox is third-party and independently maintained — **please report Toolbox\nissues to its own repository, not here.**\n\n"
+          notes_insert = notes_anchor + "## Creating and managing PS2RD cheat files\n\nFor PS2RD `.cht` files, use **PS2RD CHT Manager** — open\n**PS2RD-CHT-Manager.url** from the package, or visit\nhttps://github.com/TheRealNextria/PS2RD-CHT-Manager. It is a Windows application for\ncreating, editing and managing `.cht` cheat files for **Open PS2 Loader (OPL) / PS2RD**.\n\nPS2RD CHT Manager is third-party and independently maintained — **please report its\nissues to its own repository, not here.**\n\n"
+          replace_once(".github/rolling-release-notes-block.md", notes_anchor, notes_insert)
+
+          workflow_comment_anchor = "          #   OrbitOPL-Toolbox.url            -- link to the cross-platform PC library manager.\n"
+          workflow_comment_insert = workflow_comment_anchor + "          #   PS2RD-CHT-Manager.url           -- link to the Windows OPL / PS2RD .cht cheat-file manager.\n"
+          replace_once(".github/workflows/rolling-release.yml", workflow_comment_anchor, workflow_comment_insert)
+
+          orbit_copy_anchor = "          test -f pc/OrbitOPL-Toolbox.url\n          cp -f pc/OrbitOPL-Toolbox.url \"$PKG/OrbitOPL-Toolbox.url\"\n"
+          orbit_copy_insert = orbit_copy_anchor + "          # PS2RD CHT Manager: Windows companion utility for creating, editing and managing\n          # OPL / PS2RD .cht cheat files. Link the maintained upstream tool; do not vendor it.\n          test -f pc/PS2RD-CHT-Manager.url\n          cp -f pc/PS2RD-CHT-Manager.url \"$PKG/PS2RD-CHT-Manager.url\"\n"
+          replace_once(".github/workflows/rolling-release.yml", orbit_copy_anchor, orbit_copy_insert)
+
+          zip_anchor = "            zip -r -X \"../rolling/${ZIP}\" APP_RIPTOPL-PS2DEVROLLING POPSTARTER POPS PS2-Servers.url OrbitOPL-Toolbox.url >/dev/null\n"
+          zip_insert = "            zip -r -X \"../rolling/${ZIP}\" APP_RIPTOPL-PS2DEVROLLING POPSTARTER POPS PS2-Servers.url OrbitOPL-Toolbox.url PS2RD-CHT-Manager.url >/dev/null\n"
+          replace_once(".github/workflows/rolling-release.yml", zip_anchor, zip_insert)
+
+          release_anchor = "            printf -- '- OrbitOPL-Toolbox.url: opens OrbitOPL Toolbox, the cross-platform PC library manager\\n'\n"
+          release_insert = release_anchor + "            printf -- '- PS2RD-CHT-Manager.url: opens PS2RD CHT Manager for creating, editing and managing OPL / PS2RD .cht cheat files\\n'\n"
+          replace_once(".github/workflows/rolling-release.yml", release_anchor, release_insert)
+
+      - name: Verify and commit final PR contents
+        run: |
+          set -eu
+          rm -f .github/workflows/apply-ps2rd-cht-manager-pr.yml
+          test -f pc/PS2RD-CHT-Manager.url
+          grep -Fq 'PS2RD CHT Manager' README.md
+          grep -Fq 'PS2RD-CHT-Manager.url' .github/rolling-release-notes-block.md
+          grep -Fq 'PS2RD-CHT-Manager.url' .github/workflows/rolling-release.yml
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add README.md .github/rolling-release-notes-block.md .github/workflows/rolling-release.yml pc/PS2RD-CHT-Manager.url .github/workflows/apply-ps2rd-cht-manager-pr.yml
+          git commit -m 'docs: add PS2RD CHT Manager companion tool'
+          git push origin HEAD:feature/add-ps2rd-cht-manager
