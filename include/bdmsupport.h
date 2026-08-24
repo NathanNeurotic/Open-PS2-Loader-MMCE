@@ -92,9 +92,16 @@ int bdmEnsureSourceModules(int bdmType, u32 timeoutMs);
 // basename; may be empty) verifies the slot: the device holding <bootdir>/<elfName> IS the boot device.
 // *ioBdmType: pass the known boot-device BDM_TYPE_* to pin the search (save-path re-resolve) or
 // BDM_TYPE_UNKNOWN to classify from the prefix; on success it returns the resolved device's type.
-// Returns 1 with bootDir rewritten in place, 0 when bootDir is not a BDM path (untouched), -1 when the
-// boot device never mounted in time (untouched -- caller drops it so legacy discovery re-arms).
+// Returns 1 with bootDir rewritten in place (or confirmed unchanged for an explicit massN: slot),
+// 0 when bootDir is not a BDM path (untouched), -1 when the boot device never mounted in time
+// (untouched; callers keep that explicit identity and can fall back to defaults).
 int bdmResolveBootDir(char *bootDir, int bootDirSize, const char *elfName, int *ioBdmType);
+// Bootstrap variant for the first config read. An explicit massN: is identified only by opening
+// that exact slot and reading its driver/device ioctls; it never probes other mass slots. Its
+// bounded USB -> MX4SIO -> iLink/ATA transport bring-up prevents a normal first-run boot from
+// spending the full recovery budget before defaults are shown. Explicit custom paths and save-time
+// re-resolution use bdmResolveBootDir() above.
+int bdmResolveBootDirBootstrap(char *bootDir, int bootDirSize, const char *elfName, int *ioBdmType);
 
 int bdmFindPartition(char *target, const char *name, int write);
 int bdmIsUDPBDLoaded(void); // 1 if the UDPBD NIC stack is loaded (the SMB stack must not load on top)

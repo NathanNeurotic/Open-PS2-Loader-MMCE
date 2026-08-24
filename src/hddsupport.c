@@ -83,9 +83,9 @@ static void hddInitModules(void)
     snprintf(path, sizeof(path), "%sLNG", gHDDPrefix);
     lngAddLanguages(path, "/", hddGameList.mode);
 
-    // Create normal OPL folders only INSIDE the selected mounted PFS data home. For +OPL this
-    // is pfs0:; for the safe __common fallback it is pfs0:OPL/. Never spray OPL folders into
-    // the root of __common and never create an APA partition to obtain a home.
+    // Create normal OPL folders only inside the selected mounted PFS data home. A configured
+    // existing APA partition owns its root; the canonical __common fallback owns __common/OPL/.
+    // Never create an APA partition to obtain a home.
     sbCreateFolders(gHDDPrefix, 0);
 }
 
@@ -161,11 +161,13 @@ static void hddFindOPLPartition(void)
     config_set_t *config;
     char name[64] = {0};
     char candidate[sizeof(gOPLPart)];
+    const char *label;
 
-    // First honour an existing __common/OPL/conf_hdd.cfg, but only when the named
-    // partition already exists and mounts as PFS. Discovery must never manufacture it.
+    // __common/OPL/conf_hdd.cfg is the one authoritative APA data-home selector. Honour it
+    // only when it names an existing mountable hdd0 PFS partition; discovery never manufactures
+    // a partition, resizes one, or writes raw hdd0: metadata.
     fileXioUmount(hddPrefix);
-    if (fileXioMount(hddPrefix, "hdd0:__common", FIO_MT_RDWR) == 0) {
+    if (fileXioMount(hddPrefix, "hdd0:__common", FIO_MT_RDONLY) == 0) {
         config = configAlloc(0, NULL, "pfs0:OPL/conf_hdd.cfg");
         if (config != NULL) {
             if (configRead(config))
@@ -175,14 +177,23 @@ static void hddFindOPLPartition(void)
         fileXioUmount(hddPrefix);
 
         if (name[0] != '\0') {
-            // conf_hdd.cfg historically stores a bare APA ID (for example +OPL).
-            // Accept hdd0:<id> too, but never redirect data ownership to hdd1 here.
+            // The historical value is a bare APA ID (for example +OPL). Accept an hdd0:
+            // spelling too, but never silently redirect this drive's owner to hdd1.
             if (!strncmp(name, "hdd0:", 5))
-                snprintf(candidate, sizeof(candidate), "%s", name);
+                label = name + 5;
             else if (!strncmp(name, "hdd", 3))
+                label = NULL;
+            else
+                label = name;
+
+            // conf_hdd.cfg names one APA partition label, not a raw hdd device or a PFS path.
+            // Reject delimiters and an empty/oversized label before passing anything to the mount
+            // RPC, so an invalid redirect can only select the documented __common fallback.
+            if (label == NULL || label[0] == '\0' || strlen(label) > APA_IDMAX ||
+                strpbrk(label, ":/\\") != NULL)
                 candidate[0] = '\0';
             else
-                snprintf(candidate, sizeof(candidate), "hdd0:%s", name);
+                snprintf(candidate, sizeof(candidate), "hdd0:%s", label);
 
             if (candidate[0] != '\0' && hddPartitionMountable(candidate)) {
                 snprintf(gOPLPart, sizeof(gOPLPart), "%s", candidate);
@@ -193,11 +204,8 @@ static void hddFindOPLPartition(void)
         }
     }
 
-    // No usable configured target: __common/OPL is the canonical safe HDD home.
-    // Do NOT opportunistically select +OPL merely because it exists. A +OPL (or any other
-    // partition) is used only when __common/OPL/conf_hdd.cfg explicitly points to it.
-    // This keeps ownership deterministic and guarantees that discovery never needs to
-    // manufacture an APA partition just to obtain a writable config/data home.
+    // A missing, stale, or invalid redirect falls back only to __common/OPL. The presence of
+    // +OPL alone is intentionally not an ownership decision.
     if (hddPartitionMountable("hdd0:__common")) {
         snprintf(gOPLPart, sizeof(gOPLPart), "hdd0:__common");
         LOG("HDD: no usable configured data partition; using canonical __common/OPL/ fallback\n");
@@ -492,7 +500,7 @@ void hddLoadSupportModules(void)
     }
 
     hddSupportErrToasted = 0;
-    if (gOPLPart[5] != '+') {
+    if (!strcmp(gOPLPart, "hdd0:__common")) {
         hddCheckOPLFolder(hddPrefix);
         gHDDPrefix = "pfs0:OPL/";
     } else {
@@ -912,27 +920,23 @@ static int hddFindVcdByName(const char *vcdName)
     return -1;
 }
 
-// Resolve POPSTARTER.ELF for an HDD VCD launch: search hdd0:__common then hdd0:+OPL, each at its ROOT
-// /POPS/ (NOT the OPL/POPS/ data subfolder). On success returns 1 with elfOut = "pfs0:/POPS/POPSTARTER.ELF"
+// Resolve POPSTARTER.ELF for an HDD VCD launch from hdd0:__common/POPS/ only. APA VCD data can live
+// in its normal __.POPS / PP.* partitions and OPL data can be redirected elsewhere, but loose
+// POPS/POPSTARTER support payloads are always owned by __common. On success returns 1 with
+// elfOut = "pfs0:/POPS/POPSTARTER.ELF"
 // and LEAVES pfs0: mounted on that partition so the caller can load the ELF from it; on failure returns 0
 // with pfs0: restored to the OPL data partition. The CALLER must quiesce the art + IO workers first --
 // this remounts the single pfs0: slot, and umounting it under a live cover read is the HDD-freeze hazard.
 static int hddResolveHddPopstarter(char *elfOut, int elfLen)
 {
-    static const char *cands[2] = {"hdd0:__common", "hdd0:+OPL"};
-
-    for (int i = 0; i < 2; i++) {
-        fileXioUmount(hddPrefix);
-        if (fileXioMount(hddPrefix, cands[i], FIO_MT_RDONLY) < 0)
-            continue; // partition absent / unmountable -> try the next
-        // The APA contract is hdd0:__common/POPS/ (with +OPL retained as the existing fallback).
-        // Install directly from whichever candidate is mounted before checking its POPSTARTER.ELF.
+    fileXioUmount(hddPrefix);
+    if (fileXioMount(hddPrefix, "hdd0:__common", FIO_MT_RDONLY) == 0) {
         (void)vcdInstallPopstarterMc("pfs0:/");
         int fd = open("pfs0:/POPS/POPSTARTER.ELF", O_RDONLY);
         if (fd >= 0) {
             close(fd);
             snprintf(elfOut, elfLen, "pfs0:/POPS/POPSTARTER.ELF");
-            return 1; // keep pfs0: on this partition for the ELF load
+            return 1; // keep pfs0: on __common for the ELF load
         }
     }
 

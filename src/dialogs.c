@@ -393,7 +393,9 @@ struct UIItem diaVcdConfig[] = {
     {UI_SPACER},
     {UI_BUTTON, VCD_BDMA_BUTTON, 1, 1, -1, 0, 0, {.label = {NULL, _STR_MODIFY}}},
     {UI_BREAK},
-    {UI_BUTTON, VCD_LIST_BUTTON, 1, 1, -1, 0, 0, {.label = {NULL, _STR_GAME_LIST_SETTINGS}}},
+    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {NULL, _STR_GAME_LIST_SETTINGS}}},
+    {UI_SPACER},
+    {UI_BUTTON, VCD_LIST_BUTTON, 1, 1, -1, 0, 0, {.label = {NULL, _STR_MODIFY}}},
     {UI_BREAK},
     {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {NULL, _STR_POPSTARTER_NETWORK_SETTINGS}}},
     {UI_SPACER},
@@ -598,12 +600,22 @@ struct UIItem diaMmcePathConfig[] = {
     // end of dialog
     {UI_TERMINATOR}};
 
-// Interface page (settings-layout restructure, was Display Settings): theme/language/list behavior.
-// Artwork, Coverflow and Colors are chained sub-dialogs; the video/offset/overscan/GameID-barcode
-// rows moved to the Display page (diaDisplayConfig). Ids unchanged.
+// Interface page (settings-layout restructure, was Display Settings): high-level view/video choice,
+// then theme/language/list behavior. Artwork, Coverflow and Colors are chained sub-dialogs; the
+// remaining geometry/GameID-barcode rows live in diaDisplayConfig. Ids unchanged.
 struct UIItem diaUIConfig[] = {
     {UI_HEADER, 0, 1, 1, -1, 0, 0, {.label = {NULL, _STR_INTERFACE_SETTINGS}}},
     {UI_SPLITTER},
+
+    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {"Default game view", -1}}},
+    {UI_SPACER},
+    {UI_ENUM, UICFG_GAMEVIEW, 1, 1, -1, 0, 0, {.intvalue = {0, 0}}},
+    {UI_BREAK},
+
+    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {NULL, _STR_VMODE}}},
+    {UI_SPACER},
+    {UI_ENUM, UICFG_VMODE, 1, 1, -1, 0, 0, {.intvalue = {0, 0}}},
+    {UI_BREAK},
 
     {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {NULL, _STR_THEME}}},
     {UI_SPACER},
@@ -613,11 +625,6 @@ struct UIItem diaUIConfig[] = {
     {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {NULL, _STR_LANGUAGE}}},
     {UI_SPACER},
     {UI_ENUM, UICFG_LANG, 1, 1, -1, 0, 0, {.intvalue = {0, 0}}},
-    {UI_BREAK},
-
-    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {"Default game view", -1}}},
-    {UI_SPACER},
-    {UI_ENUM, UICFG_GAMEVIEW, 1, 1, -1, 0, 0, {.intvalue = {0, 0}}},
     {UI_BREAK},
 
     {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {NULL, _STR_AUTOSORT}}},
@@ -732,8 +739,9 @@ struct UIItem diaColorsConfig[] = {
     // end of dialog
     {UI_TERMINATOR}};
 
-// Display page (settings-layout restructure): video mode / geometry / GameID barcode. Rows moved
-// out of diaUIConfig.
+// Display section of the composed Interface page: video mode / geometry / GameID barcode. The
+// Settings-shell composition omits this Video Mode copy because it supplies the same control at
+// the top of diaUIConfig; the standalone Display editor retains its complete legacy dialog.
 struct UIItem diaDisplayConfig[] = {
     {UI_HEADER, 0, 1, 1, -1, 0, 0, {.label = {NULL, _STR_DISPLAY_SETTINGS}}},
     {UI_SPLITTER},

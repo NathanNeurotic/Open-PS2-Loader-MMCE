@@ -728,7 +728,8 @@ int vcdResolvePopstarter(const char *devPrefix, char *out, int outSize)
     // (mc/usb/mx4sio/mmce/exfat/apa) -> <root>:/POPS/POPSTARTER.ELF | Default -> the boot device (cwd)
     // then the VCD's own device. Each candidate is open()-probed; a miss falls through to the next tier.
     // NOTE: this serves the bdm/eth/mmce launch paths; the HDD VCD launch keeps its own freeze-guarded
-    // hddResolveHddPopstarter (the __common/+OPL pfs search), so HDD VCDs always load POPSTARTER off the HDD.
+    // hddResolveHddPopstarter (__common/POPS only), so HDD VCDs always load POPSTARTER from the
+    // canonical APA loose-file home rather than the selected OPL data partition.
 
     // GAME'S DEVICE: resolve ONLY on the VCD's own device (devPrefix); no boot-device (cwd) tier and
     // no Default fallthrough. A miss returns 0 so the launch path shows "Missing POPSTARTER.ELF"
@@ -782,7 +783,8 @@ int vcdResolvePopstarter(const char *devPrefix, char *out, int outSize)
                 // pfs0: BEFORE sysLaunchPopstarter re-opens the resolved ELF, so a pfs0: path that
                 // open()-probes fine HERE is dead by the time it is read (black screen into deinit'd
                 // OPL). HDD-page VCD launches keep APA POPSTARTER via their own freeze-guarded
-                // hddResolveHddPopstarter; for the rest, fall through to the Default tiers below.
+                // hddResolveHddPopstarter, which mounts hdd0:__common/POPS rather than the selected
+                // OPL data partition; for the rest, fall through to the Default tiers below.
                 LOG("VCD POPSTARTER Device 'HDD (APA)' is HDD-page-only; falling back to Default for this launch\n");
                 break;
             default:
