@@ -518,7 +518,10 @@ static void bdmLoadBlockDeviceModules(void)
     }
 }
 
-void bdmLoadModules(void)
+// Bring up only the common BDM infrastructure. Literal massN: boot resolution uses this path so an
+// explicit filesystem slot never incidentally queues every transport enabled by the last settings
+// load; it determines its backing driver from that slot's own devctl/ioctl identity instead.
+static void bdmLoadCoreModules(void)
 {
     LOG("BDMSUPPORT LoadModules\n");
 
@@ -530,14 +533,19 @@ void bdmLoadModules(void)
     LOG("[BDMFS_FATFS]:\n");
     sysLoadModuleBuffer(&bdmfs_fatfs_irx, size_bdmfs_fatfs_irx, 0, NULL);
 
-    // Load Optional Block Device drivers
-    ioPutRequest(IO_CUSTOM_SIMPLEACTION, &bdmLoadBlockDeviceModules);
-
     LOG("[BDMEVENT]:\n");
     sysLoadModuleBuffer(&bdmevent_irx, size_bdmevent_irx, 0, NULL);
     SifAddCmdHandler(0, &bdmEventHandler, NULL);
 
     LOG("BDMSUPPORT Modules loaded\n");
+}
+
+void bdmLoadModules(void)
+{
+    bdmLoadCoreModules();
+
+    // Normal enumeration retains the established asynchronous optional-transport load.
+    ioPutRequest(IO_CUSTOM_SIMPLEACTION, &bdmLoadBlockDeviceModules);
 }
 
 static void bdmInit(item_list_t *itemList)
@@ -2209,7 +2217,7 @@ static int bdmResolveLiteralMassSlot(int slot, int *ioBdmType,
     if (knownType == BDM_TYPE_UDPBD)
         return -1;
 
-    bdmLoadModules();
+    bdmLoadCoreModules();
 
     // A save-time retry may already know the exact backing family. Load only that family and wait
     // only for the literal slot; an identity change never redirects settings to another massN:.
