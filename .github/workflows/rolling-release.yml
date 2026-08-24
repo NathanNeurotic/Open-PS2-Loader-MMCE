@@ -591,6 +591,8 @@ jobs:
           #   neutrino/                       -- the official latest Neutrino core (rickgaiser/neutrino), extracted for drag-and-drop.
           #   PS2-Servers.url                 -- link to the UDPFS / SMB / UDPBD all-in-one PC server.
           #   OrbitOPL-Toolbox.url            -- link to the cross-platform PC library manager.
+          #   OPL-PS1-AIO-Converter-GUI.url   -- link to the PS1/POPSTARTER preparation tool.
+          #   PS2RD-CHT-Manager.url           -- link to the PS2RD cheat-file manager.
           PKG=riptopl_pkg
           rm -rf "$PKG"
           mkdir -p "$PKG/APP_RIPTOPL-PS2DEVROLLING" "$PKG/POPSTARTER" "$PKG/POPS"
@@ -637,6 +639,12 @@ jobs:
           # reason as PS2-Servers -- link the maintained tool, never vendor a copy of it.
           test -f pc/OrbitOPL-Toolbox.url
           cp -f pc/OrbitOPL-Toolbox.url "$PKG/OrbitOPL-Toolbox.url"
+          # The PS1 converter and PS2RD cheat manager are external companion repositories too.
+          # Ship shortcuts for them alongside the other PC-side tools, never their binaries/source.
+          test -f pc/OPL-PS1-AIO-Converter-GUI.url
+          cp -f pc/OPL-PS1-AIO-Converter-GUI.url "$PKG/OPL-PS1-AIO-Converter-GUI.url"
+          test -f pc/PS2RD-CHT-Manager.url
+          cp -f pc/PS2RD-CHT-Manager.url "$PKG/PS2RD-CHT-Manager.url"
           # neutrino/ (package folder) -- the official latest pre-release of the Neutrino core,
           # EXTRACTED into a plain folder so the user just drag-and-drops it onto the card (no
           # zip-in-zip). Best-effort: a fetch/extract failure still publishes the rest. The archive
@@ -681,7 +689,7 @@ jobs:
           ZIP="RIPTOPL-${REL}-${SHA}.zip"
           (
             cd "$PKG"
-            zip -r -X "../rolling/${ZIP}" APP_RIPTOPL-PS2DEVROLLING POPSTARTER POPS PS2-Servers.url OrbitOPL-Toolbox.url >/dev/null
+            zip -r -X "../rolling/${ZIP}" APP_RIPTOPL-PS2DEVROLLING POPSTARTER POPS PS2-Servers.url OrbitOPL-Toolbox.url OPL-PS1-AIO-Converter-GUI.url PS2RD-CHT-Manager.url >/dev/null
             if [ -d APP_RIPTOPL-PS2DEVPINNED ]; then zip -r -X "../rolling/${ZIP}" APP_RIPTOPL-PS2DEVPINNED >/dev/null; fi
             if [ -d APP_RIPTOPL-OFFICIALROLLING ]; then zip -r -X "../rolling/${ZIP}" APP_RIPTOPL-OFFICIALROLLING >/dev/null; fi
             if [ -d APP_RIPTOPL-OFFICIALPINNED ]; then zip -r -X "../rolling/${ZIP}" APP_RIPTOPL-OFFICIALPINNED >/dev/null; fi
