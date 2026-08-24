@@ -1746,66 +1746,10 @@ void bdmEnumerateDevices()
 {
     LOG("bdmEnumerateDevices\n");
 
-    // MX4SIO must be loaded AND MOUNTED before anything asks a mass slot who it is.
-    //
-    // rebuild-135 took mx4sio_bd out of bdmResolveBootDir's first pass, and that must stay gone: it is
-    // an SD driver on SIO2 -- the pad's own bus -- and leaving it resident there swallowed navigation
-    // input in every menu (#340, hardware-confirmed). But the resolver was also the only place that
-    // ever loaded MX4SIO *synchronously*. It ran before the first config read, so the card was mounted
-    // long before any device page existed; without it the load rides the queued
-    // bdmLoadBlockDeviceModules below and now lands WHILE those pages are already polling.
-    //
-    // That window is not survivable, because a mass slot is published from bdmUpdateDeviceData the
-    // moment fileXioDopen("massN:/") answers -- which can be BEFORE the block device can answer
-    // USBMASS_IOCTL_GET_DRIVERNAME. The page then carries an empty driver token, and an empty token
-    // matches no branch of the launch dispatch at the bottom of bdmLaunchGame: that path deinit()s the
-    // UI and returns without ever reaching sysLaunchLoaderElf. That is precisely the black screen with
-    // the stuck loading icon MX4SIO users hit after 135, and the identity churn behind it is what
-    // starved their cover art.
-    //
-    // gEnableMX4SIO is knowable HERE and nowhere earlier: this runs from initAllSupport, i.e. from
-    // applyConfig at the tail of _loadConfig, AFTER configReadMulti -- whereas the resolver runs inside
-    // _loadConfig before that first read, which is exactly why the flag could not be honoured there.
-    // bdmEnsureSourceModules force-loads the transport and then waits for a device of that type to
-    // answer the identity ioctl (bdmGetDeviceRootByType), so returning from it means the slot CAN be
-    // asked who it is -- which is the whole invariant, and it is stronger than "the driver is loaded".
-    //
-    // Every clause below is narrower than it looks, and each one is load-bearing.
-    //
-    // BEFORE bdmInitDevicesData, not after. That call is what registers the pages, and registering one
-    // ends in ioPutRequest(IO_MENU_UPDATE_DEFFERED) per slot -- the requests that RUN the identity
-    // query. Waiting after them does not order anything: the wait yields (DelayThread), the IO worker
-    // sits at priority 32 and is scheduled during it, and it asks the slot who it is while we are still
-    // waiting for the mount. Running first is what makes the ordering real, and it is why bdmLoadModules
-    // has to be called here by hand -- the bdm core normally arrives via bdmInit, which has not run yet.
-    // It is idempotent (every one of the 8 bdmInit calls invokes it too).
-    //
-    // AUTO, not merely "not DISABLED". initSupport only reaches itemInit -> bdmInit -> bdmLoadModules on
-    // its `startMode == START_MODE_AUTO` arm, since bdmInitDevicesData passes force_reinit = 0. Under
-    // MANUAL there is no bdm core at boot at all -- on a memory-card boot the resolver returns before its
-    // own bdmLoadModules() too -- so mx4sio_bd would fail to link, mx4sioModLoaded would stay 0, and
-    // bdmEnsureSourceModules would burn its whole budget polling for a mount that cannot happen. MANUAL
-    // also means the user asked OPL not to touch block devices until they enter the tab, and putting an
-    // SD driver on the pad's bus anyway is the exact exposure rebuild-135 exists to remove.
-    //
-    // FIRST PASS ONLY, and the latch is set unconditionally so it can never be anything else. This
-    // function is reached from applyConfig, and applyConfig is called from a dozen settings dialogs ON
-    // THE GUI THREAD (gui.c) as well as from _loadConfig. bdmEnsureSourceModules opens with
-    // WaitSema(bdmLoadModuleLock), and the IO worker holds that same lock across
-    // bdmLoadBlockDeviceModules -- whose own comment records that it can wedge on a real drive with NO
-    // timeout. Letting a settings apply block the GUI thread behind that is the freeze shape this
-    // project has already paid for once. The latch pins the only blocking call to the boot pass, on the
-    // boot thread, behind the "Scanning BDM devices" splash the caller has just put up, which is the one
-    // place in OPL where a bounded storage wait is already the norm. Enabling MX4SIO later from Settings
-    // therefore keeps the ordinary asynchronous load below; the launch guards in bdmLaunchGame are what
-    // cover that path.
-    static int mx4sioBootMountChecked = 0;
-    int mx4sioFirstPass = !mx4sioBootMountChecked;
-    mx4sioBootMountChecked = 1;
-    if (mx4sioFirstPass && gEnableMX4SIO && bdmEffectiveStartMode() == START_MODE_AUTO) {
-        bdmLoadModules();
-        bdmEnsureSourceModules(BDM_TYPE_SDC, 2000);
-    }
+    // Optional transports must remain asynchronous. A synchronous MX4SIO mount/identity wait here
+    // makes Auto startup depend on an IOP RPC returning on the GUI thread, where a real device wedge
+    // can freeze the splash indefinitely. bdmUpdateDeviceData keeps a mounted-but-unidentified slot
+    // unpublished and retries it on the deferred IO worker instead.
 
     // Initialize the device list data if it hasn't been initialized yet.
     bdmInitDevicesData();
@@ -1893,32 +1837,39 @@ int bdmUpdateDeviceData(item_list_t *itemList)
     }
 
     if (dir >= 0 && (visible == 0 || pDeviceData->bdmDeviceRoot[0] == '\0' || pDeviceData->bdmDriver[0] == '\0' || pDeviceData->bdmDeviceType == BDM_TYPE_UNKNOWN)) {
+        char driverName[sizeof(pDeviceData->bdmDriver)] = {0};
+        int massDeviceIndex = -1;
+
+        // A BDM mount can answer Dopen before its backing transport can answer the identity
+        // ioctl. Do not publish an empty-driver page: it cannot reach the native launch dispatch.
+        // This runs on the deferred IO worker, so a slow or wedged IOP RPC cannot freeze boot;
+        // the never-scanned state keeps this slot eligible for the normal later retry.
+        driverResult = fileXioIoctl2(dir, USBMASS_IOCTL_GET_DRIVERNAME, NULL, 0, driverName, sizeof(driverName) - 1);
+        deviceResult = -1;
+        if (driverResult >= 0 && driverName[0] != '\0')
+            deviceResult = fileXioIoctl2(dir, USBMASS_IOCTL_GET_DEVICE_NUMBER, NULL, 0, &massDeviceIndex, sizeof(massDeviceIndex));
+
+        if (driverResult < 0 || driverName[0] == '\0') {
+            LOG("Mass device: %d mounted but driver identity is not ready (%d); deferring page publication\n", itemList->mode, driverResult);
+            fileXioDclose(dir);
+            return 0;
+        }
+
         snprintf(pDeviceData->bdmDeviceRoot, sizeof(pDeviceData->bdmDeviceRoot), "mass%d:", itemList->mode);
         bdmBuildGamePrefix(pDeviceData->bdmPrefix, sizeof(pDeviceData->bdmPrefix), pDeviceData->bdmDeviceRoot);
         pDeviceData->FoldersCreated = 0;
-
-        memset(pDeviceData->bdmDriver, 0, sizeof(pDeviceData->bdmDriver));
-        pDeviceData->massDeviceIndex = -1;
+        snprintf(pDeviceData->bdmDriver, sizeof(pDeviceData->bdmDriver), "%s", driverName);
+        pDeviceData->massDeviceIndex = massDeviceIndex;
         pDeviceData->bdmDeviceType = BDM_TYPE_UNKNOWN;
         pDeviceData->bdmHddIsLBA48 = -1;
         pDeviceData->ataHighestUDMAMode = -1;
 
-        // Get the name of the underlying device driver that backs the fat fs.
-        driverResult = fileXioIoctl2(dir, USBMASS_IOCTL_GET_DRIVERNAME, NULL, 0, pDeviceData->bdmDriver, sizeof(pDeviceData->bdmDriver) - 1);
-        deviceResult = -1;
-        if (driverResult >= 0)
-            deviceResult = fileXioIoctl2(dir, USBMASS_IOCTL_GET_DEVICE_NUMBER, NULL, 0, &pDeviceData->massDeviceIndex, sizeof(pDeviceData->massDeviceIndex));
-
         itemList->flags = 0;
 
-        if (driverResult < 0) {
-            LOG("Mass device: %d identity lookup failed for driver name: %d, using %s\n", itemList->mode, driverResult, pDeviceData->bdmDeviceRoot);
-        } else {
-            pDeviceData->bdmDeviceType = bdmDetermineDeviceType(pDeviceData->bdmDriver);
+        pDeviceData->bdmDeviceType = bdmDetermineDeviceType(pDeviceData->bdmDriver);
 
-            if (deviceResult < 0) {
-                LOG("Mass device: %d driver %s failed to report device number: %d, using %s\n", itemList->mode, pDeviceData->bdmDriver, deviceResult, pDeviceData->bdmDeviceRoot);
-            }
+        if (deviceResult < 0) {
+            LOG("Mass device: %d driver %s failed to report device number: %d, using %s\n", itemList->mode, pDeviceData->bdmDriver, deviceResult, pDeviceData->bdmDeviceRoot);
         }
 
         if (pDeviceData->bdmDeviceType == BDM_TYPE_ATA) {
