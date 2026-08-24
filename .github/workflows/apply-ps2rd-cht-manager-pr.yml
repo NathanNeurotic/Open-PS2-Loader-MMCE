@@ -45,15 +45,6 @@ jobs:
           readme_insert = readme_anchor + "- **[PS2RD CHT Manager](https://github.com/TheRealNextria/PS2RD-CHT-Manager)** — Windows application for creating, editing and managing `.cht` cheat files for **Open PS2 Loader (OPL) / PS2RD**.\n"
           replace_once("README.md", readme_anchor, readme_insert)
 
-          normalize_anchor = "          printf '%s\\r\\n' '[InternetShortcut]' 'URL=https://github.com/shaanhomebrew-cloud/OPL-PS1-AIO-Converter-GUI' > package-work/OPL-PS1-AIO-Converter-GUI.url\n"
-          normalize_insert = normalize_anchor + "          printf '%s\\r\\n' '[InternetShortcut]' 'URL=https://github.com/TheRealNextria/PS2RD-CHT-Manager' > package-work/PS2RD-CHT-Manager.url\n"
-          replace_once(".github/workflows/release-normalize.yml", normalize_anchor, normalize_insert)
-          replace_once(
-              ".github/workflows/release-normalize.yml",
-              "          echo \"Rebuilt $(basename \"$MAIN_ZIP\") with all three external-tool shortcuts.\"\n",
-              "          echo \"Rebuilt $(basename \"$MAIN_ZIP\") with all four external-tool shortcuts.\"\n",
-          )
-
           resource_anchor = "- **OPL PS1 AIO Converter GUI** — Windows all-in-one PS1/POPStarter preparation tool for converting BIN/CUE backups to VCDs and installing them to USB, MX4SIO, MMCE, exFAT HDD, SMB and APA internal HDD: https://github.com/shaanhomebrew-cloud/OPL-PS1-AIO-Converter-GUI\\n"
           resource_insert = resource_anchor + "- **PS2RD CHT Manager** — Windows application for creating, editing and managing `.cht` cheat files for **Open PS2 Loader (OPL) / PS2RD**: https://github.com/TheRealNextria/PS2RD-CHT-Manager\\n"
           replace_once(".github/scripts/normalize_release_notes.py", resource_anchor, resource_insert)
@@ -63,21 +54,18 @@ jobs:
               "bundled Neutrino and the four external-tool shortcuts.",
           )
 
-      - name: Verify and commit final PR contents
+      - name: Verify and commit non-workflow changes
         run: |
           set -eu
-          rm -f .github/workflows/apply-ps2rd-cht-manager-pr.yml
           test -f pc/PS2RD-CHT-Manager.url
           grep -Fq 'PS2RD CHT Manager' README.md
-          grep -Fq 'PS2RD-CHT-Manager.url' .github/workflows/release-normalize.yml
           grep -Fq 'PS2RD CHT Manager' .github/scripts/normalize_release_notes.py
           grep -Fq 'four external-tool shortcuts' .github/scripts/normalize_release_notes.py
-          grep -Fq 'all four external-tool shortcuts' .github/workflows/release-normalize.yml
           python3 -m py_compile .github/scripts/normalize_release_notes.py
           rm -rf .github/scripts/__pycache__
           git diff --check
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add README.md .github/workflows/release-normalize.yml .github/scripts/normalize_release_notes.py pc/PS2RD-CHT-Manager.url .github/workflows/apply-ps2rd-cht-manager-pr.yml
+          git add README.md .github/scripts/normalize_release_notes.py pc/PS2RD-CHT-Manager.url
           git commit -m 'docs: add PS2RD CHT Manager companion tool'
           git push origin HEAD:feature/add-ps2rd-cht-manager
