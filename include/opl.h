@@ -76,9 +76,15 @@ config_set_t *oplGetLegacyAppsInfo(char *name);
 void setErrorMessage(int strId);
 void setErrorMessageWithCode(int strId, int error);
 void setErrorMessagePathCode(int strId, const char *path, int error);
+// Drop a queued error only when it is the exact condition that subsequently recovered. This avoids
+// hiding an unrelated notification merely because a later storage probe happened to succeed.
+void clearErrorMessageIf(int strId);
 int loadConfig(int types);
 int saveConfig(int types, int showUI);
 void applyConfig(int themeID, int langID, int skipDeviceRefresh);
+// True only while init() is rendering the initial boot splash. GUI code uses this to keep the
+// normal deferred-operation spinner out of the startup presentation without changing runtime UI.
+int oplIsBootInProgress(void);
 void menuDeferredUpdate(void *data);
 void moduleUpdateMenu(int mode, int themeChanged, int langChanged);
 void handleLwnbdSrv();
@@ -175,7 +181,7 @@ enum { POPS_DEV_DEFAULT = 0, // cwd (gBootDir) /POPS/, then the VCD's own device
        POPS_DEV_MX4SIO,      // BDM "mx4sio"/sdc -> the mounted massN:
        POPS_DEV_MMCE,        // mmce0: / mmce1: (checklist item 1)
        POPS_DEV_EXFAT_HDD,   // BDM "ata" internal exFAT HDD -> the mounted massN:
-       POPS_DEV_APA_HDD,     // APA HDD: the mounted OPL data partition (pfs0:)
+       POPS_DEV_APA_HDD,     // APA HDD: canonical hdd0:__common/POPS via the native HDD VCD resolver
        POPS_DEV_CUSTOM,      // free-text gPopstarterPath
        POPS_DEV_GAME };      // the VCD's OWN device ONLY; appended last to keep saved ints stable
 extern int gPopstarterDevice;
@@ -331,6 +337,9 @@ extern base_game_info_t *gAutoLaunchBDMGame;
 extern bdm_device_data_t *gAutoLaunchDeviceData;
 extern char *gHDDPrefix;
 extern char gOPLPart[128];
+
+// Conventional built-in-theme BGM location. This is a single resolved path, not a search.
+int oplGetDefaultThemeBgmPath(char *path, int pathSize);
 
 void initSupport(item_list_t *itemList, int mode, int force_reinit);
 

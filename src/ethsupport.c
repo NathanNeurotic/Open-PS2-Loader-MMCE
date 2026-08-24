@@ -298,6 +298,11 @@ int ethGetModulesLoaded(void)
     return ethModulesLoaded;
 }
 
+int ethIsSMBShareConnected(void)
+{
+    return ethModulesLoaded && gNetworkStartup == 0 && ethPrefix[0] != '\0';
+}
+
 static int ethLoadModules(void)
 {
     LOG("ETHSUPPORT LoadModules\n");
@@ -756,6 +761,17 @@ static void ethDeleteGame(item_list_t *itemList, int id)
 
 static void ethRenameGame(item_list_t *itemList, int id, char *newName)
 {
+    if (vcdListViewActive(itemList)) {
+        base_game_info_t *game = ethGameForView(itemList, id);
+
+        if (game != NULL && vcdRenameFile(ethPrefix, game->name, newName) == 0) {
+            ethInvalidateFavIsoBacking();
+            // ETH otherwise treats its VCD list as toggle-only; consume this on the already queued
+            // deferred update so the renamed POPS/ directory is scanned again.
+            vcdMarkDirty(itemList->mode);
+        }
+        return;
+    }
     ethInvalidateFavIsoBacking();
     sbRename(&ethGames, ethPrefix, "\\", ethGameCount, id, newName);
     ethULSizePrev = -2;
@@ -774,13 +790,24 @@ static void ethLaunchVcd(item_list_t *itemList, const char *vcdName, config_set_
         guiMsgBox(_l(_STR_POPSTARTER_NOT_FOUND), 0, NULL);
         return;
     }
-    // Fill every missing external from this share's direct POPS/ folder, including optional icons
-    // and utility IRX even when the required network stack was already complete. SMB keeps its hard
-    // gate: all four network modules must exist after this best-effort install.
-    (void)vcdInstallPopstarterMc(ethPrefix);
-    if (!vcdSmbModulesPresent()) {
-        guiMsgBox(_l(_STR_POPSTARTER_SMB_MISSING), 0, NULL);
-        return;
+    {
+        vcd_popsnet_ensure_t ens = vcdPreparePopstarterSmbLaunch(ethPrefix);
+        if (ens == VCD_POPSNET_SMB_MISSING) {
+            guiMsgBox(_l(_STR_POPSTARTER_SMB_MISSING), 0, NULL);
+            return;
+        }
+        if (ens == VCD_POPSNET_NEED_STATIC) {
+            guiMsgBox(_l(_STR_POPSTARTER_SMB_NEEDS_STATIC), 0, NULL);
+            return;
+        }
+        if (ens == VCD_POPSNET_IO_ERROR) {
+            guiMsgBox(_l(_STR_POPSTARTER_NET_ERR), 0, NULL);
+            return;
+        }
+        if (ens == VCD_POPSNET_INVALID) {
+            guiMsgBox(_l(_STR_POPSTARTER_NET_INVALID), 0, NULL);
+            return;
+        }
     }
     vcdBuildSelector(ethPrefix, VCD_PREFIX_SMB, vcdName, vcdSelector, sizeof(vcdSelector));
     size_t prefixLen = strlen(ethPrefix);
@@ -1054,6 +1081,11 @@ static int ethCheckVMC(item_list_t *itemList, char *name, int createSize)
 }
 
 static char *ethGetPrefix(item_list_t *itemList)
+{
+    return ethPrefix;
+}
+
+const char *ethGetSMBPrefix(void)
 {
     return ethPrefix;
 }

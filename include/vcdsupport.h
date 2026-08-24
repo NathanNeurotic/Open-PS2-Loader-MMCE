@@ -96,12 +96,22 @@ const char *vcdDisplayName(int mode, const char *text);
 void vcdToggleView(int mode);
 // Returns 1 exactly once after a toggle (and clears the flag) -- call from the support's NeedsUpdate.
 int vcdConsumeDirty(int mode);
+// Mark one VCD-capable mode dirty after its VCD storage changes. Runtime callers still enqueue that
+// support's normal deferred update; this only makes the existing NeedsUpdate path rescan it.
+void vcdMarkDirty(int mode);
 // Mark all VCD-capable modes dirty (one rescan each) -- used when the global default-view setting changes.
 void vcdMarkAllDirty(void);
 
 // Fill a base_game_info_t list (memalign'd like sbReadList; frees *outGames first) from
 // <devPrefix>POPS/*.VCD. Returns the count. name/startup = VCD basename without the extension.
 int vcdFillGameList(const char *devPrefix, base_game_info_t **outGames);
+// Rename one VCD in a device's POPS/ directory. The old entry is matched with the exact filename
+// spelling returned by the scan, so case-sensitive PFS/SMB filesystems retain their extension case.
+// Returns 0 on success; no list ownership is changed here.
+int vcdRenameFile(const char *devPrefix, const char *oldName, const char *newName);
+// As vcdRenameFile, but `dirPath` is already the directory containing the VCD (APA/PFS pooled
+// partitions use their mounted root, rather than a POPS/ child).
+int vcdRenameFileInDir(const char *dirPath, const char *oldName, const char *newName);
 // #118: 1 if a .VCD filename is disc 2+ of a multi-disc PS1 set ("(Disc N)"/"(CD N)"/"(Disk N)", N>=2,
 // case-insensitive). Callers hide it from the device lists when gVcdFirstDiscOnly is on.
 int vcdIsHiddenDisc(const char *name);
@@ -169,9 +179,10 @@ int vcdSmbModulesPresent(void);
 // ---- POPStarter network files (IPCONFIG.DAT / SMBCONFIG.DAT) --------------------------------
 // POPSLoader-parity flow: READ existing values when available, otherwise stay blank until the
 // user explicitly enters or imports values. Absence means "unknown/unconfigured", never "use
-// OPL defaults". Locations: mc0:/POPSTARTER -> mc1:/POPSTARTER, in that precedence order --
-// POPSTARTER reads its network files from the memory card ONLY (OPL's own settings live in the
-// boot dir/cwd, but that is OUR convention, not POPSTARTER's).
+// OPL defaults". The resolver evaluates mc0:/POPSTARTER and mc1:/POPSTARTER as complete homes:
+// a valid complete home wins (mc0 then mc1), then an existing partial or invalid home (so it can
+// be repaired rather than shadowed), then an available card for first setup. Callers keep the
+// selected home for validation, generation and launch preparation.
 //
 // Formats (POPStarter):
 //   IPCONFIG.DAT: one line "<PS2 IP> <NETMASK> <GATEWAY>"; a BLANK file = DHCP. The file should
@@ -183,6 +194,9 @@ typedef struct
     int smbExists; // SMBCONFIG.DAT was found (smbDir names where)
     int ipExists;  // IPCONFIG.DAT was found (ipDir names where)
     int ipDhcp;    // 1 = DHCP (file blank or absent); 0 = static triple below is valid
+    int smbInvalid;
+    int ipInvalid;
+    int homeAvailable;
     int ps2Ip[4];
     int ps2Mask[4];
     int ps2Gw[4];
@@ -193,21 +207,56 @@ typedef struct
     char smbPass[32];
     char smbDir[96];    // dir SMBCONFIG.DAT was read from ("" when absent)
     char ipDir[96];     // dir IPCONFIG.DAT was read from ("" when absent)
-    char createDir[96]; // where files that don't exist yet get created ("" = nowhere available)
+    char createDir[96]; // selected home where files that do not exist yet get created
+    char home[96];      // resolved POPSTARTER home used by this configuration
 } vcd_popsnet_t;
 
 // Scan the candidate dirs and fill *out. Absence of both files is DATA (all fields blank, the
-// exists-flags 0, ipDhcp 1), not an error. Returns 0, or -3 on a genuine mid-read IO error.
+// exists-flags 0, ipDhcp 1), not an error. Invalid file contents set ipInvalid/smbInvalid and
+// remain user-editable. Returns 0, or -3 on a genuine mid-read IO error.
 int vcdReadPopstarterNet(vcd_popsnet_t *out);
+
+typedef enum {
+    VCD_POPSNET_SMB_IMPORT_OK = 0,
+    VCD_POPSNET_SMB_IMPORT_NOT_CONNECTED = 1,
+    VCD_POPSNET_SMB_IMPORT_NOT_FOUND = 2,
+} vcd_popsnet_smb_import_t;
+
+// Read (never write) POPS/IPCONFIG.DAT and POPS/SMBCONFIG.DAT from the active mounted SMB share.
+// This does not connect SMB or use OPL's own saved network fields. Both files must pass the same
+// strict parser/validation as local POPSTARTER configuration before values are returned.
+vcd_popsnet_smb_import_t vcdReadPopstarterNetFromSmb(vcd_popsnet_t *out);
 
 // Change detection vs the read-time snapshot, for the save matrix: bit 0 = SMB fields differ,
 // bit 1 = IP fields differ. Compares semantic content only (never the dirs/exists flags).
 int vcdPopsNetChanged(const vcd_popsnet_t *orig, const vcd_popsnet_t *cur);
 
-// Write SMBCONFIG.DAT (writeSmb) and/or IPCONFIG.DAT (writeIp). Each file goes to its origin dir
-// when it existed, else to createDir (mkdir best-effort). A DHCP ipconfig is written BLANK --
-// the file must exist either way. Returns 0, or the first vcdSafeWriteFile error (-2/-3).
+// Validate values before a Settings-editor replacement. DHCP is a valid IPCONFIG.DAT value; a
+// non-DHCP write requires a complete static triple and SMB requires a usable numeric host/share.
+int vcdPopsNetValuesValid(const vcd_popsnet_t *cfg, int validateSmb, int validateIp);
+
+// Write SMBCONFIG.DAT (writeSmb) and/or IPCONFIG.DAT (writeIp) at the resolved home. A DHCP
+// ipconfig is written BLANK -- the file must exist either way. Returns 0, -2/-3 for card/IO
+// failure, or -4 when the requested values are invalid.
 int vcdWritePopstarterNetFiles(const vcd_popsnet_t *cfg, int writeSmb, int writeIp);
+
+// ---- POPStarter SMB auto-provisioning (RiptOPL launch helper) ----
+// Ensures the two required network files for SMB VCD launches exist at the validated resolved
+// POPSTARTER home. Existing valid files are preserved; only a missing peer is generated from the
+// current RiptOPL network/SMB globals when derivable. DHCP / missing static PS2 triple ->
+// NEED_STATIC (no bogus file). Malformed/unusable existing files -> INVALID.
+typedef enum {
+    VCD_POPSNET_READY = 0,       // both DAT files exist, or were successfully created
+    VCD_POPSNET_NEED_STATIC = 1, // missing file requires static PS2 IP / mask / gateway or resolved SMB IP
+    VCD_POPSNET_IO_ERROR = 2,    // MC full (-2) or IO error (-3) - partial removed
+    VCD_POPSNET_INVALID = 3,     // SMB share/IP etc invalid and not derivable
+    VCD_POPSNET_SMB_MISSING = 4  // required SMB IRX modules not present on MC
+} vcd_popsnet_ensure_t;
+
+// Shared SMB POPSTARTER preparation for both ETH VCD and APPS SB.*.ELF launches.
+// Resolves one MC home, installs missing MC support there from smbPrefix (ethPrefix), verifies
+// the SMB modules there, and ensures its *.DAT files. Returns VCD_POPSNET_READY on success.
+vcd_popsnet_ensure_t vcdPreparePopstarterSmbLaunch(const char *smbPrefix);
 
 // Render the RetroGEM Game ID optical barcode immediately prior to a POPStarter VCD launch.
 void vcdPrepareRetroGemBarcode(const char *vcdPath);

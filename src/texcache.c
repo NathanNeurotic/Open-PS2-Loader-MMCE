@@ -17,11 +17,13 @@
 
 extern void *_gp;
 
-// Tagged, not anonymous, because the record now carries its OWN queue link: art no longer rides an
+// Tagged, not anonymous, because the record now carries its OWN queue links: art no longer rides an
 // ioman request node, it rides this one.
 typedef struct load_image_request
 {
-    struct load_image_request *next; // art FIFO link, owned by whoever owns the request
+    struct load_image_request *next;
+    struct load_image_request *prev; // art FIFO links, owned by whoever owns the request
+    unsigned int queueEpoch;         // FIFO generation while queued; cleared when the worker owns it
     image_cache_t *cache;
     cache_entry_t *entry;
     item_list_t *list;
@@ -89,6 +91,10 @@ static volatile int gArtNavActive = 0;
 static load_image_request_t *gArtReqList = NULL;
 static load_image_request_t *gArtReqEnd = NULL;
 static load_image_request_t *volatile gArtCurrentReq = NULL;
+// artDetachAll() swaps the queue in O(1), then frees its old nodes with interrupts enabled. A
+// request can therefore retain old next/prev links briefly after the swap; generation membership
+// makes a later promotion reject that detached chain without turning the splice back into O(n).
+static unsigned int gArtQueueEpoch = 1;
 
 static void cacheWakeArtWorker(void);
 
@@ -395,9 +401,10 @@ static void cacheWakeArtWorker(void)
 
 static void artPush(load_image_request_t *req)
 {
-    req->next = NULL;
-
     DIntr();
+    req->next = NULL;
+    req->prev = gArtReqEnd;
+    req->queueEpoch = gArtQueueEpoch;
     if (gArtReqEnd)
         gArtReqEnd->next = req;
     else
@@ -410,10 +417,14 @@ static void artPush(load_image_request_t *req)
 static void artPushFront(load_image_request_t *req)
 {
     DIntr();
+    req->prev = NULL;
     req->next = gArtReqList;
-    gArtReqList = req;
-    if (!gArtReqEnd)
+    req->queueEpoch = gArtQueueEpoch;
+    if (gArtReqList)
+        gArtReqList->prev = req;
+    else
         gArtReqEnd = req;
+    gArtReqList = req;
     gArtQueuedCount++;
     EIntr();
 }
@@ -424,22 +435,25 @@ static void artPromote(load_image_request_t *req)
         return;
 
     DIntr();
-    // Guard against promoting a request the worker is ALREADY executing, or one that is already at the head.
-    // Checked inside the DIntr bracket to prevent a race with artPop().
-    if (gArtCurrentReq != req && gArtReqList != NULL && gArtReqList != req) {
-        load_image_request_t *prev = gArtReqList;
-        while (prev->next != NULL && prev->next != req) {
-            prev = prev->next;
-        }
+    // The selected cover can be a warmed neighbour buried in a deep queue. This used to scan the
+    // singly-linked FIFO under DIntr(), making one selection's priority handoff O(queue depth) and
+    // extending the interrupts-off window as browsing filled cache slots. The intrusive back link
+    // keeps this splice O(1); no allocation, free, or device work occurs in the bracket.
+    // Guard against promoting the request the worker is already executing, or one already at head.
+    if (gArtCurrentReq != req && req->queueEpoch == gArtQueueEpoch && req->prev != NULL) {
+        load_image_request_t *prev = req->prev;
+        load_image_request_t *next = req->next;
 
-        if (prev->next == req) {
-            prev->next = req->next;
-            if (gArtReqEnd == req)
-                gArtReqEnd = prev;
+        prev->next = next;
+        if (next)
+            next->prev = prev;
+        else
+            gArtReqEnd = prev;
 
-            req->next = gArtReqList;
-            gArtReqList = req;
-        }
+        req->prev = NULL;
+        req->next = gArtReqList;
+        gArtReqList->prev = req;
+        gArtReqList = req;
     }
     EIntr();
 }
@@ -472,9 +486,13 @@ static load_image_request_t *artPop(void)
         }
 
         gArtReqList = req->next;
-        if (!gArtReqList)
+        if (gArtReqList)
+            gArtReqList->prev = NULL;
+        else
             gArtReqEnd = NULL;
         req->next = NULL;
+        req->prev = NULL;
+        req->queueEpoch = 0;
 
         if (gArtQueuedCount > 0)
             gArtQueuedCount--;
@@ -501,6 +519,8 @@ static load_image_request_t *artDetachAll(void)
     gArtReqList = NULL;
     gArtReqEnd = NULL;
     gArtQueuedCount = 0;
+    if (++gArtQueueEpoch == 0)
+        gArtQueueEpoch = 1;
     EIntr();
 
     return list;
@@ -974,6 +994,8 @@ void cacheInit()
     gArtReqList = NULL;
     gArtReqEnd = NULL;
     gArtCurrentReq = NULL;
+    if (++gArtQueueEpoch == 0)
+        gArtQueueEpoch = 1;
     gArtQueuedCount = 0;
     gArtActiveCount = 0;
     gArtNavActive = 0;
@@ -1396,6 +1418,8 @@ GSTEXTURE *cacheGetTextureEx(image_cache_t *cache, item_list_t *list, int *cache
         req->focusEpoch = gArtFocusEpoch; // selected-game neighborhood this speculative read serves
         req->abortRequested = 0;
         req->next = NULL;
+        req->prev = NULL;
+        req->queueEpoch = 0;
         req->sio2 = (unsigned char)isSio2; // resolved above, on the GUI thread
 
         cacheClearItem(oldestEntry, 1);

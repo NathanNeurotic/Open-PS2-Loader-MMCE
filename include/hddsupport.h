@@ -98,6 +98,9 @@ void hddVcdInvalidateCache(void);
 void hddInit(item_list_t *itemList);
 item_list_t *hddGetObject(int initOnly);
 int hddLoadModules(void);
+// Non-acquiring residency check for short-lived probes. Unlike hddLoadModulesReady(), this does
+// not increment the HDD module-use count.
+int hddModulesAreLoaded(void);
 
 // Load (or confirm) the ATA stack and report residency, evaluating hddLoadModules EXACTLY ONCE.
 // A function, not a macro taking the call as its argument: the earlier HDD_LOADMODULES_OK(
@@ -110,6 +113,25 @@ static inline int hddLoadModulesReady(void)
     return r == HDD_LOADMODULES_STATUS_NOERROR || r == HDD_LOADMODULES_STATUS_ALREADYLOADED;
 }
 void hddLoadSupportModules(void);
+
+// Normal APA data-home choices surfaced by Settings -> Game Sources. POPS loose files remain
+// separately owned by __common/POPS; this selector only controls OPL's regular data home.
+enum {
+    HDD_OPL_HOME_COMMON = 0,
+    HDD_OPL_HOME_PLUS = 1,
+};
+int hddGetOplHomeSelection(void);
+int hddOplHomeIsLegacy(void);
+int hddStageOplHomeSelection(int selection);
+// A successfully saved selector applies on the next boot, while pfs0: intentionally remains on
+// the current live data home. These helpers expose that next-home write target through pfs1:.
+int hddOplHomeSelectionNeedsTargetSave(void);
+int hddMountSelectedOplHome(char *prefix, int prefixLen);
+void hddUnmountSelectedOplHome(void);
+int hddCommitOplHomeSelection(void);
+void hddDiscardOplHomeSelection(void);
+int hddOplHomeSelectionPending(void);
+
 void hddLaunchGame(item_list_t *itemList, int id, config_set_t *configSet);
 int hddIsPresent();
 

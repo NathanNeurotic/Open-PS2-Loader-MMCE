@@ -9,6 +9,7 @@
 
 #include "include/bdmsupport.h"
 #include "include/ethsupport.h"
+#include "include/vcdsupport.h"
 #include "include/hddsupport.h"
 #include "include/texcache.h"
 #include "include/textures.h"
@@ -99,6 +100,45 @@ static char *appGetBoot(char *device, int max, char *path)
     }
 
     return appGetELFName(path);
+}
+
+// POPSTARTER SMB selector detection for APPS: APPS -> SB.<game>.ELF
+// Uses VCD_PREFIX_SMB. Handles '/', '\\' and ':' separators locally so
+// smb0:\POPS\SB.Game.ELF is recognized without changing the generic
+// appGetELFName() semantics for other callers.
+static int appIsPopstarterSmb(const char *startup)
+{
+    const char *base;
+    const char *p1;
+    const char *p2;
+    const char *p3;
+    const char *last;
+
+    if (startup == NULL || startup[0] == '\0')
+        return 0;
+
+    p1 = strrchr(startup, '/');
+    p2 = strrchr(startup, '\\');
+    p3 = strrchr(startup, ':');
+    last = p1;
+    if (p2 != NULL && (last == NULL || p2 > last))
+        last = p2;
+    if (p3 != NULL && (last == NULL || p3 > last))
+        last = p3;
+    base = (last != NULL) ? last + 1 : startup;
+
+    if (base[0] == '\0')
+        return 0;
+    if (strncasecmp(base, VCD_PREFIX_SMB, strlen(VCD_PREFIX_SMB)) != 0)
+        return 0;
+    size_t len = strlen(base);
+    size_t pre = strlen(VCD_PREFIX_SMB);
+    if (len <= pre + 4)
+        return 0;
+    const char *dot = strrchr(base, '.');
+    if (dot == NULL || strcasecmp(dot, ".ELF") != 0)
+        return 0;
+    return 1;
 }
 
 static unsigned int appHashStartup(const char *value)
@@ -758,6 +798,29 @@ static void appLaunchItem(item_list_t *itemList, int id, config_set_t *configSet
 
         if (mode == HDD_MODE)
             snprintf(partition, sizeof(partition), "%s:", gOPLPart);
+
+        // POPSTARTER SMB via APPS: only an ETH/SMB SB.<game>.ELF receives the same preparation
+        // as an ETH VCD. A local SB.* tool is an ordinary app, never an SMB launch by filename alone.
+        // Uses shared helper vcdPreparePopstarterSmbLaunch(ethPrefix).
+        if (mode == ETH_MODE && appIsPopstarterSmb(filename)) {
+            vcd_popsnet_ensure_t ens = vcdPreparePopstarterSmbLaunch(ethGetSMBPrefix());
+            if (ens == VCD_POPSNET_SMB_MISSING) {
+                guiMsgBox(_l(_STR_POPSTARTER_SMB_MISSING), 0, NULL);
+                return;
+            }
+            if (ens == VCD_POPSNET_NEED_STATIC) {
+                guiMsgBox(_l(_STR_POPSTARTER_SMB_NEEDS_STATIC), 0, NULL);
+                return;
+            }
+            if (ens == VCD_POPSNET_IO_ERROR) {
+                guiMsgBox(_l(_STR_POPSTARTER_NET_ERR), 0, NULL);
+                return;
+            }
+            if (ens == VCD_POPSNET_INVALID) {
+                guiMsgBox(_l(_STR_POPSTARTER_NET_INVALID), 0, NULL);
+                return;
+            }
+        }
 
         if (configGetStr(configSet, CONFIG_ITEM_ALTSTARTUP, &argv1) != 0) {
             // Copy before deinit(): argv1 points into the config heap which

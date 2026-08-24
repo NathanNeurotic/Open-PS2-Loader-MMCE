@@ -21,6 +21,7 @@
 #include "include/system.h"      // POPS_FOLDER
 #include "include/ioman.h"       // LOG (BDMA equip probe trace)
 #include "include/bdmsupport.h"  // BDM_TYPE_* + bdmGetDeviceRootByType (BDMA source differentiation)
+#include "include/ethsupport.h"  // active mounted SMB prefix for manual POPS DAT import
 #include "include/mmcesupport.h" // mmceLoadModules (ensure mmceman for the MMCE BDMA source)
 #include "include/gui.h"         // guiWarning (passing toast on a failed launch-path BDMA equip)
 #include "include/texcache.h"    // cosmetic ID resolver yields while artwork is pending
@@ -678,6 +679,102 @@ static char vcdSep(const char *devPrefix)
     return (n > 0 && devPrefix[n - 1] == '\\') ? '\\' : '/';
 }
 
+// Choose the separator already used by a directory path. Unlike vcdSep(), this also handles an
+// SMB path whose final component is "POPS" rather than a trailing backslash.
+static char vcdDirSep(const char *dirPath)
+{
+    const char *slash = (dirPath != NULL) ? strrchr(dirPath, '/') : NULL;
+    const char *backslash = (dirPath != NULL) ? strrchr(dirPath, '\\') : NULL;
+
+    return (backslash != NULL && (slash == NULL || backslash > slash)) ? '\\' : '/';
+}
+
+static int vcdJoinDirFile(char *out, int outSize, const char *dirPath, const char *fileName)
+{
+    int n;
+    int dirLen;
+    char sep[2] = {0, 0};
+
+    if (out == NULL || outSize <= 0 || dirPath == NULL || fileName == NULL)
+        return -1;
+
+    dirLen = strlen(dirPath);
+    if (dirLen == 0)
+        return -1;
+    if (dirPath[dirLen - 1] != '/' && dirPath[dirLen - 1] != '\\')
+        sep[0] = vcdDirSep(dirPath);
+
+    n = snprintf(out, outSize, "%s%s%s", dirPath, sep, fileName);
+    return (n >= 0 && n < outSize) ? 0 : -1;
+}
+
+// Keep a VCD rename inside the POPSTARTER addressable name space. The scanner cannot represent a
+// longer basename and deliberately omits POPSTARTER itself, so accepting either here would make a
+// successful-looking rename vanish from the list or cease to launch.
+static int vcdValidRenameName(const char *name)
+{
+    size_t len;
+
+    if (name == NULL || name[0] == '\0' || strpbrk(name, ":/\\") != NULL)
+        return 0;
+    len = strlen(name);
+    return len <= ISO_GAME_NAME_MAX && strcasecmp(name, "POPSTARTER") != 0;
+}
+
+int vcdRenameFileInDir(const char *dirPath, const char *oldName, const char *newName)
+{
+    DIR *dir;
+    struct dirent *de;
+    char oldFile[VCD_NAME_MAX + 4];
+    char newFile[VCD_NAME_MAX + 4];
+    char oldPath[512];
+    char newPath[512];
+    size_t oldLen;
+
+    if (dirPath == NULL || oldName == NULL || !vcdValidRenameName(oldName) || !vcdValidRenameName(newName))
+        return -1;
+
+    oldLen = strlen(oldName);
+    dir = opendir(dirPath);
+    if (dir == NULL)
+        return -1;
+
+    oldFile[0] = '\0';
+    while ((de = readdir(dir)) != NULL) {
+        size_t len = strlen(de->d_name);
+        if (len == oldLen + 4 && !strncmp(de->d_name, oldName, oldLen) && !strcasecmp(de->d_name + oldLen, ".VCD")) {
+            snprintf(oldFile, sizeof(oldFile), "%s", de->d_name);
+            break;
+        }
+    }
+    closedir(dir);
+
+    if (oldFile[0] == '\0')
+        return -1;
+    if (snprintf(newFile, sizeof(newFile), "%s%s", newName, oldFile + oldLen) >= (int)sizeof(newFile))
+        return -1;
+    if (vcdJoinDirFile(oldPath, sizeof(oldPath), dirPath, oldFile) < 0 ||
+        vcdJoinDirFile(newPath, sizeof(newPath), dirPath, newFile) < 0)
+        return -1;
+
+    if (rename(oldPath, newPath) != 0) {
+        LOG("VCD rename failed: %s -> %s (%d)\n", oldPath, newPath, errno);
+        return -1;
+    }
+
+    vcdInvalidateGameIds();
+    return 0;
+}
+
+int vcdRenameFile(const char *devPrefix, const char *oldName, const char *newName)
+{
+    char dirPath[256];
+
+    if (devPrefix == NULL || snprintf(dirPath, sizeof(dirPath), "%s%s", devPrefix, POPS_FOLDER) >= (int)sizeof(dirPath))
+        return -1;
+    return vcdRenameFileInDir(dirPath, oldName, newName);
+}
+
 // VCD (PS1) cover FALLBACK. OPL's own art (<dev>ART/<name>_COV.png) is the PRIMARY -- each device's
 // getImage tries it first; this only runs on a genuine miss. It loads the POPSLoader-style cover named
 // exactly like the .VCD (suffixless "<name>.png"), sitting NEXT TO the game in the same POPS/ folder the
@@ -728,7 +825,8 @@ int vcdResolvePopstarter(const char *devPrefix, char *out, int outSize)
     // (mc/usb/mx4sio/mmce/exfat/apa) -> <root>:/POPS/POPSTARTER.ELF | Default -> the boot device (cwd)
     // then the VCD's own device. Each candidate is open()-probed; a miss falls through to the next tier.
     // NOTE: this serves the bdm/eth/mmce launch paths; the HDD VCD launch keeps its own freeze-guarded
-    // hddResolveHddPopstarter (the __common/+OPL pfs search), so HDD VCDs always load POPSTARTER off the HDD.
+    // hddResolveHddPopstarter (__common/POPS only), so HDD VCDs always load POPSTARTER from the
+    // canonical APA loose-file home rather than the selected OPL data partition.
 
     // GAME'S DEVICE: resolve ONLY on the VCD's own device (devPrefix); no boot-device (cwd) tier and
     // no Default fallthrough. A miss returns 0 so the launch path shows "Missing POPSTARTER.ELF"
@@ -782,7 +880,8 @@ int vcdResolvePopstarter(const char *devPrefix, char *out, int outSize)
                 // pfs0: BEFORE sysLaunchPopstarter re-opens the resolved ELF, so a pfs0: path that
                 // open()-probes fine HERE is dead by the time it is read (black screen into deinit'd
                 // OPL). HDD-page VCD launches keep APA POPSTARTER via their own freeze-guarded
-                // hddResolveHddPopstarter; for the rest, fall through to the Default tiers below.
+                // hddResolveHddPopstarter, which mounts hdd0:__common/POPS rather than the selected
+                // OPL data partition; for the rest, fall through to the Default tiers below.
                 LOG("VCD POPSTARTER Device 'HDD (APA)' is HDD-page-only; falling back to Default for this launch\n");
                 break;
             default:
@@ -922,13 +1021,18 @@ int vcdConsumeDirty(int mode)
     return 1;
 }
 
+void vcdMarkDirty(int mode)
+{
+    if (mode >= 0 && mode < MODE_COUNT && vcdModeSupported(mode))
+        vcdDirty[mode] = 1;
+}
+
 // Mark every VCD-capable mode for one rescan -- call after the global default-view setting changes so
 // each device page rebuilds its list (ISO <-> VCD) on its next refresh.
 void vcdMarkAllDirty(void)
 {
     for (int m = 0; m < MODE_COUNT; m++)
-        if (vcdModeSupported(m))
-            vcdDirty[m] = 1;
+        vcdMarkDirty(m);
 }
 
 // #118: a multi-disc PS1 game is a set of separate .VCD files whose titles carry a disc token, e.g.
@@ -1718,15 +1822,13 @@ static const char *vcdPopstarterMcFile[9] = {
     "smbman.irx", "ps2ip.irx", "ps2smap.irx", "ps2dev9.irx", "SMSUTILS.irx", "poweroff.irx", "del.icn", "list.icn", "icon.sys"};
 static const char *vcdSmbModule[4] = {"smbman.irx", "ps2ip.irx", "ps2smap.irx", "ps2dev9.irx"};
 
-int vcdInstallPopstarterMc(const char *devPrefix)
+static int vcdInstallPopstarterMcAt(const char *devPrefix, const char *mcDir)
 {
-    char mcDir[64], src[320], dst[96];
+    char src[320], dst[96];
     int firstError = 0;
 
-    if (devPrefix == NULL || devPrefix[0] == '\0')
+    if (devPrefix == NULL || devPrefix[0] == '\0' || mcDir == NULL || mcDir[0] == '\0')
         return -1;
-    if (!vcdResolvePopstarterMc(mcDir, sizeof(mcDir)))
-        return -3;
 
     for (unsigned int i = 0; i < sizeof(vcdPopstarterMcFile) / sizeof(vcdPopstarterMcFile[0]); i++) {
         snprintf(dst, sizeof(dst), "%s/%s", mcDir, vcdPopstarterMcFile[i]);
@@ -1755,22 +1857,35 @@ int vcdInstallPopstarterMc(const char *devPrefix)
     return firstError;
 }
 
+int vcdInstallPopstarterMc(const char *devPrefix)
+{
+    char mcDir[64];
+
+    if (!vcdResolvePopstarterMc(mcDir, sizeof(mcDir)))
+        return -3;
+    return vcdInstallPopstarterMcAt(devPrefix, mcDir);
+}
+
+static int vcdSmbModulesPresentAt(const char *mcDir)
+{
+    for (int i = 0; i < 4; i++) {
+        char path[96];
+        int fd;
+
+        snprintf(path, sizeof(path), "%s/%s", mcDir, vcdSmbModule[i]);
+        fd = open(path, O_RDONLY);
+        if (fd < 0)
+            return 0;
+        close(fd);
+    }
+    return 1;
+}
+
 int vcdSmbModulesPresent(void)
 {
     static const char *cards[2] = {"mc0:/POPSTARTER", "mc1:/POPSTARTER"};
     for (int c = 0; c < 2; c++) {
-        int all = 1;
-        for (int i = 0; i < 4; i++) {
-            char path[96];
-            snprintf(path, sizeof(path), "%s/%s", cards[c], vcdSmbModule[i]);
-            int fd = open(path, O_RDONLY);
-            if (fd < 0) {
-                all = 0;
-                break;
-            }
-            close(fd);
-        }
-        if (all)
+        if (vcdSmbModulesPresentAt(cards[c]))
             return 1; // this card has the complete SMB stack
     }
     return 0;
@@ -1779,10 +1894,10 @@ int vcdSmbModulesPresent(void)
 // ---- POPStarter network files (IPCONFIG.DAT / SMBCONFIG.DAT) --------------------------------
 // POPSLoader-parity flow (see include/vcdsupport.h for the formats). The central rule: read
 // existing values when available, otherwise stay blank -- absence of POPStarter's files means
-// "unknown/unconfigured", NEVER "use OPL's defaults". Candidate dirs, in POPStarter's
-// precedence order: mc0:/POPSTARTER -> mc1:/POPSTARTER. That's it -- POPSTARTER reads its
-// network files from the memory card ONLY (OPL's own settings live in the boot dir/cwd, but
-// that is OUR convention, not POPSTARTER's). Nothing here touches VCD files.
+// "unknown/unconfigured", NEVER "use OPL's defaults". Each candidate is evaluated as one complete
+// home: a usable pair wins before an arbitrary writable card, with MC0 only breaking a true tie.
+// POPSTARTER reads its network files from the memory card ONLY (OPL's own settings live in the
+// boot dir/cwd, but that is OUR convention, not POPSTARTER's). Nothing here touches VCD files.
 static int vcdPopstarterNetDirs(char dirs[][96], int maxDirs)
 {
     int n = 0;
@@ -1795,22 +1910,25 @@ static int vcdPopstarterNetDirs(char dirs[][96], int maxDirs)
 }
 
 // Read a small text config file fully. Returns the length (>= 0), -1 when absent, -2 on a real
-// IO error. Absence is data (unknown/unconfigured), not a failure.
+// IO error, or -3 when too large to be a usable POPStarter config. Absence is data
+// (unknown/unconfigured), not a failure.
 static int vcdReadNetFile(const char *path, char *buf, int bufSize)
 {
     int fd = open(path, O_RDONLY);
     if (fd < 0)
-        return -1;
+        return errno == ENOENT ? -1 : -2;
     int size = lseek(fd, 0, SEEK_END);
     if (size < 0 || lseek(fd, 0, SEEK_SET) < 0) {
         close(fd);
         return -2;
     }
-    if (size >= bufSize)
-        size = bufSize - 1; // a bigger file is garbage/truncated, but never smashes the buffer
+    if (size >= bufSize) {
+        close(fd);
+        return -3; // never silently parse a truncated configuration
+    }
     int rd = read(fd, buf, size);
     close(fd);
-    if (rd < 0)
+    if (rd != size)
         return -2;
     buf[rd] = '\0';
     return rd;
@@ -1824,8 +1942,8 @@ static int vcdQuadOk(const int q[4])
     return 1;
 }
 
-// Parse "<IP> <NETMASK> <GATEWAY>". Returns 1 when a full valid triple was read; 0 means the
-// file is blank/garbage -- the caller treats that as DHCP and shows NO invented values.
+// Parse "<IP> <NETMASK> <GATEWAY>". Returns 1 when a full valid triple was read. The caller
+// separately recognizes blank as DHCP; nonblank parse failure is invalid, never silently DHCP.
 static int vcdParseIpConfig(const char *buf, vcd_popsnet_t *out)
 {
     int n = sscanf(buf, "%d.%d.%d.%d %d.%d.%d.%d %d.%d.%d.%d",
@@ -1895,59 +2013,239 @@ static void vcdParseSmbConfig(const char *buf, vcd_popsnet_t *out)
         snprintf(out->smbPass, sizeof(out->smbPass), "%s", lines[2]);
 }
 
+static int vcdNetTextBlank(const char *text)
+{
+    while (*text != '\0') {
+        if (*text != ' ' && *text != '\t' && *text != '\r' && *text != '\n')
+            return 0;
+        text++;
+    }
+    return 1;
+}
+
+static int vcdStaticIpUsable(const vcd_popsnet_t *cfg)
+{
+    return vcdQuadOk(cfg->ps2Ip) && vcdQuadOk(cfg->ps2Mask) && vcdQuadOk(cfg->ps2Gw) &&
+           (cfg->ps2Ip[0] | cfg->ps2Ip[1] | cfg->ps2Ip[2] | cfg->ps2Ip[3]) != 0 &&
+           (cfg->ps2Mask[0] | cfg->ps2Mask[1] | cfg->ps2Mask[2] | cfg->ps2Mask[3]) != 0 &&
+           (cfg->ps2Gw[0] | cfg->ps2Gw[1] | cfg->ps2Gw[2] | cfg->ps2Gw[3]) != 0;
+}
+
+static int vcdSmbConfigUsable(const vcd_popsnet_t *cfg)
+{
+    return cfg->smbShare[0] != '\0' && vcdQuadOk(cfg->smbIp) &&
+           (cfg->smbIp[0] | cfg->smbIp[1] | cfg->smbIp[2] | cfg->smbIp[3]) != 0 &&
+           cfg->smbPort >= 0 && cfg->smbPort <= 65535;
+}
+
+enum vcd_popsnet_file_state {
+    VCD_POPSNET_FILE_MISSING = 0,
+    VCD_POPSNET_FILE_DHCP,
+    VCD_POPSNET_FILE_STATIC,
+    VCD_POPSNET_FILE_VALID,
+    VCD_POPSNET_FILE_INVALID,
+    VCD_POPSNET_FILE_IO
+};
+
+typedef struct
+{
+    int rootPresent;
+    int dirPresent;
+    int ipState;
+    int smbState;
+    vcd_popsnet_t cfg;
+} vcd_popsnet_home_t;
+
+static void vcdInspectPopstarterNetHome(const char *dir, vcd_popsnet_home_t *home)
+{
+    char root[8];
+    char path[128];
+    char buf[256];
+    DIR *d;
+    int rd;
+
+    memset(home, 0, sizeof(*home));
+    home->cfg.ipDhcp = 1;
+    snprintf(home->cfg.home, sizeof(home->cfg.home), "%s", dir);
+    snprintf(home->cfg.createDir, sizeof(home->cfg.createDir), "%s", dir);
+    snprintf(root, sizeof(root), "mc%c:/", dir[2]);
+
+    d = opendir(root);
+    if (d == NULL) {
+        if (errno != ENOENT && errno != ENXIO) {
+            home->ipState = VCD_POPSNET_FILE_IO;
+            home->smbState = VCD_POPSNET_FILE_IO;
+        }
+        return; // an absent card is not an IO error for the other slot
+    }
+    closedir(d);
+    home->rootPresent = 1;
+    home->cfg.homeAvailable = 1;
+
+    d = opendir(dir);
+    if (d == NULL) {
+        if (errno != ENOENT) {
+            home->ipState = VCD_POPSNET_FILE_IO;
+            home->smbState = VCD_POPSNET_FILE_IO;
+        }
+        return;
+    }
+    closedir(d);
+    home->dirPresent = 1;
+
+    snprintf(path, sizeof(path), "%s/IPCONFIG.DAT", dir);
+    rd = vcdReadNetFile(path, buf, sizeof(buf));
+    if (rd == -2)
+        home->ipState = VCD_POPSNET_FILE_IO;
+    else if (rd == -3) {
+        home->ipState = VCD_POPSNET_FILE_INVALID;
+        home->cfg.ipExists = 1;
+        home->cfg.ipInvalid = 1;
+        snprintf(home->cfg.ipDir, sizeof(home->cfg.ipDir), "%s", dir);
+    } else if (rd >= 0) {
+        home->cfg.ipExists = 1;
+        snprintf(home->cfg.ipDir, sizeof(home->cfg.ipDir), "%s", dir);
+        if (vcdNetTextBlank(buf)) {
+            home->ipState = VCD_POPSNET_FILE_DHCP;
+        } else if (vcdParseIpConfig(buf, &home->cfg)) {
+            home->cfg.ipDhcp = 0;
+            home->ipState = VCD_POPSNET_FILE_STATIC;
+        } else {
+            home->ipState = VCD_POPSNET_FILE_INVALID;
+            home->cfg.ipInvalid = 1;
+        }
+    }
+
+    snprintf(path, sizeof(path), "%s/SMBCONFIG.DAT", dir);
+    rd = vcdReadNetFile(path, buf, sizeof(buf));
+    if (rd == -2)
+        home->smbState = VCD_POPSNET_FILE_IO;
+    else if (rd == -3) {
+        home->smbState = VCD_POPSNET_FILE_INVALID;
+        home->cfg.smbExists = 1;
+        home->cfg.smbInvalid = 1;
+        snprintf(home->cfg.smbDir, sizeof(home->cfg.smbDir), "%s", dir);
+    } else if (rd >= 0) {
+        home->cfg.smbExists = 1;
+        snprintf(home->cfg.smbDir, sizeof(home->cfg.smbDir), "%s", dir);
+        vcdParseSmbConfig(buf, &home->cfg);
+        if (vcdSmbConfigUsable(&home->cfg))
+            home->smbState = VCD_POPSNET_FILE_VALID;
+        else {
+            home->smbState = VCD_POPSNET_FILE_INVALID;
+            home->cfg.smbInvalid = 1;
+        }
+    }
+}
+
+static int vcdPopstarterNetHomeScore(const vcd_popsnet_home_t *home)
+{
+    if (!home->rootPresent)
+        return 0;
+    if (home->ipState == VCD_POPSNET_FILE_STATIC && vcdStaticIpUsable(&home->cfg) &&
+        home->smbState == VCD_POPSNET_FILE_VALID)
+        return 5; // a complete usable setup always wins over an arbitrary writable card
+    if (!home->cfg.ipInvalid && !home->cfg.smbInvalid &&
+        (home->ipState == VCD_POPSNET_FILE_STATIC || home->ipState == VCD_POPSNET_FILE_DHCP ||
+         home->smbState == VCD_POPSNET_FILE_VALID))
+        return 4; // preserve an existing valid partial setup and generate only its missing peer
+    if (home->cfg.ipInvalid || home->cfg.smbInvalid)
+        return 3; // make the user repair bad data instead of silently shadowing it on the other card
+    if (home->dirPresent)
+        return 2; // existing POPSTARTER install, with no network configuration yet
+    return 1;     // first-time setup: this card root is available
+}
+
+static int vcdResolvePopstarterNetHome(vcd_popsnet_home_t *out)
+{
+    char dirs[2][96];
+    vcd_popsnet_home_t homes[2];
+    int count = vcdPopstarterNetDirs(dirs, 2);
+    int best = -1;
+    int bestScore = 0;
+
+    for (int i = 0; i < count; i++) {
+        int score;
+
+        vcdInspectPopstarterNetHome(dirs[i], &homes[i]);
+        score = vcdPopstarterNetHomeScore(&homes[i]);
+        if (score > bestScore) {
+            best = i;
+            bestScore = score;
+        }
+    }
+
+    if (best < 0)
+        return 0;
+    *out = homes[best];
+    return 1;
+}
+
 int vcdReadPopstarterNet(vcd_popsnet_t *out)
 {
+    vcd_popsnet_home_t home;
+
     if (out == NULL)
         return -3;
     memset(out, 0, sizeof(*out));
     out->ipDhcp = 1; // absent/blank IPCONFIG.DAT displays as DHCP, with no invented values
 
-    char dirs[2][96];
-    int ndirs = vcdPopstarterNetDirs(dirs, 2);
-    char buf[256];
+    if (!vcdResolvePopstarterNetHome(&home))
+        return 0; // no card at all: show the normal first-time blank editor state
 
-    for (int i = 0; i < ndirs && (!out->smbExists || !out->ipExists); i++) {
-        char path[128];
-        if (!out->smbExists) {
-            snprintf(path, sizeof(path), "%s/SMBCONFIG.DAT", dirs[i]);
-            int rd = vcdReadNetFile(path, buf, sizeof(buf));
-            if (rd == -2)
-                return -3;
-            if (rd >= 0) {
-                out->smbExists = 1;
-                snprintf(out->smbDir, sizeof(out->smbDir), "%s", dirs[i]);
-                vcdParseSmbConfig(buf, out);
-            }
-        }
-        if (!out->ipExists) {
-            snprintf(path, sizeof(path), "%s/IPCONFIG.DAT", dirs[i]);
-            int rd = vcdReadNetFile(path, buf, sizeof(buf));
-            if (rd == -2)
-                return -3;
-            if (rd >= 0) {
-                out->ipExists = 1;
-                snprintf(out->ipDir, sizeof(out->ipDir), "%s", dirs[i]);
-                if (vcdParseIpConfig(buf, out))
-                    out->ipDhcp = 0;
-            }
-        }
-    }
-
-    // Create-target for files that don't exist yet: the first candidate dir that EXISTS; else
-    // mc0:/POPSTARTER, created best-effort at write time. Empty when no card is present at all --
-    // creation then reports IO.
-    for (int i = 0; i < ndirs; i++) {
-        DIR *d = opendir(dirs[i]);
-        if (d != NULL) {
-            closedir(d);
-            snprintf(out->createDir, sizeof(out->createDir), "%s", dirs[i]);
-            break;
-        }
-    }
-    if (out->createDir[0] == '\0' && ndirs > 0)
-        snprintf(out->createDir, sizeof(out->createDir), "mc0:/POPSTARTER");
+    *out = home.cfg;
+    if (home.ipState == VCD_POPSNET_FILE_IO || home.smbState == VCD_POPSNET_FILE_IO)
+        return -3;
 
     return 0;
+}
+
+vcd_popsnet_smb_import_t vcdReadPopstarterNetFromSmb(vcd_popsnet_t *out)
+{
+    char ipPath[128];
+    char smbPath[128];
+    char ipBuf[256];
+    char smbBuf[256];
+    const char *prefix;
+    int ipRead;
+    int smbRead;
+
+    if (out == NULL)
+        return VCD_POPSNET_SMB_IMPORT_NOT_CONNECTED;
+
+    memset(out, 0, sizeof(*out));
+    out->ipDhcp = 1;
+    if (!ethIsSMBShareConnected())
+        return VCD_POPSNET_SMB_IMPORT_NOT_CONNECTED;
+
+    prefix = ethGetSMBPrefix();
+    if (prefix == NULL || prefix[0] == '\0')
+        return VCD_POPSNET_SMB_IMPORT_NOT_CONNECTED;
+
+    // smbman/smb2man use the same backslash form as the active ETH/VCD paths. `prefix` already
+    // has one for a configured subfolder; at share root it is exactly `smb0:`.
+    snprintf(ipPath, sizeof(ipPath), "%sPOPS\\IPCONFIG.DAT", prefix);
+    snprintf(smbPath, sizeof(smbPath), "%sPOPS\\SMBCONFIG.DAT", prefix);
+    ipRead = vcdReadNetFile(ipPath, ipBuf, sizeof(ipBuf));
+    smbRead = vcdReadNetFile(smbPath, smbBuf, sizeof(smbBuf));
+    if (ipRead < 0 || smbRead < 0)
+        return VCD_POPSNET_SMB_IMPORT_NOT_FOUND;
+
+    out->ipExists = 1;
+    out->smbExists = 1;
+    snprintf(out->ipDir, sizeof(out->ipDir), "%sPOPS", prefix);
+    snprintf(out->smbDir, sizeof(out->smbDir), "%sPOPS", prefix);
+    if (!vcdNetTextBlank(ipBuf)) {
+        if (!vcdParseIpConfig(ipBuf, out) || !vcdStaticIpUsable(out))
+            return VCD_POPSNET_SMB_IMPORT_NOT_FOUND;
+        out->ipDhcp = 0;
+    }
+
+    vcdParseSmbConfig(smbBuf, out);
+    if (!vcdSmbConfigUsable(out))
+        return VCD_POPSNET_SMB_IMPORT_NOT_FOUND;
+
+    return VCD_POPSNET_SMB_IMPORT_OK;
 }
 
 int vcdPopsNetChanged(const vcd_popsnet_t *orig, const vcd_popsnet_t *cur)
@@ -1994,41 +2292,199 @@ static int vcdBuildSmbConfig(const vcd_popsnet_t *cfg, char *buf, int bufSize)
     return snprintf(buf, bufSize, "%s %s\n%s\n%s\n", host, cfg->smbShare, cfg->smbUser, cfg->smbPass);
 }
 
-int vcdWritePopstarterNetFiles(const vcd_popsnet_t *cfg, int writeSmb, int writeIp)
+static int vcdEnsurePopstarterNetDir(const char *dir)
+{
+    DIR *d;
+
+    if (dir == NULL || dir[0] == '\0')
+        return 0;
+    d = opendir(dir);
+    if (d != NULL) {
+        closedir(d);
+        return 1;
+    }
+    if (mkdir(dir, 0777) != 0 && errno != EEXIST)
+        return 0;
+    d = opendir(dir);
+    if (d == NULL)
+        return 0;
+    closedir(d);
+    return 1;
+}
+
+int vcdPopsNetValuesValid(const vcd_popsnet_t *cfg, int validateSmb, int validateIp)
 {
     if (cfg == NULL)
-        return -3;
+        return 0;
+    if (validateSmb && !vcdSmbConfigUsable(cfg))
+        return 0;
+    if (validateIp && !cfg->ipDhcp && !vcdStaticIpUsable(cfg))
+        return 0;
+    return 1;
+}
+
+int vcdWritePopstarterNetFiles(const vcd_popsnet_t *cfg, int writeSmb, int writeIp)
+{
     char buf[256];
+    char path[128];
+    char smbPath[128];
+    const char *dir;
+    int createdSmb = 0;
+    int rc;
+
+    if (cfg == NULL)
+        return -3;
+    if (!writeSmb && !writeIp)
+        return 0;
+    if (!vcdPopsNetValuesValid(cfg, writeSmb, writeIp))
+        return -4;
+
+    dir = cfg->home[0] != '\0' ? cfg->home : cfg->createDir;
+    if (dir[0] == '\0' || !vcdEnsurePopstarterNetDir(dir))
+        return -3;
 
     if (writeSmb) {
-        const char *dir = cfg->smbExists ? cfg->smbDir : cfg->createDir;
-        if (dir[0] == '\0')
-            return -3;
-        if (!cfg->smbExists)
-            mkdir(dir, 0777); // best-effort; exists already -> error, ignored
-        char path[128];
-        snprintf(path, sizeof(path), "%s/SMBCONFIG.DAT", dir);
         int len = vcdBuildSmbConfig(cfg, buf, sizeof(buf));
-        int rc = vcdSafeWriteFile(path, buf, len);
+
+        snprintf(smbPath, sizeof(smbPath), "%s/SMBCONFIG.DAT", dir);
+        rc = vcdSafeWriteFile(smbPath, buf, len);
         if (rc != 0)
             return rc;
+        createdSmb = !cfg->smbExists;
     }
 
     if (writeIp) {
-        const char *dir = cfg->ipExists ? cfg->ipDir : cfg->createDir;
-        if (dir[0] == '\0')
-            return -3;
-        if (!cfg->ipExists)
-            mkdir(dir, 0777);
-        char path[128];
-        snprintf(path, sizeof(path), "%s/IPCONFIG.DAT", dir);
         int len = vcdBuildIpConfig(cfg, buf, sizeof(buf));
-        int rc = vcdSafeWriteFile(path, buf, len);
-        if (rc != 0)
+
+        snprintf(path, sizeof(path), "%s/IPCONFIG.DAT", dir);
+        rc = vcdSafeWriteFile(path, buf, len);
+        if (rc != 0) {
+            // Pair creation must not leave a newly generated SMB configuration behind when its
+            // companion IPCONFIG.DAT cannot be committed. Existing SMB files are user-owned.
+            if (createdSmb)
+                unlink(smbPath);
             return rc;
+        }
     }
 
     return 0;
+}
+
+static int vcdCanDeriveCurrentStatic(void)
+{
+    vcd_popsnet_t cfg;
+
+    if (ps2_ip_use_dhcp)
+        return 0;
+    memset(&cfg, 0, sizeof(cfg));
+    memcpy(cfg.ps2Ip, ps2_ip, sizeof(cfg.ps2Ip));
+    memcpy(cfg.ps2Mask, ps2_netmask, sizeof(cfg.ps2Mask));
+    memcpy(cfg.ps2Gw, ps2_gateway, sizeof(cfg.ps2Gw));
+    return vcdStaticIpUsable(&cfg);
+}
+
+static int vcdCanDeriveCurrentSmb(void)
+{
+    vcd_popsnet_t cfg;
+
+    if (strlen(gPCShareName) >= sizeof(cfg.smbShare) ||
+        strlen(gPCUserName) >= sizeof(cfg.smbUser) ||
+        strlen(gPCPassword) >= sizeof(cfg.smbPass))
+        return 0;
+    memset(&cfg, 0, sizeof(cfg));
+    memcpy(cfg.smbIp, pc_ip, sizeof(cfg.smbIp));
+    cfg.smbPort = gPCPort;
+    snprintf(cfg.smbShare, sizeof(cfg.smbShare), "%s", gPCShareName);
+    return vcdSmbConfigUsable(&cfg);
+}
+
+static vcd_popsnet_ensure_t vcdEnsurePopstarterSmbConfig(vcd_popsnet_t *cfg)
+{
+    char ipPath[128];
+    char smbPath[128];
+    char buf[256];
+    int needIp;
+    int needSmb;
+    int createdIp = 0;
+    int rc;
+
+    if (cfg == NULL || !cfg->homeAvailable || cfg->home[0] == '\0')
+        return VCD_POPSNET_IO_ERROR;
+    if (cfg->ipInvalid || cfg->smbInvalid)
+        return VCD_POPSNET_INVALID;
+
+    needIp = !cfg->ipExists;
+    needSmb = !cfg->smbExists;
+
+    // A blank IPCONFIG.DAT is a valid POPStarter DHCP file, but SMB launch needs a usable static
+    // PS2 address. Preserve it untouched and explain the requirement rather than rewriting it.
+    if (!needIp && (cfg->ipDhcp || !vcdStaticIpUsable(cfg)))
+        return VCD_POPSNET_NEED_STATIC;
+
+    if (needIp && !vcdCanDeriveCurrentStatic())
+        return VCD_POPSNET_NEED_STATIC;
+    if (needSmb && !vcdCanDeriveCurrentSmb()) {
+        if (gPCShareName[0] != '\0' &&
+            (pc_ip[0] | pc_ip[1] | pc_ip[2] | pc_ip[3]) == 0)
+            return VCD_POPSNET_NEED_STATIC; // unresolved hostname / NetBIOS host
+        return VCD_POPSNET_INVALID;
+    }
+
+    if (!needIp && !needSmb)
+        return VCD_POPSNET_READY;
+    if (!vcdEnsurePopstarterNetDir(cfg->home))
+        return VCD_POPSNET_IO_ERROR;
+
+    snprintf(ipPath, sizeof(ipPath), "%s/IPCONFIG.DAT", cfg->home);
+    snprintf(smbPath, sizeof(smbPath), "%s/SMBCONFIG.DAT", cfg->home);
+
+    if (needIp) {
+        memcpy(cfg->ps2Ip, ps2_ip, sizeof(cfg->ps2Ip));
+        memcpy(cfg->ps2Mask, ps2_netmask, sizeof(cfg->ps2Mask));
+        memcpy(cfg->ps2Gw, ps2_gateway, sizeof(cfg->ps2Gw));
+        cfg->ipDhcp = 0;
+        rc = vcdSafeWriteFile(ipPath, buf, vcdBuildIpConfig(cfg, buf, sizeof(buf)));
+        if (rc != 0)
+            return VCD_POPSNET_IO_ERROR;
+        createdIp = 1;
+    }
+
+    if (needSmb) {
+        memcpy(cfg->smbIp, pc_ip, sizeof(cfg->smbIp));
+        cfg->smbPort = gPCPort;
+        snprintf(cfg->smbShare, sizeof(cfg->smbShare), "%s", gPCShareName);
+        snprintf(cfg->smbUser, sizeof(cfg->smbUser), "%s", gPCUserName);
+        snprintf(cfg->smbPass, sizeof(cfg->smbPass), "%s", gPCPassword);
+        rc = vcdSafeWriteFile(smbPath, buf, vcdBuildSmbConfig(cfg, buf, sizeof(buf)));
+        if (rc != 0) {
+            if (createdIp)
+                unlink(ipPath);
+            return VCD_POPSNET_IO_ERROR;
+        }
+    }
+
+    return VCD_POPSNET_READY;
+}
+
+vcd_popsnet_ensure_t vcdPreparePopstarterSmbLaunch(const char *smbPrefix)
+{
+    vcd_popsnet_t cfg;
+    int installRes = 0;
+
+    if (vcdReadPopstarterNet(&cfg) != 0 || !cfg.homeAvailable || cfg.home[0] == '\0')
+        return VCD_POPSNET_IO_ERROR;
+    if (cfg.ipInvalid || cfg.smbInvalid)
+        return VCD_POPSNET_INVALID;
+    if (!vcdEnsurePopstarterNetDir(cfg.home))
+        return VCD_POPSNET_IO_ERROR;
+    if (smbPrefix != NULL && smbPrefix[0] != '\0')
+        installRes = vcdInstallPopstarterMcAt(smbPrefix, cfg.home);
+    if (!vcdSmbModulesPresentAt(cfg.home)) {
+        if (installRes == -2 || installRes == -3)
+            return VCD_POPSNET_IO_ERROR;
+        return VCD_POPSNET_SMB_MISSING;
+    }
+    return vcdEnsurePopstarterSmbConfig(&cfg);
 }
 
 void vcdPrepareRetroGemBarcode(const char *vcdPath)

@@ -413,7 +413,7 @@ static int guiGameGSMUpdater(int modified)
 // forceGlobal: shown from Settings -> Display Settings as the GLOBAL defaults page instead of from a
 // game's settings. Same dialog, source row pinned to Global, values read from and written back to
 // the global config set -- that block is what every game inherits when it has no GSM keys of its own.
-void guiGameShowGSConfig(int forceGlobal)
+int guiGameShowGSConfig(int forceGlobal)
 {
     // configure the enumerations
     // Third source: per-KEY inheritance. Only offered here (the GSM page); the cheats/VMC/etc
@@ -493,6 +493,8 @@ void guiGameShowGSConfig(int forceGlobal)
             guiGameSaveGSMGlobalConfig(configGetByType(CONFIG_GAME));
         forceGlobalGSM = 0;
     }
+
+    return ret;
 }
 
 // CHEATS

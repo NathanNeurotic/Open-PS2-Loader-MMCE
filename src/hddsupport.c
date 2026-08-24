@@ -40,6 +40,25 @@ static unsigned char hddSupportModulesLoaded = 0;
 // while it keeps failing, and re-toasting the same error box each pass would bury the UI. Reset on
 // success so a later, different failure toasts again.
 static unsigned char hddSupportErrToasted = 0;
+// A Settings selection is deliberately staged until Save Settings. It never changes the active
+// pfs0: mount: a live OPL data home can have artwork/config readers using it.
+static int hddOplHomePending = -1;
+// After the selector is committed, retain its next-boot value for later saves in this process.
+// The live pfs0: data home remains unchanged until the requested restart.
+static int hddOplHomeCommitted = -1;
+// +OPL can be the existing automatic home only when __common was unavailable during discovery.
+// Keep that distinct from an explicit conf_hdd.cfg redirect, which may fall back to __common.
+static unsigned char hddOplHomeAutoPlus = 0;
+
+static void hddClearRecoveredErrors(void)
+{
+    // Do not blank an unrelated queued notification. These are the only messages emitted by this
+    // support path, and each call is made only after the underlying APA/PFS check succeeded.
+    clearErrorMessageIf(_STR_HDD_NOT_CONNECTED_ERROR);
+    clearErrorMessageIf(_STR_HDD_NOT_FORMATTED_ERROR);
+    clearErrorMessageIf(_STR_HDD_UNAVAILABLE_ERROR);
+    clearErrorMessageIf(_STR_HDD_PFS_UNAVAILABLE_ERROR);
+}
 
 static char *hddPrefix = "pfs0:";
 static hdl_games_list_t hddGames;
@@ -83,9 +102,9 @@ static void hddInitModules(void)
     snprintf(path, sizeof(path), "%sLNG", gHDDPrefix);
     lngAddLanguages(path, "/", hddGameList.mode);
 
-    // Create normal OPL folders only INSIDE the selected mounted PFS data home. For +OPL this
-    // is pfs0:; for the safe __common fallback it is pfs0:OPL/. Never spray OPL folders into
-    // the root of __common and never create an APA partition to obtain a home.
+    // Create normal OPL folders only inside the selected mounted PFS data home. A configured
+    // existing APA partition owns its root; the canonical __common fallback owns __common/OPL/.
+    // Never create an APA partition to obtain a home.
     sbCreateFolders(gHDDPrefix, 0);
 }
 
@@ -127,18 +146,32 @@ static int hddCheckHDProKit(void)
     return ret;
 }
 
-static void hddCheckOPLFolder(const char *mountPoint)
+static int hddCheckOPLFolder(const char *mountPoint)
 {
     DIR *dir;
     char path[32];
+    int n;
 
-    sprintf(path, "%sOPL", mountPoint);
+    n = snprintf(path, sizeof(path), "%sOPL", mountPoint);
+    if (n < 0 || n >= (int)sizeof(path))
+        return 0;
 
     dir = opendir(path);
-    if (dir == NULL)
-        mkdir(path, 0777);
-    else
+    if (dir != NULL) {
         closedir(dir);
+        return 1;
+    }
+
+    if (mkdir(path, 0777) == 0)
+        return 1;
+
+    // A competing normal-folder creation can win the race. Treat that existing folder as success,
+    // but never report a usable common-home target when the directory still cannot be opened.
+    dir = opendir(path);
+    if (dir == NULL)
+        return 0;
+    closedir(dir);
+    return 1;
 }
 
 static int hddPartitionMountable(const char *partition)
@@ -161,11 +194,14 @@ static void hddFindOPLPartition(void)
     config_set_t *config;
     char name[64] = {0};
     char candidate[sizeof(gOPLPart)];
+    const char *label;
 
-    // First honour an existing __common/OPL/conf_hdd.cfg, but only when the named
-    // partition already exists and mounts as PFS. Discovery must never manufacture it.
+    // When __common is usable, its OPL/conf_hdd.cfg is the authoritative APA data-home selector.
+    // If __common itself is unavailable, an existing mountable +OPL is the legacy automatic home.
+    // Discovery never manufactures a partition, resizes one, or writes raw hdd0: metadata.
+    hddOplHomeAutoPlus = 0;
     fileXioUmount(hddPrefix);
-    if (fileXioMount(hddPrefix, "hdd0:__common", FIO_MT_RDWR) == 0) {
+    if (fileXioMount(hddPrefix, "hdd0:__common", FIO_MT_RDONLY) == 0) {
         config = configAlloc(0, NULL, "pfs0:OPL/conf_hdd.cfg");
         if (config != NULL) {
             if (configRead(config))
@@ -175,14 +211,23 @@ static void hddFindOPLPartition(void)
         fileXioUmount(hddPrefix);
 
         if (name[0] != '\0') {
-            // conf_hdd.cfg historically stores a bare APA ID (for example +OPL).
-            // Accept hdd0:<id> too, but never redirect data ownership to hdd1 here.
+            // The historical value is a bare APA ID (for example +OPL). Accept an hdd0:
+            // spelling too, but never silently redirect this drive's owner to hdd1.
             if (!strncmp(name, "hdd0:", 5))
-                snprintf(candidate, sizeof(candidate), "%s", name);
+                label = name + 5;
             else if (!strncmp(name, "hdd", 3))
+                label = NULL;
+            else
+                label = name;
+
+            // conf_hdd.cfg names one APA partition label, not a raw hdd device or a PFS path.
+            // Reject delimiters and an empty/oversized label before passing anything to the mount
+            // RPC, so an invalid redirect can only select the documented __common fallback.
+            if (label == NULL || label[0] == '\0' || strlen(label) > APA_IDMAX ||
+                strpbrk(label, ":/\\") != NULL)
                 candidate[0] = '\0';
             else
-                snprintf(candidate, sizeof(candidate), "hdd0:%s", name);
+                snprintf(candidate, sizeof(candidate), "hdd0:%s", label);
 
             if (candidate[0] != '\0' && hddPartitionMountable(candidate)) {
                 snprintf(gOPLPart, sizeof(gOPLPart), "%s", candidate);
@@ -191,16 +236,21 @@ static void hddFindOPLPartition(void)
             }
             LOG("HDD: configured data partition %s is unavailable; ignoring it\n", name);
         }
-    }
 
-    // No usable configured target: __common/OPL is the canonical safe HDD home.
-    // Do NOT opportunistically select +OPL merely because it exists. A +OPL (or any other
-    // partition) is used only when __common/OPL/conf_hdd.cfg explicitly points to it.
-    // This keeps ownership deterministic and guarantees that discovery never needs to
-    // manufacture an APA partition just to obtain a writable config/data home.
-    if (hddPartitionMountable("hdd0:__common")) {
+        // The successful __common mount above is already the proof required for the default.
+        // Do not remount it merely to rediscover the same topology.
         snprintf(gOPLPart, sizeof(gOPLPart), "hdd0:__common");
         LOG("HDD: no usable configured data partition; using canonical __common/OPL/ fallback\n");
+        return;
+    }
+
+    // Official OPL's existing +OPL layout remains valid when a drive has no usable __common.
+    // It is an automatic effective choice, not a request to create conf_hdd.cfg or a new APA
+    // partition. +OPL owns its PFS root directly, so the mounted data prefix is pfs0:.
+    if (hddPartitionMountable("hdd0:+OPL")) {
+        snprintf(gOPLPart, sizeof(gOPLPart), "hdd0:+OPL");
+        hddOplHomeAutoPlus = 1;
+        LOG("HDD: __common unavailable; using existing +OPL data-home fallback\n");
         return;
     }
 
@@ -285,6 +335,11 @@ int hddLoadModules(void)
     return retStatus;
 }
 
+int hddModulesAreLoaded(void)
+{
+    return hddModulesLoaded != 0;
+}
+
 // Validate an APA header sector without ps2hdd: the "APA" magic plus the header checksum
 // (sum of the 127 little-endian words after the checksum word itself, per ps2sdk apaCheckSum).
 static int hddApaHeaderValid(const u8 *pSectorData)
@@ -362,7 +417,10 @@ int hddDetectNonSonyFileSystem()
     return result;
 }
 
-void hddLoadSupportModules(void)
+// Bring up only the APA/PFS support needed for a read-only pfs1: probe. This intentionally does
+// not discover, mount, or create the persistent pfs0: OPL data home: Settings uses it to validate
+// an already-existing selector target without changing the live data-home state.
+static int hddLoadCoreSupportModules(void)
 {
     static char hddarg[] = "-o"
                            "\0"
@@ -406,9 +464,12 @@ void hddLoadSupportModules(void)
             setErrorMessageWithCode(_STR_HDD_NOT_CONNECTED_ERROR, ERROR_HDD_NOT_DETECTED);
             hddSupportErrToasted = 1;
         } else if (nonSony > 0) {
-            hddSupportErrToasted = 0; // probe SUCCEEDED (genuine MBR/GPT) -- a future failure is new news
+            // A recognized MBR/GPT/exFAT disk is normal BDM territory, not an APA formatting
+            // failure. It also proves a prior transient APA probe error is stale.
+            hddSupportErrToasted = 0;
+            hddClearRecoveredErrors();
         }
-        return;
+        return 0;
     }
 
     if (!hddSupportModulesLoaded) {
@@ -420,34 +481,65 @@ void hddLoadSupportModules(void)
                 setErrorMessageWithCode(_STR_HDD_NOT_CONNECTED_ERROR, ERROR_HDD_MODULE_HDD_FAILURE);
                 hddSupportErrToasted = 1;
             }
-            return;
+            return 0;
         }
 
-        // Check if a HDD unit is connected.
-        if (hddCheck() < 0) {
+        // hddCheck distinguishes a connected formatted APA disk (0), a genuinely unformatted one
+        // (1), an unusable drive (2), and no usable drive (<0). Only status 1 earns the specific
+        // "not formatted" wording; a PFS module/load or selected-data-home problem is not proof of
+        // that condition.
+        ret = hddCheck();
+        if (ret < 0) {
             LOG("HDD: No HardDisk Drive detected.\n");
             if (!hddSupportErrToasted) {
                 setErrorMessageWithCode(_STR_HDD_NOT_CONNECTED_ERROR, ERROR_HDD_NOT_DETECTED);
                 hddSupportErrToasted = 1;
             }
-            return;
+            return 0;
+        }
+        if (ret == 1) {
+            LOG("HDD: APA status reports an unformatted drive.\n");
+            if (!hddSupportErrToasted) {
+                setErrorMessageWithCode(_STR_HDD_NOT_FORMATTED_ERROR, ERROR_HDD_MODULE_PFS_FAILURE);
+                hddSupportErrToasted = 1;
+            }
+            return 0;
+        }
+        if (ret == 2) {
+            LOG("HDD: APA status reports an unavailable drive.\n");
+            if (!hddSupportErrToasted) {
+                setErrorMessageWithCode(_STR_HDD_UNAVAILABLE_ERROR, ERROR_HDD_NOT_DETECTED);
+                hddSupportErrToasted = 1;
+            }
+            return 0;
         }
 
         LOG("[PS2FS]:\n");
         ret = sysLoadModuleBuffer(&ps2fs_irx, size_ps2fs_irx, sizeof(pfsarg), pfsarg);
         if (ret < 0) {
-            LOG("HDD: HardDisk Drive not formatted (PFS).\n");
+            LOG("HDD: PFS support module failed to load.\n");
             if (!hddSupportErrToasted) {
-                setErrorMessageWithCode(_STR_HDD_NOT_FORMATTED_ERROR, ERROR_HDD_MODULE_PFS_FAILURE);
+                setErrorMessageWithCode(_STR_HDD_PFS_UNAVAILABLE_ERROR, ERROR_HDD_MODULE_PFS_FAILURE);
                 hddSupportErrToasted = 1;
             }
-            return;
+            return 0;
         }
 
         hddSupportModulesLoaded = 1;
         hddSupportErrToasted = 0;
+        hddClearRecoveredErrors();
         LOG("HDDSUPPORT modules loaded\n");
     }
+
+    return 1;
+}
+
+void hddLoadSupportModules(void)
+{
+    int ret;
+
+    if (!hddLoadCoreSupportModules())
+        return;
 
     // The modules and the persistent pfs0: data mount have separate lifetimes. If an
     // existing partition was temporarily unavailable, keep the modules loaded and retry
@@ -459,10 +551,10 @@ void hddLoadSupportModules(void)
         hddFindOPLPartition();
 
     if (gOPLPart[0] == '\0') {
-        if (!hddSupportErrToasted) {
-            setErrorMessageWithCode(_STR_HDD_NOT_FORMATTED_ERROR, ERROR_HDD_MODULE_PFS_FAILURE);
-            hddSupportErrToasted = 1;
-        }
+        // HDL/VCD enumeration can still work without a persistent OPL data home. A missing or
+        // stale redirect is not evidence that the APA disk is unformatted, so retry discovery
+        // later without poisoning the user with a false formatting warning.
+        hddSupportErrToasted = 0;
         return;
     }
 
@@ -470,8 +562,10 @@ void hddLoadSupportModules(void)
     ret = fileXioMount(hddPrefix, gOPLPart, FIO_MT_RDWR);
 
     // A configured data partition may disappear or cease to mount. Never respond by
-    // creating/reformatting APA metadata. Fall back to the existing __common partition only.
-    if (ret < 0 && strcmp(gOPLPart, "hdd0:__common") != 0) {
+    // creating/reformatting APA metadata. An automatic +OPL home was chosen because __common
+    // was unavailable, so fail closed rather than probing it again. An explicit redirect keeps
+    // the established existing-__common fallback.
+    if (ret < 0 && strcmp(gOPLPart, "hdd0:__common") != 0 && !hddOplHomeAutoPlus) {
         LOG("HDD: could not mount %s (%d); trying existing __common/OPL/ fallback\n", gOPLPart, ret);
         fileXioUmount(hddPrefix);
         ret = fileXioMount(hddPrefix, "hdd0:__common", FIO_MT_RDWR);
@@ -484,16 +578,14 @@ void hddLoadSupportModules(void)
         // Force the next call to rediscover. This does not unload/reload the APA/PFS modules.
         gOPLPart[0] = '\0';
         gHDDPrefix = NULL;
-        if (!hddSupportErrToasted) {
-            setErrorMessageWithCode(_STR_HDD_NOT_FORMATTED_ERROR, ERROR_HDD_MODULE_PFS_FAILURE);
-            hddSupportErrToasted = 1;
-        }
+        hddSupportErrToasted = 0;
         return;
     }
 
     hddSupportErrToasted = 0;
-    if (gOPLPart[5] != '+') {
-        hddCheckOPLFolder(hddPrefix);
+    hddClearRecoveredErrors();
+    if (!strcmp(gOPLPart, "hdd0:__common")) {
+        (void)hddCheckOPLFolder(hddPrefix);
         gHDDPrefix = "pfs0:OPL/";
     } else {
         gHDDPrefix = "pfs0:";
@@ -890,10 +982,265 @@ static void hddDeleteGame(item_list_t *itemList, int id)
     hddForceUpdate = 1;
 }
 
+// Settings probes use pfs1:, never pfs0:. The latter is the persistent OPL data-home mount and
+// remounting it under live readers is both unsafe and unnecessary just to prove an APA partition
+// already exists.
+static int hddPartitionMountableAt(const char *mountPoint, const char *partition, int flags)
+{
+    int ret;
+
+    fileXioUmount(mountPoint);
+    ret = fileXioMount(mountPoint, partition, flags);
+    if (ret == 0)
+        fileXioUmount(mountPoint);
+
+    return ret == 0;
+}
+
+int hddGetOplHomeSelection(void)
+{
+    if (hddOplHomePending >= 0)
+        return hddOplHomePending;
+    if (hddOplHomeCommitted >= 0)
+        return hddOplHomeCommitted;
+    return strcmp(gOPLPart, "hdd0:+OPL") == 0 ? HDD_OPL_HOME_PLUS : HDD_OPL_HOME_COMMON;
+}
+
+int hddOplHomeIsLegacy(void)
+{
+    if (hddOplHomePending >= 0 || hddOplHomeCommitted >= 0)
+        return 0;
+    return gOPLPart[0] != '\0' && strcmp(gOPLPart, "hdd0:__common") != 0 &&
+           strcmp(gOPLPart, "hdd0:+OPL") != 0;
+}
+
+int hddOplHomeSelectionPending(void)
+{
+    return hddOplHomePending >= 0;
+}
+
+void hddDiscardOplHomeSelection(void)
+{
+    hddOplHomePending = -1;
+}
+
+int hddStageOplHomeSelection(int selection)
+{
+    const char *partition;
+
+    if (selection != HDD_OPL_HOME_COMMON && selection != HDD_OPL_HOME_PLUS)
+        return 0;
+
+    // Use only the already-resident ATA stack. The selector is a short-lived proof, not an owner
+    // of a module reference; hddLoadModulesReady() would retain one on every stage/save cycle.
+    // Do not call hddLoadSupportModules here: its normal data-home recovery may mount pfs0: and
+    // create OPL folders, neither of which belongs to a source selector proof.
+    if (!hddModulesAreLoaded())
+        return 0;
+    if (!hddLoadCoreSupportModules())
+        return 0;
+
+    partition = selection == HDD_OPL_HOME_PLUS ? "hdd0:+OPL" : "hdd0:__common";
+    if (!hddPartitionMountableAt("pfs1:", partition, FIO_MT_RDONLY))
+        return 0;
+
+    hddOplHomePending = selection;
+    return 1;
+}
+
+int hddOplHomeSelectionNeedsTargetSave(void)
+{
+    int selection = hddGetOplHomeSelection();
+
+    if (hddOplHomePending < 0 && hddOplHomeCommitted < 0)
+        return 0;
+
+    return selection == HDD_OPL_HOME_PLUS ? strcmp(gOPLPart, "hdd0:+OPL") != 0 : strcmp(gOPLPart, "hdd0:__common") != 0;
+}
+
+int hddMountSelectedOplHome(char *prefix, int prefixLen)
+{
+    const char *partition;
+    const char *selectedPrefix;
+    int selection;
+    int n;
+
+    if (prefix == NULL || prefixLen <= 0)
+        return 0;
+    prefix[0] = '\0';
+
+    selection = hddGetOplHomeSelection();
+    if (hddOplHomePending < 0 && hddOplHomeCommitted < 0)
+        return 0;
+    if (!hddModulesAreLoaded() || !hddLoadCoreSupportModules())
+        return 0;
+
+    partition = selection == HDD_OPL_HOME_PLUS ? "hdd0:+OPL" : "hdd0:__common";
+    fileXioUmount("pfs1:");
+    if (fileXioMount("pfs1:", partition, FIO_MT_RDWR) < 0)
+        return 0;
+
+    if (selection == HDD_OPL_HOME_COMMON) {
+        if (!hddCheckOPLFolder("pfs1:")) {
+            fileXioUmount("pfs1:");
+            return 0;
+        }
+        selectedPrefix = "pfs1:OPL/";
+    } else {
+        selectedPrefix = "pfs1:";
+    }
+
+    n = snprintf(prefix, prefixLen, "%s", selectedPrefix);
+    if (n < 0 || n >= prefixLen) {
+        fileXioUmount("pfs1:");
+        prefix[0] = '\0';
+        return 0;
+    }
+
+    return 1;
+}
+
+void hddUnmountSelectedOplHome(void)
+{
+    fileXioUmount("pfs1:");
+}
+
+int hddCommitOplHomeSelection(void)
+{
+    config_set_t *config = NULL;
+    const char *path = "pfs1:OPL/conf_hdd.cfg";
+    int fd;
+    int exists;
+    int result = 0;
+
+    if (hddOplHomePending < 0)
+        return 1;
+
+    // An automatic +OPL home has no __common control file. The active pfs0: mount proves the
+    // staged effective choice, so commit it as a fileless no-op without probing or writing
+    // __common. This preserves the no-__common topology across ordinary Settings saves.
+    if (!hddModulesAreLoaded())
+        return 0;
+    if (!hddLoadCoreSupportModules())
+        return 0;
+    if (hddOplHomePending == HDD_OPL_HOME_PLUS && hddOplHomeAutoPlus &&
+        !strcmp(gOPLPart, "hdd0:+OPL") && gHDDPrefix != NULL) {
+        hddOplHomeCommitted = hddOplHomePending;
+        hddOplHomePending = -1;
+        return 1;
+    }
+
+    // Re-prove the common owner at commit time. No raw APA operation, partition creation, or pfs0:
+    // remount is involved; this is only a bounded pfs1: read/write mount of an existing partition.
+    if (!hddPartitionMountableAt("pfs1:", "hdd0:__common", FIO_MT_RDWR))
+        return 0;
+
+    if (fileXioMount("pfs1:", "hdd0:__common", FIO_MT_RDWR) < 0)
+        return 0;
+
+    fd = open(path, O_RDONLY);
+    exists = fd >= 0;
+    if (fd >= 0)
+        close(fd);
+
+    // A missing selector already means __common/OPL/. Keep that default fileless; only an
+    // explicit +OPL selection needs to materialize conf_hdd.cfg.
+    if (!exists && hddOplHomePending == HDD_OPL_HOME_COMMON)
+        result = 1;
+    else
+        config = configAlloc(0, NULL, (char *)path);
+    if (config != NULL) {
+        // A present-but-unreadable file is user data, not an invitation to replace it with a new
+        // selector. A missing file is the normal common-home default and can be born only for an
+        // explicit +OPL choice.
+        if (!exists || configRead(config)) {
+            if (hddOplHomePending == HDD_OPL_HOME_PLUS)
+                configSetStr(config, "hdd_partition", "+OPL");
+            else
+                configRemoveKey(config, "hdd_partition");
+
+            result = configWrite(config) > 0;
+        }
+        configFree(config);
+    }
+
+    fileXioUmount("pfs1:");
+    if (result) {
+        hddOplHomeCommitted = hddOplHomePending;
+        hddOplHomePending = -1;
+    }
+    return result;
+}
+
+// A PP.<DISC-ID>.POPS.<title> VCD is the APA/PFS partition itself, not a loose .VCD file. Preserve
+// the strict POPSTARTER prefix and replace only its title component; the next VCD scan then resolves
+// the new literal partition label for the handoff selector.
+static int hddRenamePopsPartition(const char *part, const char *newName)
+{
+    char oldPath[APA_IDMAX + 6];
+    char newPart[APA_IDMAX + 1];
+    char newPath[APA_IDMAX + 6];
+    int titleOfs;
+    int n;
+
+    if (part == NULL || newName == NULL || newName[0] == '\0' || strpbrk(newName, ":/\\") != NULL)
+        return -1;
+    titleOfs = vcdPopsPartitionTitleOffset(part);
+    if (titleOfs <= 0)
+        return -1;
+
+    n = snprintf(newPart, sizeof(newPart), "%.*s%s", titleOfs, part, newName);
+    if (n < 0 || n > APA_IDMAX)
+        return -1; // an APA label cannot grow past its on-disk field
+    snprintf(oldPath, sizeof(oldPath), "hdd0:%s", part);
+    snprintf(newPath, sizeof(newPath), "hdd0:%s", newPart);
+    return fileXioRename(oldPath, newPath);
+}
+
+static void hddRenameVcd(int id, const char *newName)
+{
+    char oldName[VCD_NAME_MAX];
+    char part[APA_IDMAX + 1];
+    int renamed = 0;
+
+    // The list builder owns pfs1: and the backing arrays on the IO worker. Block it before copying
+    // the selected storage identity and before temporarily mounting a pooled POPS partition RW.
+    ioBlockOps(1);
+    if (hddVcdGames != NULL && hddVcdParts != NULL && id >= 0 && id < hddVcdGameCount) {
+        snprintf(oldName, sizeof(oldName), "%s", hddVcdGames[id].name);
+        snprintf(part, sizeof(part), "%s", hddVcdParts[id]);
+
+        if (vcdPopsPartitionTitleOffset(part) > 0) {
+            // One-game PP.* POPS installs boot from their partition label, so a file rename would
+            // change nothing. Rename the APA record while retaining its required prefix instead.
+            renamed = (hddRenamePopsPartition(part, newName) == 0);
+        } else {
+            char mountSrc[APA_IDMAX + 6];
+
+            snprintf(mountSrc, sizeof(mountSrc), "hdd0:%s", part);
+            fileXioUmount("pfs1:");
+            if (fileXioMount("pfs1:", mountSrc, FIO_MT_RDWR) == 0) {
+                renamed = (vcdRenameFileInDir("pfs1:/", oldName, newName) == 0);
+                fileXioUmount("pfs1:");
+            }
+        }
+    }
+    ioBlockOps(0);
+
+    if (renamed) {
+        // vcdRenameFileInDir already clears this for a loose file; doing it again keeps the
+        // partition-label path identical and is harmless.
+        vcdInvalidateGameIds();
+        hddVcdInvalidateCache();
+    }
+}
+
 static void hddRenameGame(item_list_t *itemList, int id, char *newName)
 {
-    if (vcdListViewActive(itemList))
-        return; // a VCD is not an HDL partition -- no rename in VCD view
+    if (vcdListViewActive(itemList)) {
+        hddRenameVcd(id, newName);
+        return;
+    }
     hdl_game_info_t *game = hddActiveHdl(id);
     if (game == &hddEmptyHdl)
         return; // stale id in the VCD->ISO toggle window -> don't rename a wrong/OOB HDL partition
@@ -912,27 +1259,23 @@ static int hddFindVcdByName(const char *vcdName)
     return -1;
 }
 
-// Resolve POPSTARTER.ELF for an HDD VCD launch: search hdd0:__common then hdd0:+OPL, each at its ROOT
-// /POPS/ (NOT the OPL/POPS/ data subfolder). On success returns 1 with elfOut = "pfs0:/POPS/POPSTARTER.ELF"
+// Resolve POPSTARTER.ELF for an HDD VCD launch from hdd0:__common/POPS/ only. APA VCD data can live
+// in its normal __.POPS / PP.* partitions and OPL data can be redirected elsewhere, but loose
+// POPS/POPSTARTER support payloads are always owned by __common. On success returns 1 with
+// elfOut = "pfs0:/POPS/POPSTARTER.ELF"
 // and LEAVES pfs0: mounted on that partition so the caller can load the ELF from it; on failure returns 0
 // with pfs0: restored to the OPL data partition. The CALLER must quiesce the art + IO workers first --
 // this remounts the single pfs0: slot, and umounting it under a live cover read is the HDD-freeze hazard.
 static int hddResolveHddPopstarter(char *elfOut, int elfLen)
 {
-    static const char *cands[2] = {"hdd0:__common", "hdd0:+OPL"};
-
-    for (int i = 0; i < 2; i++) {
-        fileXioUmount(hddPrefix);
-        if (fileXioMount(hddPrefix, cands[i], FIO_MT_RDONLY) < 0)
-            continue; // partition absent / unmountable -> try the next
-        // The APA contract is hdd0:__common/POPS/ (with +OPL retained as the existing fallback).
-        // Install directly from whichever candidate is mounted before checking its POPSTARTER.ELF.
+    fileXioUmount(hddPrefix);
+    if (fileXioMount(hddPrefix, "hdd0:__common", FIO_MT_RDONLY) == 0) {
         (void)vcdInstallPopstarterMc("pfs0:/");
         int fd = open("pfs0:/POPS/POPSTARTER.ELF", O_RDONLY);
         if (fd >= 0) {
             close(fd);
             snprintf(elfOut, elfLen, "pfs0:/POPS/POPSTARTER.ELF");
-            return 1; // keep pfs0: on this partition for the ELF load
+            return 1; // keep pfs0: on __common for the ELF load
         }
     }
 
@@ -973,8 +1316,11 @@ static void hddDoLaunchVcd(item_list_t *itemList, const char *name, const char *
     // reported success. Note cacheAbortMmce* only covers SIO2 requests, so the second call (which
     // covers ALL of them) is the one that matters here and its result is the one worth honouring.
     cacheAbortMmceImageLoadsTimed(HDD_ART_QUIESCE_MS);
-    if (!cacheCancelPendingImageLoadsTimed(HDD_ART_QUIESCE_MS))
-        LOG("HDD VCD: art did not quiesce before the pfs0: remount\n");
+    if (!cacheCancelPendingImageLoadsTimed(HDD_ART_QUIESCE_MS)) {
+        LOG("HDD VCD: art did not quiesce; refusing the pfs0: remount\n");
+        guiMsgBox(_l(_STR_PLEASE_WAIT), 0, NULL);
+        return;
+    }
     ioBlockOps(1);
     if (!hddResolveHddPopstarter(vcdElf, sizeof(vcdElf))) {
         ioBlockOps(0); // resolver already restored pfs0: to the OPL data partition on failure

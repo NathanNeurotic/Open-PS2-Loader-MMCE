@@ -254,6 +254,9 @@ enum UI_ITEMS {
     VCDUSB_BTN_FAT32,
     VCDUSB_BTN_EXFAT,
 
+    POPS_OVERWRITE_KEEP,
+    POPS_OVERWRITE_REPLACE,
+
     // Settings-layout restructure: sub-page buttons (chained dialogs, goto-reshow pattern)
     UICFG_ARTWORK_BUTTON,
     UICFG_COLORS_BUTTON,
@@ -270,8 +273,9 @@ enum UI_ITEMS {
     SECURITY_PARENTAL_BUTTON,
     ADV_PREFIX_BUTTON,
     ADV_STORAGE_BUTTON,
-    TOOLS_NET_UPDATE_BUTTON,
-    TOOLS_NBD_BUTTON,
+    CFG_HDDOPLPART,
+    GENERAL_GSM_DEFAULTS_BUTTON,
+    LAUNCH_GSM_DEFAULTS_BUTTON,
 
 #ifdef PADEMU
     PADEMU_GLOBAL_BUTTON,
@@ -365,12 +369,12 @@ extern struct UIItem diaNeutrinoDefaults[];
 extern struct UIItem diaBdmaConfig[];
 extern struct UIItem diaVcdListConfig[];
 extern struct UIItem diaPopsNetConfig[];
+extern struct UIItem diaPopsOverwrite[];
 extern struct UIItem diaMmceCommConfig[];
 extern struct UIItem diaMmcePathConfig[];
 extern struct UIItem diaSecurityConfig[];
 extern struct UIItem diaAdvancedConfig[];
 extern struct UIItem diaPathPrefixConfig[];
 extern struct UIItem diaStorageConfig[];
-extern struct UIItem diaToolsConfig[];
 
 #endif

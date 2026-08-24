@@ -518,7 +518,10 @@ static void bdmLoadBlockDeviceModules(void)
     }
 }
 
-void bdmLoadModules(void)
+// Bring up only the common BDM infrastructure. Literal massN: boot resolution uses this path so an
+// explicit filesystem slot never incidentally queues every transport enabled by the last settings
+// load; it determines its backing driver from that slot's own devctl/ioctl identity instead.
+static void bdmLoadCoreModules(void)
 {
     LOG("BDMSUPPORT LoadModules\n");
 
@@ -530,14 +533,19 @@ void bdmLoadModules(void)
     LOG("[BDMFS_FATFS]:\n");
     sysLoadModuleBuffer(&bdmfs_fatfs_irx, size_bdmfs_fatfs_irx, 0, NULL);
 
-    // Load Optional Block Device drivers
-    ioPutRequest(IO_CUSTOM_SIMPLEACTION, &bdmLoadBlockDeviceModules);
-
     LOG("[BDMEVENT]:\n");
     sysLoadModuleBuffer(&bdmevent_irx, size_bdmevent_irx, 0, NULL);
     SifAddCmdHandler(0, &bdmEventHandler, NULL);
 
     LOG("BDMSUPPORT Modules loaded\n");
+}
+
+void bdmLoadModules(void)
+{
+    bdmLoadCoreModules();
+
+    // Normal enumeration retains the established asynchronous optional-transport load.
+    ioPutRequest(IO_CUSTOM_SIMPLEACTION, &bdmLoadBlockDeviceModules);
 }
 
 static void bdmInit(item_list_t *itemList)
@@ -886,8 +894,17 @@ static void bdmRenameGame(item_list_t *itemList, int id, char *newName)
 {
     bdm_device_data_t *pDeviceData = (bdm_device_data_t *)itemList->priv;
 
-    if (vcdListViewActive(itemList))
-        return; // #120: no rename in VCD view
+    if (vcdListViewActive(itemList)) {
+        base_game_info_t *game = bdmActiveGame(itemList, id);
+        char vcdPrefix[BDM_DEVICE_ROOT_MAX + 2];
+
+        if (game == &bdmEmptyGame)
+            return; // stale id in the toggle window
+        bdmBuildVcdPrefix(vcdPrefix, sizeof(vcdPrefix), itemList->mode);
+        if (vcdRenameFile(vcdPrefix, game->name, newName) == 0)
+            pDeviceData->ForceRefresh = 1; // the queued menu update re-scans POPS/
+        return;
+    }
     if (bdmActiveGame(itemList, id) == &bdmEmptyGame)
         return;                                   // stale id in the toggle window (see bdmDeleteGame) -> avoid sbRename OOB
     sbSetBrowseSub(folderGetSub(itemList->mode)); // rename inside the current subfolder, not the root
@@ -2169,6 +2186,109 @@ static void bdmRewriteBootDir(char *bootDir, int bootDirSize, int slot, const ch
     snprintf(bootDir, bootDirSize, "%s", resolved);
 }
 
+// Read identity from ONE literal massN: slot. The driver name is the authoritative classification;
+// USBMASS_IOCTL_GET_DEVICE_NUMBER is still requested for diagnostics, but some usable devices do not
+// implement it, so its failure must not discard a valid driver name.
+static int bdmReadLiteralMassIdentity(int slot, int *outType)
+{
+    char path[16], driver[32];
+    int deviceIndex = -1;
+
+    snprintf(path, sizeof(path), "mass%d:/", slot);
+    bdmReadDeviceIdentity(path, driver, sizeof(driver), &deviceIndex);
+    if (driver[0] == '\0')
+        return 0;
+
+    *outType = bdmDetermineDeviceType(driver);
+    LOG("BOOT literal mass%d: driver %s device %d\n", slot, driver, deviceIndex);
+    return 1;
+}
+
+// Resolve an explicit massN: boot identity without treating it as an invitation to search every
+// mounted BDM device. The launcher has already named the filesystem slot; after IOP reset the only
+// work required is to let a possible transport register THAT slot, then query its own driver/device
+// ioctls. A cold untyped slot needs bounded transport bring-up, but every Dopen/ioctl below remains
+// massN: itself. Bare mass: and typed launch aliases retain the legacy broader resolver below.
+static int bdmResolveLiteralMassSlot(int slot, int *ioBdmType,
+                                     u32 initialBudgetMs, u32 ataInitialBudgetMs,
+                                     u32 mx4sioExtraBudgetMs, u32 expensiveExtraBudgetMs)
+{
+    int knownType = *ioBdmType;
+    int detectedType;
+
+    if (bdmReadLiteralMassIdentity(slot, &detectedType)) {
+        *ioBdmType = detectedType;
+        return detectedType == BDM_TYPE_UDPBD ? -1 : 1;
+    }
+
+    // A UDPBD identity cannot be mounted until its network configuration has been read. Do not
+    // make that bootstrap cycle worse by loading unrelated local transports or scanning other slots.
+    if (knownType == BDM_TYPE_UDPBD)
+        return -1;
+
+    bdmLoadCoreModules();
+
+    // A save-time retry may already know the exact backing family. Load only that family and wait
+    // only for the literal slot; an identity change never redirects settings to another massN:.
+    if (knownType != BDM_TYPE_UNKNOWN) {
+        u32 budgetMs = knownType == BDM_TYPE_ATA ? ataInitialBudgetMs : initialBudgetMs;
+        u64 start;
+
+        WaitSema(bdmLoadModuleLock);
+        bdmEnsureTransportLoaded(knownType);
+        SignalSema(bdmLoadModuleLock);
+
+        start = GetTimerSystemTime();
+        for (;;) {
+            if (bdmReadLiteralMassIdentity(slot, &detectedType)) {
+                *ioBdmType = detectedType;
+                return detectedType == BDM_TYPE_UDPBD ? -1 : 1;
+            }
+            if ((GetTimerSystemTime() - start) / (kBUSCLK / 1000) > budgetMs)
+                break;
+            DelayThread(100 * 1000);
+        }
+
+        *ioBdmType = knownType;
+        return -1;
+    }
+
+    // With an untyped massN: token, try the possible local transports in increasing cost. The
+    // final iLink/ATA tier shares a budget because both can be cold, but no tier ever probes a
+    // different mass slot to infer where the launcher came from.
+    for (int tier = 0; tier < 3; tier++) {
+        u32 budgetMs;
+        u64 start;
+
+        WaitSema(bdmLoadModuleLock);
+        if (tier == 0) {
+            bdmEnsureTransportLoaded(BDM_TYPE_USB);
+            budgetMs = initialBudgetMs;
+        } else if (tier == 1) {
+            bdmEnsureTransportLoaded(BDM_TYPE_SDC);
+            budgetMs = mx4sioExtraBudgetMs;
+        } else {
+            bdmEnsureTransportLoaded(BDM_TYPE_ILINK);
+            bdmEnsureTransportLoaded(BDM_TYPE_ATA);
+            budgetMs = expensiveExtraBudgetMs;
+        }
+        SignalSema(bdmLoadModuleLock);
+
+        start = GetTimerSystemTime();
+        for (;;) {
+            if (bdmReadLiteralMassIdentity(slot, &detectedType)) {
+                *ioBdmType = detectedType;
+                return detectedType == BDM_TYPE_UDPBD ? -1 : 1;
+            }
+            if ((GetTimerSystemTime() - start) / (kBUSCLK / 1000) > budgetMs)
+                break;
+            DelayThread(100 * 1000);
+        }
+    }
+
+    return -1;
+}
+
 // Resolve a boot directory that names a BDM device into that device's mounted massN: filesystem root,
 // force-loading whatever driver stack the boot device needs FIRST. Called from the deferred config
 // load -- after ioInit()/bdmInitSemaphore(), before the first configReadMulti() -- because at boot time
@@ -2177,11 +2297,13 @@ static void bdmRewriteBootDir(char *bootDir, int bootDirSize, int slot, const ch
 // families are handled:
 //   - launch-binding identities (usb0:/ilink0:/sd0:/mx4sio0:/sdc0:/ata0:) -- device names with no
 //     filesystem OPL reads; remapped to the SAME device's massN: mount.
-//   - massN:/mass: -- the right namespace, but the launcher's slot numbering need not match OPL's (and
-//     the device isn't mounted yet); verified/renumbered by probing for the booted ELF itself.
+//   - massN: -- an explicit filesystem slot. It is identified through THAT slot's driver/device ioctls
+//     after the required transport registers it; it is never renumbered by probing other devices.
+//   - mass: -- a legacy unspecified filesystem token, which has no literal slot and retains the
+//     broader boot-ELF proof below.
 // elfName (argv[0]'s basename; may be empty for a getcwd()-derived boot dir) anchors the verification:
-// the slot that actually holds <tail>/<elfName> IS the boot device, immune to slot renumbering. The
-// gEnable* config flags are deliberately ignored when loading transports -- the config is precisely
+// typed launch aliases and bare mass: are resolved to the slot that actually holds <tail>/<elfName>.
+// The gEnable* config flags are deliberately ignored when loading transports -- the config is precisely
 // what cannot be read yet (the exFAT-HDD chicken-and-egg: mounting it needs gEnableBdmHDD, which lives
 // in the unreadable config); the caller reconciles the flags after the config loads.
 // *ioBdmType is in/out: pass the boot device's BDM_TYPE_* when already known (the save-path re-resolve)
@@ -2189,8 +2311,10 @@ static void bdmRewriteBootDir(char *bootDir, int bootDirSize, int slot, const ch
 // holds the resolved device's type.
 // Returns 1 with bootDir rewritten in place on success; 0 when bootDir is not a BDM path (left
 // untouched -- mc/mmce/host/pfs/hdd/... prefixes are not ours); -1 when the boot device never mounted
-// within the budget (bootDir left untouched -- the caller drops it so legacy discovery re-arms).
-int bdmResolveBootDir(char *bootDir, int bootDirSize, const char *elfName, int *ioBdmType)
+// within the budget (bootDir left untouched so its caller can keep the explicit identity and use defaults).
+static int bdmResolveBootDirWithBudget(char *bootDir, int bootDirSize, const char *elfName, int *ioBdmType,
+                                       u32 initialBudgetMs, u32 ataInitialBudgetMs,
+                                       u32 mx4sioExtraBudgetMs, u32 expensiveExtraBudgetMs)
 {
     char stem[16];
     int unit;
@@ -2221,27 +2345,31 @@ int bdmResolveBootDir(char *bootDir, int bootDirSize, const char *elfName, int *
     // which passes the already-classified type back in.
     //
     // The consequence is deliberate and not fixable here: a UDPBD/UDPFS-BD boot arriving as
-    // "massN:/OPL" is byte-identical to a USB one, its only evidence being the "udp" driver token,
-    // which needs the udpbd stack, which needs the static IP out of the config being sought. It
-    // therefore falls through to the ordinary massN: scan and simply never mounts. Adding a UDPBD rung
-    // to the escalation ladder would slow EVERY untyped massN: boot -- i.e. every ordinary USB boot --
-    // to buy that one case nothing, since the IP is still unknown.
+    // "massN:/OPL" is byte-identical to a USB one until the "udp" driver has registered, and that
+    // transport needs the static IP out of the config being sought. The literal-slot resolver therefore
+    // tries only local transports and fails closed rather than adding a network rung to every boot.
     if (filterType == BDM_TYPE_UDPBD) {
         *ioBdmType = filterType; // keep the classification so a later save retry stays pinned to it
         return -1;               // network block device: no local mount to resolve at config-load time
     }
 
+    // A numeric massN: names one filesystem slot. Do not use the boot ELF as a reason to scan
+    // MAX_BDM_DEVICES and potentially select a different device that happens to contain it.
+    if (isMass && unit >= 0)
+        return bdmResolveLiteralMassSlot(unit, ioBdmType, initialBudgetMs, ataInitialBudgetMs,
+                                         mx4sioExtraBudgetMs, expensiveExtraBudgetMs);
+
     const char *tail = strchr(bootDir, ':') + 1; // "" | "/APPS" | "APPS" (bdmParseBootStem proved the ':')
-    // The boot token's unit digit doubles as the scan-order hint for BOTH families: mass1: names the
-    // slot outright, and a typed usb1:/ata1: unit usually tracks same-type enumeration order too.
+    // A typed launch alias's unit digit is a scan-order hint. Bare mass: has no literal slot, so its
+    // legacy boot-ELF proof begins at mass0: and may inspect the remaining slots.
     int literalSlot = (unit >= 0 && unit < MAX_BDM_DEVICES) ? unit : 0;
     int haveElf = (elfName != NULL && elfName[0] != '\0');
 
     // Bring-up: the BDM core (bdm.irx + bdmfs_fatfs + hotplug events; idempotent -- every bdmInit calls
-    // it too) plus the transport(s) the boot prefix implies. An untyped massN: names the shared BDM
-    // filesystem, not a transport, so start with the cheap common ones (USB, MX4SIO) and only escalate
-    // to iLink + the ATA stack (iLinkman is known to break PCSX2, where a virtual-USB mass: boot is
-    // possible; ATA means dev9 power + drive spin-up) if nothing turns up holding the boot folder.
+    // it too) plus the transport(s) the boot prefix implies. Only a legacy bare mass: has no transport
+    // or literal slot, so start with the cheap common ones (USB, MX4SIO) and only escalate to iLink +
+    // the ATA stack (iLinkman is known to break PCSX2, where a virtual-USB mass: boot is possible; ATA
+    // means dev9 power + drive spin-up) if nothing turns up holding the boot folder.
     bdmLoadModules();
     WaitSema(bdmLoadModuleLock);
     if (filterType != BDM_TYPE_UNKNOWN) {
@@ -2252,8 +2380,8 @@ int bdmResolveBootDir(char *bootDir, int bootDirSize, const char *elfName, int *
         // mx4sio_bd is an SD-card driver on SIO2 -- THE PAD'S OWN BUS -- and once loaded it is
         // resident for the session: mx4sioModLoaded latches and no unload path exists. Turning
         // MX4SIO Off in settings afterwards cannot undo it, and this resolver ignores that flag by
-        // design. So every untyped massN: boot -- which is every ordinary USB boot -- has been
-        // running with an SD driver resident on the pad's bus.
+        // design. The literal massN: resolver above delays it until its second bounded tier; this
+        // remaining broad path is only for an old bare mass: token.
         //
         // rebuild-66 never reaches this resolver at all (its setDefaults clears gBootDir before
         // configInit), and uOPL has no resolver and loads MX4SIO only when the user enables it.
@@ -2265,12 +2393,13 @@ int bdmResolveBootDir(char *bootDir, int bootDirSize, const char *elfName, int *
     }
     SignalSema(bdmLoadModuleLock);
 
-    u32 budgetMs = (filterType == BDM_TYPE_ATA) ? 10000 : 3000; // ATA = dev9 power-up + platter spin-up
-    // Escalation tier for an untyped massN: search: 0 = only USB is up, 1 = MX4SIO added, 2 = iLink +
-    // ATA added, i.e. everything. A TYPED search starts past the end -- its one transport was loaded up
+    u32 budgetMs = (filterType == BDM_TYPE_ATA) ? ataInitialBudgetMs : initialBudgetMs;
+    // Escalation tier for a bare mass: search: 0 = only USB is up, 1 = MX4SIO added, 2 = iLink + ATA
+    // added, i.e. everything. A TYPED search starts past the end -- its one transport was loaded up
     // front and no other family can satisfy it -- which keeps its timeout path exactly as it was.
-    // Worst case for an untyped search is now 3000 + 3000 + 8000 = 14 s, inside the 30 s
-    // OPL_DEFERRED_IO_TIMEOUT_MS that bounds a post-boot reload (the boot call is not deferred at all).
+    // The full resolver receives 3000 + 3000 + 8000 = 14 s for explicit/save-time recovery. The
+    // bootstrap wrapper below uses a shorter bounded ladder: a missing first-run config must reach
+    // defaults promptly instead of spending that full recovery budget before the boot splash moves.
     int escalationTier = (filterType != BDM_TYPE_UNKNOWN) ? 2 : 0;
     // u64: GetTimerSystemTime() passes 2^32 bus ticks ~29 s after boot; a u32 start would make every
     // POST-BOOT resolve (the _saveConfig hotplug retry, a settings reload) compute a bogus huge elapsed
@@ -2337,7 +2466,7 @@ int bdmResolveBootDir(char *bootDir, int bootDirSize, const char *elfName, int *
                 WaitSema(bdmLoadModuleLock);
                 bdmEnsureTransportLoaded(BDM_TYPE_SDC);
                 SignalSema(bdmLoadModuleLock);
-                budgetMs += 3000;
+                budgetMs += mx4sioExtraBudgetMs;
                 continue;
             }
             if (escalationTier == 1) {
@@ -2349,7 +2478,7 @@ int bdmResolveBootDir(char *bootDir, int bootDirSize, const char *elfName, int *
                 bdmEnsureTransportLoaded(BDM_TYPE_ILINK);
                 bdmEnsureTransportLoaded(BDM_TYPE_ATA);
                 SignalSema(bdmLoadModuleLock);
-                budgetMs += 8000;
+                budgetMs += expensiveExtraBudgetMs;
                 continue;
             }
             // The weak fallback is now consumed LAST, after every transport has had its chance --
@@ -2373,6 +2502,22 @@ int bdmResolveBootDir(char *bootDir, int bootDirSize, const char *elfName, int *
         }
         DelayThread(100 * 1000);
     }
+}
+
+int bdmResolveBootDir(char *bootDir, int bootDirSize, const char *elfName, int *ioBdmType)
+{
+    // Full-budget resolver for explicit Custom Settings Path and save-time hotplug recovery.
+    return bdmResolveBootDirWithBudget(bootDir, bootDirSize, elfName, ioBdmType,
+                                       3000, 10000, 3000, 8000);
+}
+
+int bdmResolveBootDirBootstrap(char *bootDir, int bootDirSize, const char *elfName, int *ioBdmType)
+{
+    // Bootstrap is allowed to defer a cold/ambiguous device to the first explicit save retry, but
+    // it must not make defaults wait for every BDM transport. ATA retains a little extra spin-up
+    // room; an untyped massN: ladder is at most 1500 + 1500 + 3500 ms, plus its one ATA settle.
+    return bdmResolveBootDirWithBudget(bootDir, bootDirSize, elfName, ioBdmType,
+                                       1500, 5000, 1500, 3500);
 }
 
 static int bdmDeviceIsATA(int deviceId)

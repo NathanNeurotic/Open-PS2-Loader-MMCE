@@ -142,7 +142,6 @@ int guiShowMmceConfig(void);
 void guiShowMmceCommConfig(void);
 void guiShowMmcePathConfig(void);
 void guiShowStorageConfig(void);
-void guiShowToolsConfig(void);
 void guiShowArtworkConfig(void);
 void guiShowCoverflowConfig(void);
 void guiShowColorsConfig(void);

@@ -133,6 +133,7 @@ static clock_t lastBgRescan[MODE_COUNT];
 static unsigned int lastSeenBdmGeneration;
 
 static char errorMessage[256];
+static int errorMessageStringId = -1;
 
 static opl_io_module_t list_support[MODE_COUNT];
 
@@ -557,6 +558,17 @@ static void itemExecTriangle(struct menu_item *curMenu)
     item_list_t *support = curMenu->userdata;
 
     if (support) {
+        // A VCD is a POPSTARTER title, not a PS2-loader title. Route before the generic per-game
+        // settings branch: that branch loads/creates CFG state and exposes controls that can never
+        // affect a POPSTARTER handoff. vcdListViewActive also covers a forced-VCD Favourites proxy.
+        if (vcdListViewActive(support)) {
+            if (menuCheckParentalLock() == 0) {
+                menuInitVcdMenu();
+                guiSwitchScreen(GUI_SCREEN_APP_MENU);
+            }
+            return;
+        }
+
         unsigned char flags = (support->mode == FAV_MODE) ? favGetFlags(support) : support->flags;
 
         if (!(flags & MODE_FLAG_NO_COMPAT)) {
@@ -704,6 +716,11 @@ void initSupport(item_list_t *itemList, int mode, int force_reinit)
 // in-initAllSupport greeting redraws fire ONLY during boot -- not on a post-boot settings refresh
 // (which runs on the IO thread with the menu showing; an ungated redraw would flash the boot logo).
 static int gBootInProgress = 0;
+
+int oplIsBootInProgress(void)
+{
+    return gBootInProgress;
+}
 
 static void initAllSupport(int force_reinit)
 {
@@ -1268,6 +1285,7 @@ static void clearErrorMessage(void)
 {
     // reset the original frame hook
     frameCounter = 0;
+    errorMessageStringId = -1;
     guiSetFrameHook(&menuUpdateHook);
 }
 
@@ -1277,22 +1295,81 @@ static void errorMessageHook()
     clearErrorMessage();
 }
 
+// Language strings can choose the order of the supported substitutions, but are never handed to
+// printf directly. Unknown conversion sequences remain literal text instead of consuming an
+// argument that this caller did not provide.
+static void formatErrorMessage(const char *format, const char *path, int error, int allowPath, int allowError)
+{
+    char errorText[16];
+    size_t used = 0;
+
+    if (format == NULL) {
+        errorMessage[0] = '\0';
+        return;
+    }
+
+    snprintf(errorText, sizeof(errorText), "%d", error);
+    while (*format != '\0' && used < sizeof(errorMessage) - 1) {
+        const char *replacement = NULL;
+
+        if (*format != '%') {
+            errorMessage[used++] = *format++;
+            continue;
+        }
+
+        format++;
+        if (*format == '\0') {
+            errorMessage[used++] = '%';
+            break;
+        }
+        if (*format == '%') {
+            errorMessage[used++] = *format++;
+            continue;
+        }
+        if (*format == 's' && allowPath)
+            replacement = path ? path : "";
+        else if ((*format == 'd' || *format == 'i') && allowError)
+            replacement = errorText;
+
+        if (replacement != NULL) {
+            format++;
+            while (*replacement != '\0' && used < sizeof(errorMessage) - 1)
+                errorMessage[used++] = *replacement++;
+        } else {
+            errorMessage[used++] = '%';
+            if (used < sizeof(errorMessage) - 1)
+                errorMessage[used++] = *format;
+            format++;
+        }
+    }
+    errorMessage[used] = '\0';
+}
+
 void setErrorMessageWithCode(int strId, int error)
 {
-    snprintf(errorMessage, sizeof(errorMessage), _l(strId), error);
+    formatErrorMessage(_l(strId), NULL, error, 0, 1);
+    errorMessageStringId = strId;
     guiSetFrameHook(&errorMessageHook);
 }
 
 void setErrorMessage(int strId)
 {
-    snprintf(errorMessage, sizeof(errorMessage), _l(strId));
+    formatErrorMessage(_l(strId), NULL, 0, 0, 0);
+    errorMessageStringId = strId;
     guiSetFrameHook(&errorMessageHook);
 }
 
 void setErrorMessagePathCode(int strId, const char *path, int error)
 {
-    snprintf(errorMessage, sizeof(errorMessage), _l(strId), path ? path : "", error);
+    formatErrorMessage(_l(strId), path, error, 1, 1);
+    errorMessageStringId = strId;
     guiSetFrameHook(&errorMessageHook);
+}
+
+void clearErrorMessageIf(int strId)
+{
+    if (errorMessageStringId == strId)
+        clearErrorMessage();
 }
 
 // ----------------------------------------------------------
@@ -1302,6 +1379,7 @@ void setErrorMessagePathCode(int strId, const char *path, int error)
 static int lscstatus = CONFIG_ALL;
 static int lscret = 0;
 static char gLastSaveTarget[sizeof(gCustomSettingsPath)];
+static int gLastSaveWasStagedOplHome = 0;
 static int gHddSettingsFallbackNotice = 0;
 static int gBootHddCommonFallback = 0;
 
@@ -1426,6 +1504,59 @@ static int gBootHomeDeferred = 0;
 // Used after config read because a stored HDD=Disabled value must not turn off the transport OPL
 // itself was launched from, and by discovery to prohibit an unrelated MC write fallback.
 static int gBootHomeApa = 0;
+
+// Basename of the ELF OPL was booted as (argv[0]); pairs with gBootDir. The BDM resolver uses it
+// to verify typed launch aliases and a legacy bare mass: token. An explicit massN: is already a
+// concrete slot and is identified from that slot's own ioctls instead. Empty when argv[0] had no
+// filename part or the boot dir came from getcwd().
+static char gBootElfName[64];
+// BDM_TYPE_* of the resolved boot device, BDM_TYPE_UNKNOWN for an unclassified boot. The save-path
+// retry pins a later re-resolve to this type; config recovery also uses it to keep a known BDM boot
+// from probing unrelated storage classes.
+static int gBootDirBdmType = BDM_TYPE_UNKNOWN;
+// True for a typed BDM boot or a concrete massN: token, even when the latter has not finished
+// registering and therefore has no driver classification yet. This keeps a missing first-run file
+// on that explicit slot from triggering the legacy all-device recovery scan.
+static int gBootHomeBdm = 0;
+
+// The built-in themes have no theme directory. Their conventional BGM belongs to the normal OPL
+// data home, never POPS: `pfs0:OPL/THM/bgm.ogg` for __common/OPL and `pfs0:THM/bgm.ogg` for +OPL.
+// Every non-APA home is the exact RiptOPL working directory resolved at boot. Do not turn this into
+// a directory scan: a missing file is simply silence.
+int oplGetDefaultThemeBgmPath(char *path, int pathSize)
+{
+    int length;
+
+    if (path == NULL || pathSize <= 1)
+        return 0;
+
+    path[0] = '\0';
+    if (gBootHomeApa) {
+        if (gHDDPrefix == NULL || gHDDPrefix[0] == '\0')
+            return 0;
+
+        length = snprintf(path, pathSize, "%sTHM/bgm.ogg", gHDDPrefix);
+    } else {
+        size_t baseLength;
+
+        if (gBootDir[0] == '\0')
+            return 0;
+
+        baseLength = strlen(gBootDir);
+        if (gBootDir[baseLength - 1] == ':' || gBootDir[baseLength - 1] == '/' ||
+            gBootDir[baseLength - 1] == '\\')
+            length = snprintf(path, pathSize, "%sbgm.ogg", gBootDir);
+        else
+            length = snprintf(path, pathSize, "%s/bgm.ogg", gBootDir);
+    }
+
+    if (length < 0 || length >= pathSize) {
+        path[0] = '\0';
+        return 0;
+    }
+
+    return 1;
+}
 
 // When this function is called, the current device for loading/saving config is the memory card.
 // "Custom Settings Path" bootstrap.
@@ -1652,7 +1783,10 @@ static int prepareCustomApaSettingsPath(char *path, int pathLen)
 
     const char *activeLabel = strchr(gOPLPart, ':');
     activeLabel = activeLabel ? activeLabel + 1 : gOPLPart;
-    int commonStyleHome = (activeLabel[0] != '+');
+    // Only the canonical __common fallback maps the OPL data home below a physical OPL/
+    // subdirectory. Every valid conf_hdd.cfg-selected partition, including a non-+ label,
+    // owns its PFS root directly.
+    int commonStyleHome = !strcmp(gOPLPart, "hdd0:__common");
 
     if (isPfsAlias) {
         // Compatibility spellings seen on hardware include pfs0:, pfs:/__common/OPL and
@@ -1759,9 +1893,9 @@ static int isApaSettingsPath(const char *path)
 }
 
 // Resolve the normal safe HDD settings home after an explicit HDD path cannot be used.
-// hddLoadSupportModules owns the policy: honour an existing conf_hdd.cfg target first;
-// otherwise mount the guaranteed __common partition and use __common/OPL/. It never creates
-// or formats an APA partition. This helper only accepts the resulting mounted PFS namespace.
+// hddLoadSupportModules owns the policy: read the existing __common/OPL/conf_hdd.cfg redirect
+// first, otherwise use __common/OPL/, or an existing +OPL when __common is unavailable. It never
+// creates or formats an APA partition. This helper only accepts the resulting mounted PFS namespace.
 static int prepareHddSettingsFallback(char *path, int pathLen)
 {
     DIR *dir;
@@ -1808,9 +1942,11 @@ static int prepareCustomSettingsPath(char *path, int pathLen)
 // Last-resort READ-ONLY discovery for a missing/stale config.path. This exists to recover the
 // chicken-and-egg custom-settings value from an already-existing config; it never creates a config,
 // never changes APA metadata, and never makes an arbitrary discovered device the permanent save home.
-// A known local boot self-migrates the loaded in-memory sets back to its normal boot home; if the
-// recovered config contains Custom Settings Path, _saveConfig will honor it and regenerate config.path
-// on the user's next explicit Save Changes.
+// A known non-MC local boot self-migrates the loaded in-memory sets back to its normal boot home. A
+// concrete MC boot preserves the same-card directory it recovered, so its first save cannot relocate
+// an already-working MC1 configuration to the card root or the other slot. If the recovered config
+// contains Custom Settings Path, _saveConfig will honor it and regenerate config.path on the user's
+// next explicit Save Changes.
 static int tryReadRecoveryConfigHome(int types, const char *home)
 {
     DIR *dir = opendir(home);
@@ -1826,10 +1962,96 @@ static int tryReadRecoveryConfigHome(int types, const char *home)
     return value;
 }
 
+static int sameConcreteMcSlot(const char *first, const char *second)
+{
+    return first != NULL && second != NULL &&
+           !strncmp(first, "mc", 2) && !strncmp(second, "mc", 2) &&
+           (first[2] == '0' || first[2] == '1') && first[3] == ':' &&
+           first[2] == second[2] && second[3] == ':';
+}
+
+static void restoreRecoverySaveHome(const char *recoveredHome);
+
+static int bootHomeIsConcreteMc(void)
+{
+    return !strncmp(gBootDir, "mc", 2) &&
+           (gBootDir[2] == '0' || gBootDir[2] == '1') && gBootDir[3] == ':';
+}
+
+static int bootHomeIsKnownMmce(void)
+{
+    return !strncmp(gBootDir, "mmce", 4) &&
+           (gBootDir[4] == '0' || gBootDir[4] == '1') && gBootDir[5] == ':';
+}
+
+static int bootPathIsConcreteMass(const char *path)
+{
+    const char *p;
+
+    if (path == NULL || strncmp(path, "mass", 4) != 0)
+        return 0;
+    p = path + 4;
+    if (*p < '0' || *p > '9')
+        return 0;
+    while (*p >= '0' && *p <= '9')
+        p++;
+    return *p == ':';
+}
+
+static int bootHomeIsKnownBdm(void)
+{
+    // A resolved BDM driver or a literal massN: token is a concrete local owner. The latter can
+    // remain unclassified while its transport starts, but must not be turned into a broad search.
+    return !gBootHomeDeferred && gBootHomeBdm;
+}
+
+// A known local boot gets at most its own conventional legacy locations. The normal CWD was read
+// before this function, so these probes are migration reads only: <device>:/OPL then the device
+// root. They cannot wake USB/ATA/MMCE/other MC slots or turn an absent first-run config into a
+// whole-machine discovery pass.
+static int tryKnownBootConfigRecovery(int types)
+{
+    const char *colon = strchr(gBootDir, ':');
+    char root[16];
+    char home[32];
+    int value;
+    int n;
+
+    if (colon == NULL)
+        return 0;
+
+    n = (int)(colon - gBootDir) + 1;
+    if (n <= 0 || n >= (int)sizeof(root))
+        return 0;
+    memcpy(root, gBootDir, n);
+    root[n] = '\0';
+
+    snprintf(home, sizeof(home), "%s/OPL", root);
+    value = tryReadRecoveryConfigHome(types, home);
+    if (value & CONFIG_OPL) {
+        restoreRecoverySaveHome(home);
+        return value;
+    }
+
+    snprintf(home, sizeof(home), "%s/", root);
+    value = tryReadRecoveryConfigHome(types, home);
+    if (value & CONFIG_OPL) {
+        restoreRecoverySaveHome(home);
+        return value;
+    }
+
+    // Failed recovery probes re-home every config set. Restore the known source before returning
+    // defaults so the first explicit save stays on that same device.
+    configEnd();
+    configInit(gBootDir);
+    return 0;
+}
+
 static void restoreRecoverySaveHome(const char *recoveredHome)
 {
-    // Recovery is discovery only and never writes by itself. Known local boots return to their
-    // real boot home; a bare launch has no independent owner, so the existing config home that was
+    // Recovery is discovery only and never writes by itself. Known local boots normally return to
+    // their real boot home, but a concrete MC boot keeps the same-card directory that supplied it.
+    // A bare launch has no independent owner, so the existing config home that was
     // actually recovered becomes the next explicit-save home. A deferred network boot cannot save
     // back to its unreadable share during bootstrap, so select a concrete reachable MC home when possible.
     if (gBootHomeDeferred) {
@@ -1858,6 +2080,12 @@ static void restoreRecoverySaveHome(const char *recoveredHome)
             configSetMove((char *)mcHome);
         else
             configSetMove(NULL); // no concrete MC is reachable: keep the normal fail-visible wildcard home
+    } else if (sameConcreteMcSlot(gBootDir, recoveredHome)) {
+        // A concrete MC boot that recovered its existing settings from the same card keeps that
+        // exact directory as its save owner. In particular, a launcher that supplies only "mc1:"
+        // as the boot CWD must not move a successfully read mc1:/OPL configuration to the card
+        // root (or to mc0 when both cards are inserted).
+        configSetMove((char *)recoveredHome);
     } else if (gBootDir[0] != '\0') {
         configSetMove(gBootDir);
     } else {
@@ -1982,10 +2210,10 @@ static int tryAlternateDevice(int types)
     }
 
     // APA/PFS boot identity is authoritative. After an explicit redirect misses, ONLY the
-    // existing HDD ownership chain is eligible: conf_hdd.cfg's existing target, otherwise
-    // __common/OPL. Never import an unrelated MC/USB master config into an FHDB/APA session; that
-    // can resurrect stale Custom Settings Path state and makes the next save destination depend on
-    // whichever removable device happened to be inserted.
+    // deterministic existing-PFS ownership chain is eligible: __common/OPL/conf_hdd.cfg's valid
+    // existing target, otherwise __common/OPL. Never import an unrelated MC/USB master config into
+    // an FHDB/APA session; that can resurrect stale Custom Settings Path state and makes the next
+    // save destination depend on whichever removable device happened to be inserted.
     if (gBootHomeApa) {
         value = checkLoadConfigHDD(types);
         if (value & CONFIG_OPL)
@@ -2001,7 +2229,22 @@ static int tryAlternateDevice(int types)
         return 0;
     }
 
-    // Non-APA missing/stale redirect recovery retains the existing read-only MC/USB behavior.
+    // A missing file on a known local boot is an ordinary first-run state, not a signal to scan all
+    // supported storage. Limit migration reads to the boot device's own conventional legacy homes:
+    // same MC slot, the resolved BDM device, or the corresponding MMCE card. This is deliberately
+    // before the broad legacy hunt below, whose USB module wait and MMCE probing are unacceptable
+    // on a known device that simply has no config yet.
+    if (bootHomeIsConcreteMc() || bootHomeIsKnownBdm() || bootHomeIsKnownMmce()) {
+        value = tryKnownBootConfigRecovery(types);
+        if (value & CONFIG_OPL)
+            return value;
+
+        showCfgPopup = 0;
+        return 0;
+    }
+
+    // Bare, deferred-network, and otherwise unclassified boots retain the bounded read-only
+    // recovery chain. These have no verified local settings owner to prefer.
     value = tryMissingConfigPathRecovery(types);
     if (value & CONFIG_OPL)
         return value;
@@ -2049,7 +2292,13 @@ static int tryAlternateDevice(int types)
             // already serving this config -- sysCheckMC() gated the whole branch.
             if (gBootHomeDeferred)
                 homeLeftOnCard = 1;
-            else
+            else if (sameConcreteMcSlot(gBootDir, concreteMcHome)) {
+                configSetMove(concreteMcHome); // MC legacy config remains at the exact discovered home
+                // configSetMove already made the exact MC1/MC0 home the notification/save owner.
+                // Do not overwrite that with a compact/root boot CWD below: failure reporting must
+                // name the same directory that configWriteMulti will actually use.
+                homeLeftOnCard = 1;
+            } else
                 configSetMove(gBootDir); // home (and notifications) back on the boot dir: saves self-migrate
 
             if (value & CONFIG_OPL)
@@ -2125,19 +2374,13 @@ static void configReadNeutrinoGlobals(config_set_t *configOPL)
     }
 }
 
-// Basename of the ELF OPL was booted as (argv[0]); pairs with gBootDir. resolveBootDirToMass uses
-// it to verify WHICH mounted massN: slot is the boot device (launcher slot numbering need not
-// match OPL's). Empty when the boot dir came from getcwd() or argv[0] had no filename part.
-static char gBootElfName[64];
-// BDM_TYPE_* of the resolved boot device, BDM_TYPE_UNKNOWN for non-BDM boots. Set by
-// resolveBootDirToMass(); consumed by the _saveConfig re-resolve retry.
-static int gBootDirBdmType = BDM_TYPE_UNKNOWN;
-
-
 static void resolveBootDirToMass(void)
 {
     gBootHomeApa = 0;
     gBootHddCommonFallback = 0;
+    gBootHomeBdm = 0;
+    gBootDirBdmType = BDM_TYPE_UNKNOWN;
+    gBootHomeDeferred = 0;
     if (gBootDir[0] == '\0')
         return;
 
@@ -2265,8 +2508,8 @@ static void resolveBootDirToMass(void)
 
     char before[sizeof(gBootDir)];
     snprintf(before, sizeof(before), "%s", gBootDir);
-    gBootDirBdmType = BDM_TYPE_UNKNOWN; // classify fresh from the prefix
-    int ret = bdmResolveBootDir(gBootDir, sizeof(gBootDir), gBootElfName, &gBootDirBdmType);
+    int ret = bdmResolveBootDirBootstrap(gBootDir, sizeof(gBootDir), gBootElfName, &gBootDirBdmType);
+    gBootHomeBdm = ret != 0 && (gBootDirBdmType != BDM_TYPE_UNKNOWN || bootPathIsConcreteMass(before));
     if (ret < 0) {
         // The boot device's BDM stack did not mount within the resolve budget. It served this ELF, so it
         // IS present -- do NOT blank gBootDir and re-home the config to a plain mc here (the old
@@ -2278,7 +2521,7 @@ static void resolveBootDirToMass(void)
         // defaults if the stack is still coming up, and a save targets the boot device -- failing visibly
         // if it is genuinely gone -- never a plain mc. bdmResolveBootDir leaves gBootDir UNCHANGED on a
         // failed resolve (it only rewrites on success), so the identity here is intact.
-        LOG("BOOT boot device %s not mounted after resolve -> keep as config home (mc untouched)\n", before);
+        LOG("BOOT boot device %s not mounted during bounded bootstrap resolve -> keep as config home (mc untouched)\n", before);
         return;
     }
     if (ret > 0 && strcmp(before, gBootDir) != 0) {
@@ -2763,6 +3006,98 @@ static int configWriteChecked(int types)
     return result;
 }
 
+static const char *configFileName(const config_set_t *config)
+{
+    const char *name;
+
+    if (config == NULL || config->filename == NULL)
+        return NULL;
+
+    name = strrchr(config->filename, '/');
+    if (name != NULL)
+        return name + 1;
+    name = strrchr(config->filename, ':');
+    return name != NULL ? name + 1 : config->filename;
+}
+
+// The source picker does not remount live pfs0:. When the next boot's APA home differs from
+// the live one, persist each changed global set through pfs1: first, then let the selector commit.
+// This keeps a failed settings write from stranding the next boot on a home that never received it.
+static int saveSelectedHddOplHome(int types)
+{
+    char prefix[64];
+    char path[256];
+    int selection = hddGetOplHomeSelection();
+    int result = 1;
+
+    snprintf(gLastSaveTarget, sizeof(gLastSaveTarget), "%s",
+             selection == HDD_OPL_HOME_PLUS ? "hdd0:+OPL" : "hdd0:__common/OPL");
+    if (!hddMountSelectedOplHome(prefix, sizeof(prefix))) {
+        gLastSaveErrno = EIO;
+        return 0;
+    }
+
+    for (int bit = 1; bit < (1 << CONFIG_INDEX_COUNT); bit <<= 1) {
+        config_set_t *source;
+        config_set_t *target;
+        const char *name;
+        int n;
+
+        if (!(types & bit))
+            continue;
+
+        source = configGetByType(bit);
+        // configWrite() only materializes a set that actually changed. Preserve that normal
+        // contract so a selector-only save neither creates optional empty files nor overwrites an
+        // existing target-side config that the user did not edit this session.
+        if (source == NULL || !source->modified)
+            continue;
+
+        name = configFileName(source);
+        n = name == NULL ? -1 : snprintf(path, sizeof(path), "%s%s", prefix, name);
+        if (n < 0 || n >= (int)sizeof(path)) {
+            gLastSaveErrno = EIO;
+            result = 0;
+            break;
+        }
+
+        // Keep the live sets pointing at their pfs0: home. The target is an isolated copy that
+        // carries the live format and values, so pfs1: can be unmounted before selector commit.
+        target = configAlloc(source->type, NULL, path);
+        if (target == NULL) {
+            gLastSaveErrno = EIO;
+            result = 0;
+            break;
+        }
+        target->format = source->format;
+        configMerge(target, source);
+        target->modified = 1;
+
+        if (!configWrite(target) || target->modified) {
+            if (gLastSaveErrno == 0)
+                gLastSaveErrno = EIO;
+            result = 0;
+            configFree(target);
+            break;
+        }
+        configFree(target);
+        source->modified = 0;
+    }
+
+    hddUnmountSelectedOplHome();
+    return result;
+}
+
+static int commitSelectedHddOplHome(void)
+{
+    if (hddCommitOplHomeSelection())
+        return 1;
+
+    snprintf(gLastSaveTarget, sizeof(gLastSaveTarget), "%s", "hdd0:__common/OPL/conf_hdd.cfg");
+    gLastSaveErrno = EIO;
+    return 0;
+}
+
 static void _saveConfig()
 {
     char temp[256];
@@ -2891,6 +3226,22 @@ static void _saveConfig()
         configSetStr(configNet, CONFIG_NET_SMB_PASSW, gPCPassword);
     }
 
+    // A current APA session keeps pfs0: mounted on its original data home until restart. When the
+    // selected next-boot home differs, write only the changed sets through pfs1: and commit the
+    // selector only after that write succeeds. The normal automatic +OPL case still uses pfs0:.
+    if (gBootHomeApa && gCustomSettingsPath[0] == '\0' && hddOplHomeSelectionNeedsTargetSave()) {
+        if (!saveSelectedHddOplHome(lscstatus) ||
+            (hddOplHomeSelectionPending() && !commitSelectedHddOplHome())) {
+            lscret = 0;
+            lscstatus = 0;
+            return;
+        }
+        gLastSaveWasStagedOplHome = 1;
+        lscret = 1;
+        lscstatus = 0;
+        return;
+    }
+
     // APA launch identity is raw partition space, never a writable config filesystem. Even when
     // discovery loaded defaults or recovered settings elsewhere, an ordinary APA save without an
     // explicit Custom Settings Path must resolve the existing-PFS ownership chain NOW. This keeps
@@ -2989,22 +3340,24 @@ static void _saveConfig()
             gLastSaveErrno = EIO;
             lscret = 0;
         }
+        if (lscret > 0 && hddOplHomeSelectionPending() && !commitSelectedHddOplHome())
+            lscret = 0;
         lscstatus = 0;
         return;
     }
 
-    // Boot-device save retry: BDM slot numbering can change between the boot-time resolve and this
-    // save (a hotplug add/remove renumbers massN:). Re-resolve against the SAME boot device once --
-    // pinned to its known BDM type -- and retry. Never a different device: if the boot device is
-    // truly gone the save fails visibly. (This is gBootDirBdmType's second consumer, the one the
-    // comment in bdmsupport.c has been promising.)
-    if (lscret <= 0 && gBootDir[0] != '\0' && gBootDirBdmType != BDM_TYPE_UNKNOWN) {
+    // Boot-device save retry: ask the same concrete BDM identity to register once more, then retry
+    // the write. A literal massN: remains that exact slot and is never replaced by another device;
+    // a typed launch alias may still rewrite to its verified mount. If the boot device is gone the
+    // save fails visibly instead of scattering settings elsewhere.
+    if (lscret <= 0 && gBootDir[0] != '\0' && gBootHomeBdm) {
         char before[sizeof(gBootDir)];
         snprintf(before, sizeof(before), "%s", gBootDir);
-        if (bdmResolveBootDir(gBootDir, sizeof(gBootDir), gBootElfName, &gBootDirBdmType) > 0 &&
-            strcmp(before, gBootDir) != 0) {
-            LOG("BOOT re-resolved boot dir for save: %s -> %s\n", before, gBootDir);
-            configSetMove(gBootDir); // keep the pending values; re-point the files to the new slot
+        if (bdmResolveBootDir(gBootDir, sizeof(gBootDir), gBootElfName, &gBootDirBdmType) > 0) {
+            if (strcmp(before, gBootDir) != 0) {
+                LOG("BOOT re-resolved boot dir for save: %s -> %s\n", before, gBootDir);
+                configSetMove(gBootDir); // keep the pending values; re-point the files to the verified mount
+            }
             lscret = configWriteChecked(lscstatus);
         }
     }
@@ -3022,6 +3375,8 @@ static void _saveConfig()
         if (lscret > 0)
             writeConfigPathRedirect(configGetDir());
     }
+    if (lscret > 0 && hddOplHomeSelectionPending() && !commitSelectedHddOplHome())
+        lscret = 0;
     lscstatus = 0;
 }
 
@@ -3130,6 +3485,7 @@ int saveConfig(int types, int showUI)
     // usually the 0 that produced the nonsensical "(error 0)".
     gLastSaveErrno = 0;
     gLastSaveTarget[0] = '\0';
+    gLastSaveWasStagedOplHome = 0;
     gHddSettingsFallbackNotice = 0;
 
     guiHandleDeferedIO(&lscstatus, _l(_STR_SAVING_SETTINGS), IO_CUSTOM_SIMPLEACTION, &_saveConfig, OPL_DEFERRED_IO_TIMEOUT_MS);
@@ -3137,19 +3493,20 @@ int saveConfig(int types, int showUI)
     if (showUI) {
         if (lscret) {
             char *path = configGetDir();
-            const char *displayHome = path;
-            int savedOnHddHome = path != NULL && !strncmp(path, "pfs", 3) && gOPLPart[0] != '\0';
+            const char *displayHome = gLastSaveWasStagedOplHome ? gLastSaveTarget : path;
+            int savedOnHddHome = gLastSaveWasStagedOplHome ||
+                                 (path != NULL && !strncmp(path, "pfs", 3) && gOPLPart[0] != '\0');
 
             // pfs0: is only the transient mount name. For every successful HDD save, show the
             // physical APA/PFS owner the user can actually find in a partition browser.
-            if (savedOnHddHome) {
+            if (savedOnHddHome && !gLastSaveWasStagedOplHome) {
                 if (!strcmp(gOPLPart, "hdd0:__common"))
                     displayHome = "hdd0:__common/OPL";
                 else
                     displayHome = gOPLPart;
             }
 
-            if (gHddSettingsFallbackNotice || (gBootHddCommonFallback && savedOnHddHome))
+            if (gHddSettingsFallbackNotice || (!gLastSaveWasStagedOplHome && gBootHddCommonFallback && savedOnHddHome))
                 snprintf(notification, sizeof(notification), _l(_STR_SETTINGS_HDD_FALLBACK), displayHome);
             else
                 snprintf(notification, sizeof(notification), _l(_STR_SETTINGS_SAVED), displayHome);
@@ -4187,6 +4544,7 @@ void miniDeinit(config_set_t *configSet)
 static void autoLaunchHDDGame(char *argv[])
 {
     char path[256];
+    char launchPart[sizeof(gOPLPart)];
     config_set_t *configSet;
 
     miniInit(HDD_MODE);
@@ -4203,7 +4561,12 @@ static void autoLaunchHDDGame(char *argv[])
     // varargs list. Same below for argv[2] in the BDM twin.
     snprintf(gAutoLaunchGame->startup, sizeof(gAutoLaunchGame->startup), "%s", argv[1]);
     gAutoLaunchGame->start_sector = strtoul(argv[2], NULL, 0);
-    snprintf(gOPLPart, sizeof(gOPLPart), "hdd0:%s", argv[3]);
+    snprintf(launchPart, sizeof(launchPart), "hdd0:%s", argv[3]);
+    // argv[3] is a compatibility hint from the launching OPL instance. Re-read the authoritative
+    // __common/OPL/conf_hdd.cfg policy in miniInit() rather than letting a stale launcher hint
+    // overwrite the mounted data home used for CFG/VMC sidecars in this process.
+    if (gOPLPart[0] != '\0' && strcmp(gOPLPart, launchPart) != 0)
+        LOG("HDD mini launch: ignoring stale partition hint %s; policy selected %s\n", launchPart, gOPLPart);
 
     if (gHDDPrefix != NULL && gHDDPrefix[0] != '\0') {
         snprintf(path, sizeof(path), "%sCFG/%s.cfg", gHDDPrefix, gAutoLaunchGame->startup);
@@ -4362,6 +4725,23 @@ static void autoLaunchBDMGame(char *argv[])
 }
 
 // --------------------- Main --------------------
+// Memory-card roots require an explicit slash for file creation (mc1:/FILE, not mc1:FILE).
+// Some launchers provide an equivalent compact path such as mc1:APPS/OPL.ELF or leave getcwd()
+// at mc1:. Normalize the generic device representation once, without any launcher-specific branch.
+static void normalizeMcBootDir(void)
+{
+    if (strncmp(gBootDir, "mc", 2) || (gBootDir[2] != '0' && gBootDir[2] != '1') ||
+        gBootDir[3] != ':' || gBootDir[4] == '/')
+        return;
+
+    size_t len = strlen(gBootDir);
+    if (len + 1 >= sizeof(gBootDir))
+        return;
+
+    memmove(&gBootDir[5], &gBootDir[4], len - 3);
+    gBootDir[4] = '/';
+}
+
 static void setBootDir(const char *bootPath)
 {
     gBootDir[0] = '\0';
@@ -4426,12 +4806,13 @@ int main(int argc, char *argv[])
             snprintf(gBootDir, sizeof(gBootDir), "%s", cwd);
         }
     }
+    normalizeMcBootDir();
 
     if (argc >= 5) {
         /* argv[0] boot path
            argv[1] game->startup
            argv[2] str to u32 game->start_sector
-           argv[3] opl partition read from hdd0:__common/OPL/conf_hdd.cfg
+           argv[3] legacy OPL data-partition hint (revalidated from hdd0:__common/OPL/conf_hdd.cfg)
            argv[4] "mini" */
         if (!strcmp(argv[4], "mini"))
             autoLaunchHDDGame(argv);
