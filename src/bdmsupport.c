@@ -894,8 +894,17 @@ static void bdmRenameGame(item_list_t *itemList, int id, char *newName)
 {
     bdm_device_data_t *pDeviceData = (bdm_device_data_t *)itemList->priv;
 
-    if (vcdListViewActive(itemList))
-        return; // #120: no rename in VCD view
+    if (vcdListViewActive(itemList)) {
+        base_game_info_t *game = bdmActiveGame(itemList, id);
+        char vcdPrefix[BDM_DEVICE_ROOT_MAX + 2];
+
+        if (game == &bdmEmptyGame)
+            return; // stale id in the toggle window
+        bdmBuildVcdPrefix(vcdPrefix, sizeof(vcdPrefix), itemList->mode);
+        if (vcdRenameFile(vcdPrefix, game->name, newName) == 0)
+            pDeviceData->ForceRefresh = 1; // the queued menu update re-scans POPS/
+        return;
+    }
     if (bdmActiveGame(itemList, id) == &bdmEmptyGame)
         return;                                   // stale id in the toggle window (see bdmDeleteGame) -> avoid sbRename OOB
     sbSetBrowseSub(folderGetSub(itemList->mode)); // rename inside the current subfolder, not the root

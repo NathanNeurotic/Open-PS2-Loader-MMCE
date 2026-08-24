@@ -682,8 +682,21 @@ static void mmceDeleteGame(item_list_t *itemList, int id)
 
 static void mmceRenameGame(item_list_t *itemList, int id, char *newName)
 {
-    if (vcdViewActive(itemList->mode))
-        return; // #120: no rename in VCD view
+    if (vcdViewActive(itemList->mode)) {
+        base_game_info_t *game = mmceActiveGame(itemList, id);
+
+        if (game == &mmceEmptyGame)
+            return; // stale id in the VCD->ISO toggle window
+        if (vcdRenameFile(mmcePrefix, game->name, newName) == 0) {
+            // MMCE normally latches a successful VCD scan under NOUPDATE. Re-arm its normal scan
+            // path so the deferred menu update publishes the new filename immediately.
+            mmceVcdScanned = 0;
+            mmceVcdScanFailed = 0;
+            mmceVcdScanRetries = 0;
+            mmceGameList.updateDelay = MMCE_MODE_UPDATE_DELAY;
+        }
+        return;
+    }
     if (mmceActiveGame(itemList, id) == &mmceEmptyGame)
         return;                                   // stale id in the VCD->ISO toggle window (see mmceDeleteGame) -> avoid sbRename OOB
     sbSetBrowseSub(folderGetSub(itemList->mode)); // rename inside the current subfolder, not the root

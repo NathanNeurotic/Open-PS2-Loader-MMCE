@@ -96,12 +96,22 @@ const char *vcdDisplayName(int mode, const char *text);
 void vcdToggleView(int mode);
 // Returns 1 exactly once after a toggle (and clears the flag) -- call from the support's NeedsUpdate.
 int vcdConsumeDirty(int mode);
+// Mark one VCD-capable mode dirty after its VCD storage changes. Runtime callers still enqueue that
+// support's normal deferred update; this only makes the existing NeedsUpdate path rescan it.
+void vcdMarkDirty(int mode);
 // Mark all VCD-capable modes dirty (one rescan each) -- used when the global default-view setting changes.
 void vcdMarkAllDirty(void);
 
 // Fill a base_game_info_t list (memalign'd like sbReadList; frees *outGames first) from
 // <devPrefix>POPS/*.VCD. Returns the count. name/startup = VCD basename without the extension.
 int vcdFillGameList(const char *devPrefix, base_game_info_t **outGames);
+// Rename one VCD in a device's POPS/ directory. The old entry is matched with the exact filename
+// spelling returned by the scan, so case-sensitive PFS/SMB filesystems retain their extension case.
+// Returns 0 on success; no list ownership is changed here.
+int vcdRenameFile(const char *devPrefix, const char *oldName, const char *newName);
+// As vcdRenameFile, but `dirPath` is already the directory containing the VCD (APA/PFS pooled
+// partitions use their mounted root, rather than a POPS/ child).
+int vcdRenameFileInDir(const char *dirPath, const char *oldName, const char *newName);
 // #118: 1 if a .VCD filename is disc 2+ of a multi-disc PS1 set ("(Disc N)"/"(CD N)"/"(Disk N)", N>=2,
 // case-insensitive). Callers hide it from the device lists when gVcdFirstDiscOnly is on.
 int vcdIsHiddenDisc(const char *name);

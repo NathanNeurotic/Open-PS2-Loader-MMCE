@@ -898,10 +898,75 @@ static void hddDeleteGame(item_list_t *itemList, int id)
     hddForceUpdate = 1;
 }
 
+// A PP.<DISC-ID>.POPS.<title> VCD is the APA/PFS partition itself, not a loose .VCD file. Preserve
+// the strict POPSTARTER prefix and replace only its title component; the next VCD scan then resolves
+// the new literal partition label for the handoff selector.
+static int hddRenamePopsPartition(const char *part, const char *newName)
+{
+    char oldPath[APA_IDMAX + 6];
+    char newPart[APA_IDMAX + 1];
+    char newPath[APA_IDMAX + 6];
+    int titleOfs;
+    int n;
+
+    if (part == NULL || newName == NULL || newName[0] == '\0' || strpbrk(newName, ":/\\") != NULL)
+        return -1;
+    titleOfs = vcdPopsPartitionTitleOffset(part);
+    if (titleOfs <= 0)
+        return -1;
+
+    n = snprintf(newPart, sizeof(newPart), "%.*s%s", titleOfs, part, newName);
+    if (n < 0 || n > APA_IDMAX)
+        return -1; // an APA label cannot grow past its on-disk field
+    snprintf(oldPath, sizeof(oldPath), "hdd0:%s", part);
+    snprintf(newPath, sizeof(newPath), "hdd0:%s", newPart);
+    return fileXioRename(oldPath, newPath);
+}
+
+static void hddRenameVcd(int id, const char *newName)
+{
+    char oldName[VCD_NAME_MAX];
+    char part[APA_IDMAX + 1];
+    int renamed = 0;
+
+    // The list builder owns pfs1: and the backing arrays on the IO worker. Block it before copying
+    // the selected storage identity and before temporarily mounting a pooled POPS partition RW.
+    ioBlockOps(1);
+    if (hddVcdGames != NULL && hddVcdParts != NULL && id >= 0 && id < hddVcdGameCount) {
+        snprintf(oldName, sizeof(oldName), "%s", hddVcdGames[id].name);
+        snprintf(part, sizeof(part), "%s", hddVcdParts[id]);
+
+        if (vcdPopsPartitionTitleOffset(part) > 0) {
+            // One-game PP.* POPS installs boot from their partition label, so a file rename would
+            // change nothing. Rename the APA record while retaining its required prefix instead.
+            renamed = (hddRenamePopsPartition(part, newName) == 0);
+        } else {
+            char mountSrc[APA_IDMAX + 6];
+
+            snprintf(mountSrc, sizeof(mountSrc), "hdd0:%s", part);
+            fileXioUmount("pfs1:");
+            if (fileXioMount("pfs1:", mountSrc, FIO_MT_RDWR) == 0) {
+                renamed = (vcdRenameFileInDir("pfs1:/", oldName, newName) == 0);
+                fileXioUmount("pfs1:");
+            }
+        }
+    }
+    ioBlockOps(0);
+
+    if (renamed) {
+        // vcdRenameFileInDir already clears this for a loose file; doing it again keeps the
+        // partition-label path identical and is harmless.
+        vcdInvalidateGameIds();
+        hddVcdInvalidateCache();
+    }
+}
+
 static void hddRenameGame(item_list_t *itemList, int id, char *newName)
 {
-    if (vcdListViewActive(itemList))
-        return; // a VCD is not an HDL partition -- no rename in VCD view
+    if (vcdListViewActive(itemList)) {
+        hddRenameVcd(id, newName);
+        return;
+    }
     hdl_game_info_t *game = hddActiveHdl(id);
     if (game == &hddEmptyHdl)
         return; // stale id in the VCD->ISO toggle window -> don't rename a wrong/OOB HDL partition

@@ -607,6 +607,18 @@ void menuInitAppMenu(void)
     appMenuCurrent = appMenu;
 }
 
+void menuInitVcdMenu(void)
+{
+    if (appMenu)
+        submenuDestroy(&appMenu);
+
+    // VCDs launch through POPSTARTER, not OPL's PS2 loader/core. Keep their Triangle menu on this
+    // item-operation path so merely opening it cannot create or read a per-game CFG.
+    submenuAppendItem(&appMenu, -1, NULL, 0, _STR_RENAME);
+
+    appMenuCurrent = appMenu;
+}
+
 // -------------------------------------------------------------------------------------------
 // ---------------------------------------- Menu manipulation --------------------------------
 // -------------------------------------------------------------------------------------------

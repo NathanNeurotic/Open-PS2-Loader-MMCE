@@ -756,6 +756,17 @@ static void ethDeleteGame(item_list_t *itemList, int id)
 
 static void ethRenameGame(item_list_t *itemList, int id, char *newName)
 {
+    if (vcdListViewActive(itemList)) {
+        base_game_info_t *game = ethGameForView(itemList, id);
+
+        if (game != NULL && vcdRenameFile(ethPrefix, game->name, newName) == 0) {
+            ethInvalidateFavIsoBacking();
+            // ETH otherwise treats its VCD list as toggle-only; consume this on the already queued
+            // deferred update so the renamed POPS/ directory is scanned again.
+            vcdMarkDirty(itemList->mode);
+        }
+        return;
+    }
     ethInvalidateFavIsoBacking();
     sbRename(&ethGames, ethPrefix, "\\", ethGameCount, id, newName);
     ethULSizePrev = -2;

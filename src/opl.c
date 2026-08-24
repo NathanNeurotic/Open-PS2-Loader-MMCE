@@ -557,6 +557,17 @@ static void itemExecTriangle(struct menu_item *curMenu)
     item_list_t *support = curMenu->userdata;
 
     if (support) {
+        // A VCD is a POPSTARTER title, not a PS2-loader title. Route before the generic per-game
+        // settings branch: that branch loads/creates CFG state and exposes controls that can never
+        // affect a POPSTARTER handoff. vcdListViewActive also covers a forced-VCD Favourites proxy.
+        if (vcdListViewActive(support)) {
+            if (menuCheckParentalLock() == 0) {
+                menuInitVcdMenu();
+                guiSwitchScreen(GUI_SCREEN_APP_MENU);
+            }
+            return;
+        }
+
         unsigned char flags = (support->mode == FAV_MODE) ? favGetFlags(support) : support->flags;
 
         if (!(flags & MODE_FLAG_NO_COMPAT)) {

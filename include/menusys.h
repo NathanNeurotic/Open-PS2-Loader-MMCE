@@ -107,6 +107,9 @@ int menuHasRegisteredItems(void);
 void menuReinitMainMenu(void);
 void menuInitGameMenu(void);
 void menuInitAppMenu(void);
+// Reuses the lightweight item-operation menu, but exposes Rename only. VCD/POPSTARTER entries
+// must never enter the PS2 per-game configuration menu.
+void menuInitVcdMenu(void);
 
 void menuAppendItem(menu_item_t *item);
 

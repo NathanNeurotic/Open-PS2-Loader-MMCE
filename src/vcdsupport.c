@@ -678,6 +678,102 @@ static char vcdSep(const char *devPrefix)
     return (n > 0 && devPrefix[n - 1] == '\\') ? '\\' : '/';
 }
 
+// Choose the separator already used by a directory path. Unlike vcdSep(), this also handles an
+// SMB path whose final component is "POPS" rather than a trailing backslash.
+static char vcdDirSep(const char *dirPath)
+{
+    const char *slash = (dirPath != NULL) ? strrchr(dirPath, '/') : NULL;
+    const char *backslash = (dirPath != NULL) ? strrchr(dirPath, '\\') : NULL;
+
+    return (backslash != NULL && (slash == NULL || backslash > slash)) ? '\\' : '/';
+}
+
+static int vcdJoinDirFile(char *out, int outSize, const char *dirPath, const char *fileName)
+{
+    int n;
+    int dirLen;
+    char sep[2] = {0, 0};
+
+    if (out == NULL || outSize <= 0 || dirPath == NULL || fileName == NULL)
+        return -1;
+
+    dirLen = strlen(dirPath);
+    if (dirLen == 0)
+        return -1;
+    if (dirPath[dirLen - 1] != '/' && dirPath[dirLen - 1] != '\\')
+        sep[0] = vcdDirSep(dirPath);
+
+    n = snprintf(out, outSize, "%s%s%s", dirPath, sep, fileName);
+    return (n >= 0 && n < outSize) ? 0 : -1;
+}
+
+// Keep a VCD rename inside the POPSTARTER addressable name space. The scanner cannot represent a
+// longer basename and deliberately omits POPSTARTER itself, so accepting either here would make a
+// successful-looking rename vanish from the list or cease to launch.
+static int vcdValidRenameName(const char *name)
+{
+    size_t len;
+
+    if (name == NULL || name[0] == '\0' || strpbrk(name, ":/\\") != NULL)
+        return 0;
+    len = strlen(name);
+    return len <= ISO_GAME_NAME_MAX && strcasecmp(name, "POPSTARTER") != 0;
+}
+
+int vcdRenameFileInDir(const char *dirPath, const char *oldName, const char *newName)
+{
+    DIR *dir;
+    struct dirent *de;
+    char oldFile[VCD_NAME_MAX + 4];
+    char newFile[VCD_NAME_MAX + 4];
+    char oldPath[512];
+    char newPath[512];
+    size_t oldLen;
+
+    if (dirPath == NULL || oldName == NULL || !vcdValidRenameName(oldName) || !vcdValidRenameName(newName))
+        return -1;
+
+    oldLen = strlen(oldName);
+    dir = opendir(dirPath);
+    if (dir == NULL)
+        return -1;
+
+    oldFile[0] = '\0';
+    while ((de = readdir(dir)) != NULL) {
+        size_t len = strlen(de->d_name);
+        if (len == oldLen + 4 && !strncmp(de->d_name, oldName, oldLen) && !strcasecmp(de->d_name + oldLen, ".VCD")) {
+            snprintf(oldFile, sizeof(oldFile), "%s", de->d_name);
+            break;
+        }
+    }
+    closedir(dir);
+
+    if (oldFile[0] == '\0')
+        return -1;
+    if (snprintf(newFile, sizeof(newFile), "%s%s", newName, oldFile + oldLen) >= (int)sizeof(newFile))
+        return -1;
+    if (vcdJoinDirFile(oldPath, sizeof(oldPath), dirPath, oldFile) < 0 ||
+        vcdJoinDirFile(newPath, sizeof(newPath), dirPath, newFile) < 0)
+        return -1;
+
+    if (rename(oldPath, newPath) != 0) {
+        LOG("VCD rename failed: %s -> %s (%d)\n", oldPath, newPath, errno);
+        return -1;
+    }
+
+    vcdInvalidateGameIds();
+    return 0;
+}
+
+int vcdRenameFile(const char *devPrefix, const char *oldName, const char *newName)
+{
+    char dirPath[256];
+
+    if (devPrefix == NULL || snprintf(dirPath, sizeof(dirPath), "%s%s", devPrefix, POPS_FOLDER) >= (int)sizeof(dirPath))
+        return -1;
+    return vcdRenameFileInDir(dirPath, oldName, newName);
+}
+
 // VCD (PS1) cover FALLBACK. OPL's own art (<dev>ART/<name>_COV.png) is the PRIMARY -- each device's
 // getImage tries it first; this only runs on a genuine miss. It loads the POPSLoader-style cover named
 // exactly like the .VCD (suffixless "<name>.png"), sitting NEXT TO the game in the same POPS/ folder the
@@ -924,13 +1020,18 @@ int vcdConsumeDirty(int mode)
     return 1;
 }
 
+void vcdMarkDirty(int mode)
+{
+    if (mode >= 0 && mode < MODE_COUNT && vcdModeSupported(mode))
+        vcdDirty[mode] = 1;
+}
+
 // Mark every VCD-capable mode for one rescan -- call after the global default-view setting changes so
 // each device page rebuilds its list (ISO <-> VCD) on its next refresh.
 void vcdMarkAllDirty(void)
 {
     for (int m = 0; m < MODE_COUNT; m++)
-        if (vcdModeSupported(m))
-            vcdDirty[m] = 1;
+        vcdMarkDirty(m);
 }
 
 // #118: a multi-disc PS1 game is a set of separate .VCD files whose titles carry a disc token, e.g.
