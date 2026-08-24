@@ -4,13 +4,17 @@ on:
   push:
     branches:
       - feature/add-ps2rd-cht-manager
+  pull_request:
+    branches:
+      - rebuild/main
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: write
 
 jobs:
   patch:
-    if: github.actor != 'github-actions[bot]'
+    if: github.actor != 'github-actions[bot]' && (github.event_name != 'pull_request' || github.head_ref == 'feature/add-ps2rd-cht-manager')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout feature branch
@@ -41,25 +45,23 @@ jobs:
           readme_insert = readme_anchor + "- **[PS2RD CHT Manager](https://github.com/TheRealNextria/PS2RD-CHT-Manager)** — Windows application for creating, editing and managing `.cht` cheat files for **Open PS2 Loader (OPL) / PS2RD**.\n"
           replace_once("README.md", readme_anchor, readme_insert)
 
-          notes_anchor = "OrbitOPL Toolbox is third-party and independently maintained — **please report Toolbox\nissues to its own repository, not here.**\n\n"
-          notes_insert = notes_anchor + "## Creating and managing PS2RD cheat files\n\nFor PS2RD `.cht` files, use **PS2RD CHT Manager** — open\n**PS2RD-CHT-Manager.url** from the package, or visit\nhttps://github.com/TheRealNextria/PS2RD-CHT-Manager. It is a Windows application for\ncreating, editing and managing `.cht` cheat files for **Open PS2 Loader (OPL) / PS2RD**.\n\nPS2RD CHT Manager is third-party and independently maintained — **please report its\nissues to its own repository, not here.**\n\n"
-          replace_once(".github/rolling-release-notes-block.md", notes_anchor, notes_insert)
+          normalize_anchor = "          printf '%s\\r\\n' '[InternetShortcut]' 'URL=https://github.com/shaanhomebrew-cloud/OPL-PS1-AIO-Converter-GUI' > package-work/OPL-PS1-AIO-Converter-GUI.url\n"
+          normalize_insert = normalize_anchor + "          printf '%s\\r\\n' '[InternetShortcut]' 'URL=https://github.com/TheRealNextria/PS2RD-CHT-Manager' > package-work/PS2RD-CHT-Manager.url\n"
+          replace_once(".github/workflows/release-normalize.yml", normalize_anchor, normalize_insert)
+          replace_once(
+              ".github/workflows/release-normalize.yml",
+              "          echo \"Rebuilt $(basename \"$MAIN_ZIP\") with all three external-tool shortcuts.\"\n",
+              "          echo \"Rebuilt $(basename \"$MAIN_ZIP\") with all four external-tool shortcuts.\"\n",
+          )
 
-          workflow_comment_anchor = "          #   OrbitOPL-Toolbox.url            -- link to the cross-platform PC library manager.\n"
-          workflow_comment_insert = workflow_comment_anchor + "          #   PS2RD-CHT-Manager.url           -- link to the Windows OPL / PS2RD .cht cheat-file manager.\n"
-          replace_once(".github/workflows/rolling-release.yml", workflow_comment_anchor, workflow_comment_insert)
-
-          orbit_copy_anchor = "          test -f pc/OrbitOPL-Toolbox.url\n          cp -f pc/OrbitOPL-Toolbox.url \"$PKG/OrbitOPL-Toolbox.url\"\n"
-          orbit_copy_insert = orbit_copy_anchor + "          # PS2RD CHT Manager: Windows companion utility for creating, editing and managing\n          # OPL / PS2RD .cht cheat files. Link the maintained upstream tool; do not vendor it.\n          test -f pc/PS2RD-CHT-Manager.url\n          cp -f pc/PS2RD-CHT-Manager.url \"$PKG/PS2RD-CHT-Manager.url\"\n"
-          replace_once(".github/workflows/rolling-release.yml", orbit_copy_anchor, orbit_copy_insert)
-
-          zip_anchor = "            zip -r -X \"../rolling/${ZIP}\" APP_RIPTOPL-PS2DEVROLLING POPSTARTER POPS PS2-Servers.url OrbitOPL-Toolbox.url >/dev/null\n"
-          zip_insert = "            zip -r -X \"../rolling/${ZIP}\" APP_RIPTOPL-PS2DEVROLLING POPSTARTER POPS PS2-Servers.url OrbitOPL-Toolbox.url PS2RD-CHT-Manager.url >/dev/null\n"
-          replace_once(".github/workflows/rolling-release.yml", zip_anchor, zip_insert)
-
-          release_anchor = "            printf -- '- OrbitOPL-Toolbox.url: opens OrbitOPL Toolbox, the cross-platform PC library manager\\n'\n"
-          release_insert = release_anchor + "            printf -- '- PS2RD-CHT-Manager.url: opens PS2RD CHT Manager for creating, editing and managing OPL / PS2RD .cht cheat files\\n'\n"
-          replace_once(".github/workflows/rolling-release.yml", release_anchor, release_insert)
+          resource_anchor = "- **OPL PS1 AIO Converter GUI** — Windows all-in-one PS1/POPStarter preparation tool for converting BIN/CUE backups to VCDs and installing them to USB, MX4SIO, MMCE, exFAT HDD, SMB and APA internal HDD: https://github.com/shaanhomebrew-cloud/OPL-PS1-AIO-Converter-GUI\\n"
+          resource_insert = resource_anchor + "- **PS2RD CHT Manager** — Windows application for creating, editing and managing `.cht` cheat files for **Open PS2 Loader (OPL) / PS2RD**: https://github.com/TheRealNextria/PS2RD-CHT-Manager\\n"
+          replace_once(".github/scripts/normalize_release_notes.py", resource_anchor, resource_insert)
+          replace_once(
+              ".github/scripts/normalize_release_notes.py",
+              "bundled Neutrino and the three external-tool shortcuts.",
+              "bundled Neutrino and the four external-tool shortcuts.",
+          )
 
       - name: Verify and commit final PR contents
         run: |
@@ -67,11 +69,15 @@ jobs:
           rm -f .github/workflows/apply-ps2rd-cht-manager-pr.yml
           test -f pc/PS2RD-CHT-Manager.url
           grep -Fq 'PS2RD CHT Manager' README.md
-          grep -Fq 'PS2RD-CHT-Manager.url' .github/rolling-release-notes-block.md
-          grep -Fq 'PS2RD-CHT-Manager.url' .github/workflows/rolling-release.yml
+          grep -Fq 'PS2RD-CHT-Manager.url' .github/workflows/release-normalize.yml
+          grep -Fq 'PS2RD CHT Manager' .github/scripts/normalize_release_notes.py
+          grep -Fq 'four external-tool shortcuts' .github/scripts/normalize_release_notes.py
+          grep -Fq 'all four external-tool shortcuts' .github/workflows/release-normalize.yml
+          python3 -m py_compile .github/scripts/normalize_release_notes.py
+          rm -rf .github/scripts/__pycache__
           git diff --check
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add README.md .github/rolling-release-notes-block.md .github/workflows/rolling-release.yml pc/PS2RD-CHT-Manager.url .github/workflows/apply-ps2rd-cht-manager-pr.yml
+          git add README.md .github/workflows/release-normalize.yml .github/scripts/normalize_release_notes.py pc/PS2RD-CHT-Manager.url .github/workflows/apply-ps2rd-cht-manager-pr.yml
           git commit -m 'docs: add PS2RD CHT Manager companion tool'
           git push origin HEAD:feature/add-ps2rd-cht-manager
