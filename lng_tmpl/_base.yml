@@ -1150,5 +1150,7 @@ gui_strings:
   string: Restart RiptOPL to apply the selected OPL partition.
 - label: HDD_OPL_PARTITION_CHECKING
   string: Checking HDD OPL partition...
+- label: HDD_OPL_PARTITION_BUSY
+  string: HDD is busy. Try again once loading finishes.
 - label: GENERAL_SYSTEM
   string: General & System

@@ -43,6 +43,9 @@ static unsigned char hddSupportErrToasted = 0;
 // A Settings selection is deliberately staged until Save Settings. It never changes the active
 // pfs0: mount: a live OPL data home can have artwork/config readers using it.
 static int hddOplHomePending = -1;
+// After the selector is committed, retain its next-boot value for later saves in this process.
+// The live pfs0: data home remains unchanged until the requested restart.
+static int hddOplHomeCommitted = -1;
 // +OPL can be the existing automatic home only when __common was unavailable during discovery.
 // Keep that distinct from an explicit conf_hdd.cfg redirect, which may fall back to __common.
 static unsigned char hddOplHomeAutoPlus = 0;
@@ -143,18 +146,32 @@ static int hddCheckHDProKit(void)
     return ret;
 }
 
-static void hddCheckOPLFolder(const char *mountPoint)
+static int hddCheckOPLFolder(const char *mountPoint)
 {
     DIR *dir;
     char path[32];
+    int n;
 
-    sprintf(path, "%sOPL", mountPoint);
+    n = snprintf(path, sizeof(path), "%sOPL", mountPoint);
+    if (n < 0 || n >= (int)sizeof(path))
+        return 0;
 
     dir = opendir(path);
-    if (dir == NULL)
-        mkdir(path, 0777);
-    else
+    if (dir != NULL) {
         closedir(dir);
+        return 1;
+    }
+
+    if (mkdir(path, 0777) == 0)
+        return 1;
+
+    // A competing normal-folder creation can win the race. Treat that existing folder as success,
+    // but never report a usable common-home target when the directory still cannot be opened.
+    dir = opendir(path);
+    if (dir == NULL)
+        return 0;
+    closedir(dir);
+    return 1;
 }
 
 static int hddPartitionMountable(const char *partition)
@@ -568,7 +585,7 @@ void hddLoadSupportModules(void)
     hddSupportErrToasted = 0;
     hddClearRecoveredErrors();
     if (!strcmp(gOPLPart, "hdd0:__common")) {
-        hddCheckOPLFolder(hddPrefix);
+        (void)hddCheckOPLFolder(hddPrefix);
         gHDDPrefix = "pfs0:OPL/";
     } else {
         gHDDPrefix = "pfs0:";
@@ -984,11 +1001,15 @@ int hddGetOplHomeSelection(void)
 {
     if (hddOplHomePending >= 0)
         return hddOplHomePending;
+    if (hddOplHomeCommitted >= 0)
+        return hddOplHomeCommitted;
     return strcmp(gOPLPart, "hdd0:+OPL") == 0 ? HDD_OPL_HOME_PLUS : HDD_OPL_HOME_COMMON;
 }
 
 int hddOplHomeIsLegacy(void)
 {
+    if (hddOplHomePending >= 0 || hddOplHomeCommitted >= 0)
+        return 0;
     return gOPLPart[0] != '\0' && strcmp(gOPLPart, "hdd0:__common") != 0 &&
            strcmp(gOPLPart, "hdd0:+OPL") != 0;
 }
@@ -1027,6 +1048,63 @@ int hddStageOplHomeSelection(int selection)
     return 1;
 }
 
+int hddOplHomeSelectionNeedsTargetSave(void)
+{
+    int selection = hddGetOplHomeSelection();
+
+    if (hddOplHomePending < 0 && hddOplHomeCommitted < 0)
+        return 0;
+
+    return selection == HDD_OPL_HOME_PLUS ? strcmp(gOPLPart, "hdd0:+OPL") != 0 : strcmp(gOPLPart, "hdd0:__common") != 0;
+}
+
+int hddMountSelectedOplHome(char *prefix, int prefixLen)
+{
+    const char *partition;
+    const char *selectedPrefix;
+    int selection;
+    int n;
+
+    if (prefix == NULL || prefixLen <= 0)
+        return 0;
+    prefix[0] = '\0';
+
+    selection = hddGetOplHomeSelection();
+    if (hddOplHomePending < 0 && hddOplHomeCommitted < 0)
+        return 0;
+    if (!hddModulesAreLoaded() || !hddLoadCoreSupportModules())
+        return 0;
+
+    partition = selection == HDD_OPL_HOME_PLUS ? "hdd0:+OPL" : "hdd0:__common";
+    fileXioUmount("pfs1:");
+    if (fileXioMount("pfs1:", partition, FIO_MT_RDWR) < 0)
+        return 0;
+
+    if (selection == HDD_OPL_HOME_COMMON) {
+        if (!hddCheckOPLFolder("pfs1:")) {
+            fileXioUmount("pfs1:");
+            return 0;
+        }
+        selectedPrefix = "pfs1:OPL/";
+    } else {
+        selectedPrefix = "pfs1:";
+    }
+
+    n = snprintf(prefix, prefixLen, "%s", selectedPrefix);
+    if (n < 0 || n >= prefixLen) {
+        fileXioUmount("pfs1:");
+        prefix[0] = '\0';
+        return 0;
+    }
+
+    return 1;
+}
+
+void hddUnmountSelectedOplHome(void)
+{
+    fileXioUmount("pfs1:");
+}
+
 int hddCommitOplHomeSelection(void)
 {
     config_set_t *config = NULL;
@@ -1047,6 +1125,7 @@ int hddCommitOplHomeSelection(void)
         return 0;
     if (hddOplHomePending == HDD_OPL_HOME_PLUS && hddOplHomeAutoPlus &&
         !strcmp(gOPLPart, "hdd0:+OPL") && gHDDPrefix != NULL) {
+        hddOplHomeCommitted = hddOplHomePending;
         hddOplHomePending = -1;
         return 1;
     }
@@ -1086,8 +1165,10 @@ int hddCommitOplHomeSelection(void)
     }
 
     fileXioUmount("pfs1:");
-    if (result)
+    if (result) {
+        hddOplHomeCommitted = hddOplHomePending;
         hddOplHomePending = -1;
+    }
     return result;
 }
 

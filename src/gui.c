@@ -119,6 +119,19 @@ static int guiSettingsStageOplHome(int selection);
 static const char **guiCopyNameList(const char **src);
 static void guiFreeNameList(const char **list);
 
+enum {
+    GUI_OPL_HOME_STAGE_NOT_FOUND = 0,
+    GUI_OPL_HOME_STAGE_OK = 1,
+    GUI_OPL_HOME_STAGE_UNAVAILABLE = -1,
+};
+
+static const char *guiOplHomeStageError(int selection, int result)
+{
+    if (result == GUI_OPL_HOME_STAGE_UNAVAILABLE)
+        return _l(_STR_HDD_OPL_PARTITION_BUSY);
+    return selection == HDD_OPL_HOME_PLUS ? _l(_STR_HDD_OPL_PLUS_NOT_FOUND) : _l(_STR_HDD_OPL_COMMON_NOT_FOUND);
+}
+
 #ifdef __DEBUG
 
 // debug version displays an FPS meter
@@ -769,15 +782,16 @@ reshow_device:
     if (ret) {
         int netProtocolWas = gNetworkProtocol;
         int hddOplHomeChoice;
+        int hddOplHomeStageResult;
 
         diaGetInt(diaDeviceConfig, CFG_HDDOPLPART, &hddOplHomeChoice);
         if (hddOplHomeChoice != guiDeviceOplHomeInitial ||
             (guiDeviceOplHomeLegacy && guiDeviceOplHomeTouched)) {
-            if (!guiSettingsStageOplHome(hddOplHomeChoice)) {
+            hddOplHomeStageResult = guiSettingsStageOplHome(hddOplHomeChoice);
+            if (hddOplHomeStageResult != GUI_OPL_HOME_STAGE_OK) {
                 diaSetInt(diaDeviceConfig, CFG_HDDOPLPART, guiDeviceOplHomeInitial);
                 guiDeviceOplHomeTouched = 0;
-                guiMsgBox(hddOplHomeChoice == HDD_OPL_HOME_PLUS ? _l(_STR_HDD_OPL_PLUS_NOT_FOUND) : _l(_STR_HDD_OPL_COMMON_NOT_FOUND),
-                          0, NULL);
+                guiMsgBox(guiOplHomeStageError(hddOplHomeChoice, hddOplHomeStageResult), 0, NULL);
                 goto reshow_device;
             }
             guiMsgBox(_l(_STR_HDD_OPL_PARTITION_RESTART), 0, NULL);
@@ -2711,7 +2725,7 @@ static int guiSettingsStageOplHome(int selection)
     // Do not overwrite the static request payload after a timed-out worker. The I/O queue is
     // single-threaded, so another request cannot begin until that worker actually returns.
     if (guiSourcesOplHomeStageInFlight)
-        return 0;
+        return GUI_OPL_HOME_STAGE_UNAVAILABLE;
 
     guiSourcesOplHomeStageChoice = selection;
     guiSourcesOplHomeStageResult = 0;
@@ -2725,7 +2739,7 @@ static int guiSettingsStageOplHome(int selection)
         // a later Save Settings persist a choice the user did not get to confirm.
         guiSourcesOplHomeStageAbandoned = 1;
         hddDiscardOplHomeSelection();
-        return 0;
+        return GUI_OPL_HOME_STAGE_UNAVAILABLE;
     }
     return guiSourcesOplHomeStageResult;
 }
@@ -2790,14 +2804,16 @@ reshow_sources:
     if (result != UIID_BTN_CANCEL && result != -1) {
         int netProtocolWas = gNetworkProtocol;
         int hddOplHomeChoice;
+        int hddOplHomeStageResult;
 
         diaGetInt(ui, CFG_HDDOPLPART, &hddOplHomeChoice);
         if (hddOplHomeChoice != guiSourcesOplHomeInitial ||
             (guiSourcesOplHomeLegacy && guiSourcesOplHomeTouched)) {
-            if (!guiSettingsStageOplHome(hddOplHomeChoice)) {
+            hddOplHomeStageResult = guiSettingsStageOplHome(hddOplHomeChoice);
+            if (hddOplHomeStageResult != GUI_OPL_HOME_STAGE_OK) {
                 diaSetInt(ui, CFG_HDDOPLPART, guiSourcesOplHomeInitial);
-                guiMsgBox(hddOplHomeChoice == HDD_OPL_HOME_PLUS ? _l(_STR_HDD_OPL_PLUS_NOT_FOUND) : _l(_STR_HDD_OPL_COMMON_NOT_FOUND),
-                          0, NULL);
+                guiSourcesOplHomeTouched = 0;
+                guiMsgBox(guiOplHomeStageError(hddOplHomeChoice, hddOplHomeStageResult), 0, NULL);
                 goto reshow_sources;
             }
             guiMsgBox(_l(_STR_HDD_OPL_PARTITION_RESTART), 0, NULL);

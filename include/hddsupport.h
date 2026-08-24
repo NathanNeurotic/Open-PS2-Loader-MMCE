@@ -123,6 +123,11 @@ enum {
 int hddGetOplHomeSelection(void);
 int hddOplHomeIsLegacy(void);
 int hddStageOplHomeSelection(int selection);
+// A successfully saved selector applies on the next boot, while pfs0: intentionally remains on
+// the current live data home. These helpers expose that next-home write target through pfs1:.
+int hddOplHomeSelectionNeedsTargetSave(void);
+int hddMountSelectedOplHome(char *prefix, int prefixLen);
+void hddUnmountSelectedOplHome(void);
 int hddCommitOplHomeSelection(void);
 void hddDiscardOplHomeSelection(void);
 int hddOplHomeSelectionPending(void);

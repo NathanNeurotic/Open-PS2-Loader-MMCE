@@ -1379,6 +1379,7 @@ void clearErrorMessageIf(int strId)
 static int lscstatus = CONFIG_ALL;
 static int lscret = 0;
 static char gLastSaveTarget[sizeof(gCustomSettingsPath)];
+static int gLastSaveWasStagedOplHome = 0;
 static int gHddSettingsFallbackNotice = 0;
 static int gBootHddCommonFallback = 0;
 
@@ -3005,22 +3006,103 @@ static int configWriteChecked(int types)
     return result;
 }
 
+static const char *configFileName(const config_set_t *config)
+{
+    const char *name;
+
+    if (config == NULL || config->filename == NULL)
+        return NULL;
+
+    name = strrchr(config->filename, '/');
+    if (name != NULL)
+        return name + 1;
+    name = strrchr(config->filename, ':');
+    return name != NULL ? name + 1 : config->filename;
+}
+
+// The source picker does not remount live pfs0:. When the next boot's APA home differs from
+// the live one, persist each changed global set through pfs1: first, then let the selector commit.
+// This keeps a failed settings write from stranding the next boot on a home that never received it.
+static int saveSelectedHddOplHome(int types)
+{
+    char prefix[64];
+    char path[256];
+    int selection = hddGetOplHomeSelection();
+    int result = 1;
+
+    snprintf(gLastSaveTarget, sizeof(gLastSaveTarget), "%s",
+             selection == HDD_OPL_HOME_PLUS ? "hdd0:+OPL" : "hdd0:__common/OPL");
+    if (!hddMountSelectedOplHome(prefix, sizeof(prefix))) {
+        gLastSaveErrno = EIO;
+        return 0;
+    }
+
+    for (int bit = 1; bit < (1 << CONFIG_INDEX_COUNT); bit <<= 1) {
+        config_set_t *source;
+        config_set_t *target;
+        const char *name;
+        int n;
+
+        if (!(types & bit))
+            continue;
+
+        source = configGetByType(bit);
+        // configWrite() only materializes a set that actually changed. Preserve that normal
+        // contract so a selector-only save neither creates optional empty files nor overwrites an
+        // existing target-side config that the user did not edit this session.
+        if (source == NULL || !source->modified)
+            continue;
+
+        name = configFileName(source);
+        n = name == NULL ? -1 : snprintf(path, sizeof(path), "%s%s", prefix, name);
+        if (n < 0 || n >= (int)sizeof(path)) {
+            gLastSaveErrno = EIO;
+            result = 0;
+            break;
+        }
+
+        // Keep the live sets pointing at their pfs0: home. The target is an isolated copy that
+        // carries the live format and values, so pfs1: can be unmounted before selector commit.
+        target = configAlloc(source->type, NULL, path);
+        if (target == NULL) {
+            gLastSaveErrno = EIO;
+            result = 0;
+            break;
+        }
+        target->format = source->format;
+        configMerge(target, source);
+        target->modified = 1;
+
+        if (!configWrite(target) || target->modified) {
+            if (gLastSaveErrno == 0)
+                gLastSaveErrno = EIO;
+            result = 0;
+            configFree(target);
+            break;
+        }
+        configFree(target);
+        source->modified = 0;
+    }
+
+    hddUnmountSelectedOplHome();
+    return result;
+}
+
+static int commitSelectedHddOplHome(void)
+{
+    if (hddCommitOplHomeSelection())
+        return 1;
+
+    snprintf(gLastSaveTarget, sizeof(gLastSaveTarget), "%s", "hdd0:__common/OPL/conf_hdd.cfg");
+    gLastSaveErrno = EIO;
+    return 0;
+}
+
 static void _saveConfig()
 {
     char temp[256];
     char customSettingsTarget[sizeof(gCustomSettingsPath)] = {0};
     int customSettingsExplicit = 0;
-
-    // The APA OPL-home picker is deliberately a separate, explicitly staged policy file when
-    // __common owns the selector. Commit it only as part of the ordinary Save Settings operation;
-    // an automatic existing +OPL home remains fileless and unrelated pages cannot rewrite a redirect.
-    if ((lscstatus & CONFIG_OPL) && hddOplHomeSelectionPending() && !hddCommitOplHomeSelection()) {
-        snprintf(gLastSaveTarget, sizeof(gLastSaveTarget), "%s", "hdd0:__common/OPL/conf_hdd.cfg");
-        gLastSaveErrno = EIO;
-        lscret = 0;
-        lscstatus = 0;
-        return;
-    }
 
     if (lscstatus & CONFIG_OPL) {
         config_set_t *configOPL = configGetByType(CONFIG_OPL);
@@ -3144,6 +3226,22 @@ static void _saveConfig()
         configSetStr(configNet, CONFIG_NET_SMB_PASSW, gPCPassword);
     }
 
+    // A current APA session keeps pfs0: mounted on its original data home until restart. When the
+    // selected next-boot home differs, write only the changed sets through pfs1: and commit the
+    // selector only after that write succeeds. The normal automatic +OPL case still uses pfs0:.
+    if (gBootHomeApa && gCustomSettingsPath[0] == '\0' && hddOplHomeSelectionNeedsTargetSave()) {
+        if (!saveSelectedHddOplHome(lscstatus) ||
+            (hddOplHomeSelectionPending() && !commitSelectedHddOplHome())) {
+            lscret = 0;
+            lscstatus = 0;
+            return;
+        }
+        gLastSaveWasStagedOplHome = 1;
+        lscret = 1;
+        lscstatus = 0;
+        return;
+    }
+
     // APA launch identity is raw partition space, never a writable config filesystem. Even when
     // discovery loaded defaults or recovered settings elsewhere, an ordinary APA save without an
     // explicit Custom Settings Path must resolve the existing-PFS ownership chain NOW. This keeps
@@ -3242,6 +3340,8 @@ static void _saveConfig()
             gLastSaveErrno = EIO;
             lscret = 0;
         }
+        if (lscret > 0 && hddOplHomeSelectionPending() && !commitSelectedHddOplHome())
+            lscret = 0;
         lscstatus = 0;
         return;
     }
@@ -3275,6 +3375,8 @@ static void _saveConfig()
         if (lscret > 0)
             writeConfigPathRedirect(configGetDir());
     }
+    if (lscret > 0 && hddOplHomeSelectionPending() && !commitSelectedHddOplHome())
+        lscret = 0;
     lscstatus = 0;
 }
 
@@ -3383,6 +3485,7 @@ int saveConfig(int types, int showUI)
     // usually the 0 that produced the nonsensical "(error 0)".
     gLastSaveErrno = 0;
     gLastSaveTarget[0] = '\0';
+    gLastSaveWasStagedOplHome = 0;
     gHddSettingsFallbackNotice = 0;
 
     guiHandleDeferedIO(&lscstatus, _l(_STR_SAVING_SETTINGS), IO_CUSTOM_SIMPLEACTION, &_saveConfig, OPL_DEFERRED_IO_TIMEOUT_MS);
@@ -3390,19 +3493,20 @@ int saveConfig(int types, int showUI)
     if (showUI) {
         if (lscret) {
             char *path = configGetDir();
-            const char *displayHome = path;
-            int savedOnHddHome = path != NULL && !strncmp(path, "pfs", 3) && gOPLPart[0] != '\0';
+            const char *displayHome = gLastSaveWasStagedOplHome ? gLastSaveTarget : path;
+            int savedOnHddHome = gLastSaveWasStagedOplHome ||
+                                 (path != NULL && !strncmp(path, "pfs", 3) && gOPLPart[0] != '\0');
 
             // pfs0: is only the transient mount name. For every successful HDD save, show the
             // physical APA/PFS owner the user can actually find in a partition browser.
-            if (savedOnHddHome) {
+            if (savedOnHddHome && !gLastSaveWasStagedOplHome) {
                 if (!strcmp(gOPLPart, "hdd0:__common"))
                     displayHome = "hdd0:__common/OPL";
                 else
                     displayHome = gOPLPart;
             }
 
-            if (gHddSettingsFallbackNotice || (gBootHddCommonFallback && savedOnHddHome))
+            if (gHddSettingsFallbackNotice || (!gLastSaveWasStagedOplHome && gBootHddCommonFallback && savedOnHddHome))
                 snprintf(notification, sizeof(notification), _l(_STR_SETTINGS_HDD_FALLBACK), displayHome);
             else
                 snprintf(notification, sizeof(notification), _l(_STR_SETTINGS_SAVED), displayHome);
