@@ -45,10 +45,22 @@ static unsigned char hddSupportModulesLoaded = 0;
 // while it keeps failing, and re-toasting the same error box each pass would bury the UI. Reset on
 // success so a later, different failure toasts again.
 static unsigned char hddSupportErrToasted = 0;
-// Deferred PFS failure state. Low-level boot/config probes may transiently fail to load PS2FS/PFS;
-// they set this flag instead of publishing a user-facing error. The final HDD list-refresh path
-// evaluates the flag after recovery has had a chance to succeed and only then emits code 222 once.
-static unsigned char hddPfsLoadFailed = 0;
+// Explicit PFS lifecycle state machine. Low-level boot/config probes may transiently fail to load PS2FS/PFS;
+// they enter RECOVERING instead of publishing a user-facing error. Only a settled, verified terminal failure
+// can transition to FAILED_FINAL and emit code 222.
+static hdd_pfs_state_t hddPfsState = HDD_PFS_UNKNOWN;
+
+hdd_pfs_state_t hddGetPfsState(void)
+{
+    return hddPfsState;
+}
+
+void hddSetPfsFailedFinal(void)
+{
+    if (hddPfsState != HDD_PFS_READY) {
+        hddPfsState = HDD_PFS_FAILED_FINAL;
+    }
+}
 // A Settings selection is deliberately staged until Save Settings. It never changes the active
 // pfs0: mount: a live OPL data home can have artwork/config readers using it.
 static int hddOplHomePending = -1;
@@ -287,6 +299,7 @@ int hddLoadModules(void)
         // call into here and try to double load modules.
         hddModulesLoadCount = 1;
         hddModulesSettled = 0;
+        hddPfsState = HDD_PFS_SETTLING;
 
         // DEV9 must be loaded, as HDD.IRX depends on it. Even if not required by the I/F (i.e. HDPro)
         sysInitDev9();
@@ -329,6 +342,7 @@ int hddLoadModules(void)
             sysShutdownDev9();
             hddModulesLoadCount = 0;
             hddModulesSettled = 0;
+            hddPfsState = HDD_PFS_UNKNOWN;
         } else {
             retStatus = HDD_LOADMODULES_STATUS_NOERROR;
             hddModulesLoaded = 1;
@@ -340,6 +354,8 @@ int hddLoadModules(void)
             // still spinning up. Runs once per load generation: the dedupe branch above never gets here.
             DelayThread(1000 * 1000);
             hddModulesSettled = 1;
+            if (hddPfsState == HDD_PFS_SETTLING)
+                hddPfsState = HDD_PFS_RECOVERING;
         }
     } else {
         hddModulesLoadCount++;
@@ -535,17 +551,15 @@ static int hddLoadCoreSupportModules(void)
         if (ret < 0) {
             LOG("HDD: PFS support module failed to load.\n");
             // Do NOT toast here. Boot/config probes may fail transiently before the
-            // final list-refresh recovery has run. Record the failure and let
-            // hddUpdateGameList() decide whether to publish code 222 after recovery.
-            // Clear the general support-error latch so a previous unrelated APA error
-            // does not suppress the deferred PFS notification.
+            // final list-refresh recovery has run. Mark as RECOVERING so subsequent
+            // attempts can retry without falsely emitting code 222 during boot.
             hddSupportErrToasted = 0;
-            hddPfsLoadFailed = 1;
+            hddPfsState = HDD_PFS_RECOVERING;
             return 0;
         }
 
         hddSupportModulesLoaded = 1;
-        hddPfsLoadFailed = 0;
+        hddPfsState = HDD_PFS_READY;
         hddSupportErrToasted = 0;
         hddClearRecoveredErrors();
         LOG("HDDSUPPORT modules loaded\n");
@@ -916,13 +930,13 @@ static int hddUpdateGameList(item_list_t *itemList)
     if (!hddSupportModulesLoaded)
         LOG("HDDSUPPORT UpdateGameList: PFS support incomplete; attempting read-only APA enumeration anyway\n");
 
-    // After boot/config probes and the retry above have had their chance, publish a persistent PFS
-    // failure exactly once. A later successful load clears the deferred flag and retracts the error.
+    // Check PFS state after recovery retry. A ready state clears errors; Code 222 is only
+    // published if an authoritative operation has confirmed a terminal failure (HDD_PFS_FAILED_FINAL).
     if (hddSupportModulesLoaded) {
-        hddPfsLoadFailed = 0;
+        hddPfsState = HDD_PFS_READY;
         hddSupportErrToasted = 0;
         hddClearRecoveredErrors();
-    } else if (hddPfsLoadFailed && !hddSupportErrToasted) {
+    } else if (hddPfsState == HDD_PFS_FAILED_FINAL && !hddSupportErrToasted) {
         setErrorMessageWithCode(_STR_HDD_PFS_UNAVAILABLE_ERROR, ERROR_HDD_MODULE_PFS_FAILURE);
         hddSupportErrToasted = 1;
     }
@@ -1081,14 +1095,20 @@ int hddStageOplHomeSelection(int selection)
     // of a module reference; hddLoadModulesReady() would retain one on every stage/save cycle.
     // Do not call hddLoadSupportModules here: its normal data-home recovery may mount pfs0: and
     // create OPL folders, neither of which belongs to a source selector proof.
-    if (!hddModulesAreLoaded())
+    if (!hddModulesAreLoaded()) {
+        hddSetPfsFailedFinal();
         return 0;
-    if (!hddLoadCoreSupportModules())
+    }
+    if (!hddLoadCoreSupportModules()) {
+        hddSetPfsFailedFinal();
         return 0;
+    }
 
     partition = selection == HDD_OPL_HOME_PLUS ? "hdd0:+OPL" : "hdd0:__common";
-    if (!hddPartitionMountableAt("pfs1:", partition, FIO_MT_RDONLY))
+    if (!hddPartitionMountableAt("pfs1:", partition, FIO_MT_RDONLY)) {
+        hddSetPfsFailedFinal();
         return 0;
+    }
 
     hddOplHomePending = selection;
     return 1;
@@ -1118,17 +1138,22 @@ int hddMountSelectedOplHome(char *prefix, int prefixLen)
     selection = hddGetOplHomeSelection();
     if (hddOplHomePending < 0 && hddOplHomeCommitted < 0)
         return 0;
-    if (!hddModulesAreLoaded() || !hddLoadCoreSupportModules())
+    if (!hddModulesAreLoaded() || !hddLoadCoreSupportModules()) {
+        hddSetPfsFailedFinal();
         return 0;
+    }
 
     partition = selection == HDD_OPL_HOME_PLUS ? "hdd0:+OPL" : "hdd0:__common";
     fileXioUmount("pfs1:");
-    if (fileXioMount("pfs1:", partition, FIO_MT_RDWR) < 0)
+    if (fileXioMount("pfs1:", partition, FIO_MT_RDWR) < 0) {
+        hddSetPfsFailedFinal();
         return 0;
+    }
 
     if (selection == HDD_OPL_HOME_COMMON) {
         if (!hddCheckOPLFolder("pfs1:")) {
             fileXioUmount("pfs1:");
+            hddSetPfsFailedFinal();
             return 0;
         }
         selectedPrefix = "pfs1:OPL/";
@@ -1140,6 +1165,7 @@ int hddMountSelectedOplHome(char *prefix, int prefixLen)
     if (n < 0 || n >= prefixLen) {
         fileXioUmount("pfs1:");
         prefix[0] = '\0';
+        hddSetPfsFailedFinal();
         return 0;
     }
 
@@ -1165,10 +1191,14 @@ int hddCommitOplHomeSelection(void)
     // An automatic +OPL home has no __common control file. The active pfs0: mount proves the
     // staged effective choice, so commit it as a fileless no-op without probing or writing
     // __common. This preserves the no-__common topology across ordinary Settings saves.
-    if (!hddModulesAreLoaded())
+    if (!hddModulesAreLoaded()) {
+        hddSetPfsFailedFinal();
         return 0;
-    if (!hddLoadCoreSupportModules())
+    }
+    if (!hddLoadCoreSupportModules()) {
+        hddSetPfsFailedFinal();
         return 0;
+    }
     if (hddOplHomePending == HDD_OPL_HOME_PLUS && hddOplHomeAutoPlus &&
         !strcmp(gOPLPart, "hdd0:+OPL") && gHDDPrefix != NULL) {
         hddOplHomeCommitted = hddOplHomePending;
@@ -1178,11 +1208,15 @@ int hddCommitOplHomeSelection(void)
 
     // Re-prove the common owner at commit time. No raw APA operation, partition creation, or pfs0:
     // remount is involved; this is only a bounded pfs1: read/write mount of an existing partition.
-    if (!hddPartitionMountableAt("pfs1:", "hdd0:__common", FIO_MT_RDWR))
+    if (!hddPartitionMountableAt("pfs1:", "hdd0:__common", FIO_MT_RDWR)) {
+        hddSetPfsFailedFinal();
         return 0;
+    }
 
-    if (fileXioMount("pfs1:", "hdd0:__common", FIO_MT_RDWR) < 0)
+    if (fileXioMount("pfs1:", "hdd0:__common", FIO_MT_RDWR) < 0) {
+        hddSetPfsFailedFinal();
         return 0;
+    }
 
     fd = open(path, O_RDONLY);
     exists = fd >= 0;
@@ -1871,7 +1905,7 @@ static void hddShutdown(item_list_t *itemList)
 {
     LOG("HDDSUPPORT Shutdown\n");
 
-    hddPfsLoadFailed = 0;
+    hddPfsState = HDD_PFS_UNKNOWN;
     hddSupportErrToasted = 0;
 
     if (hddGameList.enabled) {

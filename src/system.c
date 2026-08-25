@@ -38,6 +38,8 @@
 
 #define NEWLIB_PORT_AWARE
 #include <fileXio_rpc.h> // fileXioInit, fileXioExit, fileXioDevctl
+#include <loadfile.h>
+#include <kernel.h>
 
 typedef struct
 {
@@ -1497,13 +1499,101 @@ void sysLaunchNeutrino(const char *driver, const char *path, const char *startup
             LOG("[NEUTRINO]   argv[%d]=%s\n", i, argv[i]);
     }
 
-    // Hand off WITHOUT the elf-loader IOP reset (NHDDL parity, vendored elfldr/): Neutrino reads
-    // its config/modules (-cwd) and opens the game ISO through OUR still-mounted devices, and only
-    // then does its own IOP reset -- the old resetting handoff left it a bare SIO2MAN/MCMAN/MCSERV
-    // IOP, so any USB/BDM-hosted neutrino.elf setup black-screened to OSDSYS. The callers keep both
-    // the game device and the neutrino.elf device mounted (deinitEx).
-    if (sysLoadELFKeepIOP(neutrinoPath, "", argc, argv) < 0)
-        LOG("[NEUTRINO] keep-IOP handoff failed for %s\n", neutrinoPath);
+    // Direct single protected transition into Neutrino (NHDDL parity): Neutrino reads its
+    // config/modules (-cwd) and opens the game ISO through OUR still-mounted devices pre-reset.
+    // Launch code and arguments reside in protected BRAM; ExecPS2 transitions directly.
+    sysLaunchNeutrinoDirect(neutrinoPath, argc, argv);
+}
+
+#define LAUNCH_ARGS_SIZE 4096
+
+__attribute__((section("._launch_args")))
+__attribute__((aligned(16))) static char launchArgs[LAUNCH_ARGS_SIZE];
+
+__attribute__((section("._launch_elf"), noinline)) void
+bramLaunchCore(const char *neutrinoPath, int argc, char *argv[])
+{
+    t_ExecData elfdata = {0};
+
+    // Phase 1: Wipe Neutrino ELF memory regions (0x01000000 -> GetMemorySize())
+    for (int i = 0x1000000; i < GetMemorySize(); i += 64) {
+        asm volatile("\tsq $0, 0(%0) \n"
+                     "\tsq $0, 16(%0) \n"
+                     "\tsq $0, 32(%0) \n"
+                     "\tsq $0, 48(%0) \n" ::"r"(i));
+    }
+
+    // Writeback data cache before loading ELF.
+    FlushCache(WRITEBACK_DCACHE);
+
+    // Load Neutrino ELF directly into memory
+    SifLoadFileInit();
+    int ret = SifLoadElf(neutrinoPath, &elfdata);
+    SifLoadFileExit();
+    if (!(ret == 0 && elfdata.epc != 0)) {
+        while (1) {
+            SleepThread();
+        }
+    }
+
+    // Copy launch arguments from user memory into protected kernel memory buffer
+    char **largv = (char **)launchArgs;
+    char *argStart = (char *)launchArgs + ((argc + 1) * sizeof(char *));
+    for (int i = 0; i < argc; i++) {
+        const char *src = argv[i];
+        int len = 0;
+        while (src[len] != '\0') {
+            len++;
+        }
+        if (argStart + len + 1 > launchArgs + LAUNCH_ARGS_SIZE) {
+            while (1) {
+                SleepThread();
+            }
+        }
+        for (int j = 0; j <= len; j++) {
+            argStart[j] = src[j];
+        }
+        largv[i] = argStart;
+        argStart += len + 1;
+    }
+    largv[argc] = NULL;
+
+    // The rest of the code doesn't use libc functions
+    // Phase 2: Wipe OPL launcher user memory (0x00100000 -> 0x01000000)
+    for (int i = 0x100000; i < 0x1000000; i += 64) {
+        asm volatile("\tsq $0, 0(%0) \n"
+                     "\tsq $0, 16(%0) \n"
+                     "\tsq $0, 32(%0) \n"
+                     "\tsq $0, 48(%0) \n" ::"r"(i));
+    }
+
+    FlushCache(WRITEBACK_DCACHE);
+    FlushCache(INVALIDATE_ICACHE);
+    TerminateLibrary();
+    _ExecPS2((void *)elfdata.epc, (void *)elfdata.gp, argc, largv);
+    while (1) {
+        SleepThread();
+    }
+}
+
+__attribute__((section("._launch_elf"), noreturn)) int
+sysLaunchNeutrinoDirect(const char *neutrinoPath, int argc, char *argv[])
+{
+    register const char *r_path asm("a0") = neutrinoPath;
+    register int r_argc asm("a1") = argc;
+    register char **r_argv asm("a2") = argv;
+
+    asm volatile(
+        "move $sp, %3\n\t"
+        "j bramLaunchCore\n\t"
+        "nop\n\t"
+        :
+        : "r"(r_path), "r"(r_argc), "r"(r_argv), "r"(0xffff0)
+        : "memory");
+
+    while (1) {
+        SleepThread();
+    }
 }
 
 // Hand off to an external POPSTARTER.ELF to boot a PS1 VCD. The caller resolves the per-device

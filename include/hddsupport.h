@@ -66,6 +66,17 @@ typedef enum {
     HDD_LOADMODULES_STATUS_COUNT,
 } hdd_loadmodules_status;
 
+typedef enum {
+    HDD_PFS_UNKNOWN = 0,
+    HDD_PFS_SETTLING,
+    HDD_PFS_RECOVERING,
+    HDD_PFS_READY,
+    HDD_PFS_FAILED_FINAL,
+} hdd_pfs_state_t;
+
+hdd_pfs_state_t hddGetPfsState(void);
+void hddSetPfsFailedFinal(void);
+
 // See hddLoadModulesReady() below the prototypes -- the single evaluate-once way to ask "is the ATA
 // stack actually resident?". Callers used to test `hddLoadModules() >= 0`, which also accepted
 // BUSYLOADING(2) -- returned for the whole session after a FAILED first load consumed the one-shot

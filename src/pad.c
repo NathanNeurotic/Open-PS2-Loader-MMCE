@@ -570,19 +570,20 @@ void padRumbleStopAll(void)
 {
     int i;
 
+    if (!rumbleActive)
+        return;
+
     rumbleActive = 0;
     rumbleDurTicks = 0;
     rumbleLarge = 0;
     rumbleSmall = 0;
 
-    // Send native stops twice because freepad may drop an actuator command outside TASK_UPDATE_PAD.
+    // Send native stops: state transitioned ACTIVE -> IDLE, send OFF command once.
     // PADEMU uses its own command channel, so it needs an explicit stop as well once polling ends.
     for (i = 0; i < pad_count; ++i) {
         padPademuSetRumble(&pad_data[i], 0);
         padActSet(&pad_data[i], 0, 0);
     }
-    for (i = 0; i < pad_count; ++i)
-        padActSet(&pad_data[i], 0, 0);
 }
 
 /** Lets a decision bump complete before a caller starts work that will stop readPads(). */
@@ -641,13 +642,19 @@ static void padRumbleArm(int durationMs, int large, int small)
 
     rumbleStartTicks = nowTicks;
     rumbleDurTicks = (u32)durationMs * CLOCKS_PER_MILISEC;
+
+    if (rumbleActive) {
+        // ACTIVE -> ACTIVE: pulse duration extended, actuator is already spinning.
+        // ZERO SIF RPCs issued.
+        return;
+    }
+
     rumbleActive = 1;
     rumbleLarge = large;
     rumbleSmall = small ? 1 : 0;
 
     for (i = 0; i < pad_count; ++i) {
-        // Native pads are kicked immediately and re-sent from readPads(); PADEMU gets the same
-        // immediate command so a confirm followed by blocking work still reaches a DS3/DS4/DS5.
+        // Native pads are kicked immediately (ON); PADEMU gets the same immediate command.
         padActSet(&pad_data[i], rumbleSmall, rumbleLarge);
         padPademuSetRumble(&pad_data[i], rumbleLarge);
     }
@@ -751,14 +758,10 @@ int readPads()
         }
     }
 
-    // Rumble decay + re-send. The native re-send is not redundant: freepad can drop a direct
-    // actuator command outside its update task, and PADEMU is kept in sync by readPad() above.
+    // Rumble decay. The pulse ends when duration expires; zero RPCs are sent while active.
     if (rumbleActive) {
         if (!gEnableRumble || (u32)(cpu_ticks() - rumbleStartTicks) >= rumbleDurTicks) {
             padRumbleStopAll();
-        } else {
-            for (i = 0; i < pad_count; ++i)
-                padActSet(&pad_data[i], rumbleSmall, rumbleLarge);
         }
     }
 

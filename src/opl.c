@@ -2932,6 +2932,7 @@ static int trySaveConfigHDD(int types)
         return configWriteMulti(types);
     }
 
+    hddSetPfsFailedFinal();
     return -ENOENT;
 }
 

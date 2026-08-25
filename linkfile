@@ -1,0 +1,127 @@
+/*
+# _____     ___ ____     ___ ____
+#  ____|   |    ____|   |        | |____|
+# |     ___|   |____ ___|    ____| |    \    PS2DEV Open Source Project.
+#-----------------------------------------------------------------------
+# Copyright 2001-2004, ps2dev - http://www.ps2dev.org
+# Licenced under Academic Free License version 2.0
+# Review ps2sdk README & LICENSE files for further details.
+#
+# Linkfile script for ee-ld (OPL with protected BRAM direct launch region)
+*/
+
+ENTRY(__start);
+
+MEMORY {
+	bram	: ORIGIN = 0x000e0000, LENGTH = 0x20000 /* 0x000e0000 - 0x00100000: Protected kernel memory (128 KB) */
+	gram	: ORIGIN = 0x00100000, LENGTH = 31M     /* 0x00100000 - 0x02000000: User memory */
+}
+
+REGION_ALIAS("MAIN_REGION", gram);
+
+PHDRS {
+  text PT_LOAD;
+}
+
+SECTIONS {
+	.text : {
+		*(._launch_elf)
+		*libkernel.a:*(.text .text.*)
+	} >bram
+	.rodata : {
+		*libkernel.a:*(.rodata .rodata.*)
+	} >bram
+	.data : {
+		*libkernel.a:*(.data .data.*)
+		*(._launch_args)
+	} >bram
+
+	.text 0x00100000: {
+		_ftext = . ;
+		*(.text)
+		*(.text.*)
+		*(.gnu.linkonce.t*)
+		KEEP(*(.init))
+		KEEP(*(.fini))
+		QUAD(0)
+	} >MAIN_REGION :text
+
+	PROVIDE(_etext = .);
+	PROVIDE(etext = .);
+
+	/* Global/static constructors and deconstructors. */
+	.ctors ALIGN(16): {
+		KEEP(*crtbegin*.o(.ctors))
+		KEEP(*(EXCLUDE_FILE(*crtend*.o) .ctors))
+		KEEP(*(SORT(.ctors.*)))
+		KEEP(*(.ctors))
+	} >MAIN_REGION
+	.dtors ALIGN(16): {
+		KEEP(*crtbegin*.o(.dtors))
+		KEEP(*(EXCLUDE_FILE(*crtend*.o) .dtors))
+		KEEP(*(SORT(.dtors.*)))
+		KEEP(*(.dtors))
+	} >MAIN_REGION
+
+	.reginfo : { *(.reginfo) } >MAIN_REGION
+
+	.data ALIGN(128): {
+		_fdata = . ;
+		*(.data)
+		*(.data.*)
+		*(.gnu.linkonce.d*)
+		SORT(CONSTRUCTORS)
+	} >MAIN_REGION
+
+	/* Static data.  */
+	.rodata ALIGN(128): {
+		*(.rodata)
+		*(.rodata.*)
+		*(.gnu.linkonce.r*)
+	} >MAIN_REGION
+
+	.rdata ALIGN(128): { *(.rdata) } >MAIN_REGION
+	.gcc_except_table ALIGN(128): { *(.gcc_except_table) } >MAIN_REGION
+
+	_gp = ALIGN(128) + 0x7ff0;
+	.lit4 ALIGN(128): { *(.lit4) } >MAIN_REGION
+	.lit8 ALIGN(128): { *(.lit8) } >MAIN_REGION
+
+	.sdata ALIGN(128): {
+		*(.sdata)
+		*(.sdata.*)
+		*(.gnu.linkonce.s*)
+	} >MAIN_REGION
+
+	_edata = .;
+	PROVIDE(edata = .);
+
+	/* Uninitialized data.  */
+	.sbss ALIGN(128) : {
+		_fbss = . ;
+		*(.sbss)
+		*(.sbss.*)
+		*(.gnu.linkonce.sb*)
+		*(.scommon)
+	} >MAIN_REGION
+
+	.bss ALIGN(128) : {
+		*(.bss)
+		*(.bss.*)
+		*(.gnu.linkonce.b*)
+		*(COMMON)
+	} >MAIN_REGION
+	_end_bss = .;
+
+	_end = . ;
+	PROVIDE(end = .);
+
+	.spad 0x70000000: {
+		*(.spad)
+	} >MAIN_REGION
+
+	/* Symbols needed by crt0.s.  */
+	PROVIDE(_heap_size = -1);
+	PROVIDE(_stack = -1);
+	PROVIDE(_stack_size = 128 * 1024);
+}

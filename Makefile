@@ -180,6 +180,7 @@ PNG_ASSETS_DIR = gfx/
 MMCE_ASSETS_DIR = $(PS2SDK)/iop/irx
 
 MAPFILE = opl.map
+EE_LINKFILE := linkfile
 EE_LDFLAGS += -Wl,-Map,$(MAPFILE)
 
 EE_LIBS = -L$(PS2SDK)/ports/lib -L$(GSKIT)/lib -L./lib -lgskit -ldmakit -lpoweroff -lfileXio -lpatches -lpng -lz -lmc -lfreetype -lvux -lcdvd -lnetman -lps2ips -laudsrv -lvorbisfile -lvorbis -logg -lpadx -lelf-loader-nocolour
