@@ -4286,7 +4286,7 @@ static void setDefaults(void)
     gMMCEAckWaitCycles = 5;
     gMMCEUseAlarms = 1;
 
-    gEnableUSB = 0; // USB block device is opt-in, like the other BDM transports
+    gEnableUSB = 1; // USB block device is part of the base BDM stack; the page toggle now only controls visibility/scans
     // Visual GameID barcode ships OFF, matching fork commit cc2cdfed ("GameID defaults OFF"): the
     // HDMI auto-profile latch is only verifiable on real GameID hardware, so it stays opt-in.
     gApplyGameID = 0;
@@ -4479,12 +4479,9 @@ static void miniInit(int mode)
         bdmInitSemaphore();
 
         // Force load all BDM modules.. we aren't using the gui so this is fine.
-        // gEnableUSB belongs in this list and was the one missing from it. Unlike the others it is a
-        // FORK INVENTION -- upstream loads USBMASS_BD unconditionally and has no such flag -- so the
-        // opt-in default of 0 that setDefaults() applies a few lines earlier (and which the GUI
-        // normally overrides from the saved config) had nothing to override it here: configReadMulti
-        // runs AFTER bdmLoadModules(). bdmLoadBlockDeviceModules gates the USB load on the flag, so
-        // an argv autolaunch from a USB stick loaded no USB block driver at all.
+        // USBMASS_BD is now loaded synchronously in bdmLoadCoreModules() regardless of
+        // gEnableUSB; these flags mainly ensure per-transport page/scan policy is enabled
+        // for the autolaunch path.
         gEnableUSB = 1;
         gEnableILK = 1; // iLink will break pcsx2 however.
         gEnableMX4SIO = 1;

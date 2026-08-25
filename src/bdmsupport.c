@@ -369,8 +369,8 @@ int bdmModeIsSIO2(int mode)
 
 static int bdmShouldQueueModuleLoad(void)
 {
-    if (gEnableUSB && !iUSBModLoaded)
-        return 1;
+    // USB is loaded synchronously in bdmLoadCoreModules(); it never needs an
+    // optional-transport retry queue.
     if (gEnableILK && !iLinkModLoaded)
         return 1;
     if (gEnableMX4SIO && !mx4sioModLoaded)
@@ -394,14 +394,8 @@ static void bdmLoadBlockDeviceModules(void)
 
     // Snapshot, compared after the loads below. See the refresh at the end of this function for why
     // a transport enabled from Settings needed a "double tap" before its tab appeared.
-    int modsWere = iUSBModLoaded + iLinkModLoaded + mx4sioModLoaded + hddModLoaded + udpbdModLoaded;
-
-    if (gEnableUSB && !iUSBModLoaded) {
-        // Load USB Block Device drivers -- the prime suspect for a real exFAT/USB boot wedge.
-        guiSetBootStatusSticky(_l(_STR_BOOT_LOADING_USB));
-        if (bdmLoadOptionalModule("USBMASS_BD", &usbmass_bd_irx, size_usbmass_bd_irx) >= 0)
-            iUSBModLoaded = 1;
-    }
+    // USB is intentionally omitted: it is loaded synchronously in bdmLoadCoreModules().
+    int modsWere = iLinkModLoaded + mx4sioModLoaded + hddModLoaded + udpbdModLoaded;
 
     if (gEnableILK && !iLinkModLoaded) {
         // Load iLink Block Device drivers
@@ -460,7 +454,8 @@ static void bdmLoadBlockDeviceModules(void)
             sysShutdownDev9();
     }
 
-    int modsNow = iUSBModLoaded + iLinkModLoaded + mx4sioModLoaded + hddModLoaded + udpbdModLoaded;
+    // USB is loaded synchronously in bdmLoadCoreModules(); omit from late-load detection.
+    int modsNow = iLinkModLoaded + mx4sioModLoaded + hddModLoaded + udpbdModLoaded;
 
     // BOOT PASS BUMPS NOTHING. On the first call every enabled transport loads for the first time, so
     // the comparison below is guaranteed true -- and bdmInitDevicesData is about to publish all of
@@ -518,9 +513,9 @@ static void bdmLoadBlockDeviceModules(void)
     }
 }
 
-// Bring up only the common BDM infrastructure. Literal massN: boot resolution uses this path so an
-// explicit filesystem slot never incidentally queues every transport enabled by the last settings
-// load; it determines its backing driver from that slot's own devctl/ioctl identity instead.
+// Bring up the common BDM infrastructure plus USBMASS_BD. USB is part of the base
+// BDM stack in upstream OPL and Grimdoomer; loading it here keeps it resident for
+// literal massN: boot resolution without queuing the optional-transport loader.
 static void bdmLoadCoreModules(void)
 {
     LOG("BDMSUPPORT LoadModules\n");
@@ -532,6 +527,17 @@ static void bdmLoadCoreModules(void)
     // Load FATFS (mass:) driver
     LOG("[BDMFS_FATFS]:\n");
     sysLoadModuleBuffer(&bdmfs_fatfs_irx, size_bdmfs_fatfs_irx, 0, NULL);
+
+    // Load USBMASS_BD synchronously as part of the base BDM stack. USBD is already
+    // resident from sysReset() (src/system.c:287); upstream OPL and Grimdoomer load
+    // both here in bdmLoadModules(). Treating USBMASS_BD as an optional async
+    // transport created a boot race where a stick could fail to attach and then not
+    // be retried until another generation event.
+    if (!iUSBModLoaded) {
+        LOG("[USBMASS_BD]:\n");
+        if (sysLoadModuleBuffer(&usbmass_bd_irx, size_usbmass_bd_irx, 0, NULL) >= 0)
+            iUSBModLoaded = 1;
+    }
 
     LOG("[BDMEVENT]:\n");
     sysLoadModuleBuffer(&bdmevent_irx, size_bdmevent_irx, 0, NULL);
@@ -2009,8 +2015,8 @@ static int bdmEnsureTransportLoaded(int bdmType)
 {
     switch (bdmType) {
         case BDM_TYPE_USB:
-            if (!iUSBModLoaded && bdmLoadOptionalModule("USBMASS_BD", &usbmass_bd_irx, size_usbmass_bd_irx) >= 0)
-                iUSBModLoaded = 1;
+            // USB is loaded synchronously in bdmLoadCoreModules(); this is now a
+            // simple loaded-state query.
             return iUSBModLoaded;
         case BDM_TYPE_SDC:
             if (!mx4sioModLoaded && bdmLoadOptionalModule("MX4SIO_BD", &mx4sio_bd_irx, size_mx4sio_bd_irx) >= 0)
