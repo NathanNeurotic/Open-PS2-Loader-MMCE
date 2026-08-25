@@ -497,8 +497,21 @@ pulse is timed against raw cpu_ticks() deltas so it remains correct across the 3
 // then killed rumble silently for the whole session.
 static void padRumbleRealign(struct pad_data_t *pad)
 {
-    if (pad->actAligned || pad->actuators == 0)
+    if (!rumbleLive || pad->actAligned)
         return;
+
+    // initializePad() deliberately clears this on every attempt: retaining a count across an
+    // unplug could drive a replacement digital pad. A bounded startup attempt can also return
+    // before padInfoAct() while the controller is already usable. Rumble is live only after boot,
+    // and padInfoAct() is an EE-local query, so recover the current controller's actuator count at
+    // the first real menu pulse instead of permanently sending through freepad's 0xff alignment.
+    if (pad->actuators == 0) {
+        pad->actuators = padInfoAct(pad->port, pad->slot, -1, 0);
+        if (pad->actuators <= 0) {
+            pad->actuators = 0;
+            return;
+        }
+    }
 
     pad->actAlign[0] = 0; // small engine -> byte 0 of padSetActDirect
     pad->actAlign[1] = 1; // big engine   -> byte 1
