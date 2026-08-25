@@ -129,26 +129,25 @@ static int loadElfViaFileXio(const char *path, u32 *entry)
 {
     elf_header_t eh;
     elf_pheader_t ph;
-    int fd, i, loaded = 0;
+    int fd = -1, i, loaded = 0;
 
     if (fileXioInit() < 0)
         return -1;
+
     fd = fileXioOpen(path, FIO_O_RDONLY);
     if (fd < 0)
-        return -1;
+        goto fail;
 
     // phentsize must match our struct or the per-header stride below reads garbage.
     if (readAll(fd, &eh, sizeof(eh)) != 0 || _lw((u32)&eh.ident) != ELF_MAGIC || eh.phnum == 0 ||
         eh.phentsize != sizeof(elf_pheader_t)) {
-        fileXioClose(fd);
-        return -1;
+        goto fail;
     }
 
     for (i = 0; i < eh.phnum; i++) {
         if (fileXioLseek(fd, eh.phoff + i * sizeof(elf_pheader_t), SEEK_SET) < 0 ||
             readAll(fd, &ph, sizeof(ph)) != 0) {
-            fileXioClose(fd);
-            return -1;
+            goto fail;
         }
         if (ph.type != ELF_PT_LOAD || ph.memsz == 0)
             continue;
@@ -158,13 +157,11 @@ static int loadElfViaFileXio(const char *path, u32 *entry)
         // FIRST so the subtraction in the last clause cannot underflow.
         if (ph.filesz > ph.memsz || (u32)ph.vaddr < 0x100000 ||
             ph.memsz > (u32)GetMemorySize() || (u32)ph.vaddr > (u32)GetMemorySize() - ph.memsz) {
-            fileXioClose(fd);
-            return -1;
+            goto fail;
         }
         if (ph.filesz > 0) {
             if (fileXioLseek(fd, ph.offset, SEEK_SET) < 0 || readAll(fd, ph.vaddr, ph.filesz) != 0) {
-                fileXioClose(fd);
-                return -1;
+                goto fail;
             }
         }
         if (ph.memsz > ph.filesz)
@@ -172,11 +169,19 @@ static int loadElfViaFileXio(const char *path, u32 *entry)
         loaded++;
     }
     fileXioClose(fd);
+    fd = -1;
 
     if (!loaded)
-        return -1;
+        goto fail;
+
     *entry = eh.entry;
     return 0;
+
+fail:
+    if (fd >= 0)
+        fileXioClose(fd);
+    fileXioExit();
+    return -1;
 }
 
 // argv[0] = path of the ELF to LOAD; argv[1..] = the target's FULL argv, forwarded verbatim
