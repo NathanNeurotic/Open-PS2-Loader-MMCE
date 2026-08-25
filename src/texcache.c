@@ -116,7 +116,7 @@ static void cacheWakeArtWorker(void);
 //       non-fatal (tarParseFile ignores the result) and happens only when the archive changes, but it
 //       is the thing to instrument first if a .tar-enabled build ever feels worse than a plain one.
 //   DEFAULT PATH: gEnableArtTar ships 0, so none of the above is reachable unless the user opts in.
-static int artTarLoadImage(const char *value, const char *suffix, GSTEXTURE *texture)
+static int artTarLoadImage(TarKind kind, const char *archivePath, const char *value, const char *suffix, GSTEXTURE *texture)
 {
     char prefix[64];
     TarEntryBase *entry = NULL;
@@ -126,7 +126,7 @@ static int artTarLoadImage(const char *value, const char *suffix, GSTEXTURE *tex
     if (snprintf(prefix, sizeof(prefix), "%s_%s.", value, suffix) >= (int)sizeof(prefix))
         return -1;
 
-    entry = tarFindPrefix(TAR_KIND_ART, prefix);
+    entry = archivePath != NULL ? tarFindPrefixFromPath(kind, archivePath, prefix) : tarFindPrefix(kind, prefix);
 
     if (entry == NULL) {
         LOG("ART TAR: '%s_%s' not in the archive index\n", value, suffix);
@@ -139,7 +139,7 @@ static int artTarLoadImage(const char *value, const char *suffix, GSTEXTURE *tex
         return -1;
     }
 
-    if (tarRead(TAR_KIND_ART, entry, buffer, entry->rawSize) != entry->rawSize) {
+    if (tarRead(kind, entry, buffer, entry->rawSize) != entry->rawSize) {
         LOG("ART TAR: short read for '%s' (%u bytes expected)\n", prefix, entry->rawSize);
         free(buffer);
         return -1;
@@ -826,8 +826,21 @@ static void cacheLoadImage(load_image_request_t *req)
 
     texSetLoadAbortFlag(&req->abortRequested);
 
-    if (gEnableArtTar)
-        result = artTarLoadImage(req->value, req->cache->suffix, &staged);
+    if (gEnableArtTar) {
+        char archivePath[256];
+        int archivePathResult = 0;
+
+        // HDD artwork owns a single PFS data home for the session. Its callback supplies the exact
+        // ART/art.tar path, so this lookup cannot scan __common, +OPL, or another device. A negative
+        // result means that source has no mounted home and must not fall back to the generic probe.
+        if (req->cache->isPrefixRelative && handler->itemGetArtArchivePath != NULL)
+            archivePathResult = handler->itemGetArtArchivePath(handler, req->value, archivePath, sizeof(archivePath));
+
+        if (archivePathResult > 0)
+            result = artTarLoadImage(TAR_KIND_HDD_ART, archivePath, req->value, req->cache->suffix, &staged);
+        else if (archivePathResult == 0)
+            result = artTarLoadImage(TAR_KIND_ART, NULL, req->value, req->cache->suffix, &staged);
+    }
 
     // Fall through to the per-file lookup whenever the archive is off, absent, or lacks this key.
     if (result < 0)

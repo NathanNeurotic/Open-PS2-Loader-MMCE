@@ -66,6 +66,9 @@ typedef enum {
     TAR_KIND_ART = 0,
     TAR_KIND_CFG = 1,
     TAR_KIND_CHT = 2,
+    // APA artwork has one selected PFS data home per session. Keep its index independent from the
+    // generic all-device ART archive so it can never select another source's archive.
+    TAR_KIND_HDD_ART = 3,
     TAR_KIND_MAX
 } TarKind;
 
@@ -75,6 +78,9 @@ int tarClose(TarKind kind);
 
 TarEntryBase *tarFind(TarKind kind, const char *filename);
 TarEntryBase *tarFindPrefix(TarKind kind, const char *prefix);
+// Exact-path lookup: never scans the generic device list. Reuses the selected path's index for the
+// session and reads members back from that same path.
+TarEntryBase *tarFindPrefixFromPath(TarKind kind, const char *path, const char *prefix);
 void *tarGet(TarKind kind, const char *filename);
 u32 tarRead(TarKind kind, const TarEntryBase *entry, void *dst, u32 dstSize);
 

@@ -754,6 +754,42 @@ static int favGetImage(item_list_t *itemList, char *folder, int isRelative, char
     return -1;
 }
 
+// Keep a favourite's archive lookup with its owning source. In particular, an HDD favourite must
+// use the selected APA PFS home rather than the generic multi-device ART archive search.
+static int favGetArtArchivePath(item_list_t *itemList, const char *value, char *path, int pathSize)
+{
+    if (favArray == NULL || value == NULL)
+        return 0;
+
+    for (int i = 0; i < favCount; i++) {
+        item_list_t ownerView;
+        item_list_t *o = favOwnerView(i, &ownerView);
+        if (o == NULL)
+            continue;
+
+        if (favArray[i].isVcd) {
+            if (strcmp(favArray[i].text, value) != 0) {
+                char fallbackKey[VCD_ID_MAX];
+                if (!vcdExtractGameId(favArray[i].text, fallbackKey, sizeof(fallbackKey)) ||
+                    strcmp(fallbackKey, value) != 0)
+                    continue;
+            }
+        } else {
+            if (o->itemGetStartup == NULL || !favOwnerHasId(o, favArray[i].id))
+                continue;
+            char *startup = o->itemGetStartup(o, favArray[i].id);
+            if (startup == NULL || strcmp(startup, value) != 0)
+                continue;
+        }
+
+        return o->itemGetArtArchivePath != NULL ?
+                   o->itemGetArtArchivePath(o, value, path, pathSize) :
+                   0;
+    }
+
+    return 0;
+}
+
 // Resolve an art-cache `value` (a source item's startup, or a VCD favourite's .VCD name /
 // strict PS1 id) to the favourite's SOURCE device mode, using the same matching favGetImage
 // uses to route the actual read. Lets texcache apply MMCE idle deferral, abort,
@@ -975,4 +1011,4 @@ item_list_t *favGetObject(int initOnly)
 static item_list_t favItemList = {
     FAV_MODE, -1, 0, 0, MENU_MIN_INACTIVE_FRAMES, FAV_MODE_UPDATE_DELAY, NULL, NULL, &favGetTextId, NULL, &favInit, &favNeedsUpdate, &favUpdateItemList,
     &favGetItemCount, NULL, &favGetItemName, &favGetItemNameLength, &favGetItemStartup, &favDeleteItem, &favRenameItem, &favLaunchItem,
-    &favGetConfig, &favGetImage, &favCleanUp, &favShutdown, &favCheckVMC, &favGetIconId};
+    &favGetConfig, &favGetImage, &favCleanUp, &favShutdown, &favCheckVMC, &favGetIconId, NULL, ITEM_VIEW_NATIVE, &favGetArtArchivePath};

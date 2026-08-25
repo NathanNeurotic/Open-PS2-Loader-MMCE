@@ -35,6 +35,11 @@ static unsigned char hddForceUpdate = 0;
 static unsigned char hddHDProKitDetected = 0;
 static unsigned char hddModulesLoadCount = 0;
 static unsigned char hddModulesLoaded = 0;
+// Residency is published before the one-second ATA settle so list retry can observe it, but PFS
+// must not start until the settle has completed. With every source on Auto another boot task can
+// otherwise see the resident latch mid-delay, start PS2FS too early, and leave a false code-222
+// notification behind even though the next retry mounts APA normally.
+static unsigned char hddModulesSettled = 0;
 static unsigned char hddSupportModulesLoaded = 0;
 // One toast per failure streak: hddUpdateGameList now RETRIES the support-module load every refresh
 // while it keeps failing, and re-toasting the same error box each pass would bury the UI. Reset on
@@ -273,6 +278,7 @@ int hddLoadModules(void)
         // Increment the load count as soon as possible to prevent thread scheduling from allowing another thread to
         // call into here and try to double load modules.
         hddModulesLoadCount = 1;
+        hddModulesSettled = 0;
 
         // DEV9 must be loaded, as HDD.IRX depends on it. Even if not required by the I/F (i.e. HDPro)
         sysInitDev9();
@@ -314,6 +320,7 @@ int hddLoadModules(void)
             // arm did not, and rebuild-153's device-refresh bump made the retry more frequent.
             sysShutdownDev9();
             hddModulesLoadCount = 0;
+            hddModulesSettled = 0;
         } else {
             retStatus = HDD_LOADMODULES_STATUS_NOERROR;
             hddModulesLoaded = 1;
@@ -324,6 +331,7 @@ int hddLoadModules(void)
             // ATA_DEVCTL_READ_PARTITION_SECTOR probe / ps2hdd init can otherwise race a drive that is
             // still spinning up. Runs once per load generation: the dedupe branch above never gets here.
             DelayThread(1000 * 1000);
+            hddModulesSettled = 1;
         }
     } else {
         hddModulesLoadCount++;
@@ -537,6 +545,12 @@ static int hddLoadCoreSupportModules(void)
 void hddLoadSupportModules(void)
 {
     int ret;
+
+    // Do not turn a concurrent Auto boot caller's mid-settle observation into a real PFS probe.
+    // The loader that owns the settle resumes into this function after the delay; if it is a
+    // BDM-only caller, the normal HDD list retry makes the first support attempt after it instead.
+    if (!hddModulesSettled)
+        return;
 
     if (!hddLoadCoreSupportModules())
         return;
@@ -1847,6 +1861,7 @@ static void hddShutdown(item_list_t *itemList)
             // DEV9 will remain active if ETH is in use, so put the HDD in IDLE state.
             // The HDD should still enter standby state after 21 minutes & 15 seconds, as per the ATAD defaults.
             hddSetIdleImmediate();
+            hddModulesSettled = 0;
         }
 
         // Only shut down dev9 from here, if it was initialized from here before -- and only on a
@@ -1977,7 +1992,23 @@ static char *hddGetPrefix(item_list_t *itemList)
     return gHDDPrefix;
 }
 
+// The persistent PFS mount is the session's sole APA data home. Keep packed artwork on that same
+// root: __common maps to pfs0:OPL/ART/art.tar, while +OPL maps to pfs0:ART/art.tar.
+static int hddGetArtArchivePath(item_list_t *itemList, const char *value, char *path, int pathSize)
+{
+    int len;
+
+    (void)itemList;
+    (void)value;
+
+    if (gHDDPrefix == NULL)
+        return -1;
+
+    len = snprintf(path, pathSize, "%sART/art.tar", gHDDPrefix);
+    return (len > 0 && len < pathSize) ? 1 : -1;
+}
+
 static item_list_t hddGameList = {
     HDD_MODE, 0, 0, MODE_FLAG_COMPAT_DMA, MENU_MIN_INACTIVE_FRAMES, HDD_MODE_UPDATE_DELAY, NULL, NULL, &hddGetTextId, &hddGetPrefix, &hddInit, &hddNeedsUpdate, &hddUpdateGameList,
     &hddGetGameCount, &hddGetGame, &hddGetGameName, &hddGetGameNameLength, &hddGetGameStartup, &hddDeleteGame, &hddRenameGame,
-    &hddLaunchGame, &hddGetConfig, &hddGetImage, &hddCleanUp, &hddShutdown, &hddCheckVMC, &hddGetIconId, &hddLaunchVcd};
+    &hddLaunchGame, &hddGetConfig, &hddGetImage, &hddCleanUp, &hddShutdown, &hddCheckVMC, &hddGetIconId, &hddLaunchVcd, ITEM_VIEW_NATIVE, &hddGetArtArchivePath};

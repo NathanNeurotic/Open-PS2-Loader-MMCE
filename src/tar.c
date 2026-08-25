@@ -55,13 +55,18 @@ static const TarDevice gDevices[] = {
 static const TarKindInfo gTarInfo[TAR_KIND_MAX] = {
     {"ART/art.tar", "art_cache.bin", sizeof(TarEntryArt)},
     {"CFG/cfg.tar", "cfg_cache.bin", sizeof(TarEntryCfg)},
-    {"CHT/cht.tar", "cht_cache.bin", sizeof(TarEntryCht)}};
+    {"CHT/cht.tar", "cht_cache.bin", sizeof(TarEntryCht)},
+    {"ART/art.tar", "art_cache.bin", sizeof(TarEntryArt)}};
 
-static void *s_index[TAR_KIND_MAX] = {NULL, NULL, NULL};
-static u32 s_count[TAR_KIND_MAX] = {0, 0, 0};
-static u32 s_cap[TAR_KIND_MAX] = {0, 0, 0};
-static const TarDevice *s_dev[TAR_KIND_MAX] = {NULL, NULL, NULL};
-static int s_inactive[TAR_KIND_MAX] = {0, 0, 0};
+static void *s_index[TAR_KIND_MAX] = {0};
+static u32 s_count[TAR_KIND_MAX] = {0};
+static u32 s_cap[TAR_KIND_MAX] = {0};
+static const TarDevice *s_dev[TAR_KIND_MAX] = {0};
+static int s_inactive[TAR_KIND_MAX] = {0};
+// An exact archive path is intentionally separate from the device probe table. The HDD art path
+// is the PFS data home selected for this session, not an alternate source to discover.
+static char s_exactPath[TAR_KIND_MAX][256];
+static int s_hasExactPath[TAR_KIND_MAX] = {0};
 
 static const unsigned char s_zeroBlock[TAR_BLOCK_SIZE] __attribute__((aligned(64))) = {0};
 
@@ -91,6 +96,8 @@ static void tarCloseInternal(TarKind kind)
     s_count[kind] = 0;
     s_cap[kind] = 0;
     s_dev[kind] = NULL;
+    s_exactPath[kind][0] = '\0';
+    s_hasExactPath[kind] = 0;
 }
 
 static int buildTarPath(const TarDevice *dev, TarKind kind, char *out, int outSize)
@@ -378,16 +385,51 @@ fail:
     return -1;
 }
 
+static int tarLoadExactPath(TarKind kind, const char *path)
+{
+    int len;
+
+    if (path == NULL || path[0] == '\0')
+        return -1;
+
+    if (s_hasExactPath[kind] && strcmp(s_exactPath[kind], path) == 0)
+        return s_inactive[kind] ? -1 : 0;
+
+    tarCloseInternal(kind);
+    s_inactive[kind] = 0;
+
+    len = snprintf(s_exactPath[kind], sizeof(s_exactPath[kind]), "%s", path);
+    if (len <= 0 || len >= (int)sizeof(s_exactPath[kind])) {
+        s_exactPath[kind][0] = '\0';
+        return -1;
+    }
+    s_hasExactPath[kind] = 1;
+
+    if (tarParseFile(kind, s_exactPath[kind]) == 0)
+        return 0;
+
+    // A missing selected archive should cost one open, not one open per cover. Unlike the generic
+    // loader, this latch is scoped to the exact PFS home and therefore never falls through to a
+    // second APA partition or another device.
+    s_inactive[kind] = 1;
+    LOG("TAR no archive at selected path %s -- probing disabled for this path\n", s_exactPath[kind]);
+    return -1;
+}
+
 int tarLoadFile(TarKind kind, const char *path)
 {
-    s_dev[kind] = NULL;
-    return tarParseFile(kind, path);
+    return tarLoadExactPath(kind, path);
 }
 
 int tarLoadFromAnyDevice(TarKind kind)
 {
     if (s_inactive[kind])
         return -1;
+
+    // An exact-path caller owns this kind's archive location. Never replace it with the first
+    // archive found by the generic device scan.
+    if (s_hasExactPath[kind])
+        return 0;
 
     if (s_index[kind] && s_dev[kind]) {
         char tarPath[256];
@@ -449,9 +491,12 @@ TarEntryBase *tarFind(TarKind kind, const char *filename)
     if (s_inactive[kind])
         return NULL;
 
-    if (!s_index[kind] || s_count[kind] == 0)
+    if ((!s_index[kind] || s_count[kind] == 0) && !s_hasExactPath[kind])
         if (tarLoadFromAnyDevice(kind) < 0)
             return NULL;
+
+    if (!s_index[kind] || s_count[kind] == 0)
+        return NULL;
 
     const char *queryClean = filename;
     if (!strncasecmp(queryClean, "./", 2))
@@ -478,15 +523,8 @@ TarEntryBase *tarFind(TarKind kind, const char *filename)
     return NULL;
 }
 
-TarEntryBase *tarFindPrefix(TarKind kind, const char *prefix)
+static TarEntryBase *tarFindPrefixLoaded(TarKind kind, const char *prefix)
 {
-    if (s_inactive[kind])
-        return NULL;
-
-    if (!s_index[kind] || s_count[kind] == 0)
-        if (tarLoadFromAnyDevice(kind) < 0)
-            return NULL;
-
     size_t prefixLen = strlen(prefix);
     u32 entrySize = gTarInfo[kind].entrySize;
     char *base = (char *)s_index[kind];
@@ -505,6 +543,29 @@ TarEntryBase *tarFindPrefix(TarKind kind, const char *prefix)
     return NULL;
 }
 
+TarEntryBase *tarFindPrefix(TarKind kind, const char *prefix)
+{
+    if (s_inactive[kind])
+        return NULL;
+
+    if ((!s_index[kind] || s_count[kind] == 0) && !s_hasExactPath[kind])
+        if (tarLoadFromAnyDevice(kind) < 0)
+            return NULL;
+
+    if (!s_index[kind] || s_count[kind] == 0)
+        return NULL;
+
+    return tarFindPrefixLoaded(kind, prefix);
+}
+
+TarEntryBase *tarFindPrefixFromPath(TarKind kind, const char *path, const char *prefix)
+{
+    if (tarLoadExactPath(kind, path) < 0 || !s_index[kind] || s_count[kind] == 0)
+        return NULL;
+
+    return tarFindPrefixLoaded(kind, prefix);
+}
+
 u32 tarRead(TarKind kind, const TarEntryBase *entry, void *dst, u32 dstSize)
 {
     if (s_inactive[kind])
@@ -514,8 +575,13 @@ u32 tarRead(TarKind kind, const TarEntryBase *entry, void *dst, u32 dstSize)
         return 0;
 
     char tarPath[256];
-    if (buildTarPath(s_dev[kind], kind, tarPath, sizeof(tarPath)) < 0)
+    if (s_hasExactPath[kind]) {
+        int len = snprintf(tarPath, sizeof(tarPath), "%s", s_exactPath[kind]);
+        if (len < 0 || len >= (int)sizeof(tarPath))
+            return 0;
+    } else if (buildTarPath(s_dev[kind], kind, tarPath, sizeof(tarPath)) < 0) {
         return 0;
+    }
 
     int fd = open(tarPath, O_RDONLY);
     if (fd < 0)
@@ -569,6 +635,9 @@ int tarEnsureLoaded(TarKind kind)
 {
     if (s_inactive[kind])
         return -1;
+
+    if (s_hasExactPath[kind])
+        return 0;
 
     if (!s_index[kind] || s_count[kind] == 0)
         return tarLoadFromAnyDevice(kind);
