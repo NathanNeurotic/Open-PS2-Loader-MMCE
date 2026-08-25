@@ -4051,6 +4051,10 @@ void deinitEx(int exception, int modeSelected, int modeSelected2)
 {
     gDeinitTerminal = (modeSelected == IO_MODE_SELECTED_ALL || modeSelected == IO_MODE_SELECTED_NONE);
 
+    // Stop before the I/O drain and before PADEMU is reset below. Port closure alone leaves a
+    // latched motor running through a slow launch or exit.
+    padRumbleStopAll();
+
     // Give up on the covers still QUEUED before draining. The drain waits on the ioman LIST, and the
     // worker keeps servicing it regardless of isIOBlocked, so without this the handoff pays for every
     // queued cover to be read off the game device first -- for a menu guiEnd() is about to destroy.
@@ -4108,6 +4112,9 @@ void deinitEx(int exception, int modeSelected, int modeSelected2)
 void deinit(int exception, int modeSelected)
 {
     gDeinitTerminal = (modeSelected == IO_MODE_SELECTED_ALL || modeSelected == IO_MODE_SELECTED_NONE);
+
+    // See deinitEx(): pulse shutdown must precede any blocking drain or PADEMU reset.
+    padRumbleStopAll();
 
     // Give up on the covers still QUEUED before draining. The drain waits on the ioman LIST, and the
     // worker keeps servicing it regardless of isIOBlocked, so without this the handoff pays for every
@@ -4845,6 +4852,11 @@ int main(int argc, char *argv[])
     // and it must not gate a boot that otherwise works fine.
     if (strchr(configGetDir(), '?') != NULL)
         guiWarning(_l(_STR_SETTINGS_NO_HOME), 6);
+
+    // guiIntroLoop handles input against a frozen pad snapshot. Do not send actuator RPCs until
+    // guiMainLoop is about to resume normal polling, otherwise a held boot button can race IOP loads.
+    padRumbleActivate();
+    padRumbleBump();
 
     guiMainLoop();
 
