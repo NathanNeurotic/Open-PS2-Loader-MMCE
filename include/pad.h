@@ -50,14 +50,20 @@ void padRestoreSettings(int *buffer);
  * that is still held when the destination appears. */
 void padFreezeEdgeBaseline(int freeze);
 
-/** Starts a menu rumble pulse on every connected pad that has actuators.
- * @param durationMs pulse length in ms (clamped internally)
- * @param large large-engine strength 0..255; the small engine runs for the whole pulse */
-void padRumble(int durationMs, int large);
+/** Enables menu rumble after startup. Before this, the intro loop can emit SFX_CURSOR without
+ * polling pads, so actuator commands must stay disabled. */
+void padRumbleActivate(void);
 
-/** Stops any rumble pulse in flight. Call before blocking the GUI thread -- the decay only runs
- * from readPads(), so a pulse started just before a blocking read would outlast it. */
+/** Navigation thump and decision bump. Both no-op when controller vibration is disabled. */
+void padRumbleTap(void);
+void padRumbleTapList(void);
+void padRumbleBump(void);
+
+/** Plays out a short in-flight decision bump, then stops it before blocking the GUI thread. */
 void padRumbleFlush(void);
+
+/** Stops all pad actuators immediately before polling or pad ownership stops. */
+void padRumbleStopAll(void);
 
 /** Debug HUD: longest run of polls where the pad could not be READ (freepad not ready -> SIO2 or
  * IOP-side), and longest run of polls that read fine but carried no buttons (fresh, empty sample ->
