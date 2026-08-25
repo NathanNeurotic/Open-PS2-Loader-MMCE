@@ -45,13 +45,10 @@ static unsigned char hddSupportModulesLoaded = 0;
 // while it keeps failing, and re-toasting the same error box each pass would bury the UI. Reset on
 // success so a later, different failure toasts again.
 static unsigned char hddSupportErrToasted = 0;
-// Auto startup enqueues hddInitModules before the initial HDD list refresh. A PS2FS load can still
-// transiently fail on the first post-settle attempts while the other Auto transports are coming up,
-// then succeed on a queued refresh. Count consecutive failures and only toast code 222 once the
-// failure streak has survived multiple retries -- a single transient failure must not alarm the user
-// when the PFS stack recovers before the menu becomes usable.
-static unsigned char hddPfsLoadRetryCount = 0;
-#define HDD_PFS_LOAD_RETRY_TOAST_THRESHOLD 3
+// Deferred PFS failure state. Low-level boot/config probes may transiently fail to load PS2FS/PFS;
+// they set this flag instead of publishing a user-facing error. The final HDD list-refresh path
+// evaluates the flag after recovery has had a chance to succeed and only then emits code 222 once.
+static unsigned char hddPfsLoadFailed = 0;
 // A Settings selection is deliberately staged until Save Settings. It never changes the active
 // pfs0: mount: a live OPL data home can have artwork/config readers using it.
 static int hddOplHomePending = -1;
@@ -533,17 +530,15 @@ static int hddLoadCoreSupportModules(void)
         ret = sysLoadModuleBuffer(&ps2fs_irx, size_ps2fs_irx, sizeof(pfsarg), pfsarg);
         if (ret < 0) {
             LOG("HDD: PFS support module failed to load.\n");
-            if (hddPfsLoadRetryCount < 0xFF)
-                hddPfsLoadRetryCount++;
-            if (hddPfsLoadRetryCount >= HDD_PFS_LOAD_RETRY_TOAST_THRESHOLD && !hddSupportErrToasted) {
-                setErrorMessageWithCode(_STR_HDD_PFS_UNAVAILABLE_ERROR, ERROR_HDD_MODULE_PFS_FAILURE);
-                hddSupportErrToasted = 1;
-            }
+            // Do NOT toast here. Boot/config probes may fail transiently before the
+            // final list-refresh recovery has run. Record the failure and let
+            // hddUpdateGameList() decide whether to publish code 222 after recovery.
+            hddPfsLoadFailed = 1;
             return 0;
         }
 
         hddSupportModulesLoaded = 1;
-        hddPfsLoadRetryCount = 0;
+        hddPfsLoadFailed = 0;
         hddSupportErrToasted = 0;
         hddClearRecoveredErrors();
         LOG("HDDSUPPORT modules loaded\n");
@@ -878,6 +873,15 @@ static int hddNeedsUpdate(item_list_t *itemList)
 
 static int hddUpdateGameList(item_list_t *itemList)
 {
+    // hddInitModules() runs the ATA stack load (and its required ~1-second post-ATAD settle) on the
+    // IO worker. If the GUI update runs before that async init has even started,
+    // hddLoadModulesReady() would perform the first load -- including the DelayThread -- on the GUI
+    // thread and freeze the menu. Defer until the worker has at least begun (count != 0);
+    // hddLoadModulesReady() then only blocks if an attempt is already in progress and returns safely
+    // otherwise.
+    if (hddModulesLoadCount == 0)
+        return 0;
+
     // Self-heal (wLaunchELF-R3Z3N parity: latch only on success, retry per use): a boot-time first
     // touch that raced drive spin-up used to leave the APA page EMPTY for the whole session -- the
     // one-shot hddInitModules never retried, and nothing else reloads the support stack. Both calls
@@ -904,6 +908,17 @@ static int hddUpdateGameList(item_list_t *itemList)
     // fails harmlessly if hdd0: is not ready; the VCD builder likewise skips mounts it cannot open.
     if (!hddSupportModulesLoaded)
         LOG("HDDSUPPORT UpdateGameList: PFS support incomplete; attempting read-only APA enumeration anyway\n");
+
+    // After boot/config probes and the retry above have had their chance, publish a persistent PFS
+    // failure exactly once. A later successful load clears the deferred flag and retracts the error.
+    if (hddSupportModulesLoaded) {
+        hddPfsLoadFailed = 0;
+        hddSupportErrToasted = 0;
+        hddClearRecoveredErrors();
+    } else if (hddPfsLoadFailed && !hddSupportErrToasted) {
+        setErrorMessageWithCode(_STR_HDD_PFS_UNAVAILABLE_ERROR, ERROR_HDD_MODULE_PFS_FAILURE);
+        hddSupportErrToasted = 1;
+    }
 
     if (vcdListViewActive(itemList))
         // Reuse the session's built list on view flips; hddBuildVcdGameList runs only when never
@@ -1849,7 +1864,7 @@ static void hddShutdown(item_list_t *itemList)
 {
     LOG("HDDSUPPORT Shutdown\n");
 
-    hddPfsLoadRetryCount = 0;
+    hddPfsLoadFailed = 0;
     hddSupportErrToasted = 0;
 
     if (hddGameList.enabled) {
