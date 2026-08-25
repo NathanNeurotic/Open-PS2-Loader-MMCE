@@ -640,15 +640,23 @@ static void padRumbleArm(int durationMs, int large, int small)
             durationMs = dutyMs;
     }
 
-    rumbleStartTicks = nowTicks;
-    rumbleDurTicks = (u32)durationMs * CLOCKS_PER_MILISEC;
-
     if (rumbleActive) {
-        // ACTIVE -> ACTIVE: pulse duration extended, actuator is already spinning.
+        // ACTIVE -> ACTIVE: extend duration if requested deadline is further out; promote motor levels.
         // ZERO SIF RPCs issued.
+        u32 currentEnd = rumbleStartTicks + rumbleDurTicks;
+        u32 requestedEnd = nowTicks + (u32)durationMs * CLOCKS_PER_MILISEC;
+        if ((s32)(requestedEnd - currentEnd) > 0) {
+            rumbleDurTicks = requestedEnd - rumbleStartTicks;
+        }
+        if (large > rumbleLarge)
+            rumbleLarge = large;
+        if (small > rumbleSmall)
+            rumbleSmall = small ? 1 : 0;
         return;
     }
 
+    rumbleStartTicks = nowTicks;
+    rumbleDurTicks = (u32)durationMs * CLOCKS_PER_MILISEC;
     rumbleActive = 1;
     rumbleLarge = large;
     rumbleSmall = small ? 1 : 0;
@@ -718,6 +726,15 @@ int readPads()
         rslt |= readPad(&pad_data[i], &pollClean);
     }
 
+    // Rumble decay. The pulse ends when duration expires; zero RPCs are sent while active.
+    // Processed before any deferred reconnect initialization to ensure reconnect polling delays
+    // cannot artificially prolong an active rumble pulse.
+    if (rumbleActive) {
+        if (!gEnableRumble || (u32)(cpu_ticks() - rumbleStartTicks) >= rumbleDurTicks) {
+            padRumbleStopAll();
+        }
+    }
+
     // Idle clock for the reconnect-edge self-heal gate (see PAD_SELF_HEAL_IDLE_MS). Only a clean,
     // zero-input, gap-free poll counts: misses and transitions are unknown, and an inter-poll gap
     // above the bound is unobserved time that must not be credited as a quiet user.
@@ -755,13 +772,6 @@ int readPads()
                 initializePad(&pad_data[i]);
                 break;
             }
-        }
-    }
-
-    // Rumble decay. The pulse ends when duration expires; zero RPCs are sent while active.
-    if (rumbleActive) {
-        if (!gEnableRumble || (u32)(cpu_ticks() - rumbleStartTicks) >= rumbleDurTicks) {
-            padRumbleStopAll();
         }
     }
 

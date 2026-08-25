@@ -20,6 +20,7 @@ MEMORY {
 REGION_ALIAS("MAIN_REGION", gram);
 
 PHDRS {
+  bram PT_LOAD;
   text PT_LOAD;
 }
 
@@ -27,14 +28,14 @@ SECTIONS {
 	.text : {
 		*(._launch_elf)
 		*libkernel.a:*(.text .text.*)
-	} >bram
+	} >bram :bram
 	.rodata : {
 		*libkernel.a:*(.rodata .rodata.*)
-	} >bram
+	} >bram :bram
 	.data : {
 		*libkernel.a:*(.data .data.*)
 		*(._launch_args)
-	} >bram
+	} >bram :bram
 
 	.text 0x00100000: {
 		_ftext = . ;
@@ -55,15 +56,15 @@ SECTIONS {
 		KEEP(*(EXCLUDE_FILE(*crtend*.o) .ctors))
 		KEEP(*(SORT(.ctors.*)))
 		KEEP(*(.ctors))
-	} >MAIN_REGION
+	} >MAIN_REGION :text
 	.dtors ALIGN(16): {
 		KEEP(*crtbegin*.o(.dtors))
 		KEEP(*(EXCLUDE_FILE(*crtend*.o) .dtors))
 		KEEP(*(SORT(.dtors.*)))
 		KEEP(*(.dtors))
-	} >MAIN_REGION
+	} >MAIN_REGION :text
 
-	.reginfo : { *(.reginfo) } >MAIN_REGION
+	.reginfo : { *(.reginfo) } >MAIN_REGION :text
 
 	.data ALIGN(128): {
 		_fdata = . ;
@@ -71,27 +72,27 @@ SECTIONS {
 		*(.data.*)
 		*(.gnu.linkonce.d*)
 		SORT(CONSTRUCTORS)
-	} >MAIN_REGION
+	} >MAIN_REGION :text
 
 	/* Static data.  */
 	.rodata ALIGN(128): {
 		*(.rodata)
 		*(.rodata.*)
 		*(.gnu.linkonce.r*)
-	} >MAIN_REGION
+	} >MAIN_REGION :text
 
-	.rdata ALIGN(128): { *(.rdata) } >MAIN_REGION
-	.gcc_except_table ALIGN(128): { *(.gcc_except_table) } >MAIN_REGION
+	.rdata ALIGN(128): { *(.rdata) } >MAIN_REGION :text
+	.gcc_except_table ALIGN(128): { *(.gcc_except_table) } >MAIN_REGION :text
 
 	_gp = ALIGN(128) + 0x7ff0;
-	.lit4 ALIGN(128): { *(.lit4) } >MAIN_REGION
-	.lit8 ALIGN(128): { *(.lit8) } >MAIN_REGION
+	.lit4 ALIGN(128): { *(.lit4) } >MAIN_REGION :text
+	.lit8 ALIGN(128): { *(.lit8) } >MAIN_REGION :text
 
 	.sdata ALIGN(128): {
 		*(.sdata)
 		*(.sdata.*)
 		*(.gnu.linkonce.s*)
-	} >MAIN_REGION
+	} >MAIN_REGION :text
 
 	_edata = .;
 	PROVIDE(edata = .);
@@ -103,14 +104,14 @@ SECTIONS {
 		*(.sbss.*)
 		*(.gnu.linkonce.sb*)
 		*(.scommon)
-	} >MAIN_REGION
+	} >MAIN_REGION :text
 
 	.bss ALIGN(128) : {
 		*(.bss)
 		*(.bss.*)
 		*(.gnu.linkonce.b*)
 		*(COMMON)
-	} >MAIN_REGION
+	} >MAIN_REGION :text
 	_end_bss = .;
 
 	_end = . ;
@@ -118,7 +119,7 @@ SECTIONS {
 
 	.spad 0x70000000: {
 		*(.spad)
-	} >MAIN_REGION
+	} >MAIN_REGION :text
 
 	/* Symbols needed by crt0.s.  */
 	PROVIDE(_heap_size = -1);

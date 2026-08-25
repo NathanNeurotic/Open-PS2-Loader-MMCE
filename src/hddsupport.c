@@ -57,9 +57,7 @@ hdd_pfs_state_t hddGetPfsState(void)
 
 void hddSetPfsFailedFinal(void)
 {
-    if (hddPfsState != HDD_PFS_READY) {
-        hddPfsState = HDD_PFS_FAILED_FINAL;
-    }
+    hddPfsState = HDD_PFS_FAILED_FINAL;
 }
 // A Settings selection is deliberately staged until Save Settings. It never changes the active
 // pfs0: mount: a live OPL data home can have artwork/config readers using it.
