@@ -98,23 +98,27 @@ static void hddInitModules(void)
 
     // Existing-partitions-only discovery may legitimately fail closed. Do not dereference a
     // missing data home, and do not create any folders until a PFS partition is actually mounted.
-    if (gHDDPrefix == NULL) {
+    if (gHDDPrefix != NULL) {
+        // update Themes
+        char path[256];
+        snprintf(path, sizeof(path), "%sTHM", gHDDPrefix);
+        thmAddElements(path, "/", 1);
+
+        snprintf(path, sizeof(path), "%sLNG", gHDDPrefix);
+        lngAddLanguages(path, "/", hddGameList.mode);
+
+        // Create normal OPL folders only inside the selected mounted PFS data home. A configured
+        // existing APA partition owns its root; the canonical __common fallback owns __common/OPL/.
+        // Never create an APA partition to obtain a home.
+        sbCreateFolders(gHDDPrefix, 0);
+    } else {
         LOG("HDDSUPPORT InitModules: no existing PFS data home mounted\n");
-        return;
     }
 
-    // update Themes
-    char path[256];
-    snprintf(path, sizeof(path), "%sTHM", gHDDPrefix);
-    thmAddElements(path, "/", 1);
-
-    snprintf(path, sizeof(path), "%sLNG", gHDDPrefix);
-    lngAddLanguages(path, "/", hddGameList.mode);
-
-    // Create normal OPL folders only inside the selected mounted PFS data home. A configured
-    // existing APA partition owns its root; the canonical __common fallback owns __common/OPL/.
-    // Never create an APA partition to obtain a home.
-    sbCreateFolders(gHDDPrefix, 0);
+    // Requeue the menu refresh now that the async ATA init/settle has completed. The GUI update
+    // that may have run earlier could have returned an empty list to avoid blocking on the GUI
+    // thread; this deferred update rebuilds the HDD page after the IO worker has finished.
+    ioPutRequest(IO_MENU_UPDATE_DEFFERED, &hddGameList.mode);
 }
 
 // HD Pro Kit is mapping the 1st word in ROM0 seg as a main ATA controller,
@@ -533,6 +537,9 @@ static int hddLoadCoreSupportModules(void)
             // Do NOT toast here. Boot/config probes may fail transiently before the
             // final list-refresh recovery has run. Record the failure and let
             // hddUpdateGameList() decide whether to publish code 222 after recovery.
+            // Clear the general support-error latch so a previous unrelated APA error
+            // does not suppress the deferred PFS notification.
+            hddSupportErrToasted = 0;
             hddPfsLoadFailed = 1;
             return 0;
         }

@@ -259,6 +259,23 @@ static int bdmLoadOptionalModule(const char *name, void *module, int moduleSize)
     return result;
 }
 
+// Load USBMASS_BD and record success. Callers inside bdmLoadBlockDeviceModules()/bdmEnsureTransportLoaded()
+// already hold bdmLoadModuleLock; early init callers (bdmLoadCoreModules) are single-threaded.
+static int bdmLoadUsbMassBd(void)
+{
+    if (iUSBModLoaded)
+        return 1;
+
+    LOG("[USBMASS_BD]:\n");
+    if (sysLoadModuleBuffer(&usbmass_bd_irx, size_usbmass_bd_irx, 0, NULL) >= 0) {
+        iUSBModLoaded = 1;
+        return 1;
+    }
+
+    LOG("USBMASS_BD failed to load\n");
+    return 0;
+}
+
 // Like bdmLoadOptionalModule, but passes IOP module args (arglen = byte length of the packed,
 // NUL-terminated args buffer). smap_udpbd requires an "ip=A.B.C.D" arg; the base loader passes none.
 static int bdmLoadOptionalModuleArgs(const char *name, void *module, int moduleSize, int arglen, char *args)
@@ -533,11 +550,7 @@ static void bdmLoadCoreModules(void)
     // both here in bdmLoadModules(). Treating USBMASS_BD as an optional async
     // transport created a boot race where a stick could fail to attach and then not
     // be retried until another generation event.
-    if (!iUSBModLoaded) {
-        LOG("[USBMASS_BD]:\n");
-        if (sysLoadModuleBuffer(&usbmass_bd_irx, size_usbmass_bd_irx, 0, NULL) >= 0)
-            iUSBModLoaded = 1;
-    }
+    bdmLoadUsbMassBd();
 
     LOG("[BDMEVENT]:\n");
     sysLoadModuleBuffer(&bdmevent_irx, size_bdmevent_irx, 0, NULL);
@@ -2015,9 +2028,9 @@ static int bdmEnsureTransportLoaded(int bdmType)
 {
     switch (bdmType) {
         case BDM_TYPE_USB:
-            // USB is loaded synchronously in bdmLoadCoreModules(); this is now a
-            // simple loaded-state query.
-            return iUSBModLoaded;
+            // USB is loaded synchronously in bdmLoadCoreModules(); this path also
+            // recovers from an initial load failure during normal discovery passes.
+            return bdmLoadUsbMassBd();
         case BDM_TYPE_SDC:
             if (!mx4sioModLoaded && bdmLoadOptionalModule("MX4SIO_BD", &mx4sio_bd_irx, size_mx4sio_bd_irx) >= 0)
                 mx4sioModLoaded = 1;
