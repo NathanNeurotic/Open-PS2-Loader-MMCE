@@ -166,6 +166,11 @@ typedef struct _item_list_t
     /// source without mutating the real source page's independent view. Appended last so all legacy
     /// positional item_list_t initializers default safely to native behavior.
     unsigned char viewOverride;
+
+    /// Resolve this item's ART/art.tar to one exact path. Return >0 after writing that path, 0 to
+    /// retain the generic archive lookup, or <0 to skip archive probing entirely. APA uses this to
+    /// keep artwork on its already-selected PFS data home.
+    int (*itemGetArtArchivePath)(item_list_t *itemList, const char *value, char *path, int pathSize);
 } item_list_t;
 
 #define ITEM_VIEW_NATIVE    0

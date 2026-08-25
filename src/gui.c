@@ -2144,8 +2144,10 @@ void guiShowArtworkConfig(void)
             // does nothing".
             int previousArtTar = gEnableArtTar;
             diaGetInt(diaArtworkConfig, UICFG_ENABLE_ART_TAR, &gEnableArtTar);
-            if (gEnableArtTar != previousArtTar)
+            if (gEnableArtTar != previousArtTar) {
                 tarInvalidate(TAR_KIND_ART);
+                tarInvalidate(TAR_KIND_HDD_ART);
+            }
         }
         int artDelayIdx = 0;
         diaGetInt(diaArtworkConfig, UICFG_ART_DELAY, &artDelayIdx);

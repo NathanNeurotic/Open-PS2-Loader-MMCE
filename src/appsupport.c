@@ -907,6 +907,23 @@ static int appGetImage(item_list_t *itemList, char *folder, int isRelative, char
     return oplGetAppImageByMode(app->artMode, folder, isRelative, value, suffix, resultTex, psm);
 }
 
+// Apps proxy artwork to their recorded source mode. Preserve a selected APA source's one-home
+// rule for packed art too; an unavailable HDD source must not fall back to the generic tar sweep.
+static int appGetArtArchivePath(item_list_t *itemList, const char *value, char *path, int pathSize)
+{
+    app_info_t *app = appLookupByStartup(value);
+
+    if (app == NULL || app->artMode < 0 || app->artMode >= MODE_COUNT)
+        return 0;
+
+    opl_io_module_t *module = oplGetModule(app->artMode);
+    item_list_t *source = module != NULL ? module->support : NULL;
+    if (source != NULL && source->itemGetArtArchivePath != NULL)
+        return source->itemGetArtArchivePath(source, value, path, pathSize);
+
+    return app->artMode == HDD_MODE ? -1 : 0;
+}
+
 static int appGetTextId(item_list_t *itemList)
 {
     return _STR_APPS;
@@ -948,4 +965,4 @@ static void appShutdown(item_list_t *itemList)
 static item_list_t appItemList = {
     APP_MODE, -1, 0, MODE_FLAG_NO_COMPAT | MODE_FLAG_NO_UPDATE, MENU_MIN_INACTIVE_FRAMES, APP_MODE_UPDATE_DELAY, NULL, NULL, &appGetTextId, NULL, &appInit, &appNeedsUpdate, &appUpdateItemList,
     &appGetItemCount, NULL, &appGetItemName, &appGetItemNameLength, &appGetItemStartup, &appDeleteItem, &appRenameItem, &appLaunchItem,
-    &appGetConfig, &appGetImage, &appCleanUp, &appShutdown, NULL, &appGetIconId};
+    &appGetConfig, &appGetImage, &appCleanUp, &appShutdown, NULL, &appGetIconId, NULL, ITEM_VIEW_NATIVE, &appGetArtArchivePath};

@@ -3396,6 +3396,7 @@ void applyConfig(int themeID, int langID, int skipDeviceRefresh)
     // so returning to List Mode does not re-probe USB 1.1 storage.
     if (skipDeviceRefresh == 0) {
         tarInvalidate(TAR_KIND_ART);
+        tarInvalidate(TAR_KIND_HDD_ART);
         cacheInvalidateFailMemo();
         artIndexInvalidate(); // a full settings apply is the user's own "I changed something, look again"
     }
