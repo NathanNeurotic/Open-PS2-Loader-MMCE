@@ -1013,6 +1013,11 @@ static void menuNextH()
 
     // If we found a valid menu transition to it.
     if (next != NULL) {
+        // A source switch can block the GUI thread (e.g. ATA page activation loads the APA/PFS
+        // stack), which stops readPads() and leaves a held-navigation rumble pulse latched on.
+        // Stop actuators synchronously before the switch so the motor never stays on during the
+        // freeze; padRumbleStopAll covers both native pads and PADEMU.
+        padRumbleStopAll();
         menuFolderResetLeaving(selected_item);
         selected_item = next;
         itemConfigId = -1;
@@ -1027,6 +1032,8 @@ static void menuPrevH()
         prev = prev->prev;
 
     if (prev != NULL) {
+        // See menuNextH(): stop any active rumble before a potentially blocking source switch.
+        padRumbleStopAll();
         menuFolderResetLeaving(selected_item);
         selected_item = prev;
         itemConfigId = -1;

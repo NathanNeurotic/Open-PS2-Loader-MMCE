@@ -1359,9 +1359,17 @@ void sysLaunchNeutrino(const char *driver, const char *path, const char *startup
         snprintf(filePath, sizeof(filePath), "-dvd=%s%s", bsdfsDvdPrefix[fsOverride], path);
         if (argc < argvMax)
             argv[argc++] = filePath;
+
+        // USB diagnostic: current NHDDL uses quickboot for USB (and every backend except HDL).
+        // Neutrino's quickboot path keeps the inherited IOP environment (iomanX/fileXio/bdm/bdmfs_fatfs
+        // already resident from OPL) and skips the LE IOP reset. This is a controlled A/B test for
+        // USB only; do not enable it for other devices until hardware justifies it.
+        if (!strcmp(deviceName, "usb") && argc < argvMax &&
+            !neutrinoArgHasActiveFlag(gNeutrinoArgs, "-qb") && !neutrinoArgHasActiveFlag(extraArgs, "-qb"))
+            argv[argc++] = "-qb";
     }
 
-    // Everything up to and including -dvd is the boot-critical core: the pool-fit drop loop below
+    // Everything up to and including -dvd/-qb is the boot-critical core: the pool-fit drop loop below
     // must never shed these. A fixed floor of 3 silently stopped covering -dvd once the optional
     // -bsdfs slots in front of it (argv[3]) -- record the real core count instead.
     const int coreArgc = argc;
