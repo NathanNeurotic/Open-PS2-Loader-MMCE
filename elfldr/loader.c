@@ -12,7 +12,8 @@
 # the target ELF through the STILL-LIVE IOP -- OPL's drivers and mounts stay
 # up -- and jumps into it. The target (Neutrino/POPSTARTER) reads its
 # config/modules and the game through those mounts, then performs its own
-# IOP reset.
+# IOP reset. On a SUCCESSFUL handoff we must NOT exit SIF RPC or fileXio;
+# doing so would tear down the environment the target needs before its reset.
 #
 # The target is read via SifLoadElf (rom0:LOADFILE) FIRST, with fileXio
 # (iomanX) as the rescue path. Both are needed:
@@ -120,6 +121,10 @@ static int readAll(int fd, void *buf, int size)
 // into user memory (>= 0x100000, already wiped) well above this loader's bram home, so reading
 // straight to each vaddr is safe. Returns 0 and sets *entry on success. gp stays 0 at ExecPS2:
 // standard PS2 crt0s load $gp themselves (POPSLoader's embedded loader ships the same way).
+//
+// INVARIANT: on SUCCESS we intentionally leave fileXio/RPC bound. The target (Neutrino/POPSTARTER)
+// inherits OPL's live IOP, mounts, and RPC environment and performs its own reset when ready.
+// Only the failure paths may tear down the local client, because there is no target handoff.
 static int loadElfViaFileXio(const char *path, u32 *entry)
 {
     elf_header_t eh;
@@ -129,16 +134,13 @@ static int loadElfViaFileXio(const char *path, u32 *entry)
     if (fileXioInit() < 0)
         return -1;
     fd = fileXioOpen(path, FIO_O_RDONLY);
-    if (fd < 0) {
-        fileXioExit();
+    if (fd < 0)
         return -1;
-    }
 
     // phentsize must match our struct or the per-header stride below reads garbage.
     if (readAll(fd, &eh, sizeof(eh)) != 0 || _lw((u32)&eh.ident) != ELF_MAGIC || eh.phnum == 0 ||
         eh.phentsize != sizeof(elf_pheader_t)) {
         fileXioClose(fd);
-        fileXioExit();
         return -1;
     }
 
@@ -146,7 +148,6 @@ static int loadElfViaFileXio(const char *path, u32 *entry)
         if (fileXioLseek(fd, eh.phoff + i * sizeof(elf_pheader_t), SEEK_SET) < 0 ||
             readAll(fd, &ph, sizeof(ph)) != 0) {
             fileXioClose(fd);
-            fileXioExit();
             return -1;
         }
         if (ph.type != ELF_PT_LOAD || ph.memsz == 0)
@@ -158,13 +159,11 @@ static int loadElfViaFileXio(const char *path, u32 *entry)
         if (ph.filesz > ph.memsz || (u32)ph.vaddr < 0x100000 ||
             ph.memsz > (u32)GetMemorySize() || (u32)ph.vaddr > (u32)GetMemorySize() - ph.memsz) {
             fileXioClose(fd);
-            fileXioExit();
             return -1;
         }
         if (ph.filesz > 0) {
             if (fileXioLseek(fd, ph.offset, SEEK_SET) < 0 || readAll(fd, ph.vaddr, ph.filesz) != 0) {
                 fileXioClose(fd);
-                fileXioExit();
                 return -1;
             }
         }
@@ -173,7 +172,6 @@ static int loadElfViaFileXio(const char *path, u32 *entry)
         loaded++;
     }
     fileXioClose(fd);
-    fileXioExit();
 
     if (!loaded)
         return -1;
@@ -208,7 +206,8 @@ int main(int argc, char *argv[])
     ret = SifLoadElf(argv[0], &elfdata);
     SifLoadFileExit();
     if (ret == 0 && elfdata.epc != 0) {
-        SifExitRpc();
+        // SUCCESSFUL handoff: keep SIF RPC alive so Neutrino/POPSTARTER can use OPL's live IOP,
+        // mounts, and config/modules before performing their own IOP reset.
         FlushCache(0);
         FlushCache(2);
         return ExecPS2((void *)elfdata.epc, (void *)elfdata.gp, argc - 1, &argv[1]);
@@ -216,7 +215,7 @@ int main(int argc, char *argv[])
 
     // Rescue: fileXio (iomanX) for the devices LOADFILE cannot see (mmceN:, pfs, ...).
     if (loadElfViaFileXio(argv[0], &entry) == 0) {
-        SifExitRpc();
+        // SUCCESSFUL handoff: keep SIF RPC alive (see comment above).
         FlushCache(0);
         FlushCache(2);
         return ExecPS2((void *)entry, NULL, argc - 1, &argv[1]);
