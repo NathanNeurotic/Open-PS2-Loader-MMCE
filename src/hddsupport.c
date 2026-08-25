@@ -45,6 +45,11 @@ static unsigned char hddSupportModulesLoaded = 0;
 // while it keeps failing, and re-toasting the same error box each pass would bury the UI. Reset on
 // success so a later, different failure toasts again.
 static unsigned char hddSupportErrToasted = 0;
+// Auto startup enqueues hddInitModules before the initial HDD list refresh. A PS2FS load can still
+// transiently fail on that first post-settle attempt while the other Auto transports are coming up,
+// then succeed on the queued refresh. Keep that first failure pending so code 222 describes an
+// actually unavailable PFS stack, not a condition that already recovered before the menu is usable.
+static unsigned char hddPfsLoadRetryPending = 0;
 // A Settings selection is deliberately staged until Save Settings. It never changes the active
 // pfs0: mount: a live OPL data home can have artwork/config readers using it.
 static int hddOplHomePending = -1;
@@ -526,14 +531,16 @@ static int hddLoadCoreSupportModules(void)
         ret = sysLoadModuleBuffer(&ps2fs_irx, size_ps2fs_irx, sizeof(pfsarg), pfsarg);
         if (ret < 0) {
             LOG("HDD: PFS support module failed to load.\n");
-            if (!hddSupportErrToasted) {
+            if (hddPfsLoadRetryPending && !hddSupportErrToasted) {
                 setErrorMessageWithCode(_STR_HDD_PFS_UNAVAILABLE_ERROR, ERROR_HDD_MODULE_PFS_FAILURE);
                 hddSupportErrToasted = 1;
             }
+            hddPfsLoadRetryPending = 1;
             return 0;
         }
 
         hddSupportModulesLoaded = 1;
+        hddPfsLoadRetryPending = 0;
         hddSupportErrToasted = 0;
         hddClearRecoveredErrors();
         LOG("HDDSUPPORT modules loaded\n");
@@ -1838,6 +1845,8 @@ static int hddCheckVMC(item_list_t *itemList, char *name, int createSize)
 static void hddShutdown(item_list_t *itemList)
 {
     LOG("HDDSUPPORT Shutdown\n");
+
+    hddPfsLoadRetryPending = 0;
 
     if (hddGameList.enabled) {
         hddFreeHDLGamelist(&hddGames);
