@@ -173,10 +173,11 @@ static int loadElfViaFileXio(const char *path, u32 *entry)
         loaded++;
     }
     fileXioClose(fd);
-    fileXioExit();
 
-    if (!loaded)
+    if (!loaded) {
+        fileXioExit();
         return -1;
+    }
     *entry = eh.entry;
     return 0;
 }
@@ -208,7 +209,6 @@ int main(int argc, char *argv[])
     ret = SifLoadElf(argv[0], &elfdata);
     SifLoadFileExit();
     if (ret == 0 && elfdata.epc != 0) {
-        SifExitRpc();
         FlushCache(0);
         FlushCache(2);
         return ExecPS2((void *)elfdata.epc, (void *)elfdata.gp, argc - 1, &argv[1]);
@@ -216,7 +216,6 @@ int main(int argc, char *argv[])
 
     // Rescue: fileXio (iomanX) for the devices LOADFILE cannot see (mmceN:, pfs, ...).
     if (loadElfViaFileXio(argv[0], &entry) == 0) {
-        SifExitRpc();
         FlushCache(0);
         FlushCache(2);
         return ExecPS2((void *)entry, NULL, argc - 1, &argv[1]);
