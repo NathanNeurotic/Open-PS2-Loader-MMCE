@@ -17,6 +17,7 @@
 #include "include/extern_irx.h"
 #include "include/cheatman.h"
 #include "include/sound.h"
+#include "include/bdmevent.h"
 #include "modules/iopcore/common/cdvd_config.h"
 
 #include <usbhdfsd-common.h>
@@ -63,9 +64,18 @@ static unsigned int BdmGeneration = 0;
 // Snapshot the change and emit it from the ordinary deferred device-update worker instead.
 static volatile unsigned int BdmDiagEventPreviousGeneration;
 static volatile unsigned int BdmDiagEventGeneration;
-static void *volatile BdmDiagEventPacket;
-static void *volatile BdmDiagEventOpt;
+static volatile unsigned int BdmDiagEventReceivedCount;
+static volatile int BdmDiagEventCause;
+static volatile unsigned int BdmDiagIopCallbackSequence;
+static volatile unsigned int BdmDiagIopMountCallbackCount;
+static volatile unsigned int BdmDiagIopUnmountCallbackCount;
+static volatile unsigned int BdmDiagIopBlockDeviceCount;
+static volatile unsigned int BdmDiagIopUsbRootCount;
+static volatile unsigned int BdmDiagIopUsbRootMask;
 static volatile int BdmDiagEventPending;
+static volatile int BdmDiagIopSnapshotPending;
+static unsigned int BdmDiagSnapshotRequestCount;
+static unsigned int BdmDiagSlotProbeCount[MAX_BDM_DEVICES];
 #endif
 
 static int bdmDriverIsUSB(const char *driverName)
@@ -544,20 +554,82 @@ int bdmModeIsUDPBD(int mode)
 
 static void bdmEventHandler(void *packet, void *opt)
 {
+    const bdm_event_packet_t *event = (const bdm_event_packet_t *)packet;
+
+    (void)opt;
+
+#ifdef __DEBUG
+    if (event != NULL) {
+        BdmDiagIopCallbackSequence = event->callbackSequence;
+        BdmDiagIopMountCallbackCount = event->mountCallbackCount;
+        BdmDiagIopUnmountCallbackCount = event->unmountCallbackCount;
+        BdmDiagIopBlockDeviceCount = event->blockDeviceCount;
+        BdmDiagIopUsbRootCount = event->usbRootCount;
+        BdmDiagIopUsbRootMask = event->usbRootMask;
+    }
+#endif
+
+    // A diagnostic snapshot reports IOP-side state without representing a storage change. Never
+    // let the query itself bump BdmGeneration or alter the page-refresh decision.
+    if (event != NULL && event->kind == BDMEVENT_PACKET_DIAG_SNAPSHOT) {
+#ifdef __DEBUG
+        BdmDiagIopSnapshotPending = 1;
+#endif
+        return;
+    }
+
 #ifdef __DEBUG
     BdmDiagEventPreviousGeneration = BdmGeneration;
-#else
-    (void)packet;
-    (void)opt;
+    BdmDiagEventCause = event != NULL ? event->cause : -1;
+    BdmDiagEventReceivedCount++;
 #endif
     BdmGeneration++;
 #ifdef __DEBUG
     BdmDiagEventGeneration = BdmGeneration;
-    BdmDiagEventPacket = packet;
-    BdmDiagEventOpt = opt;
     BdmDiagEventPending = 1;
 #endif
 }
+
+#ifdef __DEBUG
+static void bdmDiagRequestIopSnapshot(const char *reason, int mode, int openResult)
+{
+    static SifCmdHeader_t query;
+    int result;
+
+    BdmDiagSnapshotRequestCount++;
+    query.opt = BdmDiagSnapshotRequestCount;
+    result = SifSendCmd(BDMEVENT_IOP_DIAG_QUERY_CMD, &query, sizeof(query), NULL, NULL, 0);
+    LOG("[BDM COLD DIAG] event=iop-snapshot-request request=%u reason=%s generation=%u mode=%d open=%d send=%d\n",
+        BdmDiagSnapshotRequestCount, reason, BdmGeneration, mode, openResult, result);
+}
+
+static void bdmDiagFlushPendingIopState(item_list_t *itemList)
+{
+    if (BdmDiagEventPending) {
+        unsigned int previousGeneration = BdmDiagEventPreviousGeneration;
+        unsigned int generation = BdmDiagEventGeneration;
+        int cause = BdmDiagEventCause;
+
+        BdmDiagEventPending = 0;
+        LOG("[BDM COLD DIAG] event=generation-change source=bdm-event generation=%u->%u "
+            "eeReceived=%u cause=%d iopCallbacks=%u mountCallbacks=%u unmountCallbacks=%u "
+            "blockDevices=%u usbRoots=%u usbRootMask=0x%08x itemList=%p mode=%d\n",
+            previousGeneration, generation, BdmDiagEventReceivedCount, cause, BdmDiagIopCallbackSequence,
+            BdmDiagIopMountCallbackCount, BdmDiagIopUnmountCallbackCount, BdmDiagIopBlockDeviceCount,
+            BdmDiagIopUsbRootCount, BdmDiagIopUsbRootMask, itemList, itemList->mode);
+    }
+
+    if (BdmDiagIopSnapshotPending) {
+        BdmDiagIopSnapshotPending = 0;
+        LOG("[BDM COLD DIAG] event=iop-snapshot generation=%u eeReceived=%u iopCallbacks=%u "
+            "mountCallbacks=%u unmountCallbacks=%u blockDevices=%u usbRoots=%u usbRootMask=0x%08x "
+            "itemList=%p mode=%d\n",
+            BdmGeneration, BdmDiagEventReceivedCount, BdmDiagIopCallbackSequence,
+            BdmDiagIopMountCallbackCount, BdmDiagIopUnmountCallbackCount, BdmDiagIopBlockDeviceCount,
+            BdmDiagIopUsbRootCount, BdmDiagIopUsbRootMask, itemList, itemList->mode);
+    }
+}
+#endif
 
 // Bump the device generation the per-device refresh latch keys off, exactly as a real hotplug event
 // (bdmEventHandler) does. This invalidates every device's bdmDeviceTick so the next bdmNeedsUpdate
@@ -719,7 +791,7 @@ static void bdmLoadBlockDeviceModules(void)
         // suppress future retries via bdmShouldQueueModuleLoad() (matches the
         // conditional pattern used for USB/MX4SIO and opl.c's hddLoadModules gate).
         bdmDiagBootStageBegin("DEV9/ATAD/XHDD");
-        int hddResult = hddLoadModulesReady();
+        int hddResult = hddDiagLoadModulesReady();
         bdmDiagBootStageEnd("DEV9/ATAD/XHDD", hddResult);
         if (hddResult)
             hddModLoaded = 1;
@@ -844,7 +916,11 @@ static void bdmLoadCoreModules(void)
 
     LOG("[BDMEVENT]:\n");
     sysLoadModuleBuffer(&bdmevent_irx, size_bdmevent_irx, 0, NULL);
-    SifAddCmdHandler(0, &bdmEventHandler, NULL);
+    SifAddCmdHandler(BDMEVENT_EE_EVENT_CMD, &bdmEventHandler, NULL);
+
+#ifdef __DEBUG
+    bdmDiagRequestIopSnapshot("handler-ready", -1, -1);
+#endif
 
     LOG("BDMSUPPORT Modules loaded\n");
 }
@@ -2103,16 +2179,7 @@ int bdmUpdateDeviceData(item_list_t *itemList)
     int driverResult, deviceResult;
 
 #ifdef __DEBUG
-    if (BdmDiagEventPending) {
-        unsigned int previousGeneration = BdmDiagEventPreviousGeneration;
-        unsigned int generation = BdmDiagEventGeneration;
-        void *packet = BdmDiagEventPacket;
-        void *opt = BdmDiagEventOpt;
-
-        BdmDiagEventPending = 0;
-        LOG("[BDM DIAG] event=generation-change source=bdm-event generation=%u->%u itemList=%p mode=%d packet=%p opt=%p\n",
-            previousGeneration, generation, itemList, itemList->mode, packet, opt);
-    }
+    bdmDiagFlushPendingIopState(itemList);
 #endif
 
     // If bdm mode is disabled bail out as we don't want to update the visibility state of the device pages.
@@ -2129,6 +2196,34 @@ int bdmUpdateDeviceData(item_list_t *itemList)
     snprintf(path, sizeof(path), "mass%d:/", itemList->mode);
     int dir = fileXioDopen(path);
     // LOG("opendir %s -> %d\n", path, dir);
+
+#ifdef __DEBUG
+    {
+        const int diagSlot = itemList->mode - BDM_MODE;
+
+        if (diagSlot >= 0 && diagSlot < MAX_BDM_DEVICES) {
+            const unsigned int probe = ++BdmDiagSlotProbeCount[diagSlot];
+
+            if (probe <= 4 || (dir >= 0 && pDeviceData->bdmDeviceRoot[0] == '\0')) {
+                LOG("[BDM COLD DIAG] event=slot-probe probe=%u generation=%u eeReceived=%u "
+                    "iopCallbacks=%u mountCallbacks=%u unmountCallbacks=%u blockDevices=%u "
+                    "usbRoots=%u usbRootMask=0x%08x mode=%d slot=%d legacy=\"%s\" open=%d "
+                    "visible=%d tick=%u ulPrev=%d root=\"%s\" driver=\"%s\" type=%d\n",
+                    probe, BdmGeneration, BdmDiagEventReceivedCount, BdmDiagIopCallbackSequence,
+                    BdmDiagIopMountCallbackCount, BdmDiagIopUnmountCallbackCount,
+                    BdmDiagIopBlockDeviceCount, BdmDiagIopUsbRootCount, BdmDiagIopUsbRootMask,
+                    itemList->mode, diagSlot, path, dir, visible, pDeviceData->bdmDeviceTick,
+                    pDeviceData->bdmULSizePrev, pDeviceData->bdmDeviceRoot,
+                    pDeviceData->bdmDriver, pDeviceData->bdmDeviceType);
+            }
+
+            if (probe == 1 && (diagSlot == 0 || diagSlot == 1 || diagSlot == MAX_BDM_DEVICES - 1))
+                bdmDiagRequestIopSnapshot("slot-first-probe", itemList->mode, dir);
+            else if (probe == 2 && diagSlot == 1 && dir < 0)
+                bdmDiagRequestIopSnapshot("slot1-second-miss", itemList->mode, dir);
+        }
+    }
+#endif
 
     // Device reachable this poll -> clear the debounce miss counter (see the hide branch below).
     if (dir >= 0)

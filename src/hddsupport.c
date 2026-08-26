@@ -42,6 +42,19 @@ static unsigned char hddSupportModulesLoaded = 0;
 static unsigned char hddSupportErrToasted = 0;
 static unsigned char hddPfsDeferredFailed = 0;
 static int hddRetryQueued = 0;
+
+typedef enum {
+    HDD_PFS_DIAG_REASON_NONE = 0,
+    HDD_PFS_DIAG_REASON_HDD_CHECK_STATUS_1,
+    HDD_PFS_DIAG_REASON_PS2FS_LOAD_FAILURE,
+} hdd_pfs_diag_reason_t;
+
+#define HDD_PFS_DIAG_NOT_RUN (-9999)
+
+static hdd_pfs_diag_reason_t hddPfsDiagReason = HDD_PFS_DIAG_REASON_NONE;
+static int hddPfsDiagHddCheckResult = HDD_PFS_DIAG_NOT_RUN;
+static int hddPfsDiagPs2fsResult = HDD_PFS_DIAG_NOT_RUN;
+static unsigned char hddDiagBootStageActive = 0;
 // A Settings selection is deliberately staged until Save Settings. It never changes the active
 // pfs0: mount: a live OPL data home can have artwork/config readers using it.
 static int hddOplHomePending = -1;
@@ -51,6 +64,81 @@ static int hddOplHomeCommitted = -1;
 // +OPL can be the existing automatic home only when __common was unavailable during discovery.
 // Keep that distinct from an explicit conf_hdd.cfg redirect, which may fall back to __common.
 static unsigned char hddOplHomeAutoPlus = 0;
+
+static const char *hddPfsDiagReasonName(hdd_pfs_diag_reason_t reason)
+{
+    switch (reason) {
+        case HDD_PFS_DIAG_REASON_HDD_CHECK_STATUS_1:
+            return "HDD_CHECK_STATUS_1_UNFORMATTED";
+        case HDD_PFS_DIAG_REASON_PS2FS_LOAD_FAILURE:
+            return "PS2FS_LOAD_FAILURE";
+        default:
+            return "NONE";
+    }
+}
+
+static void hddLogPfsDiagState(const char *action, const char *why)
+{
+    LOG("[HDD PFS DIAG] action=%s why=%s reason=%s hddCheck=%d ps2fs=%d "
+        "hddModulesLoaded=%u hddSupportModulesLoaded=%u gOPLPart=\"%s\" gHDDPrefix=\"%s\"\n",
+        action, why, hddPfsDiagReasonName(hddPfsDiagReason), hddPfsDiagHddCheckResult,
+        hddPfsDiagPs2fsResult, hddModulesLoaded, hddSupportModulesLoaded, gOPLPart,
+        gHDDPrefix != NULL ? gHDDPrefix : "<null>");
+}
+
+static void hddArmPfsDiagFailure(hdd_pfs_diag_reason_t reason, int hddCheckResult, int ps2fsResult)
+{
+    hddPfsDiagReason = reason;
+    hddPfsDiagHddCheckResult = hddCheckResult;
+    hddPfsDiagPs2fsResult = ps2fsResult;
+    hddPfsDeferredFailed = 1;
+    hddLogPfsDiagState("arm", "support-load-failure");
+}
+
+static void hddClearPfsDiagFailure(const char *why)
+{
+    hddLogPfsDiagState("clear", why);
+    hddPfsDeferredFailed = 0;
+    hddPfsDiagReason = HDD_PFS_DIAG_REASON_NONE;
+    hddPfsDiagHddCheckResult = HDD_PFS_DIAG_NOT_RUN;
+    hddPfsDiagPs2fsResult = HDD_PFS_DIAG_NOT_RUN;
+}
+
+static void hddDiagBootStageBegin(const char *stage)
+{
+    char status[96];
+
+    if (!hddDiagBootStageActive)
+        return;
+
+    snprintf(status, sizeof(status), "BEGIN %s", stage);
+    LOG("%s\n", status);
+    guiSetBootStatusStickyCopy(status);
+}
+
+static void hddDiagBootStageEnd(const char *stage, int result)
+{
+    char status[96];
+
+    if (!hddDiagBootStageActive)
+        return;
+
+    snprintf(status, sizeof(status), "END %s result=%d", stage, result);
+    LOG("%s\n", status);
+    guiSetBootStatusStickyCopy(status);
+}
+
+static void hddDiagBootStageEndVoid(const char *stage)
+{
+    char status[96];
+
+    if (!hddDiagBootStageActive)
+        return;
+
+    snprintf(status, sizeof(status), "END %s", stage);
+    LOG("%s\n", status);
+    guiSetBootStatusStickyCopy(status);
+}
 
 static void hddClearRecoveredErrors(void)
 {
@@ -264,10 +352,12 @@ static void hddFindOPLPartition(void)
 
 int hddLoadModules(void)
 {
-    int retLoadModule;
+    int retLoadModule = HDD_PFS_DIAG_NOT_RUN;
+    int retBdmModule = HDD_PFS_DIAG_NOT_RUN;
+    int retXhddModule = HDD_PFS_DIAG_NOT_RUN;
     int retStatus = HDD_LOADMODULES_STATUS_UNK;
 
-    LOG("HDDSUPPORT LoadModules %d\n", hddModulesLoadCount);
+    LOG("[HDD STARTUP DIAG] hddLoadModules entry count=%u loaded=%u\n", hddModulesLoadCount, hddModulesLoaded);
 
     if (hddModulesLoaded)
         retStatus = HDD_LOADMODULES_STATUS_ALREADYLOADED;
@@ -278,23 +368,37 @@ int hddLoadModules(void)
         hddModulesLoadCount = 1;
 
         // DEV9 must be loaded, as HDD.IRX depends on it. Even if not required by the I/F (i.e. HDPro)
+        hddDiagBootStageBegin("HDD:DEV9");
         sysInitDev9();
+        hddDiagBootStageEndVoid("HDD:DEV9");
 
         // try to detect HD Pro Kit (not the connected HDD),
         // if detected it loads the specific ATAD module
+        hddDiagBootStageBegin("HDD:HDPRO-PROBE");
         hddHDProKitDetected = hddCheckHDProKit();
+        hddDiagBootStageEnd("HDD:HDPRO-PROBE", hddHDProKitDetected);
         if (hddHDProKitDetected) {
             LOG("[ATAD_HDPRO]:\n");
+            hddDiagBootStageBegin("HDD:ATAD-HDPRO");
             retLoadModule = sysLoadModuleBuffer(&hdpro_atad_irx, size_hdpro_atad_irx, 0, NULL);
+            hddDiagBootStageEnd("HDD:ATAD-HDPRO", retLoadModule);
             LOG("[XHDD]:\n");
-            sysLoadModuleBuffer(&xhdd_irx, size_xhdd_irx, 6, "-hdpro");
+            hddDiagBootStageBegin("HDD:XHDD-HDPRO");
+            retXhddModule = sysLoadModuleBuffer(&xhdd_irx, size_xhdd_irx, 6, "-hdpro");
+            hddDiagBootStageEnd("HDD:XHDD-HDPRO", retXhddModule);
         } else {
             LOG("[BDM]:\n");
-            sysLoadModuleBuffer(&bdm_irx, size_bdm_irx, 0, NULL);
+            hddDiagBootStageBegin("HDD:BDM");
+            retBdmModule = sysLoadModuleBuffer(&bdm_irx, size_bdm_irx, 0, NULL);
+            hddDiagBootStageEnd("HDD:BDM", retBdmModule);
             LOG("[ATAD]:\n");
+            hddDiagBootStageBegin("HDD:ATAD");
             retLoadModule = sysLoadModuleBuffer(&ps2atad_irx, size_ps2atad_irx, 0, NULL);
+            hddDiagBootStageEnd("HDD:ATAD", retLoadModule);
             LOG("[XHDD]:\n");
-            sysLoadModuleBuffer(&xhdd_irx, size_xhdd_irx, 0, NULL);
+            hddDiagBootStageBegin("HDD:XHDD");
+            retXhddModule = sysLoadModuleBuffer(&xhdd_irx, size_xhdd_irx, 0, NULL);
+            hddDiagBootStageEnd("HDD:XHDD", retXhddModule);
         }
 
         if (retLoadModule < 0) {
@@ -326,7 +430,9 @@ int hddLoadModules(void)
             // seconds after power-on (APA boot-identity config resolution), so the very first
             // ATA_DEVCTL_READ_PARTITION_SECTOR probe / ps2hdd init can otherwise race a drive that is
             // still spinning up. Runs once per load generation: the dedupe branch above never gets here.
+            hddDiagBootStageBegin("HDD:SETTLE");
             DelayThread(1000 * 1000);
+            hddDiagBootStageEndVoid("HDD:SETTLE");
         }
     } else {
         hddModulesLoadCount++;
@@ -334,8 +440,25 @@ int hddLoadModules(void)
             retStatus = HDD_LOADMODULES_STATUS_BUSYLOADING;
     }
 
-    LOG("HDDSUPPORT LoadModules done\n");
+    LOG("[HDD STARTUP DIAG] hddLoadModules exit count=%u loaded=%u ret=%d bdm=%d atad=%d xhdd=%d\n",
+        hddModulesLoadCount, hddModulesLoaded, retStatus, retBdmModule, retLoadModule, retXhddModule);
     return retStatus;
+}
+
+int hddDiagLoadModulesReady(void)
+{
+    int result;
+
+    hddDiagBootStageActive = 1;
+    hddDiagBootStageBegin("HDD:READY");
+    LOG("[HDD STARTUP DIAG] hddLoadModulesReady entry count=%u loaded=%u\n", hddModulesLoadCount, hddModulesLoaded);
+    result = hddLoadModulesReady();
+    LOG("[HDD STARTUP DIAG] hddLoadModulesReady exit count=%u loaded=%u result=%d\n",
+        hddModulesLoadCount, hddModulesLoaded, result);
+    hddDiagBootStageEnd("HDD:READY", result);
+    hddDiagBootStageActive = 0;
+
+    return result;
 }
 
 int hddModulesAreLoaded(void)
@@ -503,7 +626,7 @@ static int hddLoadCoreSupportModules(void)
         if (ret == 1) {
             LOG("HDD: APA status reports an unformatted drive.\n");
             hddSupportErrToasted = 0;
-            hddPfsDeferredFailed = 1;
+            hddArmPfsDiagFailure(HDD_PFS_DIAG_REASON_HDD_CHECK_STATUS_1, ret, HDD_PFS_DIAG_NOT_RUN);
             return 0;
         }
         if (ret == 2) {
@@ -520,12 +643,12 @@ static int hddLoadCoreSupportModules(void)
         if (ret < 0) {
             LOG("HDD: PFS support module failed to load.\n");
             hddSupportErrToasted = 0;
-            hddPfsDeferredFailed = 1;
+            hddArmPfsDiagFailure(HDD_PFS_DIAG_REASON_PS2FS_LOAD_FAILURE, 0, ret);
             return 0;
         }
 
         hddSupportModulesLoaded = 1;
-        hddPfsDeferredFailed = 0;
+        hddClearPfsDiagFailure("core-support-load-succeeded");
         hddSupportErrToasted = 0;
         hddClearRecoveredErrors();
         LOG("HDDSUPPORT modules loaded\n");
@@ -882,17 +1005,19 @@ static int hddUpdateGameList(item_list_t *itemList)
             hddLoadSupportModules();
         // Deferred Code 222: early boot probes never toast; settled retry may.
         if (hddSupportModulesLoaded) {
-            hddPfsDeferredFailed = 0;
+            hddClearPfsDiagFailure("update-retry-loaded-support");
             hddSupportErrToasted = 0;
             hddClearRecoveredErrors();
         } else if (hddPfsDeferredFailed && !hddSupportErrToasted) {
-            setErrorMessageWithCode(_STR_HDD_PFS_UNAVAILABLE_ERROR, ERROR_HDD_MODULE_PFS_FAILURE);
+            hddLogPfsDiagState("emit-code-222", "settled-update-retry-still-failed");
+            setErrorMessageWithCodeAndDetail(_STR_HDD_PFS_UNAVAILABLE_ERROR, ERROR_HDD_MODULE_PFS_FAILURE,
+                                             hddPfsDiagReasonName(hddPfsDiagReason));
             hddSupportErrToasted = 1;
         }
     } else {
         // Successful path also clears any prior deferred failure.
         if (hddPfsDeferredFailed) {
-            hddPfsDeferredFailed = 0;
+            hddClearPfsDiagFailure("update-found-support-already-ready");
             hddSupportErrToasted = 0;
             hddClearRecoveredErrors();
         }

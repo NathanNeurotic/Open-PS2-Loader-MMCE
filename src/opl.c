@@ -1352,6 +1352,18 @@ void setErrorMessageWithCode(int strId, int error)
     guiSetFrameHook(&errorMessageHook);
 }
 
+void setErrorMessageWithCodeAndDetail(int strId, int error, const char *detail)
+{
+    size_t used;
+
+    formatErrorMessage(_l(strId), NULL, error, 0, 1);
+    used = strlen(errorMessage);
+    if (detail != NULL && detail[0] != '\0' && used < sizeof(errorMessage) - 1)
+        snprintf(&errorMessage[used], sizeof(errorMessage) - used, "\nDiagnostic reason: %s", detail);
+    errorMessageStringId = strId;
+    guiSetFrameHook(&errorMessageHook);
+}
+
 void setErrorMessage(int strId)
 {
     formatErrorMessage(_l(strId), NULL, 0, 0, 0);

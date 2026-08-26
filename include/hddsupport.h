@@ -112,6 +112,9 @@ static inline int hddLoadModulesReady(void)
     int r = hddLoadModules();
     return r == HDD_LOADMODULES_STATUS_NOERROR || r == HDD_LOADMODULES_STATUS_ALREADYLOADED;
 }
+// Diagnostic wrapper used by the visible DEV9/ATAD/XHDD boot bracket. It preserves the exact
+// hddLoadModulesReady() decision while enabling nested, source-level startup stages beneath it.
+int hddDiagLoadModulesReady(void);
 void hddLoadSupportModules(void);
 
 // Normal APA data-home choices surfaced by Settings -> Game Sources. POPS loose files remain
