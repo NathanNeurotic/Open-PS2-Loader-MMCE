@@ -381,6 +381,8 @@ static int bdmLoadUsbMassBd(void)
 
 static int bdmShouldQueueModuleLoad(void)
 {
+    if (!iUSBModLoaded)
+        return 1;
     if (gEnableILK && !iLinkModLoaded)
         return 1;
     if (gEnableMX4SIO && !mx4sioModLoaded)
@@ -404,11 +406,13 @@ static void bdmLoadBlockDeviceModules(void)
 
     // Snapshot, compared after the loads below. See the refresh at the end of this function for why
     // a transport enabled from Settings needed a "double tap" before its tab appeared.
-    int modsWere = iLinkModLoaded + mx4sioModLoaded + hddModLoaded + udpbdModLoaded;
+    int modsWere = iUSBModLoaded + iLinkModLoaded + mx4sioModLoaded + hddModLoaded + udpbdModLoaded;
 
-    // USB mass storage is part of the base BDM stack (upstream/Grimdoomer: always
-    // resident). Its residency must not be gated by the UI-visible gEnableUSB flag;
-    // visibility is handled separately by bdmTransportEnabled.
+    // USB retry without gEnableUSB gate: base residency is unconditional, but a
+    // synchronous bdmLoadCoreModules failure must still be retried via the
+    // generation/worker path. Success will bump modsNow and refresh discovery.
+    if (!iUSBModLoaded)
+        bdmLoadUsbMassBd();
 
     if (gEnableILK && !iLinkModLoaded) {
         // Load iLink Block Device drivers
@@ -467,7 +471,7 @@ static void bdmLoadBlockDeviceModules(void)
             sysShutdownDev9();
     }
 
-    int modsNow = iLinkModLoaded + mx4sioModLoaded + hddModLoaded + udpbdModLoaded;
+    int modsNow = iUSBModLoaded + iLinkModLoaded + mx4sioModLoaded + hddModLoaded + udpbdModLoaded;
 
     // BOOT PASS BUMPS NOTHING. On the first call every enabled transport loads for the first time, so
     // the comparison below is guaranteed true -- and bdmInitDevicesData is about to publish all of
