@@ -479,12 +479,27 @@ static int rumbleLarge = 0;
 // Longest pulse we will ever hold a motor on for. Menu feedback, not a sustained buzz.
 #define RUMBLE_MAX_MS 500
 
+// Bounded delivery redundancy for actuator commands. See point 1 of the freepad note below for why
+// neither send-once nor re-send-forever is correct. Do not reduce either of these to zero.
+#define RUMBLE_CMD_REPEATS    3 // extra deliveries after the immediate one, drained by readPads()
+#define RUMBLE_OFF_SYNC_SENDS 2 // stop commands issued synchronously, for paths readPads never drains
+
+static int rumbleOnRepeats = 0;
+static int rumbleOffRepeats = 0;
+
 /* THE TWO THINGS THAT MAKE THIS SILENT ON REAL HARDWARE, both properties of freepad.irx -- which is
    what we ship as padman (Makefile: asm/padman.c is built from $(PS2SDK)/iop/irx/freepad.irx):
 
    1. freepad DROPS padSetActDirect unless its current task is TASK_UPDATE_PAD, and it still returns
-      1 when it does. Sending once per pulse means one unlucky frame eats the whole pulse. So the
-      command is RE-SENT every frame for the pulse's life. Do NOT "optimise" this back to send-once.
+      1 when it does. Sending once per pulse means one unlucky frame eats the whole pulse -- and the
+      two directions are NOT symmetric: a dropped "on" is a missing pulse, but a dropped "off"
+      latches the motor ON, because the IOP holds actuator state until something tells it otherwise.
+
+      Neither extreme works. Re-sending every frame for the pulse's life cures both drops but puts a
+      continuous RPC stream on SIO2 -- the pad's own bus, shared with MX4SIO. Sending exactly once
+      removes that traffic and reinstates both drops. So each state change is repeated over the next
+      few polls and then stops: see RUMBLE_CMD_REPEATS / RUMBLE_OFF_SYNC_SENDS above, which is what
+      readPads() drains. Do NOT "optimise" either of those to zero.
 
    2. freepad fills its actuator alignment with 0xFF on padPortOpen, and padSetActAlign is the only
       thing that overwrites it. padSetActDirect latches the bytes and returns 1 WITHOUT consulting
@@ -539,7 +554,7 @@ static void padActSet(struct pad_data_t *pad, int small, int large)
  */
 void padRumbleFlush(void)
 {
-    int i;
+    int i, r;
 
     if (!rumbleActive)
         return;
@@ -547,8 +562,16 @@ void padRumbleFlush(void)
     rumbleActive = 0;
     rumbleDurTicks = 0;
     rumbleLarge = 0;
-    for (i = 0; i < pad_count; ++i)
-        padActSet(&pad_data[i], 0, 0);
+    rumbleOnRepeats = 0;
+
+    // A dropped stop is the expensive direction (latched motor), and unloadPads() calls this on the
+    // way out where readPads() will never run again to drain the tail. Issue the first few now, and
+    // arm the rest for the polls that follow when there are any.
+    for (r = 0; r < RUMBLE_OFF_SYNC_SENDS; ++r)
+        for (i = 0; i < pad_count; ++i)
+            padActSet(&pad_data[i], 0, 0);
+
+    rumbleOffRepeats = RUMBLE_CMD_REPEATS;
 }
 
 /** Starts a rumble pulse on every connected pad that has actuators.
@@ -575,6 +598,7 @@ void padRumble(int durationMs, int large)
         rumbleDurTicks = (u32)durationMs * CLOCKS_PER_MILISEC;
         rumbleLarge = large;
         if (strengthChanged) {
+            rumbleOnRepeats = RUMBLE_CMD_REPEATS;
             for (i = 0; i < pad_count; ++i)
                 padActSet(&pad_data[i], 1, large);
         }
@@ -585,6 +609,9 @@ void padRumble(int durationMs, int large)
     rumbleDurTicks = (u32)durationMs * CLOCKS_PER_MILISEC;
     rumbleActive = 1;
     rumbleLarge = large;
+    // A new pulse cancels any stop still being repeated, or the tail would switch it back off.
+    rumbleOffRepeats = 0;
+    rumbleOnRepeats = RUMBLE_CMD_REPEATS;
 
     for (i = 0; i < pad_count; ++i)
         padActSet(&pad_data[i], 1, large);
@@ -673,11 +700,21 @@ int readPads()
         }
     }
 
-    // Rumble decay. Edge-driven: no continuous per-frame RPC while active.
+    // Rumble decay, plus the bounded re-send tail (see RUMBLE_CMD_REPEATS). Edge-driven: the RPC
+    // stream stops after a few polls instead of running for the pulse's whole life, but a single
+    // dropped padSetActDirect no longer decides whether the pulse happens -- or whether it ends.
     if (rumbleActive) {
         if ((u32)(cpu_ticks() - rumbleStartTicks) >= rumbleDurTicks) {
             padRumbleFlush();
+        } else if (rumbleOnRepeats > 0) {
+            for (i = 0; i < pad_count; ++i)
+                padActSet(&pad_data[i], 1, rumbleLarge);
+            rumbleOnRepeats--;
         }
+    } else if (rumbleOffRepeats > 0) {
+        for (i = 0; i < pad_count; ++i)
+            padActSet(&pad_data[i], 0, 0);
+        rumbleOffRepeats--;
     }
 
     for (i = 0; i < 16; ++i) {
