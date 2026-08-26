@@ -40,6 +40,7 @@ static unsigned char hddSupportModulesLoaded = 0;
 // while it keeps failing, and re-toasting the same error box each pass would bury the UI. Reset on
 // success so a later, different failure toasts again.
 static unsigned char hddSupportErrToasted = 0;
+static unsigned char hddPfsDeferredFailed = 0;
 // A Settings selection is deliberately staged until Save Settings. It never changes the active
 // pfs0: mount: a live OPL data home can have artwork/config readers using it.
 static int hddOplHomePending = -1;
@@ -499,10 +500,8 @@ static int hddLoadCoreSupportModules(void)
         }
         if (ret == 1) {
             LOG("HDD: APA status reports an unformatted drive.\n");
-            if (!hddSupportErrToasted) {
-                setErrorMessageWithCode(_STR_HDD_NOT_FORMATTED_ERROR, ERROR_HDD_MODULE_PFS_FAILURE);
-                hddSupportErrToasted = 1;
-            }
+            hddSupportErrToasted = 0;
+            hddPfsDeferredFailed = 1;
             return 0;
         }
         if (ret == 2) {
@@ -518,14 +517,13 @@ static int hddLoadCoreSupportModules(void)
         ret = sysLoadModuleBuffer(&ps2fs_irx, size_ps2fs_irx, sizeof(pfsarg), pfsarg);
         if (ret < 0) {
             LOG("HDD: PFS support module failed to load.\n");
-            if (!hddSupportErrToasted) {
-                setErrorMessageWithCode(_STR_HDD_PFS_UNAVAILABLE_ERROR, ERROR_HDD_MODULE_PFS_FAILURE);
-                hddSupportErrToasted = 1;
-            }
+            hddSupportErrToasted = 0;
+            hddPfsDeferredFailed = 1;
             return 0;
         }
 
         hddSupportModulesLoaded = 1;
+        hddPfsDeferredFailed = 0;
         hddSupportErrToasted = 0;
         hddClearRecoveredErrors();
         LOG("HDDSUPPORT modules loaded\n");
@@ -854,6 +852,13 @@ static int hddNeedsUpdate(item_list_t *itemList)
 
 static int hddUpdateGameList(item_list_t *itemList)
 {
+    // GUI thread must never block on the 1 s ATA settle (hddLoadModules DelayThread).
+    // If the base ATA stack has never completed (hddModulesLoadCount==0), defer; the
+    // separately queued hddInitModules on the IO worker will settle and this will
+    // retry on the next refresh.
+    if (hddModulesLoadCount == 0)
+        return 0;
+
     // Self-heal (wLaunchELF-R3Z3N parity: latch only on success, retry per use): a boot-time first
     // touch that raced drive spin-up used to leave the APA page EMPTY for the whole session -- the
     // one-shot hddInitModules never retried, and nothing else reloads the support stack. Both calls
@@ -867,6 +872,22 @@ static int hddUpdateGameList(item_list_t *itemList)
         // with no data mount is also retryable: Step-209 deliberately separates those lifetimes.
         if (hddLoadModulesReady())
             hddLoadSupportModules();
+        // Deferred Code 222: early boot probes never toast; settled retry may.
+        if (hddSupportModulesLoaded) {
+            hddPfsDeferredFailed = 0;
+            hddSupportErrToasted = 0;
+            hddClearRecoveredErrors();
+        } else if (hddPfsDeferredFailed && !hddSupportErrToasted) {
+            setErrorMessageWithCode(_STR_HDD_PFS_UNAVAILABLE_ERROR, ERROR_HDD_MODULE_PFS_FAILURE);
+            hddSupportErrToasted = 1;
+        }
+    } else {
+        // Successful path also clears any prior deferred failure.
+        if (hddPfsDeferredFailed) {
+            hddPfsDeferredFailed = 0;
+            hddSupportErrToasted = 0;
+            hddClearRecoveredErrors();
+        }
     }
 
     // Game discovery and the persistent config/art PFS home are separate lifetimes. HDL games
