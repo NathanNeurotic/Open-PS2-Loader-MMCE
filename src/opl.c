@@ -299,24 +299,6 @@ void moduleUpdateMenuInternal(opl_io_module_t *mod, int themeChanged, int langCh
         guiCheckNotifications(0, langChanged);
     }
 
-    /* ⚠ SERIALIZED WITH RENDERING, and it must stay that way. This function runs on the IO WORKER --
-       bdmUpdateDeviceData() calls moduleUpdateMenu() from four places as devices appear, vanish and
-       re-identify -- while the GUI thread walks the very list being rebuilt here: themes.c
-       drawHintText() reads menu->item->hints every frame, and traverses it TWICE (once to align,
-       once to draw).
-
-       menuRemoveHints() frees every node, then the menuAddHint()s below malloc new ones and walk to
-       the tail to link them. Unserialized, a draw that lands mid-rebuild follows a freed ->next into
-       memory that has already been handed back out; if the reused block happens to link back into
-       the chain, the renderer loops forever and the console sits there with the last frame still on
-       screen. It is cumulative by nature -- every device update is another roll -- which is why it
-       took a while of moving between pages before it hit.
-
-       guiStartFrame() holds gGUILockSemaId for the whole frame, so this is the lock that excludes
-       the renderer. Release it before the themeChanged block below, which takes it again for the
-       same reason (the sema is not recursive). */
-    guiLock();
-
     // refresh Hints
     menuRemoveHints(&mod->menuItem);
 
@@ -343,8 +325,6 @@ void moduleUpdateMenuInternal(opl_io_module_t *mod, int themeChanged, int langCh
         if (vcdModeSupported(mod->support->mode) && gDefaultGameView == GAME_VIEW_BOTH)
             menuAddHint(&mod->menuItem, _STR_VCD, L3_ICON);
     }
-
-    guiUnlock();
 
     // refresh Cache
     if (themeChanged) {
