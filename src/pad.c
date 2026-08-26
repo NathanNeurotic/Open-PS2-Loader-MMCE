@@ -547,10 +547,6 @@ void padRumbleFlush(void)
     rumbleActive = 0;
     rumbleDurTicks = 0;
     rumbleLarge = 0;
-    // Sent twice: the IOP LATCHES the actuator state, so a dropped "off" leaves the motor spinning
-    // with nothing left to stop it. The "on" gets a re-send every frame; the "off" gets no frames.
-    for (i = 0; i < pad_count; ++i)
-        padActSet(&pad_data[i], 0, 0);
     for (i = 0; i < pad_count; ++i)
         padActSet(&pad_data[i], 0, 0);
 }
@@ -572,6 +568,14 @@ void padRumble(int durationMs, int large)
         large = 0;
     if (large > 255)
         large = 255;
+
+    if (rumbleActive) {
+        // ACTIVE->ACTIVE: coalesce/extend without another actuator RPC.
+        rumbleStartTicks = cpu_ticks();
+        rumbleDurTicks = (u32)durationMs * CLOCKS_PER_MILISEC;
+        rumbleLarge = large;
+        return;
+    }
 
     rumbleStartTicks = cpu_ticks();
     rumbleDurTicks = (u32)durationMs * CLOCKS_PER_MILISEC;
@@ -665,15 +669,10 @@ int readPads()
         }
     }
 
-    // Rumble decay + re-send. Unsigned elapsed in RAW ticks -- see the note above padActSet().
-    // The re-send is not redundant: freepad drops padSetActDirect outside TASK_UPDATE_PAD and still
-    // reports success, so a pulse sent only once can be silently swallowed whole.
+    // Rumble decay. Edge-driven: no continuous per-frame RPC while active.
     if (rumbleActive) {
         if ((u32)(cpu_ticks() - rumbleStartTicks) >= rumbleDurTicks) {
             padRumbleFlush();
-        } else {
-            for (i = 0; i < pad_count; ++i)
-                padActSet(&pad_data[i], 1, rumbleLarge);
         }
     }
 
