@@ -122,6 +122,11 @@ int bdmEffectiveStartMode(void);
 // reads this to bypass its background SIO2 rescan throttle when a real device change occurs.
 unsigned int bdmGetGeneration(void);
 
+// Diagnostic-only hooks used by the generic game-settings save worker. They are no-ops for
+// non-BDM lists and never change which filesystem path configWrite() consumes.
+void bdmLogConfigWriteEntry(item_list_t *itemList, const config_set_t *configSet);
+void bdmLogConfigWriteResult(item_list_t *itemList, const config_set_t *configSet, int result);
+
 /** Nonzero if this BDM slot has had a device on it at some point this session (its prefix is
  * populated). Slots that have never connected are probed on a slow rotation instead of on every
  * background rescan -- attach is event-driven, so the periodic probe is only a missed-event net.

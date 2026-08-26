@@ -358,7 +358,9 @@ static void _menuSaveConfig()
     int result;
 
     WaitSema(menuSemaId);
+    bdmLogConfigWriteEntry(itemConfigList, itemConfig);
     result = configWrite(itemConfig);
+    bdmLogConfigWriteResult(itemConfigList, itemConfig, result);
     itemConfigId = -1;       // to invalidate cache and force reload
     menuSaveResult = result; // publish BEFORE actionStatus=0 -- that flag is the waiter's release signal
     actionStatus = 0;

@@ -111,6 +111,11 @@ static int gBootStatusActive = 0;
 // state is a single aligned POINTER (atomic load/store on the EE) to a static _l() string --
 // no shared buffer, so no data race. Cleared by guiSetBootStatus(NULL).
 static const char *volatile gBootStickyLabel = NULL;
+// Dynamic diagnostic labels cannot use guiSetBootStatusSticky(), which deliberately stores the
+// caller's pointer. Keep two owned buffers and always format into the one that is not published.
+// The EE is single-core: if the renderer is pre-empted after loading one pointer, the IO thread
+// only writes the other buffer, then atomically publishes that pointer.
+static char gBootStickyCopy[2][64];
 
 // forward decl.
 static void guiShow();
@@ -3559,6 +3564,18 @@ void guiSetBootStatusSticky(const char *label)
     if (label == NULL)
         return;
     gBootStickyLabel = label;
+}
+
+void guiSetBootStatusStickyCopy(const char *label)
+{
+    int target;
+
+    if (label == NULL)
+        return;
+
+    target = (gBootStickyLabel == gBootStickyCopy[0]) ? 1 : 0;
+    snprintf(gBootStickyCopy[target], sizeof(gBootStickyCopy[target]), "%s", label);
+    gBootStickyLabel = gBootStickyCopy[target];
 }
 
 static void guiRenderGreeting(int alpha)
