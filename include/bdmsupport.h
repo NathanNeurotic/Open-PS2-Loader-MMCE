@@ -173,6 +173,17 @@ void bdmLogConfigWriteResult(const bdm_config_diag_snapshot_t *snap, int result)
  */
 int bdmSlotEverConnected(int mode);
 
+/** Read a BDM device's driver name from an already-open massN: directory fd.
+ *
+ * ⚠ ALWAYS USE THIS instead of issuing USBMASS_IOCTL_GET_DRIVERNAME with a return buffer yourself.
+ * ps2sdk's bdmfs_fatfs handler dereferences NULL when a buffer is supplied for a volume that has no
+ * mounted block device, which faults the IOP and takes down every thread waiting on it. The
+ * implementation asks without a buffer first, which is the form that fails safely.
+ *
+ * Returns >= 0 on success. driverName is always left NUL-terminated.
+ */
+int bdmReadDriverName(int dir, char *driverName, int driverNameLength);
+
 /** True when this BDM slot is the MX4SIO (SD-over-SIO2) device.
  *
  * SIO2 is the CONTROLLER'S OWN BUS. An art read here contends with pad polling, and that contention

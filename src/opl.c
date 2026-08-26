@@ -4690,8 +4690,12 @@ static void autoLaunchBDMGame(char *argv[])
             char detectedDriver[sizeof(gAutoLaunchDeviceData->bdmDriver)] = {0};
             int detectedDeviceIndex = -1;
 
-            fileXioIoctl2(dir, USBMASS_IOCTL_GET_DRIVERNAME, NULL, 0, detectedDriver, sizeof(detectedDriver) - 1);
-            fileXioIoctl2(dir, USBMASS_IOCTL_GET_DEVICE_NUMBER, NULL, 0, &detectedDeviceIndex, sizeof(detectedDeviceIndex));
+            // Every slot in this sweep gets asked, including ones whose backing device has gone --
+            // and asking for the name WITH a return buffer there faults the IOP outright. Boot is
+            // the worst place to do that, so go through the guarded reader and only chase the
+            // device number once it has confirmed a mounted block device. See bdmReadDriverName().
+            if (bdmReadDriverName(dir, detectedDriver, sizeof(detectedDriver)) >= 0)
+                fileXioIoctl2(dir, USBMASS_IOCTL_GET_DEVICE_NUMBER, NULL, 0, &detectedDeviceIndex, sizeof(detectedDeviceIndex));
             fileXioDclose(dir);
 
             if (selectedMassSlot < 0) {

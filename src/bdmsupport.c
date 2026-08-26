@@ -204,6 +204,46 @@ static void bdmBuildVcdPrefix(char *target, int targetLength, int massSlot)
     snprintf(target, targetLength, "mass%d:/", massSlot);
 }
 
+/* ⚠ NEVER ASK FOR THE DRIVER NAME WITH A RETURN BUFFER UNTIL YOU KNOW THE VOLUME IS MOUNTED.
+   ps2sdk's handler NULL-DEREFERENCES otherwise. iop/fs/bdmfs_fatfs/src/fs_driver.c, upstream master,
+   verified 2026-08-26:
+
+       struct block_device *mounted_bd = fatfs_..._get_mounted_bd_from_index(file->obj.fs->pdrv);
+       ret = (mounted_bd == NULL) ? -ENXIO : *(int *)(mounted_bd->name);
+       if (rdata != NULL)
+           strncpy(rdata, mounted_bd->name, rdatalen);   // <-- NOT guarded on mounted_bd
+
+   The NULL check on the line above does not cover the copy. Supplying rdata for a volume with no
+   mounted block device therefore dereferences NULL ON THE IOP, and an IOP fault takes down every
+   thread waiting on it -- observed on hardware as the console freezing after browsing BDM pages,
+   and as mass slots that never resolve an identity.
+
+   It is reachable because "mass" resolves its volume straight from the unit number:
+   fs_driver_resolve_volume() returns `unit` for "mass" WITHOUT checking that anything is mounted
+   there, so Dopen can succeed on a slot whose backing device has gone away.
+
+   We embed the SDK's PREBUILT bdmfs_fatfs.irx (Makefile), so this cannot be fixed on our side --
+   only avoided. The no-buffer form returns -ENXIO safely (it carries the name's first four bytes in
+   its return value instead). That is precisely what Grimdoomer's fork does, and why it reads mass
+   devices where we fault. Gate on it, then ask for the full name.
+
+   Returns >= 0 on success; driverName is always left NUL-terminated. */
+int bdmReadDriverName(int dir, char *driverName, int driverNameLength)
+{
+    int result;
+
+    if (driverName == NULL || driverNameLength <= 0)
+        return -1;
+
+    driverName[0] = '\0';
+
+    result = fileXioIoctl(dir, USBMASS_IOCTL_GET_DRIVERNAME, "");
+    if (result < 0)
+        return result; // no mounted block device -- asking with a buffer here would fault the IOP
+
+    return fileXioIoctl2(dir, USBMASS_IOCTL_GET_DRIVERNAME, NULL, 0, driverName, driverNameLength - 1);
+}
+
 static int bdmReadDeviceIdentity(const char *path, char *driverName, int driverNameLength, int *deviceIndex)
 {
     int dir, result;
@@ -216,7 +256,7 @@ static int bdmReadDeviceIdentity(const char *path, char *driverName, int driverN
     if (dir < 0)
         return dir;
 
-    result = fileXioIoctl2(dir, USBMASS_IOCTL_GET_DRIVERNAME, NULL, 0, driverName, driverNameLength - 1);
+    result = bdmReadDriverName(dir, driverName, driverNameLength);
     if (result >= 0)
         result = fileXioIoctl2(dir, USBMASS_IOCTL_GET_DEVICE_NUMBER, NULL, 0, deviceIndex, sizeof(*deviceIndex));
 
@@ -249,7 +289,7 @@ static void bdmDiagProbeIdentity(const char *path, bdm_diag_identity_t *identity
         return;
     }
 
-    identity->identityResult = fileXioIoctl2(dir, USBMASS_IOCTL_GET_DRIVERNAME, NULL, 0, identity->driver, sizeof(identity->driver) - 1);
+    identity->identityResult = bdmReadDriverName(dir, identity->driver, sizeof(identity->driver));
     if (identity->identityResult >= 0)
         identity->identityResult = fileXioIoctl2(dir, USBMASS_IOCTL_GET_DEVICE_NUMBER, NULL, 0, &identity->deviceIndex, sizeof(identity->deviceIndex));
 
@@ -2391,7 +2431,9 @@ int bdmUpdateDeviceData(item_list_t *itemList)
         // ioctl. Do not publish an empty-driver page: it cannot reach the native launch dispatch.
         // This runs on the deferred IO worker, so a slow or wedged IOP RPC cannot freeze boot;
         // the never-scanned state keeps this slot eligible for the normal later retry.
-        driverResult = fileXioIoctl2(dir, USBMASS_IOCTL_GET_DRIVERNAME, NULL, 0, driverName, sizeof(driverName) - 1);
+        // Must go through bdmReadDriverName(): asking for the name WITH a return buffer on a volume
+        // whose block device has gone faults the IOP outright. See the note on that function.
+        driverResult = bdmReadDriverName(dir, driverName, sizeof(driverName));
         deviceResult = -1;
         if (driverResult >= 0 && driverName[0] != '\0')
             deviceResult = fileXioIoctl2(dir, USBMASS_IOCTL_GET_DEVICE_NUMBER, NULL, 0, &massDeviceIndex, sizeof(massDeviceIndex));
@@ -3040,7 +3082,7 @@ static int bdmDeviceIsATA(int deviceId)
     /* Zero the buffer before the ioctl: if the call fails, strcmp would read
      * uninitialised stack bytes. Pattern mirrors bdmReadDeviceIdentity(). */
     memset(&data.bdmDriver, 0, sizeof(data.bdmDriver));
-    if (fileXioIoctl2(dir, USBMASS_IOCTL_GET_DRIVERNAME, NULL, 0, &data.bdmDriver, sizeof(data.bdmDriver) - 1) < 0) {
+    if (bdmReadDriverName(dir, data.bdmDriver, sizeof(data.bdmDriver)) < 0) {
         fileXioDclose(dir);
         return 0;
     }
