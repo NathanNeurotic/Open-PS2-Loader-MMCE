@@ -570,10 +570,14 @@ void padRumble(int durationMs, int large)
         large = 255;
 
     if (rumbleActive) {
-        // ACTIVE->ACTIVE: coalesce/extend without another actuator RPC.
+        int strengthChanged = (rumbleLarge != large);
         rumbleStartTicks = cpu_ticks();
         rumbleDurTicks = (u32)durationMs * CLOCKS_PER_MILISEC;
         rumbleLarge = large;
+        if (strengthChanged) {
+            for (i = 0; i < pad_count; ++i)
+                padActSet(&pad_data[i], 1, large);
+        }
         return;
     }
 
