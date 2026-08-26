@@ -1023,14 +1023,25 @@ static int hddUpdateGameList(item_list_t *itemList)
         // anyway made a failed base load toast TWICE (base failure + the doomed non-Sony probe's)
         // on the first pass (Gemini + CodeRabbit review of #249, vetted). A loaded module stack
         // with no data mount is also retryable: Step-209 deliberately separates those lifetimes.
-        if (hddLoadModulesReady())
+        // WHETHER THE RETRY ACTUALLY RAN decides whether a failure is reportable. hddLoadModules
+        // stamps hddModulesLoadCount=1 on ENTRY -- before sysInitDev9, before the ATAD load, and
+        // before the 1 s settle, all of which run on the io worker. So the guard at the top of this
+        // function stops firing almost immediately, while the base stack is still coming up, and
+        // hddLoadModulesReady() correctly answers BUSYLOADING -> false for that whole window.
+        //
+        // Without this flag the code then fell through to the toast having attempted NOTHING, and
+        // announced it as "settled-update-retry-still-failed" -- which is why Code 222 appeared on
+        // consoles whose APA worked perfectly a moment later. A base stack that is still loading is
+        // not evidence of anything; say nothing until it is actually resident.
+        int baseReady = hddLoadModulesReady();
+        if (baseReady)
             hddLoadSupportModules();
-        // Deferred Code 222: early boot probes never toast; settled retry may.
+        // Deferred Code 222: early boot probes never toast; a settled retry that really ran may.
         if (hddSupportModulesLoaded) {
             hddClearPfsDiagFailure("update-retry-loaded-support");
             hddSupportErrToasted = 0;
             hddClearRecoveredErrors();
-        } else if (hddPfsDeferredFailed && !hddSupportErrToasted) {
+        } else if (baseReady && hddPfsDeferredFailed && !hddSupportErrToasted) {
             hddLogPfsDiagState("emit-code-222", "settled-update-retry-still-failed");
             setErrorMessageWithCodeAndDetail(_STR_HDD_PFS_UNAVAILABLE_ERROR, ERROR_HDD_MODULE_PFS_FAILURE,
                                              hddPfsDiagReasonName(hddPfsDiagReason));
