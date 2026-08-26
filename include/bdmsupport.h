@@ -62,6 +62,11 @@ typedef struct
     unsigned char LanguagesLoaded;
     unsigned char FoldersCreated;
     unsigned char ForceRefresh;
+    // Set the first time this slot's massN: root answers Dopen, INDEPENDENTLY of whether the
+    // identity ioctl has answered yet. bdmPrefix cannot serve this purpose: it is only written once
+    // identity succeeds, so a mounted-but-unidentified slot would read as "never connected" and be
+    // demoted to the slow empty-slot probe rotation -- exactly the slot that needs the full cadence.
+    unsigned char bdmSeenMounted;
 } bdm_device_data_t;
 
 void bdmLoadModules(void);

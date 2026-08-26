@@ -786,7 +786,17 @@ int bdmSlotEverConnected(int mode)
         return 0;
 
     bdm_device_data_t *pDeviceData = (bdm_device_data_t *)bdmDeviceList[mode - BDM_MODE].priv;
-    return pDeviceData != NULL && pDeviceData->bdmPrefix[0] != '\0';
+    if (pDeviceData == NULL)
+        return 0;
+
+    // bdmSeenMounted, not just bdmPrefix. The prefix is written only once the driver identity ioctl
+    // has answered, and bdmUpdateDeviceData deliberately defers publication when a mount answers
+    // Dopen before its transport can answer that ioctl -- routine when a second device enumerates
+    // behind the first. Testing the prefix alone therefore reported that slot as never-connected and
+    // dropped it to the empty-slot rotation (~8 s, and only while the user holds still), so a device
+    // that WAS mounted and merely needed one more probe could sit unpublished until it was replugged
+    // -- a hotplug bumps the generation and bypasses every gate, which is why replugging "fixed" it.
+    return pDeviceData->bdmSeenMounted != 0 || pDeviceData->bdmPrefix[0] != '\0';
 }
 
 // Is this slot the MX4SIO card -- i.e. does its IO ride SIO2, the CONTROLLER'S OWN BUS?
@@ -2335,8 +2345,14 @@ int bdmUpdateDeviceData(item_list_t *itemList)
 #endif
 
     // Device reachable this poll -> clear the debounce miss counter (see the hide branch below).
-    if (dir >= 0)
+    if (dir >= 0) {
         pDeviceData->bdmMissCount = 0;
+        // Latch "something has mounted here" the moment the root answers, BEFORE identity is known.
+        // The publish path below deliberately defers a mount whose driver ioctl is not ready yet,
+        // and without this latch that slot still looks empty to bdmSlotEverConnected() -- so the one
+        // slot guaranteed to need another look promptly is the one sent to the slow rotation.
+        pDeviceData->bdmSeenMounted = 1;
+    }
 
     // If we opened the device and the menu isn't visible (OR is visible but hasn't been initialized ex: manual device start) initialize device info.
     // A device that went away and came RIGHT BACK, identity intact, is a stall -- not a new device.
