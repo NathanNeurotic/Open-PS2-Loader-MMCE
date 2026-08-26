@@ -341,13 +341,9 @@ static int bdmDiagListIndex(const item_list_t *itemList)
     return -1;
 }
 
-static void bdmLogIdentityDiagnostic(const char *event, item_list_t *itemList, const config_set_t *configSet)
+static void bdmLogIdentityDiagnostic(const char *event, const bdm_config_diag_snapshot_t *snap)
 {
-    int slot = bdmDiagListIndex(itemList);
-    if (slot < 0 || itemList->priv == NULL)
-        return;
-
-    bdm_device_data_t *device = (bdm_device_data_t *)itemList->priv;
+    int slot;
     char legacyRoot[16], typedRoot[16];
     bdm_diag_identity_t legacyIdentity, typedIdentity;
     int typedRevalidated;
@@ -355,24 +351,30 @@ static void bdmLogIdentityDiagnostic(const char *event, item_list_t *itemList, c
     int legacyDriverMatch;
     int legacyDeviceMatch;
     int legacyRevalidated;
-    int visible = itemList->owner != NULL ? ((opl_io_module_t *)itemList->owner)->menuItem.visible : 0;
 
+    if (snap == NULL || !snap->valid)
+        return;
+
+    slot = snap->slot;
+
+    // Everything below reads the CAPTURED COPY. The probes that follow are blocking device I/O, so
+    // this must never reach back into the live item_list_t / config_set_t -- by the time we get here
+    // the menu lock is released and either of them may already be gone.
     snprintf(legacyRoot, sizeof(legacyRoot), "mass%d:/", slot);
     bdmDiagProbeIdentity(legacyRoot, &legacyIdentity);
-    typedRevalidated = bdmDiagResolveTypedIdentity(device->bdmDeviceType, device->massDeviceIndex, typedRoot, sizeof(typedRoot), &typedIdentity, &matchingTypedAliases);
+    typedRevalidated = bdmDiagResolveTypedIdentity(snap->bdmDeviceType, snap->massDeviceIndex, typedRoot, sizeof(typedRoot), &typedIdentity, &matchingTypedAliases);
 
-    legacyDriverMatch = device->bdmDriver[0] != '\0' && legacyIdentity.driver[0] != '\0' && strcmp(device->bdmDriver, legacyIdentity.driver) == 0;
-    legacyDeviceMatch = device->massDeviceIndex >= 0 && legacyIdentity.deviceIndex >= 0 && device->massDeviceIndex == legacyIdentity.deviceIndex;
+    legacyDriverMatch = snap->driver[0] != '\0' && legacyIdentity.driver[0] != '\0' && strcmp(snap->driver, legacyIdentity.driver) == 0;
+    legacyDeviceMatch = snap->massDeviceIndex >= 0 && legacyIdentity.deviceIndex >= 0 && snap->massDeviceIndex == legacyIdentity.deviceIndex;
     legacyRevalidated = legacyDriverMatch && legacyDeviceMatch;
 
     LOG("[BDM DIAG] event=%s generation=%u itemList=%p mode=%d visible=%d config=%p uid=%u modified=%d format=%d filename=\"%s\"\n",
-        event, BdmGeneration, itemList, itemList->mode, visible, configSet, configSet != NULL ? configSet->uid : 0,
-        configSet != NULL ? configSet->modified : -1, configSet != NULL ? configSet->format : -1,
-        configSet != NULL && configSet->filename != NULL ? configSet->filename : "<none>");
+        event, snap->generation, snap->itemListAddr, snap->mode, snap->visible, snap->configAddr, snap->configUid,
+        snap->configModified, snap->configFormat, snap->configFilename);
     LOG("[BDM DIAG] event=%s cached slot=%d root=\"%s\" prefix=\"%s\" driver=\"%s\" devnr=%d type=%s(%d) folders=%u games=%p/%d vcdGames=%p/%d\n",
-        event, slot, device->bdmDeviceRoot, device->bdmPrefix, device->bdmDriver, device->massDeviceIndex,
-        bdmDeviceTypeName(device->bdmDeviceType), device->bdmDeviceType, device->FoldersCreated,
-        device->bdmGames, device->bdmGameCount, device->bdmVcdGames, device->bdmVcdGameCount);
+        event, slot, snap->deviceRoot, snap->devicePrefix, snap->driver, snap->massDeviceIndex,
+        bdmDeviceTypeName(snap->bdmDeviceType), snap->bdmDeviceType, snap->foldersCreated,
+        snap->games, snap->gameCount, snap->vcdGames, snap->vcdGameCount);
     LOG("[BDM DIAG] event=%s legacy=\"%s\" readable=%d open=%d identity=%d driver=\"%s\" devnr=%d driverMatch=%d devnrMatch=%d revalidated=%d\n",
         event, legacyRoot, legacyIdentity.openResult >= 0, legacyIdentity.openResult, legacyIdentity.identityResult,
         legacyIdentity.driver, legacyIdentity.deviceIndex, legacyDriverMatch, legacyDeviceMatch, legacyRevalidated);
@@ -382,11 +384,10 @@ static void bdmLogIdentityDiagnostic(const char *event, item_list_t *itemList, c
         matchingTypedAliases, matchingTypedAliases > 1, typedRevalidated, legacyRevalidated);
 }
 #else
-static void bdmLogIdentityDiagnostic(const char *event, item_list_t *itemList, const config_set_t *configSet)
+static void bdmLogIdentityDiagnostic(const char *event, const bdm_config_diag_snapshot_t *snap)
 {
     (void)event;
-    (void)itemList;
-    (void)configSet;
+    (void)snap;
 }
 #endif
 
@@ -674,27 +675,103 @@ unsigned int bdmGetGeneration(void)
     return BdmGeneration;
 }
 
-void bdmLogConfigWriteEntry(item_list_t *itemList, const config_set_t *configSet)
-{
-    bdmLogIdentityDiagnostic("config-write-entry", itemList, configSet);
-}
-
-void bdmLogConfigWriteResult(item_list_t *itemList, const config_set_t *configSet, int result)
+// Runs UNDER the caller's menu lock: pure value copies, no I/O, no allocation. Everything the
+// reporting calls below need must be taken here, because once the lock is released the item_list_t
+// and config_set_t may be freed. Cheap enough to run unconditionally; the reporting is what costs.
+void bdmCaptureConfigWriteDiag(item_list_t *itemList, const config_set_t *configSet, bdm_config_diag_snapshot_t *out)
 {
 #ifdef __DEBUG
-    int slot = bdmDiagListIndex(itemList);
-    if (slot < 0 || itemList->priv == NULL)
+    bdm_device_data_t *device;
+    int slot;
+
+    if (out == NULL)
         return;
 
-    bdm_device_data_t *device = (bdm_device_data_t *)itemList->priv;
-    LOG("[BDM DIAG] event=config-write-result generation=%u itemList=%p mode=%d config=%p uid=%u filename=\"%s\" result=%d cachedRoot=\"%s\" cachedDriver=\"%s\" cachedDevnr=%d type=%s(%d)\n",
-        BdmGeneration, itemList, itemList->mode, configSet, configSet != NULL ? configSet->uid : 0,
-        configSet != NULL && configSet->filename != NULL ? configSet->filename : "<none>", result,
-        device->bdmDeviceRoot, device->bdmDriver, device->massDeviceIndex,
-        bdmDeviceTypeName(device->bdmDeviceType), device->bdmDeviceType);
+    memset(out, 0, sizeof(*out));
+    out->massDeviceIndex = -1;
+    out->slot = -1;
+
+    if (itemList == NULL)
+        return;
+
+    slot = bdmDiagListIndex(itemList);
+    if (slot < 0 || itemList->priv == NULL)
+        return; // not a BDM list: valid stays 0 and the reporting calls do nothing
+
+    device = (bdm_device_data_t *)itemList->priv;
+
+    out->valid = 1;
+    out->slot = slot;
+    out->mode = itemList->mode;
+    out->visible = itemList->owner != NULL ? ((opl_io_module_t *)itemList->owner)->menuItem.visible : 0;
+    out->generation = BdmGeneration;
+    out->itemListAddr = itemList;
+    out->configAddr = configSet;
+
+    if (configSet != NULL) {
+        out->configUid = configSet->uid;
+        out->configModified = configSet->modified;
+        out->configFormat = configSet->format;
+        snprintf(out->configFilename, sizeof(out->configFilename), "%s",
+                 configSet->filename != NULL ? configSet->filename : "<none>");
+    } else {
+        out->configModified = -1;
+        out->configFormat = -1;
+        snprintf(out->configFilename, sizeof(out->configFilename), "%s", "<none>");
+    }
+
+    snprintf(out->deviceRoot, sizeof(out->deviceRoot), "%s", device->bdmDeviceRoot);
+    snprintf(out->devicePrefix, sizeof(out->devicePrefix), "%s", device->bdmPrefix);
+    snprintf(out->driver, sizeof(out->driver), "%s", device->bdmDriver);
+    out->massDeviceIndex = device->massDeviceIndex;
+    out->bdmDeviceType = device->bdmDeviceType;
+    out->foldersCreated = device->FoldersCreated;
+    out->games = device->bdmGames;
+    out->gameCount = device->bdmGameCount;
+    out->vcdGames = device->bdmVcdGames;
+    out->vcdGameCount = device->bdmVcdGameCount;
 #else
     (void)itemList;
     (void)configSet;
+    if (out != NULL)
+        out->valid = 0;
+#endif
+}
+
+// Capture-and-report in one step, for the in-module callers that run on the IO worker holding NO
+// menu lock and owning the pointers they pass. Only the settings-save path needs the two-phase form,
+// because only it must release a lock between the capture and the device probes.
+static void bdmLogIdentityDiagnosticLive(const char *event, item_list_t *itemList, const config_set_t *configSet)
+{
+#ifdef __DEBUG
+    bdm_config_diag_snapshot_t snap;
+
+    bdmCaptureConfigWriteDiag(itemList, configSet, &snap);
+    bdmLogIdentityDiagnostic(event, &snap);
+#else
+    (void)event;
+    (void)itemList;
+    (void)configSet;
+#endif
+}
+
+void bdmLogConfigWriteEntry(const bdm_config_diag_snapshot_t *snap)
+{
+    bdmLogIdentityDiagnostic("config-write-entry", snap);
+}
+
+void bdmLogConfigWriteResult(const bdm_config_diag_snapshot_t *snap, int result)
+{
+#ifdef __DEBUG
+    if (snap == NULL || !snap->valid)
+        return;
+
+    LOG("[BDM DIAG] event=config-write-result generation=%u itemList=%p mode=%d config=%p uid=%u filename=\"%s\" result=%d cachedRoot=\"%s\" cachedDriver=\"%s\" cachedDevnr=%d type=%s(%d)\n",
+        snap->generation, snap->itemListAddr, snap->mode, snap->configAddr, snap->configUid,
+        snap->configFilename, result, snap->deviceRoot, snap->driver, snap->massDeviceIndex,
+        bdmDeviceTypeName(snap->bdmDeviceType), snap->bdmDeviceType);
+#else
+    (void)snap;
     (void)result;
 #endif
 }
@@ -1970,7 +2047,7 @@ static config_set_t *bdmGetConfig(item_list_t *itemList, int id)
     // Active view's array (#120 split) -- a VCD's per-game CFG keys off its own entry, and a stale
     // toggle-window id resolves to the empty entry instead of the other view's array.
     config = sbPopulateConfig(bdmActiveGame(itemList, id), pDeviceData->bdmPrefix, "/");
-    bdmLogIdentityDiagnostic("config-create", itemList, config);
+    bdmLogIdentityDiagnosticLive("config-create", itemList, config);
     return config;
 }
 
@@ -2274,7 +2351,7 @@ int bdmUpdateDeviceData(item_list_t *itemList)
         }
         pDeviceData->bdmMissCount = 0;
         LOG("bdmUpdateDeviceData: device %d reappeared intact -- restoring page, no rescan\n", itemList->mode);
-        bdmLogIdentityDiagnostic("update-fast-reappearance", itemList, NULL);
+        bdmLogIdentityDiagnosticLive("update-fast-reappearance", itemList, NULL);
         fileXioDclose(dir);
         return 0; // "nothing changed": no connect sound, no folder pass, no sbReadList
     }
@@ -2330,7 +2407,7 @@ int bdmUpdateDeviceData(item_list_t *itemList)
         else
             LOG("Mass device: %d using generic BDM path %s\n", itemList->mode, pDeviceData->bdmPrefix);
 
-        bdmLogIdentityDiagnostic("update-connect-identity", itemList, NULL);
+        bdmLogIdentityDiagnosticLive("update-connect-identity", itemList, NULL);
 
         // Publish-time enable gate (#120 audit F-13): the visible-page filter in bdmNeedsUpdate only
         // hides a page that is ALREADY showing, i.e. one refresh pass too late. Without this gate a
@@ -2396,7 +2473,7 @@ int bdmUpdateDeviceData(item_list_t *itemList)
             moduleUpdateMenu(itemList->mode, 0, 0);
         }
 
-        bdmLogIdentityDiagnostic("update-confirmed-disconnect", itemList, NULL);
+        bdmLogIdentityDiagnosticLive("update-confirmed-disconnect", itemList, NULL);
         LOG("[BDM DIAG] event=folder-reset reason=confirmed-disconnect generation=%u itemList=%p mode=%d old=%u new=0\n",
             BdmGeneration, itemList, itemList->mode, pDeviceData->FoldersCreated);
         pDeviceData->FoldersCreated = 0;
