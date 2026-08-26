@@ -173,11 +173,10 @@ static int loadElfViaFileXio(const char *path, u32 *entry)
         loaded++;
     }
     fileXioClose(fd);
+    fileXioExit();
 
-    if (!loaded) {
-        fileXioExit();
+    if (!loaded)
         return -1;
-    }
     *entry = eh.entry;
     return 0;
 }
@@ -203,12 +202,28 @@ int main(int argc, char *argv[])
     // Writeback data cache before loading ELF.
     FlushCache(0);
 
+    /* SifExitRpc() BELONGS ON EVERY EXIT PATH, INCLUDING THE SUCCESSFUL ONES. It has been removed
+       twice now on the theory that it damages the environment the target inherits. It does not.
+       Its entire implementation is:
+
+           sceSifExitCmd():  DisableDmac(DMAC_SIF0); RemoveDmacHandler(DMAC_SIF0, sif0_id);
+
+       That is EE-side only. It resets no IOP, unloads no module, unmounts nothing -- the keep-IOP
+       property this loader exists for comes from NOT calling SifIopReset, which we never do, and is
+       completely unaffected by this call. The target runs its own SifInitRpc() on entry regardless.
+
+       What skipping it costs: SIF0 DMA stays enabled with the EE's handler table still armed, and
+       ExecPS2() then overwrites the memory that table points into. There IS a live sender -- our own
+       bdmevent.irx stays resident with bdm_RegisterCallback armed and fires on EVERY mount. The
+       target, inheriting the live IOP, mounts the game device; the callback DMAs into a stale
+       handler in memory the target now owns; the console lands in OSDSYS instead of the game. */
     // Primary: the classic LOADFILE path (see header -- every ioman-visible device stays on it).
     elfdata.epc = 0;
     SifLoadFileInit();
     ret = SifLoadElf(argv[0], &elfdata);
     SifLoadFileExit();
     if (ret == 0 && elfdata.epc != 0) {
+        SifExitRpc();
         FlushCache(0);
         FlushCache(2);
         return ExecPS2((void *)elfdata.epc, (void *)elfdata.gp, argc - 1, &argv[1]);
@@ -216,6 +231,7 @@ int main(int argc, char *argv[])
 
     // Rescue: fileXio (iomanX) for the devices LOADFILE cannot see (mmceN:, pfs, ...).
     if (loadElfViaFileXio(argv[0], &entry) == 0) {
+        SifExitRpc();
         FlushCache(0);
         FlushCache(2);
         return ExecPS2((void *)entry, NULL, argc - 1, &argv[1]);
