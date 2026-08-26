@@ -1998,7 +1998,18 @@ static char *hddGetPrefix(item_list_t *itemList)
     return gHDDPrefix;
 }
 
+int hddGetArtArchivePath(item_list_t *itemList, char *out, int outSize)
+{
+    (void)itemList;
+    if (out == NULL || outSize <= 0)
+        return -1;
+    if (gHDDPrefix == NULL)
+        return -1;
+    int n = snprintf(out, outSize, "%sART/art.tar", gHDDPrefix);
+    return (n > 0 && n < outSize) ? 1 : -1;
+}
+
 static item_list_t hddGameList = {
     HDD_MODE, 0, 0, MODE_FLAG_COMPAT_DMA, MENU_MIN_INACTIVE_FRAMES, HDD_MODE_UPDATE_DELAY, NULL, NULL, &hddGetTextId, &hddGetPrefix, &hddInit, &hddNeedsUpdate, &hddUpdateGameList,
     &hddGetGameCount, &hddGetGame, &hddGetGameName, &hddGetGameNameLength, &hddGetGameStartup, &hddDeleteGame, &hddRenameGame,
-    &hddLaunchGame, &hddGetConfig, &hddGetImage, &hddCleanUp, &hddShutdown, &hddCheckVMC, &hddGetIconId, &hddLaunchVcd};
+    &hddLaunchGame, &hddGetConfig, &hddGetImage, &hddCleanUp, &hddShutdown, &hddCheckVMC, &hddGetIconId, &hddLaunchVcd, 0, &hddGetArtArchivePath};

@@ -62,6 +62,8 @@ static u32 s_count[TAR_KIND_MAX] = {0, 0, 0};
 static u32 s_cap[TAR_KIND_MAX] = {0, 0, 0};
 static const TarDevice *s_dev[TAR_KIND_MAX] = {NULL, NULL, NULL};
 static int s_inactive[TAR_KIND_MAX] = {0, 0, 0};
+static char s_exactPath[TAR_KIND_MAX][256] = {{0}, {0}, {0}};
+static int s_isExact[TAR_KIND_MAX] = {0, 0, 0};
 
 static const unsigned char s_zeroBlock[TAR_BLOCK_SIZE] __attribute__((aligned(64))) = {0};
 
@@ -91,6 +93,8 @@ static void tarCloseInternal(TarKind kind)
     s_count[kind] = 0;
     s_cap[kind] = 0;
     s_dev[kind] = NULL;
+    s_exactPath[kind][0] = '\0';
+    s_isExact[kind] = 0;
 }
 
 static int buildTarPath(const TarDevice *dev, TarKind kind, char *out, int outSize)
@@ -381,11 +385,25 @@ fail:
 int tarLoadFile(TarKind kind, const char *path)
 {
     s_dev[kind] = NULL;
-    return tarParseFile(kind, path);
+    s_inactive[kind] = 0;
+    s_exactPath[kind][0] = '\0';
+    s_isExact[kind] = 1;
+    int r = tarParseFile(kind, path);
+    if (r == 0) {
+        snprintf(s_exactPath[kind], sizeof(s_exactPath[kind]), "%s", path);
+    } else {
+        s_isExact[kind] = 0;
+    }
+    return r;
 }
 
 int tarLoadFromAnyDevice(TarKind kind)
 {
+    // Exact HDD tar occupies the same TAR_KIND_ART slot; generic sweep must
+    // discard it so USB/SMB etc. do not search the HDD archive.
+    if (s_isExact[kind])
+        tarCloseInternal(kind);
+
     if (s_inactive[kind])
         return -1;
 
@@ -446,6 +464,9 @@ int tarClose(TarKind kind)
 
 TarEntryBase *tarFind(TarKind kind, const char *filename)
 {
+    if (s_isExact[kind])
+        tarCloseInternal(kind);
+
     if (s_inactive[kind])
         return NULL;
 
@@ -480,6 +501,9 @@ TarEntryBase *tarFind(TarKind kind, const char *filename)
 
 TarEntryBase *tarFindPrefix(TarKind kind, const char *prefix)
 {
+    if (s_isExact[kind])
+        tarCloseInternal(kind);
+
     if (s_inactive[kind])
         return NULL;
 
@@ -505,17 +529,62 @@ TarEntryBase *tarFindPrefix(TarKind kind, const char *prefix)
     return NULL;
 }
 
+TarEntryBase *tarFindExact(TarKind kind, const char *filename)
+{
+    if (!s_isExact[kind] || !s_index[kind] || s_count[kind] == 0)
+        return NULL;
+    const char *queryClean = filename;
+    if (!strncasecmp(queryClean, "./", 2))
+        queryClean += 2;
+    if (!strncasecmp(queryClean, "ART/", 4) || !strncasecmp(queryClean, "CFG/", 4) || !strncasecmp(queryClean, "CHT/", 4))
+        queryClean += 4;
+    u32 entrySize = gTarInfo[kind].entrySize;
+    char *base = (char *)s_index[kind];
+    for (u32 i = 0; i < s_count[kind]; i++) {
+        char *entry = base + entrySize * i;
+        char *fname = entry + sizeof(TarEntryBase);
+        if (strcasecmp(fname, filename) == 0 || strcasecmp(fname, queryClean) == 0)
+            return (TarEntryBase *)entry;
+        const char *baseFname = strrchr(fname, '/');
+        baseFname = baseFname ? baseFname + 1 : fname;
+        if (strcasecmp(baseFname, queryClean) == 0)
+            return (TarEntryBase *)entry;
+    }
+    return NULL;
+}
+
+TarEntryBase *tarFindPrefixExact(TarKind kind, const char *prefix)
+{
+    if (!s_isExact[kind] || !s_index[kind] || s_count[kind] == 0)
+        return NULL;
+    size_t prefixLen = strlen(prefix);
+    u32 entrySize = gTarInfo[kind].entrySize;
+    char *base = (char *)s_index[kind];
+    for (u32 i = 0; i < s_count[kind]; i++) {
+        char *entry = base + entrySize * i;
+        char *fname = entry + sizeof(TarEntryBase);
+        const char *baseFname = strrchr(fname, '/');
+        baseFname = baseFname ? baseFname + 1 : fname;
+        if (strncasecmp(baseFname, prefix, prefixLen) == 0)
+            return (TarEntryBase *)entry;
+    }
+    return NULL;
+}
+
 u32 tarRead(TarKind kind, const TarEntryBase *entry, void *dst, u32 dstSize)
 {
-    if (s_inactive[kind])
-        return 0;
-
     if (!entry || dstSize < entry->rawSize)
         return 0;
 
     char tarPath[256];
-    if (buildTarPath(s_dev[kind], kind, tarPath, sizeof(tarPath)) < 0)
-        return 0;
+    if (s_isExact[kind] && s_exactPath[kind][0] != '\0') {
+        snprintf(tarPath, sizeof(tarPath), "%s", s_exactPath[kind]);
+    } else {
+        if (s_inactive[kind])
+            return 0;
+        if (buildTarPath(s_dev[kind], kind, tarPath, sizeof(tarPath)) < 0)
+            return 0;
+    }
 
     int fd = open(tarPath, O_RDONLY);
     if (fd < 0)

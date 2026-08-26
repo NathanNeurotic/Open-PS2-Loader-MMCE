@@ -12,6 +12,7 @@
 #include "include/bdmsupport.h" // bdmModeIsSIO2 -- is this cover on the pad's bus?
 #include "include/appsupport.h" // appGetArtMode -- APP rows are proxies for another device
 #include "include/favsupport.h" // favGetArtMode -- so are FAV rows
+#include "include/hddsupport.h" // hddGetArtArchivePath -- exact HDD tar home
 #include <kernel.h>
 #include <delaythread.h> // DelayThread -- must be included explicitly, it is not pulled in by kernel.h
 
@@ -116,6 +117,45 @@ static void cacheWakeArtWorker(void);
 //       non-fatal (tarParseFile ignores the result) and happens only when the archive changes, but it
 //       is the thing to instrument first if a .tar-enabled build ever feels worse than a plain one.
 //   DEFAULT PATH: gEnableArtTar ships 0, so none of the above is reachable unless the user opts in.
+static int artTarLoadImageExact(const char *value, const char *suffix, const char *exactPath, GSTEXTURE *texture)
+{
+    char prefix[64];
+    TarEntryBase *entry = NULL;
+    void *buffer;
+    int result;
+
+    if (snprintf(prefix, sizeof(prefix), "%s_%s.", value, suffix) >= (int)sizeof(prefix))
+        return -1;
+
+    if (tarLoadFile(TAR_KIND_ART, exactPath) < 0)
+        return -1;
+
+    entry = tarFindPrefixExact(TAR_KIND_ART, prefix);
+
+    if (entry == NULL) {
+        LOG("ART TAR: '%s_%s' not in the archive index\n", value, suffix);
+        return -1;
+    }
+
+    buffer = malloc(entry->rawSize);
+    if (buffer == NULL) {
+        LOG("ART TAR: out of memory for '%s' (%u bytes)\n", prefix, entry->rawSize);
+        return -1;
+    }
+
+    if (tarRead(TAR_KIND_ART, entry, buffer, entry->rawSize) != entry->rawSize) {
+        LOG("ART TAR: short read for '%s' (%u bytes expected)\n", prefix, entry->rawSize);
+        free(buffer);
+        return -1;
+    }
+
+    result = texLoadFromMemory(texture, buffer, entry->rawSize);
+    if (result < 0)
+        LOG("ART TAR: '%s' found (%u bytes) but PNG decode failed (%d)\n", prefix, entry->rawSize, result);
+    free(buffer);
+    return result;
+}
+
 static int artTarLoadImage(const char *value, const char *suffix, GSTEXTURE *texture)
 {
     char prefix[64];
@@ -826,8 +866,49 @@ static void cacheLoadImage(load_image_request_t *req)
 
     texSetLoadAbortFlag(&req->abortRequested);
 
-    if (gEnableArtTar)
-        result = artTarLoadImage(req->value, req->cache->suffix, &staged);
+    if (gEnableArtTar) {
+        char exactPath[256];
+        int useExact = 0;
+        int noHome = 0;
+        if (handler->itemGetArtArchivePath != NULL) {
+            int r = handler->itemGetArtArchivePath(handler, exactPath, sizeof(exactPath));
+            if (r == 1)
+                useExact = 1;
+            else if (r == -1)
+                noHome = 1;
+        } else if (handler->mode == HDD_MODE) {
+            int r = hddGetArtArchivePath(handler, exactPath, sizeof(exactPath));
+            if (r == 1)
+                useExact = 1;
+            else if (r == -1)
+                noHome = 1;
+        } else if (handler->mode == FAV_MODE && req->value != NULL) {
+            int src = favGetArtMode(req->value);
+            if (src == HDD_MODE) {
+                int r = hddGetArtArchivePath(handler, exactPath, sizeof(exactPath));
+                if (r == 1)
+                    useExact = 1;
+                else
+                    noHome = 1;
+            }
+        } else if (handler->mode == APP_MODE && req->value != NULL) {
+            int am = appGetArtMode(req->value);
+            if (am == HDD_MODE) {
+                int r = hddGetArtArchivePath(handler, exactPath, sizeof(exactPath));
+                if (r == 1)
+                    useExact = 1;
+                else
+                    noHome = 1;
+            }
+        }
+        if (noHome) {
+            result = -1;
+        } else if (useExact) {
+            result = artTarLoadImageExact(req->value, req->cache->suffix, exactPath, &staged);
+        } else {
+            result = artTarLoadImage(req->value, req->cache->suffix, &staged);
+        }
+    }
 
     // Fall through to the per-file lookup whenever the archive is off, absent, or lacks this key.
     if (result < 0)
