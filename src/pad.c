@@ -93,6 +93,14 @@ static u32 oldpaddata;
 static int delaycnt[16];
 static int paddelay[16];
 
+// Menu rumble pulse state. Declared up here, above readPad(), because the PADEMU poll path drives
+// the DS3/DS4/DS5 motors directly from it -- those pads never reach padSetActDirect. The pulse
+// lifetime and timing rules live with padRumble()/padRumbleFlush() further down.
+static u32 rumbleStartTicks = 0;
+static u32 rumbleDurTicks = 0;
+static int rumbleActive = 0;
+static int rumbleLarge = 0;
+
 // KEY_ to PAD_ conversion table
 static const int keyToPad[17] = {
     -1,
@@ -394,9 +402,21 @@ static int readPad(struct pad_data_t *pad, int *pollClean)
     }
 
 #ifdef PADEMU
+    // A DS3/DS4/DS5 NEVER passes through padSetActDirect: its motors live on this PADEMU channel,
+    // so the rumble state has to be driven here or the pad simply cannot vibrate, no matter what the
+    // native path does. These calls were hardcoded to zero, which is why menu rumble was dead on
+    // every PADEMU controller while working on a native pad.
+    //
+    // This costs NOTHING extra. ds34*_set_rumble is already issued on every poll -- it was just
+    // being handed 0 each time -- so none of the bounded-retry machinery the native path needs
+    // applies here: the level is re-asserted every frame as a side effect of polling, and drops back
+    // to 0 on the first poll after the pulse expires. Both motors are driven together, matching the
+    // known-good RETROLauncher behaviour.
+    u8 pademuRumble = (gEnableRumble && rumbleActive) ? (u8)rumbleLarge : 0;
+
     if (ds34bt_get_status(pad->port) & DS34BT_STATE_RUNNING) {
         ret = ds34bt_get_data(pad->port, (u8 *)&pad->buttons.btns);
-        ds34bt_set_rumble(pad->port, 0, 0);
+        ds34bt_set_rumble(pad->port, pademuRumble, pademuRumble);
         if (ret != 0) {
             newpdata |= 0xffff ^ pad->buttons.btns;
             padsRead++;
@@ -405,7 +425,7 @@ static int readPad(struct pad_data_t *pad, int *pollClean)
 
     if (ds34usb_get_status(pad->port) & DS34USB_STATE_RUNNING) {
         ret = ds34usb_get_data(pad->port, (u8 *)&pad->buttons.btns);
-        ds34usb_set_rumble(pad->port, 0, 0);
+        ds34usb_set_rumble(pad->port, pademuRumble, pademuRumble);
         if (ret != 0) {
             newpdata |= 0xffff ^ pad->buttons.btns;
             padsRead++;
@@ -471,10 +491,6 @@ elapsed comparison in raw ticks is correct across one wrap by ordinary unsigned 
 pulse is capped below at a fraction of a second, so one wrap is the most that can occur inside it.
 This is why the feature needs none of the pad-clock rework it was originally blocked on.
 ----------------------------------------------------------------------------------------------------*/
-static u32 rumbleStartTicks = 0;
-static u32 rumbleDurTicks = 0;
-static int rumbleActive = 0;
-static int rumbleLarge = 0;
 
 // Longest pulse we will ever hold a motor on for. Menu feedback, not a sustained buzz.
 #define RUMBLE_MAX_MS 500
@@ -552,6 +568,23 @@ static void padActSet(struct pad_data_t *pad, int small, int large)
  * The decay only runs from readPads(), so anything that can block the GUI thread for longer than a
  * pulse has to stop the motor on the way in or it buzzes for the whole operation.
  */
+#ifdef PADEMU
+// PADEMU motors normally decay through readPad()'s per-poll drive, but unloadPads() dismantles the
+// pad stack and readPads() never runs again -- so the last non-zero level would stay latched in the
+// ds34 driver on the way out. Stop them explicitly on the same path the native actuators use.
+static void padPademuStopAll(void)
+{
+    int i;
+
+    for (i = 0; i < pad_count; ++i) {
+        if (ds34bt_get_status(pad_data[i].port) & DS34BT_STATE_RUNNING)
+            ds34bt_set_rumble(pad_data[i].port, 0, 0);
+        if (ds34usb_get_status(pad_data[i].port) & DS34USB_STATE_RUNNING)
+            ds34usb_set_rumble(pad_data[i].port, 0, 0);
+    }
+}
+#endif
+
 void padRumbleFlush(void)
 {
     int i, r;
@@ -570,6 +603,10 @@ void padRumbleFlush(void)
     for (r = 0; r < RUMBLE_OFF_SYNC_SENDS; ++r)
         for (i = 0; i < pad_count; ++i)
             padActSet(&pad_data[i], 0, 0);
+
+#ifdef PADEMU
+    padPademuStopAll();
+#endif
 
     rumbleOffRepeats = RUMBLE_CMD_REPEATS;
 }
