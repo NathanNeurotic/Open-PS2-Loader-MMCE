@@ -1352,14 +1352,23 @@ void setErrorMessageWithCode(int strId, int error)
     guiSetFrameHook(&errorMessageHook);
 }
 
+// The detail suffix is an internal enum name ("PS2FS_LOAD_FAILURE"), untranslated by construction,
+// so a plain release gets the localized message alone and behaves exactly like setErrorMessageWithCode.
+// OPLDIAG=1 appends the reason so a tester's screenshot names WHICH probe failed, not just the code.
 void setErrorMessageWithCodeAndDetail(int strId, int error, const char *detail)
 {
+#ifdef __OPLDIAG
     size_t used;
+#else
+    (void)detail;
+#endif
 
     formatErrorMessage(_l(strId), NULL, error, 0, 1);
+#ifdef __OPLDIAG
     used = strlen(errorMessage);
     if (detail != NULL && detail[0] != '\0' && used < sizeof(errorMessage) - 1)
         snprintf(&errorMessage[used], sizeof(errorMessage) - used, "\nDiagnostic reason: %s", detail);
+#endif
     errorMessageStringId = strId;
     guiSetFrameHook(&errorMessageHook);
 }

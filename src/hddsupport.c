@@ -104,6 +104,11 @@ static void hddClearPfsDiagFailure(const char *why)
     hddPfsDiagPs2fsResult = HDD_PFS_DIAG_NOT_RUN;
 }
 
+// Diagnostic-build only, same rule as bdmDiagBootStage*: this publishes untranslated developer text
+// to the boot status line that every other caller feeds through _l(). hddDiagBootStageActive
+// additionally scopes it to the bracket opened by hddDiagLoadModulesReady(), so even a diagnostic
+// build only narrates the ATA startup it was asked to narrate.
+#ifdef __OPLDIAG
 static void hddDiagBootStageBegin(const char *stage)
 {
     char status[96];
@@ -139,6 +144,23 @@ static void hddDiagBootStageEndVoid(const char *stage)
     LOG("%s\n", status);
     guiSetBootStatusStickyCopy(status);
 }
+#else
+static void hddDiagBootStageBegin(const char *stage)
+{
+    (void)stage;
+}
+
+static void hddDiagBootStageEnd(const char *stage, int result)
+{
+    (void)stage;
+    (void)result;
+}
+
+static void hddDiagBootStageEndVoid(const char *stage)
+{
+    (void)stage;
+}
+#endif
 
 static void hddClearRecoveredErrors(void)
 {

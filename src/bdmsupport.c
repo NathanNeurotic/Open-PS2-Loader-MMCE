@@ -478,6 +478,11 @@ static int bdmLoadOptionalModuleArgs(const char *name, void *module, int moduleS
     return result;
 }
 
+// BOOT-STAGE LABELS ARE DIAGNOSTIC-BUILD ONLY (OPLDIAG=1). They publish raw, untranslated developer
+// text -- "BEGIN USBMASS_BD", "END DEV9/ATAD/XHDD result=1" -- straight to the boot status line that
+// every other caller feeds through _l(). A plain release must show only localized boot steps, so
+// these compile to nothing there; the diagnostic flavour is what a tester runs to localize a wedge.
+#ifdef __OPLDIAG
 static void bdmDiagBootStageBegin(const char *stage)
 {
     char status[64];
@@ -495,6 +500,18 @@ static void bdmDiagBootStageEnd(const char *stage, int result)
     LOG("[BDM DIAG] %s\n", status);
     guiSetBootStatusStickyCopy(status);
 }
+#else
+static void bdmDiagBootStageBegin(const char *stage)
+{
+    (void)stage;
+}
+
+static void bdmDiagBootStageEnd(const char *stage, int result)
+{
+    (void)stage;
+    (void)result;
+}
+#endif
 
 static int bdmDiagLoadOptionalModule(const char *stage, const char *name, void *module, int moduleSize)
 {
@@ -723,6 +740,10 @@ static int bdmLoadUsbMassBd(void)
     if (iUSBModLoaded)
         return 0;
 
+    // Localized boot step, restored with the move into bdmLoadCoreModules. USBMASS_BD is the prime
+    // suspect for a real exFAT/USB boot wedge, so it is the last step a stalled console should be
+    // naming -- losing this left a wedge here reading as a stall in the PREVIOUS step (BDMFS_FATFS).
+    guiSetBootStatusSticky(_l(_STR_BOOT_LOADING_USB));
     bdmDiagBootStageBegin("USBMASS_BD");
     result = bdmLoadOptionalModule("USBMASS_BD", &usbmass_bd_irx, size_usbmass_bd_irx);
     bdmDiagBootStageEnd("USBMASS_BD", result);
