@@ -382,18 +382,36 @@ fail:
     return -1;
 }
 
+// Load ONE named archive, bypassing the multi-device sweep. Three invariants this has to hold, each
+// of which was violated by the first cut and each of which fails SILENTLY:
+//
+//  1. LOAD-ONCE. The generic path is load-once by construction -- tarFind*() only sweeps when the
+//     index is empty -- but this entry point re-parsed unconditionally, so the exact (HDD) path paid
+//     a full open + index read for EVERY cover instead of once per archive. The index is keyed by
+//     path and immutable for its lifetime, so holding the same path is a no-op.
+//  2. NO INDEX SURVIVES A FAILURE. tarParseFile()'s open() failure returns BEFORE the free() that
+//     resets the index, so a failed exact load used to leave the PREVIOUS archive's index in place
+//     with s_isExact cleared. tarFind*() then saw a populated index, skipped tarLoadFromAnyDevice()
+//     forever, searched the wrong archive, and every read failed on the NULL s_dev -- i.e. one HDD
+//     home with no art.tar killed archive art on every other device for the rest of the session.
+//  3. THE "NO ARCHIVE ANYWHERE" LATCH IS NOT OURS TO CLEAR. s_inactive belongs to the generic sweep;
+//     clearing it here re-armed a full device probe (a failed open costs seconds on USB) after every
+//     exact load. Only tarClose()/tarInvalidate() may clear it.
 int tarLoadFile(TarKind kind, const char *path)
 {
-    s_dev[kind] = NULL;
-    s_inactive[kind] = 0;
-    s_exactPath[kind][0] = '\0';
+    if (s_isExact[kind] && s_index[kind] != NULL && s_count[kind] > 0 &&
+        strcmp(s_exactPath[kind], path) == 0)
+        return 0;
+
+    tarCloseInternal(kind);
+
     s_isExact[kind] = 1;
     int r = tarParseFile(kind, path);
-    if (r == 0) {
+    if (r == 0)
         snprintf(s_exactPath[kind], sizeof(s_exactPath[kind]), "%s", path);
-    } else {
-        s_isExact[kind] = 0;
-    }
+    else
+        tarCloseInternal(kind);
+
     return r;
 }
 
