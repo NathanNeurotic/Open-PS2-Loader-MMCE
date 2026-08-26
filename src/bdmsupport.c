@@ -367,10 +367,20 @@ int bdmModeIsSIO2(int mode)
     return pDeviceData != NULL && pDeviceData->bdmDeviceType == BDM_TYPE_SDC;
 }
 
+static int bdmLoadUsbMassBd(void)
+{
+    if (iUSBModLoaded)
+        return 0;
+    LOG("[USBMASS_BD]:\n");
+    if (bdmLoadOptionalModule("USBMASS_BD", &usbmass_bd_irx, size_usbmass_bd_irx) >= 0) {
+        iUSBModLoaded = 1;
+        return 0;
+    }
+    return -1;
+}
+
 static int bdmShouldQueueModuleLoad(void)
 {
-    if (gEnableUSB && !iUSBModLoaded)
-        return 1;
     if (gEnableILK && !iLinkModLoaded)
         return 1;
     if (gEnableMX4SIO && !mx4sioModLoaded)
@@ -394,14 +404,11 @@ static void bdmLoadBlockDeviceModules(void)
 
     // Snapshot, compared after the loads below. See the refresh at the end of this function for why
     // a transport enabled from Settings needed a "double tap" before its tab appeared.
-    int modsWere = iUSBModLoaded + iLinkModLoaded + mx4sioModLoaded + hddModLoaded + udpbdModLoaded;
+    int modsWere = iLinkModLoaded + mx4sioModLoaded + hddModLoaded + udpbdModLoaded;
 
-    if (gEnableUSB && !iUSBModLoaded) {
-        // Load USB Block Device drivers -- the prime suspect for a real exFAT/USB boot wedge.
-        guiSetBootStatusSticky(_l(_STR_BOOT_LOADING_USB));
-        if (bdmLoadOptionalModule("USBMASS_BD", &usbmass_bd_irx, size_usbmass_bd_irx) >= 0)
-            iUSBModLoaded = 1;
-    }
+    // USB mass storage is part of the base BDM stack (upstream/Grimdoomer: always
+    // resident). Its residency must not be gated by the UI-visible gEnableUSB flag;
+    // visibility is handled separately by bdmTransportEnabled.
 
     if (gEnableILK && !iLinkModLoaded) {
         // Load iLink Block Device drivers
@@ -460,7 +467,7 @@ static void bdmLoadBlockDeviceModules(void)
             sysShutdownDev9();
     }
 
-    int modsNow = iUSBModLoaded + iLinkModLoaded + mx4sioModLoaded + hddModLoaded + udpbdModLoaded;
+    int modsNow = iLinkModLoaded + mx4sioModLoaded + hddModLoaded + udpbdModLoaded;
 
     // BOOT PASS BUMPS NOTHING. On the first call every enabled transport loads for the first time, so
     // the comparison below is guaranteed true -- and bdmInitDevicesData is about to publish all of
@@ -532,6 +539,10 @@ static void bdmLoadCoreModules(void)
     // Load FATFS (mass:) driver
     LOG("[BDMFS_FATFS]:\n");
     sysLoadModuleBuffer(&bdmfs_fatfs_irx, size_bdmfs_fatfs_irx, 0, NULL);
+
+    // USB block device is base BDM infrastructure (upstream ps2homebrew and
+    // Grimdoomer load it synchronously, not as an optional transport).
+    bdmLoadUsbMassBd();
 
     LOG("[BDMEVENT]:\n");
     sysLoadModuleBuffer(&bdmevent_irx, size_bdmevent_irx, 0, NULL);
