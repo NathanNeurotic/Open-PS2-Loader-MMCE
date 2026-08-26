@@ -1117,9 +1117,11 @@ static void updateMenuFromGameList(opl_io_module_t *mdl)
 
     if (gAutosort) {
         gup = guiOpCreate(GUI_OP_SORT);
-        gup->menu.menu = &mdl->menuItem;
-        gup->menu.subMenu = &mdl->subMenu;
-        guiDeferUpdate(gup);
+        if (gup) { // OOM: an unsorted list beats dereferencing NULL, same as the append loop above
+            gup->menu.menu = &mdl->menuItem;
+            gup->menu.subMenu = &mdl->subMenu;
+            guiDeferUpdate(gup);
+        }
     }
 }
 

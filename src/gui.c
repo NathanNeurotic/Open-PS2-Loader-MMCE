@@ -3396,8 +3396,11 @@ int guiDeferUpdate(struct gui_update_t *op)
 
     struct gui_update_list_t *up = (struct gui_update_list_t *)malloc(sizeof(struct gui_update_list_t));
     if (!up) {
-        /* OOM: release the semaphore so future callers are not permanently locked out */
+        /* OOM: release the semaphore so future callers are not permanently locked out. The op is
+           ours to release too -- ownership transfers on enqueue, so a caller that got -1 back has
+           no pointer left to free and would otherwise leak the very object we could not queue. */
         SignalSema(gSemaId);
+        free(op);
         return -1;
     }
     up->item = op;
@@ -3510,6 +3513,18 @@ static void guiHandleDeferredOps(void)
         struct gui_update_list_t *td = gUpdateList;
         gUpdateList = gUpdateList->next;
 
+        // FREE THE OPERATION, NOT JUST ITS QUEUE NODE. Every deferred op is TWO allocations --
+        // guiOpCreate() mallocs the gui_update_t, guiDeferUpdate() mallocs the list node that
+        // carries it -- and this loop only ever released the node. The op leaked, always, and no
+        // commit in this repository's history has ever freed one.
+        //
+        // The rate is what makes it fatal rather than untidy: updateMenuFromGameList() calls
+        // guiOpCreate(GUI_OP_APPEND_MENU) once PER GAME ROW, so a single list rebuild leaks one
+        // object per row and every page change rebuilds. Enough navigation and the heap is gone.
+        //
+        // guiHandleOp() reads the op but never retains the pointer, and submenu.text points into
+        // the support's own storage rather than the op, so releasing it here is safe.
+        free(td->item);
         free(td);
 
         gCompletedOps++;
@@ -4275,6 +4290,13 @@ void guiSwitchScreen(int target)
 struct gui_update_t *guiOpCreate(gui_op_type_t type)
 {
     struct gui_update_t *op = (struct gui_update_t *)malloc(sizeof(struct gui_update_t));
+
+    // The memset used to run unconditionally, so an allocation failure faulted HERE rather than
+    // returning NULL -- which made every "if (!op)" guard at the call sites unreachable code. The
+    // callers were written expecting to handle OOM; let them.
+    if (op == NULL)
+        return NULL;
+
     memset(op, 0, sizeof(struct gui_update_t));
     op->type = type;
     return op;
