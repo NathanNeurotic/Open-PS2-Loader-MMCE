@@ -129,21 +129,7 @@ static unsigned int frameCounter;
 // noticed promptly.
 #define BDM_EMPTY_SLOT_PROBE_RATIO 8
 
-// BOOT WARM-UP. The throttle above is correct for steady state and wrong for the first few seconds
-// of a session: USB enumeration is not instant, so a stick that is physically present at power-on
-// can finish mounting AFTER its slot's early probes have already run. It is then an "empty" slot,
-// probed on the 8x rotation (~8 s) and only while the user is holding still -- so a user who is
-// navigating may not see it at all, and replugging it is the thing that finally works, because a
-// hotplug bumps the generation and bypasses every gate.
-//
-// For a bounded window after the first menu tick, probe BDM slots regardless of the empty-slot
-// rotation and regardless of idleness. The per-mode MENU_BG_RESCAN_MIN_INTERVAL_TICKS floor still
-// applies, so this is at most one probe per slot per 2 s, and it stops entirely afterwards -- the
-// steady-state cost this throttle exists to prevent is untouched.
-#define BDM_BOOT_WARMUP_TICKS (30 * CLOCKS_PER_SEC)
-
 static clock_t lastBgRescan[MODE_COUNT];
-static clock_t bdmWarmupStart;
 static unsigned int lastSeenBdmGeneration;
 
 static char errorMessage[256];
@@ -1235,11 +1221,6 @@ static void menuUpdateHook()
         int genChanged = (gen != lastSeenBdmGeneration);
         clock_t now = clock();
 
-        // First tick through here is the start of the boot warm-up window. (A clock() of exactly 0
-        // simply defers the anchor by one tick; the window is a heuristic, not a deadline.)
-        if (bdmWarmupStart == 0)
-            bdmWarmupStart = now;
-
         // "Storage changed underneath us" is the ONLY routine event that can make previously-absent
         // art exist, so it is the only routine event that should re-open the question. The memo used
         // to be cleared by updateMenuFromGameList instead -- i.e. on every list rebuild, including the
@@ -1280,18 +1261,11 @@ static void menuUpdateHook()
                 // empty since boot. It is also the most plausible source of the spurious
                 // "device replugged" the user sees while simply navigating, since those probes poke
                 // the USB stack for devices that are not there.
-                // Boot warm-up (see BDM_BOOT_WARMUP_TICKS): for a bounded window, a BDM slot is
-                // probed whether or not it has ever held a device and whether or not the user is
-                // sitting still, so a stick that finishes enumerating after boot is noticed without
-                // waiting on the empty-slot rotation -- or on the user replugging it.
-                int isBdmSlot = (mode >= BDM_MODE && mode <= BDM_MODE_LAST);
-                int bdmWarmup = isBdmSlot && (now - bdmWarmupStart) < BDM_BOOT_WARMUP_TICKS;
-
-                if (!genChanged && !bdmWarmup && isBdmSlot && !bdmSlotEverConnected(mode) &&
+                if (!genChanged && mode >= BDM_MODE && mode <= BDM_MODE_LAST && !bdmSlotEverConnected(mode) &&
                     (frameCounter % (MENU_GENERAL_UPDATE_DELAY * BDM_EMPTY_SLOT_PROBE_RATIO)) != 0)
                     continue;
 
-                if (genChanged || ((longIdle || bdmWarmup) && (now - lastBgRescan[mode]) >= MENU_BG_RESCAN_MIN_INTERVAL_TICKS)) {
+                if (genChanged || (longIdle && (now - lastBgRescan[mode]) >= MENU_BG_RESCAN_MIN_INTERVAL_TICKS)) {
                     // Stamp the throttle only on an accepted request, so a rejected one retries on
                     // the next tick instead of being silently skipped for a full interval.
                     int accepted = (ioPutRequest(IO_MENU_UPDATE_DEFFERED, &list_support[i].support->mode) == IO_OK);

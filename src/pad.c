@@ -412,7 +412,14 @@ static int readPad(struct pad_data_t *pad, int *pollClean)
     // applies here: the level is re-asserted every frame as a side effect of polling, and drops back
     // to 0 on the first poll after the pulse expires. Both motors are driven together, matching the
     // known-good RETROLauncher behaviour.
-    u8 pademuRumble = (gEnableRumble && rumbleActive) ? (u8)rumbleLarge : 0;
+    // SELF-EXPIRING, deliberately: derived from elapsed ticks rather than trusting rumbleActive to
+    // have been cleared. The ds34 driver LATCHES whatever level it was last handed, so if the decay
+    // in readPads() does not run -- reordered, skipped, or the GUI thread blocked -- a stale flag
+    // would leave the motor on with nothing to stop it. Any poll that happens at all now yields 0
+    // once the pulse is over.
+    u8 pademuRumble = 0;
+    if (gEnableRumble && rumbleActive && (u32)(cpu_ticks() - rumbleStartTicks) < rumbleDurTicks)
+        pademuRumble = (u8)rumbleLarge;
 
     if (ds34bt_get_status(pad->port) & DS34BT_STATE_RUNNING) {
         ret = ds34bt_get_data(pad->port, (u8 *)&pad->buttons.btns);
@@ -638,15 +645,26 @@ void padRumbleFlush(void)
     rumbleOffRepeats = RUMBLE_CMD_REPEATS;
 }
 
-/** Starts a rumble pulse on every connected pad that has actuators.
+/** Arms a rumble pulse. STATE ONLY -- issues no pad command, on purpose.
+ *
+ * ⚠ THIS IS CALLED FROM THREADS THAT MUST NEVER TOUCH SIO2. sfxPlay() calls sfxRumble() inline, and
+ * sfxPlay(SFX_BD_CONNECT/DISCONNECT) is reached from bdmNeedsUpdate() on the IO WORKER. Issuing
+ * padSetActDirect/padSetActAlign from there puts SIO2 traffic on the pad's own bus underneath the
+ * GUI thread's readPads(), which is the documented hard-freeze mechanism (see the freepad note
+ * above and pad.c's bounded waits) -- observed on hardware as the console locking up the moment a
+ * second USB device was hotplugged, with the motor stuck on because the poll loop that would have
+ * expired the pulse never ran again.
+ *
+ * So the actuators are driven EXCLUSIVELY from readPads(), which owns the pad bus. Arming only sets
+ * counters; the next poll issues the command. That costs one frame of onset latency and removes the
+ * cross-thread hazard entirely.
+ *
  * @param durationMs pulse length, clamped to RUMBLE_MAX_MS
  * @param large      large (variable-speed) engine strength, 0..255; the small engine runs for the
  *                   whole pulse regardless, since it is the one that gives a crisp click
  */
 void padRumble(int durationMs, int large)
 {
-    int i;
-
     if (durationMs <= 0)
         return;
     if (durationMs > RUMBLE_MAX_MS)
@@ -661,11 +679,8 @@ void padRumble(int durationMs, int large)
         rumbleStartTicks = cpu_ticks();
         rumbleDurTicks = (u32)durationMs * CLOCKS_PER_MILISEC;
         rumbleLarge = large;
-        if (strengthChanged) {
+        if (strengthChanged)
             rumbleOnRepeats = RUMBLE_CMD_REPEATS;
-            for (i = 0; i < pad_count; ++i)
-                padActSet(&pad_data[i], 1, large);
-        }
         return;
     }
 
@@ -676,9 +691,6 @@ void padRumble(int durationMs, int large)
     // A new pulse cancels any stop still being repeated, or the tail would switch it back off.
     rumbleOffRepeats = 0;
     rumbleOnRepeats = RUMBLE_CMD_REPEATS;
-
-    for (i = 0; i < pad_count; ++i)
-        padActSet(&pad_data[i], 1, large);
 }
 
 /* Screen-transition edge freeze. During the fade the main loop polls pads but dispatches no input,
