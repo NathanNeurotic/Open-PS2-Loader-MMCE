@@ -41,6 +41,7 @@ static unsigned char hddSupportModulesLoaded = 0;
 // success so a later, different failure toasts again.
 static unsigned char hddSupportErrToasted = 0;
 static unsigned char hddPfsDeferredFailed = 0;
+static int hddRetryQueued = 0;
 // A Settings selection is deliberately staged until Save Settings. It never changes the active
 // pfs0: mount: a live OPL data home can have artwork/config readers using it.
 static int hddOplHomePending = -1;
@@ -85,6 +86,7 @@ static int hddUpdateGameListCache(hdl_games_list_t *cache, hdl_games_list_t *gam
 
 static void hddInitModules(void)
 {
+    hddRetryQueued = 0;
     hddLoadModules();
     hddLoadSupportModules();
 
@@ -853,11 +855,17 @@ static int hddNeedsUpdate(item_list_t *itemList)
 static int hddUpdateGameList(item_list_t *itemList)
 {
     // GUI thread must never block on the 1 s ATA settle (hddLoadModules DelayThread).
-    // If the base ATA stack has never completed (hddModulesLoadCount==0), defer; the
-    // separately queued hddInitModules on the IO worker will settle and this will
-    // retry on the next refresh.
-    if (hddModulesLoadCount == 0)
+    // If the base ATA stack has never completed (hddModulesLoadCount==0), defer and
+    // ensure a deduplicated IO-worker retry is queued. hddLoadModules resets the count
+    // to 0 on failure for retryability, and the one-shot hddInit queue may already be
+    // consumed, so without this the stack would strand permanently.
+    if (hddModulesLoadCount == 0) {
+        if (!hddRetryQueued) {
+            if (ioPutRequest(IO_CUSTOM_SIMPLEACTION, &hddInitModules) == IO_OK)
+                hddRetryQueued = 1;
+        }
         return 0;
+    }
 
     // Self-heal (wLaunchELF-R3Z3N parity: latch only on success, retry per use): a boot-time first
     // touch that raced drive spin-up used to leave the APA page EMPTY for the whole session -- the
