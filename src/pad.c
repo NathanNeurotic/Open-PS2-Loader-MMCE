@@ -530,8 +530,27 @@ static int rumbleOffRepeats = 0;
 // then killed rumble silently for the whole session.
 static void padRumbleRealign(struct pad_data_t *pad)
 {
-    if (pad->actAligned || pad->actuators == 0)
+    if (pad->actAligned)
         return;
+
+    // RECOVER THE ACTUATOR COUNT RATHER THAN TRUSTING IT. initializePad() clears actuators to 0 up
+    // front -- deliberately, so a digital pad swapped into the port cannot inherit a stale count --
+    // and then has FOUR `return 1` bail-outs above the padInfoAct() that would refill it. Any one of
+    // them (a mode table that reads short, a pad that is not DUALSHOCK-capable on that pass, an
+    // ex-id query that fails) leaves actuators==0 for the rest of the session, and both this
+    // function and padActSet() used to veto on exactly that -- so one init hiccup killed rumble
+    // permanently, with nothing logged and no way for the user to tell.
+    //
+    // padInfoAct() is an EE-local read of the pad buffer freepad has already DMA'd; it neither
+    // blocks nor touches SIO2, so asking again at the first pulse costs nothing. A genuinely
+    // actuator-less pad answers <= 0 every time and is simply skipped.
+    if (pad->actuators == 0) {
+        pad->actuators = padInfoAct(pad->port, pad->slot, -1, 0);
+        if (pad->actuators <= 0) {
+            pad->actuators = 0;
+            return;
+        }
+    }
 
     pad->actAlign[0] = 0; // small engine -> byte 0 of padSetActDirect
     pad->actAlign[1] = 1; // big engine   -> byte 1
@@ -551,10 +570,18 @@ static void padActSet(struct pad_data_t *pad, int small, int large)
 {
     char act[6];
 
-    if (pad->actuators == 0)
+    // Gate on READINESS, not on the actuator count. The count is a cached answer that a single init
+    // bail-out can leave at 0 forever (see padRumbleRealign below, which now recovers it); gating
+    // sends on it turned that transient into a permanent, silent loss of rumble. A pad that is ready
+    // accepts the command; a digital-only controller ignores it harmlessly.
+    if (!isPadReadyState(pad->state))
         return;
 
     padRumbleRealign(pad);
+
+    // Still nothing to drive after the recovery attempt -- genuinely actuator-less pad.
+    if (pad->actuators == 0)
+        return;
 
     memset(act, 0, sizeof(act));
     act[0] = small ? 1 : 0;        // small engine: on/off only

@@ -262,6 +262,30 @@ int sfxGetSoundDuration(int id)
 // the menu mid-navigation. Always measured (two tick reads), rendered only when Settings ->
 // Debug Colors is on (gui.c / dia.c).
 #define SFX_CLOCKS_PER_MS 147456 // EE cpu_ticks() rate
+
+/* MENU RUMBLE TIMING -- the RETROLauncher model, which is the reference for feedback that actually
+   reads as feedback on hardware. Two shapes, and the split matters more than either value:
+
+     NAVIGATION is a LONG, SOFT big-motor thump. Length is what makes it perceptible -- a DualShock's
+     eccentric mass needs roughly 50-100 ms just to reach amplitude you can feel, so a short pulse is
+     inaudible to the hand no matter how hard it is driven. This was previously 35 ms at 64/255,
+     i.e. below the motor's spin-up time: correct commands, no sensation.
+
+     DECISION is a SHORTER, HARDER bump. It happens once, so it can afford to be crisp.
+
+   The old values had this backwards -- the constant, per-step event was the short weak one and the
+   one-shot events were the long strong ones.
+
+   Held navigation cannot simply repeat the full thump: steps arrive faster than 240 ms and the
+   feedback smears into one continuous drone. Repeats are therefore scaled to a fraction of the
+   OBSERVED step interval, with a floor below which we stay silent rather than buzz. */
+#define RUMBLE_NAV_MS               240
+#define RUMBLE_NAV_LEVEL            0x50
+#define RUMBLE_NAV_REPEAT_WINDOW_MS 400
+#define RUMBLE_NAV_REPEAT_DUTY_PCT  45
+#define RUMBLE_NAV_MIN_MS           80
+#define RUMBLE_DECISION_MS          110
+#define RUMBLE_DECISION_LEVEL       0x60
 static unsigned int sfxLastPlayMs = 0;
 static unsigned int sfxMaxPlayMs = 0;
 
@@ -288,33 +312,49 @@ static void sfxRumble(int id)
 
     switch (id) {
         case SFX_CURSOR: {
-            // Cursor sounds are emitted for every navigation step, including held buttons. Keep the
-            // prompt responsive without turning a long scroll into a continuous motor buzz.
+            // AN ERM HAS TO SPIN UP BEFORE IT CAN BE FELT. This was a 35 ms pulse at 64/255, and a
+            // DualShock's eccentric mass needs roughly 50-100 ms just to reach perceptible
+            // amplitude -- the stop command arrived before the motor had meaningfully moved, so
+            // navigation rumble was inaudible to the hand even when every command was delivered
+            // correctly. Length matters more than strength here.
+            //
+            // The old fixed 80 ms lockout also cannot survive a longer pulse: a held scroll would
+            // re-arm faster than the pulse ends and the "thump per step" becomes one continuous
+            // buzz. So scale to the OBSERVED step interval instead -- the first step of a scroll
+            // gets the full thump, measured repeats ride at a fraction of their own cadence, and
+            // steps coming in faster than the motor can answer stay silent rather than smearing
+            // into a drone.
             static u32 lastCursorRumbleTicks;
+            static int haveCursorInterval;
             u32 now = cpu_ticks();
-            if (lastCursorRumbleTicks != 0 && (now - lastCursorRumbleTicks) / SFX_CLOCKS_PER_MS < 80)
-                return;
+            int durationMs = RUMBLE_NAV_MS;
+
+            if (haveCursorInterval) {
+                u32 intervalMs = (now - lastCursorRumbleTicks) / SFX_CLOCKS_PER_MS;
+                if (intervalMs < RUMBLE_NAV_REPEAT_WINDOW_MS) {
+                    int dutyMs = (int)((intervalMs * RUMBLE_NAV_REPEAT_DUTY_PCT) / 100);
+                    if (dutyMs < RUMBLE_NAV_MIN_MS)
+                        return; // faster than an ERM can answer -- a buzz, not feedback
+                    if (dutyMs < durationMs)
+                        durationMs = dutyMs;
+                }
+            }
+
             lastCursorRumbleTicks = now;
-            padRumble(35, 64);
+            haveCursorInterval = 1;
+            padRumble(durationMs, RUMBLE_NAV_LEVEL);
             break;
         }
+        // One-shot events all share the decision bump. RETROLauncher does not give each of these its
+        // own signature, and inventing six was how they ended up longer and stronger than the
+        // navigation thump they are supposed to punctuate.
         case SFX_CONFIRM:
-            padRumble(120, 160);
-            break;
         case SFX_CANCEL:
-            padRumble(90, 96);
-            break;
         case SFX_MESSAGE:
-            padRumble(120, 160);
-            break;
         case SFX_TRANSITION:
-            padRumble(150, 200);
-            break;
         case SFX_BD_CONNECT:
-            padRumble(100, 128);
-            break;
         case SFX_BD_DISCONNECT:
-            padRumble(75, 96);
+            padRumble(RUMBLE_DECISION_MS, RUMBLE_DECISION_LEVEL);
             break;
         default:
             break;
