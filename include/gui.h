@@ -152,6 +152,11 @@ void guiRenderTextScreen(const char *message);
 
 void guiWarning(const char *text, int count);
 
+/* RetroAchievements: a two-line notice shown for a few seconds, like the
+   partition/config popups. Safe to call from the I/O thread; line2 may
+   be NULL. */
+void guiShowRANotice(const char *line1, const char *line2);
+
 int guiConfirmVideoMode(void);
 
 int guiGameShowRemoveSettings(config_set_t *configSet, config_set_t *configGame);

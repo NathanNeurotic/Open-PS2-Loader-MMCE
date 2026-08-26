@@ -32,7 +32,15 @@ a lot of data that needs to be copied, this should be set high. */
 /* Setting this too low may cause tcp_write() to fail when it tries to allocate from PBUF_RAM!
    Up to TCP_SND_BUF * 2 segments may be transmitted at once, thanks to Nagle and Delayed Ack. */
 #ifdef INGAME_DRIVER
+/* RA: 0x400 is 1 KB for the whole heap. One 536-byte packet took more
+   than half of it and starved the game's SMB stream: loading crawled
+   and the console rebooted. With INGAME_UDP the heap is 4 KB, noise
+   against the IOP's 2 MB. */
+#ifdef INGAME_UDP
+#define MEM_SIZE 0x1000
+#else
 #define MEM_SIZE 0x400
+#endif
 #else
 #define MEM_SIZE (TCP_SND_BUF * 2)
 #endif
@@ -41,11 +49,19 @@ a lot of data that needs to be copied, this should be set high. */
    sends a lot of data out of ROM (or other static memory), this
    should be set high. */
 #ifdef INGAME_DRIVER
+#ifdef INGAME_UDP
+#define MEMP_NUM_PBUF 20 /* RA: +10 for telemetry sends */
+#else
 #define MEMP_NUM_PBUF 10
+#endif
 #endif
 
 /* MEMP_NUM_UDP_PCB: the number of UDP protocol control blocks. One
-   per active UDP "connection". */
+   per active UDP "connection".
+
+   RA note: raising this does nothing for the OPL menu. This file builds
+   SMSTCPIP.irx, which the Makefile embeds only as the in-game driver;
+   the menu runs ps2sdk's prebuilt ps2ip-nm.irx. */
 #define MEMP_NUM_UDP_PCB 1
 
 /* MEMP_NUM_TCP_PCB: the number of simulatenously active TCP
@@ -71,25 +87,47 @@ a lot of data that needs to be copied, this should be set high. */
 /* MEMP_NUM_SYS_TIMEOUT: the number of simulateously active
    timeouts. */
 // Only used by tcpip.c, which will be used for IP reassembly and ARP.
+#ifdef INGAME_UDP
+#define MEMP_NUM_SYS_TIMEOUT 2 /* RA: ARP for the PC client plus SMB */
+#else
 #define MEMP_NUM_SYS_TIMEOUT 1
+#endif
 
-/* MEMP_NUM_NETCONN: the number of struct netconns. */
+/* MEMP_NUM_NETCONN: the number of struct netconns. Also sizes the
+   socket table (sockets.c: NUM_SOCKETS is MEMP_NUM_NETCONN). Only the
+   in-game driver is built from this file; see the note above. */
 #ifdef INGAME_DRIVER
+#ifdef INGAME_UDP
+#define MEMP_NUM_NETCONN 2 /* RA: the game's SMB connection plus the telemetry UDP socket */
+#else
 #define MEMP_NUM_NETCONN 1
+#endif
 #endif
 
 /* MEMP_NUM_APIMSG: the number of struct api_msg, used for
    communication between the TCP/IP stack and the sequential
    programs. */
 #ifdef INGAME_DRIVER
+#ifdef INGAME_UDP
+/* RA: every sendto holds a pool entry while the packet passes through
+   the stack thread. At 30 packets per second five were not enough and
+   SMB calls started to wait: the game stalled while telemetry kept
+   going out without loss. */
+#define MEMP_NUM_API_MSG 12
+#else
 #define MEMP_NUM_API_MSG 5
+#endif
 #endif
 
 /* MEMP_NUM_TCPIPMSG: the number of struct tcpip_msg, which is used
    for sequential API communication and incoming packets. Used in
    src/api/tcpip.c. */
 #ifdef INGAME_DRIVER
+#ifdef INGAME_UDP
+#define MEMP_NUM_TCPIP_MSG 32 /* RA: +17 for telemetry sends */
+#else
 #define MEMP_NUM_TCPIP_MSG 15
+#endif
 #else
 #define MEMP_NUM_TCPIP_MSG 40
 #endif
@@ -158,7 +196,10 @@ a lot of data that needs to be copied, this should be set high. */
 
 /* ---------- ARP options ---------- */
 #ifdef INGAME_DRIVER
-#define ARP_TABLE_SIZE 2
+/* RA: SMB server, gateway and the PC client running RetroAchievements;
+   with two entries the PC's could be evicted between its discovery reply
+   and the lookup in raudp. */
+#define ARP_TABLE_SIZE 4
 #else
 #define ARP_TABLE_SIZE 3
 #endif
@@ -210,7 +251,9 @@ a lot of data that needs to be copied, this should be set high. */
 #endif
 
 /* ---------- UDP options ---------- */
-#ifdef INGAME_DRIVER
+/* RA: INGAME_UDP enables UDP in the in-game build of the stack without
+   pulling in the rest of the full debug configuration. */
+#if defined(INGAME_DRIVER) && !defined(INGAME_UDP)
 #define LWIP_UDP 0
 #else
 #define LWIP_UDP 1

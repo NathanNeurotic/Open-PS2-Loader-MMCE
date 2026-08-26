@@ -15,6 +15,7 @@
 #include "include/util.h"
 #include "include/pad.h"
 #include "include/system.h"
+#include "include/rawatch.h"
 #include "include/ioman.h"
 #include "include/ioprp.h"
 #include "include/bdmsupport.h"
@@ -480,6 +481,12 @@ static unsigned int sendIrxKernelRAM(const char *startup, const char *mode_str, 
     else
         modules |= CORE_IRX_HDD;
 
+    /* RA: the network modules are needed in-game whatever the boot
+       device: RetroAchievements telemetry goes over the network even
+       when the game runs from USB. Cost: about 57 KB in the module
+       storage area (0x00097000). */
+    modules |= CORE_IRX_ETH;
+
     irxtable = (irxtab_t *)ModuleStorage;
     irxptr_tab = (irxptr_t *)((unsigned char *)irxtable + sizeof(irxtab_t));
     size_ioprp_image = size_IOPRP_img + size_cdvdman_irx + size_cdvdfsv_irx + size_eesync_irx + 256;
@@ -532,6 +539,10 @@ static unsigned int sendIrxKernelRAM(const char *startup, const char *mode_str, 
         irxptr_tab[modcount].info = size_smbinit_irx | SET_OPL_MOD_ID(OPL_MODULE_ID_SMBINIT);
         irxptr_tab[modcount++].ptr = (void *)&smbinit_irx;
     }
+
+    // RA: the telemetry gateway, loaded in every boot mode
+    irxptr_tab[modcount].info = size_raudp_irx | SET_OPL_MOD_ID(OPL_MODULE_ID_RAUDP);
+    irxptr_tab[modcount++].ptr = (void *)&raudp_irx;
 
     if (modules & CORE_IRX_VMC) {
         irxptr_tab[modcount].info = size_mcemu_irx | SET_OPL_MOD_ID(OPL_MODULE_ID_MCEMU);
@@ -909,6 +920,18 @@ void sysLaunchLoaderElf(const char *filename, const char *mode_str, int size_cdv
         config->gCheatList = GetCheatsList();
     } else
         config->gCheatList = NULL;
+
+    /* RA: the watch list for this game. It may be absent; telemetry then
+       carries no snapshot, which is not an error. */
+    config->raWatchList = GetWatchList();
+    config->raWatchCount = GetWatchCount();
+    config->raSnapBytes = GetWatchBytes();
+
+    /* The last point where the list is still ours: from here it goes
+       into ee_core with no feedback. A zero here means the game runs
+       without telemetry, and the log shows it directly instead of
+       through empty packets on the PC. */
+    raLaunchNote("to-ee-core", config->raWatchCount, config->raSnapBytes);
 
     sprintf(config->g_ps2_ip, "%u.%u.%u.%u", local_ip_address[0], local_ip_address[1], local_ip_address[2], local_ip_address[3]);
     sprintf(config->g_ps2_netmask, "%u.%u.%u.%u", local_netmask[0], local_netmask[1], local_netmask[2], local_netmask[3]);

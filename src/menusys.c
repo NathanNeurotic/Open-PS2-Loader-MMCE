@@ -6,6 +6,7 @@
 
 #include "include/opl.h"
 #include "include/menusys.h"
+#include "include/supportbase.h"
 #include "include/iosupport.h"
 #include "include/renderman.h"
 #include "include/fntsys.h"
@@ -50,6 +51,8 @@ enum GAME_MENU_IDs {
     GAME_REMOVE_CHANGES,
     GAME_RENAME_GAME,
     GAME_DELETE_GAME,
+    GAME_RA_CHECK, /* RetroAchievements: hash the image and ask the PC whether it is supported */
+    GAME_RA_TEST,  /* RetroAchievements: check that the PC client is reachable */
 };
 
 // global menu variables
@@ -240,6 +243,8 @@ void menuInitGameMenu(void)
         submenuDestroy(&gameMenu);
 
     // initialize the menu
+    submenuAppendItem(&gameMenu, -1, "RA: check game support", GAME_RA_CHECK, -1);
+    submenuAppendItem(&gameMenu, -1, "RA: test PC connection", GAME_RA_TEST, -1);
     submenuAppendItem(&gameMenu, -1, NULL, GAME_COMPAT_SETTINGS, _STR_COMPAT_SETTINGS);
     submenuAppendItem(&gameMenu, -1, NULL, GAME_CHEAT_SETTINGS, _STR_CHEAT_SETTINGS);
     submenuAppendItem(&gameMenu, -1, NULL, GAME_GSM_SETTINGS, _STR_GSCONFIG);
@@ -1127,7 +1132,29 @@ void menuHandleInputGameMenu()
 
         sfxPlay(SFX_CONFIRM);
 
-        if (menuID == GAME_COMPAT_SETTINGS) {
+        if (menuID == GAME_RA_CHECK) {
+            /* RA: hash the selected image, on demand. Hashing every
+               image during the scan would hold the console on the
+               splash screen: the scan runs before the menu appears and
+               each image has to be opened and read. */
+            item_list_t *support = selected_item->item->userdata;
+            int gid = selected_item->item->current->item.id;
+
+            if (support != NULL && support->itemGet != NULL && support->itemGetPrefix != NULL) {
+                base_game_info_t *g = (base_game_info_t *)support->itemGet(support, gid);
+                char *prefix = support->itemGetPrefix(support);
+
+                if (g != NULL && prefix != NULL) {
+                    if (sbHashGameDeferred(prefix, g->name, g->extension, g->startup))
+                        guiShowRANotice("Checking the image, this takes a few seconds...", NULL);
+                    else
+                        guiShowRANotice("An image check is already running", NULL);
+                }
+            }
+        } else if (menuID == GAME_RA_TEST) {
+            sbTestPCLinkDeferred();
+            guiShowRANotice("Looking for the PC client...", NULL);
+        } else if (menuID == GAME_COMPAT_SETTINGS) {
             guiGameShowCompatConfig(selected_item->item->current->item.id, selected_item->item->userdata, itemConfig);
         } else if (menuID == GAME_CHEAT_SETTINGS) {
             guiGameShowCheatConfig();

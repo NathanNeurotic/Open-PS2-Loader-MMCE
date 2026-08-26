@@ -56,5 +56,15 @@ int sbProbeISO9660(const char *path, base_game_info_t *game, u32 layer1_offset);
 int sbProbeISO9660_64(const char *path, base_game_info_t *game, u32 layer1_offset);
 
 int sbLoadCheats(const char *path, const char *file);
+int sbLoadWatchList(const char *path, const char *file);
+
+/* RetroAchievements: ask the PC client to answer, from the I/O thread;
+   the result is shown as a notice. */
+void sbTestPCLinkDeferred(void);
+void raHashStep(const char *what);
+void sbHashGame(const char *path, const char *name, const char *ext, const char *startup);
+/* Same, but through OPL's I/O thread. From the menu call ONLY this one. */
+/* Returns 1 when queued, 0 when a check is already running. */
+int sbHashGameDeferred(const char *path, const char *name, const char *ext, const char *startup);
 
 #endif

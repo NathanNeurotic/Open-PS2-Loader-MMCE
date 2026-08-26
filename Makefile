@@ -46,6 +46,8 @@ NOT_PACKED ?= 0
 DEBUG ?= 0
 EESIO_DEBUG ?= 0
 INGAME_DEBUG ?= 0
+# RetroAchievements: 1 builds the debug variant (HUD probe in ee_core)
+RA_DEBUG ?= 0
 DECI2_DEBUG ?= 0
 #How the TTY will reach developer: 'UDP', 'PPC_UART'.
 TTY_APPROACH ?= UDP
@@ -73,7 +75,7 @@ endif
 
 FRONTEND_OBJS = pad.o xparam.o fntsys.o renderman.o menusys.o OSDHistory.o system.o lang.o lang_internal.o config.o hdd.o dialogs.o \
 		dia.o ioman.o texcache.o themes.o supportbase.o bdmsupport.o ethsupport.o hddsupport.o zso.o lz4.o \
-		appsupport.o gui.o guigame.o vmc_groups.o textures.o opl.o atlas.o nbns.o httpclient.o gsm.o cheatman.o sound.o ps2cnf.o
+		appsupport.o gui.o guigame.o vmc_groups.o textures.o opl.o atlas.o nbns.o httpclient.o gsm.o cheatman.o rawatch.o rahash.o md5.o ranet.o rabadge.o sound.o ps2cnf.o
 
 IOP_OBJS =	iomanx.o filexio.o ps2fs.o usbd.o bdmevent.o \
 		bdm.o bdmfs_fatfs.o usbmass_bd.o iLinkman.o IEEE1394_bd.o mx4sio_bd.o \
@@ -84,6 +86,9 @@ IOP_OBJS =	iomanx.o filexio.o ps2fs.o usbd.o bdmevent.o \
 		bdm_mcemu.o hdd_mcemu.o smb_mcemu.o \
 		iremsndpatch.o apemodpatch.o f2techioppatch.o cleareffects.o resetspu.o \
 		libsd.o audsrv.o
+
+# RetroAchievements telemetry module, loaded in-game after SMBINIT
+IOP_OBJS += raudp.o
 
 EECORE_OBJS = ee_core.o ioprp.o util.o \
 		udnl.o imgdrv.o eesync.o \
@@ -98,7 +103,7 @@ PNG_ASSETS = load0 load1 load2 load3 load4 load5 load6 load7 usb usb_bd ilk_bd \
 	Rating_1 Rating_2 Rating_3 Rating_4 Rating_5 Scan_240p Scan_240p1 Scan_480i Scan_480p \
 	Scan_480p1 Scan_480p2 Scan_480p3 Scan_480p4 Scan_480p5 Scan_576i Scan_576p Scan_720p \
 	Scan_1080i Scan_1080i2 Scan_1080p Vmode_multi Vmode_ntsc Vmode_pal logo case apps_case\
-	Index_0 Index_1 Index_2 Index_3 Index_4
+	Index_0 Index_1 Index_2 Index_3 Index_4 ra_mark
 	# unused icons - up down l1 l2 l3 r1 r2 r3
 
 GFX_OBJS = $(PNG_ASSETS:%=%_png.o) poeveticanew.o icon_sys.o icon_icn.o
@@ -208,7 +213,14 @@ ifeq ($(DEBUG),1)
   endif
 else
   EE_CFLAGS += -O2
-  SMSTCPIP_INGAME_CFLAGS = INGAME_DRIVER=1
+  SMSTCPIP_INGAME_CFLAGS = INGAME_DRIVER=1 INGAME_UDP=1
+endif
+
+# RetroAchievements debug variant. A flag is not a dependency: run
+# "make clean" when switching RA_DEBUG on or off.
+ifeq ($(RA_DEBUG),1)
+  EE_CFLAGS += -DRA_DEBUG
+  EECORE_EXTRA_FLAGS += RA_DEBUG=1
 endif
 
 EE_CFLAGS += -fsingle-precision-constant -DOPL_VERSION=\"$(OPL_VERSION)\"
@@ -322,6 +334,8 @@ clean:	download_lwNBD
 	$(MAKE) -C modules/network/lwNBD/ TARGET=iop clean
 	echo " -udptty-ingame"
 	$(MAKE) -C modules/debug/udptty-ingame clean
+	echo " -raudp"
+	$(MAKE) -C modules/network/raudp clean
 	echo " -ps2link"
 	$(MAKE) -C modules/debug/ps2link clean
 	echo " -ds34usb"
@@ -386,9 +400,17 @@ $(EE_VPKD).ZIP: $(EE_VPKD).ELF DETAILED_CHANGELOG CREDITS LICENSE README.md
 	zip -r $@ $^
 	echo "Package Complete: $@"
 
-ee_core/ee_core.elf: ee_core
+# Depend on the source files, not the directory: a directory's mtime does
+# not change when a file inside it changes. The shared headers in
+# modules/network/common are included because ee_core uses them.
+EE_CORE_DEPS := $(wildcard ee_core/src/*.c) $(wildcard ee_core/src/*.S) \
+                $(wildcard ee_core/include/*.h) \
+                $(wildcard modules/network/common/*.h) \
+                ee_core/linkfile ee_core/Makefile
+
+ee_core/ee_core.elf: $(EE_CORE_DEPS) | ee_core
 	echo "-EE core"
-	$(MAKE) $(IGS_FLAGS) $(PADEMU_FLAGS) $(EECORE_EXTRA_FLAGS) -C $<
+	$(MAKE) $(IGS_FLAGS) $(PADEMU_FLAGS) $(EECORE_EXTRA_FLAGS) -C ee_core
 
 $(EE_ASM_DIR)ee_core.c: ee_core/ee_core.elf | $(EE_ASM_DIR)
 	$(BIN2C) $< $@ eecore_elf
@@ -405,8 +427,13 @@ $(EE_ASM_DIR)imgdrv.c: modules/iopcore/imgdrv/imgdrv.irx | $(EE_ASM_DIR)
 $(EE_ASM_DIR)eesync.c: $(PS2SDK)/iop/irx/eesync-nano.irx | $(EE_ASM_DIR)
 	$(BIN2C) $< $@ $(*F)_irx
 
+# USE_DEV9=1: RetroAchievements telemetry needs the network even when the
+# game runs from USB. The in-game DEV9 driver lives inside cdvdman, and
+# upstream enables it for the BDM variant only with IOPCORE_DEBUG=1
+# (modules/iopcore/cdvdman/Makefile). Without it SMAP cannot start and
+# raudp fails to load with -200 (E_IOP_DEPENDANCY).
 modules/iopcore/cdvdman/bdm_cdvdman.irx: modules/iopcore/cdvdman
-	$(MAKE) $(CDVDMAN_PS2LOGO_FLAGS) $(CDVDMAN_DEBUG_FLAGS) USE_BDM=1 -C $< all
+	$(MAKE) $(CDVDMAN_PS2LOGO_FLAGS) $(CDVDMAN_DEBUG_FLAGS) USE_BDM=1 USE_DEV9=1 -C $< all
 
 $(EE_ASM_DIR)bdm_cdvdman.c: modules/iopcore/cdvdman/bdm_cdvdman.irx | $(EE_ASM_DIR)
 	$(BIN2C) $< $@ $(*F)_irx
@@ -589,14 +616,39 @@ $(EE_ASM_DIR)smsutils.c: modules/network/SMSUTILS/SMSUTILS.irx | $(EE_ASM_DIR)
 $(EE_ASM_DIR)ps2ip.c: $(PS2SDK)/iop/irx/ps2ip-nm.irx | $(EE_ASM_DIR)
 	$(BIN2C) $< $@ $(*F)_irx
 
-modules/network/SMSTCPIP/SMSTCPIP.irx: modules/network/SMSTCPIP
-	$(MAKE) $(SMSTCPIP_INGAME_CFLAGS) -C $< rebuild
+# Depend on the sources, not the directory (see EE_CORE_DEPS).
+SMSTCPIP_DEPS := $(wildcard modules/network/SMSTCPIP/*.c) $(wildcard modules/network/SMSTCPIP/*.S) \
+                 $(wildcard modules/network/SMSTCPIP/include/*.h) modules/network/SMSTCPIP/Makefile
+
+modules/network/SMSTCPIP/SMSTCPIP.irx: $(SMSTCPIP_DEPS) | modules/network/SMSTCPIP
+	$(MAKE) $(SMSTCPIP_INGAME_CFLAGS) -C modules/network/SMSTCPIP rebuild
+
+# RetroAchievements telemetry module
+RAUDP_DEPS := $(wildcard modules/network/raudp/*.c) $(wildcard modules/network/raudp/*.h) \
+              $(wildcard modules/network/common/*.h) \
+              modules/network/raudp/imports.lst modules/network/raudp/exports.tab \
+              modules/network/raudp/Makefile
+
+modules/network/raudp/raudp.irx: $(RAUDP_DEPS) | modules/network/raudp
+	$(MAKE) -C modules/network/raudp rebuild
+
+$(EE_ASM_DIR)raudp.c: modules/network/raudp/raudp.irx | $(EE_ASM_DIR)
+	$(BIN2C) $< $@ raudp_irx
 
 $(EE_ASM_DIR)ingame_smstcpip.c: modules/network/SMSTCPIP/SMSTCPIP.irx | $(EE_ASM_DIR)
 	$(BIN2C) $< $@ $(*F)_irx
 
-modules/network/smap-ingame/smap.irx: modules/network/smap-ingame
-	$(MAKE) -C $<
+# Depend on the sources, not the directory (see EE_CORE_DEPS). This
+# driver carries local changes (transmit mutex, SMAPTxInit).
+SMAP_INGAME_DEPS := $(wildcard modules/network/smap-ingame/*.c) \
+                    $(wildcard modules/network/smap-ingame/*.h) \
+                    $(wildcard modules/network/common/*.h) \
+                    modules/network/smap-ingame/imports.lst \
+                    modules/network/smap-ingame/exports.tab \
+                    modules/network/smap-ingame/Makefile
+
+modules/network/smap-ingame/smap.irx: $(SMAP_INGAME_DEPS) | modules/network/smap-ingame
+	$(MAKE) -C modules/network/smap-ingame rebuild
 
 $(EE_ASM_DIR)smap_ingame.c: modules/network/smap-ingame/smap.irx | $(EE_ASM_DIR)
 	$(BIN2C) $< $@ $(*F)_irx
@@ -607,7 +659,13 @@ $(EE_ASM_DIR)smap.c: $(PS2SDK)/iop/irx/smap.irx | $(EE_ASM_DIR)
 $(EE_ASM_DIR)netman.c: $(PS2SDK)/iop/irx/netman.irx | $(EE_ASM_DIR)
 	$(BIN2C) $< $@ $(*F)_irx
 
-$(EE_ASM_DIR)ps2ips.c: $(PS2SDK)/iop/irx/ps2ips.irx | $(EE_ASM_DIR)
+# Local ps2ips.irx instead of the ps2sdk binary: upstream do_recvfrom
+# clobbers the DMA destination address, so UDP receive on the EE never
+# worked. See modules/network/ps2ips-ra/ps2ips.c.
+modules/network/ps2ips-ra/ps2ips.irx: $(wildcard modules/network/ps2ips-ra/*.c) $(wildcard modules/network/ps2ips-ra/*.h) modules/network/ps2ips-ra/imports.lst modules/network/ps2ips-ra/Makefile
+	$(MAKE) -C modules/network/ps2ips-ra rebuild
+
+$(EE_ASM_DIR)ps2ips.c: modules/network/ps2ips-ra/ps2ips.irx | $(EE_ASM_DIR)
 	$(BIN2C) $< $@ $(*F)_irx
 
 $(EE_ASM_DIR)smbman.c: $(PS2SDK)/iop/irx/smbman.irx | $(EE_ASM_DIR)

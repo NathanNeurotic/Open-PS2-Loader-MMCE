@@ -16,8 +16,34 @@
 #include "util.h"
 #include "syshook.h"
 #include "coreconfig.h"
+#include "../../modules/network/common/ra_snap.h"
 
 extern int _iop_reboot_count;
+/* RetroAchievements: LoadOPLModule() results for the two modules the
+   telemetry depends on. raudp imports SMAPSendPacket from SMAP, so when
+   SMAP fails raudp fails with a link error too; keeping both results
+   tells the two cases apart. Shown on the debug HUD (ra.c, RA_DEBUG). */
+int ra_raudp_result = -999;
+int ra_smap_result = -999;
+
+/* Snapshot buffer in IOP RAM. The EE allocates it so it knows the address
+   and can DMA straight into it without touching the SIF command table,
+   which the game shares. Zero means the allocation failed. */
+unsigned int ra_snap_iop = 0;
+
+/* Eight hex digits, no sprintf in ee_core. The address travels to the
+   module as a load argument string. */
+static void ra_hex32(unsigned int v, char *out)
+{
+    int i;
+
+    for (i = 7; i >= 0; i--) {
+        out[i] = "0123456789ABCDEF"[v & 0xF];
+        v >>= 4;
+    }
+    out[8] = '\0';
+}
+
 static int imgdrv_offset_ioprpimg = 0;
 static int imgdrv_offset_ioprpsiz = 0;
 
@@ -123,6 +149,16 @@ static void ResetIopSpecial(const char *args, unsigned int arglen)
         LoadOPLModule(OPL_MODULE_ID_USBD, 0, 11, "thpri=2,3");
     }
 
+    /* RetroAchievements telemetry needs the network in every mode,
+       including games running from USB. ETH mode loads these modules
+       in its own branch below; every other mode loads them here. */
+#ifndef __LOAD_DEBUG_MODULES
+    if (config->GameMode != ETH_MODE) {
+        LoadOPLModule(OPL_MODULE_ID_SMSTCPIP, 0, 0, NULL);
+        ra_smap_result = LoadOPLModule(OPL_MODULE_ID_SMAP, 0, g_ipconfig_len, g_ipconfig);
+    }
+#endif
+
     switch (config->GameMode) {
         case BDM_USB_MODE:
             LoadOPLModule(OPL_MODULE_ID_USBMASSBD, 0, 0, NULL);
@@ -130,7 +166,7 @@ static void ResetIopSpecial(const char *args, unsigned int arglen)
         case ETH_MODE:
 #ifndef __LOAD_DEBUG_MODULES
             LoadOPLModule(OPL_MODULE_ID_SMSTCPIP, 0, 0, NULL);
-            LoadOPLModule(OPL_MODULE_ID_SMAP, 0, g_ipconfig_len, g_ipconfig);
+            ra_smap_result = LoadOPLModule(OPL_MODULE_ID_SMAP, 0, g_ipconfig_len, g_ipconfig);
 #endif
             LoadOPLModule(OPL_MODULE_ID_SMBINIT, 0, 0, NULL);
             break;
@@ -146,6 +182,41 @@ static void ResetIopSpecial(const char *args, unsigned int arglen)
         case BDM_HDD_MODE:
             break;
     };
+
+    /* RetroAchievements telemetry module, loaded last because it imports
+       SMAPSendPacket from the SMAP driver. The snapshot buffer is
+       allocated in the IOP heap here, while the heap is up and the game
+       has not started, and its address is passed as a load argument.
+       RA_SNAP_TOTAL covers the header plus the values of the largest
+       supported watch list. */
+    {
+        char snap_arg[9];
+        void *snap = SifAllocIopHeap(RA_SNAP_TOTAL);
+
+        if (snap != NULL) {
+            /* Arguments: the buffer address as eight hex digits, then the
+               same ipconfig strings SMAP received (own IP, netmask,
+               gateway, each NUL-terminated). raudp reads argv[1] and
+               argv[2]. The PC address is not passed: raudp discovers it
+               on its own when the game starts. */
+            char args[9 + IPCONFIG_MAX_LEN];
+            int k;
+
+            ra_snap_iop = (unsigned int)snap;
+            ra_hex32(ra_snap_iop, snap_arg);
+            for (k = 0; k < 8; k++)
+                args[k] = snap_arg[k];
+            args[8] = '\0';
+
+            for (k = 0; k < g_ipconfig_len && k < IPCONFIG_MAX_LEN; k++)
+                args[9 + k] = g_ipconfig[k];
+
+            ra_raudp_result = LoadOPLModule(OPL_MODULE_ID_RAUDP, 0, 9 + k, args);
+        } else {
+            ra_snap_iop = 0;
+            ra_raudp_result = LoadOPLModule(OPL_MODULE_ID_RAUDP, 0, 0, NULL);
+        }
+    }
 }
 
 /*----------------------------------------------------------------*/
@@ -161,6 +232,12 @@ int New_Reset_Iop(const char *arg, int arglen)
     SifInitRpc(0);
 
     iop_reboot_count++;
+
+    /* RetroAchievements: the snapshot buffer lives in IOP RAM and dies
+       with the reboot. Stop the per-frame DMA until LoadModules() has
+       allocated a new one, otherwise it would write over whatever the
+       rebooted IOP puts at the old address. */
+    ra_snap_iop = 0;
 
     // Reseting IOP.
     while (!Reset_Iop("", 0)) {

@@ -34,6 +34,7 @@
 #include "include/cheatman.h"
 #include "include/sound.h"
 #include "include/xparam.h"
+#include "include/rabadge.h" /* RA: "tracked game" badge in the list */
 
 // FIXME: We should not need this function.
 //        Use newlib's 'stat' to get GMT time.
@@ -59,7 +60,16 @@ int configGetStat(config_set_t *configSet, iox_stat_t *stat);
 #define LOG_INIT() \
     do {           \
     } while (0)
-#define LOG_ENABLE() ioPutRequest(IO_CUSTOM_SIMPLEACTION, &debugSetActive)
+/* RA: disabled. debugSetActive() calls ethLoadInitModules() ->
+ * ethInitApplyConfig(), which waits for link (30 s) in a do/while
+ * with no upper bound. That request sits in the I/O queue BEFORE
+ * deferredInit, which sets gInitComplete, so guiIntroLoop() never
+ * finishes: OPL hangs on the splash screen drawing the debug overlay.
+ * The in-game udptty is loaded through ee_core (LOAD_DEBUG_MODULES=1)
+ * and does not need this transport. */
+#define LOG_ENABLE() \
+    do {             \
+    } while (0)
 #else
 #define LOG_INIT() \
     do {           \
@@ -666,6 +676,13 @@ static void updateMenuFromGameList(opl_io_module_t *mdl)
     // read the new game list
     struct gui_update_t *gup = NULL;
     int count = mdl->support->itemUpdate(mdl->support);
+
+    /* RA: "checked and tracked" badges, refreshed here because the list
+       has just been reread, the old menu is already torn down (nothing
+       refers to the previous strings), and this is the I/O thread,
+       where files may be touched. */
+    raBadgeRefresh(mdl->support, count);
+
     if (count > 0) {
         int i;
 
@@ -678,7 +695,12 @@ static void updateMenuFromGameList(opl_io_module_t *mdl)
 
             gup->submenu.icon_id = -1;
             gup->submenu.id = i;
-            gup->submenu.text = mdl->support->itemGetName(mdl->support, i);
+            {
+                /* RA: badged name when the game is tracked, plain name otherwise */
+                const char *badge = raBadgeText(mdl->support, i);
+
+                gup->submenu.text = badge != NULL ? (char *)badge : mdl->support->itemGetName(mdl->support, i);
+            }
             gup->submenu.text_id = -1;
             gup->submenu.selected = 0;
 

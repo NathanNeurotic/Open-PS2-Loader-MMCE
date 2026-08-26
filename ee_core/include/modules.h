@@ -21,6 +21,9 @@ enum OPL_MODULE_ID {
     OPL_MODULE_ID_SMAP,
     OPL_MODULE_ID_SMBINIT,
 
+    // RetroAchievements: telemetry sender (UDP from inside the game)
+    OPL_MODULE_ID_RAUDP,
+
     // VMC module
     OPL_MODULE_ID_MCEMU,
 

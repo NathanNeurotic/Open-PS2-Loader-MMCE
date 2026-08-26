@@ -637,6 +637,8 @@ static void ethLaunchGame(item_list_t *itemList, int id, config_set_t *configSet
 
     compatmask = sbPrepare(game, configSet, size_smb_cdvdman_irx, smb_cdvdman_irx, &i);
 
+    sbLoadWatchList(ethPrefix, game->startup); /* RA: watch list */
+
     if ((result = sbLoadCheats(ethPrefix, game->startup)) < 0) {
         switch (result) {
             case -ENOENT:

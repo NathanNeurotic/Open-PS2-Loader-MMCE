@@ -42,4 +42,5 @@ DECLARE_EXPORT_TABLE(ps2ip,1,3)
 	DECLARE_EXPORT(pbuf_clen)
 	DECLARE_EXPORT(pbuf_chain)			//40
 	DECLARE_EXPORT(pbuf_take)
+	DECLARE_EXPORT(etharp_lookup_mac)		//42 RA: MAC by IP from the ARP table
 END_EXPORT_TABLE

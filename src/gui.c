@@ -203,7 +203,7 @@ void guiShowAbout()
     char OPLVersion[40];
     char OPLBuildDetails[40];
 
-    snprintf(OPLVersion, sizeof(OPLVersion), "Open PS2 Loader %s", OPL_VERSION);
+    snprintf(OPLVersion, sizeof(OPLVersion), "OPL+RA %s", OPL_VERSION);
     diaSetLabel(diaAbout, ABOUT_TITLE, OPLVersion);
 
     snprintf(OPLBuildDetails, sizeof(OPLBuildDetails), "GSM %s"
@@ -262,12 +262,48 @@ static void guiRenderNotifications(char *string, int y)
     fntRenderString(gTheme->fonts[0], x - 5, y + 5, ALIGN_NONE, 0, 0, string, gTheme->textColor);
 }
 
+/* RetroAchievements notices, raised from the I/O thread (image check
+   result, PC link test). Rendered by the GUI thread below. */
+static char raNotice[2][96];
+static int raNoticeLines = 0;
+static clock_t raNoticeTimer = 0;
+
+void guiShowRANotice(const char *line1, const char *line2)
+{
+    /* Called from the I/O thread while the GUI thread may be drawing:
+       hide, fill, then show, so a half-copied line is never rendered. */
+    raNoticeLines = 0;
+    snprintf(raNotice[0], sizeof(raNotice[0]), "%s", line1 ? line1 : "");
+    snprintf(raNotice[1], sizeof(raNotice[1]), "%s", line2 ? line2 : "");
+    raNoticeTimer = 0;
+    raNoticeLines = (line2 != NULL && line2[0] != '\0') ? 2 : 1;
+}
+
 static void guiShowNotifications(void)
 {
     char notification[128];
     char *col_pos;
     int y = 10;
     int yadd = 35;
+
+    if (raNoticeLines > 0) {
+        int i;
+
+        if (!raNoticeTimer) {
+            raNoticeTimer = clock() + 8000 * (CLOCKS_PER_SEC / 1000);
+            sfxPlay(SFX_MESSAGE);
+        }
+
+        for (i = 0; i < raNoticeLines; i++) {
+            guiRenderNotifications(raNotice[i], y);
+            y += yadd;
+        }
+
+        if (clock() >= raNoticeTimer) {
+            raNoticeLines = 0;
+            raNoticeTimer = 0;
+        }
+    }
 
     if (showPartPopup || showThmPopup || showLngPopup || showCfgPopup) {
         if (!popupTimer) {

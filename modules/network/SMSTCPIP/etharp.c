@@ -141,6 +141,48 @@ static struct pbuf *etharp_enqueue(s8_t i, struct pbuf *q);
 static u8_t etharp_dequeue(s8_t i);
 #endif
 /**
+ * RA: look up a MAC address by IP in the ARP table.
+ *
+ * This lwIP fork predates etharp_find_addr, and the RetroAchievements
+ * telemetry needs it: raudp builds Ethernet frames by hand, bypassing
+ * the stack for speed, and has no other source for the destination MAC.
+ *
+ * Only STABLE entries qualify. PENDING means resolution is still in
+ * progress and the MAC field is not filled in yet; returning it would
+ * be worse than returning nothing.
+ *
+ * etharp_ip_input fills the table from incoming packets, so it is
+ * enough that the PC client has answered us once. No separate ARP
+ * request is needed.
+ *
+ * Returns 1 when found, 0 otherwise.
+ */
+int etharp_lookup_mac(unsigned int ipaddr, unsigned char *mac_out)
+{
+    s8_t i;
+
+    /* The address arrives as four bytes in network order rather than a
+       struct ip_addr: the calling module (raudp) does not see the lwIP
+       headers, and pulling them in for one field is not worth it. */
+    if (mac_out == NULL)
+        return 0;
+
+    for (i = 0; i < ARP_TABLE_SIZE; i++) {
+        if (arp_table[i].state == ETHARP_STATE_STABLE &&
+            arp_table[i].ipaddr.addr == ipaddr) {
+            u8_t k;
+
+            for (k = 0; k < 6; k++)
+                mac_out[k] = arp_table[i].ethaddr.addr[k];
+
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
+/**
  * Initializes ARP module.
  */
 void etharp_init(void)

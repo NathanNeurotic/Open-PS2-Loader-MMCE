@@ -91,6 +91,7 @@ enum INTERNAL_TEXTURE {
     LOGO_PICTURE,
     CASE_OVERLAY,
     APPS_CASE_OVERLAY,
+    RA_MARK, /* RA: mark over the cover of a checked game */
 
     TEXTURES_COUNT
 };

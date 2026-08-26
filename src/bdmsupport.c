@@ -492,6 +492,8 @@ void bdmLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
     // adjust ZSO cache
     settings->common.zso_cache = bdmCacheSize;
 
+    sbLoadWatchList(pDeviceData->bdmPrefix, game->startup); /* RA: watch list */
+
     if ((result = sbLoadCheats(pDeviceData->bdmPrefix, game->startup)) < 0) {
         if (gAutoLaunchBDMGame == NULL) {
             switch (result) {

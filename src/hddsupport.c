@@ -557,6 +557,11 @@ void hddLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
 
     sbPrepare(NULL, configSet, size_irx, irx, &i);
 
+    sbLoadWatchList(gHDDPrefix, game->startup); /* RA: watch list */
+    /* Games on HDD are stored in HDLoader format, not as image files:
+       hdl_game_info_t has neither a file name nor an extension, so
+       there is nothing to hash. Watch lists still load from RA/. */
+
     if ((result = sbLoadCheats(gHDDPrefix, game->startup)) < 0) {
         if (gAutoLaunchGame == NULL) {
             switch (result) {

@@ -1,5 +1,5 @@
 IOP_BIN = smap.irx
-IOP_OBJS = main.o smap.o xfer.o imports.o
+IOP_OBJS = main.o smap.o xfer.o imports.o exports.o
 
 IOP_INCS += -I../../iopcore/common -I../common
 

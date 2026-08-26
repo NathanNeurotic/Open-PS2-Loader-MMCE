@@ -3,6 +3,9 @@
 
 #include <irx.h>
 
+#include <loadcore.h>
+#include <thsemap.h>
+
 /* Please keep these in alphabetical order!  */
 #include <dmacman.h>
 #include <dev9.h>

@@ -856,6 +856,14 @@ struct UIItem diaAbout[] = {
     {UI_LABEL, ABOUT_TITLE, 1, 1, -1, 0, 0, {.label = {NULL, -1}}},
     {UI_SPLITTER},
 
+    // RetroAchievements integration
+    {UI_LABEL, 0, 1, 1, -1, 0, 0, {.label = {"RetroAchievements integration", -1}}},
+    {UI_BREAK},
+    {UI_SPACER},
+    {UI_LABEL, 0, 1, 1, -1, 0, 15, {.label = {"hacan359", -1}}},
+    {UI_BREAK},
+    {UI_BREAK},
+
     // Coders
     {UI_LABEL, 0, 1, 1, -1, 0, 0, {.label = {NULL, _STR_DEVS}}},
     {UI_BREAK},

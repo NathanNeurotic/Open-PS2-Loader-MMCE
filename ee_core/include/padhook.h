@@ -93,4 +93,5 @@ typedef struct
 
 #define NB_PADOPEN_PATTERN 7
 
+
 #endif

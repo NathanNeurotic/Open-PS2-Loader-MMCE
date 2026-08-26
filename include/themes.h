@@ -42,6 +42,11 @@ typedef struct
 
     image_texture_t *overlayTexture;
     int overlayTextureLinked;
+
+    /* RA: this image is a cover (cache pattern "COV") rather than an
+       icon or a background. The element type cannot tell them apart:
+       the theme creates all three as ELEM_TYPE_GAME_IMAGE. */
+    int raIsCover;
 } mutable_image_t;
 
 typedef struct

@@ -156,12 +156,19 @@ void SMapLowLevelInput(PBuf *pBuf)
     ps2ip_input(pBuf, &NIF);
 }
 
+extern struct irx_export_table _exp_smap_driver;
+
 static inline int SMapInit(IPAddr IP, IPAddr NM, IPAddr GW, int argc, char *argv[])
 {
     int result;
 
     if (smap_init(argc, argv) >= 0) {
         dbgprintf("SMapInit: SMap initialized\n");
+
+        /* RA: create the transmit mutex and export SMAPSendPacket so
+           the raudp module can bypass the stack and send frames directly. */
+        SMAPTxInit();
+        RegisterLibraryEntries(&_exp_smap_driver);
 
         netif_add(&NIF, &IP, &NM, &GW, NULL, &SMapIFInit, tcpip_input);
         netif_set_default(&NIF);

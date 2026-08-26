@@ -4,6 +4,9 @@
 #include "include/iosupport.h"
 #include "include/system.h"
 #include "include/supportbase.h"
+#include "include/rawatch.h"
+#include "include/rahash.h"
+#include "include/ranet.h"
 #include "include/ioman.h"
 #include "modules/iopcore/common/cdvd_config.h"
 #include "include/cheatman.h"
@@ -75,6 +78,15 @@ int isValidIsoName(char *name, int *pNameLen)
     }
 
     return 0;
+}
+
+static int GetStartupExecName(const char *path, char *filename, int maxlength);
+
+/* RA: external entry to GetStartupExecName, which is static; the image
+   hash in rahash.c needs it. */
+int raGetStartupName(const char *cnfpath, char *out, int max)
+{
+    return GetStartupExecName(cnfpath, out, max);
 }
 
 static int GetStartupExecName(const char *path, char *filename, int maxlength)
@@ -282,6 +294,92 @@ static int queryISOGameListCache(const struct game_cache_list *cache, base_game_
     return ENOENT;
 }
 
+/* RA: log of computed hashes.
+
+   Hashing runs ONLY on demand and for one image at a time. Hashing
+   every image during the scan would run before the menu appears: ten
+   images over the network, each mounted and its executable read, keep
+   the console on the splash screen for minutes, and an image that does
+   not mount waits for a timeout on top. */
+static FILE *ra_hashlog = NULL;
+
+static void raHashLogOpen(const char *path)
+{
+    char dir[128], file[160];
+
+    /* Write to the SHARE, not to the game's device. On a USB stick
+       writes sit in the driver's cache and vanish when the power goes
+       off; if hashing hangs, the file never gets closed and stays
+       empty, so the diagnostics go silent exactly when they matter.
+
+       On the share a write lands at once and can be read from the PC
+       while the console is still running. Without a share, fall back to
+       the game's device. */
+    /* File name per game device: "mass0:" -> hashes-mass0.txt. Otherwise
+       results from USB and from the share mix in one heap and a
+       broken-off step cannot be attributed. */
+    {
+        char tag[16];
+        int i, j = 0;
+
+        for (i = 0; path[i] != '\0' && j < (int)sizeof(tag) - 1; i++) {
+            char c = path[i];
+
+            if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9'))
+                tag[j++] = c;
+        }
+        tag[j] = '\0';
+
+        mkdir("smb0:RA", 0777);
+        snprintf(file, sizeof(file), "smb0:RA/hashes-%s.txt", tag[0] ? tag : "x");
+        ra_hashlog = fopen(file, "a");
+
+        if (ra_hashlog != NULL) {
+            LOG("RA: log on the share: %s\n", file);
+            return;
+        }
+    }
+
+    snprintf(dir, sizeof(dir), "%sRA", path);
+    mkdir(dir, 0777);
+    snprintf(file, sizeof(file), "%sRA/hashes.txt", path);
+
+    ra_hashlog = fopen(file, "a");
+    if (ra_hashlog == NULL)
+        LOG("RA: could not open %s for writing\n", file);
+    else
+        LOG("RA: writing hashes to %s\n", file);
+}
+
+/* A crumb into the same file: shows how far things got even after a
+   hang. Not static: ranet.c reports what arrives on the network port
+   here, otherwise a network failure is known only by its outcome. */
+void raHashStep(const char *what)
+{
+    if (ra_hashlog == NULL)
+        return;
+
+    fprintf(ra_hashlog, "  step: %s\n", what);
+    fflush(ra_hashlog);
+}
+
+static void raHashLogAdd(const char *name, const char *startup, const char *hash)
+{
+    if (ra_hashlog == NULL)
+        return;
+
+    fprintf(ra_hashlog, "%-60s %-12s %s\n", name, startup, hash);
+    fflush(ra_hashlog);
+}
+
+static void raHashLogClose(void)
+{
+    if (ra_hashlog != NULL) {
+        fclose(ra_hashlog);
+        ra_hashlog = NULL;
+    }
+}
+
 static int scanForISO(char *path, char type, struct game_list_t **glist)
 {
     int count = 0;
@@ -327,6 +425,7 @@ static int scanForISO(char *path, char type, struct game_list_t **glist)
             } else if (cacheLoaded && queryISOGameListCache(&cache, &cachedGInfo, dirent->d_name) == 0) {
                 // use cached entry
                 memcpy(game, &cachedGInfo, sizeof(base_game_info_t));
+
             } else {
                 // need to mount and read SYSTEM.CNF
                 char startup[GAME_STARTUP_MAX];
@@ -826,6 +925,166 @@ void sbCreateFolders(const char *path, int createDiscImgFolders)
 
     if (createDiscImgFolders)
         sbCreateFoldersFromList(path, discImgFolders);
+}
+
+/* RA: the watch list sits next to the cheats, in RA/. The game's own
+   device is searched first, then the share: the list is produced on the
+   PC, and keeping it on the share beats rewriting the USB stick every
+   time. */
+int sbLoadWatchList(const char *path, const char *file)
+{
+    int n = LoadWatchList(path, file);
+
+    raLaunchNote("wl-from-device", n, 0);
+
+    if (n < 0 && strncmp(path, "smb0:", 5) != 0) {
+        n = LoadWatchList("smb0:", file);
+        raLaunchNote("wl-from-share", n, 0);
+    }
+
+    raLaunchNote("wl-total", n, GetWatchBytes());
+
+    return n;
+}
+
+/* RA: hash of ONE image, the one selected in the menu. Computed on
+   demand; see the note at raHashLogOpen.
+
+   The image's folder is not known in advance, so DVD is tried first,
+   then CD, the way OPL itself lays them out. */
+/* RA: parameters for the deferred computation. OPL talks to devices
+   from a dedicated I/O thread (ioPutRequest); calling fileXioMount from
+   the menu handler hangs the console on USB, while the share happens to
+   survive it. */
+static char ra_hash_path[64];
+static char ra_hash_name[128];
+static char ra_hash_ext[16];
+static char ra_hash_startup[16];
+
+static void sbHashGameDeferredWorker(void);
+
+/* The parameters are shared with the I/O thread, so a second request
+   while the worker runs would change them under it. One check at a
+   time; the caller tells the user. */
+static volatile int ra_hash_busy = 0;
+
+int sbHashGameDeferred(const char *path, const char *name, const char *ext, const char *startup)
+{
+    if (ra_hash_busy)
+        return 0;
+    ra_hash_busy = 1;
+
+    snprintf(ra_hash_path, sizeof(ra_hash_path), "%s", path ? path : "");
+    snprintf(ra_hash_name, sizeof(ra_hash_name), "%s", name ? name : "");
+    snprintf(ra_hash_ext, sizeof(ra_hash_ext), "%s", ext ? ext : "");
+    snprintf(ra_hash_startup, sizeof(ra_hash_startup), "%s", startup ? startup : "");
+
+    ioPutRequest(IO_CUSTOM_SIMPLEACTION, &sbHashGameDeferredWorker);
+    return 1;
+}
+
+static void sbHashGameDeferredWorker(void)
+{
+    sbHashGame(ra_hash_path, ra_hash_name, ra_hash_ext, ra_hash_startup);
+    ra_hash_busy = 0;
+}
+
+static void sbTestPCLinkWorker(void)
+{
+    char line1[96], line2[96];
+
+    raNetTestLink(line1, sizeof(line1), line2, sizeof(line2));
+    guiShowRANotice(line1, line2);
+}
+
+void sbTestPCLinkDeferred(void)
+{
+    ioPutRequest(IO_CUSTOM_SIMPLEACTION, &sbTestPCLinkWorker);
+}
+
+void sbHashGame(const char *path, const char *name, const char *ext, const char *startup)
+{
+    static const char *dirs[] = {"DVD", "CD", NULL};
+    char iso[256], hash[33], info[96], info2[96];
+    char last_err[64] = "NOT HASHED";
+    int i;
+
+    info[0] = '\0';
+    info2[0] = '\0';
+    raHashLogOpen(path);
+    raHashSetStepLog(&raHashStep);
+
+    for (i = 0; dirs[i] != NULL; i++) {
+        int ret;
+
+        snprintf(iso, sizeof(iso), "%s%s/%s%s", path, dirs[i], name, ext);
+        LOG("RA: trying %s\n", iso);
+
+        /* Direct read only. Mounting is not a fallback: on USB it hangs
+           on files beyond the 2 GB mark, so falling back to it after a
+           failure would hang the console instead of reporting the
+           error.
+
+           Direct reading is also cheaper: one volume descriptor sector,
+           the root directory and the executable itself, instead of
+           mounting a whole file system. */
+        ret = raHashIsoDirect(iso, startup, hash);
+
+        if (ret == 0) {
+            int q;
+
+            raHashLogAdd(name, startup, hash);
+            LOG("RA: hash %s = %s\n", startup, hash);
+
+            /* Broadcast to the PC: does it know this image, and what
+               should be read every frame. The list is stored next to
+               the game, where the loader picks it up at launch. */
+            raHashStep("6-asking-pc");
+            q = raAskPC(hash, startup, path, info, sizeof(info), info2, sizeof(info2));
+
+            if (q == 0) {
+                raHashStep("7-list-received");
+                guiShowRANotice(info[0] ? info : "Supported by RetroAchievements",
+                                info2[0] ? info2 : "Start the game to track achievements");
+            } else if (q == 1) {
+                raHashStep("7-pc-does-not-know-image");
+                guiShowRANotice("RetroAchievements does not know this image", hash);
+            } else if (q == -7) {
+                raHashStep("7-pc-still-identifying");
+                guiShowRANotice("The PC is still identifying the image",
+                                "Try again in a few seconds");
+            } else if (q == -1) {
+                /* The console could not open a UDP socket, so nothing was
+                   ever sent -- report that, not a PC that never heard us. */
+                raHashStep("7-no-socket-on-console");
+                guiShowRANotice("The console could not open a network socket",
+                                "Restart the console, or check the ETH device in settings");
+            } else {
+                raHashStep("7-pc-did-not-answer");
+                guiShowRANotice("The PC client did not answer",
+                                "Check that ps2ra runs, or try 'RA: test PC connection'");
+            }
+
+            raHashSetStepLog(NULL);
+            raHashLogClose();
+            return;
+        }
+
+        /* Record which step failed: a bare "not hashed" says nothing. */
+        LOG("RA: %s -> code %d\n", iso, ret);
+        snprintf(last_err, sizeof(last_err), "%s: %s", dirs[i],
+                 ret == -1 ? "image did not open" :
+                 ret == -2 ? "not ISO9660" :
+                 ret == -3 ? "ELF not found in directory" :
+                 ret == -4 ? "odd ELF size" :
+                 ret == -5 ? "read broke off" :
+                             "?");
+    }
+
+    raHashLogAdd(name, startup, last_err);
+    raHashSetStepLog(NULL);
+    raHashLogClose();
+    guiShowRANotice("The image could not be hashed", last_err);
 }
 
 int sbLoadCheats(const char *path, const char *file)
