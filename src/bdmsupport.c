@@ -1008,13 +1008,24 @@ static void bdmLoadCoreModules(void)
     LOG("[BDMFS_FATFS]:\n");
     sysLoadModuleBuffer(&bdmfs_fatfs_irx, size_bdmfs_fatfs_irx, 0, NULL);
 
-    // USB block device is base BDM infrastructure (upstream ps2homebrew and
-    // Grimdoomer load it synchronously, not as an optional transport).
-    bdmLoadUsbMassBd();
-
+    // ARM THE ATTACH HANDLER BEFORE ANY BLOCK DEVICE DRIVER CAN ENUMERATE. bdmevent registers a
+    // bdm_RegisterCallback the moment it loads, and bdm only calls back for mounts that happen AFTER
+    // that -- a device already mounted when the handler arrives generates no event, ever.
+    //
+    // Every other transport (iLink, MX4SIO, ATA, UDPBD) loads later, from bdmLoadBlockDeviceModules
+    // on the io worker, so this ordering only ever mattered for USB -- and USB is precisely the one
+    // that got moved up here. Loading USBMASS_BD first left a window where a stick that enumerated
+    // quickly mounted before the handler existed: no attach event, so its page was left to the
+    // empty-slot probe rotation (opl.c, gated on longIdle AND a frame ratio) or to the user
+    // replugging it -- which is the "second USB device only shows up after a hotplug" report.
+    // The hotplug works because it is the first event the handler is actually alive for.
     LOG("[BDMEVENT]:\n");
     sysLoadModuleBuffer(&bdmevent_irx, size_bdmevent_irx, 0, NULL);
     SifAddCmdHandler(BDMEVENT_EE_EVENT_CMD, &bdmEventHandler, NULL);
+
+    // USB block device is base BDM infrastructure (upstream ps2homebrew and Grimdoomer load it
+    // synchronously, not as an optional transport) -- but it goes AFTER the handler, not before.
+    bdmLoadUsbMassBd();
 
 #ifdef __DEBUG
     bdmDiagRequestIopSnapshot("handler-ready", -1, -1);
