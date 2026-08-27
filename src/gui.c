@@ -2741,11 +2741,29 @@ static int guiSettingsStageOplHome(int selection)
                        IO_CUSTOM_SIMPLEACTION, &guiSettingsStageOplHomeWorker, 15000);
     if (gLastDeferredTimedOut) {
         // The late worker only ever changes our staged selector; never let an abandoned wait make
-        // a later Save Settings persist a choice the user did not get to confirm.
+        // a later Save Settings persist a choice the user did not get to confirm. InFlight stays
+        // SET here on purpose: the worker may still be running and must be allowed to return.
         guiSourcesOplHomeStageAbandoned = 1;
         hddDiscardOplHomeSelection();
         return GUI_OPL_HOME_STAGE_UNAVAILABLE;
     }
+
+    // NO TIMEOUT, YET STILL IN FLIGHT -> THE WORKER NEVER RAN AT ALL. guiHandleDeferedIO() clears
+    // the pending flag and returns immediately when ioPutRequest() is rejected (a full or blocked
+    // IO queue), so we never waited and nothing will ever clear this latch. Unlike the timeout
+    // above there is no worker still out there to do it.
+    //
+    // Left set, it disabled the row for the rest of the session: the first attempt returned the
+    // untouched result 0, rendered as "<name> partition not found." on a console that has the
+    // partition, and every attempt after it hit the InFlight guard at the top and returned
+    // UNAVAILABLE -- "HDD is busy, try again once loading finishes" -- instantly, with no spinner
+    // and nothing actually loading. One transiently full IO queue, and the setting was unusable.
+    if (guiSourcesOplHomeStageInFlight) {
+        guiSourcesOplHomeStageInFlight = 0;
+        guiSourcesOplHomeStagePending = 0;
+        return GUI_OPL_HOME_STAGE_UNAVAILABLE; // retryable now, and honest about why
+    }
+
     return guiSourcesOplHomeStageResult;
 }
 
