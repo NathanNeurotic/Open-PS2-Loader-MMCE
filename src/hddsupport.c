@@ -317,9 +317,23 @@ static void hddFindOPLPartition(void)
     char candidate[sizeof(gOPLPart)];
     const char *label;
 
-    // When __common is usable, its OPL/conf_hdd.cfg is the authoritative APA data-home selector.
-    // If __common itself is unavailable, an existing mountable +OPL is the legacy automatic home.
-    // Discovery never manufactures a partition, resizes one, or writes raw hdd0: metadata.
+    /* ORDER OF PREFERENCE, and the middle two are deliberately swapped from what this used to do:
+     *
+     *   1. an explicit conf_hdd.cfg selection  -- a stated choice outranks any default
+     *   2. an existing +OPL partition          -- PREFERRED default
+     *   3. __common                            -- fallback
+     *   4. nothing: fail closed
+     *
+     * +OPL used to sit at 3 and __common at 2, so a drive that has both silently landed on __common
+     * and the only route to +OPL was the Settings row -- which is exactly the path that has been
+     * failing. Preferring the partition the user actually created means the common case needs no
+     * setting at all.
+     *
+     * Discovery still never manufactures a partition, resizes one, or writes raw hdd0: metadata.
+     * Every branch below only MOUNTS something that already exists, and the last one gives up
+     * rather than create anything. */
+    int commonAvailable = 0;
+
     hddOplHomeAutoPlus = 0;
     fileXioUmount(hddPrefix);
     if (fileXioMount(hddPrefix, "hdd0:__common", FIO_MT_RDONLY) == 0) {
@@ -358,20 +372,26 @@ static void hddFindOPLPartition(void)
             LOG("HDD: configured data partition %s is unavailable; ignoring it\n", name);
         }
 
-        // The successful __common mount above is already the proof required for the default.
-        // Do not remount it merely to rediscover the same topology.
-        snprintf(gOPLPart, sizeof(gOPLPart), "hdd0:__common");
-        LOG("HDD: no usable configured data partition; using canonical __common/OPL/ fallback\n");
-        return;
+        // __common mounted but named nothing usable. Record that it is available and keep going --
+        // +OPL is preferred below when it exists. The successful mount above is already all the
+        // proof this needs; do not remount merely to rediscover the same topology.
+        commonAvailable = 1;
     }
 
-    // Official OPL's existing +OPL layout remains valid when a drive has no usable __common.
-    // It is an automatic effective choice, not a request to create conf_hdd.cfg or a new APA
-    // partition. +OPL owns its PFS root directly, so the mounted data prefix is pfs0:.
+    // PREFERRED DEFAULT: an existing +OPL. It owns its PFS root directly, so the mounted data
+    // prefix is pfs0:. Still an automatic effective choice, not a request to write conf_hdd.cfg or
+    // to create an APA partition -- taken only when the partition is already there and mountable.
     if (hddPartitionMountable("hdd0:+OPL")) {
         snprintf(gOPLPart, sizeof(gOPLPart), "hdd0:+OPL");
         hddOplHomeAutoPlus = 1;
-        LOG("HDD: __common unavailable; using existing +OPL data-home fallback\n");
+        LOG("HDD: using existing +OPL data home (preferred over __common)\n");
+        return;
+    }
+
+    // Fallback: the canonical __common/OPL/ layout, already proven mountable above.
+    if (commonAvailable) {
+        snprintf(gOPLPart, sizeof(gOPLPart), "hdd0:__common");
+        LOG("HDD: no +OPL partition; using canonical __common/OPL/ fallback\n");
         return;
     }
 
