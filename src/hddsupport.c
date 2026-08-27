@@ -21,7 +21,7 @@
 #include <io_common.h>   // FIO_MT_RDWR
 
 #include <hdd-ioctl.h>
-#include <delaythread.h> // DelayThread for the post-ATAD settle in hddLoadModules
+#include <delaythread.h> // DelayThread for the APA/ATA handoff settle
 
 #define OPL_HDD_MODE_PS2LOGO_OFFSET 0x17F8
 
@@ -36,6 +36,10 @@ static unsigned char hddHDProKitDetected = 0;
 static unsigned char hddModulesLoadCount = 0;
 static unsigned char hddModulesLoaded = 0;
 static unsigned char hddSupportModulesLoaded = 0;
+// The generic ATA block-device path does not need the APA settle. Keep one bounded gap between
+// the shared ATAD/XHDD stack and the APA/PFS stack, where the first hdd0:/ps2fs probe can race the
+// same physical drive. This avoids adding the APA-only delay to the single-partition ATA VCD path.
+static unsigned char hddApaSettled = 0;
 // One toast per failure streak: hddUpdateGameList now RETRIES the support-module load every refresh
 // while it keeps failing, and re-toasting the same error box each pass would bury the UI. Reset on
 // success so a later, different failure toasts again.
@@ -483,15 +487,6 @@ int hddLoadModules(void)
         } else {
             retStatus = HDD_LOADMODULES_STATUS_NOERROR;
             hddModulesLoaded = 1;
-            // Settle ~1 s after a FRESH ATA-stack load before anyone probes xhdd0: or loads ps2hdd.
-            // Every working reference does this: NHDDL sleeps 1 s after ata_bd ("prevents ps2hdd from
-            // hanging") and POPSLoader settles 1 s around ata_bd as well. Our earliest callers run
-            // seconds after power-on (APA boot-identity config resolution), so the very first
-            // ATA_DEVCTL_READ_PARTITION_SECTOR probe / ps2hdd init can otherwise race a drive that is
-            // still spinning up. Runs once per load generation: the dedupe branch above never gets here.
-            hddDiagBootStageBegin("HDD:SETTLE");
-            DelayThread(1000 * 1000);
-            hddDiagBootStageEndVoid("HDD:SETTLE");
         }
     } else {
         hddModulesLoadCount++;
@@ -651,6 +646,14 @@ static int hddLoadCoreSupportModules(void)
 
     // Check if the drive contains MBR/GPT partition data before we load the APA/PFS modules. If the drive is not
     // APA then loading the APA irx modules can corrupt the drive as it will try to write APA partition data.
+    // ATA-only BDM users do not need this gap. It belongs immediately before the APA probe/modules,
+    // so an APA page and the single-partition ATA page cannot cross the shared drive transition.
+    if (!hddApaSettled) {
+        hddDiagBootStageBegin("HDD:APA-SETTLE");
+        DelayThread(1000 * 1000);
+        hddDiagBootStageEndVoid("HDD:APA-SETTLE");
+        hddApaSettled = 1;
+    }
     nonSony = hddDetectNonSonyFileSystem();
     if (nonSony != 0) {
         // Drive is MBR/GPT style, or unknown, bail out or risk corrupting the drive.
@@ -2084,6 +2087,7 @@ static void hddCleanUp(item_list_t *itemList, int exception)
             hddFreeHDLGamelist(&hddGames);
             hddFreeVcdGameList();
         }
+        hddApaSettled = 0;
         return;
     }
 
@@ -2103,6 +2107,7 @@ static void hddCleanUp(item_list_t *itemList, int exception)
         hddSupportModulesLoaded = 0;
         gHDDPrefix = NULL; // pfs0: is no longer a valid persistent data-home mount marker
     }
+    hddApaSettled = 0;
 }
 
 static int hddCheckVMC(item_list_t *itemList, char *name, int createSize)
@@ -2150,6 +2155,7 @@ static void hddShutdown(item_list_t *itemList)
         if (gDeinitTerminal)
             sysShutdownDev9();
     }
+    hddApaSettled = 0;
 }
 
 static int hddLoadGameListCache(hdl_games_list_t *cache)

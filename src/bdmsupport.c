@@ -577,7 +577,7 @@ static int bdmProbeMassSlots(const char *when)
         } else {
             int devnr = -1;
             // Guarded reader: a buffered ask on an unmounted volume faults the IOP outright.
-            if (bdmReadDriverName(dir, driver, sizeof(driver)) >= 0 && driver[0] != ' ') {
+            if (bdmReadDriverName(dir, driver, sizeof(driver)) >= 0 && driver[0] != '\0') {
                 fileXioIoctl2(dir, USBMASS_IOCTL_GET_DEVICE_NUMBER, NULL, 0, &devnr, sizeof(devnr));
                 n = snprintf(summary + len, sizeof(summary) - len, " %d%c%d", i, driver[0], devnr);
             } else {

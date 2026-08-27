@@ -540,7 +540,15 @@ void ethInit(item_list_t *itemList)
         thmReinit(ethBase);
         ethULSizePrev = -2;
         ethGameCount = 0;
-        ioPutRequest(IO_CUSTOM_SIMPLEACTION, &ethInitSMB);
+        // Code 200 means the base DEV9/SMAP/PS2IP chain never became resident. Re-entering
+        // ethInitSMB() alone only retries IP/SMB configuration against missing devices, so the
+        // original startup race remained a permanent "no network adapter" state. Re-run the full
+        // loader while the failed latch is clear; once the base chain is resident, a 300+ error
+        // needs only the cheaper config/share reconnect path.
+        if (!ethModulesLoaded || gNetworkStartup <= ERROR_ETH_MODULE_SMBMAN_FAILURE)
+            ioPutRequest(IO_CUSTOM_SIMPLEACTION, &smbLoadModules);
+        else
+            ioPutRequest(IO_CUSTOM_SIMPLEACTION, &ethInitSMB);
     } else {
         LOG("ETHSUPPORT Init\n");
         ethBase = "smb0:";

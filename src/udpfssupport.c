@@ -33,6 +33,7 @@ static time_t udpfsModifiedDVDPrev;
 static int udpfsGameCount = 0;
 static base_game_info_t *udpfsGames = NULL;
 static int udpfsIomanModLoaded = 0;
+static int udpfsLoadQueued = 0;
 
 // forward declaration
 static item_list_t udpfsGameList;
@@ -50,6 +51,7 @@ static void udpfsLoadModules(void)
     char ipArg[24];
 
     LOG("UDPFSSUPPORT LoadModules\n");
+    udpfsLoadQueued = 0;
 
     if (udpfsIomanModLoaded)
         return;
@@ -110,7 +112,8 @@ void udpfsInit(item_list_t *itemList)
     udpfsGameCount = 0;
     udpfsGames = NULL;
     udpfsGameList.delay = gArtDelay;
-    ioPutRequest(IO_CUSTOM_SIMPLEACTION, &udpfsLoadModules);
+    if (ioPutRequest(IO_CUSTOM_SIMPLEACTION, &udpfsLoadModules) == IO_OK)
+        udpfsLoadQueued = 1;
     udpfsGameList.enabled = 1;
 }
 
@@ -125,6 +128,12 @@ static int udpfsNeedsUpdate(item_list_t *itemList)
 {
     int result = 0;
 
+    // A DEV9 race can make the one-shot init request fail before the UDPFS chain is resident.
+    // Keep the normal deferred-update cadence alive and let the update worker enqueue one retry;
+    // otherwise UDPFS remains dead until a full reboot even though the server is reachable.
+    if (!udpfsIomanModLoaded)
+        result = 1;
+
     // VCD view: force a rescan once on toggle, then refresh on toggle only (skip disc heuristics).
     if (vcdConsumeDirty(itemList->mode))
         return 1;
@@ -132,7 +141,7 @@ static int udpfsNeedsUpdate(item_list_t *itemList)
     if (folderConsumeDirty(itemList->mode))
         return 1;
     if (vcdListViewActive(itemList))
-        return 0;
+        return result;
 
     if (udpfsULSizePrev == -2)
         result = 1;
@@ -170,8 +179,11 @@ static int udpfsFoldersCreated = 0;
 
 static int udpfsUpdateGameList(item_list_t *itemList)
 {
-    if (udpfsIomanModLoaded == 0)
+    if (udpfsIomanModLoaded == 0) {
+        if (!udpfsLoadQueued && ioPutRequest(IO_CUSTOM_SIMPLEACTION, &udpfsLoadModules) == IO_OK)
+            udpfsLoadQueued = 1;
         return 0;
+    }
 
     if (!udpfsFoldersCreated) {
         sbCreateFolders(udpfsPrefix, 1);

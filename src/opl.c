@@ -2695,9 +2695,9 @@ static void _loadConfig()
             configGetInt(configOPL, CONFIG_OPL_ART_DELAY, &gArtDelay);
             // Keep the stored domain identical to the Artwork page's enum {0,2,5,8} (item 45), so a
             // hand-edited or legacy value cannot render as a delay the UI is unable to express.
-            // An out-of-domain value falls back to 0, matching setDefaults().
+            // An out-of-domain value falls back to 2, matching setDefaults() and the fork.
             if (gArtDelay != 0 && gArtDelay != 2 && gArtDelay != 5 && gArtDelay != 8)
-                gArtDelay = 0;
+                gArtDelay = 2;
             configGetInt(configOPL, CONFIG_OPL_FOLDER_NAV, &gEnableFolderNav);
             configGetColor(configOPL, CONFIG_OPL_PLAS_BLEND_COLOR, gDefaultPlasBlendColor);
             configGetInt(configOPL, CONFIG_OPL_COVERFLOW_COUNT, &gCoverflowCount);
@@ -4341,17 +4341,10 @@ static void setDefaults(void)
     // setBootDir() already zeroes the buffer at its own entry, so nothing needs a reset here.
     gEnableBGArt = 1; // fork parity; gEnableArt is 1 above, so this is live
     gEnableArtTar = 0;
-    // NO SETTLE BY DEFAULT. This is the number of INACTIVE frames the menu must see before art is
-    // even asked for, and it shipped at 8 -- the slowest of the four values the UI offers {0,2,5,8}
-    // -- as a placeholder pending a decision that never happened; the comment here previously said
-    // as much. The effect is that art will not begin loading until navigation has fully stopped and
-    // stayed stopped, which reads as covers refusing to appear while browsing.
-    //
-    // The reason to settle at all was to keep art reads off the bus while the user is moving, but
-    // that concern is device-specific and is already handled where it belongs: texcache gates SIO2
-    // devices (MMCE, MX4SIO) on real idleness because their reads contend with pad polling. Making
-    // every device wait for the worst device's constraint is not a trade worth a default.
-    gArtDelay = 0;
+    // Two inactive frames is the established fork default: long enough to avoid queuing artwork
+    // for every row during continuous navigation, short enough that covers appear promptly after
+    // the user stops. SIO2 devices retain their separate bus-idle floor in texcache.
+    gArtDelay = 2;
     gEnableFolderNav = 0;
     gDefaultPlasBlendColor[0] = 0x00;
     gDefaultPlasBlendColor[1] = 0x00;

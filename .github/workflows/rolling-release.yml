@@ -99,6 +99,14 @@ jobs:
               diffutils
           fi
 
+      - name: Provide PS2SDK iopfixup compatibility name
+        run: |
+          sdk_bin="${PS2SDK:-/usr/local/ps2dev/ps2sdk}/bin"
+          if [ -x "$sdk_bin/srxfixup" ]; then
+            echo "$sdk_bin" >> "$GITHUB_PATH"
+            [ -e "$sdk_bin/iopfixup" ] || ln -s srxfixup "$sdk_bin/iopfixup"
+          fi
+
       - name: Checkout
         uses: actions/checkout@v6
 
@@ -204,6 +212,14 @@ jobs:
               sed \
               gawk \
               diffutils
+          fi
+
+      - name: Provide PS2SDK iopfixup compatibility name
+        run: |
+          sdk_bin="${PS2SDK:-/usr/local/ps2dev/ps2sdk}/bin"
+          if [ -x "$sdk_bin/srxfixup" ]; then
+            echo "$sdk_bin" >> "$GITHUB_PATH"
+            [ -e "$sdk_bin/iopfixup" ] || ln -s srxfixup "$sdk_bin/iopfixup"
           fi
 
       - name: Checkout

@@ -445,6 +445,9 @@ void mmceInit(item_list_t *itemList)
     mmceGames = NULL;
     mmceVcdGameCount = 0;
     mmceVcdGames = NULL;
+    mmceVcdScanned = 0;
+    mmceVcdScanFailed = 0;
+    mmceVcdScanRetries = 0;
     mmceResolvedDevice = -1; // re-detect the Auto slot on a fresh init (tab re-enable / settings apply)
     mmceFoldersCreatedFor[0] = '\0';
     mmceFolderRetries = 0;
@@ -1199,6 +1202,10 @@ static void mmceCleanUp(item_list_t *itemList, int exception)
         mmceGames = NULL;
         free(mmceVcdGames); // #120: free the separate VCD array too; NULL both (CleanUp + Shutdown both run)
         mmceVcdGames = NULL;
+        mmceVcdGameCount = 0;
+        mmceVcdScanned = 0;
+        mmceVcdScanFailed = 0;
+        mmceVcdScanRetries = 0;
 
         //      if ((exception & UNMOUNT_EXCEPTION) == 0)
         //          ...
@@ -1215,6 +1222,10 @@ static void mmceShutdown(item_list_t *itemList)
         mmceGames = NULL;
         free(mmceVcdGames);
         mmceVcdGames = NULL;
+        mmceVcdGameCount = 0;
+        mmceVcdScanned = 0;
+        mmceVcdScanFailed = 0;
+        mmceVcdScanRetries = 0;
     }
 
     // As required by some (typically 2.5") HDDs, issue the SCSI STOP UNIT command to avoid causing an emergency park.
