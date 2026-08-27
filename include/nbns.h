@@ -1,4 +1,8 @@
 // RPC IDs
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 enum NBNS_RPC_ID {
     NBNS_RPC_ID_FIND_NAME = 0,
 
@@ -22,4 +26,8 @@ int nbnsFindName(const char *name, unsigned char *ip_address);
 #define nbnsman_IMPORTS_end   END_IMPORT_TABLE
 
 #define I_nbnsFindName DECLARE_IMPORT(4, nbnsFindName)
+#endif
+
+#ifdef __cplusplus
+}
 #endif
