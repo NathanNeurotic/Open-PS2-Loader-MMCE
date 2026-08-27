@@ -2693,9 +2693,9 @@ static void _loadConfig()
             configGetInt(configOPL, CONFIG_OPL_ART_DELAY, &gArtDelay);
             // Keep the stored domain identical to the Artwork page's enum {0,2,5,8} (item 45), so a
             // hand-edited or legacy value cannot render as a delay the UI is unable to express.
-            // An out-of-domain value falls back to 0, matching setDefaults().
+            // An out-of-domain value falls back to 2, matching setDefaults() and the fork.
             if (gArtDelay != 0 && gArtDelay != 2 && gArtDelay != 5 && gArtDelay != 8)
-                gArtDelay = 0;
+                gArtDelay = 2;
             configGetInt(configOPL, CONFIG_OPL_FOLDER_NAV, &gEnableFolderNav);
             configGetColor(configOPL, CONFIG_OPL_PLAS_BLEND_COLOR, gDefaultPlasBlendColor);
             configGetInt(configOPL, CONFIG_OPL_COVERFLOW_COUNT, &gCoverflowCount);
@@ -4345,11 +4345,24 @@ static void setDefaults(void)
     // as much. The effect is that art will not begin loading until navigation has fully stopped and
     // stayed stopped, which reads as covers refusing to appear while browsing.
     //
-    // The reason to settle at all was to keep art reads off the bus while the user is moving, but
-    // that concern is device-specific and is already handled where it belongs: texcache gates SIO2
-    // devices (MMCE, MX4SIO) on real idleness because their reads contend with pad polling. Making
-    // every device wait for the worst device's constraint is not a trade worth a default.
-    gArtDelay = 0;
+    /* 2 IS THE FORK'S OWN VALUE, and it is the one number here that something has actually run.
+     *
+     * Three candidates existed and only one had a pedigree. The fork shipped 2. The rebuild changed
+     * it to 8 and called that "official-like". I then changed it to 0, which nothing had ever run,
+     * while quoting the very comment -- "the fork lands on 2, we land on 8" -- that named 2. Twice
+     * in one day I read the number that was known to work and picked one that was not.
+     *
+     * 0 is not merely untested, it is actively wrong for the non-SIO2 devices it was meant to help.
+     * The settle counts frames of NO INPUT before art may be REQUESTED, so at 0 every scrolled row
+     * enqueues a cover immediately and USB/ATA/network art reads run underneath the scroll itself.
+     * That is the "art isn't fluid like it was" report: the covers arrive sooner and the movement
+     * they arrive during is worse, which is a bad trade at any speed.
+     *
+     * 8 is not the answer either -- that is the delay that made art feel like it needed a settle
+     * before anything appeared. 2 is short enough that a pause of two frames releases the art, and
+     * long enough that a continuous scroll never asks. SIO2 keeps its own higher floor in texcache;
+     * this is only the default for everything else. */
+    gArtDelay = 2;
     gEnableFolderNav = 0;
     gDefaultPlasBlendColor[0] = 0x00;
     gDefaultPlasBlendColor[1] = 0x00;
