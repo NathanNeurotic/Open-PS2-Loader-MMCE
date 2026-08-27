@@ -62,6 +62,11 @@ typedef struct
     unsigned char LanguagesLoaded;
     unsigned char FoldersCreated;
     unsigned char ForceRefresh;
+    // Set the first time this slot's massN: root answers Dopen, INDEPENDENTLY of whether the
+    // identity ioctl has answered yet. bdmPrefix cannot serve this purpose: it is only written once
+    // identity succeeds, so a mounted-but-unidentified slot would read as "never connected" and be
+    // demoted to the slow empty-slot probe rotation -- exactly the slot that needs the full cadence.
+    unsigned char bdmSeenMounted;
 } bdm_device_data_t;
 
 void bdmLoadModules(void);
@@ -122,11 +127,62 @@ int bdmEffectiveStartMode(void);
 // reads this to bypass its background SIO2 rescan throttle when a real device change occurs.
 unsigned int bdmGetGeneration(void);
 
+// Diagnostic-only hooks used by the generic game-settings save worker. They are no-ops for
+// non-BDM lists and never change which filesystem path configWrite() consumes.
+//
+// The reporting functions probe every BDM device root, which is blocking device I/O, so they must
+// run with NO menu lock held. That in turn means they cannot borrow the caller's item_list_t /
+// config_set_t: once the lock is released those may be freed underneath us. So the caller captures
+// every value the report needs into this plain-value snapshot WHILE the lock is held, then releases
+// the lock and reports from the copy. Nothing here is a pointer that gets dereferenced -- the two
+// address fields are carried for %p identity only.
+typedef struct
+{
+    int valid; // 0 = not a BDM list; the reporting calls do nothing
+    int slot;
+    int mode;
+    int visible;
+    unsigned int generation;
+    const void *itemListAddr; // logged as %p, NEVER dereferenced
+    const void *configAddr;   // logged as %p, NEVER dereferenced
+    unsigned int configUid;
+    int configModified;
+    int configFormat;
+    char configFilename[128];
+    char deviceRoot[BDM_DEVICE_ROOT_MAX];
+    char devicePrefix[BDM_PREFIX_MAX];
+    char driver[32];
+    int massDeviceIndex;
+    int bdmDeviceType;
+    unsigned int foldersCreated;
+    const void *games; // %p only
+    int gameCount;
+    const void *vcdGames; // %p only
+    int vcdGameCount;
+} bdm_config_diag_snapshot_t;
+
+// Call UNDER the menu lock. Pure value copies, no I/O.
+void bdmCaptureConfigWriteDiag(item_list_t *itemList, const config_set_t *configSet, bdm_config_diag_snapshot_t *out);
+// Call with NO lock held. These perform the device probes.
+void bdmLogConfigWriteEntry(const bdm_config_diag_snapshot_t *snap);
+void bdmLogConfigWriteResult(const bdm_config_diag_snapshot_t *snap, int result);
+
 /** Nonzero if this BDM slot has had a device on it at some point this session (its prefix is
  * populated). Slots that have never connected are probed on a slow rotation instead of on every
  * background rescan -- attach is event-driven, so the periodic probe is only a missed-event net.
  */
 int bdmSlotEverConnected(int mode);
+
+/** Read a BDM device's driver name from an already-open massN: directory fd.
+ *
+ * ⚠ ALWAYS USE THIS instead of issuing USBMASS_IOCTL_GET_DRIVERNAME with a return buffer yourself.
+ * ps2sdk's bdmfs_fatfs handler dereferences NULL when a buffer is supplied for a volume that has no
+ * mounted block device, which faults the IOP and takes down every thread waiting on it. The
+ * implementation asks without a buffer first, which is the form that fails safely.
+ *
+ * Returns >= 0 on success. driverName is always left NUL-terminated.
+ */
+int bdmReadDriverName(int dir, char *driverName, int driverNameLength);
 
 /** True when this BDM slot is the MX4SIO (SD-over-SIO2) device.
  *

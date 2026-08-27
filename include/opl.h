@@ -75,6 +75,7 @@ config_set_t *oplGetLegacyAppsInfo(char *name);
 
 void setErrorMessage(int strId);
 void setErrorMessageWithCode(int strId, int error);
+void setErrorMessageWithCodeAndDetail(int strId, int error, const char *detail);
 void setErrorMessagePathCode(int strId, const char *path, int error);
 // Drop a queued error only when it is the exact condition that subsequently recovered. This avoids
 // hiding an unrelated notification merely because a later storage probe happened to succeed.

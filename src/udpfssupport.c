@@ -344,11 +344,13 @@ static void udpfsLaunchGame(item_list_t *itemList, int id, config_set_t *configS
     if (sysNeutrinoPreflight("udpfs", neutrinoPath) < 0)
         return;
     int neutrinoDevMode = oplPath2Mode(neutrinoPath);
-    deinitEx(UNMOUNT_EXCEPTION, itemList->mode, neutrinoDevMode); // CAREFUL: itemCleanUp still frees udpfsGames/game
+    char gameStartup[GAME_STARTUP_MAX + 1];
+    snprintf(gameStartup, sizeof(gameStartup), "%s", game->startup);
+    deinitEx(UNMOUNT_EXCEPTION, itemList->mode, neutrinoDevMode); // itemCleanUp frees udpfsGames/game
 
-    // Hand off to Neutrino with the udpfs driver token. `partname` (the filesystem game path) + the token
-    // survive the deinit above; `game` does not and is not used past this point.
-    sysLaunchNeutrino("udpfs", partname, game->startup, compatmask, EnablePS2Logo, neutrinoPath, neutrinoExtraArgs, neutrinoVideo, neutrinoGsmComp, 0 /* #11: udpfs is fileid, no fs layer */, &neutrinoVmc);
+    // Hand off to Neutrino with the udpfs driver token. `partname` and `gameStartup` survive the deinit;
+    // `game` does not and is not dereferenced past this point.
+    sysLaunchNeutrino("udpfs", partname, gameStartup, compatmask, EnablePS2Logo, neutrinoPath, neutrinoExtraArgs, neutrinoVideo, neutrinoGsmComp, 0 /* udpfs is fileid, no fs layer */, &neutrinoVmc);
 }
 
 static config_set_t *udpfsGetConfig(item_list_t *itemList, int id)

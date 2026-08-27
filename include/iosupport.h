@@ -163,9 +163,15 @@ typedef struct _item_list_t
 
     /// Optional view override for a shallow proxy of this support. Zero keeps the support's native
     /// per-mode L3 state; Favourites uses the forced values so an ISO/VCD favourite can proxy its
-    /// source without mutating the real source page's independent view. Appended last so all legacy
+    // source without mutating the real source page's independent view. Appended last so all legacy
     /// positional item_list_t initializers default safely to native behavior.
     unsigned char viewOverride;
+
+    // Optional: exact ART tar archive path for this device (e.g. HDD selected home).
+    // Return 1 and fill out when a device-specific archive should be probed, 0 when generic
+    // sweep is appropriate, -1 when no home (no tar should be probed).
+    // Placed after viewOverride so existing positional initializers remain valid.
+    int (*itemGetArtArchivePath)(item_list_t *itemList, char *out, int outSize);
 } item_list_t;
 
 #define ITEM_VIEW_NATIVE    0

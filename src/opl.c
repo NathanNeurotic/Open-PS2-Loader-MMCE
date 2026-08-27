@@ -1117,9 +1117,11 @@ static void updateMenuFromGameList(opl_io_module_t *mdl)
 
     if (gAutosort) {
         gup = guiOpCreate(GUI_OP_SORT);
-        gup->menu.menu = &mdl->menuItem;
-        gup->menu.subMenu = &mdl->subMenu;
-        guiDeferUpdate(gup);
+        if (gup) { // OOM: an unsorted list beats dereferencing NULL, same as the append loop above
+            gup->menu.menu = &mdl->menuItem;
+            gup->menu.subMenu = &mdl->subMenu;
+            guiDeferUpdate(gup);
+        }
     }
 }
 
@@ -1348,6 +1350,27 @@ static void formatErrorMessage(const char *format, const char *path, int error, 
 void setErrorMessageWithCode(int strId, int error)
 {
     formatErrorMessage(_l(strId), NULL, error, 0, 1);
+    errorMessageStringId = strId;
+    guiSetFrameHook(&errorMessageHook);
+}
+
+// The detail suffix is an internal enum name ("PS2FS_LOAD_FAILURE"), untranslated by construction,
+// so a plain release gets the localized message alone and behaves exactly like setErrorMessageWithCode.
+// OPLDIAG=1 appends the reason so a tester's screenshot names WHICH probe failed, not just the code.
+void setErrorMessageWithCodeAndDetail(int strId, int error, const char *detail)
+{
+#ifdef __OPLDIAG
+    size_t used;
+#else
+    (void)detail;
+#endif
+
+    formatErrorMessage(_l(strId), NULL, error, 0, 1);
+#ifdef __OPLDIAG
+    used = strlen(errorMessage);
+    if (detail != NULL && detail[0] != '\0' && used < sizeof(errorMessage) - 1)
+        snprintf(&errorMessage[used], sizeof(errorMessage) - used, "\nDiagnostic reason: %s", detail);
+#endif
     errorMessageStringId = strId;
     guiSetFrameHook(&errorMessageHook);
 }
@@ -4669,8 +4692,12 @@ static void autoLaunchBDMGame(char *argv[])
             char detectedDriver[sizeof(gAutoLaunchDeviceData->bdmDriver)] = {0};
             int detectedDeviceIndex = -1;
 
-            fileXioIoctl2(dir, USBMASS_IOCTL_GET_DRIVERNAME, NULL, 0, detectedDriver, sizeof(detectedDriver) - 1);
-            fileXioIoctl2(dir, USBMASS_IOCTL_GET_DEVICE_NUMBER, NULL, 0, &detectedDeviceIndex, sizeof(detectedDeviceIndex));
+            // Every slot in this sweep gets asked, including ones whose backing device has gone --
+            // and asking for the name WITH a return buffer there faults the IOP outright. Boot is
+            // the worst place to do that, so go through the guarded reader and only chase the
+            // device number once it has confirmed a mounted block device. See bdmReadDriverName().
+            if (bdmReadDriverName(dir, detectedDriver, sizeof(detectedDriver)) >= 0)
+                fileXioIoctl2(dir, USBMASS_IOCTL_GET_DEVICE_NUMBER, NULL, 0, &detectedDeviceIndex, sizeof(detectedDeviceIndex));
             fileXioDclose(dir);
 
             if (selectedMassSlot < 0) {

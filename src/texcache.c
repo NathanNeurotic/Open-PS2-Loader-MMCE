@@ -12,6 +12,7 @@
 #include "include/bdmsupport.h" // bdmModeIsSIO2 -- is this cover on the pad's bus?
 #include "include/appsupport.h" // appGetArtMode -- APP rows are proxies for another device
 #include "include/favsupport.h" // favGetArtMode -- so are FAV rows
+#include "include/hddsupport.h" // hddGetArtArchivePath -- exact HDD tar home
 #include <kernel.h>
 #include <delaythread.h> // DelayThread -- must be included explicitly, it is not pulled in by kernel.h
 
@@ -55,6 +56,17 @@ typedef struct load_image_request
     // Not resolvable on the worker -- answering it reads the support's private device data, which a
     // background rescan rewrites underneath. One byte, copied in, is immune.
     unsigned char sio2;
+    // Which .tar archive this cover must come from, resolved on the GUI THREAD at enqueue for
+    // exactly the same reason sio2 is. Answering it reaches into support-private state -- favArray,
+    // the app list, gHDDPrefix -- that the prio-30 IO worker rewrites during a list rebuild, so the
+    // art worker must never ask the question itself.
+    //   1 = read artArchivePath and nothing else   0 = ordinary multi-device sweep
+    //  -1 = this row's source has no archive home; probe no archive at all
+    signed char artArchive;
+    // Trails value in the SAME allocation (NULL unless artArchive == 1), so a request costs nothing
+    // extra on the common path. Art has no queue-depth cap, so a fixed 256-byte field here would be
+    // paid hundreds of times over on a slow device.
+    char *artArchivePath;
     char *value;
 } load_image_request_t;
 
@@ -116,6 +128,45 @@ static void cacheWakeArtWorker(void);
 //       non-fatal (tarParseFile ignores the result) and happens only when the archive changes, but it
 //       is the thing to instrument first if a .tar-enabled build ever feels worse than a plain one.
 //   DEFAULT PATH: gEnableArtTar ships 0, so none of the above is reachable unless the user opts in.
+static int artTarLoadImageExact(const char *value, const char *suffix, const char *exactPath, GSTEXTURE *texture)
+{
+    char prefix[64];
+    TarEntryBase *entry = NULL;
+    void *buffer;
+    int result;
+
+    if (snprintf(prefix, sizeof(prefix), "%s_%s.", value, suffix) >= (int)sizeof(prefix))
+        return -1;
+
+    if (tarLoadFile(TAR_KIND_ART, exactPath) < 0)
+        return -1;
+
+    entry = tarFindPrefixExact(TAR_KIND_ART, prefix);
+
+    if (entry == NULL) {
+        LOG("ART TAR: '%s_%s' not in the archive index\n", value, suffix);
+        return -1;
+    }
+
+    buffer = malloc(entry->rawSize);
+    if (buffer == NULL) {
+        LOG("ART TAR: out of memory for '%s' (%u bytes)\n", prefix, entry->rawSize);
+        return -1;
+    }
+
+    if (tarRead(TAR_KIND_ART, entry, buffer, entry->rawSize) != entry->rawSize) {
+        LOG("ART TAR: short read for '%s' (%u bytes expected)\n", prefix, entry->rawSize);
+        free(buffer);
+        return -1;
+    }
+
+    result = texLoadFromMemory(texture, buffer, entry->rawSize);
+    if (result < 0)
+        LOG("ART TAR: '%s' found (%u bytes) but PNG decode failed (%d)\n", prefix, entry->rawSize, result);
+    free(buffer);
+    return result;
+}
+
 static int artTarLoadImage(const char *value, const char *suffix, GSTEXTURE *texture)
 {
     char prefix[64];
@@ -826,8 +877,17 @@ static void cacheLoadImage(load_image_request_t *req)
 
     texSetLoadAbortFlag(&req->abortRequested);
 
-    if (gEnableArtTar)
-        result = artTarLoadImage(req->value, req->cache->suffix, &staged);
+    // The archive decision was made on the GUI thread at enqueue (cacheResolveArtArchive). Nothing
+    // here may re-derive it: every input to that answer is support-private state a list rebuild
+    // rewrites underneath this thread.
+    if (gEnableArtTar) {
+        if (req->artArchive < 0)
+            result = -1; // source has a home we cannot reach -- never fall back to another device's archive
+        else if (req->artArchive > 0 && req->artArchivePath != NULL)
+            result = artTarLoadImageExact(req->value, req->cache->suffix, req->artArchivePath, &staged);
+        else
+            result = artTarLoadImage(req->value, req->cache->suffix, &staged);
+    }
 
     // Fall through to the per-file lookup whenever the archive is off, absent, or lacks this key.
     if (result < 0)
@@ -1201,6 +1261,45 @@ static int cacheRequestIsSIO2(item_list_t *list, const char *value)
     return bdmModeIsSIO2(mode);
 }
 
+// WHICH .tar archive serves this row -- resolved here, on the GUI thread at enqueue, under the same
+// rule and for the same reason as cacheRequestIsSIO2 directly above. FAV and APP rows are PROXIES,
+// so answering it means reading favArray / the app list, and the HDD answer reads gHDDPrefix; all
+// three are rewritten by the prio-30 IO worker during a list rebuild. The worker asking them itself
+// is a race, which is what this function exists to prevent.
+//
+// Returns 1 and fills path when one specific archive must be used, -1 when the row's source has an
+// archive home that is currently unavailable (probe NOTHING rather than falling through to the
+// generic sweep, which would serve another device's art), and 0 for the ordinary sweep.
+static int cacheResolveArtArchive(item_list_t *list, const char *value, char *path, int pathSize)
+{
+    int mode;
+
+    if (list == NULL)
+        return 0;
+
+    // A support that owns its archive answers for itself (HDD does).
+    if (list->itemGetArtArchivePath != NULL)
+        return list->itemGetArtArchivePath(list, path, pathSize);
+
+    mode = list->mode;
+
+    if (mode == FAV_MODE && value != NULL) {
+        int src = favGetArtMode(value);
+        if (src >= 0)
+            mode = src;
+    }
+    if (mode == APP_MODE && value != NULL) {
+        int src = appGetArtMode(value);
+        if (src >= 0)
+            mode = src;
+    }
+
+    if (mode == HDD_MODE)
+        return hddGetArtArchivePath(list, path, pathSize);
+
+    return 0;
+}
+
 GSTEXTURE *cacheGetTextureEx(image_cache_t *cache, item_list_t *list, int *cacheId, int *UID, char *value, int isPriority)
 {
     int i, rtime;
@@ -1402,7 +1501,24 @@ GSTEXTURE *cacheGetTextureEx(image_cache_t *cache, item_list_t *list, int *cache
     // gArtRunning is part of the gate: if the worker never started, nothing would ever clear qr and
     // the slot would be dead for the session. Better to draw no art than to poison the cache.
     if (oldestEntry && gArtRunning) {
-        load_image_request_t *req = malloc(sizeof(load_image_request_t) + strlen(value) + 1);
+        // Resolve the archive HERE, while support-private state is stable -- see cacheResolveArtArchive.
+        char archivePath[256];
+        int archiveMode = 0;
+        size_t archiveLen = 0;
+        size_t valueLen = strlen(value);
+
+        if (gEnableArtTar) {
+            archiveMode = cacheResolveArtArchive(list, value, archivePath, sizeof(archivePath));
+            if (archiveMode == 1) {
+                archiveLen = strlen(archivePath);
+                // "Use this archive" with nothing to use means the home is unreachable, not that the
+                // generic sweep is appropriate -- that fallback would serve another device's art.
+                if (archiveLen == 0)
+                    archiveMode = -1;
+            }
+        }
+
+        load_image_request_t *req = malloc(sizeof(load_image_request_t) + valueLen + 1 + (archiveLen ? archiveLen + 1 : 0));
         if (!req) {
             *cacheId = -1; // nothing cleared yet at this point, so the slot is untouched
             return NULL;
@@ -1412,6 +1528,13 @@ GSTEXTURE *cacheGetTextureEx(image_cache_t *cache, item_list_t *list, int *cache
         req->list = list;
         req->value = (char *)req + sizeof(load_image_request_t);
         strcpy(req->value, value);
+        req->artArchive = (signed char)archiveMode;
+        if (archiveLen) {
+            req->artArchivePath = req->value + valueLen + 1;
+            strcpy(req->artArchivePath, archivePath);
+        } else {
+            req->artArchivePath = NULL;
+        }
         req->cacheUID = cache->nextUID;
         req->epoch = gArtEpoch;           // the view this cover belongs to; see cacheDropQueuedArt()
         req->failEpoch = gArtFailEpoch;   // the generation an "absent" answer would belong to

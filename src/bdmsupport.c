@@ -17,6 +17,7 @@
 #include "include/extern_irx.h"
 #include "include/cheatman.h"
 #include "include/sound.h"
+#include "include/bdmevent.h"
 #include "modules/iopcore/common/cdvd_config.h"
 
 #include <usbhdfsd-common.h>
@@ -58,6 +59,24 @@ void bdmInitDevicesData();
 int bdmUpdateDeviceData(item_list_t *itemList);
 
 static unsigned int BdmGeneration = 0;
+#ifdef __DEBUG
+// bdmEventHandler runs in the SIF command callback context; never perform diagnostic I/O there.
+// Snapshot the change and emit it from the ordinary deferred device-update worker instead.
+static volatile unsigned int BdmDiagEventPreviousGeneration;
+static volatile unsigned int BdmDiagEventGeneration;
+static volatile unsigned int BdmDiagEventReceivedCount;
+static volatile int BdmDiagEventCause;
+static volatile unsigned int BdmDiagIopCallbackSequence;
+static volatile unsigned int BdmDiagIopMountCallbackCount;
+static volatile unsigned int BdmDiagIopUnmountCallbackCount;
+static volatile unsigned int BdmDiagIopBlockDeviceCount;
+static volatile unsigned int BdmDiagIopUsbRootCount;
+static volatile unsigned int BdmDiagIopUsbRootMask;
+static volatile int BdmDiagEventPending;
+static volatile int BdmDiagIopSnapshotPending;
+static unsigned int BdmDiagSnapshotRequestCount;
+static unsigned int BdmDiagSlotProbeCount[MAX_BDM_DEVICES];
+#endif
 
 static int bdmDriverIsUSB(const char *driverName)
 {
@@ -99,6 +118,26 @@ static int bdmDetermineDeviceType(const char *driverName)
 
     return BDM_TYPE_UNKNOWN;
 }
+
+#ifdef __DEBUG
+static const char *bdmDeviceTypeName(int type)
+{
+    switch (type) {
+        case BDM_TYPE_USB:
+            return "USB";
+        case BDM_TYPE_ILINK:
+            return "iLink";
+        case BDM_TYPE_SDC:
+            return "MX4SIO";
+        case BDM_TYPE_ATA:
+            return "ATA";
+        case BDM_TYPE_UDPBD:
+            return "UDPBD";
+        default:
+            return "unknown";
+    }
+}
+#endif
 
 // Parse the leading "<device><unit>:" token of a boot path into its digit-stripped stem ("ata0" ->
 // "ata", "mass1" -> "mass") and unit number (-1 when the token carries no digits, e.g. uLE's "mass:").
@@ -165,6 +204,46 @@ static void bdmBuildVcdPrefix(char *target, int targetLength, int massSlot)
     snprintf(target, targetLength, "mass%d:/", massSlot);
 }
 
+/* ⚠ NEVER ASK FOR THE DRIVER NAME WITH A RETURN BUFFER UNTIL YOU KNOW THE VOLUME IS MOUNTED.
+   ps2sdk's handler NULL-DEREFERENCES otherwise. iop/fs/bdmfs_fatfs/src/fs_driver.c, upstream master,
+   verified 2026-08-26:
+
+       struct block_device *mounted_bd = fatfs_..._get_mounted_bd_from_index(file->obj.fs->pdrv);
+       ret = (mounted_bd == NULL) ? -ENXIO : *(int *)(mounted_bd->name);
+       if (rdata != NULL)
+           strncpy(rdata, mounted_bd->name, rdatalen);   // <-- NOT guarded on mounted_bd
+
+   The NULL check on the line above does not cover the copy. Supplying rdata for a volume with no
+   mounted block device therefore dereferences NULL ON THE IOP, and an IOP fault takes down every
+   thread waiting on it -- observed on hardware as the console freezing after browsing BDM pages,
+   and as mass slots that never resolve an identity.
+
+   It is reachable because "mass" resolves its volume straight from the unit number:
+   fs_driver_resolve_volume() returns `unit` for "mass" WITHOUT checking that anything is mounted
+   there, so Dopen can succeed on a slot whose backing device has gone away.
+
+   We embed the SDK's PREBUILT bdmfs_fatfs.irx (Makefile), so this cannot be fixed on our side --
+   only avoided. The no-buffer form returns -ENXIO safely (it carries the name's first four bytes in
+   its return value instead). That is precisely what Grimdoomer's fork does, and why it reads mass
+   devices where we fault. Gate on it, then ask for the full name.
+
+   Returns >= 0 on success; driverName is always left NUL-terminated. */
+int bdmReadDriverName(int dir, char *driverName, int driverNameLength)
+{
+    int result;
+
+    if (driverName == NULL || driverNameLength <= 0)
+        return -1;
+
+    driverName[0] = '\0';
+
+    result = fileXioIoctl(dir, USBMASS_IOCTL_GET_DRIVERNAME, "");
+    if (result < 0)
+        return result; // no mounted block device -- asking with a buffer here would fault the IOP
+
+    return fileXioIoctl2(dir, USBMASS_IOCTL_GET_DRIVERNAME, NULL, 0, driverName, driverNameLength - 1);
+}
+
 static int bdmReadDeviceIdentity(const char *path, char *driverName, int driverNameLength, int *deviceIndex)
 {
     int dir, result;
@@ -177,13 +256,180 @@ static int bdmReadDeviceIdentity(const char *path, char *driverName, int driverN
     if (dir < 0)
         return dir;
 
-    result = fileXioIoctl2(dir, USBMASS_IOCTL_GET_DRIVERNAME, NULL, 0, driverName, driverNameLength - 1);
+    result = bdmReadDriverName(dir, driverName, driverNameLength);
     if (result >= 0)
         result = fileXioIoctl2(dir, USBMASS_IOCTL_GET_DEVICE_NUMBER, NULL, 0, deviceIndex, sizeof(*deviceIndex));
 
     fileXioDclose(dir);
     return result;
 }
+
+#ifdef __DEBUG
+typedef struct
+{
+    int openResult;
+    int identityResult;
+    char driver[32];
+    int deviceIndex;
+} bdm_diag_identity_t;
+
+static void bdmDiagProbeIdentity(const char *path, bdm_diag_identity_t *identity)
+{
+    int dir;
+
+    memset(identity, 0, sizeof(*identity));
+    identity->openResult = -1;
+    identity->identityResult = -1;
+    identity->deviceIndex = -1;
+
+    dir = fileXioDopen(path);
+    identity->openResult = dir;
+    if (dir < 0) {
+        identity->identityResult = dir;
+        return;
+    }
+
+    identity->identityResult = bdmReadDriverName(dir, identity->driver, sizeof(identity->driver));
+    if (identity->identityResult >= 0)
+        identity->identityResult = fileXioIoctl2(dir, USBMASS_IOCTL_GET_DEVICE_NUMBER, NULL, 0, &identity->deviceIndex, sizeof(identity->deviceIndex));
+
+    fileXioDclose(dir);
+}
+
+static const char *bdmTypedRootStem(int type)
+{
+    switch (type) {
+        case BDM_TYPE_USB:
+            return "usb";
+        case BDM_TYPE_ILINK:
+            return "ilink";
+        case BDM_TYPE_SDC:
+            return "mx4sio";
+        case BDM_TYPE_ATA:
+            return "ata";
+        default:
+            return NULL;
+    }
+}
+
+// Probe the SDK's typed filesystem aliases without making them runtime inputs. A typed unit is a
+// same-family ordinal, not the BDM driver's raw device number, so enumerate aliases and validate
+// the candidate by the driver-reported raw number instead of assuming the digits are interchangeable.
+static int bdmDiagResolveTypedIdentity(int type, int expectedDeviceIndex, char *root, int rootLength, bdm_diag_identity_t *identity, int *matchingAliases)
+{
+    const char *stem = bdmTypedRootStem(type);
+    int haveReadableAlias = 0;
+    int haveTypedCandidate = 0;
+
+    root[0] = '\0';
+    memset(identity, 0, sizeof(*identity));
+    identity->openResult = -1;
+    identity->identityResult = -1;
+    identity->deviceIndex = -1;
+    *matchingAliases = 0;
+
+    if (stem == NULL)
+        return 0;
+
+    for (int unit = 0; unit < MAX_BDM_DEVICES; unit++) {
+        char candidateRoot[16];
+        bdm_diag_identity_t candidate;
+
+        snprintf(candidateRoot, sizeof(candidateRoot), "%s%d:/", stem, unit);
+        bdmDiagProbeIdentity(candidateRoot, &candidate);
+        if (candidate.openResult < 0)
+            continue;
+
+        // Preserve the first readable alias even if its identity ioctl is unavailable. That still
+        // proves the installed SDK exported the typed filesystem, while revalidation remains false.
+        if (!haveReadableAlias) {
+            snprintf(root, rootLength, "%s", candidateRoot);
+            *identity = candidate;
+            haveReadableAlias = 1;
+        }
+
+        if (bdmDetermineDeviceType(candidate.driver) != type)
+            continue;
+
+        (*matchingAliases)++;
+        if (!haveTypedCandidate) {
+            snprintf(root, rootLength, "%s", candidateRoot);
+            *identity = candidate;
+            haveTypedCandidate = 1;
+        }
+        if (expectedDeviceIndex >= 0 && candidate.deviceIndex == expectedDeviceIndex) {
+            snprintf(root, rootLength, "%s", candidateRoot);
+            *identity = candidate;
+            return 1;
+        }
+
+        // With no cached raw number there is no way to prove ownership. Continue enumerating so the
+        // report can distinguish a single inferred same-family alias from an ambiguous multi-device
+        // result without pretending either one is revalidated.
+    }
+
+    return 0;
+}
+
+static int bdmDiagListIndex(const item_list_t *itemList)
+{
+    for (int i = 0; i < MAX_BDM_DEVICES; i++) {
+        if (itemList == &bdmDeviceList[i])
+            return i;
+    }
+
+    return -1;
+}
+
+static void bdmLogIdentityDiagnostic(const char *event, const bdm_config_diag_snapshot_t *snap)
+{
+    int slot;
+    char legacyRoot[16], typedRoot[16];
+    bdm_diag_identity_t legacyIdentity, typedIdentity;
+    int typedRevalidated;
+    int matchingTypedAliases;
+    int legacyDriverMatch;
+    int legacyDeviceMatch;
+    int legacyRevalidated;
+
+    if (snap == NULL || !snap->valid)
+        return;
+
+    slot = snap->slot;
+
+    // Everything below reads the CAPTURED COPY. The probes that follow are blocking device I/O, so
+    // this must never reach back into the live item_list_t / config_set_t -- by the time we get here
+    // the menu lock is released and either of them may already be gone.
+    snprintf(legacyRoot, sizeof(legacyRoot), "mass%d:/", slot);
+    bdmDiagProbeIdentity(legacyRoot, &legacyIdentity);
+    typedRevalidated = bdmDiagResolveTypedIdentity(snap->bdmDeviceType, snap->massDeviceIndex, typedRoot, sizeof(typedRoot), &typedIdentity, &matchingTypedAliases);
+
+    legacyDriverMatch = snap->driver[0] != '\0' && legacyIdentity.driver[0] != '\0' && strcmp(snap->driver, legacyIdentity.driver) == 0;
+    legacyDeviceMatch = snap->massDeviceIndex >= 0 && legacyIdentity.deviceIndex >= 0 && snap->massDeviceIndex == legacyIdentity.deviceIndex;
+    legacyRevalidated = legacyDriverMatch && legacyDeviceMatch;
+
+    LOG("[BDM DIAG] event=%s generation=%u itemList=%p mode=%d visible=%d config=%p uid=%u modified=%d format=%d filename=\"%s\"\n",
+        event, snap->generation, snap->itemListAddr, snap->mode, snap->visible, snap->configAddr, snap->configUid,
+        snap->configModified, snap->configFormat, snap->configFilename);
+    LOG("[BDM DIAG] event=%s cached slot=%d root=\"%s\" prefix=\"%s\" driver=\"%s\" devnr=%d type=%s(%d) folders=%u games=%p/%d vcdGames=%p/%d\n",
+        event, slot, snap->deviceRoot, snap->devicePrefix, snap->driver, snap->massDeviceIndex,
+        bdmDeviceTypeName(snap->bdmDeviceType), snap->bdmDeviceType, snap->foldersCreated,
+        snap->games, snap->gameCount, snap->vcdGames, snap->vcdGameCount);
+    LOG("[BDM DIAG] event=%s legacy=\"%s\" readable=%d open=%d identity=%d driver=\"%s\" devnr=%d driverMatch=%d devnrMatch=%d revalidated=%d\n",
+        event, legacyRoot, legacyIdentity.openResult >= 0, legacyIdentity.openResult, legacyIdentity.identityResult,
+        legacyIdentity.driver, legacyIdentity.deviceIndex, legacyDriverMatch, legacyDeviceMatch, legacyRevalidated);
+    LOG("[BDM DIAG] event=%s typed=\"%s\" exported=%d open=%d identity=%d driver=\"%s\" devnr=%d candidates=%d ambiguous=%d revalidated=%d writeOwnershipRevalidated=%d\n",
+        event, typedRoot[0] != '\0' ? typedRoot : "<none>", typedIdentity.openResult >= 0,
+        typedIdentity.openResult, typedIdentity.identityResult, typedIdentity.driver, typedIdentity.deviceIndex,
+        matchingTypedAliases, matchingTypedAliases > 1, typedRevalidated, legacyRevalidated);
+}
+#else
+static void bdmLogIdentityDiagnostic(const char *event, const bdm_config_diag_snapshot_t *snap)
+{
+    (void)event;
+    (void)snap;
+}
+#endif
 
 // Find the first mounted BDM device whose driver matches bdmType (BDM_TYPE_*) and write its massN:
 // FILESYSTEM root WITH a trailing slash (e.g. "mass0:/") to root. Returns 1 if such a device is mounted,
@@ -273,6 +519,125 @@ static int bdmLoadOptionalModuleArgs(const char *name, void *module, int moduleS
     return result;
 }
 
+/* OPEN EVERY massN: ROOT ONCE, AND SAY WHAT WAS THERE.
+ *
+ * The probe is FUNCTIONAL and always compiled; only the on-screen report is diagnostic-only.
+ *
+ * Why the probe matters: fs_dopen() calls f_opendir(), and FatFs mounts a volume LAZILY, on first
+ * access. Nothing else in the boot path opens a slot we do not already believe holds a device, so a
+ * volume can sit unmounted purely because nobody asked -- and our publication path then finds
+ * nothing and concludes the slot is empty. Touching each root once breaks that chicken-and-egg.
+ * This is why the second USB stick appeared in diagnostic builds (which did this sweep) and not in
+ * release builds (which did not): the measurement WAS the fix.
+ *
+ * Note fs_driver_resolve_volume() maps "mass" straight from the unit number without checking that
+ * anything is mounted there, so Dopen on an empty slot is a cheap, safe no-op.
+ *
+ * The report half stays OPLDIAG-only -- it is raw developer text on a line every other caller feeds
+ * through _l(). Compact by necessity: one token per slot, '-' absent, '?' open but no identity, or
+ * the driver's first letter (u/a/s/i) followed by its device number.
+ */
+// Returns the number of slots that did NOT answer, so a caller can stop waiting early.
+static int bdmProbeMassSlots(const char *when)
+{
+    char summary[96];
+    int len;
+    int i;
+    int absent = 0;
+
+    len = snprintf(summary, sizeof(summary), "MASS %s:", when);
+
+    for (i = 0; i < MAX_BDM_DEVICES && len > 0 && len < (int)sizeof(summary); i++) {
+        char root[16];
+        char driver[32] = {0};
+        int dir;
+        int n;
+
+        snprintf(root, sizeof(root), "mass%d:/", i);
+        dir = fileXioDopen(root);
+        if (dir < 0) {
+            absent++;
+            n = snprintf(summary + len, sizeof(summary) - len, " %d-", i);
+        } else {
+            int devnr = -1;
+            // Guarded reader: a buffered ask on an unmounted volume faults the IOP outright.
+            if (bdmReadDriverName(dir, driver, sizeof(driver)) >= 0 && driver[0] != ' ') {
+                fileXioIoctl2(dir, USBMASS_IOCTL_GET_DEVICE_NUMBER, NULL, 0, &devnr, sizeof(devnr));
+                n = snprintf(summary + len, sizeof(summary) - len, " %d%c%d", i, driver[0], devnr);
+            } else {
+                n = snprintf(summary + len, sizeof(summary) - len, " %d?", i);
+            }
+            fileXioDclose(dir);
+        }
+
+        if (n <= 0)
+            break;
+        len += n;
+    }
+
+    LOG("[BDM DIAG] %s\n", summary);
+#ifdef __OPLDIAG
+    guiSetBootStatusStickyCopy(summary);
+#endif
+
+    return absent;
+}
+
+// BOOT-STAGE LABELS ARE DIAGNOSTIC-BUILD ONLY (OPLDIAG=1). They publish raw, untranslated developer
+// text -- "BEGIN USBMASS_BD", "END DEV9/ATAD/XHDD result=1" -- straight to the boot status line that
+// every other caller feeds through _l(). A plain release must show only localized boot steps, so
+// these compile to nothing there; the diagnostic flavour is what a tester runs to localize a wedge.
+#ifdef __OPLDIAG
+static void bdmDiagBootStageBegin(const char *stage)
+{
+    char status[64];
+
+    snprintf(status, sizeof(status), "BEGIN %s", stage);
+    LOG("[BDM DIAG] %s\n", status);
+    guiSetBootStatusStickyCopy(status);
+}
+
+static void bdmDiagBootStageEnd(const char *stage, int result)
+{
+    char status[64];
+
+    snprintf(status, sizeof(status), "END %s result=%d", stage, result);
+    LOG("[BDM DIAG] %s\n", status);
+    guiSetBootStatusStickyCopy(status);
+}
+#else
+static void bdmDiagBootStageBegin(const char *stage)
+{
+    (void)stage;
+}
+
+static void bdmDiagBootStageEnd(const char *stage, int result)
+{
+    (void)stage;
+    (void)result;
+}
+#endif
+
+static int bdmDiagLoadOptionalModule(const char *stage, const char *name, void *module, int moduleSize)
+{
+    int result;
+
+    bdmDiagBootStageBegin(stage);
+    result = bdmLoadOptionalModule(name, module, moduleSize);
+    bdmDiagBootStageEnd(stage, result);
+    return result;
+}
+
+static int bdmDiagLoadOptionalModuleArgs(const char *stage, const char *name, void *module, int moduleSize, int arglen, char *args)
+{
+    int result;
+
+    bdmDiagBootStageBegin(stage);
+    result = bdmLoadOptionalModuleArgs(name, module, moduleSize, arglen, args);
+    bdmDiagBootStageEnd(stage, result);
+    return result;
+}
+
 // Exposed for ethsupport's NIC mutual-exclusion: UDPBD and the SMB stack both own the SMAP adapter.
 int bdmIsUDPBDLoaded(void)
 {
@@ -311,8 +676,82 @@ int bdmModeIsUDPBD(int mode)
 
 static void bdmEventHandler(void *packet, void *opt)
 {
+    const bdm_event_packet_t *event = (const bdm_event_packet_t *)packet;
+
+    (void)opt;
+
+#ifdef __DEBUG
+    if (event != NULL) {
+        BdmDiagIopCallbackSequence = event->callbackSequence;
+        BdmDiagIopMountCallbackCount = event->mountCallbackCount;
+        BdmDiagIopUnmountCallbackCount = event->unmountCallbackCount;
+        BdmDiagIopBlockDeviceCount = event->blockDeviceCount;
+        BdmDiagIopUsbRootCount = event->usbRootCount;
+        BdmDiagIopUsbRootMask = event->usbRootMask;
+    }
+#endif
+
+    // A diagnostic snapshot reports IOP-side state without representing a storage change. Never
+    // let the query itself bump BdmGeneration or alter the page-refresh decision.
+    if (event != NULL && event->kind == BDMEVENT_PACKET_DIAG_SNAPSHOT) {
+#ifdef __DEBUG
+        BdmDiagIopSnapshotPending = 1;
+#endif
+        return;
+    }
+
+#ifdef __DEBUG
+    BdmDiagEventPreviousGeneration = BdmGeneration;
+    BdmDiagEventCause = event != NULL ? event->cause : -1;
+    BdmDiagEventReceivedCount++;
+#endif
     BdmGeneration++;
+#ifdef __DEBUG
+    BdmDiagEventGeneration = BdmGeneration;
+    BdmDiagEventPending = 1;
+#endif
 }
+
+#ifdef __DEBUG
+static void bdmDiagRequestIopSnapshot(const char *reason, int mode, int openResult)
+{
+    static SifCmdHeader_t query;
+    int result;
+
+    BdmDiagSnapshotRequestCount++;
+    query.opt = BdmDiagSnapshotRequestCount;
+    result = SifSendCmd(BDMEVENT_IOP_DIAG_QUERY_CMD, &query, sizeof(query), NULL, NULL, 0);
+    LOG("[BDM COLD DIAG] event=iop-snapshot-request request=%u reason=%s generation=%u mode=%d open=%d send=%d\n",
+        BdmDiagSnapshotRequestCount, reason, BdmGeneration, mode, openResult, result);
+}
+
+static void bdmDiagFlushPendingIopState(item_list_t *itemList)
+{
+    if (BdmDiagEventPending) {
+        unsigned int previousGeneration = BdmDiagEventPreviousGeneration;
+        unsigned int generation = BdmDiagEventGeneration;
+        int cause = BdmDiagEventCause;
+
+        BdmDiagEventPending = 0;
+        LOG("[BDM COLD DIAG] event=generation-change source=bdm-event generation=%u->%u "
+            "eeReceived=%u cause=%d iopCallbacks=%u mountCallbacks=%u unmountCallbacks=%u "
+            "blockDevices=%u usbRoots=%u usbRootMask=0x%08x itemList=%p mode=%d\n",
+            previousGeneration, generation, BdmDiagEventReceivedCount, cause, BdmDiagIopCallbackSequence,
+            BdmDiagIopMountCallbackCount, BdmDiagIopUnmountCallbackCount, BdmDiagIopBlockDeviceCount,
+            BdmDiagIopUsbRootCount, BdmDiagIopUsbRootMask, itemList, itemList->mode);
+    }
+
+    if (BdmDiagIopSnapshotPending) {
+        BdmDiagIopSnapshotPending = 0;
+        LOG("[BDM COLD DIAG] event=iop-snapshot generation=%u eeReceived=%u iopCallbacks=%u "
+            "mountCallbacks=%u unmountCallbacks=%u blockDevices=%u usbRoots=%u usbRootMask=0x%08x "
+            "itemList=%p mode=%d\n",
+            BdmGeneration, BdmDiagEventReceivedCount, BdmDiagIopCallbackSequence,
+            BdmDiagIopMountCallbackCount, BdmDiagIopUnmountCallbackCount, BdmDiagIopBlockDeviceCount,
+            BdmDiagIopUsbRootCount, BdmDiagIopUsbRootMask, itemList, itemList->mode);
+    }
+}
+#endif
 
 // Bump the device generation the per-device refresh latch keys off, exactly as a real hotplug event
 // (bdmEventHandler) does. This invalidates every device's bdmDeviceTick so the next bdmNeedsUpdate
@@ -322,7 +761,14 @@ static void bdmEventHandler(void *packet, void *opt)
 // without needing a physical replug.
 void bdmForceDeviceRefresh(void)
 {
+#ifdef __DEBUG
+    unsigned int previousGeneration = BdmGeneration;
+#endif
     BdmGeneration++;
+#ifdef __DEBUG
+    LOG("[BDM DIAG] event=generation-change source=forced-refresh generation=%u->%u itemList=%p mode=-1\n",
+        previousGeneration, BdmGeneration, NULL);
+#endif
 }
 
 // Read-only accessor so the menu hook can detect a real BDM device change (hotplug via bdmEventHandler
@@ -331,6 +777,107 @@ void bdmForceDeviceRefresh(void)
 unsigned int bdmGetGeneration(void)
 {
     return BdmGeneration;
+}
+
+// Runs UNDER the caller's menu lock: pure value copies, no I/O, no allocation. Everything the
+// reporting calls below need must be taken here, because once the lock is released the item_list_t
+// and config_set_t may be freed. Cheap enough to run unconditionally; the reporting is what costs.
+void bdmCaptureConfigWriteDiag(item_list_t *itemList, const config_set_t *configSet, bdm_config_diag_snapshot_t *out)
+{
+#ifdef __DEBUG
+    bdm_device_data_t *device;
+    int slot;
+
+    if (out == NULL)
+        return;
+
+    memset(out, 0, sizeof(*out));
+    out->massDeviceIndex = -1;
+    out->slot = -1;
+
+    if (itemList == NULL)
+        return;
+
+    slot = bdmDiagListIndex(itemList);
+    if (slot < 0 || itemList->priv == NULL)
+        return; // not a BDM list: valid stays 0 and the reporting calls do nothing
+
+    device = (bdm_device_data_t *)itemList->priv;
+
+    out->valid = 1;
+    out->slot = slot;
+    out->mode = itemList->mode;
+    out->visible = itemList->owner != NULL ? ((opl_io_module_t *)itemList->owner)->menuItem.visible : 0;
+    out->generation = BdmGeneration;
+    out->itemListAddr = itemList;
+    out->configAddr = configSet;
+
+    if (configSet != NULL) {
+        out->configUid = configSet->uid;
+        out->configModified = configSet->modified;
+        out->configFormat = configSet->format;
+        snprintf(out->configFilename, sizeof(out->configFilename), "%s",
+                 configSet->filename != NULL ? configSet->filename : "<none>");
+    } else {
+        out->configModified = -1;
+        out->configFormat = -1;
+        snprintf(out->configFilename, sizeof(out->configFilename), "%s", "<none>");
+    }
+
+    snprintf(out->deviceRoot, sizeof(out->deviceRoot), "%s", device->bdmDeviceRoot);
+    snprintf(out->devicePrefix, sizeof(out->devicePrefix), "%s", device->bdmPrefix);
+    snprintf(out->driver, sizeof(out->driver), "%s", device->bdmDriver);
+    out->massDeviceIndex = device->massDeviceIndex;
+    out->bdmDeviceType = device->bdmDeviceType;
+    out->foldersCreated = device->FoldersCreated;
+    out->games = device->bdmGames;
+    out->gameCount = device->bdmGameCount;
+    out->vcdGames = device->bdmVcdGames;
+    out->vcdGameCount = device->bdmVcdGameCount;
+#else
+    (void)itemList;
+    (void)configSet;
+    if (out != NULL)
+        out->valid = 0;
+#endif
+}
+
+// Capture-and-report in one step, for the in-module callers that run on the IO worker holding NO
+// menu lock and owning the pointers they pass. Only the settings-save path needs the two-phase form,
+// because only it must release a lock between the capture and the device probes.
+static void bdmLogIdentityDiagnosticLive(const char *event, item_list_t *itemList, const config_set_t *configSet)
+{
+#ifdef __DEBUG
+    bdm_config_diag_snapshot_t snap;
+
+    bdmCaptureConfigWriteDiag(itemList, configSet, &snap);
+    bdmLogIdentityDiagnostic(event, &snap);
+#else
+    (void)event;
+    (void)itemList;
+    (void)configSet;
+#endif
+}
+
+void bdmLogConfigWriteEntry(const bdm_config_diag_snapshot_t *snap)
+{
+    bdmLogIdentityDiagnostic("config-write-entry", snap);
+}
+
+void bdmLogConfigWriteResult(const bdm_config_diag_snapshot_t *snap, int result)
+{
+#ifdef __DEBUG
+    if (snap == NULL || !snap->valid)
+        return;
+
+    LOG("[BDM DIAG] event=config-write-result generation=%u itemList=%p mode=%d config=%p uid=%u filename=\"%s\" result=%d cachedRoot=\"%s\" cachedDriver=\"%s\" cachedDevnr=%d type=%s(%d)\n",
+        snap->generation, snap->itemListAddr, snap->mode, snap->configAddr, snap->configUid,
+        snap->configFilename, result, snap->deviceRoot, snap->driver, snap->massDeviceIndex,
+        bdmDeviceTypeName(snap->bdmDeviceType), snap->bdmDeviceType);
+#else
+    (void)snap;
+    (void)result;
+#endif
 }
 
 // Has this BDM slot EVER had a device on it? bdmUpdateDeviceData's connect pass is the only thing
@@ -343,7 +890,17 @@ int bdmSlotEverConnected(int mode)
         return 0;
 
     bdm_device_data_t *pDeviceData = (bdm_device_data_t *)bdmDeviceList[mode - BDM_MODE].priv;
-    return pDeviceData != NULL && pDeviceData->bdmPrefix[0] != '\0';
+    if (pDeviceData == NULL)
+        return 0;
+
+    // bdmSeenMounted, not just bdmPrefix. The prefix is written only once the driver identity ioctl
+    // has answered, and bdmUpdateDeviceData deliberately defers publication when a mount answers
+    // Dopen before its transport can answer that ioctl -- routine when a second device enumerates
+    // behind the first. Testing the prefix alone therefore reported that slot as never-connected and
+    // dropped it to the empty-slot rotation (~8 s, and only while the user holds still), so a device
+    // that WAS mounted and merely needed one more probe could sit unpublished until it was replugged
+    // -- a hotplug bumps the generation and bypasses every gate, which is why replugging "fixed" it.
+    return pDeviceData->bdmSeenMounted != 0 || pDeviceData->bdmPrefix[0] != '\0';
 }
 
 // Is this slot the MX4SIO card -- i.e. does its IO ride SIO2, the CONTROLLER'S OWN BUS?
@@ -367,9 +924,30 @@ int bdmModeIsSIO2(int mode)
     return pDeviceData != NULL && pDeviceData->bdmDeviceType == BDM_TYPE_SDC;
 }
 
+static int bdmLoadUsbMassBd(void)
+{
+    int result;
+
+    if (iUSBModLoaded)
+        return 0;
+
+    // Localized boot step, restored with the move into bdmLoadCoreModules. USBMASS_BD is the prime
+    // suspect for a real exFAT/USB boot wedge, so it is the last step a stalled console should be
+    // naming -- losing this left a wedge here reading as a stall in the PREVIOUS step (BDMFS_FATFS).
+    guiSetBootStatusSticky(_l(_STR_BOOT_LOADING_USB));
+    bdmDiagBootStageBegin("USBMASS_BD");
+    result = bdmLoadOptionalModule("USBMASS_BD", &usbmass_bd_irx, size_usbmass_bd_irx);
+    bdmDiagBootStageEnd("USBMASS_BD", result);
+    if (result >= 0) {
+        iUSBModLoaded = 1;
+        return 0;
+    }
+    return -1;
+}
+
 static int bdmShouldQueueModuleLoad(void)
 {
-    if (gEnableUSB && !iUSBModLoaded)
+    if (!iUSBModLoaded)
         return 1;
     if (gEnableILK && !iLinkModLoaded)
         return 1;
@@ -396,18 +974,17 @@ static void bdmLoadBlockDeviceModules(void)
     // a transport enabled from Settings needed a "double tap" before its tab appeared.
     int modsWere = iUSBModLoaded + iLinkModLoaded + mx4sioModLoaded + hddModLoaded + udpbdModLoaded;
 
-    if (gEnableUSB && !iUSBModLoaded) {
-        // Load USB Block Device drivers -- the prime suspect for a real exFAT/USB boot wedge.
-        guiSetBootStatusSticky(_l(_STR_BOOT_LOADING_USB));
-        if (bdmLoadOptionalModule("USBMASS_BD", &usbmass_bd_irx, size_usbmass_bd_irx) >= 0)
-            iUSBModLoaded = 1;
-    }
+    // USB retry without gEnableUSB gate: base residency is unconditional, but a
+    // synchronous bdmLoadCoreModules failure must still be retried via the
+    // generation/worker path. Success will bump modsNow and refresh discovery.
+    if (!iUSBModLoaded)
+        bdmLoadUsbMassBd();
 
     if (gEnableILK && !iLinkModLoaded) {
         // Load iLink Block Device drivers
-        if (!iLinkManModLoaded && bdmLoadOptionalModule("ILINKMAN", &iLinkman_irx, size_iLinkman_irx) >= 0)
+        if (!iLinkManModLoaded && bdmDiagLoadOptionalModule("iLinkman", "ILINKMAN", &iLinkman_irx, size_iLinkman_irx) >= 0)
             iLinkManModLoaded = 1;
-        if (iLinkManModLoaded && !ieee1394ModLoaded && bdmLoadOptionalModule("IEEE1394_BD", &IEEE1394_bd_irx, size_IEEE1394_bd_irx) >= 0)
+        if (iLinkManModLoaded && !ieee1394ModLoaded && bdmDiagLoadOptionalModule("IEEE1394_bd", "IEEE1394_BD", &IEEE1394_bd_irx, size_IEEE1394_bd_irx) >= 0)
             ieee1394ModLoaded = 1;
 
         iLinkModLoaded = iLinkManModLoaded && ieee1394ModLoaded;
@@ -415,7 +992,7 @@ static void bdmLoadBlockDeviceModules(void)
 
     if (gEnableMX4SIO && !mx4sioModLoaded) {
         // Load MX4SIO Block Device drivers
-        if (bdmLoadOptionalModule("MX4SIO_BD", &mx4sio_bd_irx, size_mx4sio_bd_irx) >= 0)
+        if (bdmDiagLoadOptionalModule("MX4SIO", "MX4SIO_BD", &mx4sio_bd_irx, size_mx4sio_bd_irx) >= 0)
             mx4sioModLoaded = 1;
     }
 
@@ -425,7 +1002,10 @@ static void bdmLoadBlockDeviceModules(void)
         // Only mark loaded on success -- a failure (no HDD/interface) must not
         // suppress future retries via bdmShouldQueueModuleLoad() (matches the
         // conditional pattern used for USB/MX4SIO and opl.c's hddLoadModules gate).
-        if (hddLoadModulesReady())
+        bdmDiagBootStageBegin("DEV9/ATAD/XHDD");
+        int hddResult = hddDiagLoadModulesReady();
+        bdmDiagBootStageEnd("DEV9/ATAD/XHDD", hddResult);
+        if (hddResult)
             hddModLoaded = 1;
     }
 
@@ -434,24 +1014,33 @@ static void bdmLoadBlockDeviceModules(void)
     // with ATA-HDD). Both need the PS2's static IP as an "ip=" arg -- the ministack has no DHCP client.
     if (gEnableUDPBD && !udpbdModLoaded && !ethGetModulesLoaded() && !udpfsGetModulesLoaded()) {
         char ipArg[24];
+        int networkResult = -1;
+        const char *networkStage = gNetBootProtocol == NET_BOOT_UDPFS ? "UDPFS-BD chain" : "UDPBD";
+
+        bdmDiagBootStageBegin(networkStage);
         sysInitDev9();
         snprintf(ipArg, sizeof(ipArg), "ip=%d.%d.%d.%d", ps2_ip[0], ps2_ip[1], ps2_ip[2], ps2_ip[3]);
         if (gNetBootProtocol == NET_BOOT_UDPFS) {
             // UDPFS: a 3-IRX chain loaded in dependency order -- smap (exports to ministack + bd), then
             // ministack (gets the ip= arg, exports to bd), then udpfs_bd (registers the "udp" BDM device).
-            if (bdmLoadOptionalModule("UDPFS_SMAP", &udpfs_smap_irx, size_udpfs_smap_irx) >= 0 &&
-                bdmLoadOptionalModuleArgs("UDPFS_MINISTACK", &udpfs_ministack_irx, size_udpfs_ministack_irx, (int)strlen(ipArg) + 1, ipArg) >= 0 &&
-                bdmLoadOptionalModule("UDPFS_BD", &udpfs_bd_irx, size_udpfs_bd_irx) >= 0) {
+            networkResult = bdmDiagLoadOptionalModule("UDPFS_SMAP", "UDPFS_SMAP", &udpfs_smap_irx, size_udpfs_smap_irx);
+            if (networkResult >= 0)
+                networkResult = bdmDiagLoadOptionalModuleArgs("UDPFS_MINISTACK", "UDPFS_MINISTACK", &udpfs_ministack_irx, size_udpfs_ministack_irx, (int)strlen(ipArg) + 1, ipArg);
+            if (networkResult >= 0)
+                networkResult = bdmDiagLoadOptionalModule("UDPFS_BD", "UDPFS_BD", &udpfs_bd_irx, size_udpfs_bd_irx);
+            if (networkResult >= 0) {
                 udpbdModLoaded = 1;
                 udpbdLoadedProtocol = NET_BOOT_UDPFS;
             }
         } else {
             // UDPBD: the self-contained smap_udpbd monolith (smap + ministack + udpbd in one irx).
-            if (bdmLoadOptionalModuleArgs("SMAP_UDPBD", &smap_udpbd_irx, size_smap_udpbd_irx, (int)strlen(ipArg) + 1, ipArg) >= 0) {
+            networkResult = bdmDiagLoadOptionalModuleArgs("SMAP_UDPBD", "SMAP_UDPBD", &smap_udpbd_irx, size_smap_udpbd_irx, (int)strlen(ipArg) + 1, ipArg);
+            if (networkResult >= 0) {
                 udpbdModLoaded = 1;
                 udpbdLoadedProtocol = NET_BOOT_UDPBD;
             }
         }
+        bdmDiagBootStageEnd(networkStage, networkResult);
         // Release the dev9 reference taken above if the load failed -- otherwise a failing/retrying
         // UDPBD/UDPFS (both gates re-enter on every device refresh while !udpbdModLoaded) inflates the
         // refcounted dev9InitCount and a later HDD/ETH teardown can never power dev9 down. On success
@@ -516,6 +1105,47 @@ static void bdmLoadBlockDeviceModules(void)
             mx4sioSecondProbeDone = 1; // found immediately -> done
         }
     }
+
+    // USB initial discovery -- the SAME double tap, for the same reason, and USB needs it MORE than
+    // MX4SIO does since fa1a18d4.
+    //
+    // USBMASS_BD is now loaded in bdmLoadCoreModules(), i.e. BEFORE this function runs. So
+    // iUSBModLoaded is already set on entry, USB is counted in both modsWere and modsNow, and the
+    // "a driver that arrived late needs one more look" refresh above can NEVER fire for it. USB
+    // silently lost the mechanism every other transport still has.
+    //
+    // A stick has real enumeration latency of its own -- bus reset, SET_ADDRESS, descriptors, SCSI
+    // INQUIRY/READ CAPACITY, then the FAT mount. The failure this produces is counter-intuitive and
+    // matches the hardware report exactly: a SLOW stick finishes late, its mount event lands while
+    // the device list and menu loop are up, and it publishes normally. A FAST stick finishes during
+    // early init -- its event is spent before anything can act on it -- and then nothing ever asks
+    // again, so it stays invisible until the user physically replugs it to manufacture a new event.
+    //
+    // One bounded settle and exactly one refresh, one-shot, so an absent or already-found stick
+    // never costs a later call anything.
+    // UNCONDITIONAL, unlike the MX4SIO probe above, and the difference is deliberate. MX4SIO asks
+    // "did any card show up?" because there is only ever one. USB can have SEVERAL sticks, and the
+    // reported failure is one of two going missing while the other is present -- so a
+    // "did any USB root answer?" guard would find the working stick, conclude all is well, and skip
+    // the very refresh the missing one needs. Ask again regardless of what is already mounted.
+    /* ONE settle, one probe, one refresh -- deliberately NOT a retry loop.
+     *
+     * A four-pass version (4 x 700 ms) was tried and did not help: the stick that needs a replug
+     * still needed one. That result matters more than the theory behind it, which was that a modern
+     * high-speed stick negotiating down to the PS2's USB 1.1 controller simply needed longer. If
+     * extra time were the missing ingredient, four passes would have found it.
+     *
+     * So do not reintroduce a loop or raise a pass count here. Up to 2.8 s of io-worker sleep at
+     * every boot, on every console, is a real cost paid by everyone -- and it bought nothing. The
+     * remaining fault is something other than "not enough time", and adding delay only hides how
+     * little is understood about it. */
+    static int usbSecondProbeDone = 0;
+    if (iUSBModLoaded && !usbSecondProbeDone) {
+        usbSecondProbeDone = 1;
+        DelayThread(600 * 1000);               // bounded settle for USB enumeration + FAT mount
+        bdmProbeMassSlots("after-usb-settle"); // forces FatFs's lazy mount on every slot
+        bdmForceDeviceRefresh();               // exactly one second probe, covering every slot
+    }
 }
 
 // Bring up only the common BDM infrastructure. Literal massN: boot resolution uses this path so an
@@ -533,9 +1163,28 @@ static void bdmLoadCoreModules(void)
     LOG("[BDMFS_FATFS]:\n");
     sysLoadModuleBuffer(&bdmfs_fatfs_irx, size_bdmfs_fatfs_irx, 0, NULL);
 
+    // ARM THE ATTACH HANDLER BEFORE ANY BLOCK DEVICE DRIVER CAN ENUMERATE. bdmevent registers a
+    // bdm_RegisterCallback the moment it loads, and bdm only calls back for mounts that happen AFTER
+    // that -- a device already mounted when the handler arrives generates no event, ever.
+    //
+    // Every other transport (iLink, MX4SIO, ATA, UDPBD) loads later, from bdmLoadBlockDeviceModules
+    // on the io worker, so this ordering only ever mattered for USB -- and USB is precisely the one
+    // that got moved up here. Loading USBMASS_BD first left a window where a stick that enumerated
+    // quickly mounted before the handler existed: no attach event, so its page was left to the
+    // empty-slot probe rotation (opl.c, gated on longIdle AND a frame ratio) or to the user
+    // replugging it -- which is the "second USB device only shows up after a hotplug" report.
+    // The hotplug works because it is the first event the handler is actually alive for.
     LOG("[BDMEVENT]:\n");
     sysLoadModuleBuffer(&bdmevent_irx, size_bdmevent_irx, 0, NULL);
-    SifAddCmdHandler(0, &bdmEventHandler, NULL);
+    SifAddCmdHandler(BDMEVENT_EE_EVENT_CMD, &bdmEventHandler, NULL);
+
+    // USB block device is base BDM infrastructure (upstream ps2homebrew and Grimdoomer load it
+    // synchronously, not as an optional transport) -- but it goes AFTER the handler, not before.
+    bdmLoadUsbMassBd();
+
+#ifdef __DEBUG
+    bdmDiagRequestIopSnapshot("handler-ready", -1, -1);
+#endif
 
     LOG("BDMSUPPORT Modules loaded\n");
 }
@@ -1559,9 +2208,13 @@ void bdmLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
 static config_set_t *bdmGetConfig(item_list_t *itemList, int id)
 {
     bdm_device_data_t *pDeviceData = (bdm_device_data_t *)itemList->priv;
+    config_set_t *config;
+
     // Active view's array (#120 split) -- a VCD's per-game CFG keys off its own entry, and a stale
     // toggle-window id resolves to the empty entry instead of the other view's array.
-    return sbPopulateConfig(bdmActiveGame(itemList, id), pDeviceData->bdmPrefix, "/");
+    config = sbPopulateConfig(bdmActiveGame(itemList, id), pDeviceData->bdmPrefix, "/");
+    bdmLogIdentityDiagnosticLive("config-create", itemList, config);
+    return config;
 }
 
 static int bdmGetImage(item_list_t *itemList, char *folder, int isRelative, char *value, char *suffix, GSTEXTURE *resultTex, short psm)
@@ -1789,6 +2442,10 @@ int bdmUpdateDeviceData(item_list_t *itemList)
     char path[BDM_DEVICE_ROOT_MAX + 2] = {0};
     int driverResult, deviceResult;
 
+#ifdef __DEBUG
+    bdmDiagFlushPendingIopState(itemList);
+#endif
+
     // If bdm mode is disabled bail out as we don't want to update the visibility state of the device pages.
     if (bdmEffectiveStartMode() == START_MODE_DISABLED)
         return 0;
@@ -1804,9 +2461,43 @@ int bdmUpdateDeviceData(item_list_t *itemList)
     int dir = fileXioDopen(path);
     // LOG("opendir %s -> %d\n", path, dir);
 
+#ifdef __DEBUG
+    {
+        const int diagSlot = itemList->mode - BDM_MODE;
+
+        if (diagSlot >= 0 && diagSlot < MAX_BDM_DEVICES) {
+            const unsigned int probe = ++BdmDiagSlotProbeCount[diagSlot];
+
+            if (probe <= 4 || (dir >= 0 && pDeviceData->bdmDeviceRoot[0] == '\0')) {
+                LOG("[BDM COLD DIAG] event=slot-probe probe=%u generation=%u eeReceived=%u "
+                    "iopCallbacks=%u mountCallbacks=%u unmountCallbacks=%u blockDevices=%u "
+                    "usbRoots=%u usbRootMask=0x%08x mode=%d slot=%d legacy=\"%s\" open=%d "
+                    "visible=%d tick=%u ulPrev=%d root=\"%s\" driver=\"%s\" type=%d\n",
+                    probe, BdmGeneration, BdmDiagEventReceivedCount, BdmDiagIopCallbackSequence,
+                    BdmDiagIopMountCallbackCount, BdmDiagIopUnmountCallbackCount,
+                    BdmDiagIopBlockDeviceCount, BdmDiagIopUsbRootCount, BdmDiagIopUsbRootMask,
+                    itemList->mode, diagSlot, path, dir, visible, pDeviceData->bdmDeviceTick,
+                    pDeviceData->bdmULSizePrev, pDeviceData->bdmDeviceRoot,
+                    pDeviceData->bdmDriver, pDeviceData->bdmDeviceType);
+            }
+
+            if (probe == 1 && (diagSlot == 0 || diagSlot == 1 || diagSlot == MAX_BDM_DEVICES - 1))
+                bdmDiagRequestIopSnapshot("slot-first-probe", itemList->mode, dir);
+            else if (probe == 2 && diagSlot == 1 && dir < 0)
+                bdmDiagRequestIopSnapshot("slot1-second-miss", itemList->mode, dir);
+        }
+    }
+#endif
+
     // Device reachable this poll -> clear the debounce miss counter (see the hide branch below).
-    if (dir >= 0)
+    if (dir >= 0) {
         pDeviceData->bdmMissCount = 0;
+        // Latch "something has mounted here" the moment the root answers, BEFORE identity is known.
+        // The publish path below deliberately defers a mount whose driver ioctl is not ready yet,
+        // and without this latch that slot still looks empty to bdmSlotEverConnected() -- so the one
+        // slot guaranteed to need another look promptly is the one sent to the slow rotation.
+        pDeviceData->bdmSeenMounted = 1;
+    }
 
     // If we opened the device and the menu isn't visible (OR is visible but hasn't been initialized ex: manual device start) initialize device info.
     // A device that went away and came RIGHT BACK, identity intact, is a stall -- not a new device.
@@ -1832,6 +2523,7 @@ int bdmUpdateDeviceData(item_list_t *itemList)
         }
         pDeviceData->bdmMissCount = 0;
         LOG("bdmUpdateDeviceData: device %d reappeared intact -- restoring page, no rescan\n", itemList->mode);
+        bdmLogIdentityDiagnosticLive("update-fast-reappearance", itemList, NULL);
         fileXioDclose(dir);
         return 0; // "nothing changed": no connect sound, no folder pass, no sbReadList
     }
@@ -1844,19 +2536,25 @@ int bdmUpdateDeviceData(item_list_t *itemList)
         // ioctl. Do not publish an empty-driver page: it cannot reach the native launch dispatch.
         // This runs on the deferred IO worker, so a slow or wedged IOP RPC cannot freeze boot;
         // the never-scanned state keeps this slot eligible for the normal later retry.
-        driverResult = fileXioIoctl2(dir, USBMASS_IOCTL_GET_DRIVERNAME, NULL, 0, driverName, sizeof(driverName) - 1);
+        // Must go through bdmReadDriverName(): asking for the name WITH a return buffer on a volume
+        // whose block device has gone faults the IOP outright. See the note on that function.
+        driverResult = bdmReadDriverName(dir, driverName, sizeof(driverName));
         deviceResult = -1;
         if (driverResult >= 0 && driverName[0] != '\0')
             deviceResult = fileXioIoctl2(dir, USBMASS_IOCTL_GET_DEVICE_NUMBER, NULL, 0, &massDeviceIndex, sizeof(massDeviceIndex));
 
         if (driverResult < 0 || driverName[0] == '\0') {
             LOG("Mass device: %d mounted but driver identity is not ready (%d); deferring page publication\n", itemList->mode, driverResult);
+            LOG("[BDM DIAG] event=update-identity-not-ready generation=%u itemList=%p mode=%d legacy=\"%s\" open=%d driverResult=%d deviceResult=%d driver=\"%s\"\n",
+                BdmGeneration, itemList, itemList->mode, path, dir, driverResult, deviceResult, driverName);
             fileXioDclose(dir);
             return 0;
         }
 
         snprintf(pDeviceData->bdmDeviceRoot, sizeof(pDeviceData->bdmDeviceRoot), "mass%d:", itemList->mode);
         bdmBuildGamePrefix(pDeviceData->bdmPrefix, sizeof(pDeviceData->bdmPrefix), pDeviceData->bdmDeviceRoot);
+        LOG("[BDM DIAG] event=folder-reset reason=connect generation=%u itemList=%p mode=%d old=%u new=0\n",
+            BdmGeneration, itemList, itemList->mode, pDeviceData->FoldersCreated);
         pDeviceData->FoldersCreated = 0;
         snprintf(pDeviceData->bdmDriver, sizeof(pDeviceData->bdmDriver), "%s", driverName);
         pDeviceData->massDeviceIndex = massDeviceIndex;
@@ -1882,6 +2580,8 @@ int bdmUpdateDeviceData(item_list_t *itemList)
             LOG("Mass device: %d (%d) %s -> %s (compat root %s)\n", itemList->mode, pDeviceData->massDeviceIndex, pDeviceData->bdmPrefix, pDeviceData->bdmDriver, pDeviceData->bdmDeviceRoot);
         else
             LOG("Mass device: %d using generic BDM path %s\n", itemList->mode, pDeviceData->bdmPrefix);
+
+        bdmLogIdentityDiagnosticLive("update-connect-identity", itemList, NULL);
 
         // Publish-time enable gate (#120 audit F-13): the visible-page filter in bdmNeedsUpdate only
         // hides a page that is ALREADY showing, i.e. one refresh pass too late. Without this gate a
@@ -1947,6 +2647,9 @@ int bdmUpdateDeviceData(item_list_t *itemList)
             moduleUpdateMenu(itemList->mode, 0, 0);
         }
 
+        bdmLogIdentityDiagnosticLive("update-confirmed-disconnect", itemList, NULL);
+        LOG("[BDM DIAG] event=folder-reset reason=confirmed-disconnect generation=%u itemList=%p mode=%d old=%u new=0\n",
+            BdmGeneration, itemList, itemList->mode, pDeviceData->FoldersCreated);
         pDeviceData->FoldersCreated = 0;
         pDeviceData->bdmMissCount = 0;
         LOG("Mass device: %d (%d) disconnected\n", itemList->mode, pDeviceData->massDeviceIndex);
@@ -2484,7 +3187,7 @@ static int bdmDeviceIsATA(int deviceId)
     /* Zero the buffer before the ioctl: if the call fails, strcmp would read
      * uninitialised stack bytes. Pattern mirrors bdmReadDeviceIdentity(). */
     memset(&data.bdmDriver, 0, sizeof(data.bdmDriver));
-    if (fileXioIoctl2(dir, USBMASS_IOCTL_GET_DRIVERNAME, NULL, 0, &data.bdmDriver, sizeof(data.bdmDriver) - 1) < 0) {
+    if (bdmReadDriverName(dir, data.bdmDriver, sizeof(data.bdmDriver)) < 0) {
         fileXioDclose(dir);
         return 0;
     }

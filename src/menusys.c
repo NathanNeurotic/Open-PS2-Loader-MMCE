@@ -356,6 +356,23 @@ void menuRequestInfoSize(void)
 static void _menuSaveConfig()
 {
     int result;
+    bdm_config_diag_snapshot_t diag;
+
+    // bdmLogConfigWrite* report device identity by OPENING every BDM root -- up to nine blocking
+    // device probes, most of them failed opens, which cost seconds apiece on a slow stick. Holding
+    // menuSemaId across device I/O is the exact trap documented on _menuLoadConfigAsync above:
+    // menuRenderElements takes that sema every frame, so the whole UI freezes for the duration.
+    //
+    // Nor may they keep borrowing itemConfigList/itemConfig once the sema is released -- either can
+    // be freed the moment it is. So capture every value the report needs into a plain-value stack
+    // snapshot while the sema IS held, then report from the copy with no lock and no borrowed
+    // pointers. In a release build all three calls are no-ops; a diagnostic build is the one we hand
+    // to a tester, and it has to measure the save rather than itself.
+    WaitSema(menuSemaId);
+    bdmCaptureConfigWriteDiag(itemConfigList, itemConfig, &diag);
+    SignalSema(menuSemaId);
+
+    bdmLogConfigWriteEntry(&diag);
 
     WaitSema(menuSemaId);
     result = configWrite(itemConfig);
@@ -363,6 +380,8 @@ static void _menuSaveConfig()
     menuSaveResult = result; // publish BEFORE actionStatus=0 -- that flag is the waiter's release signal
     actionStatus = 0;
     SignalSema(menuSemaId);
+
+    bdmLogConfigWriteResult(&diag, result);
 
     if (!result)
         // gLastSaveErrno was latched inside configWrite at the real failure site.

@@ -111,26 +111,18 @@ static int gBootStatusActive = 0;
 // state is a single aligned POINTER (atomic load/store on the EE) to a static _l() string --
 // no shared buffer, so no data race. Cleared by guiSetBootStatus(NULL).
 static const char *volatile gBootStickyLabel = NULL;
+// Dynamic diagnostic labels cannot use guiSetBootStatusSticky(), which deliberately stores the
+// caller's pointer. Keep two owned buffers and always format into the one that is not published.
+// The EE is single-core: if the renderer is pre-empted after loading one pointer, the IO thread
+// only writes the other buffer, then atomically publishes that pointer.
+static char gBootStickyCopy[2][64];
 
 // forward decl.
 static void guiShow();
 static void guiDrawOverlays(void);
-static int guiSettingsStageOplHome(int selection);
 static const char **guiCopyNameList(const char **src);
 static void guiFreeNameList(const char **list);
 
-enum {
-    GUI_OPL_HOME_STAGE_NOT_FOUND = 0,
-    GUI_OPL_HOME_STAGE_OK = 1,
-    GUI_OPL_HOME_STAGE_UNAVAILABLE = -1,
-};
-
-static const char *guiOplHomeStageError(int selection, int result)
-{
-    if (result == GUI_OPL_HOME_STAGE_UNAVAILABLE)
-        return _l(_STR_HDD_OPL_PARTITION_BUSY);
-    return selection == HDD_OPL_HOME_PLUS ? _l(_STR_HDD_OPL_PLUS_NOT_FOUND) : _l(_STR_HDD_OPL_COMMON_NOT_FOUND);
-}
 
 #ifdef __DEBUG
 
@@ -711,19 +703,10 @@ int guiNetProtocolNeedsRestart(void)
 // guiShowDeviceConfig is retained for the legacy entry point outside the Settings peer shell.
 // Keep its APA selector semantics identical to the shell: merely opening/saving another field
 // must not normalize a legacy custom hdd_partition, while an explicit selector interaction may.
-static int guiDeviceOplHomeInitial;
-static int guiDeviceOplHomeLegacy;
-static int guiDeviceOplHomeTouched;
 
 static int guiDeviceConfigUpdater(int modified)
 {
-    int selection;
-
-    if (modified) {
-        diaGetInt(diaDeviceConfig, CFG_HDDOPLPART, &selection);
-        if (selection != guiDeviceOplHomeInitial)
-            guiDeviceOplHomeTouched = 1;
-    }
+    (void)modified;
     return 0;
 }
 
@@ -766,12 +749,6 @@ void guiShowDeviceConfig(void)
     diaSetInt(diaDeviceConfig, CFG_MMCEMODE, gMMCEStartMode);
     diaSetEnabled(diaDeviceConfig, CFG_MMCEMODE, 1);
 
-    guiDeviceOplHomeInitial = hddGetOplHomeSelection();
-    guiDeviceOplHomeLegacy = hddOplHomeIsLegacy();
-    guiDeviceOplHomeTouched = 0;
-    diaSetEnum(diaDeviceConfig, CFG_HDDOPLPART, hddOplHomes);
-    diaSetInt(diaDeviceConfig, CFG_HDDOPLPART, guiDeviceOplHomeInitial);
-
     int ret;
 reshow_device:
     ret = diaExecuteDialog(diaDeviceConfig, -1, 1, &guiDeviceConfigUpdater);
@@ -781,21 +758,6 @@ reshow_device:
     }
     if (ret) {
         int netProtocolWas = gNetworkProtocol;
-        int hddOplHomeChoice;
-        int hddOplHomeStageResult;
-
-        diaGetInt(diaDeviceConfig, CFG_HDDOPLPART, &hddOplHomeChoice);
-        if (hddOplHomeChoice != guiDeviceOplHomeInitial ||
-            (guiDeviceOplHomeLegacy && guiDeviceOplHomeTouched)) {
-            hddOplHomeStageResult = guiSettingsStageOplHome(hddOplHomeChoice);
-            if (hddOplHomeStageResult != GUI_OPL_HOME_STAGE_OK) {
-                diaSetInt(diaDeviceConfig, CFG_HDDOPLPART, guiDeviceOplHomeInitial);
-                guiDeviceOplHomeTouched = 0;
-                guiMsgBox(guiOplHomeStageError(hddOplHomeChoice, hddOplHomeStageResult), 0, NULL);
-                goto reshow_device;
-            }
-            guiMsgBox(_l(_STR_HDD_OPL_PARTITION_RESTART), 0, NULL);
-        }
 
         diaGetInt(diaDeviceConfig, CFG_DEFDEVICE, &deviceModeIndex);
         gDefaultDevice = guiDeviceTypeToIoMode(deviceModeIndex);
@@ -2687,61 +2649,11 @@ reshow_general:
     return guiSettingsPageResult(result);
 }
 
-static int guiSourcesOplHomeInitial;
-static int guiSourcesOplHomeLegacy;
-static int guiSourcesOplHomeTouched;
-static int guiSourcesOplHomeStagePending;
-static int guiSourcesOplHomeStageResult;
-static int guiSourcesOplHomeStageChoice;
-static int guiSourcesOplHomeStageInFlight;
-static int guiSourcesOplHomeStageAbandoned;
 
 static int guiSettingsSourcesUpdater(int modified)
 {
-    int selection;
-
-    if (modified) {
-        diaGetInt(guiSettingsActiveDialog, CFG_HDDOPLPART, &selection);
-        if (selection != guiSourcesOplHomeInitial)
-            guiSourcesOplHomeTouched = 1;
-    }
+    (void)modified;
     return 0;
-}
-
-static void guiSettingsStageOplHomeWorker(void)
-{
-    int result = hddStageOplHomeSelection(guiSourcesOplHomeStageChoice);
-
-    if (guiSourcesOplHomeStageAbandoned)
-        hddDiscardOplHomeSelection();
-    else
-        guiSourcesOplHomeStageResult = result;
-    guiSourcesOplHomeStageInFlight = 0;
-    guiSourcesOplHomeStagePending = 0;
-}
-
-static int guiSettingsStageOplHome(int selection)
-{
-    // Do not overwrite the static request payload after a timed-out worker. The I/O queue is
-    // single-threaded, so another request cannot begin until that worker actually returns.
-    if (guiSourcesOplHomeStageInFlight)
-        return GUI_OPL_HOME_STAGE_UNAVAILABLE;
-
-    guiSourcesOplHomeStageChoice = selection;
-    guiSourcesOplHomeStageResult = 0;
-    guiSourcesOplHomeStagePending = 1;
-    guiSourcesOplHomeStageInFlight = 1;
-    guiSourcesOplHomeStageAbandoned = 0;
-    guiHandleDeferedIO(&guiSourcesOplHomeStagePending, _l(_STR_HDD_OPL_PARTITION_CHECKING),
-                       IO_CUSTOM_SIMPLEACTION, &guiSettingsStageOplHomeWorker, 15000);
-    if (gLastDeferredTimedOut) {
-        // The late worker only ever changes our staged selector; never let an abandoned wait make
-        // a later Save Settings persist a choice the user did not get to confirm.
-        guiSourcesOplHomeStageAbandoned = 1;
-        hddDiscardOplHomeSelection();
-        return GUI_OPL_HOME_STAGE_UNAVAILABLE;
-    }
-    return guiSourcesOplHomeStageResult;
 }
 
 static int guiSettingsShowSources(void)
@@ -2779,11 +2691,6 @@ static int guiSettingsShowSources(void)
     diaSetEnum(ui, CFG_MMCEMODE, deviceModes);
     diaSetInt(ui, CFG_MMCEMODE, gMMCEStartMode);
     diaSetEnabled(ui, CFG_MMCEMODE, 1);
-    guiSourcesOplHomeInitial = hddGetOplHomeSelection();
-    guiSourcesOplHomeLegacy = hddOplHomeIsLegacy();
-    guiSourcesOplHomeTouched = 0;
-    diaSetEnum(ui, CFG_HDDOPLPART, hddOplHomes);
-    diaSetInt(ui, CFG_HDDOPLPART, guiSourcesOplHomeInitial);
     guiSettingsBeginDialog(ui);
 
 reshow_sources:
@@ -2803,21 +2710,6 @@ reshow_sources:
 
     if (result != UIID_BTN_CANCEL && result != -1) {
         int netProtocolWas = gNetworkProtocol;
-        int hddOplHomeChoice;
-        int hddOplHomeStageResult;
-
-        diaGetInt(ui, CFG_HDDOPLPART, &hddOplHomeChoice);
-        if (hddOplHomeChoice != guiSourcesOplHomeInitial ||
-            (guiSourcesOplHomeLegacy && guiSourcesOplHomeTouched)) {
-            hddOplHomeStageResult = guiSettingsStageOplHome(hddOplHomeChoice);
-            if (hddOplHomeStageResult != GUI_OPL_HOME_STAGE_OK) {
-                diaSetInt(ui, CFG_HDDOPLPART, guiSourcesOplHomeInitial);
-                guiSourcesOplHomeTouched = 0;
-                guiMsgBox(guiOplHomeStageError(hddOplHomeChoice, hddOplHomeStageResult), 0, NULL);
-                goto reshow_sources;
-            }
-            guiMsgBox(_l(_STR_HDD_OPL_PARTITION_RESTART), 0, NULL);
-        }
 
         diaGetInt(ui, CFG_DEFDEVICE, &deviceModeIndex);
         gDefaultDevice = guiDeviceTypeToIoMode(deviceModeIndex);
@@ -3391,8 +3283,11 @@ int guiDeferUpdate(struct gui_update_t *op)
 
     struct gui_update_list_t *up = (struct gui_update_list_t *)malloc(sizeof(struct gui_update_list_t));
     if (!up) {
-        /* OOM: release the semaphore so future callers are not permanently locked out */
+        /* OOM: release the semaphore so future callers are not permanently locked out. The op is
+           ours to release too -- ownership transfers on enqueue, so a caller that got -1 back has
+           no pointer left to free and would otherwise leak the very object we could not queue. */
         SignalSema(gSemaId);
+        free(op);
         return -1;
     }
     up->item = op;
@@ -3505,6 +3400,18 @@ static void guiHandleDeferredOps(void)
         struct gui_update_list_t *td = gUpdateList;
         gUpdateList = gUpdateList->next;
 
+        // FREE THE OPERATION, NOT JUST ITS QUEUE NODE. Every deferred op is TWO allocations --
+        // guiOpCreate() mallocs the gui_update_t, guiDeferUpdate() mallocs the list node that
+        // carries it -- and this loop only ever released the node. The op leaked, always, and no
+        // commit in this repository's history has ever freed one.
+        //
+        // The rate is what makes it fatal rather than untidy: updateMenuFromGameList() calls
+        // guiOpCreate(GUI_OP_APPEND_MENU) once PER GAME ROW, so a single list rebuild leaks one
+        // object per row and every page change rebuilds. Enough navigation and the heap is gone.
+        //
+        // guiHandleOp() reads the op but never retains the pointer, and submenu.text points into
+        // the support's own storage rather than the op, so releasing it here is safe.
+        free(td->item);
         free(td);
 
         gCompletedOps++;
@@ -3559,6 +3466,18 @@ void guiSetBootStatusSticky(const char *label)
     if (label == NULL)
         return;
     gBootStickyLabel = label;
+}
+
+void guiSetBootStatusStickyCopy(const char *label)
+{
+    int target;
+
+    if (label == NULL)
+        return;
+
+    target = (gBootStickyLabel == gBootStickyCopy[0]) ? 1 : 0;
+    snprintf(gBootStickyCopy[target], sizeof(gBootStickyCopy[target]), "%s", label);
+    gBootStickyLabel = gBootStickyCopy[target];
 }
 
 static void guiRenderGreeting(int alpha)
@@ -4258,6 +4177,13 @@ void guiSwitchScreen(int target)
 struct gui_update_t *guiOpCreate(gui_op_type_t type)
 {
     struct gui_update_t *op = (struct gui_update_t *)malloc(sizeof(struct gui_update_t));
+
+    // The memset used to run unconditionally, so an allocation failure faulted HERE rather than
+    // returning NULL -- which made every "if (!op)" guard at the call sites unreachable code. The
+    // callers were written expecting to handle OOM; let them.
+    if (op == NULL)
+        return NULL;
+
     memset(op, 0, sizeof(struct gui_update_t));
     op->type = type;
     return op;

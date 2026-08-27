@@ -93,6 +93,14 @@ static u32 oldpaddata;
 static int delaycnt[16];
 static int paddelay[16];
 
+// Menu rumble pulse state. Declared up here, above readPad(), because the PADEMU poll path drives
+// the DS3/DS4/DS5 motors directly from it -- those pads never reach padSetActDirect. The pulse
+// lifetime and timing rules live with padRumble()/padRumbleFlush() further down.
+static u32 rumbleStartTicks = 0;
+static u32 rumbleDurTicks = 0;
+static int rumbleActive = 0;
+static int rumbleLarge = 0;
+
 // KEY_ to PAD_ conversion table
 static const int keyToPad[17] = {
     -1,
@@ -394,9 +402,28 @@ static int readPad(struct pad_data_t *pad, int *pollClean)
     }
 
 #ifdef PADEMU
+    // A DS3/DS4/DS5 NEVER passes through padSetActDirect: its motors live on this PADEMU channel,
+    // so the rumble state has to be driven here or the pad simply cannot vibrate, no matter what the
+    // native path does. These calls were hardcoded to zero, which is why menu rumble was dead on
+    // every PADEMU controller while working on a native pad.
+    //
+    // This costs NOTHING extra. ds34*_set_rumble is already issued on every poll -- it was just
+    // being handed 0 each time -- so none of the bounded-retry machinery the native path needs
+    // applies here: the level is re-asserted every frame as a side effect of polling, and drops back
+    // to 0 on the first poll after the pulse expires. Both motors are driven together, matching the
+    // known-good RETROLauncher behaviour.
+    // SELF-EXPIRING, deliberately: derived from elapsed ticks rather than trusting rumbleActive to
+    // have been cleared. The ds34 driver LATCHES whatever level it was last handed, so if the decay
+    // in readPads() does not run -- reordered, skipped, or the GUI thread blocked -- a stale flag
+    // would leave the motor on with nothing to stop it. Any poll that happens at all now yields 0
+    // once the pulse is over.
+    u8 pademuRumble = 0;
+    if (gEnableRumble && rumbleActive && (u32)(cpu_ticks() - rumbleStartTicks) < rumbleDurTicks)
+        pademuRumble = (u8)rumbleLarge;
+
     if (ds34bt_get_status(pad->port) & DS34BT_STATE_RUNNING) {
         ret = ds34bt_get_data(pad->port, (u8 *)&pad->buttons.btns);
-        ds34bt_set_rumble(pad->port, 0, 0);
+        ds34bt_set_rumble(pad->port, pademuRumble, pademuRumble);
         if (ret != 0) {
             newpdata |= 0xffff ^ pad->buttons.btns;
             padsRead++;
@@ -405,7 +432,7 @@ static int readPad(struct pad_data_t *pad, int *pollClean)
 
     if (ds34usb_get_status(pad->port) & DS34USB_STATE_RUNNING) {
         ret = ds34usb_get_data(pad->port, (u8 *)&pad->buttons.btns);
-        ds34usb_set_rumble(pad->port, 0, 0);
+        ds34usb_set_rumble(pad->port, pademuRumble, pademuRumble);
         if (ret != 0) {
             newpdata |= 0xffff ^ pad->buttons.btns;
             padsRead++;
@@ -471,20 +498,31 @@ elapsed comparison in raw ticks is correct across one wrap by ordinary unsigned 
 pulse is capped below at a fraction of a second, so one wrap is the most that can occur inside it.
 This is why the feature needs none of the pad-clock rework it was originally blocked on.
 ----------------------------------------------------------------------------------------------------*/
-static u32 rumbleStartTicks = 0;
-static u32 rumbleDurTicks = 0;
-static int rumbleActive = 0;
-static int rumbleLarge = 0;
 
 // Longest pulse we will ever hold a motor on for. Menu feedback, not a sustained buzz.
 #define RUMBLE_MAX_MS 500
+
+// Bounded delivery redundancy for actuator commands. See point 1 of the freepad note below for why
+// neither send-once nor re-send-forever is correct. Do not reduce either of these to zero.
+#define RUMBLE_CMD_REPEATS    3 // extra deliveries after the immediate one, drained by readPads()
+#define RUMBLE_OFF_SYNC_SENDS 2 // stop commands issued synchronously, for paths readPads never drains
+
+static int rumbleOnRepeats = 0;
+static int rumbleOffRepeats = 0;
 
 /* THE TWO THINGS THAT MAKE THIS SILENT ON REAL HARDWARE, both properties of freepad.irx -- which is
    what we ship as padman (Makefile: asm/padman.c is built from $(PS2SDK)/iop/irx/freepad.irx):
 
    1. freepad DROPS padSetActDirect unless its current task is TASK_UPDATE_PAD, and it still returns
-      1 when it does. Sending once per pulse means one unlucky frame eats the whole pulse. So the
-      command is RE-SENT every frame for the pulse's life. Do NOT "optimise" this back to send-once.
+      1 when it does. Sending once per pulse means one unlucky frame eats the whole pulse -- and the
+      two directions are NOT symmetric: a dropped "on" is a missing pulse, but a dropped "off"
+      latches the motor ON, because the IOP holds actuator state until something tells it otherwise.
+
+      Neither extreme works. Re-sending every frame for the pulse's life cures both drops but puts a
+      continuous RPC stream on SIO2 -- the pad's own bus, shared with MX4SIO. Sending exactly once
+      removes that traffic and reinstates both drops. So each state change is repeated over the next
+      few polls and then stops: see RUMBLE_CMD_REPEATS / RUMBLE_OFF_SYNC_SENDS above, which is what
+      readPads() drains. Do NOT "optimise" either of those to zero.
 
    2. freepad fills its actuator alignment with 0xFF on padPortOpen, and padSetActAlign is the only
       thing that overwrites it. padSetActDirect latches the bytes and returns 1 WITHOUT consulting
@@ -499,8 +537,27 @@ static int rumbleLarge = 0;
 // then killed rumble silently for the whole session.
 static void padRumbleRealign(struct pad_data_t *pad)
 {
-    if (pad->actAligned || pad->actuators == 0)
+    if (pad->actAligned)
         return;
+
+    // RECOVER THE ACTUATOR COUNT RATHER THAN TRUSTING IT. initializePad() clears actuators to 0 up
+    // front -- deliberately, so a digital pad swapped into the port cannot inherit a stale count --
+    // and then has FOUR `return 1` bail-outs above the padInfoAct() that would refill it. Any one of
+    // them (a mode table that reads short, a pad that is not DUALSHOCK-capable on that pass, an
+    // ex-id query that fails) leaves actuators==0 for the rest of the session, and both this
+    // function and padActSet() used to veto on exactly that -- so one init hiccup killed rumble
+    // permanently, with nothing logged and no way for the user to tell.
+    //
+    // padInfoAct() is an EE-local read of the pad buffer freepad has already DMA'd; it neither
+    // blocks nor touches SIO2, so asking again at the first pulse costs nothing. A genuinely
+    // actuator-less pad answers <= 0 every time and is simply skipped.
+    if (pad->actuators == 0) {
+        pad->actuators = padInfoAct(pad->port, pad->slot, -1, 0);
+        if (pad->actuators <= 0) {
+            pad->actuators = 0;
+            return;
+        }
+    }
 
     pad->actAlign[0] = 0; // small engine -> byte 0 of padSetActDirect
     pad->actAlign[1] = 1; // big engine   -> byte 1
@@ -520,10 +577,18 @@ static void padActSet(struct pad_data_t *pad, int small, int large)
 {
     char act[6];
 
-    if (pad->actuators == 0)
+    // Gate on READINESS, not on the actuator count. The count is a cached answer that a single init
+    // bail-out can leave at 0 forever (see padRumbleRealign below, which now recovers it); gating
+    // sends on it turned that transient into a permanent, silent loss of rumble. A pad that is ready
+    // accepts the command; a digital-only controller ignores it harmlessly.
+    if (!isPadReadyState(pad->state))
         return;
 
     padRumbleRealign(pad);
+
+    // Still nothing to drive after the recovery attempt -- genuinely actuator-less pad.
+    if (pad->actuators == 0)
+        return;
 
     memset(act, 0, sizeof(act));
     act[0] = small ? 1 : 0;        // small engine: on/off only
@@ -537,9 +602,26 @@ static void padActSet(struct pad_data_t *pad, int small, int large)
  * The decay only runs from readPads(), so anything that can block the GUI thread for longer than a
  * pulse has to stop the motor on the way in or it buzzes for the whole operation.
  */
-void padRumbleFlush(void)
+#ifdef PADEMU
+// PADEMU motors normally decay through readPad()'s per-poll drive, but unloadPads() dismantles the
+// pad stack and readPads() never runs again -- so the last non-zero level would stay latched in the
+// ds34 driver on the way out. Stop them explicitly on the same path the native actuators use.
+static void padPademuStopAll(void)
 {
     int i;
+
+    for (i = 0; i < pad_count; ++i) {
+        if (ds34bt_get_status(pad_data[i].port) & DS34BT_STATE_RUNNING)
+            ds34bt_set_rumble(pad_data[i].port, 0, 0);
+        if (ds34usb_get_status(pad_data[i].port) & DS34USB_STATE_RUNNING)
+            ds34usb_set_rumble(pad_data[i].port, 0, 0);
+    }
+}
+#endif
+
+void padRumbleFlush(void)
+{
+    int i, r;
 
     if (!rumbleActive)
         return;
@@ -547,23 +629,42 @@ void padRumbleFlush(void)
     rumbleActive = 0;
     rumbleDurTicks = 0;
     rumbleLarge = 0;
-    // Sent twice: the IOP LATCHES the actuator state, so a dropped "off" leaves the motor spinning
-    // with nothing left to stop it. The "on" gets a re-send every frame; the "off" gets no frames.
-    for (i = 0; i < pad_count; ++i)
-        padActSet(&pad_data[i], 0, 0);
-    for (i = 0; i < pad_count; ++i)
-        padActSet(&pad_data[i], 0, 0);
+    rumbleOnRepeats = 0;
+
+    // A dropped stop is the expensive direction (latched motor), and unloadPads() calls this on the
+    // way out where readPads() will never run again to drain the tail. Issue the first few now, and
+    // arm the rest for the polls that follow when there are any.
+    for (r = 0; r < RUMBLE_OFF_SYNC_SENDS; ++r)
+        for (i = 0; i < pad_count; ++i)
+            padActSet(&pad_data[i], 0, 0);
+
+#ifdef PADEMU
+    padPademuStopAll();
+#endif
+
+    rumbleOffRepeats = RUMBLE_CMD_REPEATS;
 }
 
-/** Starts a rumble pulse on every connected pad that has actuators.
+/** Arms a rumble pulse. STATE ONLY -- issues no pad command, on purpose.
+ *
+ * ⚠ THIS IS CALLED FROM THREADS THAT MUST NEVER TOUCH SIO2. sfxPlay() calls sfxRumble() inline, and
+ * sfxPlay(SFX_BD_CONNECT/DISCONNECT) is reached from bdmNeedsUpdate() on the IO WORKER. Issuing
+ * padSetActDirect/padSetActAlign from there puts SIO2 traffic on the pad's own bus underneath the
+ * GUI thread's readPads(), which is the documented hard-freeze mechanism (see the freepad note
+ * above and pad.c's bounded waits) -- observed on hardware as the console locking up the moment a
+ * second USB device was hotplugged, with the motor stuck on because the poll loop that would have
+ * expired the pulse never ran again.
+ *
+ * So the actuators are driven EXCLUSIVELY from readPads(), which owns the pad bus. Arming only sets
+ * counters; the next poll issues the command. That costs one frame of onset latency and removes the
+ * cross-thread hazard entirely.
+ *
  * @param durationMs pulse length, clamped to RUMBLE_MAX_MS
  * @param large      large (variable-speed) engine strength, 0..255; the small engine runs for the
  *                   whole pulse regardless, since it is the one that gives a crisp click
  */
 void padRumble(int durationMs, int large)
 {
-    int i;
-
     if (durationMs <= 0)
         return;
     if (durationMs > RUMBLE_MAX_MS)
@@ -573,13 +674,23 @@ void padRumble(int durationMs, int large)
     if (large > 255)
         large = 255;
 
+    if (rumbleActive) {
+        int strengthChanged = (rumbleLarge != large);
+        rumbleStartTicks = cpu_ticks();
+        rumbleDurTicks = (u32)durationMs * CLOCKS_PER_MILISEC;
+        rumbleLarge = large;
+        if (strengthChanged)
+            rumbleOnRepeats = RUMBLE_CMD_REPEATS;
+        return;
+    }
+
     rumbleStartTicks = cpu_ticks();
     rumbleDurTicks = (u32)durationMs * CLOCKS_PER_MILISEC;
     rumbleActive = 1;
     rumbleLarge = large;
-
-    for (i = 0; i < pad_count; ++i)
-        padActSet(&pad_data[i], 1, large);
+    // A new pulse cancels any stop still being repeated, or the tail would switch it back off.
+    rumbleOffRepeats = 0;
+    rumbleOnRepeats = RUMBLE_CMD_REPEATS;
 }
 
 /* Screen-transition edge freeze. During the fade the main loop polls pads but dispatches no input,
@@ -665,16 +776,21 @@ int readPads()
         }
     }
 
-    // Rumble decay + re-send. Unsigned elapsed in RAW ticks -- see the note above padActSet().
-    // The re-send is not redundant: freepad drops padSetActDirect outside TASK_UPDATE_PAD and still
-    // reports success, so a pulse sent only once can be silently swallowed whole.
+    // Rumble decay, plus the bounded re-send tail (see RUMBLE_CMD_REPEATS). Edge-driven: the RPC
+    // stream stops after a few polls instead of running for the pulse's whole life, but a single
+    // dropped padSetActDirect no longer decides whether the pulse happens -- or whether it ends.
     if (rumbleActive) {
         if ((u32)(cpu_ticks() - rumbleStartTicks) >= rumbleDurTicks) {
             padRumbleFlush();
-        } else {
+        } else if (rumbleOnRepeats > 0) {
             for (i = 0; i < pad_count; ++i)
                 padActSet(&pad_data[i], 1, rumbleLarge);
+            rumbleOnRepeats--;
         }
+    } else if (rumbleOffRepeats > 0) {
+        for (i = 0; i < pad_count; ++i)
+            padActSet(&pad_data[i], 0, 0);
+        rumbleOffRepeats--;
     }
 
     for (i = 0; i < 16; ++i) {

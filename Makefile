@@ -67,6 +67,11 @@ DEBUG ?= 0
 EESIO_DEBUG ?= 0
 INGAME_DEBUG ?= 0
 DECI2_DEBUG ?= 0
+# Field diagnostics. Unlike DEBUG (which needs a TTY link and is never what a tester runs), this
+# only turns on the on-screen boot-stage labels and the error-code detail suffix, so a normal
+# release ELF can be handed to a tester and still report WHERE it wedged. The strings it emits are
+# untranslated developer text by design -- that is why they must never be in a plain release.
+OPLDIAG ?= 0
 #How the TTY will reach developer: 'UDP', 'PPC_UART'.
 TTY_APPROACH ?= UDP
 
@@ -222,6 +227,16 @@ ifeq ($(PADEMU),1)
   PADEMU_FLAGS = PADEMU=1
 else
   PADEMU_FLAGS = PADEMU=0
+endif
+
+# A DEBUG build implies the field diagnostics: it already has a TTY, so withholding the on-screen
+# labels from it would only make the two build types disagree about what they report.
+ifeq ($(DEBUG),1)
+  OPLDIAG = 1
+endif
+
+ifeq ($(OPLDIAG),1)
+  EE_CFLAGS += -D__OPLDIAG
 endif
 
 ifeq ($(DEBUG),1)

@@ -112,6 +112,9 @@ static inline int hddLoadModulesReady(void)
     int r = hddLoadModules();
     return r == HDD_LOADMODULES_STATUS_NOERROR || r == HDD_LOADMODULES_STATUS_ALREADYLOADED;
 }
+// Diagnostic wrapper used by the visible DEV9/ATAD/XHDD boot bracket. It preserves the exact
+// hddLoadModulesReady() decision while enabling nested, source-level startup stages beneath it.
+int hddDiagLoadModulesReady(void);
 void hddLoadSupportModules(void);
 
 // Normal APA data-home choices surfaced by Settings -> Game Sources. POPS loose files remain
@@ -132,7 +135,17 @@ int hddCommitOplHomeSelection(void);
 void hddDiscardOplHomeSelection(void);
 int hddOplHomeSelectionPending(void);
 
+/** Why the last hddStageOplHomeSelection() ended as it did, as a short static token
+ * ("ata-stack-unavailable", "pfs-support-unavailable", "partition-mount-refused", "ok", ...).
+ *
+ * Several distinct conditions share only two user-visible messages, so a failure here never said
+ * WHICH one fired -- which is exactly why the APA data-home row survived repeated fix attempts.
+ * Shown only in OPLDIAG builds; a normal release keeps the plain localized message.
+ */
+const char *hddOplHomeStageReason(void);
+
 void hddLaunchGame(item_list_t *itemList, int id, config_set_t *configSet);
 int hddIsPresent();
+int hddGetArtArchivePath(item_list_t *itemList, char *out, int outSize);
 
 #endif

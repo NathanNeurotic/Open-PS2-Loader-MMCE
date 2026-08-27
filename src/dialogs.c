@@ -312,11 +312,6 @@ struct UIItem diaDeviceConfig[] = {
     {UI_ENUM, CFG_HDDMODE, 1, 1, _STR_HDD_HINT, 0, 0, {.intvalue = {0, 0}}},
     {UI_BREAK},
 
-    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {"HDD (APA) OPL Partition", -1}}},
-    {UI_SPACER},
-    {UI_ENUM, CFG_HDDOPLPART, 1, 1, -1, 0, 0, {.intvalue = {0, 0}}},
-    {UI_BREAK},
-
     {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {"MMCE Start Mode", -1}}},
     {UI_SPACER},
     {UI_ENUM, CFG_MMCEMODE, 1, 1, -1, 0, 0, {.intvalue = {0, 0}}},

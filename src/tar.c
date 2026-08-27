@@ -62,6 +62,8 @@ static u32 s_count[TAR_KIND_MAX] = {0, 0, 0};
 static u32 s_cap[TAR_KIND_MAX] = {0, 0, 0};
 static const TarDevice *s_dev[TAR_KIND_MAX] = {NULL, NULL, NULL};
 static int s_inactive[TAR_KIND_MAX] = {0, 0, 0};
+static char s_exactPath[TAR_KIND_MAX][256] = {{0}, {0}, {0}};
+static int s_isExact[TAR_KIND_MAX] = {0, 0, 0};
 
 static const unsigned char s_zeroBlock[TAR_BLOCK_SIZE] __attribute__((aligned(64))) = {0};
 
@@ -91,6 +93,8 @@ static void tarCloseInternal(TarKind kind)
     s_count[kind] = 0;
     s_cap[kind] = 0;
     s_dev[kind] = NULL;
+    s_exactPath[kind][0] = '\0';
+    s_isExact[kind] = 0;
 }
 
 static int buildTarPath(const TarDevice *dev, TarKind kind, char *out, int outSize)
@@ -378,14 +382,46 @@ fail:
     return -1;
 }
 
+// Load ONE named archive, bypassing the multi-device sweep. Three invariants this has to hold, each
+// of which was violated by the first cut and each of which fails SILENTLY:
+//
+//  1. LOAD-ONCE. The generic path is load-once by construction -- tarFind*() only sweeps when the
+//     index is empty -- but this entry point re-parsed unconditionally, so the exact (HDD) path paid
+//     a full open + index read for EVERY cover instead of once per archive. The index is keyed by
+//     path and immutable for its lifetime, so holding the same path is a no-op.
+//  2. NO INDEX SURVIVES A FAILURE. tarParseFile()'s open() failure returns BEFORE the free() that
+//     resets the index, so a failed exact load used to leave the PREVIOUS archive's index in place
+//     with s_isExact cleared. tarFind*() then saw a populated index, skipped tarLoadFromAnyDevice()
+//     forever, searched the wrong archive, and every read failed on the NULL s_dev -- i.e. one HDD
+//     home with no art.tar killed archive art on every other device for the rest of the session.
+//  3. THE "NO ARCHIVE ANYWHERE" LATCH IS NOT OURS TO CLEAR. s_inactive belongs to the generic sweep;
+//     clearing it here re-armed a full device probe (a failed open costs seconds on USB) after every
+//     exact load. Only tarClose()/tarInvalidate() may clear it.
 int tarLoadFile(TarKind kind, const char *path)
 {
-    s_dev[kind] = NULL;
-    return tarParseFile(kind, path);
+    if (s_isExact[kind] && s_index[kind] != NULL && s_count[kind] > 0 &&
+        strcmp(s_exactPath[kind], path) == 0)
+        return 0;
+
+    tarCloseInternal(kind);
+
+    s_isExact[kind] = 1;
+    int r = tarParseFile(kind, path);
+    if (r == 0)
+        snprintf(s_exactPath[kind], sizeof(s_exactPath[kind]), "%s", path);
+    else
+        tarCloseInternal(kind);
+
+    return r;
 }
 
 int tarLoadFromAnyDevice(TarKind kind)
 {
+    // Exact HDD tar occupies the same TAR_KIND_ART slot; generic sweep must
+    // discard it so USB/SMB etc. do not search the HDD archive.
+    if (s_isExact[kind])
+        tarCloseInternal(kind);
+
     if (s_inactive[kind])
         return -1;
 
@@ -446,6 +482,9 @@ int tarClose(TarKind kind)
 
 TarEntryBase *tarFind(TarKind kind, const char *filename)
 {
+    if (s_isExact[kind])
+        tarCloseInternal(kind);
+
     if (s_inactive[kind])
         return NULL;
 
@@ -480,6 +519,9 @@ TarEntryBase *tarFind(TarKind kind, const char *filename)
 
 TarEntryBase *tarFindPrefix(TarKind kind, const char *prefix)
 {
+    if (s_isExact[kind])
+        tarCloseInternal(kind);
+
     if (s_inactive[kind])
         return NULL;
 
@@ -505,17 +547,62 @@ TarEntryBase *tarFindPrefix(TarKind kind, const char *prefix)
     return NULL;
 }
 
+TarEntryBase *tarFindExact(TarKind kind, const char *filename)
+{
+    if (!s_isExact[kind] || !s_index[kind] || s_count[kind] == 0)
+        return NULL;
+    const char *queryClean = filename;
+    if (!strncasecmp(queryClean, "./", 2))
+        queryClean += 2;
+    if (!strncasecmp(queryClean, "ART/", 4) || !strncasecmp(queryClean, "CFG/", 4) || !strncasecmp(queryClean, "CHT/", 4))
+        queryClean += 4;
+    u32 entrySize = gTarInfo[kind].entrySize;
+    char *base = (char *)s_index[kind];
+    for (u32 i = 0; i < s_count[kind]; i++) {
+        char *entry = base + entrySize * i;
+        char *fname = entry + sizeof(TarEntryBase);
+        if (strcasecmp(fname, filename) == 0 || strcasecmp(fname, queryClean) == 0)
+            return (TarEntryBase *)entry;
+        const char *baseFname = strrchr(fname, '/');
+        baseFname = baseFname ? baseFname + 1 : fname;
+        if (strcasecmp(baseFname, queryClean) == 0)
+            return (TarEntryBase *)entry;
+    }
+    return NULL;
+}
+
+TarEntryBase *tarFindPrefixExact(TarKind kind, const char *prefix)
+{
+    if (!s_isExact[kind] || !s_index[kind] || s_count[kind] == 0)
+        return NULL;
+    size_t prefixLen = strlen(prefix);
+    u32 entrySize = gTarInfo[kind].entrySize;
+    char *base = (char *)s_index[kind];
+    for (u32 i = 0; i < s_count[kind]; i++) {
+        char *entry = base + entrySize * i;
+        char *fname = entry + sizeof(TarEntryBase);
+        const char *baseFname = strrchr(fname, '/');
+        baseFname = baseFname ? baseFname + 1 : fname;
+        if (strncasecmp(baseFname, prefix, prefixLen) == 0)
+            return (TarEntryBase *)entry;
+    }
+    return NULL;
+}
+
 u32 tarRead(TarKind kind, const TarEntryBase *entry, void *dst, u32 dstSize)
 {
-    if (s_inactive[kind])
-        return 0;
-
     if (!entry || dstSize < entry->rawSize)
         return 0;
 
     char tarPath[256];
-    if (buildTarPath(s_dev[kind], kind, tarPath, sizeof(tarPath)) < 0)
-        return 0;
+    if (s_isExact[kind] && s_exactPath[kind][0] != '\0') {
+        snprintf(tarPath, sizeof(tarPath), "%s", s_exactPath[kind]);
+    } else {
+        if (s_inactive[kind])
+            return 0;
+        if (buildTarPath(s_dev[kind], kind, tarPath, sizeof(tarPath)) < 0)
+            return 0;
+    }
 
     int fd = open(tarPath, O_RDONLY);
     if (fd < 0)

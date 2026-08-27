@@ -40,6 +40,28 @@ static unsigned char hddSupportModulesLoaded = 0;
 // while it keeps failing, and re-toasting the same error box each pass would bury the UI. Reset on
 // success so a later, different failure toasts again.
 static unsigned char hddSupportErrToasted = 0;
+static unsigned char hddPfsDeferredFailed = 0;
+static int hddRetryQueued = 0;
+
+// Settled PS2FS attempts that must ALL fail before Code 222 is shown. A drive still spinning up
+// answers the ATA stack well before it will answer PS2FS, so a single refusal after the settle says
+// nothing -- hardware shows PFS declining a few of these and then mounting normally. Reset by
+// hddClearPfsDiagFailure() the moment the support stack latches.
+#define HDD_PFS_REPORT_AFTER_FAILURES 3
+static int hddPfsSettledFailures = 0;
+
+typedef enum {
+    HDD_PFS_DIAG_REASON_NONE = 0,
+    HDD_PFS_DIAG_REASON_HDD_CHECK_STATUS_1,
+    HDD_PFS_DIAG_REASON_PS2FS_LOAD_FAILURE,
+} hdd_pfs_diag_reason_t;
+
+#define HDD_PFS_DIAG_NOT_RUN (-9999)
+
+static hdd_pfs_diag_reason_t hddPfsDiagReason = HDD_PFS_DIAG_REASON_NONE;
+static int hddPfsDiagHddCheckResult = HDD_PFS_DIAG_NOT_RUN;
+static int hddPfsDiagPs2fsResult = HDD_PFS_DIAG_NOT_RUN;
+static unsigned char hddDiagBootStageActive = 0;
 // A Settings selection is deliberately staged until Save Settings. It never changes the active
 // pfs0: mount: a live OPL data home can have artwork/config readers using it.
 static int hddOplHomePending = -1;
@@ -49,6 +71,104 @@ static int hddOplHomeCommitted = -1;
 // +OPL can be the existing automatic home only when __common was unavailable during discovery.
 // Keep that distinct from an explicit conf_hdd.cfg redirect, which may fall back to __common.
 static unsigned char hddOplHomeAutoPlus = 0;
+
+static const char *hddPfsDiagReasonName(hdd_pfs_diag_reason_t reason)
+{
+    switch (reason) {
+        case HDD_PFS_DIAG_REASON_HDD_CHECK_STATUS_1:
+            return "HDD_CHECK_STATUS_1_UNFORMATTED";
+        case HDD_PFS_DIAG_REASON_PS2FS_LOAD_FAILURE:
+            return "PS2FS_LOAD_FAILURE";
+        default:
+            return "NONE";
+    }
+}
+
+static void hddLogPfsDiagState(const char *action, const char *why)
+{
+    LOG("[HDD PFS DIAG] action=%s why=%s reason=%s hddCheck=%d ps2fs=%d "
+        "hddModulesLoaded=%u hddSupportModulesLoaded=%u gOPLPart=\"%s\" gHDDPrefix=\"%s\"\n",
+        action, why, hddPfsDiagReasonName(hddPfsDiagReason), hddPfsDiagHddCheckResult,
+        hddPfsDiagPs2fsResult, hddModulesLoaded, hddSupportModulesLoaded, gOPLPart,
+        gHDDPrefix != NULL ? gHDDPrefix : "<null>");
+}
+
+static void hddArmPfsDiagFailure(hdd_pfs_diag_reason_t reason, int hddCheckResult, int ps2fsResult)
+{
+    hddPfsDiagReason = reason;
+    hddPfsDiagHddCheckResult = hddCheckResult;
+    hddPfsDiagPs2fsResult = ps2fsResult;
+    hddPfsDeferredFailed = 1;
+    hddLogPfsDiagState("arm", "support-load-failure");
+}
+
+static void hddClearPfsDiagFailure(const char *why)
+{
+    hddLogPfsDiagState("clear", why);
+    hddPfsDeferredFailed = 0;
+    hddPfsSettledFailures = 0; // PFS came up: the retries that failed before it were spin-up, not fault
+    hddPfsDiagReason = HDD_PFS_DIAG_REASON_NONE;
+    hddPfsDiagHddCheckResult = HDD_PFS_DIAG_NOT_RUN;
+    hddPfsDiagPs2fsResult = HDD_PFS_DIAG_NOT_RUN;
+}
+
+// Diagnostic-build only, same rule as bdmDiagBootStage*: this publishes untranslated developer text
+// to the boot status line that every other caller feeds through _l(). hddDiagBootStageActive
+// additionally scopes it to the bracket opened by hddDiagLoadModulesReady(), so even a diagnostic
+// build only narrates the ATA startup it was asked to narrate.
+#ifdef __OPLDIAG
+static void hddDiagBootStageBegin(const char *stage)
+{
+    char status[96];
+
+    if (!hddDiagBootStageActive)
+        return;
+
+    snprintf(status, sizeof(status), "BEGIN %s", stage);
+    LOG("%s\n", status);
+    guiSetBootStatusStickyCopy(status);
+}
+
+static void hddDiagBootStageEnd(const char *stage, int result)
+{
+    char status[96];
+
+    if (!hddDiagBootStageActive)
+        return;
+
+    snprintf(status, sizeof(status), "END %s result=%d", stage, result);
+    LOG("%s\n", status);
+    guiSetBootStatusStickyCopy(status);
+}
+
+static void hddDiagBootStageEndVoid(const char *stage)
+{
+    char status[96];
+
+    if (!hddDiagBootStageActive)
+        return;
+
+    snprintf(status, sizeof(status), "END %s", stage);
+    LOG("%s\n", status);
+    guiSetBootStatusStickyCopy(status);
+}
+#else
+static void hddDiagBootStageBegin(const char *stage)
+{
+    (void)stage;
+}
+
+static void hddDiagBootStageEnd(const char *stage, int result)
+{
+    (void)stage;
+    (void)result;
+}
+
+static void hddDiagBootStageEndVoid(const char *stage)
+{
+    (void)stage;
+}
+#endif
 
 static void hddClearRecoveredErrors(void)
 {
@@ -84,6 +204,7 @@ static int hddUpdateGameListCache(hdl_games_list_t *cache, hdl_games_list_t *gam
 
 static void hddInitModules(void)
 {
+    hddRetryQueued = 0;
     hddLoadModules();
     hddLoadSupportModules();
 
@@ -196,9 +317,23 @@ static void hddFindOPLPartition(void)
     char candidate[sizeof(gOPLPart)];
     const char *label;
 
-    // When __common is usable, its OPL/conf_hdd.cfg is the authoritative APA data-home selector.
-    // If __common itself is unavailable, an existing mountable +OPL is the legacy automatic home.
-    // Discovery never manufactures a partition, resizes one, or writes raw hdd0: metadata.
+    /* ORDER OF PREFERENCE, and the middle two are deliberately swapped from what this used to do:
+     *
+     *   1. an explicit conf_hdd.cfg selection  -- a stated choice outranks any default
+     *   2. an existing +OPL partition          -- PREFERRED default
+     *   3. __common                            -- fallback
+     *   4. nothing: fail closed
+     *
+     * +OPL used to sit at 3 and __common at 2, so a drive that has both silently landed on __common
+     * and the only route to +OPL was the Settings row -- which is exactly the path that has been
+     * failing. Preferring the partition the user actually created means the common case needs no
+     * setting at all.
+     *
+     * Discovery still never manufactures a partition, resizes one, or writes raw hdd0: metadata.
+     * Every branch below only MOUNTS something that already exists, and the last one gives up
+     * rather than create anything. */
+    int commonAvailable = 0;
+
     hddOplHomeAutoPlus = 0;
     fileXioUmount(hddPrefix);
     if (fileXioMount(hddPrefix, "hdd0:__common", FIO_MT_RDONLY) == 0) {
@@ -237,20 +372,26 @@ static void hddFindOPLPartition(void)
             LOG("HDD: configured data partition %s is unavailable; ignoring it\n", name);
         }
 
-        // The successful __common mount above is already the proof required for the default.
-        // Do not remount it merely to rediscover the same topology.
-        snprintf(gOPLPart, sizeof(gOPLPart), "hdd0:__common");
-        LOG("HDD: no usable configured data partition; using canonical __common/OPL/ fallback\n");
-        return;
+        // __common mounted but named nothing usable. Record that it is available and keep going --
+        // +OPL is preferred below when it exists. The successful mount above is already all the
+        // proof this needs; do not remount merely to rediscover the same topology.
+        commonAvailable = 1;
     }
 
-    // Official OPL's existing +OPL layout remains valid when a drive has no usable __common.
-    // It is an automatic effective choice, not a request to create conf_hdd.cfg or a new APA
-    // partition. +OPL owns its PFS root directly, so the mounted data prefix is pfs0:.
+    // PREFERRED DEFAULT: an existing +OPL. It owns its PFS root directly, so the mounted data
+    // prefix is pfs0:. Still an automatic effective choice, not a request to write conf_hdd.cfg or
+    // to create an APA partition -- taken only when the partition is already there and mountable.
     if (hddPartitionMountable("hdd0:+OPL")) {
         snprintf(gOPLPart, sizeof(gOPLPart), "hdd0:+OPL");
         hddOplHomeAutoPlus = 1;
-        LOG("HDD: __common unavailable; using existing +OPL data-home fallback\n");
+        LOG("HDD: using existing +OPL data home (preferred over __common)\n");
+        return;
+    }
+
+    // Fallback: the canonical __common/OPL/ layout, already proven mountable above.
+    if (commonAvailable) {
+        snprintf(gOPLPart, sizeof(gOPLPart), "hdd0:__common");
+        LOG("HDD: no +OPL partition; using canonical __common/OPL/ fallback\n");
         return;
     }
 
@@ -261,10 +402,12 @@ static void hddFindOPLPartition(void)
 
 int hddLoadModules(void)
 {
-    int retLoadModule;
+    int retLoadModule = HDD_PFS_DIAG_NOT_RUN;
+    int retBdmModule = HDD_PFS_DIAG_NOT_RUN;
+    int retXhddModule = HDD_PFS_DIAG_NOT_RUN;
     int retStatus = HDD_LOADMODULES_STATUS_UNK;
 
-    LOG("HDDSUPPORT LoadModules %d\n", hddModulesLoadCount);
+    LOG("[HDD STARTUP DIAG] hddLoadModules entry count=%u loaded=%u\n", hddModulesLoadCount, hddModulesLoaded);
 
     if (hddModulesLoaded)
         retStatus = HDD_LOADMODULES_STATUS_ALREADYLOADED;
@@ -275,23 +418,37 @@ int hddLoadModules(void)
         hddModulesLoadCount = 1;
 
         // DEV9 must be loaded, as HDD.IRX depends on it. Even if not required by the I/F (i.e. HDPro)
+        hddDiagBootStageBegin("HDD:DEV9");
         sysInitDev9();
+        hddDiagBootStageEndVoid("HDD:DEV9");
 
         // try to detect HD Pro Kit (not the connected HDD),
         // if detected it loads the specific ATAD module
+        hddDiagBootStageBegin("HDD:HDPRO-PROBE");
         hddHDProKitDetected = hddCheckHDProKit();
+        hddDiagBootStageEnd("HDD:HDPRO-PROBE", hddHDProKitDetected);
         if (hddHDProKitDetected) {
             LOG("[ATAD_HDPRO]:\n");
+            hddDiagBootStageBegin("HDD:ATAD-HDPRO");
             retLoadModule = sysLoadModuleBuffer(&hdpro_atad_irx, size_hdpro_atad_irx, 0, NULL);
+            hddDiagBootStageEnd("HDD:ATAD-HDPRO", retLoadModule);
             LOG("[XHDD]:\n");
-            sysLoadModuleBuffer(&xhdd_irx, size_xhdd_irx, 6, "-hdpro");
+            hddDiagBootStageBegin("HDD:XHDD-HDPRO");
+            retXhddModule = sysLoadModuleBuffer(&xhdd_irx, size_xhdd_irx, 6, "-hdpro");
+            hddDiagBootStageEnd("HDD:XHDD-HDPRO", retXhddModule);
         } else {
             LOG("[BDM]:\n");
-            sysLoadModuleBuffer(&bdm_irx, size_bdm_irx, 0, NULL);
+            hddDiagBootStageBegin("HDD:BDM");
+            retBdmModule = sysLoadModuleBuffer(&bdm_irx, size_bdm_irx, 0, NULL);
+            hddDiagBootStageEnd("HDD:BDM", retBdmModule);
             LOG("[ATAD]:\n");
+            hddDiagBootStageBegin("HDD:ATAD");
             retLoadModule = sysLoadModuleBuffer(&ps2atad_irx, size_ps2atad_irx, 0, NULL);
+            hddDiagBootStageEnd("HDD:ATAD", retLoadModule);
             LOG("[XHDD]:\n");
-            sysLoadModuleBuffer(&xhdd_irx, size_xhdd_irx, 0, NULL);
+            hddDiagBootStageBegin("HDD:XHDD");
+            retXhddModule = sysLoadModuleBuffer(&xhdd_irx, size_xhdd_irx, 0, NULL);
+            hddDiagBootStageEnd("HDD:XHDD", retXhddModule);
         }
 
         if (retLoadModule < 0) {
@@ -323,7 +480,9 @@ int hddLoadModules(void)
             // seconds after power-on (APA boot-identity config resolution), so the very first
             // ATA_DEVCTL_READ_PARTITION_SECTOR probe / ps2hdd init can otherwise race a drive that is
             // still spinning up. Runs once per load generation: the dedupe branch above never gets here.
+            hddDiagBootStageBegin("HDD:SETTLE");
             DelayThread(1000 * 1000);
+            hddDiagBootStageEndVoid("HDD:SETTLE");
         }
     } else {
         hddModulesLoadCount++;
@@ -331,8 +490,25 @@ int hddLoadModules(void)
             retStatus = HDD_LOADMODULES_STATUS_BUSYLOADING;
     }
 
-    LOG("HDDSUPPORT LoadModules done\n");
+    LOG("[HDD STARTUP DIAG] hddLoadModules exit count=%u loaded=%u ret=%d bdm=%d atad=%d xhdd=%d\n",
+        hddModulesLoadCount, hddModulesLoaded, retStatus, retBdmModule, retLoadModule, retXhddModule);
     return retStatus;
+}
+
+int hddDiagLoadModulesReady(void)
+{
+    int result;
+
+    hddDiagBootStageActive = 1;
+    hddDiagBootStageBegin("HDD:READY");
+    LOG("[HDD STARTUP DIAG] hddLoadModulesReady entry count=%u loaded=%u\n", hddModulesLoadCount, hddModulesLoaded);
+    result = hddLoadModulesReady();
+    LOG("[HDD STARTUP DIAG] hddLoadModulesReady exit count=%u loaded=%u result=%d\n",
+        hddModulesLoadCount, hddModulesLoaded, result);
+    hddDiagBootStageEnd("HDD:READY", result);
+    hddDiagBootStageActive = 0;
+
+    return result;
 }
 
 int hddModulesAreLoaded(void)
@@ -449,6 +625,21 @@ static int hddLoadCoreSupportModules(void)
 
     LOG("HDDSUPPORT LoadSupportModules\n");
 
+    // ALREADY PROVEN -- do not re-litigate it. The non-Sony probe below exists to avoid loading APA
+    // modules onto a non-APA drive, which is a one-time question: if hddSupportModulesLoaded is set
+    // then ps2hdd and PS2FS are up, and that cannot have happened on a drive this probe would
+    // reject. Re-running it on every call re-asks a settled question against a live drive, and
+    // hddDetectNonSonyFileSystem() answers -1 on a transient devctl error (busy bus, drive mid-seek)
+    // as well as >0 on a coexisting exFAT/MBR signature. Either one made this return 0 while APA was
+    // demonstrably working -- which is how the APA data-home selector came to report failure on a
+    // console that was browsing HDD games at the time.
+    //
+    // Placed above the probe, not merged into the existing !hddSupportModulesLoaded guard below,
+    // because that guard only covers the module loads -- the probe already ran by the time it is
+    // reached.
+    if (hddSupportModulesLoaded)
+        return 1;
+
     // Check if the drive contains MBR/GPT partition data before we load the APA/PFS modules. If the drive is not
     // APA then loading the APA irx modules can corrupt the drive as it will try to write APA partition data.
     nonSony = hddDetectNonSonyFileSystem();
@@ -499,10 +690,8 @@ static int hddLoadCoreSupportModules(void)
         }
         if (ret == 1) {
             LOG("HDD: APA status reports an unformatted drive.\n");
-            if (!hddSupportErrToasted) {
-                setErrorMessageWithCode(_STR_HDD_NOT_FORMATTED_ERROR, ERROR_HDD_MODULE_PFS_FAILURE);
-                hddSupportErrToasted = 1;
-            }
+            hddSupportErrToasted = 0;
+            hddArmPfsDiagFailure(HDD_PFS_DIAG_REASON_HDD_CHECK_STATUS_1, ret, HDD_PFS_DIAG_NOT_RUN);
             return 0;
         }
         if (ret == 2) {
@@ -518,14 +707,13 @@ static int hddLoadCoreSupportModules(void)
         ret = sysLoadModuleBuffer(&ps2fs_irx, size_ps2fs_irx, sizeof(pfsarg), pfsarg);
         if (ret < 0) {
             LOG("HDD: PFS support module failed to load.\n");
-            if (!hddSupportErrToasted) {
-                setErrorMessageWithCode(_STR_HDD_PFS_UNAVAILABLE_ERROR, ERROR_HDD_MODULE_PFS_FAILURE);
-                hddSupportErrToasted = 1;
-            }
+            hddSupportErrToasted = 0;
+            hddArmPfsDiagFailure(HDD_PFS_DIAG_REASON_PS2FS_LOAD_FAILURE, 0, ret);
             return 0;
         }
 
         hddSupportModulesLoaded = 1;
+        hddClearPfsDiagFailure("core-support-load-succeeded");
         hddSupportErrToasted = 0;
         hddClearRecoveredErrors();
         LOG("HDDSUPPORT modules loaded\n");
@@ -854,6 +1042,19 @@ static int hddNeedsUpdate(item_list_t *itemList)
 
 static int hddUpdateGameList(item_list_t *itemList)
 {
+    // GUI thread must never block on the 1 s ATA settle (hddLoadModules DelayThread).
+    // If the base ATA stack has never completed (hddModulesLoadCount==0), defer and
+    // ensure a deduplicated IO-worker retry is queued. hddLoadModules resets the count
+    // to 0 on failure for retryability, and the one-shot hddInit queue may already be
+    // consumed, so without this the stack would strand permanently.
+    if (hddModulesLoadCount == 0) {
+        if (!hddRetryQueued) {
+            if (ioPutRequest(IO_CUSTOM_SIMPLEACTION, &hddInitModules) == IO_OK)
+                hddRetryQueued = 1;
+        }
+        return 0;
+    }
+
     // Self-heal (wLaunchELF-R3Z3N parity: latch only on success, retry per use): a boot-time first
     // touch that raced drive spin-up used to leave the APA page EMPTY for the whole session -- the
     // one-shot hddInitModules never retried, and nothing else reloads the support stack. Both calls
@@ -865,8 +1066,51 @@ static int hddUpdateGameList(item_list_t *itemList)
         // anyway made a failed base load toast TWICE (base failure + the doomed non-Sony probe's)
         // on the first pass (Gemini + CodeRabbit review of #249, vetted). A loaded module stack
         // with no data mount is also retryable: Step-209 deliberately separates those lifetimes.
-        if (hddLoadModulesReady())
+        // WHETHER THE RETRY ACTUALLY RAN decides whether a failure is reportable. hddLoadModules
+        // stamps hddModulesLoadCount=1 on ENTRY -- before sysInitDev9, before the ATAD load, and
+        // before the 1 s settle, all of which run on the io worker. So the guard at the top of this
+        // function stops firing almost immediately, while the base stack is still coming up, and
+        // hddLoadModulesReady() correctly answers BUSYLOADING -> false for that whole window.
+        //
+        // Without this flag the code then fell through to the toast having attempted NOTHING, and
+        // announced it as "settled-update-retry-still-failed" -- which is why Code 222 appeared on
+        // consoles whose APA worked perfectly a moment later. A base stack that is still loading is
+        // not evidence of anything; say nothing until it is actually resident.
+        int baseReady = hddLoadModulesReady();
+        if (baseReady)
             hddLoadSupportModules();
+        // Deferred Code 222: early boot probes never toast; a settled retry that really ran may.
+        if (hddSupportModulesLoaded) {
+            hddClearPfsDiagFailure("update-retry-loaded-support");
+            hddSupportErrToasted = 0;
+            hddClearRecoveredErrors();
+        } else if (baseReady && hddPfsDeferredFailed && !hddSupportErrToasted) {
+            // ONE FAILED ATTEMPT IS NOT EVIDENCE OF A DEAD DRIVE. Gating on baseReady stopped us
+            // reporting a retry that never ran, but it still reported the FIRST settled retry that
+            // failed -- and hardware says PFS can decline several of those and then mount fine, so
+            // the box appeared on consoles whose APA worked seconds later. The 1 s post-ATAD settle
+            // is a floor, not a guarantee: a drive that is still spinning up answers the ATA stack
+            // long before it will answer PS2FS.
+            //
+            // So require the failure to PERSIST across a few settled attempts. Each pass through
+            // here is a genuine retry (hddLoadSupportModules ran and did not latch), and the success
+            // arm above resets the count, so this only fires when PFS has really refused to come up.
+            if (++hddPfsSettledFailures >= HDD_PFS_REPORT_AFTER_FAILURES) {
+                hddLogPfsDiagState("emit-code-222", "settled-retries-exhausted");
+                setErrorMessageWithCodeAndDetail(_STR_HDD_PFS_UNAVAILABLE_ERROR, ERROR_HDD_MODULE_PFS_FAILURE,
+                                                 hddPfsDiagReasonName(hddPfsDiagReason));
+                hddSupportErrToasted = 1;
+            } else {
+                hddLogPfsDiagState("defer-code-222", "settled-retry-failed-below-threshold");
+            }
+        }
+    } else {
+        // Successful path also clears any prior deferred failure.
+        if (hddPfsDeferredFailed) {
+            hddClearPfsDiagFailure("update-found-support-already-ready");
+            hddSupportErrToasted = 0;
+            hddClearRecoveredErrors();
+        }
     }
 
     // Game discovery and the persistent config/art PFS home are separate lifetimes. HDL games
@@ -1024,26 +1268,63 @@ void hddDiscardOplHomeSelection(void)
     hddOplHomePending = -1;
 }
 
+// Why the last staging attempt ended the way it did. Five distinct conditions were all collapsed
+// into two user-visible messages ("not found" / "busy"), which is why this row resisted several
+// rounds of fixing: the message never named which one had fired. Surfaced in OPLDIAG builds only.
+static const char *hddOplHomeStageReasonText = "none";
+
+const char *hddOplHomeStageReason(void)
+{
+    return hddOplHomeStageReasonText;
+}
+
 int hddStageOplHomeSelection(int selection)
 {
     const char *partition;
 
-    if (selection != HDD_OPL_HOME_COMMON && selection != HDD_OPL_HOME_PLUS)
+    hddOplHomeStageReasonText = "entered";
+
+    if (selection != HDD_OPL_HOME_COMMON && selection != HDD_OPL_HOME_PLUS) {
+        hddOplHomeStageReasonText = "invalid-selection";
         return 0;
+    }
 
     // Use only the already-resident ATA stack. The selector is a short-lived proof, not an owner
     // of a module reference; hddLoadModulesReady() would retain one on every stage/save cycle.
     // Do not call hddLoadSupportModules here: its normal data-home recovery may mount pfs0: and
     // create OPL folders, neither of which belongs to a source selector proof.
-    if (!hddModulesAreLoaded())
-        return 0;
-    if (!hddLoadCoreSupportModules())
-        return 0;
+    // "COULD NOT CHECK" IS NOT "DOES NOT EXIST". These two arms used to return 0, the same value the
+    // failed mount below returns, and the caller renders 0 as "+OPL partition not found." -- so a
+    // user with a perfectly good +OPL was told it was missing whenever the ATA stack or PS2FS was
+    // not up yet. That is the SAME condition behind the deferred Code 222, which is why the two get
+    // reported together. -1 is the caller's existing "cannot answer right now" state.
+    // BRING THE STACK UP RATHER THAN REFUSING. This used to require the ATA modules to already be
+    // resident, on the reasoning that a selector should not own a module reference. But nothing
+    // guarantees they are resident when the user opens Settings, and when they are not, the check
+    // can never pass -- so the row reported "not found" (before) or "busy" (after that was
+    // corrected) on every single attempt, with no sequence of user actions able to fix it. A
+    // setting that cannot be changed is a worse outcome than an extra hddModulesLoadCount bump.
+    //
+    // Affordable here specifically: this runs on the io worker behind guiHandleDeferedIO's spinner
+    // with a 15 s budget, which is exactly the machinery for a load that may take a second.
+    // hddLoadSupportModules() is still deliberately NOT called -- its data-home recovery mounts
+    // pfs0: and creates OPL folders, and neither belongs to a source-selector proof.
+    if (!hddModulesAreLoaded() && !hddLoadModulesReady()) {
+        hddOplHomeStageReasonText = "ata-stack-unavailable";
+        return -1; // cannot answer, not "absent"
+    }
+    if (!hddLoadCoreSupportModules()) {
+        hddOplHomeStageReasonText = "pfs-support-unavailable";
+        return -1;
+    }
 
     partition = selection == HDD_OPL_HOME_PLUS ? "hdd0:+OPL" : "hdd0:__common";
-    if (!hddPartitionMountableAt("pfs1:", partition, FIO_MT_RDONLY))
-        return 0;
+    if (!hddPartitionMountableAt("pfs1:", partition, FIO_MT_RDONLY)) {
+        hddOplHomeStageReasonText = "partition-mount-refused";
+        return 0; // genuinely absent: the stack was up and the mount still refused
+    }
 
+    hddOplHomeStageReasonText = "ok";
     hddOplHomePending = selection;
     return 1;
 }
@@ -1977,7 +2258,18 @@ static char *hddGetPrefix(item_list_t *itemList)
     return gHDDPrefix;
 }
 
+int hddGetArtArchivePath(item_list_t *itemList, char *out, int outSize)
+{
+    (void)itemList;
+    if (out == NULL || outSize <= 0)
+        return -1;
+    if (gHDDPrefix == NULL)
+        return -1;
+    int n = snprintf(out, outSize, "%sART/art.tar", gHDDPrefix);
+    return (n > 0 && n < outSize) ? 1 : -1;
+}
+
 static item_list_t hddGameList = {
     HDD_MODE, 0, 0, MODE_FLAG_COMPAT_DMA, MENU_MIN_INACTIVE_FRAMES, HDD_MODE_UPDATE_DELAY, NULL, NULL, &hddGetTextId, &hddGetPrefix, &hddInit, &hddNeedsUpdate, &hddUpdateGameList,
     &hddGetGameCount, &hddGetGame, &hddGetGameName, &hddGetGameNameLength, &hddGetGameStartup, &hddDeleteGame, &hddRenameGame,
-    &hddLaunchGame, &hddGetConfig, &hddGetImage, &hddCleanUp, &hddShutdown, &hddCheckVMC, &hddGetIconId, &hddLaunchVcd};
+    &hddLaunchGame, &hddGetConfig, &hddGetImage, &hddCleanUp, &hddShutdown, &hddCheckVMC, &hddGetIconId, &hddLaunchVcd, 0, &hddGetArtArchivePath};

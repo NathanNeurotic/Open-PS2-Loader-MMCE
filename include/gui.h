@@ -209,6 +209,9 @@ void guiRenderGreetingScreen(void);
 void guiSetBootStatus(const char *status);
 // Boot-step localizer for deferred IO-thread steps; label must be a static/_l() string.
 void guiSetBootStatusSticky(const char *label);
+// Diagnostic boot-step setter for dynamic text. Copies into an internal double buffer before
+// publishing, so an IO-thread caller may safely pass a stack-formatted message.
+void guiSetBootStatusStickyCopy(const char *label);
 
 void guiWarning(const char *text, int count);
 

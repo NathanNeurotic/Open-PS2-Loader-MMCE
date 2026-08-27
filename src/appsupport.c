@@ -246,7 +246,9 @@ static void appDedupList(void)
 
 // #253 diagnostics: write every entry's resolved identity to <config home>/apps-dump.txt so a
 // reporter's file answers "which two prefixes did this app come in through" without a serial
-// cable. Called only with debug enabled (gEnableDebug); small text file, rewritten per rebuild.
+// cable. DIAGNOSTIC BUILDS ONLY (OPLDIAG) -- it writes a file into the config home, which is a
+// device root, and no display setting should be able to cause that.
+#ifdef __OPLDIAG
 static void appDumpDiscovery(void)
 {
     char path[300];
@@ -272,6 +274,7 @@ static void appDumpDiscovery(void)
     else
         LOG("APPSUPPORT discovery dump write FAILED on close: %s\n", path);
 }
+#endif
 
 
 static const char *appBuildStartupPath(const char *path, const char *boot)
@@ -644,8 +647,13 @@ static int appUpdateItemList(item_list_t *itemList)
     // reporter's file answers "which two prefixes did this app come in through" without a
     // serial cable. Tiny text file at the config home, rewritten each rebuild -- including
     // the zero-app rebuild, or a stale dump would outlive the truth (CodeRabbit #262).
-    if (gEnableDebug)
-        appDumpDiscovery();
+    // Diagnostic builds ONLY. This used to key off gEnableDebug, which is the user-facing debug
+    // COLOURS toggle -- so turning that on silently started writing apps-dump.txt into the config
+    // home (a device root) on every list rebuild. A display setting must not create files on the
+    // user's card; OPLDIAG is the axis that exists for diagnostics now.
+#ifdef __OPLDIAG
+    appDumpDiscovery();
+#endif
 
     if (appBuildArtLookup() < 0)
         LOG("APPSUPPORT unable to allocate art lookup table.\n");

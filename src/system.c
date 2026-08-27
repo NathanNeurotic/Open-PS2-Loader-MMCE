@@ -1359,9 +1359,30 @@ void sysLaunchNeutrino(const char *driver, const char *path, const char *startup
         snprintf(filePath, sizeof(filePath), "-dvd=%s%s", bsdfsDvdPrefix[fsOverride], path);
         if (argc < argvMax)
             argv[argc++] = filePath;
+
+        /* QUICKBOOT IS THE SECOND HALF OF THE KEEP-IOP HANDOFF, and without it the first half is
+           self-defeating on USB. elfldr deliberately does NOT reset the IOP, so Neutrino inherits
+           OPL's live iomanX/fileXio/bdm/bdmfs_fatfs and its mounts -- that is the entire point. But
+           Neutrino's DEFAULT boot then performs its own IOP reset, which destroys exactly what we
+           just preserved, leaving it to re-initialise USB itself before it can reach the ISO.
+
+           Symptom when only the first half ships: the handoff completes (no OSDSYS -- the loader
+           did its job) and then the screen stays black, because Neutrino reset away the stack the
+           game path depends on. -qb keeps the inherited environment and skips that reset.
+
+           USB ONLY, deliberately. NHDDL uses quickboot for every backend except HDL, but the other
+           backends here have not shown this failure and each one reaches its media differently, so
+           they stay on the normal boot path until there is a reason to move them. A user-typed -qb
+           in either the global or per-game args wins -- do not emit a second copy.
+
+           Emitted ABOVE coreArgc so the pool-fit drop loop can never shed it: a dropped -qb would
+           silently reinstate the reset and reproduce the black screen with no way to tell why. */
+        if (!strcmp(deviceName, "usb") && argc < argvMax &&
+            !neutrinoArgHasActiveFlag(gNeutrinoArgs, "-qb") && !neutrinoArgHasActiveFlag(extraArgs, "-qb"))
+            argv[argc++] = "-qb";
     }
 
-    // Everything up to and including -dvd is the boot-critical core: the pool-fit drop loop below
+    // Everything up to and including -dvd/-qb is the boot-critical core: the pool-fit drop loop below
     // must never shed these. A fixed floor of 3 silently stopped covering -dvd once the optional
     // -bsdfs slots in front of it (argv[3]) -- record the real core count instead.
     const int coreArgc = argc;
