@@ -1,6 +1,10 @@
 #ifndef __RENDERMAN_H
 #define __RENDERMAN_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /*
  * Rendering using renderman
  *
@@ -150,5 +154,9 @@ int rmUnScaleY(int y);
 
 // Returns H-sync frequency in KHz
 unsigned char rmGetHsync(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

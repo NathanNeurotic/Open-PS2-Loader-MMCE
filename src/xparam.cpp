@@ -13,7 +13,8 @@ char params_DCACHE_OFF[] = {'0', 'x', '1', '0', 0, '0', 0};
 char params_CPU_DELAY[] = {'0', 'x', '6', 0, '0', 'x', '7', '8', '0', 0};
 
 
-int CheckSpecialDiscXParamTitle(const char *title)
+// Not declared in xparam.h; extern "C" here keeps the (TU-local) globals unmangled.
+extern "C" int CheckSpecialDiscXParamTitle(const char *title)
 {
     /*
     See if we are dealing with any of the special titles so far.
@@ -51,7 +52,7 @@ int CheckSpecialDiscXParamTitle(const char *title)
 }
 
 
-void ApplyExtraXParamTitle(const char *title, char *params)
+extern "C" void ApplyExtraXParamTitle(const char *title, char *params)
 {
     int result = 0;
 

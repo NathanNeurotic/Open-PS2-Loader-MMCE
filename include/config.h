@@ -1,6 +1,10 @@
 #ifndef __CONFIG_H
 #define __CONFIG_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // Enum for the different types of config files. Game-specific config files (<game ID>.cfg) will always have an ID of 0.
 enum CONFIG_INDEX {
     CONFIG_INDEX_OPL = 0,
@@ -265,5 +269,9 @@ void configRemoveVMCDisable(config_set_t *configSet, int slot);
 char *configGetDir(void);
 char *configGetLoadDir(void);
 void configPrepareNotifications(char *prefix);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

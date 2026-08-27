@@ -6,6 +6,9 @@
 #include "include/hdd.h"
 #include "include/ioman.h"
 #include "include/hddsupport.h"
+// modules/isofs stays guard-free: wrap the text-included module body and the EE-side
+// ziso_alloc/read_raw_data backends so every ziso_*/LZ4_* cross-TU symbol keeps C linkage.
+extern "C" {
 #include "../modules/isofs/zso.c"
 
 int probed_fd = 0;
@@ -87,3 +90,4 @@ void *ziso_alloc(u32 size)
 {
     return malloc(size);
 }
+} // extern "C"

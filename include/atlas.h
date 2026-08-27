@@ -1,6 +1,10 @@
 #ifndef __ATLAS_H
 #define __ATLAS_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 struct atlas_allocation_t
 {
     int x, y;
@@ -29,5 +33,9 @@ void atlasFree(atlas_t *atlas);
  */
 struct atlas_allocation_t *atlasPlace(atlas_t *atlas, size_t width,
                                       size_t height, const void *surface);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

@@ -2,7 +2,11 @@
 #include <kernel.h>
 #include <sifrpc.h>
 
+// modules/network/common/httpclient.h is shared with the IOP module and stays guard-free;
+// give its declarations C linkage from here instead.
+extern "C" {
 #include "httpclient.h"
+}
 #include "ioman.h"
 
 static SifRpcClientData_t SifRpcClient;

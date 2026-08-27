@@ -16,6 +16,10 @@
 #ifndef __PGGSM_H
 #define __PGGSM_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define GSM_VERSION "0.40"
 #define GSM_ARGS    1
 #include "../ee_core/include/coreconfig.h"
@@ -52,5 +56,9 @@ typedef struct predef_vmode_struct
 void InitGSMConfig(config_set_t *configSet);
 int GetGSMEnabled(void);
 void PrepareGSM(char *cmdline, struct GsmConfig_t *config);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

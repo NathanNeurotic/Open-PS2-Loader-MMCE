@@ -1,6 +1,10 @@
 #ifndef __IOMAN_H
 #define __IOMAN_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // Input output manager
 // asynchronous io handling thread with worker queue
 
@@ -78,6 +82,10 @@ int ioBlockOpsTimed(int block, int timeoutTicks);
 #else
 #define PREINIT_LOG(...)
 #define LOG(...)
+#endif
+
+#ifdef __cplusplus
+}
 #endif
 
 #endif

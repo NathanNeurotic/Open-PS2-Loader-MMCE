@@ -1,6 +1,10 @@
 #ifndef __FOLDERBROWSE_H
 #define __FOLDERBROWSE_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // Lazy per-device folder navigation for the game list (opt-in: gEnableFolderNav).
 //
 // A subdirectory found under <prefix>CD/ or <prefix>DVD/ is listed as a GAME_FORMAT_FOLDER row.
@@ -42,5 +46,9 @@ void folderReset(int mode);
 // One-shot: returns 1 once after a descend/ascend/reset, so NeedsUpdate can force the rescan even
 // when the device's own change-detection would otherwise short-circuit (mirrors vcdConsumeDirty).
 int folderConsumeDirty(int mode);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

@@ -1,6 +1,10 @@
 #ifndef __SYSTEM_H
 #define __SYSTEM_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "include/mcemu.h"
 
 #define SYS_LOAD_MC_MODULES   0x01
@@ -60,5 +64,9 @@ int sysExecElf(const char *path);
 int sysLoadModuleBuffer(void *buffer, int size, int argc, char *argv);
 int sysCheckMC(void);
 int sysCheckVMC(const char *prefix, const char *sep, char *name, int createSize, vmc_superblock_t *vmc_superblock);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

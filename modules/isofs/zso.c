@@ -26,9 +26,9 @@ void ziso_init(ZISO_header *header, u32 first_block)
     ziso_total_block = (total_bytes_p[0] >> 11) | ((total_bytes_p[1] & 0x7ff) << 21);
     // allocate memory
     if (ziso_tmp_buf == NULL) {
-        ziso_tmp_buf = ziso_alloc(2048 + sizeof(u32) * ZISO_IDX_MAX_ENTRIES + 64);
+        ziso_tmp_buf = (u8 *)ziso_alloc(2048 + sizeof(u32) * ZISO_IDX_MAX_ENTRIES + 64);
         if ((u32)ziso_tmp_buf & 63) // align 64
-            ziso_tmp_buf = (void *)(((u32)ziso_tmp_buf & (~63)) + 64);
+            ziso_tmp_buf = (u8 *)(((u32)ziso_tmp_buf & (~63)) + 64);
         if (ziso_tmp_buf) {
             ziso_idx_cache = (u32 *)(ziso_tmp_buf + 2048);
         }

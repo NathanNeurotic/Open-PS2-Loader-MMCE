@@ -161,7 +161,7 @@ static void atlasCopyData(atlas_t *atlas, struct atlas_allocation_t *al, size_t 
     if (!ps)
         return;
 
-    const char *src = surface;
+    const char *src = (const char *)surface;
     char *data = (char *)atlas->surface.Mem;
 
     // advance the pointer to the atlas position start (first pixel)

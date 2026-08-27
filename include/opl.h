@@ -1,6 +1,10 @@
 #ifndef __OPL_H
 #define __OPL_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <tamtypes.h>
 #include <kernel.h>
 #include <sifrpc.h>
@@ -372,4 +376,9 @@ BLURT output char blurttext[128];
     delay(10);
 #define BLURT snprintf(blurttext, sizeof(blurttext), "%s(%d)", blurttext, __LINE__);
 */
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif

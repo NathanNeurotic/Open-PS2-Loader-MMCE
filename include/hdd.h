@@ -1,6 +1,10 @@
 #ifndef __HDD_H
 #define __HDD_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef struct
 {
     u32 start;  // Sector address
@@ -91,5 +95,9 @@ int hddGetPartitionInfo(const char *name, apa_sub_t *parts);
 
 // Array should be max entries.
 int hddGetFileBlockInfo(const char *name, const apa_sub_t *subs, pfs_blockinfo_t *blocks, int max);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

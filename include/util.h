@@ -1,6 +1,10 @@
 #ifndef __UTIL_H
 #define __UTIL_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 int getmcID(void);
 int getFileSize(int fd);
 void checkMCFolder(void);
@@ -66,5 +70,9 @@ int sysDeleteFolder(const char *folder);
 int CheckPS2Logo(int fd, u32 lba);
 
 void delay(int count);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

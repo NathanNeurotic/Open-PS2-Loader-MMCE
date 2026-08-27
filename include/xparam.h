@@ -30,5 +30,13 @@
 
 #define GM_IF ((vu32 *)0x1F801450)
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 void ResetDeckardXParams();
 void ApplyDeckardXParam(const char *title);
+
+#ifdef __cplusplus
+}
+#endif

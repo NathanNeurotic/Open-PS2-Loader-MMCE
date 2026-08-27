@@ -1,6 +1,10 @@
 #ifndef __HDD_SUPPORT_H
 #define __HDD_SUPPORT_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "include/iosupport.h"
 #include "include/hdd.h"
 
@@ -147,5 +151,9 @@ const char *hddOplHomeStageReason(void);
 void hddLaunchGame(item_list_t *itemList, int id, config_set_t *configSet);
 int hddIsPresent();
 int hddGetArtArchivePath(item_list_t *itemList, char *out, int outSize);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

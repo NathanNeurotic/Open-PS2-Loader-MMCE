@@ -1,6 +1,10 @@
 #ifndef __ART_INDEX_H
 #define __ART_INDEX_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* An in-RAM listing of an art directory, so that "this cover does not exist" can be answered without
  * asking the device.
  *
@@ -55,5 +59,9 @@ void artIndexInvalidate(void);
 /* Debug HUD: directories currently held, and how many probes this has answered as "absent" without
  * touching the device. Either argument may be NULL. */
 void artIndexDebug(int *dirsHeld, unsigned int *absentAnswered, unsigned int *sweepsFailed);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

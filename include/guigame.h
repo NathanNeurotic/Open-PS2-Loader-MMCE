@@ -1,6 +1,10 @@
 #ifndef __GUIGAME_H
 #define __GUIGAME_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define SETTINGS_GLOBAL        0
 #define SETTINGS_PERGAME       1
 // Per-key GSM inheritance: a key PRESENT in the game's own config wins, a key ABSENT follows the
@@ -40,4 +44,8 @@ void guiGameTestSettings(int id, item_list_t *support, config_set_t *configSet);
 
 void guiGameRemoveSettings(config_set_t *configSet);
 void guiGameRemoveGlobalSettings(config_set_t *configGame);
+
+#ifdef __cplusplus
+}
+#endif
 #endif

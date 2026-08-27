@@ -17,7 +17,11 @@
 #include "include/system.h"
 #include "include/ioman.h"
 #include "include/renderman.h"
+// ee_core/include/coreconfig.h lives outside include/ and stays guard-free;
+// give g_ee_core_config C linkage from here instead.
+extern "C" {
 #include "../ee_core/include/coreconfig.h"
+}
 
 #include "include/pggsm.h"
 #include "include/guigame.h" // SETTINGS_* -- $GSMSource values shared with the GS settings page
