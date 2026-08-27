@@ -2544,15 +2544,28 @@ static int guiSettingsIsShellResult(int result)
 
 static int guiSettingsPageResult(int result)
 {
-    if (result == UIID_BTN_OK || guiSettingsIsShellResult(result))
+    // L1/R1 peer paging and an explicit Index request pass straight back to the shell loop.
+    if (guiSettingsIsShellResult(result)) {
+        guiSettingsSavePending = 1;
+        return result;
+    }
+
+    /* EVERY other way out of a page finishes at the Settings Index -- never at the main menu.
+       Only guiSettingsShowIndex leaves Settings, and only after offering to save.
+
+       The old test recognised the two generic button ids and nothing else, but pages carry their
+       OWN button ids: the Network page's confirm button is NETCFG_OK, not UIID_BTN_OK. That fell
+       through to 0, which guiShowSettings reads as "leave Settings entirely" -- so pressing OK on
+       the Network page dumped the user at the main start menu, skipping the save prompt, with
+       every edit still pending. Reconnect (NETCFG_RECONNECT) did the same.
+
+       Fixing the one id would have left the trap armed for the next page that adds a button, so
+       this fails safe instead: unless the page asked for a specific shell move, we stay inside.
+       Cancel is the only result that does not arm the save prompt. */
+    if (result != UIID_BTN_CANCEL)
         guiSettingsSavePending = 1;
 
-    if (guiSettingsIsShellResult(result))
-        return result;
-
-    // Both confirmation and cancel finish the current peer page at the Settings Index. Circle
-    // from the Index itself is handled by guiSettingsShowIndex and returns to the main menu.
-    return (result == UIID_BTN_OK || result == UIID_BTN_CANCEL) ? DIA_RESULT_INDEX : 0;
+    return DIA_RESULT_INDEX;
 }
 
 static void guiSettingsBeginDialog(struct UIItem *ui)
