@@ -3,6 +3,7 @@
 #include "include/lang.h"
 #include "include/gui.h"
 #include "include/supportbase.h"
+#include <time.h> // clock()/CLOCKS_PER_SEC -- the Code 222 grace window
 #include "include/hddsupport.h"
 #include "include/vcdsupport.h" // HDD VCD view: vcdScanDirRoot/vcdViewActive + vcd_entry_t
 #include "include/util.h"
@@ -47,8 +48,17 @@ static int hddRetryQueued = 0;
 // answers the ATA stack well before it will answer PS2FS, so a single refusal after the settle says
 // nothing -- hardware shows PFS declining a few of these and then mounting normally. Reset by
 // hddClearPfsDiagFailure() the moment the support stack latches.
-#define HDD_PFS_REPORT_AFTER_FAILURES 3
-static int hddPfsSettledFailures = 0;
+/* A COUNT WAS THE WRONG UNIT. Requiring 3 settled failures was the second attempt at this message
+   and it still fired on drives that mounted moments later -- because the retry cadence is not fixed,
+   so "3 retries" can elapse in well under the time a cold drive needs to answer PS2FS. Report on
+   TIME instead: the drive has had a real chance and still refuses. Same one variable, no extra
+   machinery, and the threshold now means what a reader assumes it means.
+
+   NOTE: this message is self-clearing (clearErrorMessageIf on recovery), which is the tell that it
+   describes a TRANSIENT. An error box a later success silently retracts is a notification wearing
+   the wrong clothes; whether it should be modal at all is a design call, not a tuning one. */
+#define HDD_PFS_REPORT_AFTER_MS 20000
+static clock_t hddPfsFirstSettledFailure = 0;
 
 typedef enum {
     HDD_PFS_DIAG_REASON_NONE = 0,
@@ -106,7 +116,7 @@ static void hddClearPfsDiagFailure(const char *why)
 {
     hddLogPfsDiagState("clear", why);
     hddPfsDeferredFailed = 0;
-    hddPfsSettledFailures = 0; // PFS came up: the retries that failed before it were spin-up, not fault
+    hddPfsFirstSettledFailure = 0; // PFS came up: the retries that failed before it were spin-up, not fault
     hddPfsDiagReason = HDD_PFS_DIAG_REASON_NONE;
     hddPfsDiagHddCheckResult = HDD_PFS_DIAG_NOT_RUN;
     hddPfsDiagPs2fsResult = HDD_PFS_DIAG_NOT_RUN;
@@ -1095,13 +1105,16 @@ static int hddUpdateGameList(item_list_t *itemList)
             // So require the failure to PERSIST across a few settled attempts. Each pass through
             // here is a genuine retry (hddLoadSupportModules ran and did not latch), and the success
             // arm above resets the count, so this only fires when PFS has really refused to come up.
-            if (++hddPfsSettledFailures >= HDD_PFS_REPORT_AFTER_FAILURES) {
+            if (hddPfsFirstSettledFailure == 0)
+                hddPfsFirstSettledFailure = clock();
+
+            if ((clock() - hddPfsFirstSettledFailure) >= (clock_t)HDD_PFS_REPORT_AFTER_MS * (CLOCKS_PER_SEC / 1000)) {
                 hddLogPfsDiagState("emit-code-222", "settled-retries-exhausted");
                 setErrorMessageWithCodeAndDetail(_STR_HDD_PFS_UNAVAILABLE_ERROR, ERROR_HDD_MODULE_PFS_FAILURE,
                                                  hddPfsDiagReasonName(hddPfsDiagReason));
                 hddSupportErrToasted = 1;
             } else {
-                hddLogPfsDiagState("defer-code-222", "settled-retry-failed-below-threshold");
+                hddLogPfsDiagState("defer-code-222", "settled-retry-failed-inside-grace");
             }
         }
     } else {
