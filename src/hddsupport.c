@@ -1244,14 +1244,19 @@ int hddStageOplHomeSelection(int selection)
     // of a module reference; hddLoadModulesReady() would retain one on every stage/save cycle.
     // Do not call hddLoadSupportModules here: its normal data-home recovery may mount pfs0: and
     // create OPL folders, neither of which belongs to a source selector proof.
+    // "COULD NOT CHECK" IS NOT "DOES NOT EXIST". These two arms used to return 0, the same value the
+    // failed mount below returns, and the caller renders 0 as "+OPL partition not found." -- so a
+    // user with a perfectly good +OPL was told it was missing whenever the ATA stack or PS2FS was
+    // not up yet. That is the SAME condition behind the deferred Code 222, which is why the two get
+    // reported together. -1 is the caller's existing "cannot answer right now" state.
     if (!hddModulesAreLoaded())
-        return 0;
+        return -1;
     if (!hddLoadCoreSupportModules())
-        return 0;
+        return -1;
 
     partition = selection == HDD_OPL_HOME_PLUS ? "hdd0:+OPL" : "hdd0:__common";
     if (!hddPartitionMountableAt("pfs1:", partition, FIO_MT_RDONLY))
-        return 0;
+        return 0; // genuinely absent: the stack was up and the mount still refused
 
     hddOplHomePending = selection;
     return 1;
