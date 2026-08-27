@@ -13,7 +13,10 @@ void sysInitDev9(void);
 void sysShutdownDev9(void);
 void sysReset(int modload_mask);
 void sysExecExit(void);
-int sysLaunchDisc(void); // boot the physical PS2 disc in the drive; <0 (stays in OPL) on failure
+// Boot the physical PS2 disc in the drive; <0 (stays in OPL) on failure. `progress` is called once
+// per poll while waiting on the drive -- pass guiRenderProbeFrame from the GUI thread so the menu
+// keeps drawing, or NULL to sleep instead. Bounded by SYS_DISC_DETECT_MS + SYS_DISC_REDETECT_MS.
+int sysLaunchDisc(void (*progress)(void));
 
 #define NEUTRINO_PATH     "mc0:NEUTRINO/neutrino.elf"
 #define NEUTRINO_ALT_PATH "mc1:NEUTRINO/neutrino.elf"

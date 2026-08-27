@@ -84,7 +84,6 @@ static void favGetFilePath(char *out, int outSize)
 // ---- explicit little-endian scalar IO (never raw-struct) ----------------------
 
 static int rdBytes(int fd, void *buf, int n) { return read(fd, buf, n) == n; }
-static int wrBytes(int fd, const void *buf, int n) { return write(fd, (void *)buf, n) == n; }
 
 static int rdU16(int fd, u16 *v)
 {
@@ -101,16 +100,6 @@ static int rdU32(int fd, u32 *v)
         return 0;
     *v = (u32)b[0] | ((u32)b[1] << 8) | ((u32)b[2] << 16) | ((u32)b[3] << 24);
     return 1;
-}
-static int wrU16(int fd, u16 v)
-{
-    u8 b[2] = {(u8)(v & 0xff), (u8)((v >> 8) & 0xff)};
-    return wrBytes(fd, b, 2);
-}
-static int wrU32(int fd, u32 v)
-{
-    u8 b[4] = {(u8)(v & 0xff), (u8)((v >> 8) & 0xff), (u8)((v >> 16) & 0xff), (u8)((v >> 24) & 0xff)};
-    return wrBytes(fd, b, 4);
 }
 
 // ---- raw on-disk record (pre-validation) --------------------------------------
@@ -279,33 +268,90 @@ static fav_raw_t *favReadFile(int *outCount)
     return recs;
 }
 
-// Write a raw-record array back out (explicit scalar fields; pointers never persisted).
+// Little-endian scalar appenders for the in-memory image favWriteFile builds.
+static void bufU16(u8 *b, int *o, u16 v)
+{
+    b[(*o)++] = (u8)(v & 0xff);
+    b[(*o)++] = (u8)((v >> 8) & 0xff);
+}
+
+static void bufU32(u8 *b, int *o, u32 v)
+{
+    b[(*o)++] = (u8)(v & 0xff);
+    b[(*o)++] = (u8)((v >> 8) & 0xff);
+    b[(*o)++] = (u8)((v >> 16) & 0xff);
+    b[(*o)++] = (u8)((v >> 24) & 0xff);
+}
+
+/* Write a raw-record array back out (explicit scalar fields; pointers never persisted).
+
+   SERIALISE FIRST, THEN WRITE ONCE. This used to emit the file field by field: three writes for
+   the header and SEVEN per record. Each one is an EE->IOP RPC round trip, so a library of 40
+   favourites cost 283 of them -- and this runs on the GUI thread, straight off the R3 press in
+   itemExecFav, which is why adding a favourite visibly stalled the menu. The byte count was never
+   the problem; the syscall count was.
+
+   The image is sized from the actual text lengths rather than FAV_MAX_ITEMS * FAV_TEXT_MAX, so a
+   normal library allocates a few KB instead of 140. */
 static int favWriteFile(fav_raw_t *recs, int count)
 {
     char path[256];
-    favGetFilePath(path, sizeof(path));
+    int i, off = 0, size = 8; // header: magic(4) + version(2) + count(2)
+    int written, fd;
+    u8 *img;
 
-    int fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0666);
-    if (fd < 0) {
-        LOG("FAV write open failed: %s\n", path);
-        return 0;
-    }
     if (count > FAV_MAX_ITEMS)
         count = FAV_MAX_ITEMS;
 
-    int ok = wrU32(fd, FAV_MAGIC) && wrU16(fd, FAV_VERSION) && wrU16(fd, (u16)count);
-    for (int i = 0; ok && i < count; i++) {
+    for (i = 0; i < count; i++) {
         int tlen = (int)strlen(recs[i].text) + 1;
         if (tlen > FAV_TEXT_MAX)
             tlen = FAV_TEXT_MAX;
-        u8 isVcd = recs[i].isVcd ? 1 : 0; // one byte between text_id and text_len (OFAV v2 layout)
-        ok = wrU16(fd, (u16)recs[i].mode) && wrU32(fd, (u32)recs[i].id) && wrU32(fd, (u32)recs[i].icon_id) &&
-             wrU32(fd, (u32)recs[i].text_id) && wrBytes(fd, &isVcd, 1) && wrU16(fd, (u16)tlen) && wrBytes(fd, recs[i].text, tlen);
+        size += 17 + tlen; // mode(2) id(4) icon(4) text_id(4) isVcd(1) text_len(2) + text
     }
+
+    img = (u8 *)malloc(size);
+    if (img == NULL) {
+        LOG("FAV write: cannot allocate %d byte image\n", size);
+        return 0;
+    }
+
+    bufU32(img, &off, FAV_MAGIC);
+    bufU16(img, &off, FAV_VERSION);
+    bufU16(img, &off, (u16)count);
+    for (i = 0; i < count; i++) {
+        int tlen = (int)strlen(recs[i].text) + 1;
+        if (tlen > FAV_TEXT_MAX)
+            tlen = FAV_TEXT_MAX;
+        bufU16(img, &off, (u16)recs[i].mode);
+        bufU32(img, &off, (u32)recs[i].id);
+        bufU32(img, &off, (u32)recs[i].icon_id);
+        bufU32(img, &off, (u32)recs[i].text_id);
+        img[off++] = recs[i].isVcd ? 1 : 0; // one byte between text_id and text_len (OFAV v2 layout)
+        bufU16(img, &off, (u16)tlen);
+        memcpy(img + off, recs[i].text, tlen - 1);
+        img[off + tlen - 1] = 0; // tlen counts the NUL, and a name capped at FAV_TEXT_MAX has none
+        off += tlen;
+    }
+
+    // Open as late as possible. O_TRUNC empties the file the instant it succeeds, so anything that
+    // can fail belongs above it -- otherwise a failure here trades a good list for an empty one.
+    favGetFilePath(path, sizeof(path));
+    fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+    if (fd < 0) {
+        LOG("FAV write open failed: %s\n", path);
+        free(img);
+        return 0;
+    }
+    written = write(fd, img, off);
     close(fd);
-    if (!ok)
-        LOG("FAV write incomplete\n");
-    return ok;
+    free(img);
+
+    if (written != off) {
+        LOG("FAV write incomplete: %d of %d bytes\n", written, off);
+        return 0;
+    }
+    return 1;
 }
 
 // ---- in-memory array lifecycle ------------------------------------------------

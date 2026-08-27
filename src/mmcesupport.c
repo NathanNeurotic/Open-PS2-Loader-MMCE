@@ -71,6 +71,13 @@ static unsigned char mmceFolderRetries = 0;
 // the loop and declares the card present.
 #define MMCE_PRESENCE_PROBE_MAX 3
 #define MMCE_PRESENCE_RETRY_US  (200 * 1000)
+// 1 once an Auto probe has ever resolved a slot. The debounce above protects the CACHE-HIT probe,
+// but the full re-detect it falls through to had no such protection: mmceDetectSlot() fires one
+// devctl per slot and gives up, so a single contended pass left mmcePrefix empty and
+// mmceUpdateGameList freed BOTH game lists -- the same "card pulled" misread the debounce exists to
+// stop, one step further down. Retry the detect too, but ONLY for a card we have already seen: a
+// console with genuinely no MMCE must not pay ~1.6 s of devctl timeouts on every 2 s refresh.
+static unsigned char mmceEverResolved = 0;
 
 // Card-switch wait: poll the MMCE busy bit every 500 ms for up to ~7.5 s, matching mmceman's own
 // switch handshake. On a CROSS-DEVICE launch (a USB/HDD/SMB game whose per-game card lives on the
@@ -362,8 +369,22 @@ void mmceSetPrefix(void)
                 snprintf(mmcePrefix, sizeof(mmcePrefix), "mmce%d:/%s", (mmceResolvedDevice == 2) ? 0 : 1, gMMCEPrefix);
             }
         }
-        if (mmceResolvedDevice <= 0)
-            mmceResolvedDevice = mmceDetectSlot();
+        if (mmceResolvedDevice <= 0) {
+            /* A USB hotplug is the worst moment to ask: re-enumeration floods the shared io worker
+               while the pad keeps polling SIO2, and that is exactly when Kamo's MMCE tab emptied.
+               Give the re-detect the same inline debounce as the presence probe above -- same gap,
+               same reasoning -- so a bus-quiet window between attempts can absorb the transient. */
+            int attempt, attempts = mmceEverResolved ? MMCE_PRESENCE_PROBE_MAX : 1;
+            for (attempt = 0; attempt < attempts; attempt++) {
+                mmceResolvedDevice = mmceDetectSlot();
+                if (mmceResolvedDevice > 0)
+                    break;
+                if (attempt + 1 < attempts)
+                    DelayThread(MMCE_PRESENCE_RETRY_US);
+            }
+        }
+        if (mmceResolvedDevice > 0)
+            mmceEverResolved = 1;
     }
 
     mmceRefreshArtRoots();

@@ -230,17 +230,33 @@ static void bdmBuildVcdPrefix(char *target, int targetLength, int massSlot)
    Returns >= 0 on success; driverName is always left NUL-terminated. */
 int bdmReadDriverName(int dir, char *driverName, int driverNameLength)
 {
-    int result;
-
     if (driverName == NULL || driverNameLength <= 0)
         return -1;
 
     driverName[0] = '\0';
 
-    result = fileXioIoctl(dir, USBMASS_IOCTL_GET_DRIVERNAME, "");
-    if (result < 0)
-        return result; // no mounted block device -- asking with a buffer here would fault the IOP
-
+    /* NO PRECONDITION PROBE. This is a retraction, and the reasoning matters more than the diff.
+     *
+     * rebuild-136 put a probe here -- fileXioIoctl(dir, USBMASS_IOCTL_GET_DRIVERNAME, "") -- and
+     * abandoned the read when it failed, on the theory that a slot with no mounted block device
+     * would fault the IOP once asked WITH a return buffer.
+     *
+     * That probe is sent to the driver's `ioctl` handler. USBMASS_IOCTL_GET_DRIVERNAME is an
+     * `ioctl2` command, and iomanX_iop_device_ops_t carries the two as SEPARATE function pointers
+     * -- so the probe never reached the handler the theory was about. Whether any given filesystem
+     * driver's plain ioctl handler even recognises 0x0003 was never checked. If it does not, the
+     * probe fails on EVERY device, always, and this function returns before reading anything.
+     *
+     * That failure is not quiet. bdmReadDeviceIdentity gates GET_DEVICE_NUMBER behind this result,
+     * so a device that is present and perfectly mountable ends up with an empty driver token AND a
+     * -1 device index -- the precise pair that dead-ends art and launch, and a strong candidate for
+     * a tab that lists nothing at all.
+     *
+     * So the guard goes. The direct call below is what OPL shipped at all three former call sites
+     * for years, on hardware, and a hardening built on an unverified premise does not get to
+     * outrank that. Reinstating protection here needs the mounted-device question answered through
+     * an entry point known to work -- GET_DEVICE_NUMBER via ioctl2 into a bounded int -- and needs
+     * the ps2sdk handler read rather than assumed. Not guessed at twice. */
     return fileXioIoctl2(dir, USBMASS_IOCTL_GET_DRIVERNAME, NULL, 0, driverName, driverNameLength - 1);
 }
 
@@ -974,11 +990,12 @@ static void bdmLoadBlockDeviceModules(void)
     // a transport enabled from Settings needed a "double tap" before its tab appeared.
     int modsWere = iUSBModLoaded + iLinkModLoaded + mx4sioModLoaded + hddModLoaded + udpbdModLoaded;
 
-    // USB retry without gEnableUSB gate: base residency is unconditional, but a
-    // synchronous bdmLoadCoreModules failure must still be retried via the
-    // generation/worker path. Success will bump modsNow and refresh discovery.
-    if (!iUSBModLoaded)
+    // Retry a synchronous bdmLoadCoreModules failure via the generation/worker path. Gated on the
+    // setting for the same reason as the core load above: an off source must not become resident.
+    if (gEnableUSB && !iUSBModLoaded) {
+        guiSetBootStatusSticky(_l(_STR_BOOT_LOADING_USB));
         bdmLoadUsbMassBd();
+    }
 
     if (gEnableILK && !iLinkModLoaded) {
         // Load iLink Block Device drivers
@@ -1151,7 +1168,10 @@ static void bdmLoadBlockDeviceModules(void)
 // Bring up only the common BDM infrastructure. Literal massN: boot resolution uses this path so an
 // explicit filesystem slot never incidentally queues every transport enabled by the last settings
 // load; it determines its backing driver from that slot's own devctl/ioctl identity instead.
-static void bdmLoadCoreModules(void)
+// forceUsb: load the USB block driver even when the USB games source is off. Only the literal
+// massN: boot resolver passes 1 -- it must be able to identify whatever slot the user actually
+// booted from, and that is independent of which sources they browse.
+static void bdmLoadCoreModules(int forceUsb)
 {
     LOG("BDMSUPPORT LoadModules\n");
 
@@ -1178,9 +1198,19 @@ static void bdmLoadCoreModules(void)
     sysLoadModuleBuffer(&bdmevent_irx, size_bdmevent_irx, 0, NULL);
     SifAddCmdHandler(BDMEVENT_EE_EVENT_CMD, &bdmEventHandler, NULL);
 
-    // USB block device is base BDM infrastructure (upstream ps2homebrew and Grimdoomer load it
-    // synchronously, not as an optional transport) -- but it goes AFTER the handler, not before.
-    bdmLoadUsbMassBd();
+    /* USB goes AFTER the handler, per the ordering note above -- but it still HONOURS THE SETTING.
+     *
+     * rebuild-136 made this residency unconditional on the reasoning that upstream and Grimdoomer
+     * load it synchronously rather than as an optional transport. That dropped the gEnableUSB gate
+     * that had been here, so a console with the USB source switched OFF still paid for usbd plus
+     * USBMASS_BD -- resident IOP memory taken from a budget that iLink, MX4SIO, ATAD, the network
+     * stack and the cdvdman replacement all draw on. On a tight configuration the cost of that does
+     * not land on USB; it lands on whichever module allocates next and fails, which presents as a
+     * transport with no games rather than as anything pointing back here.
+     *
+     * Respecting the setting is also just correct: a user who turned USB off did not ask for it. */
+    if (forceUsb || gEnableUSB)
+        bdmLoadUsbMassBd();
 
 #ifdef __DEBUG
     bdmDiagRequestIopSnapshot("handler-ready", -1, -1);
@@ -1191,7 +1221,7 @@ static void bdmLoadCoreModules(void)
 
 void bdmLoadModules(void)
 {
-    bdmLoadCoreModules();
+    bdmLoadCoreModules(0); // normal enumeration: USB residency follows gEnableUSB
 
     // Normal enumeration retains the established asynchronous optional-transport load.
     ioPutRequest(IO_CUSTOM_SIMPLEACTION, &bdmLoadBlockDeviceModules);
@@ -2880,7 +2910,7 @@ static int bdmResolveLiteralMassSlot(int slot, int *ioBdmType,
     if (knownType == BDM_TYPE_UDPBD)
         return -1;
 
-    bdmLoadCoreModules();
+    bdmLoadCoreModules(1); // literal boot slot: identify it whatever the USB source setting says
 
     // A save-time retry may already know the exact backing family. Load only that family and wait
     // only for the literal slot; an identity change never redirects settings to another massN:.
