@@ -95,7 +95,10 @@ CODE_ANCHOR = $(shell git log -1 --format=%H -- . ':(exclude).github' ':(exclude
 REVISION = $(shell expr $(shell git rev-list --count HEAD) + 2)
 
 GIT_HASH = $(shell git rev-parse --short=7 $(if $(CODE_ANCHOR),$(CODE_ANCHOR),HEAD) 2>/dev/null)
-ifeq ($(shell git diff --quiet; echo $$?),1)
+# Truthful provenance: unstaged, staged, AND untracked files all mark a build dirty.
+# (Was unstaged-only `git diff --quiet`, which let staged or untracked conversion files
+# ship under a clean-looking version string.)
+ifneq ($(shell git status --porcelain 2>/dev/null),)
   DIRTY = -dirty
 endif
 ifneq ($(shell test -d .git; echo $$?),0)
@@ -297,11 +300,19 @@ EE_CFLAGS += -Wno-format-truncation -Wno-stringop-truncation
 EE_CFLAGS += -MMD -MP
 EE_OBJS += $(FRONTEND_OBJS) $(GFX_OBJS) $(AUDIO_OBJS) $(MISC_OBJS) $(EECORE_OBJS) $(IOP_OBJS)
 EE_OBJS := $(EE_OBJS:%=$(EE_OBJS_DIR)%)
-EE_DEPS = $($(filter %.o,$(EE_OBJS)):%.o=%.d)
+EE_DEPS = $(patsubst %.o,%.d,$(filter %.o,$(EE_OBJS)))
 
 # To help linking getting rid off unused functions and data
 EE_CFLAGS += -fdata-sections -ffunction-sections
 EE_LDFLAGS += -fdata-sections -ffunction-sections -Wl,--gc-sections
+
+# C++ parity (owner-approved minimum Makefile exception for the C-to-C++ migration):
+# converted src/ translation units compile as strict GNU++17 with EXACTLY the OPL flag
+# set accumulated above. Snapshot EE_CFLAGS now -- Makefile.eeglobal (included at the
+# bottom of this file) folds pre-include values into its SDK default flags identically
+# for EE_CFLAGS (line 38) and EE_CXXFLAGS (line 41), so the final C and C++ flag sets
+# differ only by the language-only flags appended here. No -fpermissive, ever.
+EE_CXXFLAGS := $(EE_CFLAGS) -std=gnu++17 -fno-exceptions -fno-rtti -fno-threadsafe-statics -fno-use-cxa-atexit
 
 .SILENT:
 
@@ -953,6 +964,12 @@ $(EE_ASM_DIR)deci2_img.c: modules/debug/deci2.img | $(EE_ASM_DIR)
 
 $(EE_OBJS_DIR)%.o: $(EE_SRC_DIR)%.c | $(EE_OBJS_DIR)
 	$(EE_CC) $(EE_CFLAGS) $(EE_INCS) -c $< -o $@
+
+# Converted C++ translation units (physical .cpp rename). Same flags as C plus the
+# strict/freestanding C++ set snapshotted into EE_CXXFLAGS above. Generated asm/*.c
+# below stays on the C rule -- generated sources are out of conversion scope.
+$(EE_OBJS_DIR)%.o: $(EE_SRC_DIR)%.cpp | $(EE_OBJS_DIR)
+	$(EE_CXX) $(EE_CXXFLAGS) $(EE_INCS) -c $< -o $@
 
 $(EE_OBJS_DIR)%.o: $(EE_ASM_DIR)%.c | $(EE_OBJS_DIR)
 	$(EE_CC) $(EE_CFLAGS) $(EE_INCS) -c $< -o $@
