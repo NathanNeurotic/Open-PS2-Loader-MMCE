@@ -158,7 +158,7 @@ exit:
 static SifCmdHandlerData_t OplSifCmdbuffer[OPL_SIF_CMD_BUFF_SIZE];
 static unsigned char dev9Initialized = 0, dev9Loaded = 0, dev9InitCount = 0;
 
-void sysInitDev9(void)
+int sysInitDev9(void)
 {
     int ret;
 
@@ -171,13 +171,14 @@ void sysInitDev9(void)
             // the only load attempt and report a missing NIC even when the transient cause had gone.
             dev9Loaded = 0;
             LOG("[DEV9] load failed (%d); leaving initialization retryable\n", ret);
-            return;
+            return ret;
         }
         dev9Loaded = 1; // DEV9.IRX must have successfully loaded and returned RESIDENT END.
         dev9Initialized = 1;
     }
 
     dev9InitCount++;
+    return 0;
 }
 
 void sysShutdownDev9(void)

@@ -739,7 +739,9 @@ static void initAllSupport(int force_reinit)
     guiSetBootStatus(_l(_STR_BOOT_SCANNING_NET));
     if (gBootInProgress)
         guiRenderGreetingScreen();
-    initSupport(ethGetObject(0), ETH_MODE, force_reinit || (gNetworkStartup >= ERROR_ETH_SMB_CONN));
+    // A module-level failure (code 200) is retryable too. The ETH loader clears its failed latch,
+    // so the next support pass must re-enter itemInit and retry the dependency chain.
+    initSupport(ethGetObject(0), ETH_MODE, force_reinit || (gNetworkStartup >= ERROR_ETH_MODULE_NETIF_FAILURE));
     // UDPFS filesystem shares the single NIC with SMB/UDPBD; its start-mode gate (initSupport) is live
     // only when gNetworkProtocol == NET_PROTO_UDPFS, so exactly one network tab is ever enabled.
     initSupport(udpfsGetObject(0), UDPFS_MODE, force_reinit);

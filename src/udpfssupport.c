@@ -68,7 +68,10 @@ static void udpfsLoadModules(void)
 
     // dev9 is refcounted (shared with ATA-HDD). The ministack has no DHCP client, so it needs the PS2's
     // static IP as an "ip=A.B.C.D" arg -- built exactly as bdmsupport does for the udpfs_bd chain.
-    sysInitDev9();
+    if (sysInitDev9() < 0) {
+        LOG("UDPFSSUPPORT: DEV9 initialization failed; module chain remains retryable\n");
+        return;
+    }
     snprintf(ipArg, sizeof(ipArg), "ip=%d.%d.%d.%d", ps2_ip[0], ps2_ip[1], ps2_ip[2], ps2_ip[3]);
 
     LOG("[UDPFS_SMAP]:\n");

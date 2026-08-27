@@ -780,7 +780,7 @@ int vcdRenameFile(const char *devPrefix, const char *oldName, const char *newNam
 // exactly like the .VCD (suffixless "<name>.png"), sitting NEXT TO the game in the same POPS/ folder the
 // VCD scan reads -- so a cover whose name matches the VCD minus the extension still shows (FifthFox, HW
 // 2026-07-16; the tier removed by 86da2023's #120 single-lookup simplification). `scanPrefix` MUST be the
-// SAME prefix the device passes to vcdFillGameList (the device root for BDM, mmcePrefix for MMCE, etc.),
+// SAME prefix the device passes to vcdFillGameList (the device root for BDM and MMCE, etc.),
 // so the cover is looked up beside the .VCD. COVER/ICON ONLY -- background/logo/screenshot must never
 // fall back to the single suffixless file or each would render the cover instead. Returns
 // texDiscoverLoad's result (>= 0 hit, negative miss). No miss-memo: kept deliberately simple -- callers

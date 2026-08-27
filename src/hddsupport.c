@@ -402,6 +402,7 @@ static void hddFindOPLPartition(void)
 
 int hddLoadModules(void)
 {
+    int dev9Ready = 0;
     int retLoadModule = HDD_PFS_DIAG_NOT_RUN;
     int retBdmModule = HDD_PFS_DIAG_NOT_RUN;
     int retXhddModule = HDD_PFS_DIAG_NOT_RUN;
@@ -419,15 +420,22 @@ int hddLoadModules(void)
 
         // DEV9 must be loaded, as HDD.IRX depends on it. Even if not required by the I/F (i.e. HDPro)
         hddDiagBootStageBegin("HDD:DEV9");
-        sysInitDev9();
+        dev9Ready = sysInitDev9() == 0;
         hddDiagBootStageEndVoid("HDD:DEV9");
+
+        if (!dev9Ready) {
+            LOG("HDD: DEV9 initialization failed; ATA setup remains retryable\n");
+            retLoadModule = -1;
+        }
 
         // try to detect HD Pro Kit (not the connected HDD),
         // if detected it loads the specific ATAD module
-        hddDiagBootStageBegin("HDD:HDPRO-PROBE");
-        hddHDProKitDetected = hddCheckHDProKit();
-        hddDiagBootStageEnd("HDD:HDPRO-PROBE", hddHDProKitDetected);
-        if (hddHDProKitDetected) {
+        if (dev9Ready) {
+            hddDiagBootStageBegin("HDD:HDPRO-PROBE");
+            hddHDProKitDetected = hddCheckHDProKit();
+            hddDiagBootStageEnd("HDD:HDPRO-PROBE", hddHDProKitDetected);
+        }
+        if (dev9Ready && hddHDProKitDetected) {
             LOG("[ATAD_HDPRO]:\n");
             hddDiagBootStageBegin("HDD:ATAD-HDPRO");
             retLoadModule = sysLoadModuleBuffer(&hdpro_atad_irx, size_hdpro_atad_irx, 0, NULL);
@@ -436,7 +444,7 @@ int hddLoadModules(void)
             hddDiagBootStageBegin("HDD:XHDD-HDPRO");
             retXhddModule = sysLoadModuleBuffer(&xhdd_irx, size_xhdd_irx, 6, "-hdpro");
             hddDiagBootStageEnd("HDD:XHDD-HDPRO", retXhddModule);
-        } else {
+        } else if (dev9Ready) {
             LOG("[BDM]:\n");
             hddDiagBootStageBegin("HDD:BDM");
             retBdmModule = sysLoadModuleBuffer(&bdm_irx, size_bdm_irx, 0, NULL);
@@ -469,7 +477,8 @@ int hddLoadModules(void)
             // and shared with ETH/UDPBD, so an inflated count means a later teardown can never power
             // dev9 down. The UDPBD arm in bdmsupport.c already pairs its init/shutdown this way; this
             // arm did not, and rebuild-153's device-refresh bump made the retry more frequent.
-            sysShutdownDev9();
+            if (dev9Ready)
+                sysShutdownDev9();
             hddModulesLoadCount = 0;
         } else {
             retStatus = HDD_LOADMODULES_STATUS_NOERROR;

@@ -323,35 +323,59 @@ static int ethLoadModules(void)
     }
 
     if (!ethModulesLoaded) {
-        ethModulesLoaded = 1;
+        int dev9Ready;
+        int netmanInitialized = 0;
+        int httpInitialized = 0;
 
-        sysInitDev9();
+        dev9Ready = sysInitDev9();
+        if (dev9Ready < 0) {
+            gNetworkStartup = ERROR_ETH_MODULE_NETIF_FAILURE;
+            LOG("ETHSUPPORT: DEV9 initialization failed (%d); network setup remains retryable\n", dev9Ready);
+            return -1;
+        }
 
         LOG("[NETMAN]:\n");
-        if (sysLoadModuleBuffer(&netman_irx, size_netman_irx, 0, NULL) >= 0) {
-            NetManInit();
-            LOG("[SMSUTILS]:\n");
-            sysLoadModuleBuffer(&smsutils_irx, size_smsutils_irx, 0, NULL);
-            LOG("[SMAP]:\n");
-            if (sysLoadModuleBuffer(&smap_irx, size_smap_irx, 0, NULL) >= 0) {
-                // Before the network stack is loaded, attempt to set the link settings in order to avoid needing double-initialization of the IF.
-                // But do not fail here because there is currently no way to re-start initialization.
-                ethApplyNetIFConfig();
-                LOG("[PS2IP]:\n");
-                if (sysLoadModuleBuffer(&ps2ip_irx, size_ps2ip_irx, 0, NULL) >= 0) {
-                    LOG("[PS2IPS]:\n");
-                    sysLoadModuleBuffer(&ps2ips_irx, size_ps2ips_irx, 0, NULL);
-                    LOG("[HTTPCLIENT]:\n");
-                    if (sysLoadModuleBuffer(&httpclient_irx, size_httpclient_irx, 0, NULL) >= 0) {
-                        if (HttpInit() < 0)
-                            LOG("ETHSUPPORT: httpclient RPC bind failed; compat update unavailable\n");
-                    }
-                    ps2ip_init();
-                    LOG("ETHSUPPORT Modules loaded\n");
-                    return 0;
-                }
-            }
+        if (sysLoadModuleBuffer(&netman_irx, size_netman_irx, 0, NULL) < 0)
+            goto load_failed;
+
+        NetManInit();
+        netmanInitialized = 1;
+        LOG("[SMSUTILS]:\n");
+        sysLoadModuleBuffer(&smsutils_irx, size_smsutils_irx, 0, NULL);
+        LOG("[SMAP]:\n");
+        if (sysLoadModuleBuffer(&smap_irx, size_smap_irx, 0, NULL) < 0)
+            goto load_failed;
+
+        // Before the network stack is loaded, attempt to set the link settings in order to avoid
+        // needing double-initialization of the IF. A failed dependency remains retryable now.
+        ethApplyNetIFConfig();
+        LOG("[PS2IP]:\n");
+        if (sysLoadModuleBuffer(&ps2ip_irx, size_ps2ip_irx, 0, NULL) < 0)
+            goto load_failed;
+
+        LOG("[PS2IPS]:\n");
+        sysLoadModuleBuffer(&ps2ips_irx, size_ps2ips_irx, 0, NULL);
+        LOG("[HTTPCLIENT]:\n");
+        if (sysLoadModuleBuffer(&httpclient_irx, size_httpclient_irx, 0, NULL) >= 0) {
+            if (HttpInit() < 0)
+                LOG("ETHSUPPORT: httpclient RPC bind failed; compat update unavailable\n");
+            else
+                httpInitialized = 1;
         }
+
+        ps2ip_init();
+        ethModulesLoaded = 1;
+        LOG("ETHSUPPORT Modules loaded\n");
+        return 0;
+
+    load_failed:
+        if (httpInitialized)
+            HttpDeinit();
+        if (netmanInitialized)
+            NetManDeinit();
+        sysShutdownDev9();
+        ethModulesLoaded = 0;
+        LOG("ETHSUPPORT: network module chain failed; setup remains retryable\n");
 
         gNetworkStartup = ERROR_ETH_MODULE_NETIF_FAILURE;
         return -1;
@@ -511,7 +535,7 @@ void ethInit(item_list_t *itemList)
 
     ethInvalidateFavIsoBacking();
 
-    if (gNetworkStartup >= ERROR_ETH_SMB_CONN) {
+    if (gNetworkStartup >= ERROR_ETH_MODULE_NETIF_FAILURE) {
         LOG("ETHSUPPORT Re-Init\n");
         thmReinit(ethBase);
         ethULSizePrev = -2;

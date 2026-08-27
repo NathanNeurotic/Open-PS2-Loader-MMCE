@@ -94,7 +94,8 @@ static unsigned char mmceEverResolved = 0;
 // forward declaration
 static item_list_t mmceGameList;
 static void mmceGetDeviceRoot(char *root, size_t size);
-static int mmceModLoaded = 0;          // latched by mmceLoadModules; read by mmceSendGameID's arm check
+static int mmceModLoaded = 0;          // latched only after mmceLoadModules succeeds
+static int mmceModLoading = 0;         // prevents concurrent callers from issuing a second singleton load
 static char mmceGameIdTarget[8] = {0}; // last device a GameID 0x8 switch was SENT to (mmceGameIdSettle polls it)
 
 int mmceSendGameID(const char *startup, const char *protectMcPath, int vmcSlotMask)
@@ -390,17 +391,28 @@ void mmceSetPrefix(void)
     mmceRefreshArtRoots();
 }
 
-void mmceLoadModules(void)
+int mmceLoadModules(void)
 {
     // mmceman is a singleton -- loading the IRX buffer twice creates a 2nd instance. Guard so this is
     // idempotent: mmceInit calls it, and the BDMA equip now also calls it (to wake an MMCE source when
-    // MMCE games are off / Manual-not-started). Set the flag first so a partial load can't double-load.
+    // MMCE games are off / Manual-not-started). Do not mark it resident until the load succeeds: a
+    // transient IOP/module-resource failure must remain retryable for the VCD page.
     if (mmceModLoaded)
-        return;
-    mmceModLoaded = 1;
+        return 0;
+    if (mmceModLoading)
+        return -1;
+
+    mmceModLoading = 1;
     LOG("MMCESUPPORT LoadModules\n");
     LOG("[MMCEMAN]:\n");
-    sysLoadModuleBuffer(&mmceman_irx, size_mmceman_irx, 0, NULL);
+    int ret = sysLoadModuleBuffer(&mmceman_irx, size_mmceman_irx, 0, NULL);
+    mmceModLoading = 0;
+    if (ret < 0) {
+        LOG("MMCESUPPORT: mmceman load failed (%d); retry remains armed\n", ret);
+        return ret;
+    }
+    mmceModLoaded = 1;
+    return 0;
 }
 
 // Δ4 (NHDDL parity): arm the GameID transport OUTSIDE the launch path. NHDDL loads mmceman once at
@@ -414,7 +426,8 @@ void mmceArmGameIDTransport(void)
         return;
 
     guiSetBootStatusSticky(_l(_STR_BOOT_ARMING_MMCE)); // boot-step localizer (IO thread) -- see gui.c
-    mmceLoadModules();
+    if (mmceLoadModules() < 0)
+        return;
     // Post-load marker (#254): the boot arm runs right after GUI_INIT_DONE; a serial log that
     // shows the arm begin without this completion line localizes a wedge to the mmceman load.
     LOG("MMCESUPPORT GameID transport armed\n");
@@ -460,6 +473,15 @@ static int mmceNeedsUpdate(item_list_t *itemList)
     char path[256];
     int result = 0;
     struct stat st;
+
+    // A failed menu-time mmceman load must not strand the MMCE page against a dead filesystem for the
+    // whole session. Retry through the same deferred refresh worker that already owns the MMCE I/O.
+    if (!mmceModLoaded) {
+        if (mmceLoadModules() < 0) {
+            mmceGameList.updateDelay = MMCE_MODE_UPDATE_DELAY;
+            return 1;
+        }
+    }
 
     // Hacky: check if slot was changed, update prefix if needed
     mmceSetPrefix();

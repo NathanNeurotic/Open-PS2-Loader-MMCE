@@ -1035,9 +1035,9 @@ static void bdmLoadBlockDeviceModules(void)
         const char *networkStage = gNetBootProtocol == NET_BOOT_UDPFS ? "UDPFS-BD chain" : "UDPBD";
 
         bdmDiagBootStageBegin(networkStage);
-        sysInitDev9();
+        int dev9Ready = sysInitDev9() == 0;
         snprintf(ipArg, sizeof(ipArg), "ip=%d.%d.%d.%d", ps2_ip[0], ps2_ip[1], ps2_ip[2], ps2_ip[3]);
-        if (gNetBootProtocol == NET_BOOT_UDPFS) {
+        if (dev9Ready && gNetBootProtocol == NET_BOOT_UDPFS) {
             // UDPFS: a 3-IRX chain loaded in dependency order -- smap (exports to ministack + bd), then
             // ministack (gets the ip= arg, exports to bd), then udpfs_bd (registers the "udp" BDM device).
             networkResult = bdmDiagLoadOptionalModule("UDPFS_SMAP", "UDPFS_SMAP", &udpfs_smap_irx, size_udpfs_smap_irx);
@@ -1049,7 +1049,7 @@ static void bdmLoadBlockDeviceModules(void)
                 udpbdModLoaded = 1;
                 udpbdLoadedProtocol = NET_BOOT_UDPFS;
             }
-        } else {
+        } else if (dev9Ready) {
             // UDPBD: the self-contained smap_udpbd monolith (smap + ministack + udpbd in one irx).
             networkResult = bdmDiagLoadOptionalModuleArgs("SMAP_UDPBD", "SMAP_UDPBD", &smap_udpbd_irx, size_smap_udpbd_irx, (int)strlen(ipArg) + 1, ipArg);
             if (networkResult >= 0) {
@@ -1062,7 +1062,7 @@ static void bdmLoadBlockDeviceModules(void)
         // UDPBD/UDPFS (both gates re-enter on every device refresh while !udpbdModLoaded) inflates the
         // refcounted dev9InitCount and a later HDD/ETH teardown can never power dev9 down. On success
         // the reference is intentionally kept (the device stays mounted). Mirrors ETH/HDD pairing.
-        if (!udpbdModLoaded)
+        if (dev9Ready && !udpbdModLoaded)
             sysShutdownDev9();
     }
 

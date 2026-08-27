@@ -9,7 +9,9 @@
 
 unsigned int USBA_crc32(const char *string);
 int sysGetDiscID(char *discID);
-void sysInitDev9(void);
+// Acquire one shared DEV9 reference. Returns 0 when DEV9 is ready, <0 when its
+// module could not be loaded; callers must only release the reference on success.
+int sysInitDev9(void);
 void sysShutdownDev9(void);
 void sysReset(int modload_mask);
 void sysExecExit(void);
