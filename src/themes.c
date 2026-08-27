@@ -3050,8 +3050,21 @@ int thmSetGuiValue(int themeID, int reload)
 
             guiThemeID = themeID;
             return 1;
-        } else if (guiThemeID == 0)
+        } else if (guiThemeID == 0 || guiThemeID == nThemes + 1) {
+            /* Re-apply the edited gDefault*Color values to the LIVE theme when the theme itself is
+               not being reloaded -- which is the whole of what a colour edit does.
+
+               This used to fire for theme 0 alone, so the built-in Coverflow theme (id nThemes + 1)
+               silently dropped every colour change: guiShowColorsConfig offers Coverflow as
+               editable, wrote the new values into gDefault*Color, then called applyConfig with the
+               SAME theme id and reload == 0, and landed here to be skipped. The colours were saved
+               correctly and never applied, which reads exactly like "the option does nothing".
+
+               Disk themes stay excluded on purpose -- their colours come from the theme file, and
+               overwriting them with the settings picker's values is what the read-only grey-out in
+               guiShowColorsConfig exists to prevent. (issue #537) */
             thmSetColors(gTheme);
+        }
     }
     return 0;
 }
