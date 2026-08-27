@@ -519,28 +519,25 @@ static int bdmLoadOptionalModuleArgs(const char *name, void *module, int moduleS
     return result;
 }
 
-/* WHAT IS ACTUALLY ON THE MASS SLOTS, on screen, in a build a tester can run.
+/* OPEN EVERY massN: ROOT ONCE, AND SAY WHAT WAS THERE.
  *
- * The "a second USB stick only appears after a hotplug" report has now survived five source-based
- * fixes, each of which corrected a real defect that turned out not to be the cause. The reason the
- * hunt keeps missing is that three completely different failures look identical from the outside,
- * and nothing distinguishes them without a TTY:
+ * The probe is FUNCTIONAL and always compiled; only the on-screen report is diagnostic-only.
  *
- *   massN never answers Dopen        -> the IOP never mounted it; nothing OPL does can help, and the
- *                                       suspect is the usbd -> usbmass_bd registration window
- *                                       (we load usbd in sysReset and usbmass_bd much later; a fast
- *                                       stick can finish enumerating inside that gap, whereas
- *                                       Grimdoomer's fork loads the two back to back)
- *   Dopen ok, identity refuses       -> our publish path defers it, and the retry cadence is at fault
- *   identity ok but no page          -> published then hidden again, i.e. the miss/debounce logic
+ * Why the probe matters: fs_dopen() calls f_opendir(), and FatFs mounts a volume LAZILY, on first
+ * access. Nothing else in the boot path opens a slot we do not already believe holds a device, so a
+ * volume can sit unmounted purely because nobody asked -- and our publication path then finds
+ * nothing and concludes the slot is empty. Touching each root once breaks that chicken-and-egg.
+ * This is why the second USB stick appeared in diagnostic builds (which did this sweep) and not in
+ * release builds (which did not): the measurement WAS the fix.
  *
- * One line naming which of those it is ends the guessing. LOG() needs a TTY nobody testing has, so
- * this goes to the boot status line, which OPLDIAG already puts on screen. Compact by necessity --
- * that line is short -- so each slot is one token: '-' absent, '?' open but no identity, or the
- * driver's own first letter (u/a/s/i) followed by its device number.
+ * Note fs_driver_resolve_volume() maps "mass" straight from the unit number without checking that
+ * anything is mounted there, so Dopen on an empty slot is a cheap, safe no-op.
+ *
+ * The report half stays OPLDIAG-only -- it is raw developer text on a line every other caller feeds
+ * through _l(). Compact by necessity: one token per slot, '-' absent, '?' open but no identity, or
+ * the driver's first letter (u/a/s/i) followed by its device number.
  */
-#ifdef __OPLDIAG
-static void bdmDiagReportMassSlots(const char *when)
+static void bdmProbeMassSlots(const char *when)
 {
     char summary[96];
     int len;
@@ -561,7 +558,7 @@ static void bdmDiagReportMassSlots(const char *when)
         } else {
             int devnr = -1;
             // Guarded reader: a buffered ask on an unmounted volume faults the IOP outright.
-            if (bdmReadDriverName(dir, driver, sizeof(driver)) >= 0 && driver[0] != '\0') {
+            if (bdmReadDriverName(dir, driver, sizeof(driver)) >= 0 && driver[0] != ' ') {
                 fileXioIoctl2(dir, USBMASS_IOCTL_GET_DEVICE_NUMBER, NULL, 0, &devnr, sizeof(devnr));
                 n = snprintf(summary + len, sizeof(summary) - len, " %d%c%d", i, driver[0], devnr);
             } else {
@@ -576,14 +573,10 @@ static void bdmDiagReportMassSlots(const char *when)
     }
 
     LOG("[BDM DIAG] %s\n", summary);
+#ifdef __OPLDIAG
     guiSetBootStatusStickyCopy(summary);
-}
-#else
-static void bdmDiagReportMassSlots(const char *when)
-{
-    (void)when;
-}
 #endif
+}
 
 // BOOT-STAGE LABELS ARE DIAGNOSTIC-BUILD ONLY (OPLDIAG=1). They publish raw, untranslated developer
 // text -- "BEGIN USBMASS_BD", "END DEV9/ATAD/XHDD result=1" -- straight to the boot status line that
@@ -1134,7 +1127,7 @@ static void bdmLoadBlockDeviceModules(void)
     if (iUSBModLoaded && !usbSecondProbeDone) {
         usbSecondProbeDone = 1;
         DelayThread(600 * 1000); // bounded settle for USB enumeration + FAT mount
-        bdmDiagReportMassSlots("after-usb-settle");
+        bdmProbeMassSlots("after-usb-settle");
         bdmForceDeviceRefresh(); // exactly one second probe, covering every slot
     }
 }
