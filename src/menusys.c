@@ -749,8 +749,24 @@ void menuEnd()
 
     DeleteSema(menuSemaId);
     menuSemaId = -1;
-    DeleteSema(menuHintSemaId);
-    menuHintSemaId = -1;
+
+    // PUBLISH "GONE" BEFORE DELETING, not after. ioEnd() only sets gIOTerminate and wakes the io
+    // worker -- it does not join it -- so a queued moduleUpdateMenuInternal() can still be running
+    // when we get here. Clearing the id first means such a caller either reads -1 and no-ops
+    // (menuHintsLock's not-ready guard) or has already sampled a live id; deleting first would
+    // additionally let it sample an id we are in the middle of destroying.
+    //
+    // This narrows the window rather than closing it, and the same race already exists for
+    // menuSemaId above -- which ioman handlers (_menuSaveConfig, _menuLoadConfig,
+    // _menuLoadConfigAsync) take directly with no not-ready guard at all. Closing it properly means
+    // joining the io worker before support cleanup, which is a shutdown-ordering change and does
+    // not belong in a hint-list lock.
+    {
+        s32 hintSema = menuHintSemaId;
+        menuHintSemaId = -1;
+        if (hintSema >= 0)
+            DeleteSema(hintSema);
+    }
     DeleteSema(menuListSemaId);
     menuListSemaId = -1;
 }
