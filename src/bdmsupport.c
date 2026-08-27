@@ -1041,6 +1041,33 @@ static void bdmLoadBlockDeviceModules(void)
             mx4sioSecondProbeDone = 1; // found immediately -> done
         }
     }
+
+    // USB initial discovery -- the SAME double tap, for the same reason, and USB needs it MORE than
+    // MX4SIO does since fa1a18d4.
+    //
+    // USBMASS_BD is now loaded in bdmLoadCoreModules(), i.e. BEFORE this function runs. So
+    // iUSBModLoaded is already set on entry, USB is counted in both modsWere and modsNow, and the
+    // "a driver that arrived late needs one more look" refresh above can NEVER fire for it. USB
+    // silently lost the mechanism every other transport still has.
+    //
+    // A stick has real enumeration latency of its own -- bus reset, SET_ADDRESS, descriptors, SCSI
+    // INQUIRY/READ CAPACITY, then the FAT mount. The failure this produces is counter-intuitive and
+    // matches the hardware report exactly: a SLOW stick finishes late, its mount event lands while
+    // the device list and menu loop are up, and it publishes normally. A FAST stick finishes during
+    // early init -- its event is spent before anything can act on it -- and then nothing ever asks
+    // again, so it stays invisible until the user physically replugs it to manufacture a new event.
+    //
+    // One bounded settle and exactly one refresh, one-shot, so an absent or already-found stick
+    // never costs a later call anything.
+    static int usbSecondProbeDone = 0;
+    if (iUSBModLoaded && !usbSecondProbeDone) {
+        char usbRoot[16];
+        usbSecondProbeDone = 1;
+        if (!bdmGetDeviceRootByType(BDM_TYPE_USB, usbRoot, sizeof(usbRoot))) {
+            DelayThread(600 * 1000); // bounded settle for USB enumeration + FAT mount
+            bdmForceDeviceRefresh(); // exactly one second probe
+        }
+    }
 }
 
 // Bring up only the common BDM infrastructure. Literal massN: boot resolution uses this path so an

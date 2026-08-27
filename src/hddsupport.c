@@ -1249,8 +1249,19 @@ int hddStageOplHomeSelection(int selection)
     // user with a perfectly good +OPL was told it was missing whenever the ATA stack or PS2FS was
     // not up yet. That is the SAME condition behind the deferred Code 222, which is why the two get
     // reported together. -1 is the caller's existing "cannot answer right now" state.
-    if (!hddModulesAreLoaded())
-        return -1;
+    // BRING THE STACK UP RATHER THAN REFUSING. This used to require the ATA modules to already be
+    // resident, on the reasoning that a selector should not own a module reference. But nothing
+    // guarantees they are resident when the user opens Settings, and when they are not, the check
+    // can never pass -- so the row reported "not found" (before) or "busy" (after that was
+    // corrected) on every single attempt, with no sequence of user actions able to fix it. A
+    // setting that cannot be changed is a worse outcome than an extra hddModulesLoadCount bump.
+    //
+    // Affordable here specifically: this runs on the io worker behind guiHandleDeferedIO's spinner
+    // with a 15 s budget, which is exactly the machinery for a load that may take a second.
+    // hddLoadSupportModules() is still deliberately NOT called -- its data-home recovery mounts
+    // pfs0: and creates OPL folders, and neither belongs to a source-selector proof.
+    if (!hddModulesAreLoaded() && !hddLoadModulesReady())
+        return -1; // ATA stack genuinely will not come up -- cannot answer, not "absent"
     if (!hddLoadCoreSupportModules())
         return -1;
 
