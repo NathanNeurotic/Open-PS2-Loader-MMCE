@@ -1397,7 +1397,9 @@ void menuHandleInputMenu()
         sfxPlay(SFX_CONFIRM);
 
         if (id == MENU_LAUNCH_PS2_DISC) {
-            if (sysLaunchDisc() < 0) // success never returns; <0 means no/!PS2 disc -> stay in OPL
+            // Pump a frame per poll: the drive can take seconds to answer with an empty tray, and
+            // this runs on the GUI thread, so without it the menu simply stops dead (issue #465).
+            if (sysLaunchDisc(&guiRenderProbeFrame) < 0) // success never returns; <0 -> stay in OPL
                 guiMsgBox(_l(_STR_DISC_LAUNCH_ERR), 0, NULL);
         } else if (id == MENU_SETTINGS) {
             if (menuCheckParentalLock() == 0)

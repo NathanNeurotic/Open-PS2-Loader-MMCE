@@ -9,6 +9,11 @@
 #endif
 
 #include <delaythread.h> // DelayThread for the bounded disc re-detect polls in sysLaunchDisc
+#include <time.h>        // clock()/CLOCKS_PER_SEC -- the disc waits are budgeted by wall clock
+
+// Disc-probe budgets (issue #465). Both are TOTAL wall-clock caps, not per-poll ones.
+#define SYS_DISC_DETECT_MS   1000 // first "still identifying" settle
+#define SYS_DISC_REDETECT_MS 4000 // spin-up + re-detect after a NODISC report
 #include "include/opl.h"
 #include "include/gui.h"
 #include "include/lang.h" // _l(_STR_...) -- Neutrino preflight abort toasts
@@ -465,7 +470,30 @@ static int sysParseBoot2(const char *cnf, char *out, int outSize)
 // nonexistent cdrom0: path, so PS2LOGO shows the logo (the DISC authenticates fine) and falls
 // through to OSDSYS. The derivation is kept as the FALLBACK when SYSTEM.CNF is unreadable, and
 // as a logged cross-check otherwise.
-int sysLaunchDisc(void)
+// One poll interval of a disc wait. With a progress callback the vsync inside it does the waiting
+// (and keeps the menu animating); without one we fall back to a plain sleep.
+static void sysDiscProbeWait(void (*progress)(void))
+{
+    if (progress != NULL)
+        progress();
+    else
+        DelayThread(20 * 1000);
+}
+
+// Wait out a DETCT ("still identifying") report, bounded by WALL CLOCK rather than by a poll count.
+static int sysDiscSettle(void (*progress)(void), int budgetMs)
+{
+    clock_t deadline = clock() + (clock_t)budgetMs * (CLOCKS_PER_SEC / 1000);
+    int type = sceCdGetDiskType();
+
+    while (type == SCECdDETCT && clock() < deadline) {
+        sysDiscProbeWait(progress);
+        type = sceCdGetDiskType();
+    }
+    return type;
+}
+
+int sysLaunchDisc(void (*progress)(void))
 {
     u8 key[16];
     char boot[16], path[64], cnf[1024];
@@ -476,34 +504,35 @@ int sysLaunchDisc(void)
     if (sceCdStatus() == SCECdErOPENS) // tray open
         return -1;
 
-    {
-        int detecting = 0;
-        while (sceCdGetDiskType() == SCECdDETCT && detecting++ < 50)
-            DelayThread(20 * 1000); // ~1 s cap, yields (issue #465: bound DETCT, preserve 4 s NODISC re-detect)
-    }
-
-    type = sceCdGetDiskType();
+    type = sysDiscSettle(progress, SYS_DISC_DETECT_MS);
     // An idle drive spins the disc DOWN and then reports NODISC even with a game disc loaded.
     // The software equivalent of a tray open/close is a TRAY-CLOSE REQUEST on the already-closed
     // tray, which re-runs the detect cycle. A genuinely empty drive still ends at the -2 bail
     // below, just ~4 s later.
     if (type == SCECdNODISC) {
-        int spin;
+        int spin = 0;
+        clock_t deadline;
         u32 traychk = 0;
         int tr = sceCdTrayReq(SCECdTrayClose, &traychk);
         (void)tr; // only read by LOG (a no-op in release builds)
         LOG("[DISC] drive reports NODISC -- tray-close re-detect: req=%d traychk=%lu\n", tr, (unsigned long)traychk);
         sceCdSync(0);
-        for (spin = 0; spin < 20; spin++) { // ~4 s budget for a cold spin-up + re-detect
-            // Let it finish identifying after the spin-up, but bounded + yielding: a dirty laser or
-            // damaged disc can stick in DETCT, and a bare spin would hang Launch Disc and peg the CPU.
-            int detecting = 0;
-            while (sceCdGetDiskType() == SCECdDETCT && detecting++ < 50)
-                DelayThread(20 * 1000); // ~1 s cap, yields to other threads
+
+        /* ONE budget for the whole re-detect, not one per poll.
+
+           This used to nest a 1 s DETCT wait inside a 20-iteration loop whose comment claimed a
+           "~4 s budget" -- true only if DETCT never appeared. A drive that keeps answering DETCT
+           (dirty laser, marginal disc, and routinely an EMPTY tray) turned that into 20 x 1.2 s,
+           so selecting Launch Disc with no disc in the tray sat there for up to 24 seconds with a
+           frozen UI. That is issue #465's "extended read/poll loop", and the nesting was the whole
+           of it: each layer was individually bounded, and the PRODUCT was not. */
+        deadline = clock() + (clock_t)SYS_DISC_REDETECT_MS * (CLOCKS_PER_SEC / 1000);
+        while (clock() < deadline) {
+            spin++;
             type = sceCdGetDiskType();
-            if (type != SCECdNODISC)
+            if (type != SCECdNODISC && type != SCECdDETCT)
                 break;
-            DelayThread(200 * 1000); // 200 ms between polls
+            sysDiscProbeWait(progress);
         }
         LOG("[DISC] after tray-close re-detect: type=%d (%d re-polls)\n", type, spin);
     }

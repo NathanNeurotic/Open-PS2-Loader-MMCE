@@ -3457,6 +3457,23 @@ static void guiDrawBusy(int alpha)
     }
 }
 
+/* Render ONE frame of the current screen plus the busy animation, for a synchronous main-thread
+   wait on hardware that cannot be moved off that thread.
+
+   guiMainLoop dispatches handleInput AFTER guiEndFrame precisely so an input handler may drive
+   renderman, so this is safe from there -- but it takes guiLock, so it must never be called from
+   inside an existing guiStartFrame/guiEndFrame bracket or from any other thread.
+
+   The vsync wait inside guiEndFrame also paces the caller's poll loop, which is why callers can
+   drop their own DelayThread and measure the budget with clock(). */
+void guiRenderProbeFrame(void)
+{
+    guiStartFrame();
+    guiShow();
+    guiDrawBusy(0x80);
+    guiEndFrame();
+}
+
 // Boot-splash status line setter. Pass NULL to clear. Main-thread only (writes gBootStatus,
 // which only guiRenderGreeting on the same thread reads). guiRenderGreeting prefers any
 // IO-thread sticky label over this.
