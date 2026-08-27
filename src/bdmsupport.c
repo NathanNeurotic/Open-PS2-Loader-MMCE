@@ -519,6 +519,72 @@ static int bdmLoadOptionalModuleArgs(const char *name, void *module, int moduleS
     return result;
 }
 
+/* WHAT IS ACTUALLY ON THE MASS SLOTS, on screen, in a build a tester can run.
+ *
+ * The "a second USB stick only appears after a hotplug" report has now survived five source-based
+ * fixes, each of which corrected a real defect that turned out not to be the cause. The reason the
+ * hunt keeps missing is that three completely different failures look identical from the outside,
+ * and nothing distinguishes them without a TTY:
+ *
+ *   massN never answers Dopen        -> the IOP never mounted it; nothing OPL does can help, and the
+ *                                       suspect is the usbd -> usbmass_bd registration window
+ *                                       (we load usbd in sysReset and usbmass_bd much later; a fast
+ *                                       stick can finish enumerating inside that gap, whereas
+ *                                       Grimdoomer's fork loads the two back to back)
+ *   Dopen ok, identity refuses       -> our publish path defers it, and the retry cadence is at fault
+ *   identity ok but no page          -> published then hidden again, i.e. the miss/debounce logic
+ *
+ * One line naming which of those it is ends the guessing. LOG() needs a TTY nobody testing has, so
+ * this goes to the boot status line, which OPLDIAG already puts on screen. Compact by necessity --
+ * that line is short -- so each slot is one token: '-' absent, '?' open but no identity, or the
+ * driver's own first letter (u/a/s/i) followed by its device number.
+ */
+#ifdef __OPLDIAG
+static void bdmDiagReportMassSlots(const char *when)
+{
+    char summary[96];
+    int len;
+    int i;
+
+    len = snprintf(summary, sizeof(summary), "MASS %s:", when);
+
+    for (i = 0; i < MAX_BDM_DEVICES && len > 0 && len < (int)sizeof(summary); i++) {
+        char root[16];
+        char driver[32] = {0};
+        int dir;
+        int n;
+
+        snprintf(root, sizeof(root), "mass%d:/", i);
+        dir = fileXioDopen(root);
+        if (dir < 0) {
+            n = snprintf(summary + len, sizeof(summary) - len, " %d-", i);
+        } else {
+            int devnr = -1;
+            // Guarded reader: a buffered ask on an unmounted volume faults the IOP outright.
+            if (bdmReadDriverName(dir, driver, sizeof(driver)) >= 0 && driver[0] != '\0') {
+                fileXioIoctl2(dir, USBMASS_IOCTL_GET_DEVICE_NUMBER, NULL, 0, &devnr, sizeof(devnr));
+                n = snprintf(summary + len, sizeof(summary) - len, " %d%c%d", i, driver[0], devnr);
+            } else {
+                n = snprintf(summary + len, sizeof(summary) - len, " %d?", i);
+            }
+            fileXioDclose(dir);
+        }
+
+        if (n <= 0)
+            break;
+        len += n;
+    }
+
+    LOG("[BDM DIAG] %s\n", summary);
+    guiSetBootStatusStickyCopy(summary);
+}
+#else
+static void bdmDiagReportMassSlots(const char *when)
+{
+    (void)when;
+}
+#endif
+
 // BOOT-STAGE LABELS ARE DIAGNOSTIC-BUILD ONLY (OPLDIAG=1). They publish raw, untranslated developer
 // text -- "BEGIN USBMASS_BD", "END DEV9/ATAD/XHDD result=1" -- straight to the boot status line that
 // every other caller feeds through _l(). A plain release must show only localized boot steps, so
@@ -1068,6 +1134,7 @@ static void bdmLoadBlockDeviceModules(void)
     if (iUSBModLoaded && !usbSecondProbeDone) {
         usbSecondProbeDone = 1;
         DelayThread(600 * 1000); // bounded settle for USB enumeration + FAT mount
+        bdmDiagReportMassSlots("after-usb-settle");
         bdmForceDeviceRefresh(); // exactly one second probe, covering every slot
     }
 }
