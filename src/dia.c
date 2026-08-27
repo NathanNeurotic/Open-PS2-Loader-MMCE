@@ -276,6 +276,130 @@ int diaShowKeyb(char *text, int maxLen, int hide_text, const char *title)
     return 0;
 }
 
+/* NUMERIC ENTRY PAD.
+
+   A deliberately small 3x4 pad, not the full diaShowKeyb() grid. Routing int fields through the
+   text keyboard technically works -- its top row is 1234567890 -- but it answers "I do not want to
+   hold up/down" with "then hunt through 48 keys instead", which is the same problem wearing a hat.
+
+   '-' toggles the sign of the whole entry rather than inserting a character (there is no valid
+   entry with a minus anywhere but the front) and is inert, and drawn dim, on an unsigned field.
+   '<' is backspace, so the pad is complete on its own without reaching for a shoulder button. */
+#define NUMPAD_WIDTH  3
+#define NUMPAD_HEIGHT 4
+#define NUMPAD_ITEMS  (NUMPAD_WIDTH * NUMPAD_HEIGHT)
+
+static int diaShowNumPad(char *text, int maxLen, int minv, int maxv)
+{
+    static const char numpad[NUMPAD_ITEMS] = {
+        '1', '2', '3',
+        '4', '5', '6',
+        '7', '8', '9',
+        '-', '0', '<'};
+    const int allowNegative = (minv < 0);
+    int len = strlen(text), sel = 0, i, j, x, w;
+    char c[2] = "\0\0";
+    char range[32];
+
+    snprintf(range, sizeof(range), "%d - %d", minv, maxv);
+    rmGetScreenExtents(&screenWidth, &screenHeight);
+
+    while (1) {
+        readPads();
+
+        rmStartFrame();
+        if (guiDrawBGSettings() == 0)
+            guiDrawBGPlasma();
+        rmDrawRect(0, 0, screenWidth, screenHeight, gColDarker);
+
+        // The entry so far, with the accepted range beside it. An octet and a port look identical
+        // on screen otherwise, and guessing which one you are in is how you end up with 255 ports.
+        fntRenderString(gTheme->fonts[0], 50, 120, ALIGN_NONE, 0, 0, text, gTheme->textColor);
+        fntRenderString(gTheme->fonts[0], 400, 120, ALIGN_NONE, 0, 0, range, gTheme->uiTextColor);
+        rmDrawLine(25, 138, 615, 138, gColWhite);
+
+        for (j = 0; j < NUMPAD_HEIGHT; j++) {
+            for (i = 0; i < NUMPAD_WIDTH; i++) {
+                int idx = i + j * NUMPAD_WIDTH;
+                u64 col = gTheme->uiTextColor;
+
+                c[0] = numpad[idx];
+                if ((c[0] == '-') && !allowNegative)
+                    col = gTheme->textColor;
+
+                x = 270 + i * 40;
+                w = fntRenderString(gTheme->fonts[0], x, 170 + 3 * UI_SPACING_H * j, ALIGN_NONE, 0, 0, c, col) - x;
+                if (idx == sel)
+                    diaDrawBoundingBox(x, 170 + 3 * UI_SPACING_H * j, w, UI_SPACING_H, 0);
+            }
+        }
+
+        guiDrawIconAndText(SQUARE_ICON, _STR_BACKSPACE, gTheme->fonts[0], 50, 417, gTheme->selTextColor);
+        guiDrawIconAndText(START_ICON, _STR_ENTER, gTheme->fonts[0], 250, 417, gTheme->selTextColor);
+        guiDrawIconAndText(gSelectButton == KEY_CIRCLE ? CROSS_ICON : CIRCLE_ICON, _STR_CANCEL, gTheme->fonts[0], 500, 417, gTheme->selTextColor);
+
+        rmEndFrame();
+
+        // Wrap within the row on left/right and within the column on up/down: on a 3-wide pad the
+        // alternative is walking the cursor off 9 to reach 1.
+        if (getKey(KEY_LEFT)) {
+            sfxPlay(SFX_CURSOR);
+            sel = (sel % NUMPAD_WIDTH) ? sel - 1 : sel + NUMPAD_WIDTH - 1;
+        } else if (getKey(KEY_RIGHT)) {
+            sfxPlay(SFX_CURSOR);
+            sel = ((sel + 1) % NUMPAD_WIDTH) ? sel + 1 : sel - NUMPAD_WIDTH + 1;
+        } else if (getKey(KEY_UP)) {
+            sfxPlay(SFX_CURSOR);
+            sel = (sel + NUMPAD_ITEMS - NUMPAD_WIDTH) % NUMPAD_ITEMS;
+        } else if (getKey(KEY_DOWN)) {
+            sfxPlay(SFX_CURSOR);
+            sel = (sel + NUMPAD_WIDTH) % NUMPAD_ITEMS;
+        } else if (getKeyOn(gSelectButton)) {
+            c[0] = numpad[sel];
+            if (c[0] == '<') {
+                if (len > 0) {
+                    sfxPlay(SFX_CANCEL);
+                    text[--len] = '\0';
+                }
+            } else if (c[0] == '-') {
+                if (!allowNegative)
+                    sfxPlay(SFX_CANCEL);
+                else if (text[0] == '-') {
+                    sfxPlay(SFX_CONFIRM);
+                    memmove(text, text + 1, len); // len bytes == the remaining chars AND the NUL
+                    len--;
+                } else if (len < (maxLen - 1)) {
+                    sfxPlay(SFX_CONFIRM);
+                    memmove(text + 1, text, len + 1);
+                    text[0] = '-';
+                    len++;
+                }
+            } else if (len < (maxLen - 1)) {
+                sfxPlay(SFX_CONFIRM);
+                text[len++] = c[0];
+                text[len] = '\0';
+            }
+        } else if (getKey(KEY_SQUARE)) { // BACKSPACE
+            if (len > 0) {
+                sfxPlay(SFX_CANCEL);
+                text[--len] = '\0';
+            }
+        } else if (getKeyOn(KEY_TRIANGLE)) { // CLEAR -- the same button that opened the pad
+            sfxPlay(SFX_CANCEL);
+            len = 0;
+            text[0] = '\0';
+        } else if (getKeyOn(KEY_START)) {
+            sfxPlay(SFX_CONFIRM);
+            return 1; // ENTER
+        }
+
+        if (getKey(gSelectButton == KEY_CIRCLE ? KEY_CROSS : KEY_CIRCLE)) {
+            sfxPlay(SFX_CANCEL);
+            return 0;
+        }
+    }
+}
+
 static int colPadSettings[16];
 
 static int diaShowColSel(unsigned char *r, unsigned char *g, unsigned char *b)
@@ -810,11 +934,17 @@ void diaRenderUI(struct UIItem *ui, short inMenu, struct UIItem *cur, int haveFo
         diaDrawHint(cur->hintId);
     }
 
+    /* A focused int accepts Triangle for direct entry, and nothing on screen would otherwise say so:
+       dialogs have no per-item hint row while focused (diaDrawHint above is skipped in that state),
+       so an undocumented binding would be an undiscoverable one. Widen the standard two-hint footer
+       to three for exactly as long as the pad is reachable. */
+    int intFocus = (cur != NULL) && haveFocus && (cur->type == UI_INT);
+
     int uiY = gTheme->usedHeight - 32;
     if (settingsContext) {
-        int uiHints[2] = {_STR_SELECT, _STR_BACK};
-        int uiIcons[2] = {CROSS_ICON, CIRCLE_ICON};
-        int uiX = guiAlignSubMenuHints(2, uiHints, uiIcons, gTheme->fonts[0], 12, 2);
+        int uiHints[3] = {_STR_SELECT, _STR_BACK, _STR_ENTER};
+        int uiIcons[3] = {CROSS_ICON, CIRCLE_ICON, TRIANGLE_ICON};
+        int uiX = guiAlignSubMenuHints(intFocus ? 3 : 2, uiHints, uiIcons, gTheme->fonts[0], 12, 2);
 
         if (settingsShell) {
             // Use the same controller button textures as the rest of OPL. Do not introduce a
@@ -836,15 +966,24 @@ void diaRenderUI(struct UIItem *ui, short inMenu, struct UIItem *cur, int haveFo
         }
         uiX = guiDrawIconAndText(uiIcons[0], uiHints[0], gTheme->fonts[0], uiX, uiY, gTheme->textColor);
         uiX += 12;
-        guiDrawIconAndText(uiIcons[1], uiHints[1], gTheme->fonts[0], uiX, uiY, gTheme->textColor);
+        uiX = guiDrawIconAndText(uiIcons[1], uiHints[1], gTheme->fonts[0], uiX, uiY, gTheme->textColor);
+        if (intFocus) {
+            uiX += 12;
+            guiDrawIconAndText(uiIcons[2], uiHints[2], gTheme->fonts[0], uiX, uiY, gTheme->textColor);
+        }
     } else {
-        int uiHints[2] = {_STR_SELECT, _STR_BACK};
-        int uiIcons[2] = {CIRCLE_ICON, CROSS_ICON};
-        int uiX = guiAlignSubMenuHints(2, uiHints, uiIcons, gTheme->fonts[0], 12, 2);
+        int uiHints[3] = {_STR_SELECT, _STR_BACK, _STR_ENTER};
+        int uiIcons[3] = {CIRCLE_ICON, CROSS_ICON, TRIANGLE_ICON};
+        int uiX = guiAlignSubMenuHints(intFocus ? 3 : 2, uiHints, uiIcons, gTheme->fonts[0], 12, 2);
 
         uiX = guiDrawIconAndText(gSelectButton == KEY_CIRCLE ? uiIcons[0] : uiIcons[1], uiHints[0], gTheme->fonts[0], uiX, uiY, gTheme->textColor);
         uiX += 12;
-        guiDrawIconAndText(gSelectButton == KEY_CIRCLE ? uiIcons[1] : uiIcons[0], uiHints[1], gTheme->fonts[0], uiX, uiY, gTheme->textColor);
+        uiX = guiDrawIconAndText(gSelectButton == KEY_CIRCLE ? uiIcons[1] : uiIcons[0], uiHints[1], gTheme->fonts[0], uiX, uiY, gTheme->textColor);
+        if (intFocus) {
+            // Triangle stays Triangle: the swap above only ever exchanges cross and circle.
+            uiX += 12;
+            guiDrawIconAndText(uiIcons[2], uiHints[2], gTheme->fonts[0], uiX, uiY, gTheme->textColor);
+        }
     }
 }
 
@@ -894,21 +1033,21 @@ static int diaHandleInput(struct UIItem *item, int *modified, int settingsContex
     }
     if (item->type == UI_INT) {
         /* DIRECT ENTRY. Nudging with up/down is fine for a value near where it already is and awful
-           for anything else -- reaching a four-digit number one press at a time is not a UI. Triangle
-           opens the same on-screen keyboard the string fields use, seeded with the current value:
-           its top row is 1234567890 and the cursor starts on '1', so it serves as a numeric pad
-           without needing a second widget.
+           for anything else -- an IP octet or a 65535-max port is not something you hold a direction
+           to reach. Triangle opens diaShowNumPad() seeded with the current value.
 
-           Triangle and Square are both free while an int has focus -- dia.c binds them only INSIDE
-           diaShowKeyb(), for backspace and space -- so this adds a way in without taking one away.
-           Up/down still nudge, and cross/circle still accept/cancel exactly as before. */
+           Up/down still nudge, deliberately: most int fields here are small ranges (mtap port 1-2,
+           turbo speed 1-4, caches 0-32) where one press IS the fastest route, and taking that away
+           to fix the octets would just move the annoyance. Triangle is free while an int has focus
+           -- dia.c binds it only INSIDE the keyboard, for space -- so this adds a way in without
+           taking one away, and cross/circle still accept/cancel exactly as before. */
         if (getKeyOn(KEY_TRIANGLE)) {
             char numbuf[16];
             char *end = NULL;
             long entered;
 
             snprintf(numbuf, sizeof(numbuf), "%d", item->intvalue.current);
-            if (diaShowKeyb(numbuf, sizeof(numbuf), 0, NULL)) {
+            if (diaShowNumPad(numbuf, sizeof(numbuf), item->intvalue.min, item->intvalue.max)) {
                 entered = strtol(numbuf, &end, 10);
                 // Reject junk instead of storing it: strtol answers 0 for "abc", which would look
                 // like a deliberate entry. Only commit when at least one digit was consumed.
