@@ -299,6 +299,12 @@ void moduleUpdateMenuInternal(opl_io_module_t *mod, int themeChanged, int langCh
         guiCheckNotifications(0, langChanged);
     }
 
+    /* One lock across the WHOLE rebuild, not per call. This runs on the io worker while the GUI
+       thread walks the same list twice a frame; a per-call lock would still let a draw land between
+       the free and the relink and render a half-built row. Cheap: a few frees and mallocs, no I/O,
+       nothing that can block -- so the renderer never waits more than microseconds for it. */
+    menuHintsLock();
+
     // refresh Hints
     menuRemoveHints(&mod->menuItem);
 
@@ -325,6 +331,8 @@ void moduleUpdateMenuInternal(opl_io_module_t *mod, int themeChanged, int langCh
         if (vcdModeSupported(mod->support->mode) && gDefaultGameView == GAME_VIEW_BOTH)
             menuAddHint(&mod->menuItem, _STR_VCD, L3_ICON);
     }
+
+    menuHintsUnlock();
 
     // refresh Cache
     if (themeChanged) {

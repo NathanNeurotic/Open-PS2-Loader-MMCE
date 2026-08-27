@@ -145,6 +145,24 @@ void menuHandleInputAppMenu();
 // Sets the selected item if it is found in the menu list
 void menuSetSelectedItem(menu_item_t *item);
 
+/** Serialize menu_item_t::hints against the renderer.
+ *
+ * ⚠ EVERY toucher of a hint list must bracket itself with these -- readers included. The list is
+ * rebuilt on the IO WORKER (moduleUpdateMenuInternal) while the GUI thread walks it every frame in
+ * themes.c drawHintText(), twice per frame. Without this, a draw landing mid-rebuild follows a
+ * freed ->next.
+ *
+ * These are CALLER-LOCKED on purpose: menuAddHint()/menuRemoveHints() do not lock internally,
+ * because a rebuild is many calls that must be atomic as a whole and the semaphore is not
+ * recursive. Do not nest them.
+ *
+ * Not guiLock(): that is held across rmEndFrame()'s vsync wait, so borrowing it here stalls the IO
+ * worker for a whole frame on every device change. This lock is held only for the list work itself.
+ */
+void menuHintsLock(void);
+void menuHintsUnlock(void);
+
+// Call with menuHintsLock() held -- see above.
 void menuAddHint(menu_item_t *menu, int text_id, int icon_id);
 void menuRemoveHints(menu_item_t *menu);
 

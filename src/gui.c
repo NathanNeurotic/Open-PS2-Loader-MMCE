@@ -3381,7 +3381,9 @@ static void guiHandleOp(struct gui_update_t *item)
 
         case GUI_OP_ADD_HINT:
             // append the hint list in the menu item
+            menuHintsLock();
             menuAddHint(item->menu.menu, item->hint.text_id, item->hint.icon_id);
+            menuHintsUnlock();
             break;
 
         default:
