@@ -120,34 +120,9 @@ static char gBootStickyCopy[2][64];
 // forward decl.
 static void guiShow();
 static void guiDrawOverlays(void);
-static int guiSettingsStageOplHome(int selection);
 static const char **guiCopyNameList(const char **src);
 static void guiFreeNameList(const char **list);
 
-enum {
-    GUI_OPL_HOME_STAGE_NOT_FOUND = 0,
-    GUI_OPL_HOME_STAGE_OK = 1,
-    GUI_OPL_HOME_STAGE_UNAVAILABLE = -1,
-};
-
-// Set at each GUI-side staging exit. hddOplHomeStageReason() covers the hdd-side ones.
-static const char *guiOplHomeStageReason = "none";
-
-static const char *guiOplHomeStageError(int selection, int result)
-{
-    const char *base = (result == GUI_OPL_HOME_STAGE_UNAVAILABLE) ? _l(_STR_HDD_OPL_PARTITION_BUSY) : (selection == HDD_OPL_HOME_PLUS ? _l(_STR_HDD_OPL_PLUS_NOT_FOUND) : _l(_STR_HDD_OPL_COMMON_NOT_FOUND));
-
-#ifdef __OPLDIAG
-    // Name the condition that actually fired. Five different failures share these two strings, so a
-    // report of "it says busy" has never been enough to tell them apart -- which is why this row has
-    // now survived several rounds of fixes aimed at the wrong one. Diagnostic builds only.
-    static char detailed[192];
-    snprintf(detailed, sizeof(detailed), "%s\n[%s / %s]", base, guiOplHomeStageReason, hddOplHomeStageReason());
-    return detailed;
-#else
-    return base;
-#endif
-}
 
 #ifdef __DEBUG
 
@@ -728,19 +703,10 @@ int guiNetProtocolNeedsRestart(void)
 // guiShowDeviceConfig is retained for the legacy entry point outside the Settings peer shell.
 // Keep its APA selector semantics identical to the shell: merely opening/saving another field
 // must not normalize a legacy custom hdd_partition, while an explicit selector interaction may.
-static int guiDeviceOplHomeInitial;
-static int guiDeviceOplHomeLegacy;
-static int guiDeviceOplHomeTouched;
 
 static int guiDeviceConfigUpdater(int modified)
 {
-    int selection;
-
-    if (modified) {
-        diaGetInt(diaDeviceConfig, CFG_HDDOPLPART, &selection);
-        if (selection != guiDeviceOplHomeInitial)
-            guiDeviceOplHomeTouched = 1;
-    }
+    (void)modified;
     return 0;
 }
 
@@ -783,12 +749,6 @@ void guiShowDeviceConfig(void)
     diaSetInt(diaDeviceConfig, CFG_MMCEMODE, gMMCEStartMode);
     diaSetEnabled(diaDeviceConfig, CFG_MMCEMODE, 1);
 
-    guiDeviceOplHomeInitial = hddGetOplHomeSelection();
-    guiDeviceOplHomeLegacy = hddOplHomeIsLegacy();
-    guiDeviceOplHomeTouched = 0;
-    diaSetEnum(diaDeviceConfig, CFG_HDDOPLPART, hddOplHomes);
-    diaSetInt(diaDeviceConfig, CFG_HDDOPLPART, guiDeviceOplHomeInitial);
-
     int ret;
 reshow_device:
     ret = diaExecuteDialog(diaDeviceConfig, -1, 1, &guiDeviceConfigUpdater);
@@ -798,21 +758,6 @@ reshow_device:
     }
     if (ret) {
         int netProtocolWas = gNetworkProtocol;
-        int hddOplHomeChoice;
-        int hddOplHomeStageResult;
-
-        diaGetInt(diaDeviceConfig, CFG_HDDOPLPART, &hddOplHomeChoice);
-        if (hddOplHomeChoice != guiDeviceOplHomeInitial ||
-            (guiDeviceOplHomeLegacy && guiDeviceOplHomeTouched)) {
-            hddOplHomeStageResult = guiSettingsStageOplHome(hddOplHomeChoice);
-            if (hddOplHomeStageResult != GUI_OPL_HOME_STAGE_OK) {
-                diaSetInt(diaDeviceConfig, CFG_HDDOPLPART, guiDeviceOplHomeInitial);
-                guiDeviceOplHomeTouched = 0;
-                guiMsgBox(guiOplHomeStageError(hddOplHomeChoice, hddOplHomeStageResult), 0, NULL);
-                goto reshow_device;
-            }
-            guiMsgBox(_l(_STR_HDD_OPL_PARTITION_RESTART), 0, NULL);
-        }
 
         diaGetInt(diaDeviceConfig, CFG_DEFDEVICE, &deviceModeIndex);
         gDefaultDevice = guiDeviceTypeToIoMode(deviceModeIndex);
@@ -2704,84 +2649,11 @@ reshow_general:
     return guiSettingsPageResult(result);
 }
 
-static int guiSourcesOplHomeInitial;
-static int guiSourcesOplHomeLegacy;
-static int guiSourcesOplHomeTouched;
-static int guiSourcesOplHomeStagePending;
-static int guiSourcesOplHomeStageResult;
-static int guiSourcesOplHomeStageChoice;
-static int guiSourcesOplHomeStageInFlight;
-static int guiSourcesOplHomeStageAbandoned;
 
 static int guiSettingsSourcesUpdater(int modified)
 {
-    int selection;
-
-    if (modified) {
-        diaGetInt(guiSettingsActiveDialog, CFG_HDDOPLPART, &selection);
-        if (selection != guiSourcesOplHomeInitial)
-            guiSourcesOplHomeTouched = 1;
-    }
+    (void)modified;
     return 0;
-}
-
-static void guiSettingsStageOplHomeWorker(void)
-{
-    int result = hddStageOplHomeSelection(guiSourcesOplHomeStageChoice);
-
-    if (guiSourcesOplHomeStageAbandoned)
-        hddDiscardOplHomeSelection();
-    else
-        guiSourcesOplHomeStageResult = result;
-    guiSourcesOplHomeStageInFlight = 0;
-    guiSourcesOplHomeStagePending = 0;
-}
-
-static int guiSettingsStageOplHome(int selection)
-{
-    // Do not overwrite the static request payload after a timed-out worker. The I/O queue is
-    // single-threaded, so another request cannot begin until that worker actually returns.
-    if (guiSourcesOplHomeStageInFlight) {
-        guiOplHomeStageReason = "still-in-flight-from-previous";
-        return GUI_OPL_HOME_STAGE_UNAVAILABLE;
-    }
-
-    guiOplHomeStageReason = "worker-completed";
-    guiSourcesOplHomeStageChoice = selection;
-    guiSourcesOplHomeStageResult = 0;
-    guiSourcesOplHomeStagePending = 1;
-    guiSourcesOplHomeStageInFlight = 1;
-    guiSourcesOplHomeStageAbandoned = 0;
-    guiHandleDeferedIO(&guiSourcesOplHomeStagePending, _l(_STR_HDD_OPL_PARTITION_CHECKING),
-                       IO_CUSTOM_SIMPLEACTION, &guiSettingsStageOplHomeWorker, 15000);
-    if (gLastDeferredTimedOut) {
-        // The late worker only ever changes our staged selector; never let an abandoned wait make
-        // a later Save Settings persist a choice the user did not get to confirm. InFlight stays
-        // SET here on purpose: the worker may still be running and must be allowed to return.
-        guiSourcesOplHomeStageAbandoned = 1;
-        guiOplHomeStageReason = "worker-timed-out-15s";
-        hddDiscardOplHomeSelection();
-        return GUI_OPL_HOME_STAGE_UNAVAILABLE;
-    }
-
-    // NO TIMEOUT, YET STILL IN FLIGHT -> THE WORKER NEVER RAN AT ALL. guiHandleDeferedIO() clears
-    // the pending flag and returns immediately when ioPutRequest() is rejected (a full or blocked
-    // IO queue), so we never waited and nothing will ever clear this latch. Unlike the timeout
-    // above there is no worker still out there to do it.
-    //
-    // Left set, it disabled the row for the rest of the session: the first attempt returned the
-    // untouched result 0, rendered as "<name> partition not found." on a console that has the
-    // partition, and every attempt after it hit the InFlight guard at the top and returned
-    // UNAVAILABLE -- "HDD is busy, try again once loading finishes" -- instantly, with no spinner
-    // and nothing actually loading. One transiently full IO queue, and the setting was unusable.
-    if (guiSourcesOplHomeStageInFlight) {
-        guiSourcesOplHomeStageInFlight = 0;
-        guiSourcesOplHomeStagePending = 0;
-        guiOplHomeStageReason = "worker-never-ran-queue-rejected";
-        return GUI_OPL_HOME_STAGE_UNAVAILABLE; // retryable now, and honest about why
-    }
-
-    return guiSourcesOplHomeStageResult;
 }
 
 static int guiSettingsShowSources(void)
@@ -2819,11 +2691,6 @@ static int guiSettingsShowSources(void)
     diaSetEnum(ui, CFG_MMCEMODE, deviceModes);
     diaSetInt(ui, CFG_MMCEMODE, gMMCEStartMode);
     diaSetEnabled(ui, CFG_MMCEMODE, 1);
-    guiSourcesOplHomeInitial = hddGetOplHomeSelection();
-    guiSourcesOplHomeLegacy = hddOplHomeIsLegacy();
-    guiSourcesOplHomeTouched = 0;
-    diaSetEnum(ui, CFG_HDDOPLPART, hddOplHomes);
-    diaSetInt(ui, CFG_HDDOPLPART, guiSourcesOplHomeInitial);
     guiSettingsBeginDialog(ui);
 
 reshow_sources:
@@ -2843,21 +2710,6 @@ reshow_sources:
 
     if (result != UIID_BTN_CANCEL && result != -1) {
         int netProtocolWas = gNetworkProtocol;
-        int hddOplHomeChoice;
-        int hddOplHomeStageResult;
-
-        diaGetInt(ui, CFG_HDDOPLPART, &hddOplHomeChoice);
-        if (hddOplHomeChoice != guiSourcesOplHomeInitial ||
-            (guiSourcesOplHomeLegacy && guiSourcesOplHomeTouched)) {
-            hddOplHomeStageResult = guiSettingsStageOplHome(hddOplHomeChoice);
-            if (hddOplHomeStageResult != GUI_OPL_HOME_STAGE_OK) {
-                diaSetInt(ui, CFG_HDDOPLPART, guiSourcesOplHomeInitial);
-                guiSourcesOplHomeTouched = 0;
-                guiMsgBox(guiOplHomeStageError(hddOplHomeChoice, hddOplHomeStageResult), 0, NULL);
-                goto reshow_sources;
-            }
-            guiMsgBox(_l(_STR_HDD_OPL_PARTITION_RESTART), 0, NULL);
-        }
 
         diaGetInt(ui, CFG_DEFDEVICE, &deviceModeIndex);
         gDefaultDevice = guiDeviceTypeToIoMode(deviceModeIndex);
