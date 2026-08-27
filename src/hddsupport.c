@@ -36,6 +36,11 @@ static unsigned char hddHDProKitDetected = 0;
 static unsigned char hddModulesLoadCount = 0;
 static unsigned char hddModulesLoaded = 0;
 static unsigned char hddSupportModulesLoaded = 0;
+// A failed ATA dependency load must keep the DEV9 reference across retries. Releasing it powers
+// the card off while sysLoadModuleBuffer still remembers the resident DEV9 IRX, so a later retry
+// skips the load and probes a stopped adapter. This flag owns exactly one reference for the ATA
+// stack and is released only by terminal teardown.
+static unsigned char hddDev9RefHeld = 0;
 // The generic ATA block-device path does not need the APA settle. Keep one bounded gap between
 // the shared ATAD/XHDD stack and the APA/PFS stack, where the first hdd0:/ps2fs probe can race the
 // same physical drive. This avoids adding the APA-only delay to the single-partition ATA VCD path.
@@ -424,7 +429,13 @@ int hddLoadModules(void)
 
         // DEV9 must be loaded, as HDD.IRX depends on it. Even if not required by the I/F (i.e. HDPro)
         hddDiagBootStageBegin("HDD:DEV9");
-        dev9Ready = sysInitDev9() == 0;
+        if (hddDev9RefHeld)
+            dev9Ready = 1;
+        else {
+            dev9Ready = sysInitDev9() == 0;
+            if (dev9Ready)
+                hddDev9RefHeld = 1;
+        }
         hddDiagBootStageEndVoid("HDD:DEV9");
 
         if (!dev9Ready) {
@@ -476,13 +487,9 @@ int hddLoadModules(void)
             // power-on). sysInitDev9/sysLoadModuleBuffer are safe to re-run; a later caller (e.g. the
             // HDD tab) now gets a real second attempt instead of a poisoned latch.
             //
-            // Release the dev9 reference taken above before clearing the count, or the retry that this
-            // line exists to permit takes a SECOND one and never gives either back. dev9 is refcounted
-            // and shared with ETH/UDPBD, so an inflated count means a later teardown can never power
-            // dev9 down. The UDPBD arm in bdmsupport.c already pairs its init/shutdown this way; this
-            // arm did not, and rebuild-153's device-refresh bump made the retry more frequent.
-            if (dev9Ready)
-                sysShutdownDev9();
+            // Keep the single DEV9 reference for a retry. Releasing it here can power the card off
+            // while the resident-module tracker still makes the next sysInitDev9() skip loading it.
+            // Terminal teardown releases hddDev9RefHeld exactly once.
             hddModulesLoadCount = 0;
         } else {
             retStatus = HDD_LOADMODULES_STATUS_NOERROR;
@@ -2152,8 +2159,10 @@ static void hddShutdown(item_list_t *itemList)
         // emulated DEV9 power-off is inert). ee_core/POPSTARTER reset the IOP right after, so the
         // launch path needs no power-off. Note the refcount asymmetry this also softens: N
         // hddLoadModules calls take ONE dev9 reference, but every hddShutdown used to drop it.
-        if (gDeinitTerminal)
-            sysShutdownDev9();
+    }
+    if (gDeinitTerminal && hddDev9RefHeld) {
+        sysShutdownDev9();
+        hddDev9RefHeld = 0;
     }
     hddApaSettled = 0;
 }

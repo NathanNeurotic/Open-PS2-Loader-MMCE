@@ -3828,13 +3828,9 @@ int oplUpdateGameCompatSingle(int id, item_list_t *support, config_set_t *config
 
 static void shutdownLwnbdNetwork(void)
 {
-    // The loaded-check mirrors ethShutdown: DEV9's refcount is shared with BDM/HDD, so only
-    // release it when the eth path actually holds it.
-    int ethWasLoaded = ethGetModulesLoaded();
-
+    // ETH owns its DEV9 reference, including partial dependency-load state, through teardown.
     ethDeinitModules();
-    if (ethWasLoaded)
-        sysShutdownDev9();
+    ethReleaseDev9();
 }
 
 static int loadLwnbdSvr(int *teardownStarted)

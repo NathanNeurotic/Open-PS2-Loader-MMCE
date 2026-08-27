@@ -537,7 +537,7 @@ static int mmceNeedsUpdate(item_list_t *itemList)
     if (folderConsumeDirty(itemList->mode))
         return 1;
     if (vcdViewActive(itemList->mode)) {
-        if (!mmceVcdScanned) {
+        if (!mmceVcdScanned && !mmceVcdScanFailed) {
             mmceGameList.updateDelay = MMCE_MODE_UPDATE_DELAY;
             return 1;
         }

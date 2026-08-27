@@ -1,4 +1,5 @@
 #include <string.h>
+#include <delaythread.h>
 #include <kernel.h>
 #include <sifrpc.h>
 
@@ -9,14 +10,25 @@ static SifRpcClientData_t SifRpcClient;
 static unsigned char RpcTxBuffer[256] ALIGNED(64);
 static unsigned char RpcRxBuffer[64] ALIGNED(64);
 
+// HTTP is optional compatibility-update support. A missing or late httpclient RPC server must not
+// hold the shared network worker forever, so give the server a short startup window and let ETH
+// continue without update support if it never appears.
+#define HTTP_INIT_RETRIES 30
+
 int HttpInit(void)
 {
-    while (SifBindRpc(&SifRpcClient, 0x00001B14, 0) < 0 || SifRpcClient.server == NULL) {
+    int retry;
+
+    for (retry = 0; retry < HTTP_INIT_RETRIES; retry++) {
+        if (SifBindRpc(&SifRpcClient, 0x00001B14, 0) >= 0 && SifRpcClient.server != NULL)
+            return 0;
+
         LOG("libhttpclient: bind failed\n");
-        nopdelay();
+        DelayThread(10000);
     }
 
-    return 0;
+    HttpDeinit();
+    return -1;
 }
 
 void HttpDeinit(void)

@@ -31,6 +31,17 @@ static time_t ethModifiedCDPrev;
 static time_t ethModifiedDVDPrev;
 static int ethGameCount = 0;
 static unsigned char ethModulesLoaded = 0;
+// Keep the DEV9/NIC ownership state separate from the fully usable SMB state. A dependency can
+// fail after NetMan/SMAP has claimed the adapter; dropping the DEV9 reference in that window powers
+// the adapter off while sysLoadModuleBuffer still considers its IRXs resident, and another transport
+// can then try to claim the same SMAP driver. The claim remains until the ETH stack is explicitly
+// torn down, while a retry reuses the one DEV9 reference instead of incrementing it again.
+static unsigned char ethNetworkClaimed = 0;
+static unsigned char ethDev9RefHeld = 0;
+static unsigned char ethNetmanInitialized = 0;
+static unsigned char ethPs2ipInitialized = 0;
+static unsigned char ethHttpInitialized = 0;
+static unsigned char ethNbnsInitialized = 0;
 static base_game_info_t *ethGames = NULL;
 
 // Favourites needs to validate an ISO record even when the live ETH page currently owns the VCD
@@ -295,7 +306,7 @@ static void ethInitSMB(void)
 
 int ethGetModulesLoaded(void)
 {
-    return ethModulesLoaded;
+    return ethModulesLoaded || ethNetworkClaimed;
 }
 
 int ethIsSMBShareConnected(void)
@@ -323,15 +334,14 @@ static int ethLoadModules(void)
     }
 
     if (!ethModulesLoaded) {
-        int dev9Ready;
-        int netmanInitialized = 0;
-        int httpInitialized = 0;
-
-        dev9Ready = sysInitDev9();
-        if (dev9Ready < 0) {
-            gNetworkStartup = ERROR_ETH_MODULE_NETIF_FAILURE;
-            LOG("ETHSUPPORT: DEV9 initialization failed (%d); network setup remains retryable\n", dev9Ready);
-            return -1;
+        if (!ethDev9RefHeld) {
+            int dev9Ready = sysInitDev9();
+            if (dev9Ready < 0) {
+                gNetworkStartup = ERROR_ETH_MODULE_NETIF_FAILURE;
+                LOG("ETHSUPPORT: DEV9 initialization failed (%d); network setup remains retryable\n", dev9Ready);
+                return -1;
+            }
+            ethDev9RefHeld = 1;
         }
 
         LOG("[NETMAN]:\n");
@@ -339,12 +349,13 @@ static int ethLoadModules(void)
             goto load_failed;
 
         NetManInit();
-        netmanInitialized = 1;
+        ethNetmanInitialized = 1;
         LOG("[SMSUTILS]:\n");
         sysLoadModuleBuffer(&smsutils_irx, size_smsutils_irx, 0, NULL);
         LOG("[SMAP]:\n");
         if (sysLoadModuleBuffer(&smap_irx, size_smap_irx, 0, NULL) < 0)
             goto load_failed;
+        ethNetworkClaimed = 1;
 
         // Before the network stack is loaded, attempt to set the link settings in order to avoid
         // needing double-initialization of the IF. A failed dependency remains retryable now.
@@ -359,21 +370,28 @@ static int ethLoadModules(void)
         if (sysLoadModuleBuffer(&httpclient_irx, size_httpclient_irx, 0, NULL) >= 0) {
             if (HttpInit() < 0)
                 LOG("ETHSUPPORT: httpclient RPC bind failed; compat update unavailable\n");
-            else
-                httpInitialized = 1;
+            else {
+                ethHttpInitialized = 1;
+            }
         }
 
         ps2ip_init();
+        ethPs2ipInitialized = 1;
         ethModulesLoaded = 1;
         LOG("ETHSUPPORT Modules loaded\n");
         return 0;
 
     load_failed:
-        if (httpInitialized)
+        if (ethHttpInitialized)
             HttpDeinit();
-        if (netmanInitialized)
+        if (ethNetmanInitialized)
             NetManDeinit();
-        sysShutdownDev9();
+        ethHttpInitialized = 0;
+        ethPs2ipInitialized = 0;
+        ethNetmanInitialized = 0;
+        // Keep the DEV9 reference and any claimed NIC ownership. The next invocation retries the
+        // missing dependency against the already-resident lower layers; releasing here would issue
+        // DDIOC_OFF while dev9Initialized/module-buffer tracking still says the stack is present.
         ethModulesLoaded = 0;
         LOG("ETHSUPPORT: network module chain failed; setup remains retryable\n");
 
@@ -392,7 +410,9 @@ static int ethLoadModules(void)
 
 void ethDeinitModules(void)
 {
-    if (ethModulesLoaded) {
+    if (ethModulesLoaded || ethNetworkClaimed || ethDev9RefHeld) {
+        int wasModulesLoaded = ethModulesLoaded;
+        int wasPs2ipInitialized = ethPs2ipInitialized;
         // BOUNDED ACQUIRE, was an unbounded WaitSema. deinit runs this while a game launch is in
         // flight, and anything still holding this lock -- an in-progress SMB reconnect, a network
         // read that will not return because the link is already going away -- used to stop the exit
@@ -415,10 +435,26 @@ void ethDeinitModules(void)
                 LOG("ETH: deinit could not take the init lock -- tearing down anyway\n");
         }
 
-        HttpDeinit();
-        nbnsDeinit();
-        NetManDeinit();
+        if (ethHttpInitialized)
+            HttpDeinit();
+        if (ethNbnsInitialized)
+            nbnsDeinit();
+        if (ethNetmanInitialized) {
+            NetManDeinit();
+            ethNetmanInitialized = 0;
+        }
+        // To allow the configuration to be read later on, read the latest version while PS2IP is
+        // still available. Preserve the old full-stack behavior, but skip it for a partial claim.
+        if (wasModulesLoaded)
+            ethReadNetConfig();
+        if (wasPs2ipInitialized)
+            ps2ip_deinit();
+
         ethModulesLoaded = 0;
+        ethHttpInitialized = 0;
+        ethPs2ipInitialized = 0;
+        ethNetmanInitialized = 0;
+        ethNbnsInitialized = 0;
         gNetworkStartup = ERROR_ETH_NOT_STARTED;
 
         if (ethInitSemaID >= 0) {
@@ -428,9 +464,17 @@ void ethDeinitModules(void)
             ethInitSemaID = -1;
         }
 
-        // To allow the configuration to be read later on, read the latest version now.
-        ethReadNetConfig();
-        ps2ip_deinit();
+    }
+}
+
+void ethReleaseDev9(void)
+{
+    // Deinit and DEV9 release are separate because the launch cleanup path must leave DEV9 powered
+    // for the handoff ELF, while terminal shutdown and the NBD preflight explicitly return it.
+    ethNetworkClaimed = 0;
+    if (ethDev9RefHeld) {
+        sysShutdownDev9();
+        ethDev9RefHeld = 0;
     }
 }
 
@@ -518,6 +562,7 @@ static void smbLoadModules(void)
             LOG("[NBNS]:\n");
             sysLoadModuleBuffer(&nbns_irx, size_nbns_irx, 0, NULL);
             nbnsInit();
+            ethNbnsInitialized = 1;
 
             LOG("SMBSUPPORT Modules loaded\n");
             ethInitSMB();
@@ -1082,6 +1127,8 @@ static void ethCleanUp(item_list_t *itemList, int exception)
 
     // UI may have initialized modules outside of ETH mode, so deinitialize regardless of the enabled status.
     ethDeinitModules();
+    if (gDeinitTerminal)
+        ethReleaseDev9();
 }
 
 // This may be called, even if ethInit() was not.
@@ -1099,12 +1146,8 @@ static void ethShutdown(item_list_t *itemList)
     }
 
     // UI may have initialized modules outside of ETH mode, so deinitialize regardless of the enabled status.
-    int ethWasLoaded = ethModulesLoaded; // capture BEFORE ethDeinitModules() clears ethModulesLoaded
     ethDeinitModules();
-
-    // Only shut down dev9 from here, if it was initialized from here before.
-    if (ethWasLoaded)
-        sysShutdownDev9();
+    ethReleaseDev9();
 }
 
 static int ethCheckVMC(item_list_t *itemList, char *name, int createSize)

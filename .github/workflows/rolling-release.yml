@@ -50,7 +50,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 # Per-ref: master pushes still supersede each other (rolling), but a v* tag release runs in its
 # own group, so a new master push can't cancel an in-flight release cut (or vice versa).

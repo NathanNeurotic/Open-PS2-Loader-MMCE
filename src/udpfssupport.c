@@ -34,6 +34,9 @@ static int udpfsGameCount = 0;
 static base_game_info_t *udpfsGames = NULL;
 static int udpfsIomanModLoaded = 0;
 static int udpfsLoadQueued = 0;
+// UDPFS can leave its SMAP/ministack layers resident when the ioman module fails. Retain one DEV9
+// reference across retries and advertise the partial claim so ETH/UDPBD cannot double-drive SMAP.
+static unsigned char udpfsDev9RefHeld = 0;
 
 // forward declaration
 static item_list_t udpfsGameList;
@@ -70,9 +73,12 @@ static void udpfsLoadModules(void)
 
     // dev9 is refcounted (shared with ATA-HDD). The ministack has no DHCP client, so it needs the PS2's
     // static IP as an "ip=A.B.C.D" arg -- built exactly as bdmsupport does for the udpfs_bd chain.
-    if (sysInitDev9() < 0) {
-        LOG("UDPFSSUPPORT: DEV9 initialization failed; module chain remains retryable\n");
-        return;
+    if (!udpfsDev9RefHeld) {
+        if (sysInitDev9() < 0) {
+            LOG("UDPFSSUPPORT: DEV9 initialization failed; module chain remains retryable\n");
+            return;
+        }
+        udpfsDev9RefHeld = 1;
     }
     snprintf(ipArg, sizeof(ipArg), "ip=%d.%d.%d.%d", ps2_ip[0], ps2_ip[1], ps2_ip[2], ps2_ip[3]);
 
@@ -89,15 +95,15 @@ static void udpfsLoadModules(void)
         }
     }
 
-    // Release the dev9 reference taken above if any load failed -- otherwise a failing/retrying UDPFS
-    // inflates the refcounted dev9InitCount and a later HDD/ETH teardown can never power dev9 down.
+    // Keep the single DEV9 reference for a retry. The partially resident SMAP/ministack must retain
+    // ownership of the adapter until the IOP is reset; releasing it here would leave the next retry
+    // with a powered-off card but a resident-module latch.
     LOG("UDPFSSUPPORT: module chain failed to load\n");
-    sysShutdownDev9();
 }
 
 int udpfsGetModulesLoaded(void)
 {
-    return udpfsIomanModLoaded;
+    return udpfsIomanModLoaded || udpfsDev9RefHeld;
 }
 
 void udpfsInit(item_list_t *itemList)

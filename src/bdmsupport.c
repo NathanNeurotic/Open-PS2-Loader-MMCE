@@ -35,6 +35,10 @@ static int ieee1394ModLoaded = 0;
 static int mx4sioModLoaded = 0;
 static int hddModLoaded = 0;
 static int udpbdModLoaded = 0;
+// Keep one DEV9 reference while a UDPBD/UDPFS-BD dependency chain is incomplete. The lower-layer
+// SMAP module can already be resident when the final module fails; releasing DEV9 then powers off
+// the adapter and prevents a later retry from restoring it because module loading is deduplicated.
+static unsigned char udpbdDev9RefHeld = 0;
 /*
   WHICH network block transport is actually resident, as NET_BOOT_UDPBD / NET_BOOT_UDPFS, or -1
   when none is loaded.
@@ -657,7 +661,7 @@ static int bdmDiagLoadOptionalModuleArgs(const char *stage, const char *name, vo
 // Exposed for ethsupport's NIC mutual-exclusion: UDPBD and the SMB stack both own the SMAP adapter.
 int bdmIsUDPBDLoaded(void)
 {
-    return udpbdModLoaded;
+    return udpbdModLoaded || udpbdDev9RefHeld;
 }
 
 /*
@@ -1035,7 +1039,14 @@ static void bdmLoadBlockDeviceModules(void)
         const char *networkStage = gNetBootProtocol == NET_BOOT_UDPFS ? "UDPFS-BD chain" : "UDPBD";
 
         bdmDiagBootStageBegin(networkStage);
-        int dev9Ready = sysInitDev9() == 0;
+        int dev9Ready;
+        if (udpbdDev9RefHeld)
+            dev9Ready = 1;
+        else {
+            dev9Ready = sysInitDev9() == 0;
+            if (dev9Ready)
+                udpbdDev9RefHeld = 1;
+        }
         snprintf(ipArg, sizeof(ipArg), "ip=%d.%d.%d.%d", ps2_ip[0], ps2_ip[1], ps2_ip[2], ps2_ip[3]);
         if (dev9Ready && gNetBootProtocol == NET_BOOT_UDPFS) {
             // UDPFS: a 3-IRX chain loaded in dependency order -- smap (exports to ministack + bd), then
@@ -1058,12 +1069,9 @@ static void bdmLoadBlockDeviceModules(void)
             }
         }
         bdmDiagBootStageEnd(networkStage, networkResult);
-        // Release the dev9 reference taken above if the load failed -- otherwise a failing/retrying
-        // UDPBD/UDPFS (both gates re-enter on every device refresh while !udpbdModLoaded) inflates the
-        // refcounted dev9InitCount and a later HDD/ETH teardown can never power dev9 down. On success
-        // the reference is intentionally kept (the device stays mounted). Mirrors ETH/HDD pairing.
-        if (dev9Ready && !udpbdModLoaded)
-            sysShutdownDev9();
+        // Keep the single DEV9 reference on failure so a retry can complete the dependency chain
+        // against the already-resident lower layers. It remains held for the life of the boot once
+        // the UDPBD/UDPFS-BD transport has claimed the adapter.
     }
 
     int modsNow = iUSBModLoaded + iLinkModLoaded + mx4sioModLoaded + hddModLoaded + udpbdModLoaded;

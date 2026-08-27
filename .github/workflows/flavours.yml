@@ -1,5 +1,8 @@
 name: build-flavours
 
+permissions:
+  contents: read
+
 # FOUR FLAVOURS, along two independent axes: WHICH toolchain, and PINNED vs ROLLING.
 #
 #                      pinned (reproducible)          rolling (early warning)

@@ -17,8 +17,9 @@ typedef struct
 
 void ethInit(item_list_t *itemList); // Full initialization (Start ETH + SMB and apply configuration). GUI must be already initialized, used by GUI to start SMB mode.
 void ethDeinitModules(void);         // Module-only deinitialization, without the GUI's knowledge (for specific reasons, otherwise unused).
+void ethReleaseDev9(void);           // Release ETH's DEV9/NIC ownership after module teardown.
 int ethLoadInitModules(void);        // Initializes Ethernet and applies configuration.
-int ethGetModulesLoaded(void);       // 1 if the SMB NIC stack is loaded (UDPBD must not load on top).
+int ethGetModulesLoaded(void);       // 1 if ETH fully loaded or owns a partial SMB NIC claim (UDPBD must not load on top).
 // True only after OPENSHARE succeeded and the active smb0: prefix is usable. This is deliberately
 // stronger than "Network Protocol == SMB": callers must not turn a read-only import into a long
 // connection attempt or consume stale saved values.
