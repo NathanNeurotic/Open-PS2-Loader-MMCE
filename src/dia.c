@@ -893,6 +893,36 @@ static int diaHandleInput(struct UIItem *item, int *modified, int settingsContex
         return 0;
     }
     if (item->type == UI_INT) {
+        /* DIRECT ENTRY. Nudging with up/down is fine for a value near where it already is and awful
+           for anything else -- reaching a four-digit number one press at a time is not a UI. Triangle
+           opens the same on-screen keyboard the string fields use, seeded with the current value:
+           its top row is 1234567890 and the cursor starts on '1', so it serves as a numeric pad
+           without needing a second widget.
+
+           Triangle and Square are both free while an int has focus -- dia.c binds them only INSIDE
+           diaShowKeyb(), for backspace and space -- so this adds a way in without taking one away.
+           Up/down still nudge, and cross/circle still accept/cancel exactly as before. */
+        if (getKeyOn(KEY_TRIANGLE)) {
+            char numbuf[16];
+            char *end = NULL;
+            long entered;
+
+            snprintf(numbuf, sizeof(numbuf), "%d", item->intvalue.current);
+            if (diaShowKeyb(numbuf, sizeof(numbuf), 0, NULL)) {
+                entered = strtol(numbuf, &end, 10);
+                // Reject junk instead of storing it: strtol answers 0 for "abc", which would look
+                // like a deliberate entry. Only commit when at least one digit was consumed.
+                if (end != numbuf) {
+                    if (entered < item->intvalue.min)
+                        entered = item->intvalue.min;
+                    if (entered > item->intvalue.max)
+                        entered = item->intvalue.max;
+                    item->intvalue.current = (int)entered;
+                }
+            }
+            return 0; // lose focus after editing, same as the string fields
+        }
+
         // to be sure
         setButtonDelay(KEY_UP, DIA_INT_SET_SPEED);
         setButtonDelay(KEY_DOWN, DIA_INT_SET_SPEED);
