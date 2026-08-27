@@ -632,7 +632,9 @@ static int mmceUpdateGameList(item_list_t *itemList)
     // Each view scans into its OWN array (#120): a failed rescan preserves only that view's last-good and
     // can never resurrect the other view's list (see the mmceVcdGames comment at the declarations).
     if (vcdViewActive(itemList->mode)) {
-        int r = vcdFillGameList(mmcePrefix, &mmceVcdGames);
+        char vcdPrefix[sizeof(mmcePrefix)];
+        mmceGetDeviceRoot(vcdPrefix, sizeof(vcdPrefix));
+        int r = vcdFillGameList(vcdPrefix, &mmceVcdGames);
         if (r >= 0) { // r < 0: transient scan failure (contended bus) -> keep the last-good VCD list
             mmceVcdScanned = 1;
             mmceVcdGameCount = r;
@@ -705,10 +707,12 @@ static void mmceRenameGame(item_list_t *itemList, int id, char *newName)
 {
     if (vcdViewActive(itemList->mode)) {
         base_game_info_t *game = mmceActiveGame(itemList, id);
+        char vcdPrefix[sizeof(mmcePrefix)];
 
         if (game == &mmceEmptyGame)
             return; // stale id in the VCD->ISO toggle window
-        if (vcdRenameFile(mmcePrefix, game->name, newName) == 0) {
+        mmceGetDeviceRoot(vcdPrefix, sizeof(vcdPrefix));
+        if (vcdRenameFile(vcdPrefix, game->name, newName) == 0) {
             // MMCE normally latches a successful VCD scan under NOUPDATE. Re-arm its normal scan
             // path so the deferred menu update publishes the new filename immediately.
             mmceVcdScanned = 0;
@@ -731,9 +735,14 @@ static void mmceRenameGame(item_list_t *itemList, int id, char *newName)
 static void mmceLaunchVcd(item_list_t *itemList, const char *vcdName, config_set_t *configSet)
 {
     char vcdElf[256], vcdSelector[320];
+    char vcdPrefix[sizeof(mmcePrefix)];
+
+    (void)configSet;
 
     if (vcdName == NULL || vcdName[0] == '\0' || !strcasecmp(vcdName, "POPSTARTER")) // reserved-name belt: the scanner no longer lists it (#154); strcasecmp -- FAT is case-insensitive
         return;
+
+    mmceGetDeviceRoot(vcdPrefix, sizeof(vcdPrefix));
 
     // Present preparation indicator before potentially expensive memory-card file IO
     guiRenderTextScreen(_l(_STR_PLEASE_WAIT));
@@ -744,20 +753,20 @@ static void mmceLaunchVcd(item_list_t *itemList, const char *vcdName, config_set
         return;
     }
 
-    if (!vcdResolvePopstarter(mmcePrefix, vcdElf, sizeof(vcdElf))) {
+    if (!vcdResolvePopstarter(vcdPrefix, vcdElf, sizeof(vcdElf))) {
         guiMsgBox(_l(_STR_POPSTARTER_NOT_FOUND), 0, NULL);
         return;
     }
-    vcdBuildSelector(mmcePrefix, VCD_PREFIX_MASS, vcdName, vcdSelector, sizeof(vcdSelector));
+    vcdBuildSelector(vcdPrefix, VCD_PREFIX_MASS, vcdName, vcdSelector, sizeof(vcdSelector));
 
     // Source MC-side externals from this MMCE card's direct POPS/ folder; never overwrite card files.
-    (void)vcdInstallPopstarterMc(mmcePrefix);
+    (void)vcdInstallPopstarterMc(vcdPrefix);
 
     // Best-effort card prep: BDMA prep is card preparation, never a POPSTARTER launch gate.
     vcdEnsureBdmaForLaunch(VCD_BDMA_SRC_MMCE, VCD_BDMA_MMCE);
 
     char vcdFullPath[256];
-    snprintf(vcdFullPath, sizeof(vcdFullPath), "%sPOPS/%s.VCD", mmcePrefix, vcdName);
+    snprintf(vcdFullPath, sizeof(vcdFullPath), "%sPOPS/%s.VCD", vcdPrefix, vcdName);
     vcdPrepareRetroGemBarcode(vcdFullPath);
     deinit(UNMOUNT_EXCEPTION, itemList->mode); // keep the MMCE device mounted across the IOP reset
     sysLaunchPopstarter(vcdElf, vcdSelector);
@@ -1122,14 +1131,25 @@ static config_set_t *mmceGetConfig(item_list_t *itemList, int id)
     // Config (CFG + #Format/#System/#DiscType badges) comes from the ACTIVE view's array; mmceActiveGame
     // picks it (VCD keys off the basename) and returns a safe empty entry for a stale id during the toggle
     // window -- so this can never index the wrong/NULL array out of range.
+    if (vcdViewActive(itemList->mode)) {
+        char vcdPrefix[sizeof(mmcePrefix)];
+        mmceGetDeviceRoot(vcdPrefix, sizeof(vcdPrefix));
+        return sbPopulateConfig(mmceActiveGame(itemList, id), vcdPrefix, "/");
+    }
     return sbPopulateConfig(mmceActiveGame(itemList, id), mmcePrefix, "/");
 }
 
 static int mmceGetImage(item_list_t *itemList, char *folder, int isRelative, char *value, char *suffix, GSTEXTURE *resultTex, short psm)
 {
-    int r = mmceTryLoadImage(mmceArtPrimary, folder, isRelative, value, suffix, resultTex);
+    char vcdPrefix[sizeof(mmcePrefix)];
+    const char *imagePrefix = mmceArtPrimary;
+    if (vcdViewActive(itemList->mode)) {
+        mmceGetDeviceRoot(vcdPrefix, sizeof(vcdPrefix));
+        imagePrefix = vcdPrefix;
+    }
+    int r = mmceTryLoadImage(imagePrefix, folder, isRelative, value, suffix, resultTex);
     if (r == ERR_BAD_FILE && isRelative && vcdViewActive(itemList->mode))
-        r = vcdLoadPopsCover(mmceArtPrimary, value, suffix, resultTex);
+        r = vcdLoadPopsCover(imagePrefix, value, suffix, resultTex);
     return r;
 }
 

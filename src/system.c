@@ -165,7 +165,15 @@ void sysInitDev9(void)
     if (!dev9Initialized) {
         LOG("[DEV9]:\n");
         ret = sysLoadModuleBuffer(&ps2dev9_irx, size_ps2dev9_irx, 0, NULL);
-        dev9Loaded = (ret == 0); // DEV9.IRX must have successfully loaded and returned RESIDENT END.
+        if (ret < 0) {
+            // A failed first load must remain retryable. Recent boot recovery paths can touch DEV9
+            // before Ethernet; latching this as initialized made every later network bring-up skip
+            // the only load attempt and report a missing NIC even when the transient cause had gone.
+            dev9Loaded = 0;
+            LOG("[DEV9] load failed (%d); leaving initialization retryable\n", ret);
+            return;
+        }
+        dev9Loaded = 1; // DEV9.IRX must have successfully loaded and returned RESIDENT END.
         dev9Initialized = 1;
     }
 
