@@ -2545,13 +2545,30 @@ static int thmLoadResource(GSTEXTURE *texture, int texId, const char *themePath,
     return success;
 }
 
-static void thmSetColors(theme_t *theme)
+/* retintElements: also force every main element to the new textColor.
+ *
+ * THIS IS NOT A PALETTE OPERATION and the distinction is load-bearing. At theme-load time the
+ * element list is still empty when this runs, so the loop below is a no-op and the elements get
+ * their real colours moments later from the theme's own config (initBasic / the "color" key).
+ * Called again on a POPULATED theme, the same loop overwrites every one of those parsed colours
+ * with a single flat value.
+ *
+ * That is harmless for the built-in default theme, whose elements all use textColor anyway --
+ * which is why it went unnoticed for years while theme 0 was the only live caller. It is
+ * destructive for any theme that gives its elements distinct colours, and <Coverflow> is exactly
+ * such a theme: theme_coverflow_cfg sets them. Flattening them repaints the whole page in one
+ * colour, and any element whose text then matches its background simply stops being visible --
+ * a list that renders nothing while navigation still works perfectly. */
+static void thmSetColors(theme_t *theme, int retintElements)
 {
     memcpy(theme->bgColor, gDefaultBgColor, 3);
     memcpy(theme->plasBlendColor, gDefaultPlasBlendColor, 3);
     theme->textColor = GS_SETREG_RGBA(gDefaultTextColor[0], gDefaultTextColor[1], gDefaultTextColor[2], 0x80);
     theme->uiTextColor = GS_SETREG_RGBA(gDefaultUITextColor[0], gDefaultUITextColor[1], gDefaultUITextColor[2], 0x80);
     theme->selTextColor = GS_SETREG_RGBA(gDefaultSelTextColor[0], gDefaultSelTextColor[1], gDefaultSelTextColor[2], 0x80);
+
+    if (!retintElements)
+        return;
 
     theme_element_t *elem = theme->mainElems.first;
     while (elem) {
@@ -2616,7 +2633,7 @@ static int thmLoad(const char *themePath)
 
     newT->useDefault = 1;
     newT->usedHeight = 480;
-    thmSetColors(newT);
+    thmSetColors(newT, 1); // element list is still empty here; the retint is a no-op by construction
     newT->mainElems.first = NULL;
     newT->mainElems.last = NULL;
     newT->infoElems.first = NULL;
@@ -3062,8 +3079,15 @@ int thmSetGuiValue(int themeID, int reload)
 
                Disk themes stay excluded on purpose -- their colours come from the theme file, and
                overwriting them with the settings picker's values is what the read-only grey-out in
-               guiShowColorsConfig exists to prevent. (issue #537) */
-            thmSetColors(gTheme);
+               guiShowColorsConfig exists to prevent. (issue #537)
+
+               ONLY THEME 0 GETS THE ELEMENT RETINT. Extending this call to Coverflow without that
+               restriction repainted every Coverflow element in one flat colour on EVERY applyConfig
+               -- not just on a colour edit -- because the retint loop stomps the per-element colours
+               theme_coverflow_cfg had parsed. Elements whose text then matched their background
+               stopped drawing at all, which presents as broken visuals and vanishing game lists
+               while navigation stays perfectly responsive. Coverflow takes the palette only. */
+            thmSetColors(gTheme, guiThemeID == 0);
         }
     }
     return 0;
