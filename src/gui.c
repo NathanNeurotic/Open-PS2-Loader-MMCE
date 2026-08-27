@@ -130,11 +130,23 @@ enum {
     GUI_OPL_HOME_STAGE_UNAVAILABLE = -1,
 };
 
+// Set at each GUI-side staging exit. hddOplHomeStageReason() covers the hdd-side ones.
+static const char *guiOplHomeStageReason = "none";
+
 static const char *guiOplHomeStageError(int selection, int result)
 {
-    if (result == GUI_OPL_HOME_STAGE_UNAVAILABLE)
-        return _l(_STR_HDD_OPL_PARTITION_BUSY);
-    return selection == HDD_OPL_HOME_PLUS ? _l(_STR_HDD_OPL_PLUS_NOT_FOUND) : _l(_STR_HDD_OPL_COMMON_NOT_FOUND);
+    const char *base = (result == GUI_OPL_HOME_STAGE_UNAVAILABLE) ? _l(_STR_HDD_OPL_PARTITION_BUSY) : (selection == HDD_OPL_HOME_PLUS ? _l(_STR_HDD_OPL_PLUS_NOT_FOUND) : _l(_STR_HDD_OPL_COMMON_NOT_FOUND));
+
+#ifdef __OPLDIAG
+    // Name the condition that actually fired. Five different failures share these two strings, so a
+    // report of "it says busy" has never been enough to tell them apart -- which is why this row has
+    // now survived several rounds of fixes aimed at the wrong one. Diagnostic builds only.
+    static char detailed[192];
+    snprintf(detailed, sizeof(detailed), "%s\n[%s / %s]", base, guiOplHomeStageReason, hddOplHomeStageReason());
+    return detailed;
+#else
+    return base;
+#endif
 }
 
 #ifdef __DEBUG
@@ -2729,9 +2741,12 @@ static int guiSettingsStageOplHome(int selection)
 {
     // Do not overwrite the static request payload after a timed-out worker. The I/O queue is
     // single-threaded, so another request cannot begin until that worker actually returns.
-    if (guiSourcesOplHomeStageInFlight)
+    if (guiSourcesOplHomeStageInFlight) {
+        guiOplHomeStageReason = "still-in-flight-from-previous";
         return GUI_OPL_HOME_STAGE_UNAVAILABLE;
+    }
 
+    guiOplHomeStageReason = "worker-completed";
     guiSourcesOplHomeStageChoice = selection;
     guiSourcesOplHomeStageResult = 0;
     guiSourcesOplHomeStagePending = 1;
@@ -2744,6 +2759,7 @@ static int guiSettingsStageOplHome(int selection)
         // a later Save Settings persist a choice the user did not get to confirm. InFlight stays
         // SET here on purpose: the worker may still be running and must be allowed to return.
         guiSourcesOplHomeStageAbandoned = 1;
+        guiOplHomeStageReason = "worker-timed-out-15s";
         hddDiscardOplHomeSelection();
         return GUI_OPL_HOME_STAGE_UNAVAILABLE;
     }
@@ -2761,6 +2777,7 @@ static int guiSettingsStageOplHome(int selection)
     if (guiSourcesOplHomeStageInFlight) {
         guiSourcesOplHomeStageInFlight = 0;
         guiSourcesOplHomeStagePending = 0;
+        guiOplHomeStageReason = "worker-never-ran-queue-rejected";
         return GUI_OPL_HOME_STAGE_UNAVAILABLE; // retryable now, and honest about why
     }
 

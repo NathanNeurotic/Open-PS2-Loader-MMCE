@@ -1248,12 +1248,26 @@ void hddDiscardOplHomeSelection(void)
     hddOplHomePending = -1;
 }
 
+// Why the last staging attempt ended the way it did. Five distinct conditions were all collapsed
+// into two user-visible messages ("not found" / "busy"), which is why this row resisted several
+// rounds of fixing: the message never named which one had fired. Surfaced in OPLDIAG builds only.
+static const char *hddOplHomeStageReasonText = "none";
+
+const char *hddOplHomeStageReason(void)
+{
+    return hddOplHomeStageReasonText;
+}
+
 int hddStageOplHomeSelection(int selection)
 {
     const char *partition;
 
-    if (selection != HDD_OPL_HOME_COMMON && selection != HDD_OPL_HOME_PLUS)
+    hddOplHomeStageReasonText = "entered";
+
+    if (selection != HDD_OPL_HOME_COMMON && selection != HDD_OPL_HOME_PLUS) {
+        hddOplHomeStageReasonText = "invalid-selection";
         return 0;
+    }
 
     // Use only the already-resident ATA stack. The selector is a short-lived proof, not an owner
     // of a module reference; hddLoadModulesReady() would retain one on every stage/save cycle.
@@ -1275,15 +1289,22 @@ int hddStageOplHomeSelection(int selection)
     // with a 15 s budget, which is exactly the machinery for a load that may take a second.
     // hddLoadSupportModules() is still deliberately NOT called -- its data-home recovery mounts
     // pfs0: and creates OPL folders, and neither belongs to a source-selector proof.
-    if (!hddModulesAreLoaded() && !hddLoadModulesReady())
-        return -1; // ATA stack genuinely will not come up -- cannot answer, not "absent"
-    if (!hddLoadCoreSupportModules())
+    if (!hddModulesAreLoaded() && !hddLoadModulesReady()) {
+        hddOplHomeStageReasonText = "ata-stack-unavailable";
+        return -1; // cannot answer, not "absent"
+    }
+    if (!hddLoadCoreSupportModules()) {
+        hddOplHomeStageReasonText = "pfs-support-unavailable";
         return -1;
+    }
 
     partition = selection == HDD_OPL_HOME_PLUS ? "hdd0:+OPL" : "hdd0:__common";
-    if (!hddPartitionMountableAt("pfs1:", partition, FIO_MT_RDONLY))
+    if (!hddPartitionMountableAt("pfs1:", partition, FIO_MT_RDONLY)) {
+        hddOplHomeStageReasonText = "partition-mount-refused";
         return 0; // genuinely absent: the stack was up and the mount still refused
+    }
 
+    hddOplHomeStageReasonText = "ok";
     hddOplHomePending = selection;
     return 1;
 }

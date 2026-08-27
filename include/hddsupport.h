@@ -135,6 +135,15 @@ int hddCommitOplHomeSelection(void);
 void hddDiscardOplHomeSelection(void);
 int hddOplHomeSelectionPending(void);
 
+/** Why the last hddStageOplHomeSelection() ended as it did, as a short static token
+ * ("ata-stack-unavailable", "pfs-support-unavailable", "partition-mount-refused", "ok", ...).
+ *
+ * Several distinct conditions share only two user-visible messages, so a failure here never said
+ * WHICH one fired -- which is exactly why the APA data-home row survived repeated fix attempts.
+ * Shown only in OPLDIAG builds; a normal release keeps the plain localized message.
+ */
+const char *hddOplHomeStageReason(void);
+
 void hddLaunchGame(item_list_t *itemList, int id, config_set_t *configSet);
 int hddIsPresent();
 int hddGetArtArchivePath(item_list_t *itemList, char *out, int outSize);
