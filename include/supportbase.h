@@ -62,6 +62,12 @@ int sbLoadWatchList(const char *path, const char *file);
    the result is shown as a notice. */
 void sbTestPCLinkDeferred(void);
 void raHashStep(const char *what);
+/* RA: the hash log, shared with the disc flow in discsupport.c. Open
+   before hashing, close after: raHashStep and ranet.c drop their crumbs
+   into whatever log is open. */
+void raHashLogOpen(const char *path);
+void raHashLogAdd(const char *name, const char *startup, const char *hash);
+void raHashLogClose(void);
 void sbHashGame(const char *path, const char *name, const char *ext, const char *startup);
 /* Same, but through OPL's I/O thread. From the menu call ONLY this one. */
 /* Returns 1 when queued, 0 when a check is already running. */

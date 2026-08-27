@@ -279,6 +279,39 @@ void guiShowRANotice(const char *line1, const char *line2)
     raNoticeLines = (line2 != NULL && line2[0] != '\0') ? 2 : 1;
 }
 
+/* RA: drawn on every frame, regardless of the notifications setting.
+   Returns the y the ordinary notifications should continue from, so
+   the two never overlap. */
+static int guiRenderRANotices(int y, int yadd)
+{
+    int i;
+
+    if (raNoticeLines <= 0)
+        return y;
+
+    if (!raNoticeTimer) {
+        raNoticeTimer = clock() + 8000 * (CLOCKS_PER_SEC / 1000);
+        sfxPlay(SFX_MESSAGE);
+    }
+
+    for (i = 0; i < raNoticeLines; i++) {
+        guiRenderNotifications(raNotice[i], y);
+        y += yadd;
+    }
+
+    if (clock() >= raNoticeTimer) {
+        raNoticeLines = 0;
+        raNoticeTimer = 0;
+    }
+
+    return y;
+}
+
+void guiShowRANotices(void)
+{
+    guiRenderRANotices(10, 35);
+}
+
 static void guiShowNotifications(void)
 {
     char notification[128];
@@ -286,24 +319,9 @@ static void guiShowNotifications(void)
     int y = 10;
     int yadd = 35;
 
-    if (raNoticeLines > 0) {
-        int i;
-
-        if (!raNoticeTimer) {
-            raNoticeTimer = clock() + 8000 * (CLOCKS_PER_SEC / 1000);
-            sfxPlay(SFX_MESSAGE);
-        }
-
-        for (i = 0; i < raNoticeLines; i++) {
-            guiRenderNotifications(raNotice[i], y);
-            y += yadd;
-        }
-
-        if (clock() >= raNoticeTimer) {
-            raNoticeLines = 0;
-            raNoticeTimer = 0;
-        }
-    }
+    /* Already drawn by guiShowRANotices() this frame; only move past
+       them, so the two kinds never overlap. */
+    y += raNoticeLines * yadd;
 
     if (showPartPopup || showThmPopup || showLngPopup || showCfgPopup) {
         if (!popupTimer) {
@@ -1615,6 +1633,12 @@ void guiMainLoop(void)
 
         // Render overlaying gui thingies :)
         guiDrawOverlays();
+
+        /* RA: our notices answer an explicit menu action, they are not
+           background chatter, so they must not depend on the
+           "Notifications" setting -- which is off by default and has
+           already once made the console look like it did nothing. */
+        guiShowRANotices();
 
         if (gEnableNotifications)
             guiShowNotifications();

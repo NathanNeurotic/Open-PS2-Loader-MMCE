@@ -7,6 +7,7 @@
 #include "include/opl.h"
 #include "include/menusys.h"
 #include "include/supportbase.h"
+#include "include/discsupport.h"
 #include "include/iosupport.h"
 #include "include/renderman.h"
 #include "include/fntsys.h"
@@ -33,7 +34,9 @@ enum MENU_IDs {
     MENU_ABOUT,
     MENU_SAVE_CHANGES,
     MENU_EXIT,
-    MENU_POWER_OFF
+    MENU_POWER_OFF,
+    MENU_RA_DISC_LAUNCH, /* RetroAchievements: boot the disc in the tray */
+    MENU_RA_DISC_CHECK,  /* RetroAchievements: hash the disc and ask the PC */
 };
 
 enum GAME_MENU_IDs {
@@ -215,6 +218,8 @@ static void menuInitMainMenu(void)
         submenuDestroy(&mainMenu);
 
     // initialize the menu
+    submenuAppendItem(&mainMenu, -1, "RA: launch disc", MENU_RA_DISC_LAUNCH, -1);
+    submenuAppendItem(&mainMenu, -1, "RA: check disc support", MENU_RA_DISC_CHECK, -1);
     submenuAppendItem(&mainMenu, -1, NULL, MENU_SETTINGS, _STR_SETTINGS);
     submenuAppendItem(&mainMenu, -1, NULL, MENU_GFX_SETTINGS, _STR_GFX_SETTINGS);
     submenuAppendItem(&mainMenu, -1, NULL, MENU_AUDIO_SETTINGS, _STR_AUDIO_SETTINGS);
@@ -784,7 +789,7 @@ void menuRenderMenu()
         // render, advance
         fntRenderString(gTheme->fonts[0], 320, y, ALIGN_CENTER, 0, 0, submenuItemGetText(&it->item), (cp == sitem) ? gTheme->selTextColor : gTheme->textColor);
         y += spacing;
-        if (cp == (MENU_ABOUT - 1))
+        if (cp == (MENU_ABOUT - 1 + 2)) /* RA: two disc items sit above */
             y += spacing / 2;
     }
 
@@ -870,7 +875,15 @@ void menuHandleInputMenu()
 
         sfxPlay(SFX_CONFIRM);
 
-        if (id == MENU_SETTINGS) {
+        if (id == MENU_RA_DISC_LAUNCH) {
+            /* Does not return when the disc boots. */
+            discLaunch();
+        } else if (id == MENU_RA_DISC_CHECK) {
+            if (discCheckSupportDeferred())
+                guiShowRANotice("Checking the disc, this takes a few seconds...", NULL);
+            else
+                guiShowRANotice("A disc check is already running", NULL);
+        } else if (id == MENU_SETTINGS) {
             if (menuCheckParentalLock() == 0)
                 guiShowConfig();
         } else if (id == MENU_GFX_SETTINGS) {

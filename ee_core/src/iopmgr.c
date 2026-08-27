@@ -22,7 +22,7 @@ extern int _iop_reboot_count;
 /* RetroAchievements: LoadOPLModule() results for the two modules the
    telemetry depends on. raudp imports SMAPSendPacket from SMAP, so when
    SMAP fails raudp fails with a link error too; keeping both results
-   tells the two cases apart. Shown on the debug HUD (ra.c, RA_DEBUG). */
+   tells the two cases apart. */
 int ra_raudp_result = -999;
 int ra_smap_result = -999;
 
@@ -153,6 +153,13 @@ static void ResetIopSpecial(const char *args, unsigned int arglen)
        including games running from USB. ETH mode loads these modules
        in its own branch below; every other mode loads them here. */
 #ifndef __LOAD_DEBUG_MODULES
+    /* RA disc mode: no OPL cdvdman, hence no built-in DEV9; SMAP needs
+       it loaded first. */
+    if (config->GameMode == DISC_MODE) {
+        LoadOPLModule(OPL_MODULE_ID_DEV9, 0, 0, NULL);
+        LoadOPLModule(OPL_MODULE_ID_SMSUTILS, 0, 0, NULL);
+    }
+
     if (config->GameMode != ETH_MODE) {
         LoadOPLModule(OPL_MODULE_ID_SMSTCPIP, 0, 0, NULL);
         ra_smap_result = LoadOPLModule(OPL_MODULE_ID_SMAP, 0, g_ipconfig_len, g_ipconfig);
@@ -180,6 +187,10 @@ static void ResetIopSpecial(const char *args, unsigned int arglen)
             LoadOPLModule(OPL_MODULE_ID_MX4SIOBD, 0, 0, NULL);
             break;
         case BDM_HDD_MODE:
+            break;
+        case DISC_MODE:
+            /* RA: nothing to load. The disc is served by the console's
+               own CDVDMAN, which the IOPRP left in place. */
             break;
     };
 

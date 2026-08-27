@@ -468,7 +468,9 @@ static unsigned int sendIrxKernelRAM(const char *startup, const char *mode_str, 
     int i, modcount;
     unsigned int curIrxSize, size_ioprp_image, total_size;
 
-    if (!strcmp(mode_str, "BDM_USB_MODE"))
+    if (!strcmp(mode_str, "DISC_MODE"))
+        ; /* RA: the game comes off the drive; no storage driver needed */
+    else if (!strcmp(mode_str, "BDM_USB_MODE"))
         modules |= CORE_IRX_USB;
     else if (!strcmp(mode_str, "BDM_ILK_MODE"))
         modules |= CORE_IRX_ILINK;
@@ -489,10 +491,20 @@ static unsigned int sendIrxKernelRAM(const char *startup, const char *mode_str, 
 
     irxtable = (irxtab_t *)ModuleStorage;
     irxptr_tab = (irxptr_t *)((unsigned char *)irxtable + sizeof(irxtab_t));
-    size_ioprp_image = size_IOPRP_img + size_cdvdman_irx + size_cdvdfsv_irx + size_eesync_irx + 256;
-    LOG("IOPRP image size calculated: %d\n", size_ioprp_image);
-    ioprp_image = malloc(size_ioprp_image);
-    size_ioprp_image = patch_IOPRP_image(ioprp_image, cdvdman_irx, size_cdvdman_irx);
+
+    /* RA: no cdvdman to substitute means the disc in the tray: build
+       the IOPRP that leaves the console's own drive driver in place. */
+    if (cdvdman_irx == NULL) {
+        size_ioprp_image = patch_IOPRP_image_disc_size();
+        LOG("IOPRP image size calculated: %d (disc, no CDVD emulation)\n", size_ioprp_image);
+        ioprp_image = malloc(size_ioprp_image);
+        size_ioprp_image = patch_IOPRP_image_disc(ioprp_image);
+    } else {
+        size_ioprp_image = size_IOPRP_img + size_cdvdman_irx + size_cdvdfsv_irx + size_eesync_irx + 256;
+        LOG("IOPRP image size calculated: %d\n", size_ioprp_image);
+        ioprp_image = malloc(size_ioprp_image);
+        size_ioprp_image = patch_IOPRP_image(ioprp_image, cdvdman_irx, size_cdvdman_irx);
+    }
     LOG("IOPRP image size actual:     %d\n", size_ioprp_image);
 
     modcount = 0;
@@ -528,6 +540,20 @@ static unsigned int sendIrxKernelRAM(const char *startup, const char *mode_str, 
     if (modules & CORE_IRX_MX4SIO) {
         irxptr_tab[modcount].info = size_mx4sio_bd_irx | SET_OPL_MOD_ID(OPL_MODULE_ID_MX4SIOBD);
         irxptr_tab[modcount++].ptr = (void *)&mx4sio_bd_irx;
+    }
+    /* RA disc mode: SMAP imports the dev9 library, which every other
+       mode gets from OPL's cdvdman. Here the ROM's cdvdman serves the
+       drive, so DEV9 travels as its own module -- the same ps2dev9.irx
+       the menu uses. Without it SMAP fails to load and the game runs
+       with no telemetry at all, which is exactly what the first disc
+       launch on hardware did. */
+    if (cdvdman_irx == NULL) {
+        irxptr_tab[modcount].info = size_ps2dev9_irx | SET_OPL_MOD_ID(OPL_MODULE_ID_DEV9);
+        irxptr_tab[modcount++].ptr = (void *)&ps2dev9_irx;
+        /* Likewise smsutils (mips_memcpy and friends), which SMSTCPIP
+           imports and OPL's cdvdman normally exports. */
+        irxptr_tab[modcount].info = size_smsutils_irx | SET_OPL_MOD_ID(OPL_MODULE_ID_SMSUTILS);
+        irxptr_tab[modcount++].ptr = (void *)&smsutils_irx;
     }
     if (modules & CORE_IRX_ETH) {
         irxptr_tab[modcount].info = size_smap_ingame_irx | SET_OPL_MOD_ID(OPL_MODULE_ID_SMAP);
@@ -851,7 +877,10 @@ void sysLaunchLoaderElf(const char *filename, const char *mode_str, int size_cdv
 #endif
 #endif
 
-    modules |= CORE_IRX_VMC;
+    /* RA: VMC lives inside OPL's own cdvdman, which the disc mode does
+       not load. Asking for it there would only waste module storage. */
+    if (size_cdvdman_irx > 0)
+        modules |= CORE_IRX_VMC;
 
     LOG("SYSTEM LaunchLoaderElf loading modules\n");
     ModuleStorageSize = (sendIrxKernelRAM(filename, mode_str, modules, ModuleStorage, size_cdvdman_irx, cdvdman_irx, size_mcemu_irx, mcemu_irx) + 0x3F) & ~0x3F;

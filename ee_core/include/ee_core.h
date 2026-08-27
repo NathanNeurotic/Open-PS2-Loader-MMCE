@@ -72,6 +72,10 @@ enum GAME_MODE {
     BDM_HDD_MODE,
     ETH_MODE,
     HDD_MODE,
+    /* RA: the game runs off the disc in the tray. No storage driver to
+       load, and no CDVD emulation: the console's own CDVDMAN out of ROM
+       serves cdrom0:. */
+    DISC_MODE,
 };
 
 extern int EnableDebug;

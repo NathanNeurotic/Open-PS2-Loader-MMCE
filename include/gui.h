@@ -156,6 +156,9 @@ void guiWarning(const char *text, int count);
    partition/config popups. Safe to call from the I/O thread; line2 may
    be NULL. */
 void guiShowRANotice(const char *line1, const char *line2);
+/* RA: draws the pending notice. Called every frame, outside the
+   "Notifications" setting -- see the note at the call site. */
+void guiShowRANotices(void);
 
 int guiConfirmVideoMode(void);
 

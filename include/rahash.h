@@ -15,4 +15,13 @@ int raGetStartupName(const char *cnfpath, char *out, int max);
    digits plus the terminator. Returns 0 on success. */
 int raHashIsoDirect(const char *isopath, const char *startup, char *out33);
 
+/* RA: the same hash, taken off the disc in the tray instead of an
+   image file. Only valid from the menu, where the IOP still runs the
+   console's own CDVDMAN and cdrom0: is the real drive. */
+int raHashDisc(const char *startup, char *out33);
+
+/* RA: reads BOOT2 out of the disc's own SYSTEM.CNF and returns the
+   boot executable name, e.g. "SLUS_210.65". Returns 0 on success. */
+int raDiscBootFile(char *out, int max);
+
 #endif

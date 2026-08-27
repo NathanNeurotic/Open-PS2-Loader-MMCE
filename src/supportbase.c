@@ -303,7 +303,7 @@ static int queryISOGameListCache(const struct game_cache_list *cache, base_game_
    not mount waits for a timeout on top. */
 static FILE *ra_hashlog = NULL;
 
-static void raHashLogOpen(const char *path)
+void raHashLogOpen(const char *path)
 {
     char dir[128], file[160];
 
@@ -363,7 +363,7 @@ void raHashStep(const char *what)
     fflush(ra_hashlog);
 }
 
-static void raHashLogAdd(const char *name, const char *startup, const char *hash)
+void raHashLogAdd(const char *name, const char *startup, const char *hash)
 {
     if (ra_hashlog == NULL)
         return;
@@ -372,7 +372,7 @@ static void raHashLogAdd(const char *name, const char *startup, const char *hash
     fflush(ra_hashlog);
 }
 
-static void raHashLogClose(void)
+void raHashLogClose(void)
 {
     if (ra_hashlog != NULL) {
         fclose(ra_hashlog);

@@ -26,8 +26,6 @@ extern int isceSifDmaStat(int trid);
 
 /* Filled in by iopmgr.c while loading the IOP modules. */
 extern unsigned int ra_snap_iop; /* snapshot buffer in IOP RAM, 0 if none */
-extern int ra_raudp_result;      /* LoadOPLModule() result for raudp */
-extern int ra_smap_result;       /* LoadOPLModule() result for SMAP */
 
 /* Frames to wait after the game starts before touching its memory: the
    game must load its own ELF first. About 10 seconds at 60 frames/s. */
@@ -152,43 +150,6 @@ static void ra_snap_send(void)
         ra_snap_fail++;
 }
 
-#ifdef RA_DEBUG
-/* Debug HUD, built only with RA_DEBUG=1.
-
-   Inside the game there is no console and no network until raudp is up,
-   so the only way to see whether the IOP modules loaded is to write a
-   number into memory the game already displays. This writes into the
-   money counter of Need for Speed: Underground 2 (SLUS_210.65), the
-   title used during development; on any other game it writes into an
-   unrelated address and shows nothing. The cheat engine must be off,
-   otherwise it overwrites the same field.
-
-   Reading the number, alternating every ~3 s:
-     7 0xx xxx  SMAP loaded, xxx = return code
-     8 0xx xxx  SMAP failed, xxx = error code
-     5 0xx xxx  raudp loaded
-     6 0xx xxx  raudp failed
-     x 000 999  the loader never reached that module */
-#define RA_PROBE_ADDR      0x004F9A64
-#define RA_PROBE_SWAP      180
-#define RA_PROBE_MOD_OK    5000000
-#define RA_PROBE_MOD_FAIL  6000000
-#define RA_PROBE_SMAP_OK   7000000
-#define RA_PROBE_SMAP_FAIL 8000000
-
-static void ra_debug_hud(void)
-{
-    u32 out;
-
-    if (((ra_frames / RA_PROBE_SWAP) & 1) == 0) {
-        out = (ra_smap_result >= 1) ? (RA_PROBE_SMAP_OK + (u32)ra_smap_result) : (RA_PROBE_SMAP_FAIL + (u32)(-ra_smap_result));
-    } else {
-        out = (ra_raudp_result >= 1) ? (RA_PROBE_MOD_OK + (u32)ra_raudp_result) : (RA_PROBE_MOD_FAIL + (u32)(-ra_raudp_result));
-    }
-
-    *(volatile u32 *)UNCACHED_SEG(RA_PROBE_ADDR) = out;
-}
-#endif
 
 void RA_OnVblank(void)
 {
@@ -196,9 +157,6 @@ void RA_OnVblank(void)
     if (ra_frames <= RA_START_DELAY)
         return;
 
-#ifdef RA_DEBUG
-    ra_debug_hud();
-#endif
 
     ra_snap_send();
 }
