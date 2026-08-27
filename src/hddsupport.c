@@ -43,6 +43,13 @@ static unsigned char hddSupportErrToasted = 0;
 static unsigned char hddPfsDeferredFailed = 0;
 static int hddRetryQueued = 0;
 
+// Settled PS2FS attempts that must ALL fail before Code 222 is shown. A drive still spinning up
+// answers the ATA stack well before it will answer PS2FS, so a single refusal after the settle says
+// nothing -- hardware shows PFS declining a few of these and then mounting normally. Reset by
+// hddClearPfsDiagFailure() the moment the support stack latches.
+#define HDD_PFS_REPORT_AFTER_FAILURES 3
+static int hddPfsSettledFailures = 0;
+
 typedef enum {
     HDD_PFS_DIAG_REASON_NONE = 0,
     HDD_PFS_DIAG_REASON_HDD_CHECK_STATUS_1,
@@ -99,6 +106,7 @@ static void hddClearPfsDiagFailure(const char *why)
 {
     hddLogPfsDiagState("clear", why);
     hddPfsDeferredFailed = 0;
+    hddPfsSettledFailures = 0; // PFS came up: the retries that failed before it were spin-up, not fault
     hddPfsDiagReason = HDD_PFS_DIAG_REASON_NONE;
     hddPfsDiagHddCheckResult = HDD_PFS_DIAG_NOT_RUN;
     hddPfsDiagPs2fsResult = HDD_PFS_DIAG_NOT_RUN;
@@ -1042,10 +1050,24 @@ static int hddUpdateGameList(item_list_t *itemList)
             hddSupportErrToasted = 0;
             hddClearRecoveredErrors();
         } else if (baseReady && hddPfsDeferredFailed && !hddSupportErrToasted) {
-            hddLogPfsDiagState("emit-code-222", "settled-update-retry-still-failed");
-            setErrorMessageWithCodeAndDetail(_STR_HDD_PFS_UNAVAILABLE_ERROR, ERROR_HDD_MODULE_PFS_FAILURE,
-                                             hddPfsDiagReasonName(hddPfsDiagReason));
-            hddSupportErrToasted = 1;
+            // ONE FAILED ATTEMPT IS NOT EVIDENCE OF A DEAD DRIVE. Gating on baseReady stopped us
+            // reporting a retry that never ran, but it still reported the FIRST settled retry that
+            // failed -- and hardware says PFS can decline several of those and then mount fine, so
+            // the box appeared on consoles whose APA worked seconds later. The 1 s post-ATAD settle
+            // is a floor, not a guarantee: a drive that is still spinning up answers the ATA stack
+            // long before it will answer PS2FS.
+            //
+            // So require the failure to PERSIST across a few settled attempts. Each pass through
+            // here is a genuine retry (hddLoadSupportModules ran and did not latch), and the success
+            // arm above resets the count, so this only fires when PFS has really refused to come up.
+            if (++hddPfsSettledFailures >= HDD_PFS_REPORT_AFTER_FAILURES) {
+                hddLogPfsDiagState("emit-code-222", "settled-retries-exhausted");
+                setErrorMessageWithCodeAndDetail(_STR_HDD_PFS_UNAVAILABLE_ERROR, ERROR_HDD_MODULE_PFS_FAILURE,
+                                                 hddPfsDiagReasonName(hddPfsDiagReason));
+                hddSupportErrToasted = 1;
+            } else {
+                hddLogPfsDiagState("defer-code-222", "settled-retry-failed-below-threshold");
+            }
         }
     } else {
         // Successful path also clears any prior deferred failure.
