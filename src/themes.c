@@ -1873,6 +1873,15 @@ static void drawHintText(struct menu_list *menu, struct submenu_list *item, conf
     if (thmElemSkipsDevice(elem, menu->item->icon_id))
         return; // devices= filter: not this page's element
 
+    /* HELD ACROSS BOTH WALKS, not just the draw loop. guiAlignMenuHints() traverses the list too, so
+       reading the head and then measuring it under one lock and drawing it under another would still
+       let the io worker free the chain in between. The rebuild that races this
+       (moduleUpdateMenuInternal, on the io worker) frees every node before relinking, so a stale
+       ->next points into memory already handed back out.
+       Cheap enough to sit on the per-frame draw path: uncontended almost always, and the only
+       holder on the other side does a handful of frees and mallocs with no I/O. */
+    menuHintsLock();
+
     menu_hint_item_t *hint = menu->item->hints;
     if (hint) {
         int x = elem->posX;
@@ -1885,6 +1894,8 @@ static void drawHintText(struct menu_list *menu, struct submenu_list *item, conf
             x += elem->width;
         }
     }
+
+    menuHintsUnlock();
 }
 
 static void drawInfoHintText(struct menu_list *menu, struct submenu_list *item, config_set_t *config, struct theme_element *elem)

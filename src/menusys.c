@@ -91,6 +91,45 @@ static submenu_list_t *appMenu;
 static submenu_list_t *appMenuCurrent;
 
 static s32 menuSemaId = -1;
+
+/* HINT-LIST LOCK. Deliberately its OWN semaphore, and deliberately not guiLock.
+ *
+ * menu_item_t::hints is a linked list that the IO WORKER rebuilds -- moduleUpdateMenuInternal()
+ * calls menuRemoveHints() to free every node and then menuAddHint() several times to malloc and
+ * relink -- while the GUI thread walks that same list every frame in themes.c drawHintText(), twice
+ * (guiAlignMenuHints() to align, then again to draw). Unserialized, a draw landing mid-rebuild
+ * follows a freed ->next into memory already handed back out.
+ *
+ * guiLock() is the WRONG lock for this even though it does exclude the renderer: guiStartFrame()
+ * takes it and guiEndFrame() releases it after rmEndFrame()'s vsync wait, so it is held for
+ * essentially a whole frame. Taking that on a per-device-update path stalls the io worker ~16 ms
+ * every time a device appears or vanishes, which measurably disturbed unrelated timing.
+ *
+ * This one is held only for the list work itself -- a few frees and mallocs, or one traversal --
+ * so the worst a waiter ever sees is microseconds.
+ *
+ * CALLER-LOCKED. menuAddHint()/menuRemoveHints() do NOT lock internally: a rebuild is many calls and
+ * must be atomic as a whole, and this semaphore is not recursive. Every caller brackets its own
+ * sequence with menuHintsLock()/menuHintsUnlock().
+ */
+static s32 menuHintSemaId = -1;
+static ee_sema_t menuHintSema;
+
+void menuHintsLock(void)
+{
+    // Not-ready guard, same shape as guiLock(): hints are built during init before menuInit() has
+    // created this, and everything is single-threaded until the GUI and IO threads exist.
+    if (menuHintSemaId < 0)
+        return;
+    WaitSema(menuHintSemaId);
+}
+
+void menuHintsUnlock(void)
+{
+    if (menuHintSemaId < 0)
+        return;
+    SignalSema(menuHintSemaId);
+}
 static s32 menuListSemaId = -1;
 static ee_sema_t menuSema;
 
@@ -669,6 +708,12 @@ void menuInit()
         menuSema.option = 0;
         menuSemaId = CreateSema(&menuSema);
     }
+    if (menuHintSemaId < 0) {
+        menuHintSema.init_count = 1;
+        menuHintSema.max_count = 1;
+        menuHintSema.option = 0;
+        menuHintSemaId = CreateSema(&menuHintSema);
+    }
     if (menuListSemaId < 0) {
         menuListSemaId = sbCreateSemaphore();
     }
@@ -686,7 +731,9 @@ void menuEnd()
         if (td->item)
             submenuDestroy(&(td->item->submenu));
 
+        menuHintsLock();
         menuRemoveHints(td->item);
+        menuHintsUnlock();
 
         free(td);
     }
@@ -702,6 +749,8 @@ void menuEnd()
 
     DeleteSema(menuSemaId);
     menuSemaId = -1;
+    DeleteSema(menuHintSemaId);
+    menuHintSemaId = -1;
     DeleteSema(menuListSemaId);
     menuListSemaId = -1;
 }
