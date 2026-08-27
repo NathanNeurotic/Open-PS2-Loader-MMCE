@@ -1059,14 +1059,16 @@ static void bdmLoadBlockDeviceModules(void)
     //
     // One bounded settle and exactly one refresh, one-shot, so an absent or already-found stick
     // never costs a later call anything.
+    // UNCONDITIONAL, unlike the MX4SIO probe above, and the difference is deliberate. MX4SIO asks
+    // "did any card show up?" because there is only ever one. USB can have SEVERAL sticks, and the
+    // reported failure is one of two going missing while the other is present -- so a
+    // "did any USB root answer?" guard would find the working stick, conclude all is well, and skip
+    // the very refresh the missing one needs. Ask again regardless of what is already mounted.
     static int usbSecondProbeDone = 0;
     if (iUSBModLoaded && !usbSecondProbeDone) {
-        char usbRoot[16];
         usbSecondProbeDone = 1;
-        if (!bdmGetDeviceRootByType(BDM_TYPE_USB, usbRoot, sizeof(usbRoot))) {
-            DelayThread(600 * 1000); // bounded settle for USB enumeration + FAT mount
-            bdmForceDeviceRefresh(); // exactly one second probe
-        }
+        DelayThread(600 * 1000); // bounded settle for USB enumeration + FAT mount
+        bdmForceDeviceRefresh(); // exactly one second probe, covering every slot
     }
 }
 

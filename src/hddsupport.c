@@ -605,6 +605,21 @@ static int hddLoadCoreSupportModules(void)
 
     LOG("HDDSUPPORT LoadSupportModules\n");
 
+    // ALREADY PROVEN -- do not re-litigate it. The non-Sony probe below exists to avoid loading APA
+    // modules onto a non-APA drive, which is a one-time question: if hddSupportModulesLoaded is set
+    // then ps2hdd and PS2FS are up, and that cannot have happened on a drive this probe would
+    // reject. Re-running it on every call re-asks a settled question against a live drive, and
+    // hddDetectNonSonyFileSystem() answers -1 on a transient devctl error (busy bus, drive mid-seek)
+    // as well as >0 on a coexisting exFAT/MBR signature. Either one made this return 0 while APA was
+    // demonstrably working -- which is how the APA data-home selector came to report failure on a
+    // console that was browsing HDD games at the time.
+    //
+    // Placed above the probe, not merged into the existing !hddSupportModulesLoaded guard below,
+    // because that guard only covers the module loads -- the probe already ran by the time it is
+    // reached.
+    if (hddSupportModulesLoaded)
+        return 1;
+
     // Check if the drive contains MBR/GPT partition data before we load the APA/PFS modules. If the drive is not
     // APA then loading the APA irx modules can corrupt the drive as it will try to write APA partition data.
     nonSony = hddDetectNonSonyFileSystem();
