@@ -1128,36 +1128,23 @@ static void bdmLoadBlockDeviceModules(void)
     // reported failure is one of two going missing while the other is present -- so a
     // "did any USB root answer?" guard would find the working stick, conclude all is well, and skip
     // the very refresh the missing one needs. Ask again regardless of what is already mounted.
-    /* SEVERAL ATTEMPTS, NOT ONE. A single settle at 600 ms was not enough on hardware, and the
-       reason is the opposite of what "the fast stick fails" first suggests: the PS2's controller is
-       USB 1.1, so a modern high-speed stick has to negotiate DOWN to full speed before it can
-       enumerate at all. Newer and faster on a PC means slower to come up here, which is exactly why
-       the older, simpler stick was always the one that appeared on its own.
-
-       Each pass opens every massN: root, which is what forces FatFs to mount the volume lazily (see
-       bdmProbeMassSlots), so a slot that was not ready on an earlier pass is picked up on a later
-       one. Stops as soon as every slot answers, so the common case where everything is already up
-       costs exactly one pass and no sleeping at all.
-
-       Bounded hard at BDM_USB_SETTLE_PASSES * BDM_USB_SETTLE_STEP_MS. This runs on the io worker,
-       so the sleeps are real: keep the ceiling low enough that a console with no USB at all does not
-       stall boot behind it. */
-#define BDM_USB_SETTLE_PASSES  4
-#define BDM_USB_SETTLE_STEP_MS 700
-
+    /* ONE settle, one probe, one refresh -- deliberately NOT a retry loop.
+     *
+     * A four-pass version (4 x 700 ms) was tried and did not help: the stick that needs a replug
+     * still needed one. That result matters more than the theory behind it, which was that a modern
+     * high-speed stick negotiating down to the PS2's USB 1.1 controller simply needed longer. If
+     * extra time were the missing ingredient, four passes would have found it.
+     *
+     * So do not reintroduce a loop or raise a pass count here. Up to 2.8 s of io-worker sleep at
+     * every boot, on every console, is a real cost paid by everyone -- and it bought nothing. The
+     * remaining fault is something other than "not enough time", and adding delay only hides how
+     * little is understood about it. */
     static int usbSecondProbeDone = 0;
     if (iUSBModLoaded && !usbSecondProbeDone) {
-        int pass;
-
         usbSecondProbeDone = 1;
-
-        for (pass = 0; pass < BDM_USB_SETTLE_PASSES; pass++) {
-            DelayThread(BDM_USB_SETTLE_STEP_MS * 1000);
-            if (bdmProbeMassSlots("usb-settle") == 0)
-                break; // every slot answered -- nothing left to wait for
-        }
-
-        bdmForceDeviceRefresh(); // one refresh once the slots have had their chance
+        DelayThread(600 * 1000);               // bounded settle for USB enumeration + FAT mount
+        bdmProbeMassSlots("after-usb-settle"); // forces FatFs's lazy mount on every slot
+        bdmForceDeviceRefresh();               // exactly one second probe, covering every slot
     }
 }
 
