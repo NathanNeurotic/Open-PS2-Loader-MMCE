@@ -403,15 +403,28 @@ void mmceSetPrefix(void)
 
 void mmceLoadModules(void)
 {
-    // mmceman is a singleton -- loading the IRX buffer twice creates a 2nd instance. Guard so this is
-    // idempotent: mmceInit calls it, and the BDMA equip now also calls it (to wake an MMCE source when
-    // MMCE games are off / Manual-not-started). Set the flag first so a partial load can't double-load.
+    // mmceman is a singleton, and this is called from several places -- mmceInit, the BDMA equip
+    // (to wake an MMCE source when MMCE games are off or Manual-not-started), and the boot-dir
+    // resolver -- so it has to be idempotent.
+    //
+    // It used to set the flag BEFORE the load, to stop a partial load creating a second instance.
+    // That protection already exists one layer down: sysLoadModuleBuffer keeps a table of buffers
+    // it has loaded, returns 0 for one it already holds, never records a failure, and consults that
+    // table under sysLoadModuleLock. Guarding it a second time here bought nothing and cost the
+    // retry -- a single failed load left mmceman marked resident for the whole session, so MMCE
+    // games and the GameID transport stayed silently dead until a reboot.
+    //
+    // Latch on SUCCESS instead. A retry after a failure genuinely re-attempts; a retry after a
+    // success is a cheap no-op; and a racing second caller is serialised by that same lock, so no
+    // in-progress flag is needed either.
     if (mmceModLoaded)
         return;
-    mmceModLoaded = 1;
     LOG("MMCESUPPORT LoadModules\n");
     LOG("[MMCEMAN]:\n");
-    sysLoadModuleBuffer(&mmceman_irx, size_mmceman_irx, 0, NULL);
+    if (sysLoadModuleBuffer(&mmceman_irx, size_mmceman_irx, 0, NULL) == 0)
+        mmceModLoaded = 1;
+    else
+        LOG("MMCESUPPORT mmceman load FAILED -- retry stays armed\n");
 }
 
 // Δ4 (NHDDL parity): arm the GameID transport OUTSIDE the launch path. NHDDL loads mmceman once at
