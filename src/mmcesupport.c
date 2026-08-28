@@ -96,6 +96,10 @@ static unsigned char mmceEverResolved = 0;
 // forward declaration
 static item_list_t mmceGameList;
 static void mmceGetDeviceRoot(char *root, size_t size);
+// The card ROOT ("mmceN:/"), where library folders live. mmcePrefix is NOT it: that carries the
+// user's configurable games prefix (gMMCEPrefix), which POPS has always been resolved under and
+// must keep being resolved under. EMBER/ is new and follows the device-root rule instead.
+static const char *mmcePs1Root(void);
 static int mmceModLoaded = 0;          // latched by mmceLoadModules; read by mmceSendGameID's arm check
 static char mmceGameIdTarget[8] = {0}; // last device a GameID 0x8 switch was SENT to (mmceGameIdSettle polls it)
 
@@ -228,6 +232,13 @@ int mmceGameIdSettle(int timeoutMs)
     }
     LOG("MMCE GameID settle NOT confirmed after %d ms\n", timeoutMs);
     return -1;
+}
+
+static const char *mmcePs1Root(void)
+{
+    static char root[sizeof(mmcePrefix)];
+    mmceGetDeviceRoot(root, sizeof(root));
+    return root;
 }
 
 static void mmceGetDeviceRoot(char *root, size_t size)
@@ -636,7 +647,7 @@ static int mmceUpdateGameList(item_list_t *itemList)
     if (libViewActive(itemList->mode) == LIB_VIEW_PS1) {
         // ONE list, BOTH cores -- POPS/*.VCD unioned with EMBER/games/*. mmcePrefix is the card
         // root, which is where both folders live, so the same prefix serves both halves.
-        int r = ps1FillGameList(mmcePrefix, &mmcePs1Games);
+        int r = ps1FillGameList(mmcePrefix, mmcePs1Root(), &mmcePs1Games);
         if (r >= 0) { // r < 0: transient scan failure (contended bus) -> keep the last-good VCD list
             mmcePs1Scanned = 1;
             mmcePs1GameCount = r;
@@ -711,8 +722,14 @@ static void mmceRenameGame(item_list_t *itemList, int id, char *newName)
         base_game_info_t *game = mmceActiveGame(itemList, id);
 
         if (game == &mmceEmptyGame)
-            return; // stale id in the VCD->ISO toggle window
-        if (vcdRenameFile(mmcePrefix, game->name, newName) == 0) {
+            return; // stale id in the PS2<->PS1 toggle window
+        // The ROW picks the target, exactly as the launch does. Dispatching on the view would send
+        // an Ember row to vcdRenameFile, which searches POPS/ for "<name>.VCD" -- absent for an
+        // Ember title, so the rename would quietly do nothing; and where a .VCD of the same name
+        // exists (a game held for BOTH cores, the case the merged list makes ordinary) it would
+        // rename the POPSTARTER file instead. Renaming the wrong file is the worse half of that.
+        int renamed = cueIsCueEntry(game) ? cueRenameGame(mmcePs1Root(), game->name, newName) : vcdRenameFile(mmcePrefix, game->name, newName);
+        if (renamed == 0) {
             // MMCE normally latches a successful VCD scan under NOUPDATE. Re-arm its normal scan
             // path so the deferred menu update publishes the new filename immediately.
             mmcePs1Scanned = 0;
@@ -754,18 +771,18 @@ static void mmceLaunchCue(item_list_t *itemList, const char *cueName, config_set
         return;
     }
 
-    if (!cueResolveEmber(mmcePrefix, emberElf, sizeof(emberElf))) {
+    if (!cueResolveEmber(mmcePs1Root(), emberElf, sizeof(emberElf))) {
         guiMsgBox(_l(_STR_EMBER_NOT_FOUND), 0, NULL);
         return;
     }
-    if (!cueResolveEmberBios(mmcePrefix, biosPath, sizeof(biosPath))) {
+    if (!cueResolveEmberBios(mmcePs1Root(), biosPath, sizeof(biosPath))) {
         guiMsgBox(_l(_STR_EMBER_BIOS_MISSING), 0, NULL);
         return;
     }
     // The scan lists folders without reading inside them -- that would be a directory read per row
     // on every refresh. Pay for it once, HERE, while a dialog can still be drawn: an empty or
     // mis-filled folder otherwise drops the user into the PS1 BIOS shell with no explanation.
-    if (!cueGameHasImage(mmcePrefix, cueName)) {
+    if (!cueGameHasImage(mmcePs1Root(), cueName)) {
         guiMsgBox(_l(_STR_EMBER_NO_DISC), 0, NULL);
         return;
     }
@@ -1186,7 +1203,7 @@ static int mmceGetImage(item_list_t *itemList, char *folder, int isRelative, cha
         // The cache hands us a NAME, so resolve which core owns the row against the published list
         // (memory scan, no card IO on the art path). Unknown falls back to the POPSTARTER layout.
         if (cueRowIsCueByName(mmcePs1Games, mmcePs1GameCount, value) == 1)
-            r = cueLoadFolderCover(mmceArtPrimary, value, suffix, resultTex);
+            r = cueLoadFolderCover(mmcePs1Root(), value, suffix, resultTex);
         else
             r = vcdLoadPopsCover(mmceArtPrimary, value, suffix, resultTex);
     }

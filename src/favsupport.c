@@ -217,7 +217,12 @@ static fav_raw_t *favReadFile(int *outCount)
         close(fd);
         return imported;
     }
-    if (ver != 1 && ver != 2) {
+    // Range-checked against FAV_VERSION rather than listing versions. The enumerated form let the
+    // writer's version outrun the reader's list: FAV_VERSION went to 3, favWriteFile stamped 3, and
+    // this gate still admitted only 1 and 2 -- so the first save after upgrading produced a file the
+    // NEXT boot refused, presenting an empty favourites tab that would then be written back over the
+    // user's real list. Bumping the version must never again require remembering to edit this line.
+    if (ver < 1 || ver > FAV_VERSION) {
         LOG("FAV reject: unsupported OFAV version %d\n", ver);
         close(fd);
         return NULL;

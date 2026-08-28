@@ -148,12 +148,27 @@ int cueIsCueEntry(const base_game_info_t *game);
 // handed a name rather than the row.
 int cueRowIsCueByName(const base_game_info_t *games, int count, const char *name);
 
+// Rename an Ember game by renaming its FOLDER under EMBER/games/. The folder name IS the identity
+// -- launch argument, art key, config key -- so this is the exact peer of vcdRenameFile, which
+// renames the .VCD file. Returns 0 on success, -1 otherwise (bad name, folder absent, or the
+// filesystem refusing a directory rename). Nothing is moved on failure.
+int cueRenameGame(const char *devPrefix, const char *oldName, const char *newName);
+
 // Fill a base_game_info_t list with the device's COMPLETE PS1 library: POPSTARTER *.VCD entries and
 // Ember game folders, merged and sorted together as one list (frees *outGames first, memalign'd
 // like sbReadList). Returns the count, or -1 when EITHER half could not read the device -- the
 // caller then keeps its last-good list rather than blanking a page over a transient wedge.
 // This is the ONE place the two libraries are unioned.
-int ps1FillGameList(const char *devPrefix, base_game_info_t **outGames);
+//
+// TWO prefixes, and the split is deliberate rather than an oversight:
+//   vcdPrefix   -- passed to the POPSTARTER scan EXACTLY as that device has always passed it. On
+//                  MMCE that includes the user's configurable games prefix (gMMCEPrefix), so a card
+//                  laid out as mmce0:/<prefix>/POPS keeps working. Changing it would relocate an
+//                  existing library out from under its owner.
+//   emberPrefix -- the device ROOT, always. EMBER/ is a new library folder and follows the standing
+//                  rule that library folders live at the root of each activated device.
+// On every BDM device the two are the same value, so nothing there is affected either way.
+int ps1FillGameList(const char *vcdPrefix, const char *emberPrefix, base_game_info_t **outGames);
 
 // PS1 (Ember) cover FALLBACK inside the game's own folder: "<games>/<name>/cover.png", then
 // "<games>/<name>/<name>.png". Cover/icon suffixes only; a device getImage calls this ONLY after

@@ -257,6 +257,46 @@ int cueGameHasImage(const char *devPrefix, const char *name)
     return found;
 }
 
+int cueRenameGame(const char *devPrefix, const char *oldName, const char *newName)
+{
+    char gamesDir[288];
+    char oldPath[320];
+    char newPath[320];
+    DIR *probe;
+
+    // The NEW name has to satisfy Ember's argument rules, or the rename would succeed on disk and
+    // leave behind a row that can never be launched.
+    if (devPrefix == NULL || oldName == NULL || newName == NULL)
+        return -1;
+    if (!cueNameLaunchable(oldName) || !cueNameLaunchable(newName))
+        return -1;
+    if (!strcmp(oldName, newName))
+        return 0;
+
+    cueBuildGamesDir(devPrefix, gamesDir, sizeof(gamesDir));
+    if (gamesDir[0] == '\0')
+        return -1;
+    if (snprintf(oldPath, sizeof(oldPath), "%s/%s", gamesDir, oldName) >= (int)sizeof(oldPath))
+        return -1;
+    if (snprintf(newPath, sizeof(newPath), "%s/%s", gamesDir, newName) >= (int)sizeof(newPath))
+        return -1;
+
+    // Refuse to clobber an existing folder. rename() over a non-empty directory is not portable
+    // across the filesystems here, and silently merging two libraries would be worse than refusing.
+    probe = opendir(newPath);
+    if (probe != NULL) {
+        closedir(probe);
+        LOG("[CUE] rename refused, target exists: %s\n", newPath);
+        return -1;
+    }
+
+    if (rename(oldPath, newPath) != 0) {
+        LOG("[CUE] rename failed: %s -> %s (%d)\n", oldPath, newPath, errno);
+        return -1;
+    }
+    return 0;
+}
+
 int cueIsCueEntry(const base_game_info_t *game)
 {
     return (game != NULL && strcasecmp(game->extension, CUE_ROW_EXTENSION) == 0);
@@ -335,7 +375,7 @@ static int cueFillGameList(const char *devPrefix, base_game_info_t **outGames)
     return n;
 }
 
-int ps1FillGameList(const char *devPrefix, base_game_info_t **outGames)
+int ps1FillGameList(const char *vcdPrefix, const char *emberPrefix, base_game_info_t **outGames)
 {
     base_game_info_t *vcdGames = NULL, *cueGames = NULL, *merged = NULL;
     int vcdCount, cueCount, total;
@@ -343,8 +383,8 @@ int ps1FillGameList(const char *devPrefix, base_game_info_t **outGames)
     if (outGames == NULL)
         return 0;
 
-    vcdCount = vcdFillGameList(devPrefix, &vcdGames);
-    cueCount = cueFillGameList(devPrefix, &cueGames);
+    vcdCount = vcdFillGameList(vcdPrefix, &vcdGames);
+    cueCount = cueFillGameList(emberPrefix, &cueGames);
 
     // EITHER half failing means the device could not be READ, not that it holds no games -- an
     // absent POPS or EMBER folder reports 0. Publishing a half list would look exactly like the
@@ -358,22 +398,32 @@ int ps1FillGameList(const char *devPrefix, base_game_info_t **outGames)
 
     total = vcdCount + cueCount;
 
-    // Both scans reached the device: only NOW is it safe to replace the old list.
-    free(*outGames);
-    *outGames = NULL;
-
     if (total == 0) {
+        // Both scans reached the device and it genuinely holds no PS1 titles: publishing empty is
+        // the correct answer, so release the old list here.
+        free(*outGames);
+        *outGames = NULL;
         free(vcdGames);
         free(cueGames);
         return 0;
     }
 
+    // ALLOCATE BEFORE RELEASING. Freeing the published list first and then failing to allocate its
+    // replacement turns a transient out-of-memory into a permanently blank PS1 page -- the caller is
+    // told 0 ("readable, nothing here") and has nothing left to fall back on. Failing to allocate is
+    // exactly the case where the last-good list is most worth keeping, so report it like any other
+    // scan failure and leave *outGames untouched.
     merged = (base_game_info_t *)memalign(64, total * sizeof(base_game_info_t));
     if (merged == NULL) {
         free(vcdGames);
         free(cueGames);
-        return 0; // list already released above; an empty page beats a dangling one
+        LOG("[PS1] merge alloc failed (%d rows) -- keeping last-good list\n", total);
+        return -1;
     }
+
+    // The replacement exists: only NOW is it safe to drop the old one.
+    free(*outGames);
+    *outGames = NULL;
 
     if (vcdCount > 0)
         memcpy(merged, vcdGames, vcdCount * sizeof(base_game_info_t));

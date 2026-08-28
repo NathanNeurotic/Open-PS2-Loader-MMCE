@@ -524,8 +524,16 @@ static void itemExecSquare(struct menu_item *curMenu)
 // are ELF favourites, a PS1 page's rows are PS1 favourites), but for PS1 the CORE comes from the
 // ROW -- both cores share that one list, so asking the page which core to record would file every
 // Ember title as a POPSTARTER one and it would then launch through the wrong core.
-static int itemFavKind(item_list_t *support, int id)
+// `text` is the row as DRAWN. L3 changes the active backing list synchronously while the submenu is
+// rebuilt on the deferred IO thread, so for a short window the drawn rows belong to the old view
+// while itemGet already indexes the new one. Comparing the looked-up row's name against the drawn
+// text is what closes that window: they agree only when the row on screen is the row we resolved.
+// Returns -1 when they disagree, and the caller declines the action rather than writing a record
+// that names one game and launches another.
+static int itemFavKind(item_list_t *support, int id, const char *text)
 {
+    const base_game_info_t *game;
+
     if (support == NULL)
         return FAV_KIND_ISO;
     if (support->mode == APP_MODE)
@@ -533,15 +541,20 @@ static int itemFavKind(item_list_t *support, int id)
     if (libViewActive(support->mode) != LIB_VIEW_PS1)
         return FAV_KIND_ISO;
 
-    // itemGet hands back the live base_game_info_t; its extension is the row-kind discriminator.
-    // A support without itemGet (or a stale id during the toggle window) falls back to POPSTARTER,
-    // which is what every pre-Ember library is.
-    if (support->itemGet != NULL) {
-        const base_game_info_t *game = (const base_game_info_t *)support->itemGet(support, id);
-        if (game != NULL && cueIsCueEntry(game))
-            return FAV_KIND_CUE;
-    }
-    return FAV_KIND_VCD;
+    // A PS1 page holds both cores, so the CORE comes from the row. Without itemGet there is nothing
+    // to read it from; POPSTARTER is the right assumption, being what every pre-Ember library is.
+    if (support->itemGet == NULL || text == NULL)
+        return FAV_KIND_VCD;
+
+    game = (const base_game_info_t *)support->itemGet(support, id);
+    if (game == NULL)
+        return -1;
+    // The toggle-window guards hand back a static EMPTY entry for an id the new list cannot honour;
+    // its name is "", which no drawn row has, so the mismatch below catches that case too.
+    if (strcmp(game->name, text) != 0)
+        return -1;
+
+    return cueIsCueEntry(game) ? FAV_KIND_CUE : FAV_KIND_VCD;
 }
 
 // R3: toggle the current row's favourite star (checklist item 33). On the Favourites tab
@@ -569,7 +582,13 @@ static void itemExecFav(struct menu_item *curMenu)
     if (support->mode == FAV_MODE) {
         favRemoveByIndex(it->id);
     } else {
-        int kind = itemFavKind(support, it->id);
+        int kind = itemFavKind(support, it->id, it->text);
+        // Mid-rebuild: the row on screen is not the row the backing list would give us. Storing it
+        // now would file the favourite under the wrong core, or under a name that is about to move.
+        // Do nothing and let the user press R3 again once the list has settled -- the star is not
+        // touched either, so nothing on screen lies about what was saved.
+        if (kind < 0)
+            return;
         // Only store a favourite this device can actually resolve and launch later. A PS1 record
         // whose source has no hook for that core would be a permanently-hidden, unlaunchable entry.
         if (kind == FAV_KIND_VCD && support->itemLaunchVcd == NULL)

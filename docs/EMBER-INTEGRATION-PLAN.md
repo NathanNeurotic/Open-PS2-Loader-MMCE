@@ -769,22 +769,25 @@ git diff --stat origin/rebuild/main -- src/ include/
 under `gEmberView`. No favourites, no merged list, no settings page yet (hardcode `gEmberView =
 AUTO`, `gEmberFolder = "EMBER"`).
 
-Validate: list populates; L3 rings ISO → VCD → CUE; art resolves from `<devroot>ART/`; launch works;
-a device with no `EMBER/` folder shows exactly today's two-stop ring.
+Validate: the list populates; L3 rings PS2 → PS1 with Ember rows interleaved among the `.VCD` ones;
+art resolves from `<devroot>ART/`; launch works; a device with no `EMBER/` folder looks exactly as it
+did before.
 
 ### Phase 3 — MMCE + ETH, settings page, docs
 
 Mirror into `mmcesupport.c` and (gated on R4) `ethsupport.c`. Add the Ember settings page, the
 config keys, the language labels appended to `_base.yml`, `docs/EMBER.md`.
 
-### Phase 4 — Favourites v3 + merged PS1 list + APA HDD
+### Phase 4 — Favourites v3 + APA HDD
 
-OFAV v3 with the `kind` byte and the v2 migration; the `ISO → VCD → CUE → ELF` FAV ring; the
-`gEmberSharePs1List` merged list; `hddsupport.c` (`pfs0:/EMBER/`).
+OFAV v3 with the `kind` byte and the v2 migration, and the Favourites ring PS2 → PS1 → APPS (Part 2);
+`hddsupport.c` (`pfs0:/EMBER/`). There is no merged-list setting — merging is the behaviour, see
+Part 4.
 
-Validate the migration explicitly: take a v2 `favourites.bin` with ISO, VCD **and** app favourites,
-confirm all three land on the right stop after the upgrade and that a v3 file still loads on the
-next boot.
+Validate the migration explicitly: take a v2 `favourites.bin` holding ISO, VCD **and** app
+favourites, confirm all three land on the right shelf after the upgrade, **and that a v3 file still
+loads on the next boot** — the reader's accepted-version range and the writer's `FAV_VERSION` have
+to move together, and getting that wrong presents an empty tab that then overwrites the real list.
 
 ### Phase 5 — Bonus surface
 
