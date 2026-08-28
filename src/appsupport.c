@@ -10,6 +10,7 @@
 #include "include/bdmsupport.h"
 #include "include/ethsupport.h"
 #include "include/vcdsupport.h"
+#include "include/cuesupport.h"
 #include "include/hddsupport.h"
 #include "include/texcache.h"
 #include "include/textures.h"
@@ -140,6 +141,36 @@ static int appIsPopstarterSmb(const char *startup)
         return 0;
     return 1;
 }
+
+#ifdef __OPLDIAG
+// Ember probe (docs/EMBER-INTEGRATION-PLAN.md Phase 0): does this APPS boot path name an ember.elf?
+// Basename match only, case-insensitively -- FAT is case-insensitive and Ember's install folder is
+// the user's to name. Separator handling mirrors appIsPopstarterSmb above so smb0:\EMBER\ember.elf
+// is recognised too, without changing appGetELFName()'s semantics for other callers.
+static int appIsEmberElf(const char *startup)
+{
+    const char *base;
+    const char *p1;
+    const char *p2;
+    const char *p3;
+    const char *last;
+
+    if (startup == NULL || startup[0] == '\0')
+        return 0;
+
+    p1 = strrchr(startup, '/');
+    p2 = strrchr(startup, '\\');
+    p3 = strrchr(startup, ':');
+    last = p1;
+    if (p2 != NULL && (last == NULL || p2 > last))
+        last = p2;
+    if (p3 != NULL && (last == NULL || p3 > last))
+        last = p3;
+    base = (last != NULL) ? last + 1 : startup;
+
+    return strcasecmp(base, EMBER_ELF_NAME) == 0;
+}
+#endif
 
 static unsigned int appHashStartup(const char *value)
 {
@@ -838,6 +869,37 @@ static void appLaunchItem(item_list_t *itemList, int id, config_set_t *configSet
             argv[0] = altStartup;
             argc = 1;
         }
+
+#ifdef __OPLDIAG
+        // ---- Ember Phase 0 probe (docs/EMBER-INTEGRATION-PLAN.md Part 8) --------------------
+        // An APPS entry whose boot path names an ember.elf is handed over with the KEEP-IOP loader
+        // instead of the resetting SDK one below, passing argv1 through as the bare game-folder
+        // name. Ember performs no IOP reset of its own, so it needs the launcher's live driver
+        // stack; LoadELFFromFileWithPartition() a few lines down resets the IOP and is therefore
+        // the CONTROL CASE -- the identical entry on a release build is expected to fail, and that
+        // contrast is the measurement this probe exists to make.
+        //
+        // Diagnostic builds only, deliberately: an APPS row that silently launches through a
+        // different loader than every other APPS row would be a lying control in a shipping build.
+        // The real, user-visible launch path arrives with the CUE view and is not this.
+        if (appIsEmberElf(filename)) {
+            // Validate BEFORE deinit, while the GUI can still draw a dialog. An untranslated
+            // English string is correct here: this is OPLDIAG-only text, matching the existing
+            // convention for diagnostic detail (see setErrorMessageWithCodeAndDetail in opl.c).
+            const char *emberGame = (argc > 0) ? argv[0] : NULL;
+
+            if (emberGame != NULL && !cueNameLaunchable(emberGame)) {
+                guiMsgBox("Ember probe: argv1 must be a bare folder name under games/\n"
+                          "No '/', ':' or '\\', not starting with '..', max 180 chars.",
+                          0, NULL);
+                return;
+            }
+
+            deinit(UNMOUNT_EXCEPTION, mode); // keep THIS device mounted: Ember cannot remount it
+            sysLaunchEmber(filename, emberGame);
+            return; // reached only when the handoff itself failed; OPL is already torn down
+        }
+#endif
 
         deinit(UNMOUNT_EXCEPTION, mode); // CAREFUL: deinit will call appCleanUp, which frees appsList, appArtLookupTable, and configApps
         LoadELFFromFileWithPartition(filename, partition, argc, argv);

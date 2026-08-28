@@ -47,6 +47,18 @@ int sysNeutrinoPreflight(const char *driver, const char *neutrinoPath);
 // "<POPS>/<prefix><name>.ELF" token. Caller deinit()s with UNMOUNT_EXCEPTION first.
 void sysLaunchPopstarter(const char *popstarterElf, const char *selector);
 
+// Launch an external ember.elf for a PS1 CUE title (the second PS1 core; see include/cuesupport.h).
+//   emberElf   full path of ember.elf. It is ALSO the target's argv[0], and that is load-bearing:
+//              ps2sdk's __init_cwd derives Ember's working directory from argv[0], so everything
+//              Ember opens -- bios.bin, settings.txt, games/ -- resolves relative to it.
+//   gameFolder the BARE game-folder name under <emberdir>/games/. Ember refuses '/', ':' and '\\'
+//              anywhere in it, so validate with cueNameLaunchable() first. NULL or "" passes no
+//              game argument at all, which is Ember's own default: it then looks for games/default
+//              and otherwise runs the PS1 BIOS shell.
+// Caller deinit()s with UNMOUNT_EXCEPTION first and MUST leave the game's device mounted -- Ember
+// performs no IOP reset of its own and cannot bring a device back up.
+void sysLaunchEmber(const char *emberElf, const char *gameFolder);
+
 // ELF handoff that KEEPS the IOP (drivers + mounts) alive -- NHDDL parity: the vendored elfldr/
 // child loader SifLoadElf()s the target through OPL's live mounts and never SifIopReset()s (the
 // target resets the IOP itself). argv is the target's FULL argv, argv[0] INCLUDED and
