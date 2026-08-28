@@ -43,6 +43,9 @@ RiptOPL is intended to work with these maintained companion tools:
 - **[PS2-Servers](https://github.com/NathanNeurotic/PS2-Servers)** — all-in-one PC server launcher for **SMBv1, UDPFS and UDPBD**.
 - **[OrbitOPL Toolbox](https://github.com/Luden02/OrbitOPL-Toolbox)** — cross-platform PC library manager for importing discs, artwork/screenshots, ZSO compression, per-game settings and VMC management.
 - **[OPL PS1 AIO Converter GUI](https://github.com/shaanhomebrew-cloud/OPL-PS1-AIO-Converter-GUI)** — Windows all-in-one PS1/POPStarter preparation tool for converting BIN/CUE backups to VCDs and installing them to USB, MX4SIO, MMCE, exFAT HDD, SMB and APA internal HDD.
+- **[PS2RD CHT Manager](https://github.com/TheRealNextria/PS2RD-CHT-Manager)** — PC manager for the PS2RD `.cht` cheat files RiptOPL reads from your device's `CHT` folder. A `PS2RD-CHT-Manager.url` shortcut ships in every release package.
+- **[Ember](https://github.com/Gageformer/Ember)** — a PS1 emulator that runs natively on the PS2, used as RiptOPL's **second PS1 core** alongside POPSTARTER. Unlike the others this one is not just a shortcut: an `EMBER/` folder ships **inside** the release package, ready to drop onto a device. See [PS1 games](#ps1-games-two-cores-one-list).
+
 ## Contents
 
 - [Introduction](#introduction) · [Quick Start](#quick-start) · [Major Features Overview](#major-features-overview) · [Releases](#releases) · [How to Use](#how-to-use) · [USB/MMCE/MX4SIO/iLink](#usbmmcemx4sioilink) · [SMB](#smb) · [HDD](#hdd) · [APPS](#apps) · [Cheats](#cheats) · [NBD Server](#nbd-server) · [ZSO Format](#zso-format) · [PS3 BC](#ps3-bc) · [Frequent Issues](#frequent-issues)
@@ -186,6 +189,41 @@ This build layers several features on top of upstream OPL:
   **[PS2 Servers](https://github.com/NathanNeurotic/PS2-Servers)** all-in-one PC launcher for UDPFS,
   SMB and UDPBD; advanced users can run **[pcm720/udpfsd](https://github.com/pcm720/udpfsd)** directly.
   Same static-IP and SMB-exclusivity rules as UDPBD.
+<a name="ps1-games-two-cores-one-list"></a>
+- **PS1 games — two cores, one list:** RiptOPL plays PS1 titles through **two** cores, and both appear
+  together in a single **PS1** list. Press **L3** on a device page to swap between your PS2 discs and
+  that PS1 list.
+
+  | Core | Format | Lives in |
+  | --- | --- | --- |
+  | **POPSTARTER** | `*.VCD` | `<device>:/POPS/` |
+  | **[Ember](https://github.com/Gageformer/Ember)** | `*.cue` / `*.bin` / `*.exe` | `<device>:/EMBER/games/<Game Name>/` |
+
+  The two are interleaved and sorted as one library, so a game you hold for both cores simply shows
+  twice. Which core runs a title is a property of that row, decided when you launch it — there is
+  nothing to configure and no third toggle.
+
+  **Setting Ember up.** The release package contains a ready-made `EMBER/` folder; copy it to the
+  root of a device, beside `POPS/`. Then add **your own PS1 BIOS** as `EMBER/bios.bin` (exactly
+  512 KB) — a BIOS is copyrighted, so it is never distributed with RiptOPL, and the folder ships with
+  a placeholder file whose name says so. Finally give each game its own folder:
+
+  ```
+  <device>:/EMBER/
+      ember.elf
+      bios.bin                       <- yours, 512 KB
+      games/
+          Spyro 2 (Ripto's Rage)/
+              whatever.cue
+              whatever.bin
+  ```
+
+  The **folder name** is what you see in the list, and it is also the key for cover art and per-game
+  settings — so `ART/Spyro 2 (Ripto's Rage)_COV.png` on that device just works, exactly as it does
+  for a `.VCD`. Files inside can be named anything; `.cue` is preferred over `.exe` over `.bin`.
+  Ember writes its per-game memory cards (`MC1.vmc`, `MC2.vmc`) into that same folder, so it must be
+  on writable media. Currently available on USB, MX4SIO, iLink, exFAT-ATA and MMCE.
+
 - **PS1 games via POPSTARTER (VCD view):** press **L3** on a device page to switch between your
   PS2 discs and a list of PS1 `*.VCD` games on the same device — it's a *view*, not a separate tab.
   A **Default game view** setting (**Both** / **ISO** / **VCD**, default **Both**) can lock a page
