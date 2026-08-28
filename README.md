@@ -194,10 +194,9 @@ This build layers several features on top of upstream OPL:
   together in a single **PS1** list. Press **L3** on a device page to swap between your PS2 discs and
   that PS1 list.
 
-  | Core | Format | Lives in |
-  | --- | --- | --- |
-  | **POPSTARTER** | `*.VCD` | `<device>:/POPS/` |
-  | **[Ember](https://github.com/Gageformer/Ember)** | `*.cue` / `*.bin` / `*.exe` | `<device>:/EMBER/games/<Game Name>/` |
+  - **POPSTARTER** runs `*.VCD` files from `<device>:/POPS/`.
+  - **[Ember](https://github.com/Gageformer/Ember)** runs `*.cue` / `*.bin` / `*.exe` from
+    `<device>:/EMBER/games/<Game Name>/`.
 
   The two are interleaved and sorted as one library, so a game you hold for both cores simply shows
   twice. Which core runs a title is a property of that row, decided when you launch it — there is
