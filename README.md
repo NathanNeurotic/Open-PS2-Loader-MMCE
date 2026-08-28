@@ -222,15 +222,30 @@ This build layers several features on top of upstream OPL:
   Ember writes its per-game memory cards (`MC1.vmc`, `MC2.vmc`) into that same folder, so it must be
   on writable media. Currently available on USB, MX4SIO, iLink, exFAT-ATA and MMCE.
 
-- **PS1 games via POPSTARTER (VCD view):** press **L3** on a device page to switch between your
-  PS2 discs and a list of PS1 `*.VCD` games on the same device — it's a *view*, not a separate tab.
-  A **Default game view** setting (**Both** / **ISO** / **VCD**, default **Both**) can lock a page
-  to one type, and Favourites follow the active view. PS1 titles boot through **POPSTARTER** only
-  (never OPL's core, never Neutrino — the Loader Core selector is inert for them). Works on USB /
-  MMCE / MX4SIO / iLink / SMB **and the internal HDD** — both APA (exact `__.POPS[0-9]?`
-  containers plus `PP.<name>` / `__.<name>` one-game partitions containing `IMAGE0.VCD`) and
-  **exFAT** (BDMA; PS1 games in `massN:/POPS/`). See
-  **[docs/VCD.md](docs/VCD.md)**.
+  **Ember display mode.** The **PS1 settings** page carries an *Ember Display Mode* setting
+  (**Default** / **240p** / **480p**). On *Default* RiptOPL does not touch Ember's own configuration
+  at all. Choose 240p or 480p and it writes that key into `<device>:/EMBER/settings.txt` when you
+  launch an Ember title, on the launching device only, preserving any other lines already in that
+  file.
+
+- **Alternate POPSTARTER builds:** the release package ships
+  `POPS/POPSTARTER VERSIONS/` containing five builds of POPSTARTER — **MAIN**, **DEBUG**,
+  **USBDELAY**, **USBDELAY_DEBUG** and **USBDELAY_LONGER_DEBUG**. To switch, copy the
+  `POPSTARTER.ELF` you want over `POPS/POPSTARTER.ELF` on your device; nothing in RiptOPL selects
+  them for you. The `USBDELAY*` builds give USB devices longer to settle before POPSTARTER reads
+  them, and the `*DEBUG*` builds print diagnostics on screen — use one of those when reporting a
+  POPSTARTER problem. Note the `POPSTARTER.ELF` shipped at `POPS/POPSTARTER.ELF` is currently
+  byte-identical to **DEBUG**, which is why POPSTARTER diagnostics can appear during a VCD launch;
+  copy **MAIN** over it if you would rather not see them.
+
+- **Where POPSTARTER's VCDs come from:** the PS1 list is a *view* on a device page, not a separate
+  tab. A **Default game view** setting (**Both** / **PS2** / **PS1**, default **Both**) can lock a
+  page to one type, and Favourites follow the active view. A `*.VCD` row boots through
+  **POPSTARTER** — never OPL's own core and never Neutrino, so the Loader Core selector is inert for
+  it. POPSTARTER VCDs work on USB / MMCE / MX4SIO / iLink / SMB **and the internal HDD** — both APA
+  (exact `__.POPS[0-9]?` containers plus `PP.<name>` / `__.<name>` one-game partitions containing
+  `IMAGE0.VCD`) and **exFAT** (BDMA; PS1 games in `massN:/POPS/`). Ember's half of the list has its
+  own device coverage, noted above. See **[docs/VCD.md](docs/VCD.md)**.
 - **Core-aware per-game settings:** the per-game screen adapts to the selected **Loader Core** —
   under Neutrino it greys the panels Neutrino ignores (GSM, Cheats, PADEMU, OSD Language and the
   OPL-only compat modes) and offers a structured **Neutrino Video** picker (Off / 240p / 480p /

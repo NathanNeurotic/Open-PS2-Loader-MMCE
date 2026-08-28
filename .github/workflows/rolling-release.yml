@@ -586,8 +586,17 @@ jobs:
           #   APP_RIPTOPL-PS2DEVPINNED/RIPTOPL.ELF   -- digest pin of ps2dev:latest; SAFE FALLBACK.
           #   APP_RIPTOPL-PS2DEVROLLING/RIPTOPL.ELF -- ps2dev:latest (bleeding-edge MOVING tag; may not
           #                                              boot, issue #102). No unlabeled default folder.
-          #   POPSTARTER/                     -- Legacy manual MC bundle + network templates/marker.
-          #   POPS/                           -- POPSTARTER.ELF + every auto-installed MC external + BDMA variants.
+          #   POPS/                           -- POPSTARTER.ELF + every auto-installed MC external + BDMA
+          #                                      variants, plus "POPSTARTER VERSIONS/" holding the alternate
+          #                                      POPSTARTER builds (MAIN, DEBUG, USBDELAY*) for users to swap
+          #                                      in by hand. Copied wholesale, so the subfolder needs no rule
+          #                                      of its own -- only the assertion below that it arrived.
+          #
+          #   There is deliberately NO POPSTARTER/ folder. It used to ship a second copy of nine files
+          #   that POPS/ already carries, plus three templates from popsmb/ that did not belong there:
+          #   OPL reads and writes IPCONFIG.DAT / SMBCONFIG.DAT under POPS\ (see vcdsupport.c), and
+          #   bdma_config.txt is a marker OPL WRITES to record which BDMA variant it equipped -- the
+          #   shipped copy said "fat32", so a fresh install claimed an equipped variant it did not have.
           #   EMBER/                          -- Ember, the second PS1 core (ember.elf + an empty games/).
           #                                      Ships WITHOUT a PS1 BIOS: bios.bin is copyrighted and
           #                                      user-supplied, and the placeholder filename in the folder
@@ -599,7 +608,7 @@ jobs:
           #   PS2RD-CHT-Manager.url           -- link to the PS2RD cheat-file manager.
           PKG=riptopl_pkg
           rm -rf "$PKG"
-          mkdir -p "$PKG/APP_RIPTOPL-PS2DEVROLLING" "$PKG/POPSTARTER" "$PKG/POPS" "$PKG/EMBER"
+          mkdir -p "$PKG/APP_RIPTOPL-PS2DEVROLLING" "$PKG/POPS" "$PKG/EMBER"
           # PS2DEVROLLING is the required-to-build flavour (its build job failing already fails
           # the workflow); the two pinned flavours are best-effort, each in its own labeled folder.
           # This belt-and-braces check just asserts the PS2DEVROLLING ELF landed before packaging.
@@ -630,9 +639,18 @@ jobs:
           else
             echo "WARN: officialsdk build missing this run; package ships without APP_RIPTOPL-OFFICIALROLLING" >&2
           fi
-          cp -f POPS/{smbman.irx,ps2ip.irx,ps2smap.irx,ps2dev9.irx,SMSUTILS.irx,poweroff.irx,del.icn,list.icn,icon.sys} "$PKG/POPSTARTER/"
-          cp -rf popsmb/. "$PKG/POPSTARTER/"
           cp -rf POPS/. "$PKG/POPS/"
+          # The alternate POPSTARTER builds ride along inside POPS/, so the copy above already has
+          # them. Assert it anyway: `*.ELF` in .gitignore is one negation line away from swallowing
+          # all five, and `git add` fails that way SILENTLY. Without this the package would ship an
+          # empty "POPSTARTER VERSIONS" folder and nobody would notice until a user went looking.
+          VERS="$PKG/POPS/POPSTARTER VERSIONS"
+          for v in MAIN DEBUG USBDELAY USBDELAY_DEBUG USBDELAY_LONGER_DEBUG; do
+            if [ ! -s "$VERS/$v/POPSTARTER.ELF" ]; then
+              echo "ERROR: POPSTARTER VERSIONS/$v/POPSTARTER.ELF missing or empty -- check .gitignore" >&2
+              exit 1
+            fi
+          done
           # Ember, the second PS1 core. Copied whole, like POPS/. Asserted rather than best-effort:
           # the loader lists Ember titles whenever a device has an EMBER/ folder, so shipping that
           # folder WITHOUT its ember.elf would hand users a library whose rows cannot launch.
@@ -705,7 +723,7 @@ jobs:
           ZIP="RIPTOPL-${REL}-${SHA}.zip"
           (
             cd "$PKG"
-            zip -r -X "../rolling/${ZIP}" APP_RIPTOPL-PS2DEVROLLING POPSTARTER POPS EMBER PS2-Servers.url OrbitOPL-Toolbox.url OPL-PS1-AIO-Converter-GUI.url PS2RD-CHT-Manager.url >/dev/null
+            zip -r -X "../rolling/${ZIP}" APP_RIPTOPL-PS2DEVROLLING POPS EMBER PS2-Servers.url OrbitOPL-Toolbox.url OPL-PS1-AIO-Converter-GUI.url PS2RD-CHT-Manager.url >/dev/null
             if [ -d APP_RIPTOPL-PS2DEVPINNED ]; then zip -r -X "../rolling/${ZIP}" APP_RIPTOPL-PS2DEVPINNED >/dev/null; fi
             if [ -d APP_RIPTOPL-OFFICIALROLLING ]; then zip -r -X "../rolling/${ZIP}" APP_RIPTOPL-OFFICIALROLLING >/dev/null; fi
             if [ -d APP_RIPTOPL-OFFICIALPINNED ]; then zip -r -X "../rolling/${ZIP}" APP_RIPTOPL-OFFICIALPINNED >/dev/null; fi
@@ -827,6 +845,9 @@ jobs:
             printf -- '- PS1 via POPSTARTER (*.VCD) and Ember (*.cue) together in ONE per-device PS1 list (L3)\n'
             printf -- '- EMBER/ folder in this package: drop it at a device ROOT beside POPS/, add your own\n'
             printf -- '  512 KB PS1 bios.bin, then one folder per game under EMBER/games/\n'
+            printf -- '- Ember display mode (240p/480p) on the PS1 settings page, written to EMBER/settings.txt\n'
+            printf -- '- POPS/POPSTARTER VERSIONS/: MAIN, DEBUG and three USBDELAY builds of POPSTARTER to swap in by hand\n'
+            printf -- '- The redundant POPSTARTER/ folder is gone from this package; POPS/ already held all of it\n'
             printf -- '- Category settings layout\n'
             printf -- '- Per-game VMC shared with Neutrino on writable BDM (honours OPL VMC groups)\n'
             printf -- '- Visual GameID barcode for Pixel FX / RetroGEM / PS2Digital (Display page, OFF by default)\n'

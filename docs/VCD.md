@@ -84,6 +84,28 @@ freezing on a dead path). Keep your APA copy for HDD-page launches; give the oth
 the boot device or the VCD's own device. For the **Custom** option the on-screen editor caps at 31
 characters; for a longer path set `popstarter_path` in `settings_riptopl.cfg` directly.
 
+### Which *build* of POPSTARTER
+
+The picker above chooses which **copy** of `POPSTARTER.ELF` is loaded. Which **build** that copy is
+comes down to the file itself, and the release package ships five of them in
+`POPS/POPSTARTER VERSIONS/`:
+
+| Build | Use it when |
+| --- | --- |
+| **MAIN** | The normal build. Start here if a VCD misbehaves. |
+| **DEBUG** | Prints POPSTARTER's own diagnostics on screen — the one to use when reporting a VCD problem. |
+| **USBDELAY** | USB devices that need longer to settle before POPSTARTER reads them. |
+| **USBDELAY_DEBUG** | USBDELAY plus the diagnostics. |
+| **USBDELAY_LONGER_DEBUG** | A longer delay again, with diagnostics. |
+
+Swapping is manual: copy the `POPSTARTER.ELF` you want over the `POPS/POPSTARTER.ELF` that the
+picker resolves to. RiptOPL never chooses a build for you and never rewrites that file.
+
+> The `POPSTARTER.ELF` shipped at `POPS/POPSTARTER.ELF` is currently byte-identical to **DEBUG**.
+> That is the explanation for POPSTARTER diagnostic text appearing during an otherwise healthy VCD
+> launch — including the `Cannot mount __common to pfs1` line reported against MMCE launches. Copy
+> **MAIN** over it to silence them.
+
 ## 4. Where to put your VCD files
 
 | Device | Location |

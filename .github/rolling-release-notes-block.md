@@ -77,8 +77,40 @@ writable media.
 Available on USB, MX4SIO, iLink, exFAT-ATA and MMCE. SMB and the APA internal HDD are
 POPSTARTER-only for now.
 
+**Ember display mode.** Ember can run at 240p or 480p. There is a setting for it on the
+**PS1 settings** page — leave it on *Default* and RiptOPL does not touch Ember's own
+configuration at all. Pick 240p or 480p and it writes that choice to
+`<device>:/EMBER/settings.txt` when you launch a game, on that device only. Any other lines
+already in that file are left alone.
+
 Ember is by **Gageformer** — https://github.com/Gageformer/Ember — and is included here with his
 blessing. Please report Ember problems to *us* first, not to him: the launching is ours.
+
+## Alternate POPSTARTER builds
+
+`POPS/` now carries a **`POPSTARTER VERSIONS/`** folder holding five builds of POPSTARTER:
+
+| Build | Use it when |
+| --- | --- |
+| **MAIN** | The normal build. Try this first if a VCD misbehaves. |
+| **DEBUG** | Prints diagnostics on screen. Use it when reporting a POPSTARTER problem. |
+| **USBDELAY** | USB devices that need longer to settle before POPSTARTER reads them. |
+| **USBDELAY_DEBUG** | USBDELAY, with the diagnostics. |
+| **USBDELAY_LONGER_DEBUG** | A longer delay still, with diagnostics. |
+
+To switch, copy the `POPSTARTER.ELF` you want over `POPS/POPSTARTER.ELF` on your device.
+Nothing in RiptOPL selects these for you — it is a manual swap, and the folder is there so
+you do not have to go hunting for the builds.
+
+Note that the `POPSTARTER.ELF` shipped at `POPS/POPSTARTER.ELF` is currently byte-identical
+to **DEBUG**, which is why some users see POPSTARTER diagnostics during a VCD launch. If
+that bothers you, copy **MAIN** over it.
+
+**The redundant `POPSTARTER/` folder is gone.** It used to sit at the root of this package
+holding a second copy of nine files that `POPS/` already contains. It also carried a
+`bdma_config.txt` that said `fat32` — that file is a *marker RiptOPL writes itself* to
+record which BDMAssault variant it installed, so shipping a pre-filled copy told a fresh
+install that a variant was equipped when it was not. Everything you need is in `POPS/`.
 
 ## Setting up cover art and game metadata
 
