@@ -35,12 +35,14 @@ jobs:
           ps2_servers = "https://github.com/NathanNeurotic/PS2-Servers"
           orbit = "https://github.com/Luden02/OrbitOPL-Toolbox"
           ps1_converter = "https://github.com/shaanhomebrew-cloud/OPL-PS1-AIO-Converter-GUI"
+          cht_manager = "https://github.com/TheRealNextria/PS2RD-CHT-Manager"
+          ember = "https://github.com/Gageformer/Ember"
           badge = "[![CI](https://github.com/NathanNeurotic/Open-PS2-Loader/actions/workflows/flavours.yml/badge.svg?branch=rebuild/main)](https://github.com/NathanNeurotic/Open-PS2-Loader/actions/workflows/flavours.yml)"
 
           readme = Path("README.md")
           text = readme.read_text(encoding="utf-8")
           text = re.sub(r'^\[!\[CI\]\([^\n]+\)\]\([^\n]+\)$', badge, text, count=1, flags=re.MULTILINE)
-          section = f'''## External Tools & Services\n\nRiptOPL is intended to work with these maintained companion tools:\n\n- **[PS2-Servers]({ps2_servers})** — all-in-one PC server launcher for **SMBv1, UDPFS and UDPBD**.\n- **[OrbitOPL Toolbox]({orbit})** — cross-platform PC library manager for importing discs, artwork/screenshots, ZSO compression, per-game settings and VMC management.\n- **[OPL PS1 AIO Converter GUI]({ps1_converter})** — Windows all-in-one PS1/POPStarter preparation tool for converting BIN/CUE backups to VCDs and installing them to USB, MX4SIO, MMCE, exFAT HDD, SMB and APA internal HDD.\n'''
+          section = f'''## External Tools & Services\n\nRiptOPL is intended to work with these maintained companion tools:\n\n- **[PS2-Servers]({ps2_servers})** — all-in-one PC server launcher for **SMBv1, UDPFS and UDPBD**.\n- **[OrbitOPL Toolbox]({orbit})** — cross-platform PC library manager for importing discs, artwork/screenshots, ZSO compression, per-game settings and VMC management.\n- **[OPL PS1 AIO Converter GUI]({ps1_converter})** — Windows all-in-one PS1/POPStarter preparation tool for converting BIN/CUE backups to VCDs and installing them to USB, MX4SIO, MMCE, exFAT HDD, SMB and APA internal HDD.\n- **[PS2RD CHT Manager]({cht_manager})** — PC manager for the PS2RD `.cht` cheat files RiptOPL reads from your device's `CHT` folder. A `PS2RD-CHT-Manager.url` shortcut ships in every release package.\n- **[Ember]({ember})** — a PS1 emulator that runs natively on the PS2, used as RiptOPL's **second PS1 core** alongside POPSTARTER. Unlike the others this one is not just a shortcut: an `EMBER/` folder ships **inside** the release package, ready to drop onto a device.\n'''
           if "## External Tools & Services" in text:
               text = re.sub(r'## External Tools & Services\n.*?(?=\n## |\Z)', section.rstrip(), text, count=1, flags=re.DOTALL)
           else:
@@ -48,7 +50,7 @@ jobs:
           readme.write_text(text, encoding="utf-8")
 
           pages = Path("../gh-pages")
-          html_section = f'''<section class="callout info" id="external-tools"><div class="h">External Tools &amp; Services</div>\n<p><b><a href="{ps2_servers}">PS2-Servers</a></b> — all-in-one PC server launcher for <b>SMBv1, UDPFS and UDPBD</b>.<br>\n<b><a href="{orbit}">OrbitOPL Toolbox</a></b> — cross-platform PC library manager for importing discs, artwork/screenshots, ZSO compression, per-game settings and VMC management.<br>\n<b><a href="{ps1_converter}">OPL PS1 AIO Converter GUI</a></b> — Windows all-in-one PS1/POPStarter preparation tool for BIN/CUE → VCD conversion and installation to USB, MX4SIO, MMCE, exFAT HDD, SMB and APA internal HDD.</p></section>'''
+          html_section = f'''<section class="callout info" id="external-tools"><div class="h">External Tools &amp; Services</div>\n<p><b><a href="{ps2_servers}">PS2-Servers</a></b> — all-in-one PC server launcher for <b>SMBv1, UDPFS and UDPBD</b>.<br>\n<b><a href="{orbit}">OrbitOPL Toolbox</a></b> — cross-platform PC library manager for importing discs, artwork/screenshots, ZSO compression, per-game settings and VMC management.<br>\n<b><a href="{ps1_converter}">OPL PS1 AIO Converter GUI</a></b> — Windows all-in-one PS1/POPStarter preparation tool for BIN/CUE → VCD conversion and installation to USB, MX4SIO, MMCE, exFAT HDD, SMB and APA internal HDD.<br>\n<b><a href="{cht_manager}">PS2RD CHT Manager</a></b> — PC manager for the PS2RD <code>.cht</code> cheat files RiptOPL reads from your device's <code>CHT</code> folder.<br>\n<b><a href="{ember}">Ember</a></b> — a PS1 emulator running natively on the PS2, used as RiptOPL's second PS1 core alongside POPSTARTER. Ships as an <code>EMBER/</code> folder inside the release package.</p></section>'''
           for name in ("index.html", "releases.html"):
               path = pages / name
               html = path.read_text(encoding="utf-8")
