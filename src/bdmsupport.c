@@ -579,7 +579,7 @@ static int bdmProbeMassSlots(const char *when)
         } else {
             int devnr = -1;
             // Guarded reader: a buffered ask on an unmounted volume faults the IOP outright.
-            if (bdmReadDriverName(dir, driver, sizeof(driver)) >= 0 && driver[0] != ' ') {
+            if (bdmReadDriverName(dir, driver, sizeof(driver)) >= 0 && driver[0] != '\0') {
                 fileXioIoctl2(dir, USBMASS_IOCTL_GET_DEVICE_NUMBER, NULL, 0, &devnr, sizeof(devnr));
                 n = snprintf(summary + len, sizeof(summary) - len, " %d%c%d", i, driver[0], devnr);
             } else {
@@ -1644,6 +1644,10 @@ static void bdmLaunchCue(item_list_t *itemList, const char *cueName, config_set_
     // The scan lists folders without reading inside them -- that would be a directory read per row
     // on every refresh. Pay for it once, HERE, while a dialog can still be drawn: an empty or
     // mis-filled folder otherwise drops the user into the PS1 BIOS shell with no explanation.
+    // Leave Ember's display marker before the handoff, like the BDMA equip does for POPSTARTER.
+    // Best-effort: never a launch gate.
+    cueApplyDisplaySetting(ps1Prefix);
+
     if (!cueGameHasImage(ps1Prefix, cueName)) {
         guiMsgBox(_l(_STR_EMBER_NO_DISC), 0, NULL);
         return;
