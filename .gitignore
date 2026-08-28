@@ -34,6 +34,13 @@ DETAILED_CHANGELOG
 !.clang-format
 !.clang-format-ignore
 !modules/debug/*.irx
+# Ember's core is a SHIPPED PAYLOAD, not a build product. Both `*.elf` and `*.ELF` above would
+# swallow it -- the lowercase rule matches on any filesystem, and on a case-insensitive checkout
+# (Windows, core.ignorecase=true) the uppercase one does too. `git add` then skips it silently and
+# the release package ships an EMBER/ folder with no core in it, which the loader would happily
+# advertise games for. POPS/POPSTARTER.ELF only escapes the same rules because it was tracked before
+# they existed; this says so explicitly instead of relying on that accident.
+!EMBER/ember.elf
 
 #
 # Generated source files
