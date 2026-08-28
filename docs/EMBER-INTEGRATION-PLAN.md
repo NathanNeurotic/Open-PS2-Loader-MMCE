@@ -1,6 +1,6 @@
 # Ember as a second PS1 core — integration plan
 
-**Status:** phases 0 and 1 landed (see Implementation status below); phases 2-5 pending hardware.
+**Status:** the PS1 list ships both cores on BDM and MMCE; the Ember launch itself is hardware-unproven.
 **Base commit:** `291716d3` on `rebuild/main` (2026-08-27).
 **Permission:** Gage (author of Ember) has approved and encouraged this integration.
 
@@ -11,41 +11,51 @@
 Branch `feat/ember-ps1-core`. Update this table as phases land; it is the first thing the next
 agent should read.
 
-| Phase | State | Notes |
+| Item | State | Notes |
 | --- | --- | --- |
-| 0 — prove the handoff | **code landed, HARDWARE PENDING** | `sysLaunchEmber()` + `cuesupport.c` + an OPLDIAG-only interception in `appLaunchItem`. **Blocks phases 2-5.** See "How to run the Phase 0 test" below. |
-| 1 — view engine | **landed** | `libview.c`/`libview.h` own the ring; the binary `vcdView` API is deleted, not shadowed. Both audit gates pass (zero old-API references; per-file call-site counts identical). Rings still ISO -> VCD only, so behaviour is unchanged. |
-| 2 — CUE list on BDM | not started | gated on Phase 0 |
-| 3 — MMCE + ETH, settings, docs | not started | gated on Phase 0 |
-| 4 — Favourites v3, merged list, APA | not started | gated on Phase 0 |
-| 5 — bonus surface | not started | gated on Phase 0 |
+| Phase 0 — prove the handoff | **code landed, HARDWARE PENDING** | `sysLaunchEmber()` + `cuesupport.c` + an OPLDIAG-only interception in `appLaunchItem`. See "How to run the Phase 0 test" below. |
+| Phase 1 — view engine | **landed** | `libview.c/.h` own the ring; the binary `vcdView` API is deleted, not shadowed. Both audit gates pass. |
+| One PS1 list, both cores | **landed** | `ps1FillGameList()`; row-kind dispatch for launch and art. Wired for **BDM and MMCE**. |
+| SMB / ETH | **deliberately POPSTARTER-only** | Risk R4 (RiptOPL uses `\`, Ember uses `/`) is untested. One line to flip once proven; the reason is in the code. |
+| APA-HDD, UDPFS | not started | HDD needs its own layout decision (APA has no filesystem root — `POPS` lives on `__common`). |
+| Favourites (OFAV v3 `kind`) | not started | A CUE favourite currently has no way to record which core it belongs to. |
+| Ember settings page / `ember_folder` | not started | Nothing is required for basic operation — the list is driven by what is on disk, exactly like `POPS`. |
 
-### How to run the Phase 0 test
+### How to test Ember on hardware
 
-Build with `OPLDIAG=1` (a release build deliberately does NOT include the probe). On the test
-device, lay out:
+There are now two ways in, and both matter.
+
+**1. The real path (works in a normal release build).** Lay out the device exactly as you would a
+POPSTARTER library, with `EMBER/` beside `POPS/`:
 
 ```
-mass0:/EMBER/ember.elf      <- from Ember.Beta.Release.zip
-mass0:/EMBER/bios.bin       <- your own PS1 BIOS, exactly 512 KB
-mass0:/EMBER/games/Crash Bandicoot (USA)/game.cue  (+ game.bin)
+mass0:/POPS/  ...                                   <- your existing PS1 library, untouched
+mass0:/EMBER/ember.elf                              <- from Ember.Beta.Release.zip
+mass0:/EMBER/bios.bin                               <- your own PS1 BIOS, exactly 512 KB
+mass0:/EMBER/games/Spyro 2 (Ripto's Rage)/game.cue  (+ game.bin)
 ```
 
-Add an APPS entry pointing at it — `boot` = `mass0:/EMBER/ember.elf`, `argv1` =
-`Crash Bandicoot (USA)` — and launch it from the APPS page.
+Press **L3** on that device page to reach the PS1 list. Ember titles appear interleaved with your
+`.VCD` ones, sorted together. Launch one.
+
+**2. The OPLDIAG probe (the control experiment).** An APPS entry with `boot` =
+`mass0:/EMBER/ember.elf` and `argv1` = the folder name is handed over with the keep-IOP loader in an
+`OPLDIAG=1` build. The same entry on a **release** build is expected to *fail*, because the stock
+APPS loader resets the IOP out from under Ember. That contrast is what proves the no-reset premise —
+if the release build also works, the premise needs re-examining.
 
 **What to report back**
 
-1. Does the game boot at all?
-2. **Do the controllers work?** This is risk R1 and it decides whether the rest of the design
-   stands as written or needs the clean-IOP fallback.
-3. Does it work from MX4SIO / MMCE / internal exFAT ATA, not just USB? (Use `mass1:` etc.)
-4. Does `bios.bin` load, and do `MC1.vmc` / `MC2.vmc` appear in the game folder afterwards?
-5. Anything that looks like IOP memory exhaustion (late, unexplained failure).
+1. Do the Ember rows appear in the PS1 list, correctly interleaved with the `.VCD` ones?
+2. Does a title boot?
+3. **Do the controllers work?** This is risk R1 and it decides whether the design stands as written
+   or needs the clean-IOP fallback.
+4. Does it work from MX4SIO / MMCE / internal exFAT ATA, not just USB?
+5. Do `MC1.vmc` / `MC2.vmc` appear in the game folder afterwards? (Confirms it can write there.)
+6. Anything that looks like IOP memory exhaustion — a late, unexplained failure.
 
-The control case: the identical APPS entry on a **release** build is expected to fail, because
-`LoadELFFromFileWithPartition` resets the IOP out from under Ember. That contrast is the
-measurement — if the release build also works, the no-reset premise needs re-examining.
+Covers: an Ember row uses the device's normal `ART/<name>_COV.png` first, then falls back to
+`EMBER/games/<name>/cover.png`.
 
 ## Part 0 — What Ember actually is (measured, not guessed)
 
@@ -209,115 +219,85 @@ purely additive, no existing theme changes.
 
 ### 2.1 What exists today
 
-`src/vcdsupport.c` owns a **binary** per-mode view: `vcdView[mode]` (0=ISO, 1=VCD), a dirty flag
-consumed in each support's `itemNeedsUpdate`, and a global lock `gDefaultGameView`
-(`GAME_VIEW_BOTH` / `_ISO` / `_VCD`). `item_list_t.viewOverride` lets Favourites proxy a source
-device in a forced view without disturbing that page's own L3 state
-(`ITEM_VIEW_NATIVE` / `_FORCE_ISO` / `_FORCE_VCD`).
+`src/vcdsupport.c` owned a **binary** per-mode view: `vcdView[mode]` (0 = ISO, 1 = VCD), a dirty
+flag consumed in each support's `itemNeedsUpdate`, and a global lock `gDefaultGameView`.
+`item_list_t.viewOverride` lets Favourites proxy a source device in a forced view without
+disturbing that page's own L3 state.
 
 ### 2.2 What it becomes
 
-Generalise the binary flag into an **N-way ring**. Keep the state in `vcdsupport.c` (it already owns
-the dirty-flag protocol every support consumes) or move it to a new `src/libview.c` +
-`include/libview.h` — either is fine; what matters is that the old binary API is **deleted, not
-shadowed** (see the audit gate in §8, Phase 1).
+The state moves to `libview.c`/`libview.h` and the second stop is renamed for what the user sees:
 
 ```c
 enum LIB_VIEW {
-    LIB_VIEW_ISO = 0,   // disc games (PS2 ISO/ZSO/UL/HDL) — today's vcdView == 0
-    LIB_VIEW_VCD,       // PS1 via POPSTARTER               — today's vcdView == 1
-    LIB_VIEW_CUE,       // PS1 via Ember                    — new
-    LIB_VIEW_ELF,       // homebrew ELFs                    — Favourites only
+    LIB_VIEW_ISO = 0, // PS2 disc games: ISO / ZSO / UL / HDL
+    LIB_VIEW_PS1,     // PS1 titles -- BOTH cores in one list (Part 4)
     LIB_VIEW_COUNT
 };
 ```
 
-**Rings (the order Nathan specified):**
+**Still exactly two stops.** The rename is the point: the old name was one of the two cores, so
+every caller had to ask "is it VCD?" to mean "is it PS1?". That reads as a bug the moment a .cue row
+appears in the same list.
 
 | Page | Ring |
 | --- | --- |
-| Device pages (BDM, MMCE, ETH, HDD) | `ISO → VCD → CUE →` wrap |
-| Favourites (`FAV_MODE`) | `ISO → VCD → CUE → ELF →` wrap |
-| Apps (`APP_MODE`) | none — ELF only, L3 inert, no hint |
+| Device pages (BDM, MMCE, ETH, HDD) | `PS2 → PS1 →` wrap |
+| Favourites | `PS2 → PS1 →` wrap |
+| Apps | none — one list, L3 inert, no hint |
 
-**Combined PS1 list setting** (`gEmberSharePs1List`, default OFF). When ON:
+Favourites keeps its own independent slot, and app favourites stay where they have always been, in
+its PS2 list. (An earlier draft proposed a 4-stop ring with a separate ELF stop; that is superseded
+along with the CUE stop. If an ELF stop is ever wanted it is a UI decision on its own merits, not a
+consequence of supporting a second PS1 core.)
 
-| Page | Ring |
-| --- | --- |
-| Device pages | `ISO → PS1 →` wrap, where PS1 = VCD entries **and** CUE entries merged |
-| Favourites | `ISO → PS1 → ELF →` wrap |
+The ring machinery is deliberately kept general — supported-stop set, wrap-around advance — so
+adding a stop later needs no second rewrite.
 
-This is the "removing the need for a 3rd toggle if the user wants PS1 all together" requirement.
-
-**Stop suppression.** A ring stop is only offered when it can actually produce something, so nobody
-gets a dead L3 press:
-
-* `LIB_VIEW_VCD` — offered when `vcdModeSupported(mode)` (unchanged).
-* `LIB_VIEW_CUE` — governed by `gEmberView`: `Off` / `Auto` (default) / `Always`.
-  In `Auto`, the stop appears only when `<devroot><gEmberFolder>/ember.elf` exists. That probe is
-  one `open()`+`close()`, folded into the support's existing `itemNeedsUpdate` device tick and
-  memoised per `gCacheGeneration` — **never** on the render path.
-* `LIB_VIEW_ELF` — Favourites only, and only when `gFAVStartMode` is on.
-
-**API to add** (replacing the binary calls one-for-one):
+**API**
 
 ```c
-int  libViewSupported(int mode, int view);      // is this stop in this mode's ring?
-int  libViewActive(int mode);                   // current LIB_VIEW_* for the page
-int  libListViewActive(const item_list_t *il);  // honours viewOverride, else libViewActive(il->mode)
-void libViewAdvance(int mode);                  // L3: next supported stop, wrapping; marks dirty
-int  libViewConsumeDirty(int mode);             // unchanged semantics from vcdConsumeDirty
+int  libViewSupported(int mode, int view);      // the single definition of a page's ring
+int  libViewRingSize(int mode);                 // what the hint and the toggle guard ask
+int  libViewActive(int mode);
+int  libListViewActive(const item_list_t *il);  // honours viewOverride
+void libViewAdvance(int mode);                  // next stop, wrapping; marks dirty
+int  libViewConsumeDirty(int mode);
 void libViewMarkDirty(int mode);
 void libViewMarkAllDirty(void);
 ```
 
-`gDefaultGameView` gains `GAME_VIEW_CUE` **appended after `GAME_VIEW_VCD`** so persisted ints do not
-shift. `GAME_VIEW_BOTH` continues to mean "L3 rings"; the lock values pin the page and make L3
-inert, exactly as today.
+`gDefaultGameView` is unchanged (`BOTH` / `ISO` / `VCD`); a lock pins every page that has the pinned
+stop and makes L3 inert. No new enum value is needed, because no new stop was added.
 
-`item_list_t.viewOverride` gains `ITEM_VIEW_FORCE_CUE = 3` and `ITEM_VIEW_FORCE_ELF = 4`.
+### 2.3 The conversion rule
 
-### 2.3 Call-site conversion table
+Every old call asked a yes/no question and must become an explicit `LIB_VIEW_*` comparison. Do not
+leave a boolean wrapper behind: one that answers "is it VCD?" answers wrongly for a `.cue` row.
 
-Every one of these currently asks a **yes/no** question and must be re-expressed as an explicit
-`LIB_VIEW_*` comparison. Do not leave a `vcdViewActive()` wrapper behind — a wrapper that answers
-"is it VCD?" will silently answer "no" for a CUE page and route CUE rows down the ISO path, which is
-precisely the failure shape the pre-v1.0 audit catalogued (data half ported, code half not).
+Two sites changed *meaning* rather than spelling, and both were already asking the wrong question:
+the L3 hint and `itemExecToggleView` tested "does this device have a VCD view" to decide whether to
+offer the toggle. What they mean is "does this page have more than one list" — `libViewRingSize`.
 
-| File | Sites | Becomes |
-| --- | --- | --- |
-| `src/opl.c` | `itemExecToggleView`, hint block (~L331), `itemExecSquare` `#Size` skip, `itemExecFav` `isVcd` capture, `itemExecTriangle` VCD routing, `oplQueueVcdDeviceUpdates` | ring advance; hint text per view; skip `#Size` for VCD **and** CUE; capture a `kind`; route both PS1 kinds away from the PS2 per-game settings |
-| `src/bdmsupport.c` | `bdmNeedsUpdate`, `bdmUpdateGameList`, `bdmGetGameCount`, `bdmActiveGame`, delete/rename guards, `bdmGetImage` fallback, `bdmLaunchGame` dispatch, cleanup frees | third array `bdmCueGames`/`bdmCueGameCount` alongside `bdmGames`/`bdmVcdGames`, same last-good-on-failure discipline |
-| `src/mmcesupport.c` | mirror of the above | same |
-| `src/ethsupport.c` | mirror | same |
-| `src/hddsupport.c` | mirror (+ APA specifics) | Phase 4 |
-| `src/udpfssupport.c` | currently VCD-unsupported | leave unsupported unless R5 passes |
-| `src/favsupport.c` | `favUpdateItemList` filter, `favResolve`, `favOwnerView`, `favGetConfig`, `favLaunchItem`, `favGetImage`, `favResolveStoredId` | `kind` instead of `isVcd` throughout |
-| `src/guigame.c` | VCD per-game routing | treat CUE like VCD (no Loader Core, no compat flags) |
-| `src/texcache.c` | `cacheGetEffectiveMode` via `favGetArtMode` | unchanged shape, `kind`-aware |
+**Audit gates (both required before merging this refactor):**
 
-**Note the `bdmsupport.c` gotcha:** the file contains NUL bytes, so `grep` treats it as binary.
-Use `grep -a` / `tr -d '\000'` when reading it.
+```bash
+# Must be ZERO -- the binary API is deleted, not shadowed.
+grep -rn "vcdViewActive\|vcdListViewActive\|vcdToggleView\|vcdConsumeDirty" src/ include/
+
+# Per-file call-site counts, COMMENTS EXCLUDED, before vs after must match.
+# A raw line count will mislead: comments mentioning the old names inflate the "before".
+```
 
 ### 2.4 UI strings
 
-Existing `_STR_VCD` (L3 hint), `_STR_VCD_ON`, `_STR_VCD_OFF` are binary. Replace the hint with a
-per-view label and add toast strings. **All new labels go at the END of `lng_tmpl/_base.yml`**
-(currently after `GENERAL_SYSTEM`) — `.lng` files are consumed by line position and this rule has
-been broken three times already. Suggested new labels:
+The L3 hint became `PS1` and its toast `Showing PS1 games`. `VCD` is a bare token in all 31
+`lng_fork` translations, so that swap is safe in every language; `VCD_OFF` ("disc games" and its
+translations) is untouched because the PS2 list really is discs.
 
-```
-VIEW_TOGGLE, VIEW_ISO, VIEW_VCD, VIEW_CUE, VIEW_ELF, VIEW_PS1,
-EMBER, EMBER_VIEW, HINT_EMBER_VIEW, EMBER_FOLDER, HINT_EMBER_FOLDER,
-EMBER_SHARE_PS1, HINT_EMBER_SHARE_PS1, EMBER_CLEAN_IOP, HINT_EMBER_CLEAN_IOP,
-EMBER_NOT_FOUND, EMBER_BIOS_MISSING, EMBER_NAME_TOO_LONG, EMBER_NAME_BAD_CHARS,
-EMBER_NO_GAMES
-```
+New labels go at the **END** of `lng_tmpl/_base.yml` — `.lng` files are consumed by line position.
+`lang_autogen.h` and `lang_internal.c` are gitignored build artifacts; regenerate, never hand-edit.
 
-`lang_autogen.h` and `lang_internal.c` are **gitignored build artifacts** — regenerate, do not
-hand-edit.
-
----
 
 ## Part 3 — Scanning: `src/cuesupport.c` + `include/cuesupport.h`
 
@@ -379,38 +359,51 @@ everywhere rather than open-coding the compare.
 
 ---
 
-## Part 4 — Merged PS1 list (`gEmberSharePs1List`)
+## Part 4 — One PS1 list, two cores
 
-When ON, `LIB_VIEW_VCD` and `LIB_VIEW_CUE` collapse into one stop labelled **PS1**.
+**Decided 2026-08-28 (Nathan): there are exactly two toggles, PS2 and PS1.** The PS1 list holds
+both cores' titles together. This is not a setting and there is no third stop — merged *is* the
+list. An earlier draft of this plan proposed a separate CUE stop plus an opt-in merge; that is
+superseded, and the simpler shape is also the better one.
 
-Implementation: keep the two arrays scanned separately (they have different failure modes and
-different last-good semantics), then build a **third, merged view array** at publish time:
+A PS1 list can therefore contain:
 
 ```
-ps1Games = memalign(64, (vcdCount + cueCount) * sizeof(base_game_info_t));
-memcpy VCD rows, then CUE rows, then sort by name with the existing submenu sort.
+Spyro 2 (Ripto's Rage)      <- POPS/Spyro 2 (Ripto's Rage).VCD      -> POPSTARTER
+Spyro 2 (Ripto's Rage)      <- EMBER/games/Spyro 2 (Ripto's Rage)/  -> Ember
 ```
 
-Every downstream decision then keys off the **row**, not the page:
+Two rows, same title, different cores, sorted together. From the front end they behave identically.
 
-| Decision | Today | With merged list |
-| --- | --- | --- |
-| launch dispatch | `if (vcdViewActive(mode))` | `if (cueIsCueEntry(g))` → Ember; else → POPSTARTER |
-| art fallback | `vcdLoadPopsCover` | `cueIsCueEntry(g) ? cueLoadFolderCover : vcdLoadPopsCover` |
-| `#Size` skip | view-based | both PS1 kinds skip |
-| favourite `kind` | `isVcd` | `cueIsCueEntry(g) ? CUE : VCD` |
+**The rule that makes this work: the ROW picks the core, never the page.** Every decision that used
+to key off "is this page in the VCD view" must key off the row instead:
 
-**Trap (already bitten once, see the VCD-sort note):** `submenuSort` runs *last*, on raw display
-text, and it must stay aware of `vcdDisplayName()` (the game-ID-hiding cosmetic transform). A merged
-list runs both name shapes through the same sort, so verify `gVcdHideGameId` still only affects VCD
-rows and never mangles a CUE folder name.
+| Decision | Ask |
+| --- | --- |
+| launch dispatch | `cueIsCueEntry(game)` → Ember, else POPSTARTER |
+| art fallback | same test; `cueLoadFolderCover` vs `vcdLoadPopsCover` |
+| favourite kind | same test, stored in the record |
+| `#Size` skip | neither PS1 kind has a meaningful size — skip for the whole PS1 view |
 
-**Trap:** the CUE array is a third store to free in every `itemCleanUp` and to bounds-guard in every
-`*ActiveGame()` helper. The `bdmActiveGame` toggle-window guard exists precisely because the L3 flip
-is synchronous while the rebuild is deferred; with three (or four) arrays the guard is mandatory,
-not optional. Extend it, do not copy-paste it.
+The row-kind discriminator is `base_game_info_t.extension`: `".VCD"` or `".CUE"`.
+`ISO_GAME_EXTENSION_MAX` is 4, so it fits exactly, and no struct change is needed.
 
----
+`ps1FillGameList()` in `cuesupport.c` is the ONE place the union is formed. Its failure contract is
+load-bearing: it returns −1 only when a scan could not **read** the device. An absent `POPS` or
+`EMBER` folder is `0`, not failure — treating "this device only uses one core" as a failure would
+freeze the PS1 page of most setups. When either half genuinely fails, the whole last-good list is
+kept, because publishing half a list looks exactly like the user's titles disappearing.
+
+**Sort.** The merged comparator reuses the VCD scan's existing visible-name key, exported as
+`vcdSortKey()` so there is one definition rather than two that can drift. Enabling Ember therefore
+cannot reorder an existing PS1 list. The extension tie-break is not cosmetic: the same game held for
+both cores is the *expected* case, and without a deterministic tie-break `qsort` may swap those two
+rows on every rescan, making them appear to jump around.
+
+**Trap.** The PS1 array is a second store to free in every `itemCleanUp` and to bounds-guard in
+every `*ActiveGame()` helper. The toggle-window guard exists because the L3 flip is synchronous
+while the rebuild is deferred; extend it, do not copy-paste it.
+
 
 ## Part 5 — Launch
 
@@ -561,14 +554,12 @@ We deliberately do **not** pre-verify a `.cue`/`.bin`/`.exe` inside the folder (
 ```c
 extern int  gEmberView;          // EMBER_VIEW_OFF / _AUTO (default) / _ALWAYS
 extern char gEmberFolder[32];    // per-device folder name, default "EMBER"
-extern int  gEmberSharePs1List;  // merge the VCD and CUE lists into one PS1 stop (default 0)
 extern int  gEmberCleanIop;      // fallback handoff, see R1 (default 0)
 ```
 
 ```c
 #define CONFIG_OPL_EMBER_VIEW      "ember_view"      // 0=Off 1=Auto 2=Always
 #define CONFIG_OPL_EMBER_FOLDER    "ember_folder"    // per-device folder holding ember.elf + games/
-#define CONFIG_OPL_EMBER_SHARE_PS1 "ember_share_ps1" // one merged PS1 list instead of VCD + CUE stops
 #define CONFIG_OPL_EMBER_CLEAN_IOP "ember_clean_iop" // reset+reload the IOP before handing off (fallback)
 ```
 
@@ -585,13 +576,12 @@ from the same parent. Rows:
 | --- | --- |
 | Ember Library | enum: Off / Auto / Always (`gEmberView`) |
 | Ember Folder | string, default shown when empty (`gEmberFolder`) — reuse `diaSetShowDefaultWhenEmpty` |
-| Combine VCD + CUE into one PS1 list | on/off (`gEmberSharePs1List`) |
 | Clean IOP handoff | on/off (`gEmberCleanIop`), hidden unless advanced/diag is set |
 
 **Trap:** `diaSetEnum` stores the array *pointer*, it does not copy. Any `const char *[]` handed to
 it must outlive every render of that dialog — make them `static`, as `guiSetBdmaSettings` does.
 
-Changing `gEmberView`, `gEmberFolder` or `gEmberSharePs1List` must call `libViewMarkAllDirty()` and
+Changing `gEmberView` or `gEmberFolder` must call `libViewMarkAllDirty()` and
 then `oplQueueVcdDeviceUpdates()` (rename it `oplQueueLibraryDeviceUpdates`) — marking dirty alone
 is not enough for HDD, whose `updateDelay == -1` means a dirty view otherwise renders stale forever.
 
@@ -600,7 +590,7 @@ is not enough for HDD, whose `updateDelay == -1` means a dirty view otherwise re
 `FAV_VERSION` 2 → **3**. The per-record `isVcd` byte becomes a `kind` byte:
 
 ```
-0 = ISO   1 = VCD   2 = CUE   3 = ELF
+0 = ISO   1 = VCD   2 = CUE
 ```
 
 Read compatibility:
@@ -608,13 +598,12 @@ Read compatibility:
 | File version | Mapping |
 | --- | --- |
 | v1 (no byte) | `kind = ISO` for every record (today's behaviour) |
-| v2 (`isVcd` byte) | `isVcd == 1` → VCD; `isVcd == 0 && mode == APP_MODE` → **ELF**; else ISO |
+| v2 (`isVcd` byte) | `isVcd == 1` → VCD; else ISO — unchanged, no records move |
 | v3 | `kind` verbatim |
 
-The v2 → ELF remap is the one behaviour change existing users will see: app favourites currently sit
-in the FAV tab's ISO list and will move to the new ELF stop. That is exactly the requested
-`ISO → VCD → CUE → ELF` ring, but it must be called out in the release notes, because a user with
-app favourites will otherwise think they vanished.
+No records move between stops. App favourites stay in the Favourites PS2 list exactly where they
+are today, so unlike the earlier 4-stop draft this migration has no user-visible effect at all — the
+`kind` byte only gains the ability to say "this PS1 favourite is an Ember title".
 
 Record size line (`favsupport.c` ~L310) stays `17 + tlen` — one byte either way.
 
