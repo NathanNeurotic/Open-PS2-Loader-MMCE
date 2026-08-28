@@ -393,6 +393,14 @@ struct UIItem diaVcdConfig[] = {
     {UI_BOOL, CFG_POPSTARTER_RETROGEM_GAMEID, 1, 1, _STR_HINT_POPSTARTER_RETROGEM_GAMEID, 0, 0, {.intvalue = {1, 1}}},
     {UI_BREAK},
 
+    // Ember is the OTHER PS1 core, and this page is where the PS1 settings live. Its own settings
+    // are deliberately tiny: no device picker (its argument contract makes one impossible), no core
+    // selector (the row decides), no enable toggle (the EMBER folder's presence is the switch).
+    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {NULL, _STR_EMBER_DISPLAY}}},
+    {UI_SPACER},
+    {UI_ENUM, CFG_EMBER_DISPLAY, 1, 1, _STR_HINT_EMBER_DISPLAY, 0, 0, {.intvalue = {0, 0}}},
+    {UI_BREAK},
+
 
     // Legacy sub-pages remain callable outside the Settings shell; the peer page skips this row
     // and composes the BDMA fields inline below.

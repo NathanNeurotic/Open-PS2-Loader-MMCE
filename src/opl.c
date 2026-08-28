@@ -186,6 +186,7 @@ int gNeutrinoVideoDefault;   // global default Neutrino -gsm video mode (0=Off..
 int gNeutrinoGsmCompDefault; // global default -gsm ":c" field-flip half (0=off, 1-3=type)
 int gNeutrinoElfArg;         // default-on (settings key only, no UI): auto-emit -elf=cdrom0: on Neutrino launches
 int gDefaultGameView;
+int gEmberDisplay;
 char gPopstarterPath[256];         // custom POPSTARTER.ELF path (used only when gPopstarterDevice == POPS_DEV_CUSTOM)
 int gPopstarterDevice;             // POPSTARTER.ELF device (POPS_DEV_*); legacy path -> Custom
 int gPopstarterRetroGemGameID = 1; // RetroGEM Game ID optical barcode for VCD launches (1=on, default)
@@ -2717,6 +2718,11 @@ static void _loadConfig()
             configGetInt(configOPL, CONFIG_OPL_DEFAULT_GAME_VIEW, &gDefaultGameView);
             if (gDefaultGameView < GAME_VIEW_BOTH || gDefaultGameView > GAME_VIEW_VCD)
                 gDefaultGameView = GAME_VIEW_BOTH;
+            gEmberDisplay = EMBER_DISPLAY_LEAVE;
+            if (!configGetInt(configOPL, CONFIG_OPL_EMBER_DISPLAY, &gEmberDisplay))
+                gEmberDisplay = EMBER_DISPLAY_LEAVE;
+            if (gEmberDisplay < EMBER_DISPLAY_LEAVE || gEmberDisplay > EMBER_DISPLAY_480)
+                gEmberDisplay = EMBER_DISPLAY_LEAVE;
             // A boot default-view locked to one type (VCD or ISO) must force the same one-shot
             // rescan the settings dialog does on a view change (gui.c). Without it, libViewActive()
             // short-circuits bdm/hdd/eth NeedsUpdate before the initial-scan trigger and the
@@ -3239,6 +3245,7 @@ static void _saveConfig()
         configSetInt(configOPL, CONFIG_OPL_APPLY_GAMEID, gApplyGameID);
         configSetInt(configOPL, CONFIG_OPL_DEFAULT_GAME_VIEW, gDefaultGameView);
         configSetStr(configOPL, CONFIG_OPL_POPSTARTER_PATH, gPopstarterPath);
+        configSetInt(configOPL, CONFIG_OPL_EMBER_DISPLAY, gEmberDisplay);
         configSetInt(configOPL, CONFIG_OPL_POPSTARTER_DEVICE, gPopstarterDevice);
         configSetInt(configOPL, CONFIG_OPL_POPSTARTER_RETROGEM_GAMEID, gPopstarterRetroGemGameID);
         configSetInt(configOPL, CONFIG_OPL_BDMA_SOURCE, gBdmaSource);

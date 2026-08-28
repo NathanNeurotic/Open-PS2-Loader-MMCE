@@ -1164,3 +1164,7 @@ gui_strings:
   string: No PS1 disc image in this Ember game folder.
 - label: VIEW_APPS
   string: Showing apps
+- label: EMBER_DISPLAY
+  string: Ember Display Mode
+- label: HINT_EMBER_DISPLAY
+  string: Output mode Ember uses for PS1 games. Written to settings.txt in the device's EMBER folder when a game launches. Default leaves that file untouched.

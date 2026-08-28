@@ -236,6 +236,78 @@ int cueScanDir(const char *devPrefix, cue_entry_t **outList)
 // folder holding just a .bin is still a valid game.
 static const char *const cueDiscExts[] = {".cue", ".exe", ".bin"};
 
+void cueApplyDisplaySetting(const char *devPrefix)
+{
+    char path[320];
+    char before[512];
+    char after[512];
+    const char *want;
+    int fd, len = 0, out = 0, i, lineStart;
+
+    if (gEmberDisplay == EMBER_DISPLAY_LEAVE || devPrefix == NULL)
+        return;
+    want = (gEmberDisplay == EMBER_DISPLAY_480) ? "display:480" : "display:240";
+
+    snprintf(path, sizeof(path), "%s%s%c%s", devPrefix, cueEmberFolder(), cueSep(devPrefix),
+             EMBER_SETTINGS_NAME);
+
+    // Read whatever is there. An absent file is the normal first-run case, not an error.
+    fd = open(path, O_RDONLY);
+    if (fd >= 0) {
+        len = read(fd, before, sizeof(before) - 1);
+        close(fd);
+        if (len < 0)
+            len = 0;
+    }
+    before[len] = 0;
+
+    // Copy every line EXCEPT an existing display: line, then append ours. Keeping the other lines
+    // is the point: Ember ignores unknown keys, so anything else in here belongs to the user or to
+    // a future Ember, and neither is ours to delete.
+    for (i = 0, lineStart = 0; i <= len; i++) {
+        if (i != len && before[i] != 0x0A)
+            continue;
+        int lineLen = i - lineStart;
+        if (lineLen > 0 && before[lineStart + lineLen - 1] == 0x0D)
+            lineLen--; // tolerate CRLF, which a PC-side editor will leave behind
+        if (lineLen > 0 && strncasecmp(&before[lineStart], "display:", 8) != 0) {
+            if (out + lineLen + 1 >= (int)sizeof(after))
+                break; // pathological file: keep what fits rather than truncate mid-line
+            memcpy(&after[out], &before[lineStart], lineLen);
+            out += lineLen;
+            after[out++] = 0x0A;
+        }
+        lineStart = i + 1;
+    }
+    // snprintf returns what it WOULD have written, so adding it blindly can push `out` PAST the end
+    // of the buffer and make the write() below over-read into whatever follows on the stack -- and
+    // this is a path that writes to the user's memory card or USB stick. If our own line does not
+    // fit, leave the file completely alone: a settings.txt we mangled is worse than one we never
+    // touched, and Ember runs fine without the key.
+    {
+        int n = snprintf(&after[out], sizeof(after) - out, "%s\n", want);
+        if (n < 0 || n >= (int)sizeof(after) - out) {
+            LOG("[CUE] no room for the display line in %s -- left untouched\n", path);
+            return;
+        }
+        out += n;
+    }
+
+    // Only touch the device when the content actually changes. This runs on every Ember launch, and
+    // a needless write is a needless card/stick write.
+    if (out == len && memcmp(after, before, out) == 0)
+        return;
+
+    fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+    if (fd < 0) {
+        LOG("[CUE] cannot write %s -- launching without applying the display mode\n", path);
+        return;
+    }
+    if (write(fd, after, out) != out)
+        LOG("[CUE] short write on %s\n", path);
+    close(fd);
+}
+
 int cueGameHasImage(const char *devPrefix, const char *name)
 {
     char gamesDir[288];

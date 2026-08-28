@@ -990,7 +990,7 @@ reshow_ui:
     diaSetInt(diaUIConfig, UICFG_AUTOREFRESH, gAutoRefresh);
     diaSetInt(diaUIConfig, UICFG_NOTIFICATIONS, gEnableNotifications);
     diaSetVisible(diaUIConfig, UICFG_COVERFLOW_BUTTON, gTheme->coverflow != NULL);
-    const char *gameViewNames[] = {"Both", "ISO", "VCD", NULL};
+    const char *gameViewNames[] = {"Both", "PS2", "PS1", NULL};
     diaSetEnum(diaUIConfig, UICFG_GAMEVIEW, gameViewNames);
     diaSetInt(diaUIConfig, UICFG_GAMEVIEW, gDefaultGameView);
     diaSetEnum(diaUIConfig, UICFG_VMODE, vmodeNames);
@@ -1359,6 +1359,13 @@ void guiShowVcdConfig(void)
 {
     // POPSTARTER.ELF device TYPE (POPS_DEV_*). MUST stay in sync with vcdResolvePopstarter() (vcdsupport.c).
     const char *popsDevStrs[] = {_l(_STR_DEFAULT), "Memory Card", "USB", "MX4SIO", "MMCE", "HDD (exFAT)", "HDD (APA)", "Custom", _l(_STR_GAMES_DEVICE), NULL}; // "Game's Device" (POPS_DEV_GAME) appended last to match the enum tail
+    // diaSetEnum stores the ARRAY POINTER rather than copying, so this must outlive every render of
+    // the dialog -- static, like the BDMA option arrays on the peer page.
+    static const char *emberDisplayStrs[] = {NULL, "240p", "480p", NULL};
+    emberDisplayStrs[0] = _l(_STR_DEFAULT);
+    diaSetEnum(diaVcdConfig, CFG_EMBER_DISPLAY, emberDisplayStrs);
+    diaSetInt(diaVcdConfig, CFG_EMBER_DISPLAY, gEmberDisplay);
+
     diaSetEnum(diaVcdConfig, CFG_POPSTARTER_DEVICE, popsDevStrs);
     diaSetInt(diaVcdConfig, CFG_POPSTARTER_DEVICE, gPopstarterDevice);
     diaSetString(diaVcdConfig, CFG_POPSTARTER_PATH, gPopstarterPath);
@@ -1387,6 +1394,7 @@ reshow_vcd:
     if (ret) {
         diaGetInt(diaVcdConfig, CFG_POPSTARTER_DEVICE, &gPopstarterDevice);
         diaGetInt(diaVcdConfig, CFG_POPSTARTER_RETROGEM_GAMEID, &gPopstarterRetroGemGameID);
+        diaGetInt(diaVcdConfig, CFG_EMBER_DISPLAY, &gEmberDisplay);
 
         {
             // The dialog field is char[32]; only adopt the typed value if it actually changed, so
@@ -2799,7 +2807,7 @@ static int guiSettingsShowInterface(void)
 {
     const struct UIItem *parts[] = {diaUIConfig, diaDisplayConfig};
     const int skipIDs[] = {UICFG_VMODE};
-    const char *gameViewNames[] = {"Both", "ISO", "VCD", NULL};
+    const char *gameViewNames[] = {"Both", "PS2", "PS1", NULL};
     const char *vmodeNames[] = {_l(_STR_AUTO), "PAL 640x512i @50Hz 24bit", "NTSC 640x448i @60Hz 24bit",
                                 "EDTV 640x448p @60Hz 24bit", "EDTV 640x512p @50Hz 24bit", "VGA 640x480p @60Hz 24bit",
                                 "PAL 704x576i @50Hz 24bit (HIRES)", "NTSC 704x480i @60Hz 24bit (HIRES)",
