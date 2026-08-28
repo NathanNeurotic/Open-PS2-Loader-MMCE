@@ -1,10 +1,51 @@
 # Ember as a second PS1 core — integration plan
 
-**Status:** design only, nothing implemented. Written for an implementing agent.
+**Status:** phases 0 and 1 landed (see Implementation status below); phases 2-5 pending hardware.
 **Base commit:** `291716d3` on `rebuild/main` (2026-08-27).
 **Permission:** Gage (author of Ember) has approved and encouraged this integration.
 
 ---
+
+## Implementation status
+
+Branch `feat/ember-ps1-core`. Update this table as phases land; it is the first thing the next
+agent should read.
+
+| Phase | State | Notes |
+| --- | --- | --- |
+| 0 — prove the handoff | **code landed, HARDWARE PENDING** | `sysLaunchEmber()` + `cuesupport.c` + an OPLDIAG-only interception in `appLaunchItem`. **Blocks phases 2-5.** See "How to run the Phase 0 test" below. |
+| 1 — view engine | **landed** | `libview.c`/`libview.h` own the ring; the binary `vcdView` API is deleted, not shadowed. Both audit gates pass (zero old-API references; per-file call-site counts identical). Rings still ISO -> VCD only, so behaviour is unchanged. |
+| 2 — CUE list on BDM | not started | gated on Phase 0 |
+| 3 — MMCE + ETH, settings, docs | not started | gated on Phase 0 |
+| 4 — Favourites v3, merged list, APA | not started | gated on Phase 0 |
+| 5 — bonus surface | not started | gated on Phase 0 |
+
+### How to run the Phase 0 test
+
+Build with `OPLDIAG=1` (a release build deliberately does NOT include the probe). On the test
+device, lay out:
+
+```
+mass0:/EMBER/ember.elf      <- from Ember.Beta.Release.zip
+mass0:/EMBER/bios.bin       <- your own PS1 BIOS, exactly 512 KB
+mass0:/EMBER/games/Crash Bandicoot (USA)/game.cue  (+ game.bin)
+```
+
+Add an APPS entry pointing at it — `boot` = `mass0:/EMBER/ember.elf`, `argv1` =
+`Crash Bandicoot (USA)` — and launch it from the APPS page.
+
+**What to report back**
+
+1. Does the game boot at all?
+2. **Do the controllers work?** This is risk R1 and it decides whether the rest of the design
+   stands as written or needs the clean-IOP fallback.
+3. Does it work from MX4SIO / MMCE / internal exFAT ATA, not just USB? (Use `mass1:` etc.)
+4. Does `bios.bin` load, and do `MC1.vmc` / `MC2.vmc` appear in the game folder afterwards?
+5. Anything that looks like IOP memory exhaustion (late, unexplained failure).
+
+The control case: the identical APPS entry on a **release** build is expected to fail, because
+`LoadELFFromFileWithPartition` resets the IOP out from under Ember. That contrast is the
+measurement — if the release build also works, the no-reset premise needs re-examining.
 
 ## Part 0 — What Ember actually is (measured, not guessed)
 

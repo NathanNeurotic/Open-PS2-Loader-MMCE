@@ -4,6 +4,7 @@
 #include "include/supportbase.h"
 #include "include/udpfssupport.h"
 #include "include/vcdsupport.h"
+#include "include/libview.h" // libViewActive / libListViewActive -- which list this page shows
 #include "include/folderbrowse.h"
 #include "include/util.h"
 #include "include/renderman.h"
@@ -123,12 +124,12 @@ static int udpfsNeedsUpdate(item_list_t *itemList)
     int result = 0;
 
     // VCD view: force a rescan once on toggle, then refresh on toggle only (skip disc heuristics).
-    if (vcdConsumeDirty(itemList->mode))
+    if (libViewConsumeDirty(itemList->mode))
         return 1;
     // Folder browsing: descend/ascend forces one rescan.
     if (folderConsumeDirty(itemList->mode))
         return 1;
-    if (vcdListViewActive(itemList))
+    if (libListViewActive(itemList) == LIB_VIEW_VCD)
         return 0;
 
     if (udpfsULSizePrev == -2)
@@ -175,7 +176,7 @@ static int udpfsUpdateGameList(item_list_t *itemList)
         udpfsFoldersCreated = 1;
     }
 
-    if (vcdListViewActive(itemList)) {
+    if (libListViewActive(itemList) == LIB_VIEW_VCD) {
         int r = vcdFillGameList(udpfsPrefix, &udpfsGames);
         if (r >= 0) // r < 0: transient scan failure -> preserve the last-good list
             udpfsGameCount = r;
@@ -211,7 +212,7 @@ static int udpfsGetGameNameLength(item_list_t *itemList, int id)
 static char *udpfsGetGameStartup(item_list_t *itemList, int id)
 {
     // VCD view keys per-game data (CFG/art) off the VCD filename, not a disc ID (see sbPopulateConfig).
-    if (vcdListViewActive(itemList))
+    if (libListViewActive(itemList) == LIB_VIEW_VCD)
         return udpfsGames[id].name;
     return udpfsGames[id].startup;
 }
@@ -254,7 +255,7 @@ static void udpfsLaunchGame(item_list_t *itemList, int id, config_set_t *configS
     sbSetBrowseSub(folderGetSub(itemList->mode));
 
     // VCD view: udpfs cannot host a POPSTARTER launch (network filesystem) -> hand off to the guard.
-    if (game != NULL && vcdListViewActive(itemList)) {
+    if (game != NULL && (libListViewActive(itemList) == LIB_VIEW_VCD)) {
         udpfsLaunchVcd(itemList, game->name, configSet);
         return;
     }
@@ -367,7 +368,7 @@ static int udpfsGetImage(item_list_t *itemList, char *folder, int isRelative, ch
     else
         snprintf(path, sizeof(path), "%s%s_%s", folder, value, suffix);
     int r = texDiscoverLoad(resultTex, path, -1);
-    if (r == ERR_BAD_FILE && isRelative && vcdListViewActive(itemList))
+    if (r == ERR_BAD_FILE && isRelative && (libListViewActive(itemList) == LIB_VIEW_VCD))
         r = vcdLoadPopsCover(udpfsPrefix, value, suffix, resultTex);
     return r;
 }

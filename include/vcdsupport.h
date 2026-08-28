@@ -80,27 +80,15 @@ void vcdBuildSelector(const char *devPrefix, const char *prefix, const char *nam
 // Returns texDiscoverLoad's result (>= 0 hit, negative miss).
 int vcdLoadPopsCover(const char *scanPrefix, const char *value, const char *suffix, GSTEXTURE *resultTex);
 
-// ---- per-device VCD view (L3 toggle) ----------------------------------------------
-// Does this device class get a VCD view? (BDM range, MMCE, ETH, and the APA/PFS HDD.)
-int vcdModeSupported(int mode);
-// Is the given device mode currently showing its VCD list (vs its disc list)?
-int vcdViewActive(int mode);
-// Same query for an item-list instance. A normal source delegates to vcdViewActive(mode); a
-// Favourites shallow proxy may force ISO or VCD without changing the source page's own L3 state.
-int vcdListViewActive(const item_list_t *itemList);
+// ---- per-device VCD view -----------------------------------------------------------
+// The view state itself now lives in libview.h: which list a page shows became an N-way ring
+// (ISO / VCD / CUE / ELF) the moment a second PS1 core arrived, and a boolean "is it VCD?" helper
+// could only answer that question wrongly for the new stops. Ask libViewActive(mode) == LIB_VIEW_VCD.
+//
 // Display-only: strip a leading PS1 game-ID prefix from a VCD list name when the gVcdHideGameId
-// setting is on and `mode` is a VCD view; returns `text` unchanged otherwise. COSMETIC -- the
-// result is for on-screen text only, never for launch/art/favourites/config lookups.
+// setting is on and `mode` is showing its VCD list; returns `text` unchanged otherwise. COSMETIC --
+// the result is for on-screen text only, never for launch/art/favourites/config lookups.
 const char *vcdDisplayName(int mode, const char *text);
-// Flip the VCD view for a mode + mark it dirty so the owning support's NeedsUpdate forces a rescan.
-void vcdToggleView(int mode);
-// Returns 1 exactly once after a toggle (and clears the flag) -- call from the support's NeedsUpdate.
-int vcdConsumeDirty(int mode);
-// Mark one VCD-capable mode dirty after its VCD storage changes. Runtime callers still enqueue that
-// support's normal deferred update; this only makes the existing NeedsUpdate path rescan it.
-void vcdMarkDirty(int mode);
-// Mark all VCD-capable modes dirty (one rescan each) -- used when the global default-view setting changes.
-void vcdMarkAllDirty(void);
 
 // Fill a base_game_info_t list (memalign'd like sbReadList; frees *outGames first) from
 // <devPrefix>POPS/*.VCD. Returns the count. name/startup = VCD basename without the extension.

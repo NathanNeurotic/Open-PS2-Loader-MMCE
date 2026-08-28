@@ -4,6 +4,7 @@
 #include "include/supportbase.h"
 #include "include/mmcesupport.h"
 #include "include/vcdsupport.h"
+#include "include/libview.h" // libViewActive / libListViewActive -- which list this page shows
 #include "include/folderbrowse.h"
 #include "include/util.h"
 #include "include/themes.h"
@@ -504,14 +505,14 @@ static int mmceNeedsUpdate(item_list_t *itemList)
     }
 
     // VCD view: force a rescan once on toggle, then skip the disc heuristics while showing VCDs.
-    if (vcdConsumeDirty(itemList->mode)) {
+    if (libViewConsumeDirty(itemList->mode)) {
         mmceVcdScanRetries = 0; // fresh user toggle re-arms the failed-scan retry budget
         return 1;
     }
     // Folder browsing: descend/ascend forces one rescan (consumed before the NOUPDATE latch below).
     if (folderConsumeDirty(itemList->mode))
         return 1;
-    if (vcdViewActive(itemList->mode)) {
+    if (libViewActive(itemList->mode) == LIB_VIEW_VCD) {
         if (!mmceVcdScanned) {
             mmceGameList.updateDelay = MMCE_MODE_UPDATE_DELAY;
             return 1;
@@ -631,7 +632,7 @@ static int mmceUpdateGameList(item_list_t *itemList)
 
     // Each view scans into its OWN array (#120): a failed rescan preserves only that view's last-good and
     // can never resurrect the other view's list (see the mmceVcdGames comment at the declarations).
-    if (vcdViewActive(itemList->mode)) {
+    if (libViewActive(itemList->mode) == LIB_VIEW_VCD) {
         int r = vcdFillGameList(mmcePrefix, &mmceVcdGames);
         if (r >= 0) { // r < 0: transient scan failure (contended bus) -> keep the last-good VCD list
             mmceVcdScanned = 1;
@@ -650,13 +651,13 @@ static int mmceUpdateGameList(item_list_t *itemList)
 
 static int mmceGetGameCount(item_list_t *itemList)
 {
-    return vcdViewActive(itemList->mode) ? mmceVcdGameCount : mmceGameCount;
+    return (libViewActive(itemList->mode) == LIB_VIEW_VCD) ? mmceVcdGameCount : mmceGameCount;
 }
 
 static base_game_info_t mmceEmptyGame;
 static base_game_info_t *mmceActiveGame(item_list_t *itemList, int id)
 {
-    int vcd = vcdViewActive(itemList->mode);
+    int vcd = (libViewActive(itemList->mode) == LIB_VIEW_VCD);
     base_game_info_t *arr = vcd ? mmceVcdGames : mmceGames;
     int count = vcd ? mmceVcdGameCount : mmceGameCount;
     if (arr == NULL || id < 0 || id >= count)
@@ -684,17 +685,17 @@ static char *mmceGetGameStartup(item_list_t *itemList, int id)
 {
     // VCD view keys per-game data (CFG/art) off the VCD filename, not a disc ID (see sbPopulateConfig).
     base_game_info_t *g = mmceActiveGame(itemList, id);
-    if (vcdViewActive(itemList->mode))
+    if (libViewActive(itemList->mode) == LIB_VIEW_VCD)
         return g->name;
     return g->startup;
 }
 
 static void mmceDeleteGame(item_list_t *itemList, int id)
 {
-    if (vcdViewActive(itemList->mode))
+    if (libViewActive(itemList->mode) == LIB_VIEW_VCD)
         return; // #120: a VCD is not an ISO game -- no delete in VCD view
     if (mmceActiveGame(itemList, id) == &mmceEmptyGame)
-        return;                                   // stale id in the VCD->ISO toggle window (vcdViewActive already flipped, old VCD submenu id
+        return;                                   // stale id in the VCD->ISO toggle window (libViewActive already flipped, old VCD submenu id
                                                   // still live): sbDelete does NOT bounds-check, so this avoids an OOB/NULL deref + wrong unlink
     sbSetBrowseSub(folderGetSub(itemList->mode)); // delete inside the current subfolder, not the root
     sbDelete(&mmceGames, mmcePrefix, "/", mmceGameCount, id);
@@ -703,7 +704,7 @@ static void mmceDeleteGame(item_list_t *itemList, int id)
 
 static void mmceRenameGame(item_list_t *itemList, int id, char *newName)
 {
-    if (vcdViewActive(itemList->mode)) {
+    if (libViewActive(itemList->mode) == LIB_VIEW_VCD) {
         base_game_info_t *game = mmceActiveGame(itemList, id);
 
         if (game == &mmceEmptyGame)
@@ -805,7 +806,7 @@ void mmceLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
     }
 
     // VCD view: hand off to POPSTARTER (by name) instead of the disc path below. Menu-launch only.
-    if (gAutoLaunchBDMGame == NULL && game != NULL && vcdViewActive(itemList->mode)) {
+    if (gAutoLaunchBDMGame == NULL && game != NULL && (libViewActive(itemList->mode) == LIB_VIEW_VCD)) {
         mmceLaunchVcd(itemList, game->name, configSet);
         return;
     }
@@ -1128,7 +1129,7 @@ static config_set_t *mmceGetConfig(item_list_t *itemList, int id)
 static int mmceGetImage(item_list_t *itemList, char *folder, int isRelative, char *value, char *suffix, GSTEXTURE *resultTex, short psm)
 {
     int r = mmceTryLoadImage(mmceArtPrimary, folder, isRelative, value, suffix, resultTex);
-    if (r == ERR_BAD_FILE && isRelative && vcdViewActive(itemList->mode))
+    if (r == ERR_BAD_FILE && isRelative && (libViewActive(itemList->mode) == LIB_VIEW_VCD))
         r = vcdLoadPopsCover(mmceArtPrimary, value, suffix, resultTex);
     return r;
 }

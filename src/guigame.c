@@ -12,7 +12,8 @@
 #include "include/ethsupport.h"
 #include "include/favsupport.h"
 #include "include/bdmsupport.h"
-#include "include/vcdsupport.h" // vcdViewActive -- VCD games are POPSTARTER-only (Loader Core is N/A)
+#include "include/vcdsupport.h" // VCD games are POPSTARTER-only (Loader Core is N/A)
+#include "include/libview.h"    // libViewActive / libListViewActive -- which list this page shows
 #include "include/compatupd.h"
 #include "include/cheatman.h"
 #include "include/system.h"
@@ -1184,17 +1185,17 @@ void guiGameShowCompatConfig(int id, item_list_t *support, config_set_t *configS
     // a VCD (PS1) view never launches through Neutrino at all. FAV proxies the real device, so it
     // stays enabled and the launch-side guard arbitrates.
     bsdfsDeviceCapable = (support == NULL) ||
-                         ((support->mode >= BDM_MODE && support->mode <= BDM_MODE6 && !vcdViewActive(support->mode)) ||
+                         ((support->mode >= BDM_MODE && support->mode <= BDM_MODE6 && libViewActive(support->mode) != LIB_VIEW_VCD) ||
                           support->mode == FAV_MODE);
     // VCD games launch through POPSTARTER only, so the Loader Core is inert for them -- keep every
     // Neutrino-only row greyed even under a Neutrino global default (guiGameSetCoreAwareState reads
     // this). SMB likewise: ethsupport has no Neutrino launch leg, the effective core is always <OPL>.
-    coreNeverNeutrino = (support != NULL && (vcdViewActive(support->mode) || support->mode == ETH_MODE));
+    coreNeverNeutrino = (support != NULL && ((libViewActive(support->mode) == LIB_VIEW_VCD) || support->mode == ETH_MODE));
 
     // UDPBD games have no OPL core backend -- they always launch via Neutrino
     // (bdmsupport.c forces it). Lock the selector to Neutrino so the screen matches;
     // re-enable it for every other device (the dialog struct is reused across games).
-    if (support != NULL && vcdViewActive(support->mode)) {
+    if (support != NULL && (libViewActive(support->mode) == LIB_VIEW_VCD)) {
         // VCD (PS1) games launch ONLY via POPSTARTER -- neither OPL's core nor Neutrino is used, so the
         // Loader Core choice is meaningless. Pin it to the inert "Default" row (index 2 -> no per-game
         // $CoreLoader key persisted, as before) and lock the row so the screen doesn't imply a VCD game

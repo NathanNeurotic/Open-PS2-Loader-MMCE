@@ -4,6 +4,7 @@
 #include "include/supportbase.h"
 #include "include/bdmsupport.h"
 #include "include/vcdsupport.h"
+#include "include/libview.h" // libViewActive / libListViewActive -- which list this page shows
 #include "include/folderbrowse.h"
 #include "include/util.h"
 #include "include/themes.h"
@@ -1320,11 +1321,11 @@ static int bdmNeedsUpdate(item_list_t *itemList)
     // mmceNeedsUpdate checks it first). Otherwise a device already scanned this BdmGeneration -- which
     // every USB stick is, the moment its ISO list loads -- short-circuits at the gate and never
     // rescans, leaving the VCD (PS1/POPSTARTER) list permanently empty on USB/BDM while MMCE worked.
-    if (vcdConsumeDirty(itemList->mode))
+    if (libViewConsumeDirty(itemList->mode))
         return 1;
 
     // Folder browsing: a descend/ascend marks the mode dirty but bumps nothing the tick gate below
-    // watches, so consume it here (same discipline as vcdConsumeDirty) or the deeper/shallower list
+    // watches, so consume it here (same discipline as libViewConsumeDirty) or the deeper/shallower list
     // never rebuilds on a device already scanned this BdmGeneration.
     if (folderConsumeDirty(itemList->mode))
         return 1;
@@ -1439,8 +1440,8 @@ static int bdmNeedsUpdate(item_list_t *itemList)
 
     // VCD view: while this device shows its VCD list, skip the disc-folder heuristics (it refreshes on
     // L3 toggle / manual refresh only). The toggle's forced rescan is consumed ABOVE the device-tick
-    // gate (see vcdConsumeDirty near the top) so the per-generation cache can't swallow it.
-    if (vcdListViewActive(itemList))
+    // gate (see libViewConsumeDirty near the top) so the per-generation cache can't swallow it.
+    if (libListViewActive(itemList) == LIB_VIEW_VCD)
         return 0;
 
     snprintf(path, sizeof(path), "%sCD", pDeviceData->bdmPrefix);
@@ -1487,7 +1488,7 @@ static int bdmUpdateGameList(item_list_t *itemList)
     // bdmGames, so a VCD scan reporting failure (r < 0) left the ISO list published under the VCD
     // view -- the L3 toggle then "never changed the list" (Nathan, HW, ATA/HDD_BD), and a device with
     // no POPS folder hit that on every single toggle.
-    if (vcdListViewActive(itemList)) {
+    if (libListViewActive(itemList) == LIB_VIEW_VCD) {
         char vcdPrefix[BDM_DEVICE_ROOT_MAX + 2];
         bdmBuildVcdPrefix(vcdPrefix, sizeof(vcdPrefix), itemList->mode); // device root, NOT gBDMPrefix
         int r = vcdFillGameList(vcdPrefix, &pDeviceData->bdmVcdGames);
@@ -1503,12 +1504,12 @@ static int bdmGetGameCount(item_list_t *itemList)
 {
     bdm_device_data_t *pDeviceData = (bdm_device_data_t *)itemList->priv;
 
-    return vcdListViewActive(itemList) ? pDeviceData->bdmVcdGameCount : pDeviceData->bdmGameCount;
+    return (libListViewActive(itemList) == LIB_VIEW_VCD) ? pDeviceData->bdmVcdGameCount : pDeviceData->bdmGameCount;
 }
 
-// Toggle-window guard (mirrors mmceActiveGame). The L3 toggle flips vcdViewActive() SYNCHRONOUSLY
-// (vcdToggleView) but rebuilds the submenu on the DEFERRED IO thread, so for a window the OLD submenu's
-// ids are still live while vcdViewActive() already reports the NEW view -- and an id from the old view
+// Toggle-window guard (mirrors mmceActiveGame). The L3 toggle changes the active view SYNCHRONOUSLY
+// (libViewAdvance) but rebuilds the submenu on the DEFERRED IO thread, so for a window the OLD submenu's
+// ids are still live while libViewActive() already reports the NEW view -- and an id from the old view
 // can index the freshly-switched other-view array, which may be NULL (never scanned), shorter, or
 // mid-scan. Resolve EVERY id through here: an out-of-range id yields a STATIC EMPTY entry, so a stale-id
 // READ is safe empty data instead of an OOB deref, and launch/delete/rename treat &bdmEmptyGame as
@@ -1518,7 +1519,7 @@ static base_game_info_t bdmEmptyGame = {0};
 static base_game_info_t *bdmActiveGame(item_list_t *itemList, int id)
 {
     bdm_device_data_t *pDeviceData = (bdm_device_data_t *)itemList->priv;
-    int vcd = vcdListViewActive(itemList);
+    int vcd = (libListViewActive(itemList) == LIB_VIEW_VCD);
     base_game_info_t *arr = vcd ? pDeviceData->bdmVcdGames : pDeviceData->bdmGames;
     int count = vcd ? pDeviceData->bdmVcdGameCount : pDeviceData->bdmGameCount;
 
@@ -1550,7 +1551,7 @@ static char *bdmGetGameStartup(item_list_t *itemList, int id)
 
     // VCD view: identity is the filename, not a disc ID -> per-game data (CFG/art) keys off the
     // VCD name (matches sbPopulateConfig).
-    if (vcdListViewActive(itemList))
+    if (libListViewActive(itemList) == LIB_VIEW_VCD)
         return g->name;
     return g->startup;
 }
@@ -1559,7 +1560,7 @@ static void bdmDeleteGame(item_list_t *itemList, int id)
 {
     bdm_device_data_t *pDeviceData = (bdm_device_data_t *)itemList->priv;
 
-    if (vcdListViewActive(itemList))
+    if (libListViewActive(itemList) == LIB_VIEW_VCD)
         return; // #120: a VCD is not an ISO game -- no delete in VCD view (mirrors mmceDeleteGame)
     if (bdmActiveGame(itemList, id) == &bdmEmptyGame)
         return;                                   // stale id in the toggle window: sbDelete does NOT bounds-check -> avoid an OOB/wrong unlink
@@ -1573,7 +1574,7 @@ static void bdmRenameGame(item_list_t *itemList, int id, char *newName)
 {
     bdm_device_data_t *pDeviceData = (bdm_device_data_t *)itemList->priv;
 
-    if (vcdListViewActive(itemList)) {
+    if (libListViewActive(itemList) == LIB_VIEW_VCD) {
         base_game_info_t *game = bdmActiveGame(itemList, id);
         char vcdPrefix[BDM_DEVICE_ROOT_MAX + 2];
 
@@ -1906,7 +1907,7 @@ void bdmLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
     // disc / Neutrino path below (which is entirely disc-specific). The BDM_TYPE_ATA internal exFAT HDD
     // still launches off the live massN: prefix, NOT ata0:/ (OPL never mounts an ata0: filesystem -- a
     // re-point there made LoadELFFromFile fail into an already-deinit'd OPL = black-screen freeze).
-    if (gAutoLaunchBDMGame == NULL && game != NULL && vcdListViewActive(itemList)) {
+    if (gAutoLaunchBDMGame == NULL && game != NULL && (libListViewActive(itemList) == LIB_VIEW_VCD)) {
         bdmLaunchVcd(itemList, game->name, configSet);
         return;
     }
@@ -2258,7 +2259,7 @@ static int bdmGetImage(item_list_t *itemList, char *folder, int isRelative, char
     else
         snprintf(path, sizeof(path), "%s%s_%s", folder, value, suffix);
     int r = texDiscoverLoad(resultTex, path, -1);
-    if (r == ERR_BAD_FILE && isRelative && vcdListViewActive(itemList)) {
+    if (r == ERR_BAD_FILE && isRelative && (libListViewActive(itemList) == LIB_VIEW_VCD)) {
         char vcdPrefix[BDM_DEVICE_ROOT_MAX + 2];
         bdmBuildVcdPrefix(vcdPrefix, sizeof(vcdPrefix), itemList->mode);
         r = vcdLoadPopsCover(vcdPrefix, value, suffix, resultTex);

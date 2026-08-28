@@ -36,7 +36,8 @@
 #include "include/folderbrowse.h" // folderDepth -- favourites suppression inside subfolders
 #include "include/mmcesupport.h"  // mmceLoadModules() -- MMCE boot branch of resolveBootDirToMass
 #include "include/tar.h"          // tarInvalidate -- re-arm the .tar probe on a settings apply
-#include "include/vcdsupport.h"   // vcdViewActive stub -- isVcd stays 0 until item 12 lands
+#include "include/vcdsupport.h"   // VCD display naming + POPSTARTER launch helpers
+#include "include/libview.h"      // libViewActive / libListViewActive -- which list this page shows
 
 #include "include/cheatman.h"
 #include "include/sound.h"
@@ -326,9 +327,13 @@ void moduleUpdateMenuInternal(opl_io_module_t *mod, int themeChanged, int langCh
         if (gFAVStartMode)
             menuAddHint(&mod->menuItem, _STR_FAV_HINT, R3_ICON);
 
-        // L3 toggles the device's disc list <-> its VCD (PS1-via-POPSTARTER) list -- only under the
-        // "Both" default-view setting; ISO/VCD lock the page, so the toggle and its hint go away.
-        if (vcdModeSupported(mod->support->mode) && gDefaultGameView == GAME_VIEW_BOTH)
+        // L3 moves the page around its ring of lists -- only under the "Both" default-view setting;
+        // a locked setting pins the page, so the toggle and its hint go away.
+        //
+        // The question is "does this page have more than one list", NOT "does it have a VCD list".
+        // Those were the same thing while every ring was ISO<->VCD, and stop being the same as soon
+        // as a page offers a third; libViewRingSize keeps the hint honest either way.
+        if (libViewRingSize(mod->support->mode) > 1 && gDefaultGameView == GAME_VIEW_BOTH)
             menuAddHint(&mod->menuItem, _STR_VCD, L3_ICON);
     }
 
@@ -420,7 +425,7 @@ static void itemExecRefresh(struct menu_item *curMenu)
         if (support->mode == FAV_MODE) {
             loadFavourites();
         } else {
-            if (support->mode == HDD_MODE && vcdListViewActive(support))
+            if (support->mode == HDD_MODE && (libListViewActive(support) == LIB_VIEW_VCD))
                 hddVcdInvalidateCache();
             ioPutRequest(IO_MENU_UPDATE_DEFFERED, &support->mode);
         }
@@ -428,13 +433,13 @@ static void itemExecRefresh(struct menu_item *curMenu)
     }
 }
 
-// L3: toggle the device's list between its disc games and its VCD (PS1-via-POPSTARTER) list. Only
-// device classes that have a VCD view (vcdModeSupported) respond. vcdToggleView marks the mode
-// dirty; the deferred update + the support's NeedsUpdate (vcdConsumeDirty) then force the rescan.
+// L3: advance the page one stop around its ring of lists. Only pages with more than one list
+// respond. libViewAdvance marks the mode dirty; the deferred update + the support's NeedsUpdate
+// (libViewConsumeDirty) then force the rescan.
 static void itemExecToggleView(struct menu_item *curMenu)
 {
     item_list_t *support = curMenu->userdata;
-    if (!support || !vcdModeSupported(support->mode))
+    if (!support || libViewRingSize(support->mode) < 2)
         return;
     if (gDefaultGameView != GAME_VIEW_BOTH)
         return; // the global default-view setting locks the page to one type -> L3 is inert
@@ -442,7 +447,7 @@ static void itemExecToggleView(struct menu_item *curMenu)
     // Folder browsing: the VCD/POPS list has no folder tree, so drop any ISO-view subfolder position
     // back to root on a view toggle (the deferred rebuild below restores the plain device title).
     folderReset(support->mode);
-    vcdToggleView(support->mode);
+    libViewAdvance(support->mode);
 
     // Every cover already queued belongs to the view being discarded, and none of them will be
     // cancelled on their own: the loader's per-row cancellation keys on a row having scrolled away,
@@ -453,7 +458,7 @@ static void itemExecToggleView(struct menu_item *curMenu)
     cacheDropQueuedArt();
 
     sfxPlay(SFX_CONFIRM);
-    guiWarning(vcdViewActive(support->mode) ? _l(_STR_VCD_ON) : _l(_STR_VCD_OFF), 2);
+    guiWarning((libViewActive(support->mode) == LIB_VIEW_VCD) ? _l(_STR_VCD_ON) : _l(_STR_VCD_OFF), 2);
     ioPutRequest(IO_MENU_UPDATE_DEFFERED, &support->mode);
 }
 
@@ -503,7 +508,7 @@ static void itemExecSquare(struct menu_item *curMenu)
         // Direct HDD/HDL rows already carry their size in APA metadata (total_size_in_kb), so the
         // generic CFG+stat pass is redundant there. VCD rows likewise have no meaningful #Size.
         // Avoid putting either no-op read onto the shared IO worker merely for opening Info.
-        if (support == NULL || (!vcdListViewActive(support) && support->mode != HDD_MODE))
+        if (support == NULL || (libListViewActive(support) != LIB_VIEW_VCD && support->mode != HDD_MODE))
             menuRequestInfoSize();
         guiSwitchScreen(GUI_SCREEN_INFO);
     }
@@ -536,7 +541,7 @@ static void itemExecFav(struct menu_item *curMenu)
     } else {
         // A favourite captured while the device page is in its L3 VCD view is a PS1/.VCD favourite
         // (checklist item 12; the stub keeps isVcd at 0 until VCD views exist).
-        int isVcd = vcdViewActive(support->mode) ? 1 : 0;
+        int isVcd = (libViewActive(support->mode) == LIB_VIEW_VCD) ? 1 : 0;
         // Only on a device whose VCD favourites can actually be resolved/launched later: storing one
         // on a device without itemLaunchVcd would leave a permanently-hidden, unlaunchable record.
         if (isVcd && support->itemLaunchVcd == NULL)
@@ -568,8 +573,8 @@ static void itemExecTriangle(struct menu_item *curMenu)
     if (support) {
         // A VCD is a POPSTARTER title, not a PS2-loader title. Route before the generic per-game
         // settings branch: that branch loads/creates CFG state and exposes controls that can never
-        // affect a POPSTARTER handoff. vcdListViewActive also covers a forced-VCD Favourites proxy.
-        if (vcdListViewActive(support)) {
+        // affect a POPSTARTER handoff. libListViewActive also covers a forced-VCD Favourites proxy.
+        if (libListViewActive(support) == LIB_VIEW_VCD) {
             if (menuCheckParentalLock() == 0) {
                 menuInitVcdMenu();
                 guiSwitchScreen(GUI_SCREEN_APP_MENU);
@@ -771,15 +776,15 @@ static void deinitAllSupport(int exception, int modeSelected)
     }
 }
 
-void oplQueueVcdDeviceUpdates(void)
+void oplQueueLibraryDeviceUpdates(void)
 {
-    // vcdMarkAllDirty() is intentionally side-effect-free because it also runs during early config
+    // libViewMarkAllDirty() is intentionally side-effect-free because it also runs during early config
     // loading, before the IO worker and device modules are ready. Runtime callers must explicitly
     // enqueue the enabled pages. This matters most for HDD, whose updateDelay=-1 means a dirty view
     // otherwise keeps displaying the old submenu indefinitely while rendering uses the new view.
     for (int i = 0; i < MODE_COUNT; i++) {
         item_list_t *support = list_support[i].support;
-        if (support != NULL && support->enabled && support->mode != FAV_MODE && vcdModeSupported(support->mode))
+        if (support != NULL && support->enabled && support->mode != FAV_MODE && libViewRingSize(support->mode) > 1)
             ioPutRequest(IO_MENU_UPDATE_DEFFERED, &support->mode);
     }
 }
@@ -2664,13 +2669,13 @@ static void _loadConfig()
             if (gDefaultGameView < GAME_VIEW_BOTH || gDefaultGameView > GAME_VIEW_VCD)
                 gDefaultGameView = GAME_VIEW_BOTH;
             // A boot default-view locked to one type (VCD or ISO) must force the same one-shot
-            // rescan the settings dialog does on a view change (gui.c). Without it, vcdViewActive()
+            // rescan the settings dialog does on a view change (gui.c). Without it, libViewActive()
             // short-circuits bdm/hdd/eth NeedsUpdate before the initial-scan trigger and the
             // list stays blank on boot -- a manual SELECT does not recover it (NeedsUpdate still
             // returns 0), only re-toggling the view does. This runs before applyConfig()'s first
             // support scans, so each VCD-capable page consumes the dirty flag on its first refresh.
             if (gDefaultGameView != GAME_VIEW_BOTH)
-                vcdMarkAllDirty();
+                libViewMarkAllDirty();
             configGetStrCopy(configOPL, CONFIG_OPL_POPSTARTER_PATH, gPopstarterPath, sizeof(gPopstarterPath));
             // POPSTARTER device TYPE (POPS_DEV_*). Absent in legacy configs: a non-empty custom
             // popstarter_path migrates to Custom (honour the old override); otherwise Default (cwd).

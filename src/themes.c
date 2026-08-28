@@ -12,6 +12,7 @@
 #include "include/texcache.h"
 #include "include/favsupport.h"
 #include "include/vcdsupport.h" // vcdDisplayName -- display-only VCD game-ID prefix hide
+#include "include/libview.h"    // libViewActive / libListViewActive -- which list this page shows
 
 #include <time.h>
 #include <math.h>
@@ -1854,7 +1855,7 @@ static void drawItemText(struct menu_list *menu, struct submenu_list *item, conf
                 // ONLY (vcdDisplayIdCached): the id is resolved off the render thread
                 // (vcdRequestDisplayId, menusys.c), so a slow device never blocks here; until it
                 // lands, the filename's own id prefix is shown, then the title as before.
-                if (vcdViewActive(support->mode)) {
+                if (libViewActive(support->mode) == LIB_VIEW_VCD) {
                     char vcdId[VCD_ID_MAX];
                     if (vcdDisplayIdCached(startup, vcdId, sizeof(vcdId)) ||
                         vcdExtractGameId(startup, vcdId, sizeof(vcdId))) {

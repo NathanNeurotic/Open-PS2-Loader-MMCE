@@ -24,7 +24,8 @@
 #include "include/textures.h"
 #include "include/config.h"
 #include "include/supportbase.h" // sbPopulateConfig + base_game_info_t (VCD favourite config)
-#include "include/vcdsupport.h"  // vcdViewActive / vcdConsumeDirty (VCD favourites)
+#include "include/vcdsupport.h"  // VCD favourites: name-addressed POPSTARTER launch helpers
+#include "include/libview.h"     // libViewActive / libListViewActive -- which list this page shows
 #include "include/ethsupport.h"  // ETH ISO favourite resolution while the live source is in VCD view
 #include "include/favsupport.h"
 
@@ -376,7 +377,7 @@ static void favFreeArray(void)
 // shifted -- purely cosmetic on the source page; the FAV record + launch are unaffected either way.
 static void favVcdMarkStar(opl_io_module_t *mod, int id, const char *text)
 {
-    if (mod == NULL || mod->support == NULL || !vcdViewActive(mod->support->mode))
+    if (mod == NULL || mod->support == NULL || libViewActive(mod->support->mode) != LIB_VIEW_VCD)
         return;
     submenu_list_t *src = submenuFindItemByIdAndText(mod->subMenu, id, text);
     if (src != NULL)
@@ -489,7 +490,7 @@ static item_list_t *favResolve(int mode, int id, const char *text, int isVcd, in
                 continue;
             int liveId = id;
             if (favResolveStoredId(mod->support, id, text, 0, &liveId)) {
-                if (!vcdViewActive(mod->support->mode)) {
+                if (libViewActive(mod->support->mode) != LIB_VIEW_VCD) {
                     submenu_list_t *src = submenuFindItemByIdAndText(mod->subMenu, liveId, text);
                     if (src != NULL)
                         src->item.favourited = 1;
@@ -512,7 +513,7 @@ static item_list_t *favResolve(int mode, int id, const char *text, int isVcd, in
     if (!favResolveStoredId(mod->support, id, text, 0, &liveId))
         return NULL;
 
-    if (!vcdViewActive(mod->support->mode)) {
+    if (libViewActive(mod->support->mode) != LIB_VIEW_VCD) {
         submenu_list_t *src = submenuFindItemByIdAndText(mod->subMenu, liveId, text);
         if (src != NULL)
             src->item.favourited = 1;
@@ -538,7 +539,7 @@ static int favNeedsUpdate(item_list_t *itemList)
     // Consume the FAV L3 ISO<->VCD dirty flag UNCONDITIONALLY (and first) so a concurrent
     // favForceUpdate rebuild also clears it -- otherwise a default-view change that raises both would
     // trigger one redundant byte-identical re-read on the following pass.
-    int viewToggled = vcdConsumeDirty(FAV_MODE);
+    int viewToggled = libViewConsumeDirty(FAV_MODE);
     if (favForceUpdate) {
         favForceUpdate = 0;
         return 1;
@@ -573,7 +574,7 @@ static int favUpdateItemList(item_list_t *itemList)
     // also restores the star on the source submenu. Filtering first meant a saved VCD record was never
     // resolved while FAV itself was in ISO view, so rebuilding the HDD list on an L3 toggle erased the
     // visible star and loadFavourites() could not put it back (#495).
-    int favVcdView = vcdViewActive(FAV_MODE);
+    int favVcdView = (libViewActive(FAV_MODE) == LIB_VIEW_VCD);
     for (int i = 0; i < rawCount; i++) {
         int resolvedMode = recs[i].mode;
         int resolvedId = recs[i].id;
