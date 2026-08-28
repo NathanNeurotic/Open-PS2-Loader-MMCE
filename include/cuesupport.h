@@ -160,15 +160,10 @@ int cueRenameGame(const char *devPrefix, const char *oldName, const char *newNam
 // caller then keeps its last-good list rather than blanking a page over a transient wedge.
 // This is the ONE place the two libraries are unioned.
 //
-// TWO prefixes, and the split is deliberate rather than an oversight:
-//   vcdPrefix   -- passed to the POPSTARTER scan EXACTLY as that device has always passed it. On
-//                  MMCE that includes the user's configurable games prefix (gMMCEPrefix), so a card
-//                  laid out as mmce0:/<prefix>/POPS keeps working. Changing it would relocate an
-//                  existing library out from under its owner.
-//   emberPrefix -- the device ROOT, always. EMBER/ is a new library folder and follows the standing
-//                  rule that library folders live at the root of each activated device.
-// On every BDM device the two are the same value, so nothing there is affected either way.
-int ps1FillGameList(const char *vcdPrefix, const char *emberPrefix, base_game_info_t **outGames);
+// devPrefix is the device ROOT for BOTH libraries -- POPS/ and EMBER/ are peers there, on every
+// device class. See the note at the top of this header for why the root, and not a configurable
+// games prefix, is the right home for them.
+int ps1FillGameList(const char *devPrefix, base_game_info_t **outGames);
 
 // PS1 (Ember) cover FALLBACK inside the game's own folder: "<games>/<name>/cover.png", then
 // "<games>/<name>/<name>.png". Cover/icon suffixes only; a device getImage calls this ONLY after

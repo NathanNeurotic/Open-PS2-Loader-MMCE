@@ -1495,8 +1495,8 @@ static int bdmUpdateGameList(item_list_t *itemList)
         // ONE list, BOTH cores: ps1FillGameList unions POPS/*.VCD with EMBER/games/* and sorts them
         // together. It reports failure only when a scan could not READ the device -- an absent POPS
         // or EMBER folder is 0 -- so a device using just one core never preserves a stale list.
-        int r = ps1FillGameList(ps1Prefix, ps1Prefix, &pDeviceData->bdmPs1Games); // same root for both halves on BDM
-        if (r >= 0)                                                               // r < 0: transient scan failure -> keep THIS view's last-good (empty if never scanned)
+        int r = ps1FillGameList(ps1Prefix, &pDeviceData->bdmPs1Games);
+        if (r >= 0) // r < 0: transient scan failure -> keep THIS view's last-good (empty if never scanned)
             pDeviceData->bdmPs1GameCount = r;
         return pDeviceData->bdmPs1GameCount;
     }

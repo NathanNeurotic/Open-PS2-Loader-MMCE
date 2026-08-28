@@ -96,9 +96,11 @@ static unsigned char mmceEverResolved = 0;
 // forward declaration
 static item_list_t mmceGameList;
 static void mmceGetDeviceRoot(char *root, size_t size);
-// The card ROOT ("mmceN:/"), where library folders live. mmcePrefix is NOT it: that carries the
-// user's configurable games prefix (gMMCEPrefix), which POPS has always been resolved under and
-// must keep being resolved under. EMBER/ is new and follows the device-root rule instead.
+// The card ROOT ("mmceN:/"), where the PS1 library folders live -- POPS/ and EMBER/ alike, exactly
+// as on every other device. mmcePrefix is NOT the root: it carries the user's configurable games
+// prefix (gMMCEPrefix), which is right for OPL's own data (CD/ DVD/ ART/ CFG/ VMC/) and wrong for a
+// library folder. POPS used to be resolved under it, which put an MMCE card with a configured
+// prefix out of step with its own documentation and with every other device.
 static const char *mmcePs1Root(void);
 static int mmceModLoaded = 0;          // latched by mmceLoadModules; read by mmceSendGameID's arm check
 static char mmceGameIdTarget[8] = {0}; // last device a GameID 0x8 switch was SENT to (mmceGameIdSettle polls it)
@@ -645,9 +647,8 @@ static int mmceUpdateGameList(item_list_t *itemList)
     // Each view scans into its OWN array (#120): a failed rescan preserves only that view's last-good and
     // can never resurrect the other view's list (see the mmcePs1Games comment at the declarations).
     if (libViewActive(itemList->mode) == LIB_VIEW_PS1) {
-        // ONE list, BOTH cores -- POPS/*.VCD unioned with EMBER/games/*. mmcePrefix is the card
-        // root, which is where both folders live, so the same prefix serves both halves.
-        int r = ps1FillGameList(mmcePrefix, mmcePs1Root(), &mmcePs1Games);
+        // ONE list, BOTH cores -- POPS/*.VCD unioned with EMBER/games/*, both at the card root.
+        int r = ps1FillGameList(mmcePs1Root(), &mmcePs1Games);
         if (r >= 0) { // r < 0: transient scan failure (contended bus) -> keep the last-good VCD list
             mmcePs1Scanned = 1;
             mmcePs1GameCount = r;
@@ -728,7 +729,7 @@ static void mmceRenameGame(item_list_t *itemList, int id, char *newName)
         // Ember title, so the rename would quietly do nothing; and where a .VCD of the same name
         // exists (a game held for BOTH cores, the case the merged list makes ordinary) it would
         // rename the POPSTARTER file instead. Renaming the wrong file is the worse half of that.
-        int renamed = cueIsCueEntry(game) ? cueRenameGame(mmcePs1Root(), game->name, newName) : vcdRenameFile(mmcePrefix, game->name, newName);
+        int renamed = cueIsCueEntry(game) ? cueRenameGame(mmcePs1Root(), game->name, newName) : vcdRenameFile(mmcePs1Root(), game->name, newName);
         if (renamed == 0) {
             // MMCE normally latches a successful VCD scan under NOUPDATE. Re-arm its normal scan
             // path so the deferred menu update publishes the new filename immediately.
@@ -746,7 +747,7 @@ static void mmceRenameGame(item_list_t *itemList, int id, char *newName)
     mmceULSizePrev = -2;
 }
 
-// Launch an Ember (.cue) PS1 title BY NAME -- peer of mmceLaunchVcd below. mmcePrefix is the card
+// Launch an Ember (.cue) PS1 title BY NAME -- peer of mmceLaunchVcd below. mmcePs1Root() is the card
 // root, where EMBER/ sits next to POPS/. None of the POPSTARTER memory-card preparation applies:
 // Ember performs no IOP reset and inherits our live driver stack, so it needs no MC-side driver.
 static void mmceLaunchCue(item_list_t *itemList, const char *cueName, config_set_t *configSet)
@@ -811,20 +812,20 @@ static void mmceLaunchVcd(item_list_t *itemList, const char *vcdName, config_set
         return;
     }
 
-    if (!vcdResolvePopstarter(mmcePrefix, vcdElf, sizeof(vcdElf))) {
+    if (!vcdResolvePopstarter(mmcePs1Root(), vcdElf, sizeof(vcdElf))) {
         guiMsgBox(_l(_STR_POPSTARTER_NOT_FOUND), 0, NULL);
         return;
     }
-    vcdBuildSelector(mmcePrefix, VCD_PREFIX_MASS, vcdName, vcdSelector, sizeof(vcdSelector));
+    vcdBuildSelector(mmcePs1Root(), VCD_PREFIX_MASS, vcdName, vcdSelector, sizeof(vcdSelector));
 
     // Source MC-side externals from this MMCE card's direct POPS/ folder; never overwrite card files.
-    (void)vcdInstallPopstarterMc(mmcePrefix);
+    (void)vcdInstallPopstarterMc(mmcePs1Root());
 
     // Best-effort card prep: BDMA prep is card preparation, never a POPSTARTER launch gate.
     vcdEnsureBdmaForLaunch(VCD_BDMA_SRC_MMCE, VCD_BDMA_MMCE);
 
     char vcdFullPath[256];
-    snprintf(vcdFullPath, sizeof(vcdFullPath), "%sPOPS/%s.VCD", mmcePrefix, vcdName);
+    snprintf(vcdFullPath, sizeof(vcdFullPath), "%sPOPS/%s.VCD", mmcePs1Root(), vcdName);
     vcdPrepareRetroGemBarcode(vcdFullPath);
     deinit(UNMOUNT_EXCEPTION, itemList->mode); // keep the MMCE device mounted across the IOP reset
     sysLaunchPopstarter(vcdElf, vcdSelector);
@@ -1205,7 +1206,7 @@ static int mmceGetImage(item_list_t *itemList, char *folder, int isRelative, cha
         if (cueRowIsCueByName(mmcePs1Games, mmcePs1GameCount, value) == 1)
             r = cueLoadFolderCover(mmcePs1Root(), value, suffix, resultTex);
         else
-            r = vcdLoadPopsCover(mmceArtPrimary, value, suffix, resultTex);
+            r = vcdLoadPopsCover(mmcePs1Root(), value, suffix, resultTex);
     }
     return r;
 }
