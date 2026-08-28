@@ -145,6 +145,28 @@ int cueScanDir(const char *devPrefix, cue_entry_t **outList)
     if (devPrefix == NULL)
         return 0;
 
+    // NO EMBER CORE, NO EMBER LIBRARY -- and settle that with an open(), not with opendir's errno.
+    //
+    // The absent-vs-contended split below reads errno to tell "this folder isn't here" (fine, 0 rows)
+    // from "this device wouldn't answer" (a failure the caller must not mistake for emptiness). That
+    // works only on drivers that actually report ENOENT, and this very file documents one that does
+    // not: mmceman collapses every failure, including the card's own not-found reply, into a bare -1.
+    // There was never any reason to assume other block drivers are better behaved.
+    //
+    // The cost of getting it wrong is severe and was reported from hardware (FifthFox, iLink): a
+    // device with a POPS library and NO EMBER folder returned -1 from this scan, ps1FillGameList
+    // treated that as "device unreadable", and the ENTIRE PS1 list -- including the POPSTARTER
+    // titles that had scanned perfectly -- stayed empty. USB and APA were fine because their driver
+    // does report ENOENT.
+    //
+    // A plain open() of ember.elf has none of that ambiguity. If the core is not readable there is
+    // no Ember library to list, whatever the reason: we could not launch a row from it either.
+    // gamesDir is scratch for the probe here -- cueResolveEmber writes the ELF path into it and we
+    // discard that, then rebuild it as the games directory below. One buffer, not two, on a stack
+    // this platform keeps small.
+    if (!cueResolveEmber(devPrefix, gamesDir, sizeof(gamesDir)))
+        return 0;
+
     cueBuildGamesDir(devPrefix, gamesDir, sizeof(gamesDir));
     if (gamesDir[0] == '\0')
         return 0;
@@ -386,14 +408,31 @@ int ps1FillGameList(const char *devPrefix, base_game_info_t **outGames)
     vcdCount = vcdFillGameList(devPrefix, &vcdGames);
     cueCount = cueFillGameList(devPrefix, &cueGames);
 
-    // EITHER half failing means the device could not be READ, not that it holds no games -- an
-    // absent POPS or EMBER folder reports 0. Publishing a half list would look exactly like the
-    // user's titles disappearing, so keep the caller's last-good list instead.
-    if (vcdCount < 0 || cueCount < 0) {
+    // ONLY BOTH halves failing means the device could not be read. This used to fail the whole scan
+    // when EITHER half did, on the reasoning that publishing half a list looks like a user's titles
+    // disappearing. That reasoning was wrong in the direction that matters: one half failing then
+    // hid the OTHER half too, so a device holding a perfectly readable POPS library showed NOTHING
+    // because its (absent) Ember half reported a failure. Hardware-reported on iLink.
+    //
+    // Half a list beats no list. A half that failed contributes no rows this pass and is retried on
+    // the next refresh; the half that succeeded is published, because it is real.
+    if (vcdCount < 0 && cueCount < 0) {
         free(vcdGames);
         free(cueGames);
-        LOG("[PS1] scan failed (vcd=%d cue=%d) -- keeping last-good list\n", vcdCount, cueCount);
+        LOG("[PS1] both scans failed -- keeping last-good list\n");
         return -1;
+    }
+    if (vcdCount < 0) {
+        LOG("[PS1] POPS scan failed -- publishing the Ember half alone this pass\n");
+        free(vcdGames);
+        vcdGames = NULL;
+        vcdCount = 0;
+    }
+    if (cueCount < 0) {
+        LOG("[PS1] EMBER scan failed -- publishing the POPSTARTER half alone this pass\n");
+        free(cueGames);
+        cueGames = NULL;
+        cueCount = 0;
     }
 
     total = vcdCount + cueCount;
