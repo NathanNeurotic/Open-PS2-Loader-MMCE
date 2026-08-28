@@ -1,0 +1,24 @@
+name: VCD scanner contract
+
+on:
+  push:
+    paths:
+      - 'src/vcdsupport.c'
+      - '.github/scripts/test-vcd-directory.py'
+      - '.github/workflows/scanner-tests.yml'
+  pull_request:
+    paths:
+      - 'src/vcdsupport.c'
+      - '.github/scripts/test-vcd-directory.py'
+      - '.github/workflows/scanner-tests.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  scanner:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check MMCE EOF compatibility and other-device error preservation
+        run: python3 .github/scripts/test-vcd-directory.py --cc gcc
