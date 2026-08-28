@@ -739,6 +739,19 @@ void bgmQuiesce(void)
     if (!audio_initialized)
         return;
 
+    // MUTE FIRST, then ask the threads to wind down. Setting terminateFlag only stops the FEEDER;
+    // audsrv keeps playing whatever is already queued, and the decode thread stops refilling it --
+    // so the last fraction of a second loops or judders while the caller gets on with a teardown
+    // that can block for seconds (see LAUNCH_IO_DRAIN_TICKS). That judder is the "audio stutters
+    // when a game launches" report, and it is purely cosmetic damage done while we are on the way
+    // out. Dropping the volume makes the same interval silent instead.
+    //
+    // Volume, not audsrv_stop_audio(): the BGM thread may be inside audsrv_play_audio right now,
+    // and issuing a competing stop on the same RPC channel from this thread is exactly the class of
+    // teardown race that produced the old exit-hang. Muting touches no state the thread owns, and
+    // the real stop still happens in audioEnd() where it always did.
+    bgmMute();
+
     terminateFlag = 1;
     SignalSema(inSema);
     SignalSema(outSema);

@@ -4116,6 +4116,18 @@ void deinitEx(int exception, int modeSelected, int modeSelected2)
 {
     gDeinitTerminal = (modeSelected == IO_MODE_SELECTED_ALL || modeSelected == IO_MODE_SELECTED_NONE);
 
+    // Say something BEFORE the blocking teardown below, because it can hold this thread for the
+    // whole of LAUNCH_IO_DRAIN_TICKS (~10 s) and nothing repaints while it does. Measured on
+    // hardware: roughly seven seconds of black screen between pressing X and the game's first
+    // output, with a loading spinner visible for only the first instant. A user cannot tell that
+    // from a freeze, and reasonably concludes the console has hung.
+    //
+    // This is the one place worth doing it: every launch and the exit path all funnel through here,
+    // so a per-launch-leg banner would have to be repeated in each and would still miss some. The
+    // frame flips and then persists on its own -- nothing draws again until the handoff -- so one
+    // call covers the entire wait.
+    guiRenderTextScreen(_l(_STR_PLEASE_WAIT));
+
     // Give up on the covers still QUEUED before draining. The drain waits on the ioman LIST, and the
     // worker keeps servicing it regardless of isIOBlocked, so without this the handoff pays for every
     // queued cover to be read off the game device first -- for a menu guiEnd() is about to destroy.
@@ -4173,6 +4185,18 @@ void deinitEx(int exception, int modeSelected, int modeSelected2)
 void deinit(int exception, int modeSelected)
 {
     gDeinitTerminal = (modeSelected == IO_MODE_SELECTED_ALL || modeSelected == IO_MODE_SELECTED_NONE);
+
+    // Say something BEFORE the blocking teardown below, because it can hold this thread for the
+    // whole of LAUNCH_IO_DRAIN_TICKS (~10 s) and nothing repaints while it does. Measured on
+    // hardware: roughly seven seconds of black screen between pressing X and the game's first
+    // output, with a loading spinner visible for only the first instant. A user cannot tell that
+    // from a freeze, and reasonably concludes the console has hung.
+    //
+    // This is the one place worth doing it: every launch and the exit path all funnel through here,
+    // so a per-launch-leg banner would have to be repeated in each and would still miss some. The
+    // frame flips and then persists on its own -- nothing draws again until the handoff -- so one
+    // call covers the entire wait.
+    guiRenderTextScreen(_l(_STR_PLEASE_WAIT));
 
     // Give up on the covers still QUEUED before draining. The drain waits on the ioman LIST, and the
     // worker keeps servicing it regardless of isIOBlocked, so without this the handoff pays for every
