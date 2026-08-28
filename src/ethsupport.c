@@ -463,7 +463,6 @@ void ethDeinitModules(void)
             DeleteSema(ethInitSemaID);
             ethInitSemaID = -1;
         }
-
     }
 }
 
