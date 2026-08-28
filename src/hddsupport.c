@@ -4,7 +4,8 @@
 #include "include/gui.h"
 #include "include/supportbase.h"
 #include "include/hddsupport.h"
-#include "include/vcdsupport.h" // HDD VCD view: vcdScanDirRoot/vcdViewActive + vcd_entry_t
+#include "include/vcdsupport.h" // HDD VCD view: vcdScanDirRoot + vcd_entry_t
+#include "include/libview.h"    // libViewActive / libListViewActive -- which list this page shows
 #include "include/util.h"
 #include "include/themes.h"
 #include "include/textures.h"
@@ -1030,9 +1031,9 @@ static int hddBuildVcdGameList(void)
 static int hddNeedsUpdate(item_list_t *itemList)
 { /* Auto refresh is disabled by setting HDD_MODE_UPDATE_DELAY to MENU_UPD_DELAY_NOUPDATE, within hddsupport.h.
        Hence any update request would be issued by the user, which should be taken as an explicit request to re-scan the HDD. */
-    if (vcdConsumeDirty(itemList->mode))
+    if (libViewConsumeDirty(itemList->mode))
         return 1; // L3 toggle / default-view change -> rebuild the submenu (the ARRAY may be cached)
-    if (vcdListViewActive(itemList))
+    if (libListViewActive(itemList) == LIB_VIEW_PS1)
         // The locked-to-VCD startup path also receives the normal initial deferred update, but no
         // toggle dirtied the view first. Build once when the VCD backing list does not exist yet.
         // A manual HDD/VCD refresh invalidates this latch before posting the same deferred update.
@@ -1125,7 +1126,7 @@ static int hddUpdateGameList(item_list_t *itemList)
     if (!hddSupportModulesLoaded)
         LOG("HDDSUPPORT UpdateGameList: PFS support incomplete; attempting read-only APA enumeration anyway\n");
 
-    if (vcdListViewActive(itemList))
+    if (libListViewActive(itemList) == LIB_VIEW_PS1)
         // Reuse the session's built list on view flips; hddBuildVcdGameList runs only when never
         // built, invalidated (first-disc-only change), or freed by teardown (hddFreeVcdGameList).
         return hddVcdListBuilt ? hddVcdGameCount : hddBuildVcdGameList();
@@ -1169,11 +1170,11 @@ static int hddUpdateGameList(item_list_t *itemList)
 
 static int hddGetGameCount(item_list_t *itemList)
 {
-    return vcdListViewActive(itemList) ? hddVcdGameCount : (int)hddGames.count;
+    return (libListViewActive(itemList) == LIB_VIEW_PS1) ? hddVcdGameCount : (int)hddGames.count;
 }
 
-// Toggle-window guard (Codex/Fable audit), mirroring mmceActiveGame. HDD_MODE is vcdModeSupported, so the L3
-// toggle flips vcdViewActive() SYNCHRONOUSLY ahead of the DEFERRED per-__.POPS pfs rebuild -- a WIDER window
+// Toggle-window guard (Codex/Fable audit), mirroring mmceActiveGame. HDD_MODE has a VCD stop in its ring, so the L3
+// toggle changes the active view SYNCHRONOUSLY ahead of the DEFERRED per-__.POPS pfs rebuild -- a WIDER window
 // than MMCE. During it an OLD-view id can index the freshly-switched other array (hddGames.games is {NULL,0}
 // on a PS1-only HDD; hddVcdGames NULL/shorter if that view never scanned) -> NULL/OOB deref + crash. Resolve
 // every id through these: an out-of-range id returns a static empty entry so a stale READ is safe empty data
@@ -1196,28 +1197,28 @@ static hdl_game_info_t *hddActiveHdl(int id)
 
 static void *hddGetGame(item_list_t *itemList, int id)
 {
-    return vcdListViewActive(itemList) ? (void *)hddActiveVcd(id) : (void *)hddActiveHdl(id);
+    return (libListViewActive(itemList) == LIB_VIEW_PS1) ? (void *)hddActiveVcd(id) : (void *)hddActiveHdl(id);
 }
 
 static char *hddGetGameName(item_list_t *itemList, int id)
 {
-    return vcdListViewActive(itemList) ? hddActiveVcd(id)->name : hddActiveHdl(id)->name;
+    return (libListViewActive(itemList) == LIB_VIEW_PS1) ? hddActiveVcd(id)->name : hddActiveHdl(id)->name;
 }
 
 static int hddGetGameNameLength(item_list_t *itemList, int id)
 {
-    return vcdListViewActive(itemList) ? VCD_NAME_MAX : (HDL_GAME_NAME_MAX + 1);
+    return (libListViewActive(itemList) == LIB_VIEW_PS1) ? VCD_NAME_MAX : (HDL_GAME_NAME_MAX + 1);
 }
 
 static char *hddGetGameStartup(item_list_t *itemList, int id)
 {
     // VCD view keys per-game CFG/art off the VCD filename (game->name), not a disc id.
-    return vcdListViewActive(itemList) ? hddActiveVcd(id)->name : hddActiveHdl(id)->startup;
+    return (libListViewActive(itemList) == LIB_VIEW_PS1) ? hddActiveVcd(id)->name : hddActiveHdl(id)->startup;
 }
 
 static void hddDeleteGame(item_list_t *itemList, int id)
 {
-    if (vcdListViewActive(itemList))
+    if (libListViewActive(itemList) == LIB_VIEW_PS1)
         return; // a VCD is not an HDL partition -- no delete in VCD view
     hdl_game_info_t *game = hddActiveHdl(id);
     if (game == &hddEmptyHdl)
@@ -1518,7 +1519,7 @@ static void hddRenameVcd(int id, const char *newName)
 
 static void hddRenameGame(item_list_t *itemList, int id, char *newName)
 {
-    if (vcdListViewActive(itemList)) {
+    if (libListViewActive(itemList) == LIB_VIEW_PS1) {
         hddRenameVcd(id, newName);
         return;
     }
@@ -1767,7 +1768,7 @@ void hddLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
     // POPSTARTER self-mounts it after the loader's IOP reset. HW-VALIDATE: POPSTARTER's exact HDD
     // selector/partition contract is hardware-testable -- POPSLoader proved the shape with a vendored
     // loader; we use the stock ps2sdk loader, the same one the shipping USB/MMCE/SMB VCD launch uses.
-    if (gAutoLaunchGame == NULL && vcdListViewActive(itemList)) {
+    if (gAutoLaunchGame == NULL && (libListViewActive(itemList) == LIB_VIEW_PS1)) {
         char vcdName[VCD_NAME_MAX];
         char vcdPart[APA_IDMAX + 1];
 
@@ -1989,7 +1990,7 @@ static config_set_t *hddGetConfig(item_list_t *itemList, int id)
     // VCD (PS1) view: `id` indexes hddVcdGames, NOT hddGames. The list itself is discoverable from
     // APA even when the persistent config/art PFS home is temporarily unavailable. In that state
     // return a runtime-only config instead of dereferencing a NULL prefix or hiding the whole list.
-    if (vcdListViewActive(itemList)) {
+    if (libListViewActive(itemList) == LIB_VIEW_PS1) {
         base_game_info_t *g = hddActiveVcd(id);
         if (gHDDPrefix != NULL)
             return sbPopulateConfig(g, gHDDPrefix, "/");

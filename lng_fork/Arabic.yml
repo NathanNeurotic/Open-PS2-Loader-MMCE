@@ -41,8 +41,8 @@ translations:
   WRITE_POPSTARTER_NET: كتابة إعدادات شبكة POPSTARTER
   HINT_WRITE_POPSTARTER_NET: احفظ قيم IP + SMB أيضاً في IPCONFIG.DAT / SMBCONFIG.DAT الخاصة بـ POPSTARTER على بطاقة الذاكرة (لـ VCD عبر SMB).
   POPSTARTER_NET_ERR: تعذّرت كتابة إعدادات شبكة POPSTARTER على بطاقة الذاكرة.
-  VCD: VCD
-  VCD_ON: عرض ألعاب VCD
+  VCD: PS1
+  VCD_ON: عرض ألعاب PS1
   VCD_OFF: عرض ألعاب الأقراص
   NEUTRINO_ARGS: وسيطات تشغيل Neutrino
   HINT_NEUTRINO_ARGS: أعلام Neutrino إضافية مفصولة بمسافة (مثال -mt=dvd). العامة تُطبَّق على جميع الألعاب؛ الخاصة بالعبة تُضاف فوقها. ضع $ قبل العلم لتعطيله دون حذفه.

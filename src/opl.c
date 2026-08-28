@@ -36,7 +36,9 @@
 #include "include/folderbrowse.h" // folderDepth -- favourites suppression inside subfolders
 #include "include/mmcesupport.h"  // mmceLoadModules() -- MMCE boot branch of resolveBootDirToMass
 #include "include/tar.h"          // tarInvalidate -- re-arm the .tar probe on a settings apply
-#include "include/vcdsupport.h"   // vcdViewActive stub -- isVcd stays 0 until item 12 lands
+#include "include/vcdsupport.h"
+#include "include/cuesupport.h" // cueIsCueEntry -- a PS1 row names its own core   // VCD display naming + POPSTARTER launch helpers
+#include "include/libview.h"    // libViewActive / libListViewActive -- which list this page shows
 
 #include "include/cheatman.h"
 #include "include/sound.h"
@@ -326,9 +328,13 @@ void moduleUpdateMenuInternal(opl_io_module_t *mod, int themeChanged, int langCh
         if (gFAVStartMode)
             menuAddHint(&mod->menuItem, _STR_FAV_HINT, R3_ICON);
 
-        // L3 toggles the device's disc list <-> its VCD (PS1-via-POPSTARTER) list -- only under the
-        // "Both" default-view setting; ISO/VCD lock the page, so the toggle and its hint go away.
-        if (vcdModeSupported(mod->support->mode) && gDefaultGameView == GAME_VIEW_BOTH)
+        // L3 moves the page around its ring of lists -- only under the "Both" default-view setting;
+        // a locked setting pins the page, so the toggle and its hint go away.
+        //
+        // The question is "does this page have more than one list", NOT "does it have a VCD list".
+        // Those were the same thing while every ring was ISO<->VCD, and stop being the same as soon
+        // as a page offers a third; libViewRingSize keeps the hint honest either way.
+        if (libViewRingUsable(mod->support->mode))
             menuAddHint(&mod->menuItem, _STR_VCD, L3_ICON);
     }
 
@@ -420,7 +426,7 @@ static void itemExecRefresh(struct menu_item *curMenu)
         if (support->mode == FAV_MODE) {
             loadFavourites();
         } else {
-            if (support->mode == HDD_MODE && vcdListViewActive(support))
+            if (support->mode == HDD_MODE && (libListViewActive(support) == LIB_VIEW_PS1))
                 hddVcdInvalidateCache();
             ioPutRequest(IO_MENU_UPDATE_DEFFERED, &support->mode);
         }
@@ -428,21 +434,19 @@ static void itemExecRefresh(struct menu_item *curMenu)
     }
 }
 
-// L3: toggle the device's list between its disc games and its VCD (PS1-via-POPSTARTER) list. Only
-// device classes that have a VCD view (vcdModeSupported) respond. vcdToggleView marks the mode
-// dirty; the deferred update + the support's NeedsUpdate (vcdConsumeDirty) then force the rescan.
+// L3: advance the page one stop around its ring of lists. Only pages with more than one list
+// respond. libViewAdvance marks the mode dirty; the deferred update + the support's NeedsUpdate
+// (libViewConsumeDirty) then force the rescan.
 static void itemExecToggleView(struct menu_item *curMenu)
 {
     item_list_t *support = curMenu->userdata;
-    if (!support || !vcdModeSupported(support->mode))
+    if (!support || !libViewRingUsable(support->mode))
         return;
-    if (gDefaultGameView != GAME_VIEW_BOTH)
-        return; // the global default-view setting locks the page to one type -> L3 is inert
 
     // Folder browsing: the VCD/POPS list has no folder tree, so drop any ISO-view subfolder position
     // back to root on a view toggle (the deferred rebuild below restores the plain device title).
     folderReset(support->mode);
-    vcdToggleView(support->mode);
+    libViewAdvance(support->mode);
 
     // Every cover already queued belongs to the view being discarded, and none of them will be
     // cancelled on their own: the loader's per-row cancellation keys on a row having scrolled away,
@@ -453,7 +457,14 @@ static void itemExecToggleView(struct menu_item *curMenu)
     cacheDropQueuedArt();
 
     sfxPlay(SFX_CONFIRM);
-    guiWarning(vcdViewActive(support->mode) ? _l(_STR_VCD_ON) : _l(_STR_VCD_OFF), 2);
+    // Three shelves are possible now (Favourites rings PS2 -> PS1 -> APPS), so the toast names the
+    // one you landed on rather than reading as an on/off flag.
+    {
+        int view = libViewActive(support->mode);
+        int msg = (view == LIB_VIEW_PS1) ? _STR_VCD_ON : (view == LIB_VIEW_ELF) ? _STR_VIEW_APPS :
+                                                                                  _STR_VCD_OFF;
+        guiWarning(_l(msg), 2);
+    }
     ioPutRequest(IO_MENU_UPDATE_DEFFERED, &support->mode);
 }
 
@@ -503,10 +514,47 @@ static void itemExecSquare(struct menu_item *curMenu)
         // Direct HDD/HDL rows already carry their size in APA metadata (total_size_in_kb), so the
         // generic CFG+stat pass is redundant there. VCD rows likewise have no meaningful #Size.
         // Avoid putting either no-op read onto the shared IO worker merely for opening Info.
-        if (support == NULL || (!vcdListViewActive(support) && support->mode != HDD_MODE))
+        if (support == NULL || (libListViewActive(support) != LIB_VIEW_PS1 && support->mode != HDD_MODE))
             menuRequestInfoSize();
         guiSwitchScreen(GUI_SCREEN_INFO);
     }
+}
+
+// Which favourite kind is the row at `id` on this page? The SHELF comes from the page (APPS rows
+// are ELF favourites, a PS1 page's rows are PS1 favourites), but for PS1 the CORE comes from the
+// ROW -- both cores share that one list, so asking the page which core to record would file every
+// Ember title as a POPSTARTER one and it would then launch through the wrong core.
+// `text` is the row as DRAWN. L3 changes the active backing list synchronously while the submenu is
+// rebuilt on the deferred IO thread, so for a short window the drawn rows belong to the old view
+// while itemGet already indexes the new one. Comparing the looked-up row's name against the drawn
+// text is what closes that window: they agree only when the row on screen is the row we resolved.
+// Returns -1 when they disagree, and the caller declines the action rather than writing a record
+// that names one game and launches another.
+static int itemFavKind(item_list_t *support, int id, const char *text)
+{
+    const base_game_info_t *game;
+
+    if (support == NULL)
+        return FAV_KIND_ISO;
+    if (support->mode == APP_MODE)
+        return FAV_KIND_ELF;
+    if (libViewActive(support->mode) != LIB_VIEW_PS1)
+        return FAV_KIND_ISO;
+
+    // A PS1 page holds both cores, so the CORE comes from the row. Without itemGet there is nothing
+    // to read it from; POPSTARTER is the right assumption, being what every pre-Ember library is.
+    if (support->itemGet == NULL || text == NULL)
+        return FAV_KIND_VCD;
+
+    game = (const base_game_info_t *)support->itemGet(support, id);
+    if (game == NULL)
+        return -1;
+    // The toggle-window guards hand back a static EMPTY entry for an id the new list cannot honour;
+    // its name is "", which no drawn row has, so the mismatch below catches that case too.
+    if (strcmp(game->name, text) != 0)
+        return -1;
+
+    return cueIsCueEntry(game) ? FAV_KIND_CUE : FAV_KIND_VCD;
 }
 
 // R3: toggle the current row's favourite star (checklist item 33). On the Favourites tab
@@ -534,18 +582,24 @@ static void itemExecFav(struct menu_item *curMenu)
     if (support->mode == FAV_MODE) {
         favRemoveByIndex(it->id);
     } else {
-        // A favourite captured while the device page is in its L3 VCD view is a PS1/.VCD favourite
-        // (checklist item 12; the stub keeps isVcd at 0 until VCD views exist).
-        int isVcd = vcdViewActive(support->mode) ? 1 : 0;
-        // Only on a device whose VCD favourites can actually be resolved/launched later: storing one
-        // on a device without itemLaunchVcd would leave a permanently-hidden, unlaunchable record.
-        if (isVcd && support->itemLaunchVcd == NULL)
+        int kind = itemFavKind(support, it->id, it->text);
+        // Mid-rebuild: the row on screen is not the row the backing list would give us. Storing it
+        // now would file the favourite under the wrong core, or under a name that is about to move.
+        // Do nothing and let the user press R3 again once the list has settled -- the star is not
+        // touched either, so nothing on screen lies about what was saved.
+        if (kind < 0)
+            return;
+        // Only store a favourite this device can actually resolve and launch later. A PS1 record
+        // whose source has no hook for that core would be a permanently-hidden, unlaunchable entry.
+        if (kind == FAV_KIND_VCD && support->itemLaunchVcd == NULL)
+            return;
+        if (kind == FAV_KIND_CUE && support->itemLaunchCue == NULL)
             return;
         if (it->favourited) {
-            if (removeFavouriteByIdAndText(support->mode, it->id, it->text, isVcd))
+            if (removeFavouriteByIdAndText(support->mode, it->id, it->text, kind))
                 it->favourited = 0; // only clear the star once the store write succeeded
         } else {
-            if (addFavouriteItem(support->mode, it->id, it->icon_id, it->text_id, it->text, isVcd))
+            if (addFavouriteItem(support->mode, it->id, it->icon_id, it->text_id, it->text, kind))
                 it->favourited = 1; // only show the star once the store write succeeded
         }
     }
@@ -568,8 +622,8 @@ static void itemExecTriangle(struct menu_item *curMenu)
     if (support) {
         // A VCD is a POPSTARTER title, not a PS2-loader title. Route before the generic per-game
         // settings branch: that branch loads/creates CFG state and exposes controls that can never
-        // affect a POPSTARTER handoff. vcdListViewActive also covers a forced-VCD Favourites proxy.
-        if (vcdListViewActive(support)) {
+        // affect a POPSTARTER handoff. libListViewActive also covers a forced-VCD Favourites proxy.
+        if (libListViewActive(support) == LIB_VIEW_PS1) {
             if (menuCheckParentalLock() == 0) {
                 menuInitVcdMenu();
                 guiSwitchScreen(GUI_SCREEN_APP_MENU);
@@ -771,15 +825,15 @@ static void deinitAllSupport(int exception, int modeSelected)
     }
 }
 
-void oplQueueVcdDeviceUpdates(void)
+void oplQueueLibraryDeviceUpdates(void)
 {
-    // vcdMarkAllDirty() is intentionally side-effect-free because it also runs during early config
+    // libViewMarkAllDirty() is intentionally side-effect-free because it also runs during early config
     // loading, before the IO worker and device modules are ready. Runtime callers must explicitly
     // enqueue the enabled pages. This matters most for HDD, whose updateDelay=-1 means a dirty view
     // otherwise keeps displaying the old submenu indefinitely while rendering uses the new view.
     for (int i = 0; i < MODE_COUNT; i++) {
         item_list_t *support = list_support[i].support;
-        if (support != NULL && support->enabled && support->mode != FAV_MODE && vcdModeSupported(support->mode))
+        if (support != NULL && support->enabled && support->mode != FAV_MODE && libViewRingSize(support->mode) > 1)
             ioPutRequest(IO_MENU_UPDATE_DEFFERED, &support->mode);
     }
 }
@@ -2664,13 +2718,13 @@ static void _loadConfig()
             if (gDefaultGameView < GAME_VIEW_BOTH || gDefaultGameView > GAME_VIEW_VCD)
                 gDefaultGameView = GAME_VIEW_BOTH;
             // A boot default-view locked to one type (VCD or ISO) must force the same one-shot
-            // rescan the settings dialog does on a view change (gui.c). Without it, vcdViewActive()
+            // rescan the settings dialog does on a view change (gui.c). Without it, libViewActive()
             // short-circuits bdm/hdd/eth NeedsUpdate before the initial-scan trigger and the
             // list stays blank on boot -- a manual SELECT does not recover it (NeedsUpdate still
             // returns 0), only re-toggling the view does. This runs before applyConfig()'s first
             // support scans, so each VCD-capable page consumes the dirty flag on its first refresh.
             if (gDefaultGameView != GAME_VIEW_BOTH)
-                vcdMarkAllDirty();
+                libViewMarkAllDirty();
             configGetStrCopy(configOPL, CONFIG_OPL_POPSTARTER_PATH, gPopstarterPath, sizeof(gPopstarterPath));
             // POPSTARTER device TYPE (POPS_DEV_*). Absent in legacy configs: a non-empty custom
             // popstarter_path migrates to Custom (honour the old override); otherwise Default (cwd).
@@ -4081,6 +4135,18 @@ void deinitEx(int exception, int modeSelected, int modeSelected2)
 {
     gDeinitTerminal = (modeSelected == IO_MODE_SELECTED_ALL || modeSelected == IO_MODE_SELECTED_NONE);
 
+    // Say something BEFORE the blocking teardown below, because it can hold this thread for the
+    // whole of LAUNCH_IO_DRAIN_TICKS (~10 s) and nothing repaints while it does. Measured on
+    // hardware: roughly seven seconds of black screen between pressing X and the game's first
+    // output, with a loading spinner visible for only the first instant. A user cannot tell that
+    // from a freeze, and reasonably concludes the console has hung.
+    //
+    // This is the one place worth doing it: every launch and the exit path all funnel through here,
+    // so a per-launch-leg banner would have to be repeated in each and would still miss some. The
+    // frame flips and then persists on its own -- nothing draws again until the handoff -- so one
+    // call covers the entire wait.
+    guiRenderTextScreen(_l(_STR_PLEASE_WAIT));
+
     // Give up on the covers still QUEUED before draining. The drain waits on the ioman LIST, and the
     // worker keeps servicing it regardless of isIOBlocked, so without this the handoff pays for every
     // queued cover to be read off the game device first -- for a menu guiEnd() is about to destroy.
@@ -4138,6 +4204,18 @@ void deinitEx(int exception, int modeSelected, int modeSelected2)
 void deinit(int exception, int modeSelected)
 {
     gDeinitTerminal = (modeSelected == IO_MODE_SELECTED_ALL || modeSelected == IO_MODE_SELECTED_NONE);
+
+    // Say something BEFORE the blocking teardown below, because it can hold this thread for the
+    // whole of LAUNCH_IO_DRAIN_TICKS (~10 s) and nothing repaints while it does. Measured on
+    // hardware: roughly seven seconds of black screen between pressing X and the game's first
+    // output, with a loading spinner visible for only the first instant. A user cannot tell that
+    // from a freeze, and reasonably concludes the console has hung.
+    //
+    // This is the one place worth doing it: every launch and the exit path all funnel through here,
+    // so a per-launch-leg banner would have to be repeated in each and would still miss some. The
+    // frame flips and then persists on its own -- nothing draws again until the handoff -- so one
+    // call covers the entire wait.
+    guiRenderTextScreen(_l(_STR_PLEASE_WAIT));
 
     // Give up on the covers still QUEUED before draining. The drain waits on the ioman LIST, and the
     // worker keeps servicing it regardless of isIOBlocked, so without this the handoff pays for every

@@ -41,8 +41,8 @@ translations:
   WRITE_POPSTARTER_NET: Εγγραφή Ρύθμισης Δικτύου POPSTARTER
   HINT_WRITE_POPSTARTER_NET: Αποθήκευση τιμών IP + SMB και στα IPCONFIG.DAT / SMBCONFIG.DAT του POPSTARTER στην κάρτα μνήμης (για VCD μέσω SMB).
   POPSTARTER_NET_ERR: Αποτυχία εγγραφής ρύθμισης δικτύου POPSTARTER στην κάρτα μνήμης.
-  VCD: VCD
-  VCD_ON: Εμφάνιση VCD παιχνιδιών
+  VCD: PS1
+  VCD_ON: Εμφάνιση PS1 παιχνιδιών
   VCD_OFF: Εμφάνιση παιχνιδιών δίσκου
   NEUTRINO_ARGS: Ορίσματα Εκκίνησης Neutrino
   HINT_NEUTRINO_ARGS: 'Επιπλέον σημαίες Neutrino, διαχωρισμένες με κενό (π.χ. -mt=dvd). Το καθολικό ισχύει για όλα τα παιχνίδια· ανά παιχνίδι προστίθεται επιπλέον. Προσθέστε $ πριν μια σημαία για απενεργοποίηση χωρίς διαγραφή.'

@@ -41,8 +41,8 @@ translations:
   WRITE_POPSTARTER_NET: Zapsat síťovou konfiguraci POPSTARTER
   HINT_WRITE_POPSTARTER_NET: Uložit také tyto hodnoty IP + SMB sdílení do vlastních souborů POPSTARTER IPCONFIG.DAT / SMBCONFIG.DAT na paměťové kartě (pro VCD přes SMB).
   POPSTARTER_NET_ERR: Nepodařilo se zapsat síťovou konfiguraci POPSTARTER na paměťovou kartu.
-  VCD: VCD
-  VCD_ON: Zobrazuji VCD hry
+  VCD: PS1
+  VCD_ON: Zobrazuji PS1 hry
   VCD_OFF: Zobrazuji diskové hry
   NEUTRINO_ARGS: Neutrino Spouštěcí Args
   HINT_NEUTRINO_ARGS: 'Extra příznaky Neutrino, oddělené mezerami (např. -mt=dvd). Globální platí pro všechny hry; na hru se přidá navíc. Prefix příznaku $ ho zakáže bez smazání.'

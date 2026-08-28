@@ -41,8 +41,8 @@ translations:
   WRITE_POPSTARTER_NET: POPSTARTER ネットワーク設定を書き込む
   HINT_WRITE_POPSTARTER_NET: IP と SMB 共有の値をメモリーカード上の POPSTARTER 用 IPCONFIG.DAT / SMBCONFIG.DAT にも保存すん（VCD-over-SMB 向け）。
   POPSTARTER_NET_ERR: POPSTARTER ネットワーク設定をメモリーカードに書き込めんかた。
-  VCD: VCD
-  VCD_ON: VCD ゲームを表示中
+  VCD: PS1
+  VCD_ON: PS1 ゲームを表示中
   VCD_OFF: ディスクゲームを表示中
   NEUTRINO_ARGS: Neutrino 起動引数
   HINT_NEUTRINO_ARGS: 'Neutrino 追加フラグをスペース区切りで入力（例: -mt=dvd）。グローバルは全ゲームに適用、ゲーム別は追加分。フラグの前に $ を付けると削除せずに無効化できゅん。'

@@ -41,8 +41,8 @@ translations:
   WRITE_POPSTARTER_NET: POPSTARTER Netzwerkkonfiguration schreiben
   HINT_WRITE_POPSTARTER_NET: Diese IP- und SMB-Freigabewerte auch in POPSTARTER's eigene IPCONFIG.DAT / SMBCONFIG.DAT auf der Speicherkarte schreiben (für VCD über SMB).
   POPSTARTER_NET_ERR: POPSTARTER-Netzwerkkonfiguration konnte nicht auf die Speicherkarte geschrieben werden.
-  VCD: VCD
-  VCD_ON: VCD-Spiele werden angezeigt
+  VCD: PS1
+  VCD_ON: PS1-Spiele werden angezeigt
   VCD_OFF: Disc-Spiele werden angezeigt
   NEUTRINO_ARGS: Neutrino Startargumente
   HINT_NEUTRINO_ARGS: 'Zusätzliche Neutrino-Flags, durch Leerzeichen getrennt (z.B. -mt=dvd). Global gilt für alle Spiele; pro Spiel wird obendrauf addiert. Flag mit $ präfixieren, um es ohne Löschen zu deaktivieren.'

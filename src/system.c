@@ -1571,6 +1571,47 @@ void sysLaunchPopstarter(const char *popstarterElf, const char *selector)
         LOG("[POPS] keep-IOP handoff failed for %s\n", popstarterElf);
 }
 
+// Hand off to an external ember.elf to boot a PS1 CUE title. Contract in include/system.h.
+//
+// The keep-IOP loader is MANDATORY here, not a preference. ember.elf carries sceSifInitRpc,
+// SifLoadModule and SifInitIopHeap but NO SifIopReset / SifIopRebootBuffer / sceSifRebootIop
+// (verified against the shipped Beta binary, which is unstripped) -- it cannot rebuild a device
+// stack and simply inherits whatever the launcher leaves running. Ember's own bundled launcher.elf
+// resets the IOP and then loads iomanX + fileXio + usbd + usbmass_bd + bdm + bdmfs_fatfs before
+// ExecPS2'ing into it; OPL's live IOP is a superset of that, which is why this handoff reaches
+// every device OPL can mount rather than USB alone. Using the resetting SDK loader instead leaves
+// Ember with no drivers and no way to make any -- a black screen, not a degraded launch.
+//
+// argv[0] must be ember.elf's real path: ps2sdk's __init_cwd derives the target's working
+// directory from it, and Ember resolves bios.bin, settings.txt and games/<name> against that.
+// sysLoadELFKeepIOP forwards argv verbatim (argv[0] included), the same property the POPSTARTER
+// selector relies on.
+void sysLaunchEmber(const char *emberElf, const char *gameFolder)
+{
+    char *argv[2];
+    int argc = 0;
+
+    if (emberElf == NULL) {
+        LOG("[EMBER] null arg, abort\n");
+        return;
+    }
+
+    argv[argc++] = (char *)emberElf;
+
+    // No game argument is a legitimate call, not a caller bug: Ember then resolves games/default
+    // and, failing that, runs the PS1 BIOS shell. Both are useful answers when probing a setup.
+    if (gameFolder != NULL && gameFolder[0] != '\0')
+        argv[argc++] = (char *)gameFolder;
+
+    LOG("[EMBER] elf=%s game=%s\n", emberElf, (argc > 1) ? argv[1] : "(none)");
+
+    // The kernel argv budget (15 strings / 256-byte pool, counting the child loader's own argv[0])
+    // is enforced inside sysLoadELFKeepIOP, which refuses rather than truncating. Callers keep the
+    // game name under CUE_NAME_LAUNCH_MAX so a refusal here means a pathological device path.
+    if (sysLoadELFKeepIOP(emberElf, "", argc, argv) < 0)
+        LOG("[EMBER] keep-IOP handoff failed for %s\n", emberElf);
+}
+
 void sysLaunchLoaderElf(const char *filename, const char *mode_str, int size_cdvdman_irx, void **cdvdman_irx, int size_mcemu_irx, void **mcemu_irx, int EnablePS2Logo, unsigned int compatflags)
 {
     unsigned int modules, ModuleStorageSize;

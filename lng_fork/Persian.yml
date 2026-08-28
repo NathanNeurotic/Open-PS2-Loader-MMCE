@@ -41,8 +41,8 @@ translations:
   WRITE_POPSTARTER_NET: نوشتن تنظیمات شبکه POPSTARTER
   HINT_WRITE_POPSTARTER_NET: 'مقادیر IP + SMB را در IPCONFIG.DAT / SMBCONFIG.DAT مربوط به POPSTARTER روی کارت حافظه ذخیره کنید (برای VCD از طریق SMB).'
   POPSTARTER_NET_ERR: نوشتن تنظیمات شبکه POPSTARTER روی کارت حافظه ناموفق بود.
-  VCD: VCD
-  VCD_ON: نمایش بازی‌های VCD
+  VCD: PS1
+  VCD_ON: نمایش بازی‌های PS1
   VCD_OFF: نمایش بازی‌های دیسک
   NEUTRINO_ARGS: آرگومان‌های اجرای Neutrino
   HINT_NEUTRINO_ARGS: فلگ‌های اضافی Neutrino، جداشده با فاصله (مثلاً -mt=dvd). کلی روی همه بازی‌ها اعمال می‌شود؛ هر بازی می‌تواند فلگ اضافه کند. پیشوند $ فلگ را بدون حذف غیرفعال می‌کند.

@@ -50,8 +50,8 @@ typedef struct
     // absent dir from a contended one (opendir just fails) and returns -1 = preserve-last-good. Separate
     // arrays make a failed scan of one view preserve only THAT view's last-good (empty if never scanned),
     // so it can never resurrect the other view's contents. Mirrors mmceGames/mmceVcdGames.
-    int bdmVcdGameCount;
-    base_game_info_t *bdmVcdGames;
+    int bdmPs1GameCount;
+    base_game_info_t *bdmPs1Games;
     char bdmDriver[32];
     int bdmDeviceType;      // Type of BDM device, see BDM_TYPE_* above
     int bdmDeviceTick;      // Used alongside BdmGeneration to tell if device data needs to be refreshed
@@ -157,8 +157,8 @@ typedef struct
     unsigned int foldersCreated;
     const void *games; // %p only
     int gameCount;
-    const void *vcdGames; // %p only
-    int vcdGameCount;
+    const void *ps1Games; // %p only
+    int ps1GameCount;
 } bdm_config_diag_snapshot_t;
 
 // Call UNDER the menu lock. Pure value copies, no I/O.

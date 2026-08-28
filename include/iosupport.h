@@ -172,10 +172,17 @@ typedef struct _item_list_t
     // sweep is appropriate, -1 when no home (no tar should be probed).
     // Placed after viewOverride so existing positional initializers remain valid.
     int (*itemGetArtArchivePath)(item_list_t *itemList, char *out, int outSize);
+
+    /// Launch an Ember (.cue) PS1 title by its stored game-folder name, regardless of the device's
+    /// current view -- the peer of itemLaunchVcd. NULL on a device with no Ember support. Used by
+    /// Favourites, whose PS1 shelf holds both cores' titles and must send each row to the right one.
+    /// APPENDED at the end: every support initialises item_list_t POSITIONALLY, so a member added
+    /// anywhere else silently shifts every one of them.
+    void (*itemLaunchCue)(item_list_t *itemList, const char *cueName, config_set_t *configSet);
 } item_list_t;
 
 #define ITEM_VIEW_NATIVE    0
 #define ITEM_VIEW_FORCE_ISO 1
-#define ITEM_VIEW_FORCE_VCD 2
+#define ITEM_VIEW_FORCE_PS1 2 // the PS1 list -- holds POPSTARTER *.VCD and Ember rows alike
 
 #endif

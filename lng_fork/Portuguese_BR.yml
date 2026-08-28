@@ -41,8 +41,8 @@ translations:
   WRITE_POPSTARTER_NET: Gravar Config de Rede do POPSTARTER
   HINT_WRITE_POPSTARTER_NET: Salva também os valores de IP + compartilhamento SMB nos arquivos IPCONFIG.DAT / SMBCONFIG.DAT do POPSTARTER no cartão de memória (para VCD via SMB).
   POPSTARTER_NET_ERR: Não foi possível gravar a configuração de rede do POPSTARTER no cartão de memória.
-  VCD: VCD
-  VCD_ON: Exibindo jogos VCD
+  VCD: PS1
+  VCD_ON: Exibindo jogos PS1
   VCD_OFF: Exibindo jogos em disco
   NEUTRINO_ARGS: Args de Inicialização do Neutrino
   HINT_NEUTRINO_ARGS: Flags extras do Neutrino, separadas por espaço (ex. -mt=dvd). Global aplica a todos os jogos; por jogo adiciona ao topo. Prefixe uma flag com $ para desativá-la sem excluir.

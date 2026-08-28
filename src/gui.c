@@ -26,6 +26,7 @@
 #include "include/bdmsupport.h" // bdmIsUDPBDLoaded() + bdmForceDeviceRefresh()
 #include "include/hddsupport.h" // staged normal APA OPL-home selector
 #include "include/vcdsupport.h" // POPStarter pages: BDMA equip, list options, POPS net config
+#include "include/libview.h"    // libViewActive / libListViewActive -- which list this page shows
 #include "include/compatupd.h"
 #include "include/pggsm.h"
 #include "include/cheatman.h"
@@ -1033,7 +1034,7 @@ reshow_ui:
         diaGetInt(diaUIConfig, UICFG_GAMEVIEW, &gDefaultGameView);
         int gameViewChanged = gDefaultGameView != previousGameView;
         if (gameViewChanged) {
-            vcdMarkAllDirty(); // rebuild every VCD-capable page so the new default view takes effect
+            libViewMarkAllDirty(); // rebuild every VCD-capable page so the new default view takes effect
         }
         diaGetInt(diaUIConfig, UICFG_VMODE, &gVMode);
 
@@ -1045,7 +1046,7 @@ reshow_ui:
             // applyConfig(..., skipDeviceRefresh=1) deliberately avoids device scans. Queue after it
             // returns so HDD (which has no automatic refresh) cannot retain PS2 rows while rendering
             // uses the new VCD view, without racing the theme/menu bookkeeping above.
-            oplQueueVcdDeviceUpdates();
+            oplQueueLibraryDeviceUpdates();
             loadFavourites(); // queued after source pages so the FAV resolver sees their rebuilt rows
         }
         sfxInit(0);
@@ -1506,7 +1507,7 @@ void guiShowVcdListConfig(void)
         {
             // #195: hide-gameid is NO LONGER purely cosmetic -- it is now a SORT KEY. The menu sort
             // (submenuSort) orders by the DISPLAYED title, i.e. past the hidden prefix, so a change must
-            // re-sort every VCD-capable page. vcdMarkAllDirty() + rebuildVcdLists forces that menu rebuild
+            // re-sort every VCD-capable page. libViewMarkAllDirty() + rebuildVcdLists forces that menu rebuild
             // and its submenuSort re-runs against the new vcdDisplayName key -- WITHOUT re-reading any
             // device. Do NOT invalidate the HDD VCD cache here (unlike first-disc-only below): this toggle
             // changes only the DISPLAY ORDER, not the list CONTENTS, and submenuSort reorders the cached
@@ -1517,7 +1518,7 @@ void guiShowVcdListConfig(void)
             int previousHideGameId = gVcdHideGameId;
             diaGetInt(diaVcdListConfig, CFG_VCD_HIDE_GAMEID, &gVcdHideGameId);
             if (gVcdHideGameId != previousHideGameId) {
-                vcdMarkAllDirty();
+                libViewMarkAllDirty();
                 rebuildVcdLists = 1;
             }
         }
@@ -1528,7 +1529,7 @@ void guiShowVcdListConfig(void)
             int previousFirstDiscOnly = gVcdFirstDiscOnly;
             diaGetInt(diaVcdListConfig, CFG_VCD_FIRST_DISC_ONLY, &gVcdFirstDiscOnly);
             if (gVcdFirstDiscOnly != previousFirstDiscOnly) {
-                vcdMarkAllDirty();
+                libViewMarkAllDirty();
                 hddVcdInvalidateCache(); // scan-time filter changed -> the cached HDD VCD list is stale
                 rebuildVcdLists = 1;
             }
@@ -1540,7 +1541,7 @@ void guiShowVcdListConfig(void)
             int previousShowPpPops = gVcdShowPpPops;
             diaGetInt(diaVcdListConfig, CFG_VCD_SHOW_PP_POPS, &gVcdShowPpPops);
             if (gVcdShowPpPops != previousShowPpPops) {
-                vcdMarkAllDirty();
+                libViewMarkAllDirty();
                 hddVcdInvalidateCache();
                 rebuildVcdLists = 1;
             }
@@ -1550,7 +1551,7 @@ void guiShowVcdListConfig(void)
         // Queue after applyConfig/menu reinit so the IO worker cannot rebuild a submenu concurrently
         // with their support/menu bookkeeping on the GUI thread.
         if (rebuildVcdLists)
-            oplQueueVcdDeviceUpdates();
+            oplQueueLibraryDeviceUpdates();
     }
 }
 
@@ -2884,7 +2885,7 @@ reshow_interface:
             diaGetInt(ui, UICFG_GAMEVIEW, &gDefaultGameView);
             gameViewChanged = gDefaultGameView != previousGameView;
             if (gameViewChanged)
-                vcdMarkAllDirty();
+                libViewMarkAllDirty();
         }
         diaGetInt(ui, UICFG_VMODE, &gVMode);
         diaGetInt(ui, UICFG_WIDESCREEN, &gWideScreen);
@@ -2901,7 +2902,7 @@ reshow_interface:
             bgmStop();
         applyConfig(themeID, langID, 1);
         if (gameViewChanged) {
-            oplQueueVcdDeviceUpdates();
+            oplQueueLibraryDeviceUpdates();
             loadFavourites();
         }
         sfxInit(0);

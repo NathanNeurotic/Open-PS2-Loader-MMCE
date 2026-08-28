@@ -41,8 +41,8 @@ translations:
   WRITE_POPSTARTER_NET: Skriv POPSTARTER-netværkskonfig
   HINT_WRITE_POPSTARTER_NET: Gem også disse IP + SMB-delingsværdier til POPSTARTERs egne IPCONFIG.DAT / SMBCONFIG.DAT på hukommelseskortet (til VCD over SMB).
   POPSTARTER_NET_ERR: Kunne ikke skrive POPSTARTER-netværkskonfig til hukommelseskortet.
-  VCD: VCD
-  VCD_ON: Viser VCD-spil
+  VCD: PS1
+  VCD_ON: Viser PS1-spil
   VCD_OFF: Viser diskspil
   NEUTRINO_ARGS: Neutrino-startargumenter
   HINT_NEUTRINO_ARGS: 'Ekstra Neutrino-flag, mellemrumsadskilt (f.eks. -mt=dvd). Global gælder alle spil; per spil tilføjes ovenpå. Præfiks et flag med $ for at deaktivere det uden at slette det.'

@@ -41,8 +41,8 @@ translations:
   WRITE_POPSTARTER_NET: POPSTARTER Ağ Yapılandırmasını Yaz
   HINT_WRITE_POPSTARTER_NET: Bu IP + SMB paylaşım değerlerini hafıza kartındaki POPSTARTER'ın IPCONFIG.DAT / SMBCONFIG.DAT dosyalarına da kaydet (SMB üzerinden VCD için).
   POPSTARTER_NET_ERR: POPSTARTER ağ yapılandırması hafıza kartına yazılamadı.
-  VCD: VCD
-  VCD_ON: VCD oyunları gösteriliyor
+  VCD: PS1
+  VCD_ON: PS1 oyunları gösteriliyor
   VCD_OFF: Disk oyunları gösteriliyor
   NEUTRINO_ARGS: Neutrino Başlatma Parametreleri
   HINT_NEUTRINO_ARGS: 'Ekstra Neutrino bayrakları, boşlukla ayrılmış (ör. -mt=dvd). Global tüm oyunlara uygulanır; oyun başına üstüne eklenir. Bir bayrağı silmeden devre dışı bırakmak için $ öneki ekleyin.'

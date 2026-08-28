@@ -32,6 +32,7 @@
 #include "include/bdma_embed.h"  // embedded BDMAssault variant pairs (gzipped; PROVENANCE.md)
 #include <zlib.h>                // inflate for the embedded pairs (already linked via libpng)
 #include "include/vcdsupport.h"
+#include "include/libview.h" // which list a page is showing (the L3 ring)
 #include "include/retrogem.h"
 
 
@@ -174,7 +175,10 @@ static int vcdGameIdPrefixLen(const char *name)
 const char *vcdDisplayName(int mode, const char *text)
 {
     int n;
-    if (!gVcdHideGameId || text == NULL || !vcdViewActive(mode))
+    // VCD rows only, and deliberately so: the game-ID prefix this strips is a POPSTARTER/.VCD
+    // filename convention. A CUE row's name is an Ember game FOLDER, which carries no such prefix
+    // and must never be trimmed by this option.
+    if (!gVcdHideGameId || text == NULL || libViewActive(mode) != LIB_VIEW_PS1)
         return text;
     n = vcdGameIdPrefixLen(text);
     return n ? text + n : text;
@@ -184,6 +188,13 @@ const char *vcdDisplayName(int mode, const char *text)
 // uses (strcasecmp on the SAME display-adjusted key -- menusys.c was updated alongside this to sort by
 // vcdDisplayName), or the two disagree and the menu-level gAutosort pass, which runs LAST, silently
 // undoes this backing array's order.
+const char *vcdSortKey(const char *name)
+{
+    if (name == NULL)
+        return name;
+    return gVcdHideGameId ? name + vcdGameIdPrefixLen(name) : name;
+}
+
 static int vcdEntryCmp(const void *a, const void *b)
 {
     const char *na = ((const vcd_entry_t *)a)->name;
@@ -194,10 +205,8 @@ static int vcdEntryCmp(const void *a, const void *b)
     // part in the alphabet"). Skip the same prefix here so the visible order matches the visible text.
     // With hide off, the prefix IS shown, so it stays part of the sort key. vcdGameIdPrefixLen returns
     // 0 for a name without a strict game-ID prefix, so untagged titles are unaffected either way.
-    if (gVcdHideGameId) {
-        na += vcdGameIdPrefixLen(na);
-        nb += vcdGameIdPrefixLen(nb);
-    }
+    na = vcdSortKey(na);
+    nb = vcdSortKey(nb);
     return strcasecmp(na, nb);
 }
 
@@ -958,82 +967,10 @@ void vcdBuildSelector(const char *devPrefix, const char *prefix, const char *nam
     snprintf(out, outSize, "%s/%s/%s%s.ELF", root, POPS_FOLDER, prefix ? prefix : "", name ? name : "");
 }
 
-// ---- per-device VCD view state ------------------------------------------------
-
-static unsigned char vcdView[MODE_COUNT];  // 1 = this mode is showing its VCD list
-static unsigned char vcdDirty[MODE_COUNT]; // 1 = view just toggled -> force one rescan
-
-int vcdModeSupported(int mode)
-{
-    // FAV_MODE has its own L3 ISO<->VCD view too: the Favourites tab swaps between disc favourites and
-    // PS1/.VCD favourites (favsupport filters its list by vcdViewActive(FAV_MODE)). Its vcdView slot is
-    // independent of any device's, so toggling Favourites never disturbs a device page's view.
-    //
-    // Supported L3 VCD pages:
-    // - USB / exFAT, MMCE, MX4SIO, SMB, ATA (BDM HDD), APA / PFS HDD, FAV_MODE
-    //
-    // Unsupported:
-    // - UDPBD, UDPFS, APPS
-    if (mode >= BDM_MODE && mode <= BDM_MODE_LAST)
-        return !bdmModeIsUDPBD(mode);
-
-    return mode == MMCE_MODE || mode == ETH_MODE || mode == HDD_MODE || mode == FAV_MODE;
-}
-
-int vcdViewActive(int mode)
-{
-    if (mode < 0 || mode >= MODE_COUNT || !vcdModeSupported(mode))
-        return 0;
-    // The global default-view setting overrides the per-device L3 toggle when locked to one type.
-    if (gDefaultGameView == GAME_VIEW_ISO)
-        return 0; // locked to the ISO/disc list
-    if (gDefaultGameView == GAME_VIEW_VCD)
-        return 1;         // locked to the VCD (PS1) list
-    return vcdView[mode]; // GAME_VIEW_BOTH: per-device L3 toggle (defaults to ISO)
-}
-
-int vcdListViewActive(const item_list_t *itemList)
-{
-    if (itemList == NULL)
-        return 0;
-    if (itemList->viewOverride == ITEM_VIEW_FORCE_ISO)
-        return 0;
-    if (itemList->viewOverride == ITEM_VIEW_FORCE_VCD)
-        return 1;
-    return vcdViewActive(itemList->mode);
-}
-
-void vcdToggleView(int mode)
-{
-    if (mode < 0 || mode >= MODE_COUNT)
-        return;
-    if (gDefaultGameView != GAME_VIEW_BOTH)
-        return; // globally locked to one type -> the L3 toggle is disabled
-    vcdView[mode] = vcdView[mode] ? 0 : 1;
-    vcdDirty[mode] = 1;
-}
-
-int vcdConsumeDirty(int mode)
-{
-    if (mode < 0 || mode >= MODE_COUNT || !vcdDirty[mode])
-        return 0;
-    vcdDirty[mode] = 0;
-    return 1;
-}
-
-void vcdMarkDirty(int mode)
-{
-    if (mode >= 0 && mode < MODE_COUNT && vcdModeSupported(mode))
-        vcdDirty[mode] = 1;
-}
-
-// Mark every VCD-capable mode for one rescan -- call after the global default-view setting changes so
-// each device page rebuilds its list (ISO <-> VCD) on its next refresh.
-void vcdMarkAllDirty(void)
-{
-    for (int m = 0; m < MODE_COUNT; m++)
-        vcdMarkDirty(m);
-}
+// ---- per-device VCD view ---------------------------------------------------
+// The view state moved to libview.c when the per-page list choice stopped being a boolean.
+// vcdDisplayName below is the only piece that stayed: it is display formatting for the VCD
+// list, not view state, and it asks libViewActive() which list is on screen.
 
 // #118: a multi-disc PS1 game is a set of separate .VCD files whose titles carry a disc token, e.g.
 // "Game (Disc 2).VCD". With gVcdFirstDiscOnly on, the device VCD lists hide discs 2+ (POPSLoader

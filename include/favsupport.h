@@ -7,10 +7,28 @@
 #define FAV_TEXT_MAX          256        // cap on a stored favourite's text length (incl. NUL)
 #define FAV_MAX_ITEMS         512        // cap on records read from favourites.bin
 #define FAV_MAGIC             0x4641464F // 'OFAV' (little-endian on the EE)
-#define FAV_VERSION           2          // v2 adds a per-record isVcd byte; v1 is still read (isVcd=0)
+#define FAV_VERSION           3          // v3 widens v2's isVcd byte to a KIND (see FAV_KIND_*)
 
 // Defined in favsupport.c; consumed by opl.c/gui.c (config load/save/default).
 extern int gFAVStartMode;
+
+// Which shelf a favourite belongs on, and which core launches it. Stored in the byte OFAV v2 used
+// for isVcd, so the on-disk record layout is unchanged and only its meaning widens.
+//   ISO -- a PS2 disc game, launched by id through the source's itemLaunch
+//   VCD -- a PS1 title launched by NAME through POPSTARTER (itemLaunchVcd)
+//   CUE -- a PS1 title launched by NAME through Ember     (itemLaunchCue)
+//   ELF -- a homebrew app, launched by id from the APPS tab
+// VCD and CUE share the Favourites PS1 shelf; the kind picks the core, exactly as a row's extension
+// does on a device page.
+enum FAV_KIND {
+    FAV_KIND_ISO = 0,
+    FAV_KIND_VCD,
+    FAV_KIND_CUE,
+    FAV_KIND_ELF
+};
+
+// The LIB_VIEW_* shelf a kind is displayed on.
+int favKindView(int kind);
 
 item_list_t *favGetObject(int initOnly);
 
@@ -34,8 +52,8 @@ int favGetArtMode(const char *value);
 // item is already present. removeFavouriteByIdAndText matches mode (BDM-lenient) + id + text + isVcd.
 // isVcd = 1 when the favourited item was a PS1/.VCD entry (device was in its L3 VCD view); such
 // favourites resolve + launch as POPSTARTER rather than as a disc image. See favsupport.c.
-int addFavouriteItem(int mode, int id, int icon_id, int text_id, const char *text, int isVcd);
-int removeFavouriteByIdAndText(int mode, int id, const char *text, int isVcd);
+int addFavouriteItem(int mode, int id, int icon_id, int text_id, const char *text, int kind);
+int removeFavouriteByIdAndText(int mode, int id, const char *text, int kind);
 
 // Remove the favourite at FAV-list index favIndex (R3 pressed on the Favourites tab).
 void favRemoveByIndex(int favIndex);

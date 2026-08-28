@@ -40,7 +40,7 @@ int folderAscend(int mode);
 void folderReset(int mode);
 
 // One-shot: returns 1 once after a descend/ascend/reset, so NeedsUpdate can force the rescan even
-// when the device's own change-detection would otherwise short-circuit (mirrors vcdConsumeDirty).
+// when the device's own change-detection would otherwise short-circuit (mirrors libViewConsumeDirty).
 int folderConsumeDirty(int mode);
 
 #endif

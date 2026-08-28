@@ -5,6 +5,7 @@
 #include "include/supportbase.h"
 #include "include/ethsupport.h"
 #include "include/vcdsupport.h"
+#include "include/libview.h" // libViewActive / libListViewActive -- which list this page shows
 #include "include/util.h"
 #include "include/renderman.h"
 #include "include/themes.h"
@@ -547,9 +548,9 @@ static int ethNeedsUpdate(item_list_t *itemList)
 
     // VCD view: force a rescan once on toggle; once a share is selected, the VCD list refreshes on
     // toggle only (skip disc heuristics). With no share yet, fall through so the share list updates.
-    if (vcdConsumeDirty(itemList->mode))
+    if (libViewConsumeDirty(itemList->mode))
         return 1;
-    if (gPCShareName[0] && vcdListViewActive(itemList))
+    if (gPCShareName[0] && (libListViewActive(itemList) == LIB_VIEW_PS1))
         return 0;
 
     if (ethULSizePrev == -2)
@@ -590,7 +591,14 @@ static int ethUpdateGameList(item_list_t *itemList)
         if (gNetworkStartup != 0)
             return 0;
 
-        if (vcdListViewActive(itemList)) {
+        if (libListViewActive(itemList) == LIB_VIEW_PS1) {
+            // POPSTARTER titles ONLY on SMB, deliberately: this is the one device class where the
+            // Ember half is not yet known to work. RiptOPL composes SMB paths with '\' while Ember
+            // composes its own with '/' (its io_path format string is "%s/%s%s"), and whether
+            // smbman accepts that has not been tested on hardware. Listing Ember rows here that
+            // then fail to open would be worse than not listing them -- half a working list is
+            // worse than none. Swap this for ps1FillGameList once an Ember title is confirmed to
+            // launch from a share; nothing else on this path needs to change.
             int r = vcdFillGameList(ethPrefix, &ethGames);
             if (r >= 0) // r < 0: transient scan failure -> preserve the last-good list
                 ethGameCount = r;
@@ -652,7 +660,7 @@ int ethResolveIsoFavourite(int id, const char *name, int *outId)
     if (name == NULL || outId == NULL || id < 0 || !gPCShareName[0] || gNetworkStartup != 0)
         return 0;
 
-    if (!vcdViewActive(ETH_MODE)) {
+    if (libViewActive(ETH_MODE) != LIB_VIEW_PS1) {
         // The live ETH backing store already IS the ISO list. Preserve the old id+name validation.
         games = ethGames;
         count = ethGameCount;
@@ -690,7 +698,7 @@ static base_game_info_t *ethBackingForView(item_list_t *itemList, int *count)
     // to live ethGames when that snapshot was invalidated: returning an empty view is safer than using
     // the same numeric ID against the wrong backing list, and the normal favourite rebuild will resolve
     // it again after the ETH mutation/reconnect that invalidated the snapshot.
-    if (itemList != NULL && itemList->viewOverride == ITEM_VIEW_FORCE_ISO && vcdViewActive(ETH_MODE)) {
+    if (itemList != NULL && itemList->viewOverride == ITEM_VIEW_FORCE_ISO && (libViewActive(ETH_MODE) == LIB_VIEW_PS1)) {
         if (!ethFavIsoValid || ethFavIsoGames == NULL) {
             if (count != NULL)
                 *count = 0;
@@ -747,7 +755,7 @@ static char *ethGetGameStartup(item_list_t *itemList, int id)
     if (game == NULL)
         return "";
     // VCD view keys per-game data (CFG/art) off the VCD filename, not a disc ID (see sbPopulateConfig).
-    if (vcdListViewActive(itemList))
+    if (libListViewActive(itemList) == LIB_VIEW_PS1)
         return game->name;
     return game->startup;
 }
@@ -761,14 +769,14 @@ static void ethDeleteGame(item_list_t *itemList, int id)
 
 static void ethRenameGame(item_list_t *itemList, int id, char *newName)
 {
-    if (vcdListViewActive(itemList)) {
+    if (libListViewActive(itemList) == LIB_VIEW_PS1) {
         base_game_info_t *game = ethGameForView(itemList, id);
 
         if (game != NULL && vcdRenameFile(ethPrefix, game->name, newName) == 0) {
             ethInvalidateFavIsoBacking();
             // ETH otherwise treats its VCD list as toggle-only; consume this on the already queued
             // deferred update so the renamed POPS/ directory is scanned again.
-            vcdMarkDirty(itemList->mode);
+            libViewMarkDirty(itemList->mode);
         }
         return;
     }
@@ -834,7 +842,7 @@ static void ethLaunchGame(item_list_t *itemList, int id, config_set_t *configSet
     unsigned short int layer1_part;
 
     // VCD view (SMB): hand off to POPSTARTER by name, only once a share is selected.
-    if (gPCShareName[0] && game != NULL && vcdListViewActive(itemList)) {
+    if (gPCShareName[0] && game != NULL && (libListViewActive(itemList) == LIB_VIEW_PS1)) {
         ethLaunchVcd(itemList, game->name, configSet);
         return;
     }
@@ -1018,7 +1026,7 @@ static int ethGetImage(item_list_t *itemList, char *folder, int isRelative, char
     else
         snprintf(path, sizeof(path), "%s%s_%s", folder, value, suffix);
     int r = texDiscoverLoad(resultTex, path, -1);
-    if (r == ERR_BAD_FILE && isRelative && vcdListViewActive(itemList))
+    if (r == ERR_BAD_FILE && isRelative && (libListViewActive(itemList) == LIB_VIEW_PS1))
         r = vcdLoadPopsCover(ethPrefix, value, suffix, resultTex);
     return r;
 }

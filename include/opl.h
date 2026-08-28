@@ -96,9 +96,9 @@ extern int gDeinitTerminal; // 1 while deinit() runs for exit/poweroff, 0 for a 
 extern int gArtAbandoned;   // 1 when cacheEnd() could NOT join the art worker: a thread is still inside a
                             // device read while teardown proceeds. hddCleanUp skips its unmount and
                             // PDIOC_CLOSEALL when set -- see the comment there.
-// Enqueue a deferred list rebuild for every enabled VCD-capable page (vcdMarkAllDirty is
+// Enqueue a deferred list rebuild for every enabled page that has a list ring (libViewMarkAllDirty is
 // side-effect-free by design; runtime view changes must explicitly queue the rebuilds).
-void oplQueueVcdDeviceUpdates(void);
+void oplQueueLibraryDeviceUpdates(void);
 
 // Shutdown minimal services initiated for auto loading.
 void miniDeinit(config_set_t *configSet);
