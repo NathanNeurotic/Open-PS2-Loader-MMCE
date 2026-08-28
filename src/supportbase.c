@@ -960,6 +960,7 @@ static char ra_hash_path[64];
 static char ra_hash_name[128];
 static char ra_hash_ext[16];
 static char ra_hash_startup[16];
+static int ra_hash_format = -1; /* GAME_FORMAT_USBLD is 0: never default to it */
 
 static void sbHashGameDeferredWorker(void);
 
@@ -968,7 +969,7 @@ static void sbHashGameDeferredWorker(void);
    time; the caller tells the user. */
 static volatile int ra_hash_busy = 0;
 
-int sbHashGameDeferred(const char *path, const char *name, const char *ext, const char *startup)
+int sbHashGameDeferred(const char *path, const char *name, const char *ext, const char *startup, int format)
 {
     if (ra_hash_busy)
         return 0;
@@ -978,6 +979,7 @@ int sbHashGameDeferred(const char *path, const char *name, const char *ext, cons
     snprintf(ra_hash_name, sizeof(ra_hash_name), "%s", name ? name : "");
     snprintf(ra_hash_ext, sizeof(ra_hash_ext), "%s", ext ? ext : "");
     snprintf(ra_hash_startup, sizeof(ra_hash_startup), "%s", startup ? startup : "");
+    ra_hash_format = format;
 
     ioPutRequest(IO_CUSTOM_SIMPLEACTION, &sbHashGameDeferredWorker);
     return 1;
@@ -985,7 +987,7 @@ int sbHashGameDeferred(const char *path, const char *name, const char *ext, cons
 
 static void sbHashGameDeferredWorker(void)
 {
-    sbHashGame(ra_hash_path, ra_hash_name, ra_hash_ext, ra_hash_startup);
+    sbHashGame(ra_hash_path, ra_hash_name, ra_hash_ext, ra_hash_startup, ra_hash_format);
     ra_hash_busy = 0;
 }
 
@@ -1002,7 +1004,7 @@ void sbTestPCLinkDeferred(void)
     ioPutRequest(IO_CUSTOM_SIMPLEACTION, &sbTestPCLinkWorker);
 }
 
-void sbHashGame(const char *path, const char *name, const char *ext, const char *startup)
+void sbHashGame(const char *path, const char *name, const char *ext, const char *startup, int format)
 {
     static const char *dirs[] = {"DVD", "CD", NULL};
     char iso[256], hash[33], info[96], info2[96];
@@ -1014,10 +1016,31 @@ void sbHashGame(const char *path, const char *name, const char *ext, const char 
     raHashLogOpen(path);
     raHashSetStepLog(&raHashStep);
 
+    /* Split UL games are not image files; nothing to open. Say so
+       instead of reporting a missing file. */
+    if (format == GAME_FORMAT_USBLD) {
+        raHashStep("1-ul-format-not-supported");
+        raHashLogAdd(name, startup, "UL: not an image, not supported yet");
+        guiShowRANotice("UL/USBExtreme games cannot be checked yet",
+                        "Only plain .iso images in DVD/ or CD/ are supported");
+        raHashSetStepLog(NULL);
+        raHashLogClose();
+        return;
+    }
+
     for (i = 0; dirs[i] != NULL; i++) {
         int ret;
 
-        snprintf(iso, sizeof(iso), "%s%s/%s%s", path, dirs[i], name, ext);
+        /* The file name follows the game's format, the way
+           sbCreatePath_name builds it. In the old naming scheme
+           (OPL Manager's default: "SLPM_656.88.Berserk.iso") the scan
+           strips the ID off the displayed name, so it has to go back
+           in front of it here -- the first tester report was exactly
+           "image did not open" on every such file. */
+        if (format == GAME_FORMAT_OLD_ISO)
+            snprintf(iso, sizeof(iso), "%s%s/%s.%s%s", path, dirs[i], startup, name, ext);
+        else
+            snprintf(iso, sizeof(iso), "%s%s/%s%s", path, dirs[i], name, ext);
         LOG("RA: trying %s\n", iso);
 
         /* Direct read only. Mounting is not a fallback: on USB it hangs

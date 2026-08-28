@@ -1158,7 +1158,7 @@ void menuHandleInputGameMenu()
                 char *prefix = support->itemGetPrefix(support);
 
                 if (g != NULL && prefix != NULL) {
-                    if (sbHashGameDeferred(prefix, g->name, g->extension, g->startup))
+                    if (sbHashGameDeferred(prefix, g->name, g->extension, g->startup, g->format))
                         guiShowRANotice("Checking the image, this takes a few seconds...", NULL);
                     else
                         guiShowRANotice("An image check is already running", NULL);

@@ -68,9 +68,9 @@ void raHashStep(const char *what);
 void raHashLogOpen(const char *path);
 void raHashLogAdd(const char *name, const char *startup, const char *hash);
 void raHashLogClose(void);
-void sbHashGame(const char *path, const char *name, const char *ext, const char *startup);
+void sbHashGame(const char *path, const char *name, const char *ext, const char *startup, int format);
 /* Same, but through OPL's I/O thread. From the menu call ONLY this one. */
 /* Returns 1 when queued, 0 when a check is already running. */
-int sbHashGameDeferred(const char *path, const char *name, const char *ext, const char *startup);
+int sbHashGameDeferred(const char *path, const char *name, const char *ext, const char *startup, int format);
 
 #endif
