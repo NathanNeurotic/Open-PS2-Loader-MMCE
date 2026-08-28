@@ -39,6 +39,47 @@ nothing; a silent one costs everyone.
 **Every report is genuinely valued.** This does not improve without them: the last two
 weeks of fixes came almost entirely from tester reports, not from reading code.
 
+## Playing PS1 games — two cores, one list
+
+RiptOPL plays PS1 titles through **two** cores, and both show up together in a single **PS1**
+list. Press **L3** on a device page to swap between your PS2 discs and that PS1 list.
+
+| Core | Format | Lives in |
+| --- | --- | --- |
+| **POPSTARTER** | `*.VCD` | `<device>:/POPS/` |
+| **Ember** | `*.cue` / `*.bin` / `*.exe` | `<device>:/EMBER/games/<Game Name>/` |
+
+They are interleaved and sorted as one library, so a game you keep for both cores simply appears
+twice. Which core runs a title is decided by that row when you launch it — there is nothing to
+configure and no extra toggle.
+
+**Setting up Ember.** This package contains a ready-made **`EMBER/`** folder. Copy it to the root of
+a device, right beside `POPS/`. Then add **your own PS1 BIOS** as `EMBER/bios.bin` — it must be
+exactly 512 KB. A BIOS is copyrighted and is never distributed with RiptOPL, so the folder ships with
+a placeholder file whose name reminds you. Give each game its own folder:
+
+```
+<device>:/EMBER/
+    ember.elf
+    bios.bin                       <- yours, 512 KB, not included
+    games/
+        Spyro 2 (Ripto's Rage)/
+            whatever.cue
+            whatever.bin
+```
+
+The **folder name** is what you see in the list, and it is also the key for cover art and per-game
+settings — so `ART/Spyro 2 (Ripto's Rage)_COV.png` on that device just works, exactly as it does for
+a `.VCD`. Files inside can be named anything; `.cue` is preferred over `.exe` over `.bin`. Ember
+writes its per-game memory cards (`MC1.vmc`, `MC2.vmc`) into that game folder, so it has to be on
+writable media.
+
+Available on USB, MX4SIO, iLink, exFAT-ATA and MMCE. SMB and the APA internal HDD are
+POPSTARTER-only for now.
+
+Ember is by **Gageformer** — https://github.com/Gageformer/Ember — and is included here with his
+blessing. Please report Ember problems to *us* first, not to him: the launching is ours.
+
 ## Setting up cover art and game metadata
 
 The easiest way to get art and metadata right is **OrbitOPL Toolbox** — open
