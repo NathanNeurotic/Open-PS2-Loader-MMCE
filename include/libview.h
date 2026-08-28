@@ -6,7 +6,9 @@
   Library view state: which of a page's several lists is on screen, and the L3 ring that moves
   between them.
 
-  There are exactly two stops: PS2 discs, and PS1. The PS1 stop is deliberately ONE list holding
+  A device page has two stops: PS2 discs, and PS1. Favourites has three -- PS2, PS1, APPS -- so its
+  saved ELF entries get a shelf of their own instead of sharing the PS2 list. Rings are per-mode for
+  exactly this reason; nothing else needs to know. The PS1 stop is deliberately ONE list holding
   BOTH PS1 cores' titles -- POPSTARTER *.VCD entries and Ember game folders, interleaved and sorted
   together. A user thinks "PS1", not "which emulator", so the front end does too; which core launches
   a given row is a property of the ROW, resolved at launch time, and never of the page.
@@ -34,6 +36,7 @@
 enum LIB_VIEW {
     LIB_VIEW_ISO = 0, // PS2 disc games: ISO / ZSO / UL / HDL
     LIB_VIEW_PS1,     // PS1 titles, BOTH cores together (see the note above)
+    LIB_VIEW_ELF,     // homebrew ELFs -- a stop on the FAVOURITES ring only
     LIB_VIEW_COUNT
 };
 
@@ -55,6 +58,11 @@ int libViewActive(int mode);
 // shallow proxy may force a view through item_list_t.viewOverride without disturbing the real
 // source page's own L3 state.
 int libListViewActive(const item_list_t *itemList);
+
+// Can L3 do anything on this page -- more than one stop AND not pinned by the global setting?
+// The on-screen hint and the L3 handler must both ask THIS, or one will offer a toggle the other
+// refuses (or hide one that works). Favourites is never pinned; see libViewPinned in libview.c.
+int libViewRingUsable(int mode);
 
 // L3: advance to the next supported stop, wrapping, and mark the mode dirty. No-op when the global
 // default-view setting pins the page, or when the ring has fewer than two stops.

@@ -52,6 +52,13 @@ int libViewSupported(int mode, int view)
                 return !bdmModeIsUDPBD(mode);
             return mode == MMCE_MODE || mode == ETH_MODE || mode == HDD_MODE || mode == FAV_MODE;
 
+        case LIB_VIEW_ELF:
+            // FAVOURITES ONLY. A device page's ELFs live on the APPS tab, which is its own page --
+            // giving devices a third stop would duplicate that tab per device for no gain. But a
+            // saved app favourite had nowhere of its own and sat in the Favourites PS2 list, mixed
+            // in with disc games; this is the shelf it belongs on.
+            return mode == FAV_MODE;
+
         default:
             return 0;
     }
@@ -72,8 +79,18 @@ int libViewRingSize(int mode)
 // L3 ring free (GAME_VIEW_BOTH). A page that does not have the pinned stop is NOT pinned -- it
 // keeps showing its base list, which is what the old flag did for a non-VCD mode under the VCD
 // lock, and is what keeps APPS and UDPFS on their normal lists.
-static int libViewPinned(void)
+static int libViewPinned(int mode)
 {
+    // FAVOURITES IS NEVER PINNED, and this is load-bearing rather than a preference. The setting is
+    // "Default game view" -- it decides which list a GAME DEVICE page opens on. Favourites is not a
+    // device page: it is one shelf per kind of thing you saved, and its ring now has three stops.
+    // Pinning it to a single stop would make the APPS shelf permanently unreachable for anyone who
+    // locked the setting, silently hiding their app favourites with no way to get them back. When
+    // that shelf did not exist the question never arose; now it does, so Favourites keeps its own
+    // ring and L3 always works there.
+    if (mode == FAV_MODE)
+        return -1;
+
     if (gDefaultGameView == GAME_VIEW_ISO)
         return LIB_VIEW_ISO;
     if (gDefaultGameView == GAME_VIEW_VCD)
@@ -88,7 +105,7 @@ int libViewActive(int mode)
     if (mode < 0 || mode >= MODE_COUNT)
         return LIB_VIEW_ISO;
 
-    pin = libViewPinned();
+    pin = libViewPinned(mode);
     if (pin >= 0)
         return libViewSupported(mode, pin) ? pin : LIB_VIEW_ISO;
 
@@ -104,10 +121,17 @@ int libListViewActive(const item_list_t *itemList)
     // favourite reads its source's retained ISO array even while that source page shows VCD.
     if (itemList->viewOverride == ITEM_VIEW_FORCE_ISO)
         return LIB_VIEW_ISO;
-    if (itemList->viewOverride == ITEM_VIEW_FORCE_VCD)
+    if (itemList->viewOverride == ITEM_VIEW_FORCE_PS1)
         return LIB_VIEW_PS1;
 
     return libViewActive(itemList->mode);
+}
+
+int libViewRingUsable(int mode)
+{
+    if (mode < 0 || mode >= MODE_COUNT)
+        return 0;
+    return libViewRingSize(mode) > 1 && libViewPinned(mode) < 0;
 }
 
 void libViewAdvance(int mode)
@@ -116,7 +140,7 @@ void libViewAdvance(int mode)
 
     if (mode < 0 || mode >= MODE_COUNT)
         return;
-    if (libViewPinned() >= 0)
+    if (libViewPinned(mode) >= 0)
         return; // globally pinned to one list -> the L3 ring is inert
     if (libViewRingSize(mode) < 2)
         return; // nothing to move between

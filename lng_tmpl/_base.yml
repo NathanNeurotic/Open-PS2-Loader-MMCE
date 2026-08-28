@@ -1162,3 +1162,5 @@ gui_strings:
   string: Ember cannot use this folder name (no slash, colon or backslash, and no leading dots).
 - label: EMBER_NO_DISC
   string: No PS1 disc image in this Ember game folder.
+- label: VIEW_APPS
+  string: Showing apps

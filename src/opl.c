@@ -36,8 +36,9 @@
 #include "include/folderbrowse.h" // folderDepth -- favourites suppression inside subfolders
 #include "include/mmcesupport.h"  // mmceLoadModules() -- MMCE boot branch of resolveBootDirToMass
 #include "include/tar.h"          // tarInvalidate -- re-arm the .tar probe on a settings apply
-#include "include/vcdsupport.h"   // VCD display naming + POPSTARTER launch helpers
-#include "include/libview.h"      // libViewActive / libListViewActive -- which list this page shows
+#include "include/vcdsupport.h"
+#include "include/cuesupport.h" // cueIsCueEntry -- a PS1 row names its own core   // VCD display naming + POPSTARTER launch helpers
+#include "include/libview.h"    // libViewActive / libListViewActive -- which list this page shows
 
 #include "include/cheatman.h"
 #include "include/sound.h"
@@ -333,7 +334,7 @@ void moduleUpdateMenuInternal(opl_io_module_t *mod, int themeChanged, int langCh
         // The question is "does this page have more than one list", NOT "does it have a VCD list".
         // Those were the same thing while every ring was ISO<->VCD, and stop being the same as soon
         // as a page offers a third; libViewRingSize keeps the hint honest either way.
-        if (libViewRingSize(mod->support->mode) > 1 && gDefaultGameView == GAME_VIEW_BOTH)
+        if (libViewRingUsable(mod->support->mode))
             menuAddHint(&mod->menuItem, _STR_VCD, L3_ICON);
     }
 
@@ -439,10 +440,8 @@ static void itemExecRefresh(struct menu_item *curMenu)
 static void itemExecToggleView(struct menu_item *curMenu)
 {
     item_list_t *support = curMenu->userdata;
-    if (!support || libViewRingSize(support->mode) < 2)
+    if (!support || !libViewRingUsable(support->mode))
         return;
-    if (gDefaultGameView != GAME_VIEW_BOTH)
-        return; // the global default-view setting locks the page to one type -> L3 is inert
 
     // Folder browsing: the VCD/POPS list has no folder tree, so drop any ISO-view subfolder position
     // back to root on a view toggle (the deferred rebuild below restores the plain device title).
@@ -458,7 +457,14 @@ static void itemExecToggleView(struct menu_item *curMenu)
     cacheDropQueuedArt();
 
     sfxPlay(SFX_CONFIRM);
-    guiWarning((libViewActive(support->mode) == LIB_VIEW_PS1) ? _l(_STR_VCD_ON) : _l(_STR_VCD_OFF), 2);
+    // Three shelves are possible now (Favourites rings PS2 -> PS1 -> APPS), so the toast names the
+    // one you landed on rather than reading as an on/off flag.
+    {
+        int view = libViewActive(support->mode);
+        int msg = (view == LIB_VIEW_PS1) ? _STR_VCD_ON : (view == LIB_VIEW_ELF) ? _STR_VIEW_APPS :
+                                                                                  _STR_VCD_OFF;
+        guiWarning(_l(msg), 2);
+    }
     ioPutRequest(IO_MENU_UPDATE_DEFFERED, &support->mode);
 }
 
@@ -514,6 +520,30 @@ static void itemExecSquare(struct menu_item *curMenu)
     }
 }
 
+// Which favourite kind is the row at `id` on this page? The SHELF comes from the page (APPS rows
+// are ELF favourites, a PS1 page's rows are PS1 favourites), but for PS1 the CORE comes from the
+// ROW -- both cores share that one list, so asking the page which core to record would file every
+// Ember title as a POPSTARTER one and it would then launch through the wrong core.
+static int itemFavKind(item_list_t *support, int id)
+{
+    if (support == NULL)
+        return FAV_KIND_ISO;
+    if (support->mode == APP_MODE)
+        return FAV_KIND_ELF;
+    if (libViewActive(support->mode) != LIB_VIEW_PS1)
+        return FAV_KIND_ISO;
+
+    // itemGet hands back the live base_game_info_t; its extension is the row-kind discriminator.
+    // A support without itemGet (or a stale id during the toggle window) falls back to POPSTARTER,
+    // which is what every pre-Ember library is.
+    if (support->itemGet != NULL) {
+        const base_game_info_t *game = (const base_game_info_t *)support->itemGet(support, id);
+        if (game != NULL && cueIsCueEntry(game))
+            return FAV_KIND_CUE;
+    }
+    return FAV_KIND_VCD;
+}
+
 // R3: toggle the current row's favourite star (checklist item 33). On the Favourites tab
 // itself R3 removes; on any source list it adds/removes by (mode, id, text).
 static void itemExecFav(struct menu_item *curMenu)
@@ -539,18 +569,18 @@ static void itemExecFav(struct menu_item *curMenu)
     if (support->mode == FAV_MODE) {
         favRemoveByIndex(it->id);
     } else {
-        // A favourite captured while the device page is in its L3 VCD view is a PS1/.VCD favourite
-        // (checklist item 12; the stub keeps isVcd at 0 until VCD views exist).
-        int isVcd = (libViewActive(support->mode) == LIB_VIEW_PS1) ? 1 : 0;
-        // Only on a device whose VCD favourites can actually be resolved/launched later: storing one
-        // on a device without itemLaunchVcd would leave a permanently-hidden, unlaunchable record.
-        if (isVcd && support->itemLaunchVcd == NULL)
+        int kind = itemFavKind(support, it->id);
+        // Only store a favourite this device can actually resolve and launch later. A PS1 record
+        // whose source has no hook for that core would be a permanently-hidden, unlaunchable entry.
+        if (kind == FAV_KIND_VCD && support->itemLaunchVcd == NULL)
+            return;
+        if (kind == FAV_KIND_CUE && support->itemLaunchCue == NULL)
             return;
         if (it->favourited) {
-            if (removeFavouriteByIdAndText(support->mode, it->id, it->text, isVcd))
+            if (removeFavouriteByIdAndText(support->mode, it->id, it->text, kind))
                 it->favourited = 0; // only clear the star once the store write succeeded
         } else {
-            if (addFavouriteItem(support->mode, it->id, it->icon_id, it->text_id, it->text, isVcd))
+            if (addFavouriteItem(support->mode, it->id, it->icon_id, it->text_id, it->text, kind))
                 it->favourited = 1; // only show the star once the store write succeeded
         }
     }
