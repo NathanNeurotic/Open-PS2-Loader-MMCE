@@ -375,7 +375,7 @@ static int cueFillGameList(const char *devPrefix, base_game_info_t **outGames)
     return n;
 }
 
-int ps1FillGameList(const char *vcdPrefix, const char *emberPrefix, base_game_info_t **outGames)
+int ps1FillGameList(const char *devPrefix, base_game_info_t **outGames)
 {
     base_game_info_t *vcdGames = NULL, *cueGames = NULL, *merged = NULL;
     int vcdCount, cueCount, total;
@@ -383,8 +383,8 @@ int ps1FillGameList(const char *vcdPrefix, const char *emberPrefix, base_game_in
     if (outGames == NULL)
         return 0;
 
-    vcdCount = vcdFillGameList(vcdPrefix, &vcdGames);
-    cueCount = cueFillGameList(emberPrefix, &cueGames);
+    vcdCount = vcdFillGameList(devPrefix, &vcdGames);
+    cueCount = cueFillGameList(devPrefix, &cueGames);
 
     // EITHER half failing means the device could not be READ, not that it holds no games -- an
     // absent POPS or EMBER folder reports 0. Publishing a half list would look exactly like the
