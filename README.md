@@ -222,6 +222,16 @@ This build layers several features on top of upstream OPL:
   Ember writes its per-game memory cards (`MC1.vmc`, `MC2.vmc`) into that same folder, so it must be
   on writable media. Currently available on USB, MX4SIO, iLink, exFAT-ATA and MMCE.
 
+  **Credit and licence — Ember is created by [Gageformer](https://github.com/Gageformer), and its
+  official release page is <https://github.com/Gageformer/Ember/releases>.** Ember is an
+  independent PS1 emulator written from scratch for the PS2; it is **not** part of RiptOPL and is
+  not our work. We bundle it unmodified and with the author's blessing, under the **Ember Public
+  Beta Testing Licence**, which ships in the release package as `EMBER/LICENSE-BETA.txt` and governs
+  the build it accompanies. That licence permits non-commercial bundling but prohibits selling,
+  modifying or repackaging the build. Ember contains no PlayStation BIOS and no game data — you
+  supply your own, from hardware and media you lawfully own. Please report Ember problems to *us*
+  first rather than to Gageformer: the launching is ours.
+
   **Ember display mode.** The **PS1 settings** page carries an *Ember Display Mode* setting
   (**Default** / **240p** / **480p**). On *Default* RiptOPL does not touch Ember's own configuration
   at all. Choose 240p or 480p and it writes that key into `<device>:/EMBER/settings.txt` when you

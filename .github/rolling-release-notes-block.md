@@ -83,8 +83,19 @@ configuration at all. Pick 240p or 480p and it writes that choice to
 `<device>:/EMBER/settings.txt` when you launch a game, on that device only. Any other lines
 already in that file are left alone.
 
-Ember is by **Gageformer** — https://github.com/Gageformer/Ember — and is included here with his
-blessing. Please report Ember problems to *us* first, not to him: the launching is ours.
+### Ember credit and licence
+
+**Ember is created by Gageformer.** Official release page: <https://github.com/Gageformer/Ember/releases>
+
+Ember is an independent PS1 emulator written from scratch for the PS2 — it is **not** part of
+RiptOPL and is not our work. It is bundled here unmodified, with the author's blessing, under
+its **Ember Public Beta Testing Licence**. That licence ships in the package as
+**`EMBER/LICENSE-BETA.txt`** and governs the Ember build it accompanies — please read it. In
+short: free to use and to bundle non-commercially, no selling, no modifying or repackaging the
+build, and no BIOS or game content is included or ever will be.
+
+Please report Ember problems to *us* first, not to Gageformer: the launching is ours, and most
+issues turn out to be on our side.
 
 ## Alternate POPSTARTER builds
 

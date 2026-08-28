@@ -655,7 +655,18 @@ jobs:
           # the loader lists Ember titles whenever a device has an EMBER/ folder, so shipping that
           # folder WITHOUT its ember.elf would hand users a library whose rows cannot launch.
           test -f EMBER/ember.elf
+          # Ember's licence (LICENSE-BETA.txt, section 2) permits bundling ONLY IF the build ships
+          # unmodified, complete and WITH THE LICENCE FILE, credited to Gageformer by name with a
+          # link to the official release page. Shipping the ELF without the licence is not a
+          # missing nicety, it is a breach of the terms that let us ship it at all -- so this is a
+          # hard failure, exactly like the bios.bin guard below.
+          test -f EMBER/LICENSE-BETA.txt
           cp -rf EMBER/. "$PKG/EMBER/"
+          if [ ! -s "$PKG/EMBER/LICENSE-BETA.txt" ]; then
+            echo "ERROR: EMBER/LICENSE-BETA.txt did not reach the package -- bundling Ember without" >&2
+            echo "       its licence breaches section 2(a) of that licence. Refusing to publish." >&2
+            exit 1
+          fi
           # A PS1 BIOS is copyrighted and must never be redistributed. The folder ships with a
           # zero-byte file whose NAME tells the user to supply their own; guard against one ever
           # being committed by accident.
@@ -846,6 +857,9 @@ jobs:
             printf -- '- EMBER/ folder in this package: drop it at a device ROOT beside POPS/, add your own\n'
             printf -- '  512 KB PS1 bios.bin, then one folder per game under EMBER/games/\n'
             printf -- '- Ember display mode (240p/480p) on the PS1 settings page, written to EMBER/settings.txt\n'
+            printf -- '- Ember is created by Gageformer -- https://github.com/Gageformer/Ember/releases\n'
+            printf -- '  -- bundled unmodified with permission under its beta licence. EMBER/LICENSE-BETA.txt\n'
+            printf -- '  ships in the package and governs that build; Ember is not our work.\n'
             printf -- '- POPS/POPSTARTER VERSIONS/: MAIN, DEBUG and three USBDELAY builds of POPSTARTER to swap in by hand\n'
             printf -- '- The redundant POPSTARTER/ folder is gone from this package; POPS/ already held all of it\n'
             printf -- '- Category settings layout\n'
