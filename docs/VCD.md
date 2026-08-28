@@ -60,7 +60,7 @@ title and POPSTARTER finds the matching `*.VCD`. An APA one-game install instead
 with its literal, case-sensitive `PP.<name>` / `__.<name>` partition label so POPSTARTER can
 mount that partition and boot its fixed `IMAGE0.VCD`.
 
-Where `POPSTARTER.ELF` is loaded from is set by **POPStarter →
+Where `POPSTARTER.ELF` is loaded from is set by **PS Emulation Settings →
 POPSTARTER.ELF Device** — a driver-accurate picker (matching the Neutrino Device picker):
 
 | Choice | Loads `POPS/POPSTARTER.ELF` from |
@@ -92,8 +92,8 @@ comes down to the file itself, and the release package ships five of them in
 
 | Build | Use it when |
 | --- | --- |
-| **MAIN** | The normal build. Start here if a VCD misbehaves. |
-| **DEBUG** | Prints POPSTARTER's own diagnostics on screen — the one to use when reporting a VCD problem. |
+| **MAIN** | POPSTARTER without the SMB support the shipped default carries. Only if you know you do not need SMB. |
+| **DEBUG** | **The shipped default.** SMB-capable, and prints POPSTARTER's own diagnostics on screen. |
 | **USBDELAY** | USB devices that need longer to settle before POPSTARTER reads them. |
 | **USBDELAY_DEBUG** | USBDELAY plus the diagnostics. |
 | **USBDELAY_LONGER_DEBUG** | A longer delay again, with diagnostics. |
@@ -101,10 +101,10 @@ comes down to the file itself, and the release package ships five of them in
 Swapping is manual: copy the `POPSTARTER.ELF` you want over the `POPS/POPSTARTER.ELF` that the
 picker resolves to. RiptOPL never chooses a build for you and never rewrites that file.
 
-> The `POPSTARTER.ELF` shipped at `POPS/POPSTARTER.ELF` is currently byte-identical to **DEBUG**.
-> That is the explanation for POPSTARTER diagnostic text appearing during an otherwise healthy VCD
-> launch — including the `Cannot mount __common to pfs1` line reported against MMCE launches. Copy
-> **MAIN** over it to silence them.
+> **The shipped `POPS/POPSTARTER.ELF` is the DEBUG build, deliberately** — it is the build carrying
+> SMB support, so it is the correct default for the package. POPSTARTER diagnostic text during an
+> otherwise healthy VCD launch is therefore expected on every device, and is not evidence of a
+> problem on its own. Do not replace it with **MAIN** unless you are certain you do not need SMB.
 
 ## 4. Where to put your VCD files
 
@@ -140,7 +140,7 @@ the same physical `IMAGE0.VCD` filename, so config and art use the displayed `<n
 
 POPSTARTER's stock driver reads FAT32. To boot PS1 games from an **exFAT** drive,
 POPSTARTER needs extra block-device modules (the BDMAssault / "BDMA" drivers). RiptOPL
-*equips* them for you from **POPStarter → BDMA Settings** — RiptOPL copies the right pair onto your memory
+*equips* them for you from **PS Emulation Settings → BDMA Settings** — RiptOPL copies the right pair onto your memory
 card; your own module files win when present, and a gzipped built-in pair fills the gap when
 they aren't:
 

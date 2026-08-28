@@ -883,7 +883,7 @@ gui_strings:
 - label: PLASCOLOR
   string: Plasma Blend Color
 - label: POPSTARTER
-  string: POPSTARTER
+  string: PS Emulation Settings
 - label: POPSTARTER_DEVICE
   string: POPSTARTER.ELF Device
 - label: POPSTARTER_PATH

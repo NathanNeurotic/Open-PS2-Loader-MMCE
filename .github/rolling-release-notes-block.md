@@ -92,8 +92,8 @@ blessing. Please report Ember problems to *us* first, not to him: the launching 
 
 | Build | Use it when |
 | --- | --- |
-| **MAIN** | The normal build. Try this first if a VCD misbehaves. |
-| **DEBUG** | Prints diagnostics on screen. Use it when reporting a POPSTARTER problem. |
+| **MAIN** | POPSTARTER without the SMB support the shipped default carries. Only if you know you do not need SMB. |
+| **DEBUG** | **The shipped default.** SMB-capable, and prints diagnostics on screen. |
 | **USBDELAY** | USB devices that need longer to settle before POPSTARTER reads them. |
 | **USBDELAY_DEBUG** | USBDELAY, with the diagnostics. |
 | **USBDELAY_LONGER_DEBUG** | A longer delay still, with diagnostics. |
@@ -102,9 +102,10 @@ To switch, copy the `POPSTARTER.ELF` you want over `POPS/POPSTARTER.ELF` on your
 Nothing in RiptOPL selects these for you — it is a manual swap, and the folder is there so
 you do not have to go hunting for the builds.
 
-Note that the `POPSTARTER.ELF` shipped at `POPS/POPSTARTER.ELF` is currently byte-identical
-to **DEBUG**, which is why some users see POPSTARTER diagnostics during a VCD launch. If
-that bothers you, copy **MAIN** over it.
+**The `POPSTARTER.ELF` shipped at `POPS/POPSTARTER.ELF` is the DEBUG build on purpose** — that
+is the build with SMB support, so it is the right default. Seeing POPSTARTER diagnostics
+during a VCD launch is expected, not a fault. Do not copy **MAIN** over it unless you are
+sure you do not need SMB — the alternate builds are here mainly for the `USBDELAY` cases.
 
 **The redundant `POPSTARTER/` folder is gone.** It used to sit at the root of this package
 holding a second copy of nine files that `POPS/` already contains. It also carried a

@@ -234,9 +234,12 @@ This build layers several features on top of upstream OPL:
   `POPSTARTER.ELF` you want over `POPS/POPSTARTER.ELF` on your device; nothing in RiptOPL selects
   them for you. The `USBDELAY*` builds give USB devices longer to settle before POPSTARTER reads
   them, and the `*DEBUG*` builds print diagnostics on screen — use one of those when reporting a
-  POPSTARTER problem. Note the `POPSTARTER.ELF` shipped at `POPS/POPSTARTER.ELF` is currently
-  byte-identical to **DEBUG**, which is why POPSTARTER diagnostics can appear during a VCD launch;
-  copy **MAIN** over it if you would rather not see them.
+  POPSTARTER problem.
+
+  **The shipped `POPS/POPSTARTER.ELF` is the DEBUG build, and that is deliberate** — it is the build
+  with SMB support, so it is the right default for the package. On-screen POPSTARTER diagnostics
+  during a VCD launch are expected and are not a fault. Do not overwrite it with **MAIN** unless you
+  are certain you do not need SMB; the alternate builds are here for the `USBDELAY` cases.
 
 - **Where POPSTARTER's VCDs come from:** the PS1 list is a *view* on a device page, not a separate
   tab. A **Default game view** setting (**Both** / **PS2** / **PS1**, default **Both**) can lock a
@@ -486,7 +489,7 @@ Sources**. For PS2, 48-bit LBA internal HDDs are supported. The HDD can be forma
 	- Enable **BDM HDD** in **Game Sources**. The exFAT HDD then mounts through the Block Device Manager (BDMAssault / "BDMA") into the shared `massN:` namespace — the same path as USB/MX4SIO — and appears as an **HDD (exFAT)** games list with the HDD icon.
 	- Files should be added contiguously or synchronously to avoid fragmentation. For example, drag and drop files one at a time, or ensure that files are added sequentially.
 	- When formatting drives for the exFAT filesystem, please make sure the `Allocation unit size` is set to `Default`.
-	- **PS1 games:** PS1 `*.VCD` titles in the HDD's `POPS/` folder list under the **L3** VCD view like any other device. To boot them, open **POPStarter → BDMA Settings** from the main menu. **VCD BDMA Apply on Launch** is on by default and equips the matching exFAT driver automatically; turn it off to reveal the manual **BDMA Source** / **BDMA Mode** pickers and set **BDMA Mode → HDD (exFAT)** by hand so POPSTARTER can read the exFAT volume. See **[docs/VCD.md](docs/VCD.md)**.
+	- **PS1 games:** PS1 `*.VCD` titles in the HDD's `POPS/` folder list under the **L3** VCD view like any other device. To boot them, open **PS Emulation Settings → BDMA Settings** from the main menu. **VCD BDMA Apply on Launch** is on by default and equips the matching exFAT driver automatically; turn it off to reveal the manual **BDMA Source** / **BDMA Mode** pickers and set **BDMA Mode → HDD (exFAT)** by hand so POPSTARTER can read the exFAT volume. See **[docs/VCD.md](docs/VCD.md)**.
 
 ## APPS
 
