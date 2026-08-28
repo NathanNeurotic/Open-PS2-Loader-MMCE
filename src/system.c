@@ -160,15 +160,25 @@ static unsigned char dev9Initialized = 0, dev9Loaded = 0, dev9InitCount = 0;
 
 void sysInitDev9(void)
 {
-    int ret;
-
     if (!dev9Initialized) {
         LOG("[DEV9]:\n");
-        ret = sysLoadModuleBuffer(&ps2dev9_irx, size_ps2dev9_irx, 0, NULL);
-        dev9Loaded = (ret == 0); // DEV9.IRX must have successfully loaded and returned RESIDENT END.
-        dev9Initialized = 1;
+        // DEV9.IRX must have loaded AND returned RESIDENT END for the adapter to be usable.
+        dev9Loaded = (sysLoadModuleBuffer(&ps2dev9_irx, size_ps2dev9_irx, 0, NULL) == 0);
+
+        // LATCH ONLY ON SUCCESS. This used to set dev9Initialized unconditionally, so a single
+        // failed load disabled DEV9 -- and with it the NIC and the internal HDD -- for the whole
+        // session: every later call saw the flag, skipped the load and just bumped the refcount.
+        //
+        // Retrying is safe rather than a double-load risk, because the guard lives one layer down:
+        // sysLoadModuleBuffer keeps a table of buffers it has loaded, returns 0 for one it already
+        // holds, and never records a failure. So a retry after a failure genuinely re-attempts, and
+        // a retry after a success is a cheap no-op. That is also why no extra in-progress flag is
+        // needed here -- that table is consulted under sysLoadModuleLock.
+        dev9Initialized = dev9Loaded;
     }
 
+    // Refcount every caller regardless, so each sysInitDev9 still pairs with its sysShutdownDev9.
+    // On a failed load dev9Loaded stays 0, so the power-off at count 0 is correctly skipped.
     dev9InitCount++;
 }
 
@@ -225,10 +235,17 @@ void sysReset(int modload_mask)
 #endif
 #endif
 
-    // The IOP was just rebooted: its DEV9 modules and refcount are gone, so reset both
-    // bookkeeping vars together. Leaving dev9InitCount stale inflates the refcount across
-    // resets, so sysShutdownDev9() would never power DEV9 off again.
+    // The IOP was just rebooted: its DEV9 modules and refcount are gone, so reset the bookkeeping
+    // vars together. Leaving dev9InitCount stale inflates the refcount across resets, so
+    // sysShutdownDev9() would never power DEV9 off again.
+    //
+    // dev9Loaded is cleared for the same reason the other two are -- the module it describes no
+    // longer exists. It was previously left behind, which was harmless only because the old
+    // unconditional assignment in sysInitDev9 always overwrote it before use. Now that the load can
+    // fail without latching, a stale 1 could outlive the reset and let sysShutdownDev9 try to power
+    // off a DEV9 that was never brought back up.
     dev9Initialized = 0;
+    dev9Loaded = 0;
     dev9InitCount = 0;
     while (!SifIopSync())
         ;
