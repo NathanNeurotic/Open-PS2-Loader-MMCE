@@ -594,6 +594,7 @@ static int vcdScanOpenDir(const char *dirPath, vcd_entry_t **outList)
 
     int count = 0;
     struct dirent *de;
+    errno = 0; // distinguish a clean end-of-directory from a failed readdir() RPC
     while (count < VCD_MAX_ITEMS && (de = readdir(dir)) != NULL) {
         int len = (int)strlen(de->d_name);
         if (len < 5 || strcasecmp(de->d_name + len - 4, ".VCD") != 0)
@@ -622,6 +623,21 @@ static int vcdScanOpenDir(const char *dirPath, vcd_entry_t **outList)
         vcdNoteScanDir(list[count].name, dirPath); // string only -- NO device IO on the scan path
         count++;
     }
+
+    // A directory can open successfully and still fail during enumeration. On MMCE this is a
+    // realistic transient: each readdir() is another SIO2/filesystem transaction, and a bus
+    // collision can terminate the walk after the first few entries. Treating that as a clean empty
+    // directory makes vcdFillGameList free the last-good list and the GUI clears the page. Return
+    // the same transient-failure result as an opendir() error so callers preserve their list and
+    // their existing retry policy. When count reached VCD_MAX_ITEMS, the loop stopped by design;
+    // errno is irrelevant in that case.
+    if (count < VCD_MAX_ITEMS && de == NULL && errno != 0) {
+        LOG("[VCD] readdir failed for '%s' (errno %d)\n", dirPath, errno);
+        free(list);
+        closedir(dir);
+        return -1;
+    }
+
     closedir(dir);
     LOG("[VCD] scanned '%s': found %d entries\n", dirPath, count);
 
