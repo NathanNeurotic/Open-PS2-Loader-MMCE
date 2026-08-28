@@ -41,8 +41,8 @@ translations:
   WRITE_POPSTARTER_NET: Shkruaj Konfigurimin e Rrjetit POPSTARTER
   HINT_WRITE_POPSTARTER_NET: Ruaj gjithashtu këto vlera IP + SMB në IPCONFIG.DAT / SMBCONFIG.DAT të POPSTARTER në kartën e memories (për VCD mbi SMB).
   POPSTARTER_NET_ERR: Nuk u shkrua konfigurimi i rrjetit POPSTARTER në kartën e memories.
-  VCD: VCD
-  VCD_ON: Po shfaq lojërat VCD
+  VCD: PS1
+  VCD_ON: Po shfaq lojërat PS1
   VCD_OFF: Po shfaq lojërat e diskut
   NEUTRINO_ARGS: Argumente të Nisjes Neutrino
   HINT_NEUTRINO_ARGS: Flamurë shtesë Neutrino, të ndarë me hapësira (p.sh. -mt=dvd). Globale zbatohet për të gjitha lojërat; për-lojë shtohet sipër. Parashtro një flamur me $ për ta çaktivizuar pa fshirë.

@@ -1003,9 +1003,9 @@ gui_strings:
 - label: NEUTRINO_VMC_HDD_UNSUPPORTED
   string: Neutrino cannot use a VMC on APA HDD (no pfs support) -- launching without it.
 - label: VCD
-  string: VCD
+  string: PS1
 - label: VCD_ON
-  string: Showing VCD games
+  string: Showing PS1 games
 - label: VCD_OFF
   string: Showing disc games
 - label: BOOT_SCANNING_BDM
@@ -1154,3 +1154,9 @@ gui_strings:
   string: HDD is busy. Try again once loading finishes.
 - label: GENERAL_SYSTEM
   string: General & System
+- label: EMBER_NOT_FOUND
+  string: Missing ember.elf
+- label: EMBER_BIOS_MISSING
+  string: Missing bios.bin beside ember.elf
+- label: EMBER_BAD_NAME
+  string: Ember cannot use this folder name (no slash, colon or backslash, and no leading dots).

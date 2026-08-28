@@ -80,10 +80,16 @@ void vcdBuildSelector(const char *devPrefix, const char *prefix, const char *nam
 // Returns texDiscoverLoad's result (>= 0 hit, negative miss).
 int vcdLoadPopsCover(const char *scanPrefix, const char *value, const char *suffix, GSTEXTURE *resultTex);
 
-// ---- per-device VCD view -----------------------------------------------------------
-// The view state itself now lives in libview.h: which list a page shows became an N-way ring
-// (ISO / VCD / CUE / ELF) the moment a second PS1 core arrived, and a boolean "is it VCD?" helper
-// could only answer that question wrongly for the new stops. Ask libViewActive(mode) == LIB_VIEW_VCD.
+// ---- PS1 list display --------------------------------------------------------------
+// The view state itself lives in libview.h; ask libViewActive(mode) == LIB_VIEW_PS1. Note that one
+// PS1 list holds BOTH cores' titles, so "is this page showing PS1" and "is this row a .VCD" are
+// different questions -- the second is a property of the ROW (cueIsCueEntry, cuesupport.h).
+//
+// Sort/display key for a PS1 row's name: skips the leading game-ID prefix while gVcdHideGameId is
+// on, so the visible order matches the visible text. Returns a pointer INTO `name`. Exported so the
+// merged PS1 list sorts by exactly the rule the VCD-only scan always used -- one definition of it,
+// not two that can drift apart.
+const char *vcdSortKey(const char *name);
 //
 // Display-only: strip a leading PS1 game-ID prefix from a VCD list name when the gVcdHideGameId
 // setting is on and `mode` is showing its VCD list; returns `text` unchanged otherwise. COSMETIC --

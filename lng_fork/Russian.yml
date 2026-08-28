@@ -41,8 +41,8 @@ translations:
   WRITE_POPSTARTER_NET: Записать сетевую конфигурацию POPSTARTER
   HINT_WRITE_POPSTARTER_NET: Также сохранить значения IP + SMB в IPCONFIG.DAT / SMBCONFIG.DAT POPSTARTER на карте памяти (для VCD через SMB).
   POPSTARTER_NET_ERR: Не удалось записать сетевую конфигурацию POPSTARTER на карту памяти.
-  VCD: VCD
-  VCD_ON: Показаны VCD-игры
+  VCD: PS1
+  VCD_ON: Показаны PS1-игры
   VCD_OFF: Показаны дисковые игры
   NEUTRINO_ARGS: Аргументы запуска Neutrino
   HINT_NEUTRINO_ARGS: Дополнительные флаги Neutrino через пробел (напр. -mt=dvd). Глобальные применяются ко всем играм; игровые добавляются поверх. Префикс $ отключает флаг без удаления.

@@ -41,8 +41,8 @@ translations:
   WRITE_POPSTARTER_NET: Spremi POPSTARTER mrežnu konfiguraciju
   HINT_WRITE_POPSTARTER_NET: Spremi ove IP + SMB vrijednosti i u POPSTARTER-ove IPCONFIG.DAT / SMBCONFIG.DAT na memorijskoj kartici (za VCD-over-SMB).
   POPSTARTER_NET_ERR: Nije moguće zapisati POPSTARTER mrežnu konfiguraciju na memorijsku karticu.
-  VCD: VCD
-  VCD_ON: Prikazuju se VCD igre
+  VCD: PS1
+  VCD_ON: Prikazuju se PS1 igre
   VCD_OFF: Prikazuju se disk igre
   NEUTRINO_ARGS: Neutrino Argumenti pokretanja
   HINT_NEUTRINO_ARGS: Dodatne Neutrino zastavice, odvojene razmacima (npr. -mt=dvd). Globalno vrijedi za sve igre; po igri dodaje na vrh. Prefiks zastavice s $ onemogućuje je bez brisanja.

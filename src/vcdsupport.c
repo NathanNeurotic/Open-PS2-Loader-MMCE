@@ -178,7 +178,7 @@ const char *vcdDisplayName(int mode, const char *text)
     // VCD rows only, and deliberately so: the game-ID prefix this strips is a POPSTARTER/.VCD
     // filename convention. A CUE row's name is an Ember game FOLDER, which carries no such prefix
     // and must never be trimmed by this option.
-    if (!gVcdHideGameId || text == NULL || libViewActive(mode) != LIB_VIEW_VCD)
+    if (!gVcdHideGameId || text == NULL || libViewActive(mode) != LIB_VIEW_PS1)
         return text;
     n = vcdGameIdPrefixLen(text);
     return n ? text + n : text;
@@ -188,6 +188,13 @@ const char *vcdDisplayName(int mode, const char *text)
 // uses (strcasecmp on the SAME display-adjusted key -- menusys.c was updated alongside this to sort by
 // vcdDisplayName), or the two disagree and the menu-level gAutosort pass, which runs LAST, silently
 // undoes this backing array's order.
+const char *vcdSortKey(const char *name)
+{
+    if (name == NULL)
+        return name;
+    return gVcdHideGameId ? name + vcdGameIdPrefixLen(name) : name;
+}
+
 static int vcdEntryCmp(const void *a, const void *b)
 {
     const char *na = ((const vcd_entry_t *)a)->name;
@@ -198,10 +205,8 @@ static int vcdEntryCmp(const void *a, const void *b)
     // part in the alphabet"). Skip the same prefix here so the visible order matches the visible text.
     // With hide off, the prefix IS shown, so it stays part of the sort key. vcdGameIdPrefixLen returns
     // 0 for a name without a strict game-ID prefix, so untagged titles are unaffected either way.
-    if (gVcdHideGameId) {
-        na += vcdGameIdPrefixLen(na);
-        nb += vcdGameIdPrefixLen(nb);
-    }
+    na = vcdSortKey(na);
+    nb = vcdSortKey(nb);
     return strcasecmp(na, nb);
 }
 

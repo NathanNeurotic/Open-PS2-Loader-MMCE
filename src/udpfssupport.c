@@ -129,7 +129,7 @@ static int udpfsNeedsUpdate(item_list_t *itemList)
     // Folder browsing: descend/ascend forces one rescan.
     if (folderConsumeDirty(itemList->mode))
         return 1;
-    if (libListViewActive(itemList) == LIB_VIEW_VCD)
+    if (libListViewActive(itemList) == LIB_VIEW_PS1)
         return 0;
 
     if (udpfsULSizePrev == -2)
@@ -176,7 +176,7 @@ static int udpfsUpdateGameList(item_list_t *itemList)
         udpfsFoldersCreated = 1;
     }
 
-    if (libListViewActive(itemList) == LIB_VIEW_VCD) {
+    if (libListViewActive(itemList) == LIB_VIEW_PS1) {
         int r = vcdFillGameList(udpfsPrefix, &udpfsGames);
         if (r >= 0) // r < 0: transient scan failure -> preserve the last-good list
             udpfsGameCount = r;
@@ -212,7 +212,7 @@ static int udpfsGetGameNameLength(item_list_t *itemList, int id)
 static char *udpfsGetGameStartup(item_list_t *itemList, int id)
 {
     // VCD view keys per-game data (CFG/art) off the VCD filename, not a disc ID (see sbPopulateConfig).
-    if (libListViewActive(itemList) == LIB_VIEW_VCD)
+    if (libListViewActive(itemList) == LIB_VIEW_PS1)
         return udpfsGames[id].name;
     return udpfsGames[id].startup;
 }
@@ -255,7 +255,7 @@ static void udpfsLaunchGame(item_list_t *itemList, int id, config_set_t *configS
     sbSetBrowseSub(folderGetSub(itemList->mode));
 
     // VCD view: udpfs cannot host a POPSTARTER launch (network filesystem) -> hand off to the guard.
-    if (game != NULL && (libListViewActive(itemList) == LIB_VIEW_VCD)) {
+    if (game != NULL && (libListViewActive(itemList) == LIB_VIEW_PS1)) {
         udpfsLaunchVcd(itemList, game->name, configSet);
         return;
     }
@@ -368,7 +368,7 @@ static int udpfsGetImage(item_list_t *itemList, char *folder, int isRelative, ch
     else
         snprintf(path, sizeof(path), "%s%s_%s", folder, value, suffix);
     int r = texDiscoverLoad(resultTex, path, -1);
-    if (r == ERR_BAD_FILE && isRelative && (libListViewActive(itemList) == LIB_VIEW_VCD))
+    if (r == ERR_BAD_FILE && isRelative && (libListViewActive(itemList) == LIB_VIEW_PS1))
         r = vcdLoadPopsCover(udpfsPrefix, value, suffix, resultTex);
     return r;
 }

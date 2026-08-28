@@ -377,7 +377,7 @@ static void favFreeArray(void)
 // shifted -- purely cosmetic on the source page; the FAV record + launch are unaffected either way.
 static void favVcdMarkStar(opl_io_module_t *mod, int id, const char *text)
 {
-    if (mod == NULL || mod->support == NULL || libViewActive(mod->support->mode) != LIB_VIEW_VCD)
+    if (mod == NULL || mod->support == NULL || libViewActive(mod->support->mode) != LIB_VIEW_PS1)
         return;
     submenu_list_t *src = submenuFindItemByIdAndText(mod->subMenu, id, text);
     if (src != NULL)
@@ -490,7 +490,7 @@ static item_list_t *favResolve(int mode, int id, const char *text, int isVcd, in
                 continue;
             int liveId = id;
             if (favResolveStoredId(mod->support, id, text, 0, &liveId)) {
-                if (libViewActive(mod->support->mode) != LIB_VIEW_VCD) {
+                if (libViewActive(mod->support->mode) != LIB_VIEW_PS1) {
                     submenu_list_t *src = submenuFindItemByIdAndText(mod->subMenu, liveId, text);
                     if (src != NULL)
                         src->item.favourited = 1;
@@ -513,7 +513,7 @@ static item_list_t *favResolve(int mode, int id, const char *text, int isVcd, in
     if (!favResolveStoredId(mod->support, id, text, 0, &liveId))
         return NULL;
 
-    if (libViewActive(mod->support->mode) != LIB_VIEW_VCD) {
+    if (libViewActive(mod->support->mode) != LIB_VIEW_PS1) {
         submenu_list_t *src = submenuFindItemByIdAndText(mod->subMenu, liveId, text);
         if (src != NULL)
             src->item.favourited = 1;
@@ -574,7 +574,7 @@ static int favUpdateItemList(item_list_t *itemList)
     // also restores the star on the source submenu. Filtering first meant a saved VCD record was never
     // resolved while FAV itself was in ISO view, so rebuilding the HDD list on an L3 toggle erased the
     // visible star and loadFavourites() could not put it back (#495).
-    int favVcdView = (libViewActive(FAV_MODE) == LIB_VIEW_VCD);
+    int favVcdView = (libViewActive(FAV_MODE) == LIB_VIEW_PS1);
     for (int i = 0; i < rawCount; i++) {
         int resolvedMode = recs[i].mode;
         int resolvedId = recs[i].id;

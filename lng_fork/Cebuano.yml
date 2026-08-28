@@ -41,8 +41,8 @@ translations:
   WRITE_POPSTARTER_NET: I-sulat ang POPSTARTER Network Config
   HINT_WRITE_POPSTARTER_NET: I-save usab kining IP + SMB share nga mga kantidad sa kaugalingon nga IPCONFIG.DAT / SMBCONFIG.DAT sa POPSTARTER sa memory card (para sa VCD-over-SMB).
   POPSTARTER_NET_ERR: Dili ma-sulat ang POPSTARTER network config sa memory card.
-  VCD: VCD
-  VCD_ON: Gipakita ang VCD games
+  VCD: PS1
+  VCD_ON: Gipakita ang PS1 games
   VCD_OFF: Gipakita ang disc games
   NEUTRINO_ARGS: Neutrino Launch Args
   HINT_NEUTRINO_ARGS: Dugang Neutrino flags, gibulag og espasyo (hal. -mt=dvd). Global alang sa tanan nga laro; per-game dugang pa. Ibutang ang $ sa unahan sa flag aron ma-disable nga dili pa ma-delete.

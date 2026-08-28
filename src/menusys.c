@@ -1485,7 +1485,7 @@ static void menuRenderElements(theme_elems_t *elems)
     // Deep VCD ID inspection is cosmetic and must be explicit-theme-demand only. ItemText is
     // the sole render element that consumes vcdDisplayIdCached(), so a family without ItemText does
     // zero .VCD opens/seeks here. The resolver itself is opportunistic and yields to art/BGM.
-    if (elems->needsVcdDisplayId && list != NULL && (libViewActive(list->mode) == LIB_VIEW_VCD) &&
+    if (elems->needsVcdDisplayId && list != NULL && (libViewActive(list->mode) == LIB_VIEW_PS1) &&
         selected_item->item->current != NULL) {
         char *vcdName = list->itemGetStartup(list, selected_item->item->current->item.id);
         if (vcdName != NULL)
@@ -1512,7 +1512,7 @@ static void menuRenderElements(theme_elems_t *elems)
 // guard so the two paths cannot drift again.
 static theme_elems_t *menuGetInfoElems(item_list_t *list)
 {
-    if (list != NULL && (libViewActive(list->mode) == LIB_VIEW_VCD))
+    if (list != NULL && (libViewActive(list->mode) == LIB_VIEW_PS1))
         return gTheme->vcdInfoElems.first ? &gTheme->vcdInfoElems : &gTheme->infoElems;
     if (list != NULL && list->mode == FAV_MODE)
         return gTheme->favsInfoElems.first ? &gTheme->favsInfoElems : &gTheme->infoElems;
@@ -1523,7 +1523,7 @@ static theme_elems_t *menuGetInfoElems(item_list_t *list)
 
 static theme_elems_t *menuGetMainElems(item_list_t *list)
 {
-    if (list != NULL && (libViewActive(list->mode) == LIB_VIEW_VCD))
+    if (list != NULL && (libViewActive(list->mode) == LIB_VIEW_PS1))
         return gTheme->vcdMainElems.first ? &gTheme->vcdMainElems : &gTheme->mainElems;
     if (list != NULL && list->mode == FAV_MODE)
         return gTheme->favsMainElems.first ? &gTheme->favsMainElems : &gTheme->mainElems;
@@ -1536,7 +1536,7 @@ void menuRenderMain(void)
 {
     item_list_t *list = selected_item->item->userdata;
 
-    if (libViewActive(list->mode) == LIB_VIEW_VCD) {
+    if (libViewActive(list->mode) == LIB_VIEW_PS1) {
         // VCD/PS1 listings render with the vcd family (vcdMain*; each slot falls back at parse time to
         // appsMain* then main*). The VCD list uses its OWN items-list slot (vcdItemsList) so it keeps a
         // SEPARATE cover cache from the device's ISO list -- the view reuses the device's game list
@@ -1647,7 +1647,7 @@ void menuRenderInfo(void)
 {
     item_list_t *list = selected_item->item->userdata;
 
-    if (libViewActive(list->mode) == LIB_VIEW_VCD) {
+    if (libViewActive(list->mode) == LIB_VIEW_PS1) {
         menuRenderElements(menuGetInfoElems(list));
         gTheme->itemsList = thmResolveItemsList(&gTheme->vcdInfoElems, gTheme->vcdItemsList ? gTheme->vcdItemsList : gTheme->gamesItemsList, selected_item->item->icon_id);
     } else if (list->mode == FAV_MODE) {
@@ -1767,7 +1767,7 @@ static int gameMenuCoreIsNeutrino(void)
     // be blocked under a Neutrino global default.
     if (selected_item != NULL && selected_item->item != NULL) {
         item_list_t *support = (item_list_t *)selected_item->item->userdata;
-        if (support != NULL && ((libViewActive(support->mode) == LIB_VIEW_VCD) || support->mode == ETH_MODE))
+        if (support != NULL && ((libViewActive(support->mode) == LIB_VIEW_PS1) || support->mode == ETH_MODE))
             return 0;
     }
     // UDPBD games are Neutrino-only even while $CoreLoader is still its OPL default.

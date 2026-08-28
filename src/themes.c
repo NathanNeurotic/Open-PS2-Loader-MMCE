@@ -1855,7 +1855,7 @@ static void drawItemText(struct menu_list *menu, struct submenu_list *item, conf
                 // ONLY (vcdDisplayIdCached): the id is resolved off the render thread
                 // (vcdRequestDisplayId, menusys.c), so a slow device never blocks here; until it
                 // lands, the filename's own id prefix is shown, then the title as before.
-                if (libViewActive(support->mode) == LIB_VIEW_VCD) {
+                if (libViewActive(support->mode) == LIB_VIEW_PS1) {
                     char vcdId[VCD_ID_MAX];
                     if (vcdDisplayIdCached(startup, vcdId, sizeof(vcdId)) ||
                         vcdExtractGameId(startup, vcdId, sizeof(vcdId))) {

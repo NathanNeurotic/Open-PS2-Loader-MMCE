@@ -425,7 +425,7 @@ static void itemExecRefresh(struct menu_item *curMenu)
         if (support->mode == FAV_MODE) {
             loadFavourites();
         } else {
-            if (support->mode == HDD_MODE && (libListViewActive(support) == LIB_VIEW_VCD))
+            if (support->mode == HDD_MODE && (libListViewActive(support) == LIB_VIEW_PS1))
                 hddVcdInvalidateCache();
             ioPutRequest(IO_MENU_UPDATE_DEFFERED, &support->mode);
         }
@@ -458,7 +458,7 @@ static void itemExecToggleView(struct menu_item *curMenu)
     cacheDropQueuedArt();
 
     sfxPlay(SFX_CONFIRM);
-    guiWarning((libViewActive(support->mode) == LIB_VIEW_VCD) ? _l(_STR_VCD_ON) : _l(_STR_VCD_OFF), 2);
+    guiWarning((libViewActive(support->mode) == LIB_VIEW_PS1) ? _l(_STR_VCD_ON) : _l(_STR_VCD_OFF), 2);
     ioPutRequest(IO_MENU_UPDATE_DEFFERED, &support->mode);
 }
 
@@ -508,7 +508,7 @@ static void itemExecSquare(struct menu_item *curMenu)
         // Direct HDD/HDL rows already carry their size in APA metadata (total_size_in_kb), so the
         // generic CFG+stat pass is redundant there. VCD rows likewise have no meaningful #Size.
         // Avoid putting either no-op read onto the shared IO worker merely for opening Info.
-        if (support == NULL || (libListViewActive(support) != LIB_VIEW_VCD && support->mode != HDD_MODE))
+        if (support == NULL || (libListViewActive(support) != LIB_VIEW_PS1 && support->mode != HDD_MODE))
             menuRequestInfoSize();
         guiSwitchScreen(GUI_SCREEN_INFO);
     }
@@ -541,7 +541,7 @@ static void itemExecFav(struct menu_item *curMenu)
     } else {
         // A favourite captured while the device page is in its L3 VCD view is a PS1/.VCD favourite
         // (checklist item 12; the stub keeps isVcd at 0 until VCD views exist).
-        int isVcd = (libViewActive(support->mode) == LIB_VIEW_VCD) ? 1 : 0;
+        int isVcd = (libViewActive(support->mode) == LIB_VIEW_PS1) ? 1 : 0;
         // Only on a device whose VCD favourites can actually be resolved/launched later: storing one
         // on a device without itemLaunchVcd would leave a permanently-hidden, unlaunchable record.
         if (isVcd && support->itemLaunchVcd == NULL)
@@ -574,7 +574,7 @@ static void itemExecTriangle(struct menu_item *curMenu)
         // A VCD is a POPSTARTER title, not a PS2-loader title. Route before the generic per-game
         // settings branch: that branch loads/creates CFG state and exposes controls that can never
         // affect a POPSTARTER handoff. libListViewActive also covers a forced-VCD Favourites proxy.
-        if (libListViewActive(support) == LIB_VIEW_VCD) {
+        if (libListViewActive(support) == LIB_VIEW_PS1) {
             if (menuCheckParentalLock() == 0) {
                 menuInitVcdMenu();
                 guiSwitchScreen(GUI_SCREEN_APP_MENU);

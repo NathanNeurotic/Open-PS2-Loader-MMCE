@@ -41,8 +41,8 @@ translations:
   WRITE_POPSTARTER_NET: POPSTARTER hálózati konfiguráció írása
   HINT_WRITE_POPSTARTER_NET: Az IP + SMB megosztási értékek mentése a POPSTARTER saját IPCONFIG.DAT / SMBCONFIG.DAT fájljaiba a memóriakártyán (SMB-n keresztüli VCD-hez).
   POPSTARTER_NET_ERR: Nem sikerült a POPSTARTER hálózati konfigurációt a memóriakártyára írni.
-  VCD: VCD
-  VCD_ON: VCD játékok megjelenítése
+  VCD: PS1
+  VCD_ON: PS1 játékok megjelenítése
   VCD_OFF: Lemezes játékok megjelenítése
   NEUTRINO_ARGS: Neutrino indítási argumentumok
   HINT_NEUTRINO_ARGS: 'Extra Neutrino jelzők, szóközzel elválasztva (pl. -mt=dvd). A globális minden játékra vonatkozik; a játékonkénti hozzáadódik. Egy jelző elé írj $ jelet a letiltásához törlés nélkül.'

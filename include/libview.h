@@ -6,11 +6,16 @@
   Library view state: which of a page's several lists is on screen, and the L3 ring that moves
   between them.
 
-  This replaces the binary per-mode VCD flag that used to live in vcdsupport.c. That flag answered
-  one yes/no question -- "is this page showing its VCD list?" -- which stopped being expressible the
-  moment a page could show a THIRD list (CUE, PS1 via Ember). A retained boolean helper would have
-  answered "no" for a CUE page and routed CUE rows down the ISO path, silently. The whole point of
-  this file is that every caller now names the view it means.
+  There are exactly two stops: PS2 discs, and PS1. The PS1 stop is deliberately ONE list holding
+  BOTH PS1 cores' titles -- POPSTARTER *.VCD entries and Ember game folders, interleaved and sorted
+  together. A user thinks "PS1", not "which emulator", so the front end does too; which core launches
+  a given row is a property of the ROW, resolved at launch time, and never of the page.
+
+  This replaces the binary per-mode VCD flag that used to live in vcdsupport.c. That flag was named
+  for one of the two cores, and every caller had to ask "is it VCD?" to mean "is it PS1?". The ring
+  machinery below is kept general (supported-stop set, wrap-around advance) so a genuinely separate
+  third list can be added later without another rewrite -- but adding one is a UI decision, not a
+  consequence of supporting another core.
 
   A page's ring is the ordered set of views it supports. L3 advances one stop and wraps. The global
   gDefaultGameView setting can PIN every page that has a given stop to it, which makes L3 inert --
@@ -27,10 +32,8 @@
 #include "include/iosupport.h"
 
 enum LIB_VIEW {
-    LIB_VIEW_ISO = 0, // disc games: PS2 ISO / ZSO / UL / HDL
-    LIB_VIEW_VCD,     // PS1 via POPSTARTER (*.VCD)
-    LIB_VIEW_CUE,     // PS1 via Ember (a game folder holding *.cue / *.bin / *.exe)
-    LIB_VIEW_ELF,     // homebrew ELFs
+    LIB_VIEW_ISO = 0, // PS2 disc games: ISO / ZSO / UL / HDL
+    LIB_VIEW_PS1,     // PS1 titles, BOTH cores together (see the note above)
     LIB_VIEW_COUNT
 };
 
@@ -40,7 +43,7 @@ int libViewSupported(int mode, int view);
 
 // How many stops this mode's ring has. 1 means there is nothing to toggle: L3 is inert and the
 // on-screen hint is suppressed. Callers that used to ask "does this device have a VCD view" to
-// decide whether to offer the toggle want THIS, not libViewSupported(mode, LIB_VIEW_VCD) -- the two
+// decide whether to offer the toggle want THIS, not libViewSupported(mode, LIB_VIEW_PS1) -- the two
 // stopped meaning the same thing once a page could have more than two lists.
 int libViewRingSize(int mode);
 

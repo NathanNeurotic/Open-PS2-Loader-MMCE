@@ -6,8 +6,9 @@
   Library view state + the L3 ring. See include/libview.h for the contract.
 
   Ported from the binary vcdView[]/vcdDirty[] pair that lived in vcdsupport.c. Behaviour is
-  deliberately IDENTICAL to that flag while the ring holds only ISO and VCD; the CUE and ELF stops
-  are declared but not yet offered, so this file changes structure and nothing else.
+  deliberately IDENTICAL to that flag: the same two stops on the same pages. What changed is that
+  the second stop is now named for what it shows the user (PS1) rather than for one of the two
+  cores that can launch a row in it.
 */
 
 #include <string.h>
@@ -28,33 +29,28 @@ int libViewSupported(int mode, int view)
         case LIB_VIEW_ISO:
             // Every page's base list.
             //
-            // APPS is the standing exception in waiting: its only list is ELF, so its ring becomes
-            // a single ELF stop when that view is introduced. Until then it reports ISO here, which
-            // reproduces the old flag exactly -- appsupport never asked for the view at all, and
-            // the old boolean helper reported ISO for APP_MODE. Nothing reads it either way.
+            // APPS has one list and no ring, so it simply reports its base stop here and L3 stays
+            // inert on it -- exactly what the old flag did, and appsupport never asks for the view
+            // at all.
             return 1;
 
-        case LIB_VIEW_VCD:
-            // Unchanged from the old VCD-capability test: USB / exFAT, MMCE, MX4SIO, iLink, SMB, ATA
-            // (BDM HDD), APA / PFS HDD, and FAV_MODE.
+        case LIB_VIEW_PS1:
+            // USB / exFAT, MMCE, MX4SIO, iLink, SMB, ATA (BDM HDD), APA / PFS HDD, and FAV_MODE.
             //
             // FAV_MODE has a ring of its own: the Favourites tab swaps between disc favourites and
             // PS1 favourites, and its slot is independent of any device's, so toggling Favourites
             // never disturbs a device page's view.
             //
-            // UDPBD is excluded because POPSTARTER cannot bring a network block device back up
-            // after its own IOP reset. That reasoning is POPSTARTER-specific and does NOT carry
-            // over to the CUE stop below -- Ember never resets, so it keeps whatever mount it is
-            // handed. Do not "tidy" the two cases into one.
+            // UDPBD is excluded, and the reason is POPSTARTER-specific: it cannot bring a network
+            // block device back up after its own IOP reset. Ember has no reset and keeps whatever
+            // mount it is handed, so an Ember title on UDPBD should in principle work. The stop is
+            // still withheld here because a PS1 page on UDPBD would list POPSTARTER titles that
+            // cannot launch alongside Ember ones that can -- half a working list is worse than
+            // none. Revisit as a per-ROW rule once the Ember launch is hardware-proven, not by
+            // flipping this line.
             if (mode >= BDM_MODE && mode <= BDM_MODE_LAST)
                 return !bdmModeIsUDPBD(mode);
             return mode == MMCE_MODE || mode == ETH_MODE || mode == HDD_MODE || mode == FAV_MODE;
-
-        case LIB_VIEW_CUE:
-            return 0; // introduced with the Ember library scan
-
-        case LIB_VIEW_ELF:
-            return 0; // introduced with the Favourites ELF stop
 
         default:
             return 0;
@@ -81,7 +77,7 @@ static int libViewPinned(void)
     if (gDefaultGameView == GAME_VIEW_ISO)
         return LIB_VIEW_ISO;
     if (gDefaultGameView == GAME_VIEW_VCD)
-        return LIB_VIEW_VCD;
+        return LIB_VIEW_PS1;
     return -1;
 }
 
@@ -109,7 +105,7 @@ int libListViewActive(const item_list_t *itemList)
     if (itemList->viewOverride == ITEM_VIEW_FORCE_ISO)
         return LIB_VIEW_ISO;
     if (itemList->viewOverride == ITEM_VIEW_FORCE_VCD)
-        return LIB_VIEW_VCD;
+        return LIB_VIEW_PS1;
 
     return libViewActive(itemList->mode);
 }

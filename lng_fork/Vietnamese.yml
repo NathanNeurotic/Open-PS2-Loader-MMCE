@@ -41,8 +41,8 @@ translations:
   WRITE_POPSTARTER_NET: Ghi cấu hình mạng POPSTARTER
   HINT_WRITE_POPSTARTER_NET: Cũng lưu các giá trị IP + SMB vào IPCONFIG.DAT / SMBCONFIG.DAT của POPSTARTER trên thẻ nhớ (dành cho VCD qua SMB).
   POPSTARTER_NET_ERR: Không thể ghi cấu hình mạng POPSTARTER vào thẻ nhớ.
-  VCD: VCD
-  VCD_ON: Đang hiển thị game VCD
+  VCD: PS1
+  VCD_ON: Đang hiển thị game PS1
   VCD_OFF: Đang hiển thị game đĩa
   NEUTRINO_ARGS: Tham số khởi động Neutrino
   HINT_NEUTRINO_ARGS: Cờ Neutrino bổ sung, cách nhau bằng dấu cách (vd. -mt=dvd). Toàn cục áp dụng cho tất cả game; riêng game cộng thêm. Thêm $ trước cờ để tắt mà không xóa.
