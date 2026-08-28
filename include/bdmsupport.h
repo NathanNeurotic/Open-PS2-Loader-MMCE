@@ -1,6 +1,10 @@
 #ifndef __BDM_SUPPORT_H
 #define __BDM_SUPPORT_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "include/iosupport.h"
 
 #define BDM_MODE_UPDATE_DELAY MENU_UPD_DELAY_GENREFRESH
@@ -196,4 +200,10 @@ int bdmReadDriverName(int dir, char *driverName, int driverNameLength);
  * private bdm_device_data_t, which a background rescan rewrites.
  */
 int bdmModeIsSIO2(int mode);
+
+#ifdef __cplusplus
+}
 #endif
+
+#endif
+

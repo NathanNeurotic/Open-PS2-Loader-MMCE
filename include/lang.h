@@ -1,6 +1,10 @@
 #ifndef __LANG_H
 #define __LANG_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "lang_autogen.h"
 
 // Maximum external languages supported
@@ -28,4 +32,9 @@ int lngFindGuiID(const char *lang);
 char **lngGetGuiList(void);
 char *lngGetFilePath(int langID);
 
+#ifdef __cplusplus
+}
 #endif
+
+#endif
+

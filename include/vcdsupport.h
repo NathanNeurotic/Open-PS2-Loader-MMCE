@@ -12,6 +12,10 @@
 #ifndef __VCDSUPPORT_H
 #define __VCDSUPPORT_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "include/iosupport.h"
 #include "include/supportbase.h" // base_game_info_t (for vcdFillGameList)
 
@@ -261,4 +265,9 @@ vcd_popsnet_ensure_t vcdPreparePopstarterSmbLaunch(const char *smbPrefix);
 // Render the RetroGEM Game ID optical barcode immediately prior to a POPStarter VCD launch.
 void vcdPrepareRetroGemBarcode(const char *vcdPath);
 
+#ifdef __cplusplus
+}
 #endif
+
+#endif
+

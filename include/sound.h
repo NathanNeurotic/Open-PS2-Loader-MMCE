@@ -1,6 +1,10 @@
 #ifndef __SOUND_H
 #define __SOUND_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 enum SFX {
     SFX_BOOT = 0,
     SFX_CANCEL,
@@ -45,4 +49,9 @@ void bgmUnMute(void);
  * why the art worst-open latch samples it separately. */
 extern volatile int gBgmInRead;
 
+#ifdef __cplusplus
+}
 #endif
+
+#endif
+

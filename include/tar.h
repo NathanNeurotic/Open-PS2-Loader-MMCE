@@ -1,6 +1,10 @@
 #ifndef __TAR_H
 #define __TAR_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // Lazy .tar archive loader (ART/CFG/CHT), ported from wOPL (author: mystyq).
 // RiptOPL wires ONLY the ART kind, behind the user toggle gEnableArtTar (default OFF);
 // the CFG/CHT kinds are kept intact so they can be wired later with no engine change.
@@ -85,4 +89,9 @@ void tarInvalidate(TarKind kind);
 
 const char *tarGetDevicePrefix(TarKind kind);
 
+#ifdef __cplusplus
+}
 #endif
+
+#endif
+

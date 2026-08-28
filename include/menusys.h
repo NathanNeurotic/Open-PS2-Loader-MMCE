@@ -1,6 +1,10 @@
 #ifndef __MENUSYS_H
 #define __MENUSYS_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "include/config.h"
 #include "include/dia.h"
 
@@ -151,4 +155,9 @@ void menuRemoveHints(menu_item_t *menu);
 int menuSetParentalLockCheckState(int enabled);
 int menuCheckParentalLock(void);
 
+#ifdef __cplusplus
+}
 #endif
+
+#endif
+

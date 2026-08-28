@@ -1,6 +1,10 @@
 #ifndef __APP_SUPPORT_H
 #define __APP_SUPPORT_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "include/iosupport.h"
 
 #define APP_MODE_UPDATE_DELAY 240
@@ -36,4 +40,9 @@ item_list_t *appGetObject(int initOnly);
 void appPostUpdateCallback(int mode);
 int appGetArtMode(const char *startup);
 
+#ifdef __cplusplus
+}
 #endif
+
+#endif
+

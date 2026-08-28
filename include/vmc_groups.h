@@ -1,6 +1,10 @@
 #ifndef VMC_GROUPS_H
 #define VMC_GROUPS_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 
 /**
  * @brief Finds the Group ID associated with a given Title ID.
@@ -16,4 +20,10 @@
  * otherwise, a const char* pointer to the original titleId parameter.
  */
 const char *getGroupIdForTitleId(const char *titleId);
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif // VMC_GROUPS_H
+

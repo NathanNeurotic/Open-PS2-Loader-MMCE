@@ -1,6 +1,10 @@
 #ifndef EXTERN_IRX_H
 #define EXTERN_IRX_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define IMPORT_BIN2C(_n) \
     extern void *_n[];   \
     extern int size_##_n
@@ -156,4 +160,9 @@ IMPORT_BIN2C(usb_pademu_irx);
 
 IMPORT_BIN2C(xhdd_irx);
 
+#ifdef __cplusplus
+}
 #endif
+
+#endif
+

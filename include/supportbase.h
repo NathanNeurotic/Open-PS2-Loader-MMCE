@@ -1,6 +1,10 @@
 #ifndef __SUPPORT_BASE_H
 #define __SUPPORT_BASE_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "include/system.h" // neutrino_vmc_args_t
 
 #define UL_GAME_NAME_MAX       32
@@ -110,4 +114,9 @@ void neutrinoArgsAssemble(const neutrino_args_t *na, char *out, int outSize);
 // BEFORE deinit frees it. vmcPrefix = the device prefix VMC/ lives under.
 void sbBuildVmcNeutrinoArgs(config_set_t *configSet, const char *vmcPrefix, neutrino_vmc_args_t *vmcArgs);
 
+#ifdef __cplusplus
+}
 #endif
+
+#endif
+
