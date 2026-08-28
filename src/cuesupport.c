@@ -258,6 +258,18 @@ void cueApplyDisplaySetting(const char *devPrefix)
         close(fd);
         if (len < 0)
             len = 0;
+        // A read that FILLED the buffer means the file may continue past what we hold. Rewriting
+        // from that prefix would O_TRUNC away everything beyond it -- silently deleting settings
+        // that belong to the user or to a future Ember, which is the exact opposite of this
+        // function's promise to preserve them. Leave the file completely alone instead.
+        //
+        // An Ember settings.txt is a couple of short lines, so this is a pathological case rather
+        // than a real one; a file that big is a reason to keep our hands off it, not to grow a
+        // buffer. Refusing an exactly-full read costs nothing but the display key this launch.
+        if (len == (int)sizeof(before) - 1) {
+            LOG("[CUE] %s is larger than we can safely rewrite -- left untouched\n", path);
+            return;
+        }
     }
     before[len] = 0;
 

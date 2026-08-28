@@ -1355,6 +1355,14 @@ int guiShowVcdUsbMode(void)
 // network settings are chained sub-dialogs (guiShowBdmaConfig / guiShowVcdListConfig /
 // guiShowPopsNetConfig). CFG ids are shared with the old rows, so saved config values map through
 // unchanged.
+// SUPERSEDED AND UNREFERENCED. The live PS Emulation Settings page is guiSettingsShowPopstarter(),
+// which COMPOSES a copy of diaVcdConfig + diaBdmaConfig and drives that copy. Nothing calls this
+// function any more; it is kept only because its declaration is still published in gui.h.
+//
+// Wiring a new row here does NOTHING. That mistake was made once already, with CFG_EMBER_DISPLAY:
+// the row rendered on the composed page with no enum list and never saved, because its diaSetEnum
+// ran against the template in here instead of against the composed `ui`. Add new rows to
+// guiSettingsShowPopstarter().
 void guiShowVcdConfig(void)
 {
     // POPSTARTER.ELF device TYPE (POPS_DEV_*). MUST stay in sync with vcdResolvePopstarter() (vcdsupport.c).
@@ -3010,11 +3018,19 @@ static int guiSettingsShowPopstarter(void)
     const struct UIItem *parts[] = {diaVcdConfig, diaBdmaConfig};
     const int skipIDs[] = {VCD_BDMA_BUTTON};
     const char *popsDevStrs[] = {_l(_STR_DEFAULT), "Memory Card", "USB", "MX4SIO", "MMCE", "HDD (exFAT)", "HDD (APA)", "Custom", _l(_STR_GAMES_DEVICE), NULL};
+    const char *emberDisplayStrs[] = {_l(_STR_DEFAULT), "240p", "480p", NULL};
     struct UIItem *ui = guiSettingsCompose(parts, 2, skipIDs, 1, -1, 1);
     int result;
 
     if (ui == NULL)
         return 0;
+
+    // Ember's display mode. This MUST be set on `ui` -- the composed COPY -- not on the diaVcdConfig
+    // template it was built from: the copy is what renders and what diaGetInt reads back. Setting
+    // the template instead leaves the row on screen with no enum list and silently discards every
+    // change, which is exactly the bug this line replaced.
+    diaSetEnum(ui, CFG_EMBER_DISPLAY, emberDisplayStrs);
+    diaSetInt(ui, CFG_EMBER_DISPLAY, gEmberDisplay);
 
     diaSetEnum(ui, CFG_POPSTARTER_DEVICE, popsDevStrs);
     diaSetInt(ui, CFG_POPSTARTER_DEVICE, gPopstarterDevice);
@@ -3044,6 +3060,7 @@ reshow_popstarter:
 
         diaGetInt(ui, CFG_POPSTARTER_DEVICE, &gPopstarterDevice);
         diaGetInt(ui, CFG_POPSTARTER_RETROGEM_GAMEID, &gPopstarterRetroGemGameID);
+        diaGetInt(ui, CFG_EMBER_DISPLAY, &gEmberDisplay);
         diaGetString(ui, CFG_POPSTARTER_PATH, tmpPop, sizeof(tmpPop));
         if (strncmp(tmpPop, gPopstarterPath, 31) != 0)
             snprintf(gPopstarterPath, sizeof(gPopstarterPath), "%s", tmpPop);
