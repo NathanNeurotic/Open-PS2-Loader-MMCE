@@ -209,6 +209,54 @@ int cueScanDir(const char *devPrefix, cue_entry_t **outList)
     return count;
 }
 
+// The extensions Ember's io_find_disc accepts, in ITS priority order (.cue beats .exe beats .bin).
+// We only test presence, so the order is documentation rather than logic -- but it is the reason a
+// folder holding just a .bin is still a valid game.
+static const char *const cueDiscExts[] = {".cue", ".exe", ".bin"};
+
+int cueGameHasImage(const char *devPrefix, const char *name)
+{
+    char gamesDir[288];
+    char gameDir[320];
+    struct dirent *de;
+    DIR *dir;
+    int found = 0;
+    unsigned int i;
+
+    if (devPrefix == NULL || name == NULL || name[0] == '\0')
+        return 0;
+
+    cueBuildGamesDir(devPrefix, gamesDir, sizeof(gamesDir));
+    if (gamesDir[0] == '\0')
+        return 0;
+    snprintf(gameDir, sizeof(gameDir), "%s/%s", gamesDir, name);
+
+    dir = opendir(gameDir);
+    if (dir == NULL) {
+        // The probe itself failed -- the folder may be there and merely unreadable this instant.
+        // Never let a failed PROBE block a launch: report "has an image" and let Ember be the judge.
+        LOG("[CUE] cannot probe '%s' -- launching anyway\n", gameDir);
+        return 1;
+    }
+
+    while (!found && (de = readdir(dir)) != NULL) {
+        int len = (int)strlen(de->d_name);
+        if (len < 5)
+            continue; // shortest possible match is "x.cue"
+        for (i = 0; i < sizeof(cueDiscExts) / sizeof(cueDiscExts[0]); i++) {
+            if (strcasecmp(de->d_name + len - 4, cueDiscExts[i]) == 0) {
+                found = 1;
+                break;
+            }
+        }
+    }
+    closedir(dir);
+
+    if (!found)
+        LOG("[CUE] '%s' holds no .cue/.bin/.exe\n", gameDir);
+    return found;
+}
+
 int cueIsCueEntry(const base_game_info_t *game)
 {
     return (game != NULL && strcasecmp(game->extension, CUE_ROW_EXTENSION) == 0);

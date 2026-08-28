@@ -8,9 +8,39 @@
   author's blessing.
 
   Ember's library sits at <device>:/EMBER/, the exact peer of POPSTARTER's <device>:/POPS/ -- one
-  folder at each activated device's root, sought the same way on every device class. The contents
-  differ (POPS holds loose *.VCD files; EMBER holds ember.elf, bios.bin and a games/ folder of
-  per-game directories) but nothing above the scan needs to care.
+  folder at each activated device's root, sought the same way on every device class. That is where
+  the resemblance ENDS, and the difference is not cosmetic:
+
+      POPS/   holds loose *.VCD FILES        -> scan for files, identity = basename minus ".VCD"
+      EMBER/  holds ember.elf, bios.bin and
+              a games/ folder of per-game
+              DIRECTORIES                    -> scan a subfolder for DIRECTORIES, identity = the
+                                                directory name (there is no extension to strip)
+
+  WHICH LAYOUTS EMBER ACCEPTS, AND WHY WE LIST ONLY ONE. Ember's resolver is looser than its README:
+  it tries "games/<arg>" and then "<arg>", and io_find_disc takes EITHER a directory containing a
+  *.cue / *.bin / *.exe OR such a file directly. So all four of these boot:
+
+      1. games/<Name>/            a directory holding the image   <- the README layout
+      2. games/<Name>.cue         a loose image file
+      3. <Name>/                  a directory beside ember.elf     <- via the "retry arg as path" leg
+      4. <Name>.cue               a loose file beside ember.elf    <- same leg
+
+  We deliberately list ONLY layout 1, because only layout 1 saves. main() calls memcard_init exactly
+  once, and always with the COMPOSED path "games/<arg>" -- never with wherever the disc was actually
+  found. The per-game cards are then "games/<arg>/MC1.vmc" and "MC2.vmc". So:
+
+      - layout 2 puts the cards under a FILE ("games/Spyro.cue/MC1.vmc"), which cannot exist;
+      - layouts 3 and 4 put the cards in "games/<Name>/", a directory unrelated to the disc that
+        was actually mounted from EMBER/<Name>/.
+
+  Those titles play and silently cannot save, which is a worse experience than not being offered --
+  and the user would blame RiptOPL, not the layout. Listing only layout 1 means every row we show is
+  a row that fully works. Do NOT "fix" this by widening the scan; widen it only if Ember's memory
+  card resolution changes to follow the resolved disc.
+
+  Note also that io_find_disc does not recurse: an image at games/<Name>/disc1/game.cue is NOT found.
+  One level only.
 
   ONE PS1 LIST, TWO CORES. A device page has two stops -- PS2 discs and PS1 -- and the PS1 stop
   lists both cores' titles together, sorted as one library:
@@ -99,6 +129,15 @@ int cueNameLaunchable(const char *name);
 // (contended bus): an absent EMBER folder is 0, "readable, nothing here", exactly as the VCD scan
 // treats an absent POPS folder -- so a device with only one of the two never looks like a failure.
 int cueScanDir(const char *devPrefix, cue_entry_t **outList);
+
+// Does this game folder actually hold something Ember can mount -- a *.cue, *.bin or *.exe at its
+// top level? Costs ONE directory read, so callers use it on the LAUNCH path only (before deinit,
+// while a dialog can still be drawn) and never on the scan path, where it would be one directory
+// read per row on every refresh -- unaffordable on MMCE and SMB. An empty or mis-filled folder is a
+// user mistake rather than a normal state, so paying for it once per launch is the right trade.
+// Returns 1 when an image is present, 0 when the folder is readable and holds none, and 1 when the
+// folder cannot be read at all (never block a launch on a probe that itself failed).
+int cueGameHasImage(const char *devPrefix, const char *name);
 
 // 1 when a published row is an Ember title rather than a POPSTARTER one. THE row-kind test; use it
 // for launch dispatch and art fallback instead of asking which view the page is on.

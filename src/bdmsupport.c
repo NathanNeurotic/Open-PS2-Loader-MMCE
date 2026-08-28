@@ -1613,7 +1613,7 @@ static void bdmLaunchCue(item_list_t *itemList, const char *cueName, config_set_
 
     (void)configSet; // an Ember title carries no per-game loader settings (see guigame.c)
 
-    if (pDeviceData == NULL || cueName == NULL || cueName[0] == ' ')
+    if (pDeviceData == NULL || cueName == NULL || cueName[0] == '\0')
         return;
 
     // Refuse what Ember itself would refuse, while a dialog can still be drawn. The scanner already
@@ -1634,6 +1634,13 @@ static void bdmLaunchCue(item_list_t *itemList, const char *cueName, config_set_
     // it just runs the PS1 BIOS shell. Check while we can still explain.
     if (!cueResolveEmberBios(ps1Prefix, biosPath, sizeof(biosPath))) {
         guiMsgBox(_l(_STR_EMBER_BIOS_MISSING), 0, NULL);
+        return;
+    }
+    // The scan lists folders without reading inside them -- that would be a directory read per row
+    // on every refresh. Pay for it once, HERE, while a dialog can still be drawn: an empty or
+    // mis-filled folder otherwise drops the user into the PS1 BIOS shell with no explanation.
+    if (!cueGameHasImage(ps1Prefix, cueName)) {
+        guiMsgBox(_l(_STR_EMBER_NO_DISC), 0, NULL);
         return;
     }
 

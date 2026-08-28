@@ -162,58 +162,83 @@ RESOLVE: snprintf(path, 192, "games/%s", arg);       // 0x158b10, rodata 0x16d38
 
 ## Part 1 — Folder structure
 
-Ember cannot be given a path, so the layout is forced: **the games live under the same directory as
-the `ember.elf` we launch.** Per-device, mirroring the existing `POPS/` doctrine
-(*library folders at the ROOT of each activated device — never mc, never cwd*):
+`<device>:/EMBER/` is the peer of `<device>:/POPS/` — one folder at each activated device's root,
+sought the same way on every device class. **That is where the resemblance ends.** POPS holds loose
+`*.VCD` FILES; EMBER holds a program plus a `games/` folder of per-game DIRECTORIES. The scan is a
+directory scan, not a file scan, and the identity is the directory name with no extension to strip.
 
 ```
 <device-root>/
-  EMBER/                      <- folder name configurable (gEmberFolder, default "EMBER")
-    ember.elf                 <- required; its presence is what enables the CUE view
-    bios.bin                  <- required by Ember at launch (512 KB, user-supplied)
-    settings.txt              <- optional, Ember's own
+  POPS/                             <- unchanged
+    POPSTARTER.ELF
+    Spyro 2 (Ripto's Rage).VCD
+  EMBER/
+    ember.elf                       <- required; its presence is what enables Ember rows
+    bios.bin                        <- required at launch (512 KB, user-supplied, never shipped)
+    settings.txt                    <- optional, Ember's own (key:value; only `display:240|480`)
     games/
-      Crash Bandicoot (USA)/  <- one folder == one CUE library entry; the folder NAME is the identity
+      Spyro 2 (Ripto's Rage)/       <- one directory per title; the NAME is the launch argument
         game.cue
         game.bin
-        MC1.vmc  MC2.vmc      <- created by Ember on first launch
-      Spyro the Dragon (USA)/
-        Spyro.cue
-        Spyro.bin
+        MC1.vmc  MC2.vmc            <- Ember creates these HERE on first launch
 ```
 
-`<device-root>` per device class, matching where `POPS/` already lives:
+### Which layouts Ember accepts, and why we list exactly one
+
+Ember's resolver is looser than its README. It tries `games/<arg>` and then `<arg>`, and
+`io_find_disc` takes **either** a directory containing a `*.cue` / `*.bin` / `*.exe` **or** such a
+file directly. All four of these boot:
+
+| # | Layout | Boots | Saves |
+| --- | --- | --- | --- |
+| 1 | `games/<Name>/` holding the image | yes | **yes** |
+| 2 | `games/<Name>.cue` (loose file) | yes | no |
+| 3 | `<Name>/` beside `ember.elf` | yes | wrong place |
+| 4 | `<Name>.cue` beside `ember.elf` | yes | wrong place |
+
+**Only layout 1 saves**, and that is why it is the only one we list. `main()` calls `memcard_init`
+exactly once — verified, one call site — and always with the *composed* path `games/<arg>`, never
+with wherever the disc was actually found. The cards are therefore always
+`games/<arg>/MC1.vmc` / `MC2.vmc`. So layout 2 asks for a card *inside a file*
+(`games/Spyro.cue/MC1.vmc`), which cannot exist; layouts 3 and 4 put the cards in
+`games/<Name>/`, a directory unrelated to the disc mounted from `EMBER/<Name>/`.
+
+Those titles play and silently cannot save. That is a worse experience than not being offered — and
+the user blames the launcher, not the layout. Listing only layout 1 means every row shown is a row
+that fully works. Widen the scan only if Ember's card resolution changes to follow the resolved disc.
+
+Two further limits, both measured:
+
+- `io_find_disc` does **not** recurse. An image at `games/<Name>/disc1/game.cue` is not found.
+- `.cue` is preferred over `.exe` over `.bin` when a folder holds more than one. `.exe` (PSX-EXE) is
+  accepted and is undocumented in the README.
+
+### Verifying a folder actually holds a disc
+
+The scan lists directories without reading inside them: that would be one directory read per row on
+every refresh, which MMCE and SMB cannot afford. Instead `cueGameHasImage()` runs once on the
+**launch** path, before `deinit`, while a dialog can still be drawn. An empty or mis-filled folder
+otherwise drops the user into the PS1 BIOS shell with no explanation. A probe that itself fails to
+read reports success — never block a launch on a failed probe.
+
+### Where `<device-root>` is, per device class
 
 | Device | Root used |
 | --- | --- |
-| USB / MX4SIO / iLink / exFAT-ATA (all BDM) | `massN:/` — the **device root**, not `gBDMPrefix`. Reuse `bdmBuildVcdPrefix()`. |
-| MMCE | `mmceN:/` (`mmcePrefix`) |
-| SMB / ETH | the mounted share root (`ethGetSMBPrefix()`) — **validation-gated, see Risk R4** |
-| APA / PFS HDD | `pfs0:/EMBER/…` on the selected OPL partition (`+OPL`, else `__common`) — **Phase 4** |
-| UDPBD / UDPFS | the live `massN:` / udpfs mount — **bonus, see Risk R5** |
-
-**Invariant to enforce in code:** the scanned `games/` directory and the launched `ember.elf` are
-always the *same* `EMBER/` directory on the *same* device. There is deliberately **no**
-POPSTARTER-style "Ember Device" picker: POPSTARTER can be loaded from anywhere because it takes a
-`mass:/POPS/XX.<name>.ELF` selector string, but Ember takes a bare folder name and can only look
-inside its own directory. A picker would be a lying control. The only knob is the folder *name*
-(`gEmberFolder`), which lets a user keep e.g. `PS1/` instead of `EMBER/`.
+| USB / MX4SIO / iLink / exFAT-ATA (BDM) | `massN:/` — the device **root**, not `gBDMPrefix` |
+| MMCE | `mmceN:/` |
+| SMB / ETH | the share root — **POPSTARTER-only for now**, see R4 |
+| APA / PFS HDD | needs its own decision: APA has no filesystem root, and `POPS` lives on `__common` |
+| UDPBD / UDPFS | not enabled |
 
 ### Art and per-game config
 
-Identity = **the game folder name**, exactly parallel to a VCD's basename-without-`.VCD`. So the
-existing device art/CFG rules apply unchanged:
+Identity is the game folder name, so the device's normal rules apply unchanged:
+`<devroot>ART/<Name>_COV.png` and `<devroot>CFG/<Name>.cfg`. The Ember-specific fallback, peer of
+`vcdLoadPopsCover`, looks inside the game folder: `cover.png`, then `<Name>.png`.
 
-* `<devroot>ART/<Folder Name>_COV.png`, `<devroot>CFG/<Folder Name>.cfg`
-* Fallback, mirroring `vcdLoadPopsCover()`: `<devroot>EMBER/games/<Folder Name>/cover.png`, then
-  `<devroot>EMBER/games/<Folder Name>/<Folder Name>.png`. Cover/icon suffixes only, CUE view only.
-
-Badges: reuse `sbSetDiscAttributes(config, /*isPS1*/1, /*isCD*/1)` → `#System=PS1`, `#Media=CD`,
-`#DiscType=PS1CD`. Every shipped theme already draws these, so CUE entries look right on day one.
-Optionally also stamp `CONFIG_ITEM_FORMAT = "CUE"` so a theme can add a `CUE_#Format.png` glyph —
-purely additive, no existing theme changes.
-
----
+Badges reuse `sbSetDiscAttributes(config, isPS1=1, isCD=1)` → `#System=PS1`, `#Media=CD`,
+`#DiscType=PS1CD`, so an Ember row looks right in every shipped theme on day one.
 
 ## Part 2 — The view engine (L3)
 

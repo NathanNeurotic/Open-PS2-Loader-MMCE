@@ -738,7 +738,7 @@ static void mmceLaunchCue(item_list_t *itemList, const char *cueName, config_set
 
     (void)configSet; // an Ember title carries no per-game loader settings
 
-    if (cueName == NULL || cueName[0] == ' ')
+    if (cueName == NULL || cueName[0] == '\0')
         return;
     if (!cueNameLaunchable(cueName)) {
         guiMsgBox(_l(_STR_EMBER_BAD_NAME), 0, NULL);
@@ -760,6 +760,13 @@ static void mmceLaunchCue(item_list_t *itemList, const char *cueName, config_set
     }
     if (!cueResolveEmberBios(mmcePrefix, biosPath, sizeof(biosPath))) {
         guiMsgBox(_l(_STR_EMBER_BIOS_MISSING), 0, NULL);
+        return;
+    }
+    // The scan lists folders without reading inside them -- that would be a directory read per row
+    // on every refresh. Pay for it once, HERE, while a dialog can still be drawn: an empty or
+    // mis-filled folder otherwise drops the user into the PS1 BIOS shell with no explanation.
+    if (!cueGameHasImage(mmcePrefix, cueName)) {
+        guiMsgBox(_l(_STR_EMBER_NO_DISC), 0, NULL);
         return;
     }
 

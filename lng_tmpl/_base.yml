@@ -1160,3 +1160,5 @@ gui_strings:
   string: Missing bios.bin beside ember.elf
 - label: EMBER_BAD_NAME
   string: Ember cannot use this folder name (no slash, colon or backslash, and no leading dots).
+- label: EMBER_NO_DISC
+  string: No PS1 disc image in this Ember game folder.
