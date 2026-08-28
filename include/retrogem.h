@@ -7,6 +7,10 @@
 #ifndef __RETROGEM_H
 #define __RETROGEM_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <tamtypes.h>
 #include <stddef.h>
 
@@ -35,5 +39,9 @@ int retrogemGetVcdGameID(const char *vcdPath, char *gameID, size_t maxLen);
  * @param frames Number of frames to hold the barcode (typically 2)
  */
 void displayRetroGemGameID(const char *gameID, int frames);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // __RETROGEM_H

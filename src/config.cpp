@@ -17,7 +17,7 @@
 //        Use newlib's 'stat' to get GMT time.
 #define NEWLIB_PORT_AWARE
 #include <fileXio_rpc.h> // iox_stat_t, fileXioGetStat
-int configGetStat(config_set_t *configSet, iox_stat_t *stat);
+extern "C" int configGetStat(config_set_t *configSet, iox_stat_t *stat);
 
 static u32 currentUID = 0;
 static config_set_t configFiles[CONFIG_INDEX_COUNT];
@@ -413,7 +413,7 @@ void configMove(config_set_t *configSet, const char *fileName)
 {
     int length = strlen(fileName) + 1;
     // Use a temporary so a failed realloc doesn't clobber (and leak) the old pointer
-    char *tmp = realloc(configSet->filename, length);
+    char *tmp = (char *)realloc(configSet->filename, length);
     if (!tmp)
         return;
     configSet->filename = tmp;
@@ -643,7 +643,7 @@ void configGetDiscIDBinary(config_set_t *configSet, void *dst)
     const char *gid = NULL;
     if (configGetStr(configSet, CONFIG_ITEM_DNAS, &gid)) {
         // convert from hex to binary
-        char *cdst = dst;
+        char *cdst = (char *)dst;
         int p = 0;
         while (*gid && p < 10) {
             int dv = -1;

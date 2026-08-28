@@ -202,7 +202,7 @@ int hddGetHDLGamelist(hdl_games_list_t *game_list)
 
         pGameEntry = GetGameListRecord(head, dirent.name);
         if (pGameEntry == NULL) {
-            struct GameDataEntry *newEntry = malloc(sizeof(struct GameDataEntry));
+            struct GameDataEntry *newEntry = (struct GameDataEntry *)malloc(sizeof(struct GameDataEntry));
             if (newEntry == NULL) {
                 ret = -ENOMEM;
                 break;
@@ -241,7 +241,7 @@ int hddGetHDLGamelist(hdl_games_list_t *game_list)
         ret = readResult;
 
     if (ret == 0 && head != NULL) {
-        game_list->games = malloc(sizeof(hdl_game_info_t) * count);
+        game_list->games = (hdl_game_info_t *)malloc(sizeof(hdl_game_info_t) * count);
         if (game_list->games != NULL) {
             memset(game_list->games, 0, sizeof(hdl_game_info_t) * count);
 
@@ -342,7 +342,7 @@ int hddGetPopsPartitionList(hdd_pops_list_t *list)
         if (dup)
             continue;
 
-        char(*grown)[APA_IDMAX + 1] = realloc(names, (count + 1) * sizeof(*names));
+        char(*grown)[APA_IDMAX + 1] = (char(*)[APA_IDMAX + 1])realloc(names, (count + 1) * sizeof(*names));
         if (grown == NULL) {
             ret = -ENOMEM;
             break;

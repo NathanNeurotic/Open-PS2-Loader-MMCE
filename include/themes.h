@@ -1,6 +1,10 @@
 #ifndef __THEMES_H
 #define __THEMES_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "include/textures.h"
 #include "include/texcache.h"
 #include "include/menusys.h"
@@ -197,5 +201,9 @@ int thmGetGuiValue(void);
 int thmFindGuiID(const char *theme);
 const char **thmGetGuiList(void);
 char *thmGetFilePath(int themeID);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

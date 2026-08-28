@@ -25,6 +25,10 @@
 #ifndef _CHEATMAN_H_
 #define _CHEATMAN_H_
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "opl.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -84,5 +88,9 @@ void set_cheats_list(void);
 int GetImageEnabled(void);
 const u32 *GetImage(void);
 int LoadImage(const char *filename);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _CHEATMAN_H_ */

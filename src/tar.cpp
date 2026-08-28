@@ -10,7 +10,10 @@
 // toggle is off the engine is never called, and even when on a device with no ART/art.tar is marked
 // inactive and costs nothing.
 
+// SDK header without C++ linkage guards (declares lseek64): wrap at the use site.
+extern "C" {
 #include <ps2sdkapi.h>
+}
 #include <stdio.h>
 #include <malloc.h>
 #include <fcntl.h>
@@ -257,10 +260,11 @@ static int tarParseFile(TarKind kind, const char *path)
     s_cap[kind] = 0;
 
     u32 entrySize = gTarInfo[kind].entrySize;
+    u32 nameMax;
     if (entrySize <= sizeof(TarEntryBase) + 1)
         goto fail;
 
-    u32 nameMax = entrySize - sizeof(TarEntryBase) - 1;
+    nameMax = entrySize - sizeof(TarEntryBase) - 1;
 
     while (1) {
         unsigned char header[TAR_BLOCK_SIZE] __attribute__((aligned(64)));

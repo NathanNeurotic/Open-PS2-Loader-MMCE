@@ -1,6 +1,10 @@
 #ifndef __TEX_CACHE_H
 #define __TEX_CACHE_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "include/iosupport.h"
 
 /// A single cache entry...
@@ -211,5 +215,9 @@ void cacheDropQueuedArt(void);
 // and deinitEx(), both of which hand off to another ELF and never return to a live menu. Anything
 // that DOES return to a live menu must not call this.
 void cacheShutdownArtLoads(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
