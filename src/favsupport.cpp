@@ -647,13 +647,13 @@ static int favGetItemNameLength(item_list_t *itemList, int id)
 static char *favGetItemStartup(item_list_t *itemList, int id)
 {
     if (!favValidIndex(id))
-        return "";
+        return (char *)"";
     if (favArray[id].isVcd)
         return favArray[id].text; // VCD favourites key art/launch off the .VCD name, not a submenu id
     item_list_t ownerView;
     item_list_t *o = favOwnerView(id, &ownerView);
     if (o == NULL || o->itemGetStartup == NULL || !favOwnerHasId(o, favArray[id].id))
-        return "";
+        return (char *)"";
     return o->itemGetStartup(o, favArray[id].id);
 }
 
