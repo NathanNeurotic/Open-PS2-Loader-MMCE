@@ -220,7 +220,27 @@ This build layers several features on top of upstream OPL:
   settings — so `ART/Spyro 2 (Ripto's Rage)_COV.png` on that device just works, exactly as it does
   for a `.VCD`. Files inside can be named anything; `.cue` is preferred over `.exe` over `.bin`.
   Ember writes its per-game memory cards (`MC1.vmc`, `MC2.vmc`) into that same folder, so it must be
-  on writable media. Currently available on USB, MX4SIO, iLink, exFAT-ATA and MMCE.
+  on writable media. Available on USB, MX4SIO, iLink, exFAT-ATA, MMCE, SMB and the internal
+  APA/PFS hard drive.
+
+  **On an internal APA/PFS drive**, where there is no filesystem root to copy a folder to, the
+  `EMBER/` folder goes on a partition instead. RiptOPL looks in two places and lists whatever it
+  finds in both:
+
+  - **`__common`** — the shared partition POPSTARTER already lives on. Simplest option, and the one
+    to use if your library is small enough to fit beside everything else that partition holds.
+  - **`__.EMBER`** (or `__.EMBER0` … `__.EMBER9`) — a partition you create for the purpose. Deliberately
+    the same naming shape as the `__.POPS` containers, and the right choice for a real library, since
+    PS1 disc images are large and `__common` usually is not.
+
+  Inside the partition the layout is exactly the one above, starting at the partition root:
+  `EMBER/ember.elf`, `EMBER/bios.bin`, `EMBER/games/<Game Name>/`. Cover art is unchanged too —
+  `ART/<Game Name>_COV.png` on your OPL data partition, the same key a `.VCD` uses.
+
+  One difference is worth knowing about, because it is the reason this works at all: an APA Ember
+  title is launched with its partition **still mounted**. Ember inherits that live mount instead of
+  re-opening the drive for itself, which is also why the partition is mounted read/write — Ember's
+  memory cards and `settings.txt` are written straight through it.
 
   **Credit and licence — Ember is created by [Gageformer](https://github.com/Gageformer), and its
   official release page is <https://github.com/Gageformer/Ember/releases>.** Ember is an

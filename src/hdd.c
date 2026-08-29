@@ -298,6 +298,25 @@ static int hddIsPopsContainerName(const char *name)
     return name[7] == '\0' || (name[7] >= '0' && name[7] <= '9' && name[8] == '\0');
 }
 
+// __.EMBER / __.EMBER0..9, plus the shared __common partition. Deliberately the same shape as the
+// __.POPS[0-9]? containers above, so a user who already understands where their PS1 library lives on
+// an APA drive does not have to learn a second convention.
+//
+// __common earns its place because POPSTARTER already lives there (hddResolveHddPopstarter mounts
+// it), so a drive that runs PS1 at all usually has one; a dedicated __.EMBER is for libraries too
+// big to sit in it. Both are scanned, and a partition with no EMBER folder costs one mount and one
+// open() before it is dropped -- cueScanDir gates itself on the core being readable.
+static int hddIsEmberContainerName(const char *name)
+{
+    if (name == NULL)
+        return 0;
+    if (strcmp(name, "__common") == 0)
+        return 1;
+    if (strncmp(name, "__.EMBER", 8) != 0)
+        return 0;
+    return name[8] == '\0' || (name[8] >= '0' && name[8] <= '9' && name[9] == '\0');
+}
+
 int hddIsPopsPartitionGame(const char *name)
 {
     if (name == NULL)
@@ -310,10 +329,20 @@ int hddIsPopsPartitionGame(const char *name)
 }
 
 // Enumerate the HDD's PS1/VCD APA partitions: exact __.POPS / __.POPS0..9 multi-VCD containers and
+// The candidate test the POPS walk has always applied, unchanged, now named so the shared walk
+// below can take it as a parameter.
+static int hddIsPopsCandidateName(const char *name)
+{
+    return hddIsPopsContainerName(name) || hddIsPopsPartitionGame(name);
+}
+
 // PP.<name> / __.<name> one-game installs. Mirror POPSLoader's APA-table filter: only main PFS records
 // can be mounted and scanned. In particular, ordinary HDL games also commonly use PP.* labels but have
 // mode 0x1337; filtering them here avoids a failed PFS mount for every PS2 game during a VCD refresh.
-int hddGetPopsPartitionList(hdd_pops_list_t *list)
+//
+// ONE walk, two callers: the dedupe, the grow-on-demand array, the refusal to publish a partial walk
+// and the sort are all the POPS enumerator's own body. Only the name test is passed in.
+static int hddCollectPartitions(hdd_pops_list_t *list, int (*keep)(const char *))
 {
     iox_dirent_t dirent;
     int fd, i, count = 0, readResult = 0, ret = 0;
@@ -329,8 +358,8 @@ int hddGetPopsPartitionList(hdd_pops_list_t *list)
     while ((readResult = fileXioDread(fd, &dirent)) > 0) {
         if (dirent.stat.attr != HDD_APA_ATTR_MAIN_PARTITION || dirent.stat.mode != HDD_APA_FS_TYPE_PFS)
             continue; // skip APA sub-partitions and HDL/raw/system formats
-        if (!hddIsPopsContainerName(dirent.name) && !hddIsPopsPartitionGame(dirent.name))
-            continue; // not an HDD-resident PS1/VCD source
+        if (!keep(dirent.name))
+            continue; // not a PS1 source of the kind this caller is enumerating
 
         int dup = 0;
         for (i = 0; i < count; i++) {
@@ -363,7 +392,7 @@ int hddGetPopsPartitionList(hdd_pops_list_t *list)
 
     if (count == 0) {
         free(names);
-        return 0; // successful enumeration, no POPS candidates
+        return 0; // successful enumeration, no candidates of the requested kind
     }
 
     qsort(names, count, sizeof(*names), hddPopsNameCompare);
@@ -371,6 +400,18 @@ int hddGetPopsPartitionList(hdd_pops_list_t *list)
     list->names = names;
     list->count = count;
     return count;
+}
+
+//-------------------------------------------------------------------------
+int hddGetPopsPartitionList(hdd_pops_list_t *list)
+{
+    return hddCollectPartitions(list, hddIsPopsCandidateName);
+}
+
+//-------------------------------------------------------------------------
+int hddGetEmberPartitionList(hdd_pops_list_t *list)
+{
+    return hddCollectPartitions(list, hddIsEmberContainerName);
 }
 
 //-------------------------------------------------------------------------

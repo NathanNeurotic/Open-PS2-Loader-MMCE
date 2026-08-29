@@ -70,7 +70,22 @@ The **folder name** is what you see in the list, and it is the key for cover art
 settings — so `ART/Spyro 2 (Ripto's Rage)_COV.png` on that device just works, exactly as for a
 `.VCD`. Files inside can be named anything; `.cue` is preferred over `.exe` over `.bin`. Ember
 writes its per-game memory cards (`MC1.vmc`, `MC2.vmc`) into that game folder, so it must be on
-writable media.
+writable media. Available on USB, MX4SIO, iLink, exFAT-ATA, MMCE, SMB and the internal APA/PFS
+hard drive.
+
+**On an internal APA/PFS drive** there is no filesystem root to copy to, so the `EMBER/` folder goes
+on a partition. Both of these are scanned, and titles from both are listed together:
+
+| Partition | Use it when |
+| --- | --- |
+| `__common` | Simplest — the shared partition POPSTARTER already lives on. Fine for a small library. |
+| `__.EMBER`, `__.EMBER0` … `__.EMBER9` | A partition you create for the job. Same naming shape as the `__.POPS` containers, and the right choice for a real library. |
+
+The layout inside is the one above, starting at the partition root: `EMBER/ember.elf`,
+`EMBER/bios.bin`, `EMBER/games/<Game Name>/`. Cover art is unchanged — `ART/<Game Name>_COV.png` on
+your OPL data partition. An APA title launches with its partition **still mounted read/write**:
+Ember inherits that live mount rather than re-opening the drive, and writes its memory cards and
+`settings.txt` straight through it.
 
 **Display mode.** *Settings → PS Emulation Settings → Ember Display Mode* (Default / 240p / 480p).
 Ember's `settings.txt` is optional and stays that way: **240p** or **480p** writes the key to

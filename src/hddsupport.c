@@ -4,6 +4,7 @@
 #include "include/gui.h"
 #include "include/supportbase.h"
 #include "include/hddsupport.h"
+#include "include/cuesupport.h" // Ember rows share the HDD PS1 list with the VCD ones
 #include "include/vcdsupport.h" // HDD VCD view: vcdScanDirRoot + vcd_entry_t
 #include "include/libview.h"    // libViewActive / libListViewActive -- which list this page shows
 #include "include/util.h"
@@ -1010,6 +1011,97 @@ static int hddBuildVcdGameList(void)
     }
 
     hddFreePopsPartitionList(&parts);
+
+    // ---- second phase: EMBER --------------------------------------------------------------------
+    // ONE list, BOTH cores -- the APA restatement of what ps1FillGameList does for every other
+    // device. The rows land in the SAME arrays, so the PS1 view, Favourites resolution, art lookup
+    // and the sort all keep working with no idea that two different emulators are involved. What
+    // tells them apart is the row's extension, exactly as on USB and SMB.
+    hdd_pops_list_t emberParts;
+    int emberCount = hddGetEmberPartitionList(&emberParts);
+    if (emberCount < 0) {
+        // A failed walk is not an empty Ember library, and it must not blank the VCD rows already
+        // collected above either. Mark the refresh incomplete and let the transaction below decide.
+        LOG("HDD EMBER: APA partition enumeration failed (%d)\n", emberCount);
+        scanIncomplete = 1;
+    } else {
+        for (int p = 0; p < emberParts.count; p++) {
+            char mountSrc[64];
+            snprintf(mountSrc, sizeof(mountSrc), "hdd0:%s", emberParts.names[p]);
+
+            if (fileXioMount("pfs1:", mountSrc, FIO_MT_RDONLY) < 0) {
+                scanIncomplete = 1;
+                continue;
+            }
+
+            // cueScanDir gates itself on open()ing the core, so a partition with no EMBER folder
+            // costs this mount plus one failed open and returns 0. That is what makes it safe to
+            // scan __common unconditionally: the usual drive pays almost nothing for the attempt.
+            cue_entry_t *cues = NULL;
+            int n = cueScanDir("pfs1:/", &cues);
+            fileXioUmount("pfs1:");
+            if (n < 0) {
+                free(cues);
+                scanIncomplete = 1;
+                continue;
+            }
+            if (n == 0) {
+                free(cues);
+                continue;
+            }
+
+            base_game_info_t *grownGames = realloc(newGames, (total + n) * sizeof(base_game_info_t));
+            if (grownGames == NULL) {
+                free(cues);
+                scanIncomplete = 1;
+                break;
+            }
+            newGames = grownGames;
+            char(*grownParts)[APA_IDMAX + 1] = realloc(newParts, (total + n) * sizeof(*newParts));
+            if (grownParts == NULL) {
+                free(cues);
+                scanIncomplete = 1;
+                break;
+            }
+            newParts = grownParts;
+
+            int kept = 0;
+            for (int i = 0; i < n; i++) {
+                // Names are resolved back to a partition by hddFindVcdByName, which matches on name
+                // alone. An Ember folder that collides with a VCD title (or with an Ember folder on
+                // another partition) would otherwise always launch whichever came first, so drop
+                // the duplicate rather than list a row that launches someone else's game.
+                int taken = 0;
+                for (int j = 0; j < total + kept; j++) {
+                    if (strcmp(newGames[j].name, cues[i].name) == 0) {
+                        taken = 1;
+                        break;
+                    }
+                }
+                if (taken) {
+                    LOG("HDD EMBER: '%s' on %s shadowed by an earlier row; skipped\n", cues[i].name, emberParts.names[p]);
+                    continue;
+                }
+
+                base_game_info_t *g = &newGames[total + kept];
+                memset(g, 0, sizeof(base_game_info_t));
+                // IDENTITY IS THE FOLDER NAME, unchanged: it is Ember's launch argument, and art,
+                // per-game config and Favourites all key off it. ART/<folder name>_COV.png resolves
+                // through the ordinary hddGetImage path with no special case.
+                snprintf(g->name, sizeof(g->name), "%s", cues[i].name);
+                snprintf(g->startup, sizeof(g->startup), "%s", cues[i].name);
+                snprintf(g->extension, sizeof(g->extension), "%s", CUE_ROW_EXTENSION);
+                g->parts = 1;
+                g->format = GAME_FORMAT_ISO; // harmless; the row's extension gates the launch path
+                snprintf(newParts[total + kept], APA_IDMAX + 1, "%s", emberParts.names[p]);
+                kept++;
+            }
+            free(cues);
+            total += kept;
+        }
+        hddFreePopsPartitionList(&emberParts);
+    }
+
     fileXioUmount("pfs1:");
 
     // If a refresh could not inspect every candidate, a non-empty last-good list has more authority
@@ -1483,7 +1575,7 @@ static void hddRenameVcd(int id, const char *newName)
 {
     char oldName[VCD_NAME_MAX];
     char part[APA_IDMAX + 1];
-    int renamed = 0;
+    int renamed = 0, isEmber = 0;
 
     // The list builder owns pfs1: and the backing arrays on the IO worker. Block it before copying
     // the selected storage identity and before temporarily mounting a pooled POPS partition RW.
@@ -1491,8 +1583,20 @@ static void hddRenameVcd(int id, const char *newName)
     if (hddVcdGames != NULL && hddVcdParts != NULL && id >= 0 && id < hddVcdGameCount) {
         snprintf(oldName, sizeof(oldName), "%s", hddVcdGames[id].name);
         snprintf(part, sizeof(part), "%s", hddVcdParts[id]);
+        isEmber = cueIsCueEntry(&hddVcdGames[id]);
 
-        if (vcdPopsPartitionTitleOffset(part) > 0) {
+        if (isEmber) {
+            // An Ember title IS its folder, on the partition the scan recorded. Mount that partition
+            // RW on the scan slot, exactly as the pooled-VCD branch below does for a loose file.
+            char mountSrc[APA_IDMAX + 6];
+
+            snprintf(mountSrc, sizeof(mountSrc), "hdd0:%s", part);
+            fileXioUmount("pfs1:");
+            if (fileXioMount("pfs1:", mountSrc, FIO_MT_RDWR) == 0) {
+                renamed = (cueRenameGame("pfs1:/", oldName, newName) == 0);
+                fileXioUmount("pfs1:");
+            }
+        } else if (vcdPopsPartitionTitleOffset(part) > 0) {
             // One-game PP.* POPS installs boot from their partition label, so a file rename would
             // change nothing. Rename the APA record while retaining its required prefix instead.
             renamed = (hddRenamePopsPartition(part, newName) == 0);
@@ -1541,6 +1645,19 @@ static int hddFindVcdByName(const char *vcdName)
     return -1;
 }
 
+// Put pfs0: back on the OPL data partition after a launch attempt borrowed the slot. A list-only
+// APA session may legitimately have no persistent data home, in which case there is nothing truthful
+// to remount and an empty gOPLPart must never be passed to fileXioMount.
+static void hddRestoreDataHome(void)
+{
+    fileXioUmount(hddPrefix);
+    if (gOPLPart[0] != '\0' && fileXioMount(hddPrefix, gOPLPart, FIO_MT_RDWR) < 0) {
+        // Never leave a non-NULL prefix advertising an unmounted pfs0:.
+        gHDDPrefix = NULL;
+        gOPLPart[0] = '\0';
+    }
+}
+
 // Resolve POPSTARTER.ELF for an HDD VCD launch from hdd0:__common/POPS/ only. APA VCD data can live
 // in its normal __.POPS / PP.* partitions and OPL data can be redirected elsewhere, but loose
 // POPS/POPSTARTER support payloads are always owned by __common. On success returns 1 with
@@ -1561,17 +1678,86 @@ static int hddResolveHddPopstarter(char *elfOut, int elfLen)
         }
     }
 
-    // Not found: restore the default OPL data-partition mount when one exists. A list-only
-    // APA session may legitimately have no persistent data home, in which case there is nothing
-    // truthful to remount and an empty gOPLPart must never be passed to fileXioMount.
-    fileXioUmount(hddPrefix);
-    if (gOPLPart[0] != '\0' && fileXioMount(hddPrefix, gOPLPart, FIO_MT_RDWR) < 0) {
-        // The restore mount is part of the persistent-home invariant. Never leave a non-NULL
-        // prefix advertising an unmounted pfs0: after POPSTARTER discovery borrowed the slot.
-        gHDDPrefix = NULL;
-        gOPLPart[0] = '\0';
-    }
+    // Not found: restore the default OPL data-partition mount. The restore is part of the
+    // persistent-home invariant -- never leave a non-NULL prefix advertising an unmounted pfs0:
+    // after POPSTARTER discovery borrowed the slot.
+    hddRestoreDataHome();
     return 0;
+}
+
+// Hand an APA/PFS Ember title off with pfs0: STILL MOUNTED on the partition that holds it.
+//
+// This is the one launch in OPL where the mount is not a means of finding an ELF but the thing the
+// child actually runs on: Ember does not reset the IOP (sysLoadELFKeepIOP), so the ps2fs driver, the
+// pfs0: mount and the descriptors under it are all inherited live, and every read Ember makes from
+// here on goes through them. Both the core and the game data are on this one partition, which is why
+// a single mount is enough where POPSTARTER needs a partition passed out of band.
+//
+// Three consequences, all load-bearing:
+//   RDWR, not RDONLY. Ember writes memory cards and settings.txt through this mount. The POPSTARTER
+//   resolver mounts read-only because its mount dies at the IOP reset moments later; this one has to
+//   survive and stay writable.
+//   UNMOUNT_EXCEPTION keeps hddCleanUp from unmounting pfs0:.
+//   KEEPIOP_EXCEPTION keeps it from issuing PDIOC_CLOSEALL, which would drop every pfs descriptor in
+//   the IOP -- harmless before an IOP reset, fatal before a handoff that does not reset.
+static void hddDoLaunchEmber(item_list_t *itemList, const char *name, const char *part)
+{
+    char emberElf[256], biosPath[288], mountSrc[APA_IDMAX + 6];
+
+    if (name == NULL || name[0] == '\0' || part == NULL || part[0] == '\0')
+        return;
+
+    // Refuse what Ember itself would refuse, while a dialog can still be drawn and before anything
+    // has been torn down. Same order as every other device's Ember leg.
+    if (!cueNameLaunchable(name)) {
+        guiMsgBox(_l(_STR_EMBER_BAD_NAME), 0, NULL);
+        return;
+    }
+
+    // There is exactly ONE pfs0: slot and the remount below is destructive to any HDD art read still
+    // in flight, so quiesce first -- the same discipline, and the same reason, as the VCD leg.
+    cacheAbortMmceImageLoadsTimed(HDD_ART_QUIESCE_MS);
+    if (!cacheCancelPendingImageLoadsTimed(HDD_ART_QUIESCE_MS)) {
+        LOG("HDD EMBER: art did not quiesce; refusing the pfs0: remount\n");
+        guiMsgBox(_l(_STR_PLEASE_WAIT), 0, NULL);
+        return;
+    }
+    ioBlockOps(1);
+
+    snprintf(mountSrc, sizeof(mountSrc), "hdd0:%s", part);
+    fileXioUmount(hddPrefix);
+    if (fileXioMount(hddPrefix, mountSrc, FIO_MT_RDWR) < 0) {
+        hddRestoreDataHome();
+        ioBlockOps(0);
+        guiMsgBox(_l(_STR_EMBER_NOT_FOUND), 0, NULL);
+        return;
+    }
+
+    // Verify against the partition as it is mounted RIGHT NOW, not against what the scan saw: the
+    // scan read this partition read-only through pfs1: and may be minutes old.
+    if (!cueResolveEmber("pfs0:/", emberElf, sizeof(emberElf))) {
+        hddRestoreDataHome();
+        ioBlockOps(0);
+        guiMsgBox(_l(_STR_EMBER_NOT_FOUND), 0, NULL);
+        return;
+    }
+    if (!cueResolveEmberBios("pfs0:/", biosPath, sizeof(biosPath))) {
+        hddRestoreDataHome();
+        ioBlockOps(0);
+        guiMsgBox(_l(_STR_EMBER_BIOS_MISSING), 0, NULL);
+        return;
+    }
+    if (!cueGameHasImage("pfs0:/", name)) {
+        hddRestoreDataHome();
+        ioBlockOps(0);
+        guiMsgBox(_l(_STR_EMBER_NO_DISC), 0, NULL);
+        return;
+    }
+    cueApplyDisplaySetting("pfs0:/"); // best-effort marker, never a launch gate -- needs the RDWR mount
+
+    // Past this point pfs0: stays where it is and IO stays blocked; deinit re-blocks anyway.
+    deinit(UNMOUNT_EXCEPTION | KEEPIOP_EXCEPTION, itemList->mode);
+    sysLaunchEmber(emberElf, name);
 }
 
 // Shared POPSTARTER handoff for an HDD VCD. argv[0] differs by partition shape: PP.<name> / __.<name>
@@ -1642,13 +1828,19 @@ static void hddLaunchVcd(item_list_t *itemList, const char *vcdName, config_set_
         hddBuildVcdGameList();
         idx = hddFindVcdByName(vcdName);
     }
+    int isEmber = 0;
     if (idx >= 0) {
         snprintf(resolvedName, sizeof(resolvedName), "%s", hddVcdGames[idx].name);
         snprintf(resolvedPart, sizeof(resolvedPart), "%s", hddVcdParts[idx]);
+        isEmber = cueIsCueEntry(&hddVcdGames[idx]); // kind read while the worker is still blocked
     }
     ioBlockOps(0); // resolvedName/resolvedPart are now independent of the mutable backing arrays
     if (idx < 0) {
         guiMsgBox(_l(_STR_POPSTARTER_NOT_FOUND), 0, NULL);
+        return;
+    }
+    if (isEmber) {
+        hddDoLaunchEmber(itemList, resolvedName, resolvedPart);
         return;
     }
     hddDoLaunchVcd(itemList, resolvedName, resolvedPart);
@@ -1780,9 +1972,13 @@ void hddLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
         }
         snprintf(vcdName, sizeof(vcdName), "%s", vcd->name);
         snprintf(vcdPart, sizeof(vcdPart), "%s", hddVcdParts[id]);
+        int isEmber = cueIsCueEntry(vcd); // read the row's kind while the list is still locked
         guiUnlock();
 
-        hddDoLaunchVcd(itemList, vcdName, vcdPart);
+        if (isEmber)
+            hddDoLaunchEmber(itemList, vcdName, vcdPart);
+        else
+            hddDoLaunchVcd(itemList, vcdName, vcdPart);
         return;
     }
 
@@ -2090,7 +2286,13 @@ static void hddCleanUp(item_list_t *itemList, int exception)
 
     // UI may have loaded modules outside of HDD mode, so deinitialize regardless of the enabled status.
     if (hddSupportModulesLoaded) {
-        fileXioDevctl("pfs:", PDIOC_CLOSEALL, NULL, 0, NULL, 0);
+        // PDIOC_CLOSEALL closes EVERY pfs descriptor in the IOP. That is free when the next thing to
+        // run resets the IOP and reclaims them anyway -- the assumption stated above, and the one
+        // every launch made until Ember. An Ember handoff keeps the IOP precisely so the child
+        // inherits this pfs0: mount and reads its game through it; closing the descriptors out from
+        // under it would leave Ember holding a mount it can no longer open anything on.
+        if ((exception & KEEPIOP_EXCEPTION) == 0)
+            fileXioDevctl("pfs:", PDIOC_CLOSEALL, NULL, 0, NULL, 0);
 
         hddSupportModulesLoaded = 0;
         gHDDPrefix = NULL; // pfs0: is no longer a valid persistent data-home mount marker
