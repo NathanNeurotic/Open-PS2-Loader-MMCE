@@ -5,7 +5,8 @@
 #include "include/supportbase.h"
 #include "include/ethsupport.h"
 #include "include/vcdsupport.h"
-#include "include/libview.h" // libViewActive / libListViewActive -- which list this page shows
+#include "include/cuesupport.h" // ps1FillGameList + the Ember launch helpers
+#include "include/libview.h"    // libViewActive / libListViewActive -- which list this page shows
 #include "include/util.h"
 #include "include/renderman.h"
 #include "include/themes.h"
@@ -593,13 +594,21 @@ static int ethUpdateGameList(item_list_t *itemList)
 
         if (libListViewActive(itemList) == LIB_VIEW_PS1) {
             // POPSTARTER titles ONLY on SMB, deliberately: this is the one device class where the
-            // Ember half is not yet known to work. RiptOPL composes SMB paths with '\' while Ember
-            // composes its own with '/' (its io_path format string is "%s/%s%s"), and whether
-            // smbman accepts that has not been tested on hardware. Listing Ember rows here that
-            // then fail to open would be worse than not listing them -- half a working list is
-            // worse than none. Swap this for ps1FillGameList once an Ember title is confirmed to
-            // launch from a share; nothing else on this path needs to change.
-            int r = vcdFillGameList(ethPrefix, &ethGames);
+            // ONE list, BOTH cores -- the same union every other device page builds.
+            //
+            // This used to be POPSTARTER-only, on the reasoning that RiptOPL composes SMB paths
+            // with '\' while Ember composes its own with '/', that smbman's tolerance for that was
+            // untested, and that listing rows which then fail to open is worse than listing none.
+            // The first half of that is now handled -- cuesupport builds every path with
+            // cueSep(devPrefix), so a share prefix produces backslashes throughout.
+            //
+            // The second half was already handled and we had not noticed: cueScanDir opens
+            // EMBER/ember.elf for real before it lists anything, and returns 0 rows if that open
+            // fails. So the bad outcome the old comment guarded against cannot occur here. If SMB
+            // path composition does not work on a given server, the Ember half contributes nothing
+            // and the POPSTARTER half is untouched -- which is exactly the "no half lists" rule it
+            // wanted. The feature gates itself on a real file open.
+            int r = ps1FillGameList(ethPrefix, &ethGames);
             if (r >= 0) // r < 0: transient scan failure -> preserve the last-good list
                 ethGameCount = r;
             // NULL sub opts SMB/ETH out of folder-row collection: it uses a "\\" separator and does not
@@ -772,7 +781,10 @@ static void ethRenameGame(item_list_t *itemList, int id, char *newName)
     if (libListViewActive(itemList) == LIB_VIEW_PS1) {
         base_game_info_t *game = ethGameForView(itemList, id);
 
-        if (game != NULL && vcdRenameFile(ethPrefix, game->name, newName) == 0) {
+        // Rename through the row's OWN core: an Ember title is a FOLDER under EMBER/games/, a
+        // POPSTARTER title is a .VCD file in POPS/. Renaming one as the other silently fails.
+        if (game != NULL &&
+            (cueIsCueEntry(game) ? cueRenameGame(ethPrefix, game->name, newName) : vcdRenameFile(ethPrefix, game->name, newName)) == 0) {
             ethInvalidateFavIsoBacking();
             // ETH otherwise treats its VCD list as toggle-only; consume this on the already queued
             // deferred update so the renamed POPS/ directory is scanned again.
@@ -827,6 +839,48 @@ static void ethLaunchVcd(item_list_t *itemList, const char *vcdName, config_set_
     sysLaunchPopstarter(vcdElf, vcdSelector);
 }
 
+// Ember (*.cue) launch over SMB. Mirrors bdmLaunchCue; the only SMB-specific part is that the
+// prefix already ends with its own separator, which cuesupport honours via cueSep().
+static void ethLaunchCue(item_list_t *itemList, const char *cueName, config_set_t *configSet)
+{
+    char emberElf[256], biosPath[288];
+
+    (void)configSet; // an Ember title carries no per-game loader settings (see guigame.c)
+
+    if (!gPCShareName[0] || cueName == NULL || cueName[0] == '\0')
+        return;
+
+    // Refuse what Ember itself would refuse, while a dialog can still be drawn.
+    if (!cueNameLaunchable(cueName)) {
+        guiMsgBox(_l(_STR_EMBER_BAD_NAME), 0, NULL);
+        return;
+    }
+    if (!cueResolveEmber(ethPrefix, emberElf, sizeof(emberElf))) {
+        guiMsgBox(_l(_STR_EMBER_NOT_FOUND), 0, NULL);
+        return;
+    }
+    if (!cueResolveEmberBios(ethPrefix, biosPath, sizeof(biosPath))) {
+        guiMsgBox(_l(_STR_EMBER_BIOS_MISSING), 0, NULL);
+        return;
+    }
+    cueApplyDisplaySetting(ethPrefix); // best-effort marker, never a launch gate
+    if (!cueGameHasImage(ethPrefix, cueName)) {
+        guiMsgBox(_l(_STR_EMBER_NO_DISC), 0, NULL);
+        return;
+    }
+
+    // NO vcdPreparePopstarterSmbLaunch here, deliberately. That equips POPSTARTER's own
+    // IPCONFIG.DAT / SMBCONFIG.DAT because POPSTARTER resets the IOP and has to redial the share
+    // itself. Ember never resets the IOP -- it inherits this live smbman mount -- so it needs no
+    // network configuration of its own, and writing POPSTARTER's files for an Ember launch would
+    // be a side effect with no purpose.
+
+    // UNMOUNT_EXCEPTION is load-bearing: Ember reads its game through the SMB mount that is live
+    // right now, so that mount must survive the teardown.
+    deinit(UNMOUNT_EXCEPTION, itemList->mode);
+    sysLaunchEmber(emberElf, cueName);
+}
+
 static void ethLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
 {
     int i, compatmask;
@@ -841,9 +895,13 @@ static void ethLaunchGame(item_list_t *itemList, int id, config_set_t *configSet
     u32 layer1_start, layer1_offset;
     unsigned short int layer1_part;
 
-    // VCD view (SMB): hand off to POPSTARTER by name, only once a share is selected.
+    // PS1 view (SMB): the row carries its own core, so dispatch on the ROW, not on the view.
+    // A .cue row is Ember's; anything else on this list is a POPSTARTER .VCD.
     if (gPCShareName[0] && game != NULL && (libListViewActive(itemList) == LIB_VIEW_PS1)) {
-        ethLaunchVcd(itemList, game->name, configSet);
+        if (cueIsCueEntry(game))
+            ethLaunchCue(itemList, game->name, configSet);
+        else
+            ethLaunchVcd(itemList, game->name, configSet);
         return;
     }
 
