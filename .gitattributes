@@ -10,7 +10,13 @@
 # in ".irx" and `*.irx` alone misses every one of them. Upstream spells this rule `pops/*`, which
 # matches nothing on a case-sensitive checkout (the directory is POPS/), so the CI runner never
 # applied it; using the real casing here is a deliberate divergence, not a typo.
-POPS/* binary
+#
+# Spelled `POPS/**` rather than `POPS/*` because the folder now carries a "POPSTARTER VERSIONS"
+# subdirectory of alternate POPSTARTER builds, and the single-star form stops at the top level --
+# exactly the reason EMBER/** below is spelled the same way. Those nested files are PS2 ELFs; a
+# CRLF<->LF pass through one produces a binary that no longer loads, and the failure would surface
+# as "this POPSTARTER variant hangs" long after the commit that caused it.
+POPS/** binary
 *.irx binary
 
 # Ember's core, shipped verbatim exactly like the POPSTARTER payload above. ember.elf is a PS2 ELF;

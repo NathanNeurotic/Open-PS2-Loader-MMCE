@@ -175,6 +175,16 @@ enum {
     GAME_VIEW_VCD       // lock every VCD-capable page to its VCD (PS1) list
 };
 extern int gDefaultGameView;
+// Ember's own display mode, written to <EmberFolder>/settings.txt on the device being launched.
+// LEAVE is the default and writes NOTHING: a display preference must not create a file on a user's
+// device unless they asked for one, and it is also the only value that respects a settings.txt the
+// user wrote by hand.
+enum {
+    EMBER_DISPLAY_LEAVE = 0,
+    EMBER_DISPLAY_240,
+    EMBER_DISPLAY_480
+};
+extern int gEmberDisplay;
 // POPSTARTER.ELF Device picker: where PS1 VCD launches load POPS/POPSTARTER.ELF from.
 enum { POPS_DEV_DEFAULT = 0, // cwd (gBootDir) /POPS/, then the VCD's own device (back-compat fallback)
        POPS_DEV_MC,          // mc0: / mc1:

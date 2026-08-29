@@ -799,6 +799,10 @@ static void mmceLaunchCue(item_list_t *itemList, const char *cueName, config_set
     // The scan lists folders without reading inside them -- that would be a directory read per row
     // on every refresh. Pay for it once, HERE, while a dialog can still be drawn: an empty or
     // mis-filled folder otherwise drops the user into the PS1 BIOS shell with no explanation.
+    // Leave Ember's display marker before the handoff, like the BDMA equip does for POPSTARTER.
+    // Best-effort: never a launch gate.
+    cueApplyDisplaySetting(ps1Root);
+
     if (!cueGameHasImage(ps1Root, cueName)) {
         guiMsgBox(_l(_STR_EMBER_NO_DISC), 0, NULL);
         return;

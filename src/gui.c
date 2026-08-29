@@ -990,7 +990,7 @@ reshow_ui:
     diaSetInt(diaUIConfig, UICFG_AUTOREFRESH, gAutoRefresh);
     diaSetInt(diaUIConfig, UICFG_NOTIFICATIONS, gEnableNotifications);
     diaSetVisible(diaUIConfig, UICFG_COVERFLOW_BUTTON, gTheme->coverflow != NULL);
-    const char *gameViewNames[] = {"Both", "ISO", "VCD", NULL};
+    const char *gameViewNames[] = {"Both", "PS2", "PS1", NULL};
     diaSetEnum(diaUIConfig, UICFG_GAMEVIEW, gameViewNames);
     diaSetInt(diaUIConfig, UICFG_GAMEVIEW, gDefaultGameView);
     diaSetEnum(diaUIConfig, UICFG_VMODE, vmodeNames);
@@ -1355,10 +1355,25 @@ int guiShowVcdUsbMode(void)
 // network settings are chained sub-dialogs (guiShowBdmaConfig / guiShowVcdListConfig /
 // guiShowPopsNetConfig). CFG ids are shared with the old rows, so saved config values map through
 // unchanged.
+// SUPERSEDED AND UNREFERENCED. The live PS Emulation Settings page is guiSettingsShowPopstarter(),
+// which COMPOSES a copy of diaVcdConfig + diaBdmaConfig and drives that copy. Nothing calls this
+// function any more; it is kept only because its declaration is still published in gui.h.
+//
+// Wiring a new row here does NOTHING. That mistake was made once already, with CFG_EMBER_DISPLAY:
+// the row rendered on the composed page with no enum list and never saved, because its diaSetEnum
+// ran against the template in here instead of against the composed `ui`. Add new rows to
+// guiSettingsShowPopstarter().
 void guiShowVcdConfig(void)
 {
     // POPSTARTER.ELF device TYPE (POPS_DEV_*). MUST stay in sync with vcdResolvePopstarter() (vcdsupport.c).
     const char *popsDevStrs[] = {_l(_STR_DEFAULT), "Memory Card", "USB", "MX4SIO", "MMCE", "HDD (exFAT)", "HDD (APA)", "Custom", _l(_STR_GAMES_DEVICE), NULL}; // "Game's Device" (POPS_DEV_GAME) appended last to match the enum tail
+    // diaSetEnum stores the ARRAY POINTER rather than copying, so this must outlive every render of
+    // the dialog -- static, like the BDMA option arrays on the peer page.
+    static const char *emberDisplayStrs[] = {NULL, "240p", "480p", NULL};
+    emberDisplayStrs[0] = _l(_STR_DEFAULT);
+    diaSetEnum(diaVcdConfig, CFG_EMBER_DISPLAY, emberDisplayStrs);
+    diaSetInt(diaVcdConfig, CFG_EMBER_DISPLAY, gEmberDisplay);
+
     diaSetEnum(diaVcdConfig, CFG_POPSTARTER_DEVICE, popsDevStrs);
     diaSetInt(diaVcdConfig, CFG_POPSTARTER_DEVICE, gPopstarterDevice);
     diaSetString(diaVcdConfig, CFG_POPSTARTER_PATH, gPopstarterPath);
@@ -1387,6 +1402,7 @@ reshow_vcd:
     if (ret) {
         diaGetInt(diaVcdConfig, CFG_POPSTARTER_DEVICE, &gPopstarterDevice);
         diaGetInt(diaVcdConfig, CFG_POPSTARTER_RETROGEM_GAMEID, &gPopstarterRetroGemGameID);
+        diaGetInt(diaVcdConfig, CFG_EMBER_DISPLAY, &gEmberDisplay);
 
         {
             // The dialog field is char[32]; only adopt the typed value if it actually changed, so
@@ -2799,7 +2815,7 @@ static int guiSettingsShowInterface(void)
 {
     const struct UIItem *parts[] = {diaUIConfig, diaDisplayConfig};
     const int skipIDs[] = {UICFG_VMODE};
-    const char *gameViewNames[] = {"Both", "ISO", "VCD", NULL};
+    const char *gameViewNames[] = {"Both", "PS2", "PS1", NULL};
     const char *vmodeNames[] = {_l(_STR_AUTO), "PAL 640x512i @50Hz 24bit", "NTSC 640x448i @60Hz 24bit",
                                 "EDTV 640x448p @60Hz 24bit", "EDTV 640x512p @50Hz 24bit", "VGA 640x480p @60Hz 24bit",
                                 "PAL 704x576i @50Hz 24bit (HIRES)", "NTSC 704x480i @60Hz 24bit (HIRES)",
@@ -3002,11 +3018,19 @@ static int guiSettingsShowPopstarter(void)
     const struct UIItem *parts[] = {diaVcdConfig, diaBdmaConfig};
     const int skipIDs[] = {VCD_BDMA_BUTTON};
     const char *popsDevStrs[] = {_l(_STR_DEFAULT), "Memory Card", "USB", "MX4SIO", "MMCE", "HDD (exFAT)", "HDD (APA)", "Custom", _l(_STR_GAMES_DEVICE), NULL};
+    const char *emberDisplayStrs[] = {_l(_STR_DEFAULT), "240p", "480p", NULL};
     struct UIItem *ui = guiSettingsCompose(parts, 2, skipIDs, 1, -1, 1);
     int result;
 
     if (ui == NULL)
         return 0;
+
+    // Ember's display mode. This MUST be set on `ui` -- the composed COPY -- not on the diaVcdConfig
+    // template it was built from: the copy is what renders and what diaGetInt reads back. Setting
+    // the template instead leaves the row on screen with no enum list and silently discards every
+    // change, which is exactly the bug this line replaced.
+    diaSetEnum(ui, CFG_EMBER_DISPLAY, emberDisplayStrs);
+    diaSetInt(ui, CFG_EMBER_DISPLAY, gEmberDisplay);
 
     diaSetEnum(ui, CFG_POPSTARTER_DEVICE, popsDevStrs);
     diaSetInt(ui, CFG_POPSTARTER_DEVICE, gPopstarterDevice);
@@ -3036,6 +3060,7 @@ reshow_popstarter:
 
         diaGetInt(ui, CFG_POPSTARTER_DEVICE, &gPopstarterDevice);
         diaGetInt(ui, CFG_POPSTARTER_RETROGEM_GAMEID, &gPopstarterRetroGemGameID);
+        diaGetInt(ui, CFG_EMBER_DISPLAY, &gEmberDisplay);
         diaGetString(ui, CFG_POPSTARTER_PATH, tmpPop, sizeof(tmpPop));
         if (strncmp(tmpPop, gPopstarterPath, 31) != 0)
             snprintf(gPopstarterPath, sizeof(gPopstarterPath), "%s", tmpPop);

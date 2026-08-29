@@ -42,6 +42,13 @@ DETAILED_CHANGELOG
 # they existed; this says so explicitly instead of relying on that accident.
 !EMBER/ember.elf
 
+# The alternate POPSTARTER builds, for the same reason and with the same trap. POPS/POPSTARTER.ELF
+# itself escapes `*.ELF` only because it was tracked before that rule existed -- a NEW file at a NEW
+# path gets no such grandfathering, so without this line `git add` skips all five silently and the
+# folder ships empty. Spelled with the directory prefix so it re-includes only these, never any
+# build product that happens to land elsewhere.
+!POPS/POPSTARTER VERSIONS/**/*.ELF
+
 #
 # Generated source files
 #

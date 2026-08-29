@@ -222,15 +222,43 @@ This build layers several features on top of upstream OPL:
   Ember writes its per-game memory cards (`MC1.vmc`, `MC2.vmc`) into that same folder, so it must be
   on writable media. Currently available on USB, MX4SIO, iLink, exFAT-ATA and MMCE.
 
-- **PS1 games via POPSTARTER (VCD view):** press **L3** on a device page to switch between your
-  PS2 discs and a list of PS1 `*.VCD` games on the same device — it's a *view*, not a separate tab.
-  A **Default game view** setting (**Both** / **ISO** / **VCD**, default **Both**) can lock a page
-  to one type, and Favourites follow the active view. PS1 titles boot through **POPSTARTER** only
-  (never OPL's core, never Neutrino — the Loader Core selector is inert for them). Works on USB /
-  MMCE / MX4SIO / iLink / SMB **and the internal HDD** — both APA (exact `__.POPS[0-9]?`
-  containers plus `PP.<name>` / `__.<name>` one-game partitions containing `IMAGE0.VCD`) and
-  **exFAT** (BDMA; PS1 games in `massN:/POPS/`). See
-  **[docs/VCD.md](docs/VCD.md)**.
+  **Credit and licence — Ember is created by [Gageformer](https://github.com/Gageformer), and its
+  official release page is <https://github.com/Gageformer/Ember/releases>.** Ember is an
+  independent PS1 emulator written from scratch for the PS2; it is **not** part of RiptOPL and is
+  not our work. We bundle it unmodified and with the author's blessing, under the **Ember Public
+  Beta Testing Licence**, which ships in the release package as `EMBER/LICENSE-BETA.txt` and governs
+  the build it accompanies. That licence permits non-commercial bundling but prohibits selling,
+  modifying or repackaging the build. Ember contains no PlayStation BIOS and no game data — you
+  supply your own, from hardware and media you lawfully own. Please report Ember problems to *us*
+  first rather than to Gageformer: the launching is ours.
+
+  **Ember display mode.** The **PS1 settings** page carries an *Ember Display Mode* setting
+  (**Default** / **240p** / **480p**). On *Default* RiptOPL does not touch Ember's own configuration
+  at all. Choose 240p or 480p and it writes that key into `<device>:/EMBER/settings.txt` when you
+  launch an Ember title, on the launching device only, preserving any other lines already in that
+  file.
+
+- **Alternate POPSTARTER builds:** the release package ships
+  `POPS/POPSTARTER VERSIONS/` containing five builds of POPSTARTER — **MAIN**, **DEBUG**,
+  **USBDELAY**, **USBDELAY_DEBUG** and **USBDELAY_LONGER_DEBUG**. To switch, copy the
+  `POPSTARTER.ELF` you want over `POPS/POPSTARTER.ELF` on your device; nothing in RiptOPL selects
+  them for you. The `USBDELAY*` builds give USB devices longer to settle before POPSTARTER reads
+  them, and the `*DEBUG*` builds print diagnostics on screen — use one of those when reporting a
+  POPSTARTER problem.
+
+  **The shipped `POPS/POPSTARTER.ELF` is the DEBUG build, and that is deliberate** — it is the build
+  with SMB support, so it is the right default for the package. On-screen POPSTARTER diagnostics
+  during a VCD launch are expected and are not a fault. Do not overwrite it with **MAIN** unless you
+  are certain you do not need SMB; the alternate builds are here for the `USBDELAY` cases.
+
+- **Where POPSTARTER's VCDs come from:** the PS1 list is a *view* on a device page, not a separate
+  tab. A **Default game view** setting (**Both** / **PS2** / **PS1**, default **Both**) can lock a
+  page to one type, and Favourites follow the active view. A `*.VCD` row boots through
+  **POPSTARTER** — never OPL's own core and never Neutrino, so the Loader Core selector is inert for
+  it. POPSTARTER VCDs work on USB / MMCE / MX4SIO / iLink / SMB **and the internal HDD** — both APA
+  (exact `__.POPS[0-9]?` containers plus `PP.<name>` / `__.<name>` one-game partitions containing
+  `IMAGE0.VCD`) and **exFAT** (BDMA; PS1 games in `massN:/POPS/`). Ember's half of the list has its
+  own device coverage, noted above. See **[docs/VCD.md](docs/VCD.md)**.
 - **Core-aware per-game settings:** the per-game screen adapts to the selected **Loader Core** —
   under Neutrino it greys the panels Neutrino ignores (GSM, Cheats, PADEMU, OSD Language and the
   OPL-only compat modes) and offers a structured **Neutrino Video** picker (Off / 240p / 480p /
@@ -471,7 +499,7 @@ Sources**. For PS2, 48-bit LBA internal HDDs are supported. The HDD can be forma
 	- Enable **BDM HDD** in **Game Sources**. The exFAT HDD then mounts through the Block Device Manager (BDMAssault / "BDMA") into the shared `massN:` namespace — the same path as USB/MX4SIO — and appears as an **HDD (exFAT)** games list with the HDD icon.
 	- Files should be added contiguously or synchronously to avoid fragmentation. For example, drag and drop files one at a time, or ensure that files are added sequentially.
 	- When formatting drives for the exFAT filesystem, please make sure the `Allocation unit size` is set to `Default`.
-	- **PS1 games:** PS1 `*.VCD` titles in the HDD's `POPS/` folder list under the **L3** VCD view like any other device. To boot them, open **POPStarter → BDMA Settings** from the main menu. **VCD BDMA Apply on Launch** is on by default and equips the matching exFAT driver automatically; turn it off to reveal the manual **BDMA Source** / **BDMA Mode** pickers and set **BDMA Mode → HDD (exFAT)** by hand so POPSTARTER can read the exFAT volume. See **[docs/VCD.md](docs/VCD.md)**.
+	- **PS1 games:** PS1 `*.VCD` titles in the HDD's `POPS/` folder list under the **L3** VCD view like any other device. To boot them, open **PS Emulation Settings → BDMA Settings** from the main menu. **VCD BDMA Apply on Launch** is on by default and equips the matching exFAT driver automatically; turn it off to reveal the manual **BDMA Source** / **BDMA Mode** pickers and set **BDMA Mode → HDD (exFAT)** by hand so POPSTARTER can read the exFAT volume. See **[docs/VCD.md](docs/VCD.md)**.
 
 ## APPS
 

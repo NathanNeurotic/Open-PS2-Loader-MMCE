@@ -77,8 +77,52 @@ writable media.
 Available on USB, MX4SIO, iLink, exFAT-ATA and MMCE. SMB and the APA internal HDD are
 POPSTARTER-only for now.
 
-Ember is by **Gageformer** — https://github.com/Gageformer/Ember — and is included here with his
-blessing. Please report Ember problems to *us* first, not to him: the launching is ours.
+**Ember display mode.** Ember can run at 240p or 480p. There is a setting for it on the
+**PS1 settings** page — leave it on *Default* and RiptOPL does not touch Ember's own
+configuration at all. Pick 240p or 480p and it writes that choice to
+`<device>:/EMBER/settings.txt` when you launch a game, on that device only. Any other lines
+already in that file are left alone.
+
+### Ember credit and licence
+
+**Ember is created by Gageformer.** Official release page: <https://github.com/Gageformer/Ember/releases>
+
+Ember is an independent PS1 emulator written from scratch for the PS2 — it is **not** part of
+RiptOPL and is not our work. It is bundled here unmodified, with the author's blessing, under
+its **Ember Public Beta Testing Licence**. That licence ships in the package as
+**`EMBER/LICENSE-BETA.txt`** and governs the Ember build it accompanies — please read it. In
+short: free to use and to bundle non-commercially, no selling, no modifying or repackaging the
+build, and no BIOS or game content is included or ever will be.
+
+Please report Ember problems to *us* first, not to Gageformer: the launching is ours, and most
+issues turn out to be on our side.
+
+## Alternate POPSTARTER builds
+
+`POPS/` now carries a **`POPSTARTER VERSIONS/`** folder holding five builds of POPSTARTER:
+
+| Build | Use it when |
+| --- | --- |
+| **MAIN** | POPSTARTER without the SMB support the shipped default carries. Only if you know you do not need SMB. |
+| **DEBUG** | **The shipped default.** SMB-capable, and prints diagnostics on screen. |
+| **USBDELAY** | USB devices that need longer to settle before POPSTARTER reads them. |
+| **USBDELAY_DEBUG** | USBDELAY, with the diagnostics. |
+| **USBDELAY_LONGER_DEBUG** | A longer delay still, with diagnostics. |
+
+To switch, copy the `POPSTARTER.ELF` you want over `POPS/POPSTARTER.ELF` on your device.
+Nothing in RiptOPL selects these for you — it is a manual swap, and the folder is there so
+you do not have to go hunting for the builds.
+
+**The `POPSTARTER.ELF` shipped at `POPS/POPSTARTER.ELF` is the DEBUG build on purpose** — that
+is the build with SMB support, so it is the right default. Seeing POPSTARTER diagnostics
+during a VCD launch is expected, not a fault. Do not copy **MAIN** over it unless you are
+sure you do not need SMB — the alternate builds are here mainly for the `USBDELAY` cases.
+
+**The redundant `POPSTARTER/` folder is gone.** It used to sit at the root of this package
+holding a second copy of nine files that `POPS/` already contains. It also carried a
+`bdma_config.txt` that said `fat32` — that file is a *marker RiptOPL writes itself* to
+record which BDMAssault variant it installed, so shipping a pre-filled copy told a fresh
+install that a variant was equipped when it was not. Everything you need is in `POPS/`.
 
 ## Setting up cover art and game metadata
 

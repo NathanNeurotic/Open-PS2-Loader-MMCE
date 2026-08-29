@@ -93,6 +93,7 @@
 #define EMBER_ELF_NAME       "ember.elf"
 #define EMBER_BIOS_NAME      "bios.bin"
 #define EMBER_GAMES_FOLDER   "games"
+#define EMBER_SETTINGS_NAME  "settings.txt"
 
 // The extension stamped into base_game_info_t for an Ember row. This is the ROW-KIND discriminator
 // that makes one merged PS1 list possible: a .VCD row launches through POPSTARTER, a .CUE row
@@ -129,6 +130,19 @@ int cueNameLaunchable(const char *name);
 // (contended bus): an absent EMBER folder is 0, "readable, nothing here", exactly as the VCD scan
 // treats an absent POPS folder -- so a device with only one of the two never looks like a failure.
 int cueScanDir(const char *devPrefix, cue_entry_t **outList);
+
+// Apply the Ember display mode to <devPrefix><EmberFolder>/settings.txt, the same way the BDMA
+// equip leaves its marker beside POPSTARTER. Called on the LAUNCH path only, so the file lands on
+// the device actually being launched and nowhere else.
+//
+// EMBER_DISPLAY_LEAVE writes nothing at all, which is the default: a display preference must not
+// create a file on a user's device unless they asked for one, and it is the only setting that
+// leaves a hand-written settings.txt alone.
+//
+// Lines other than "display:" are PRESERVED. Ember ignores keys it does not know (it logs and moves
+// on), so a key it gains later, or one a user added, must survive us rewriting this file.
+// Best-effort by design: a failure here is never a launch gate -- Ember runs fine without the file.
+void cueApplyDisplaySetting(const char *devPrefix);
 
 // Does this game folder actually hold something Ember can mount -- a *.cue, *.bin or *.exe at its
 // top level? Costs ONE directory read, so callers use it on the LAUNCH path only (before deinit,
