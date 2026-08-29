@@ -242,7 +242,7 @@ translations:
   HINT_POPSTARTER_RETROGEM_GAMEID: Menampilkan barcode optik untuk Pixel FX / RetroGEM / PS2Digital saat meluncurkan VCD PS1
   HINT_POPS_IMPORT: Membaca IPCONFIG.DAT dan SMBCONFIG.DAT milik POPSTARTER dari folder POPS pada berbagi SMB yang terhubung. Tidak ada yang ditulis sampai Anda mengonfirmasi dengan OK.
   HINT_POPS_PORT: Port SMB di server -- 445 adalah bawaannya. Biarkan 0 (atau 445) untuk berbagi biasa; gunakan 139 untuk server SMB1 lama.
-  HINT_VCD_SHOW_PP_POPS: Hanya HDD -- menampilkan partisi satu gim bernama PP.<ID>.POPS.<nama> (mis. PP.SCES-01492.POPS.MEDIEVIL) sebagai gim PS1. Hanya pendaftaran; cara meluncurkan tidak berubah. Partisi PP.* lainnya (aplikasi, gim PS2) tetap tersembunyi.
+  HINT_VCD_SHOW_PP_POPS: Hanya HDD -- menampilkan partisi satu gim bernama PP.<ID>.POPS.<name> (mis. PP.SCES-01492.POPS.MEDIEVIL) sebagai gim PS1. Hanya pendaftaran; cara meluncurkan tidak berubah. Partisi PP.* lainnya (aplikasi, gim PS2) tetap tersembunyi.
   INTERFACE_SETTINGS: Antarmuka
   MENU_NETWORK: Jaringan
   NEUTRINO_DEFAULTS: Bawaan Neutrino
@@ -288,7 +288,7 @@ translations:
   ERR_DEVICE_BUSY_TIMEOUT: 'Perangkat sibuk: penulisan pengaturan tidak pernah dimulai. Coba lagi setelah pemuatan selesai.'
   BDMA_EQUIPPING: Menyiapkan driver PS1 di kartu memori...
   VCD_USB_BDMA: Driver BDMA USB
-  HINT_VCD_USB_BDMA: Hanya berlaku untuk peluncuran PS1 (VCD) dari flashdisk. PS2 tidak dapat mendeteksi apakah flashdisk itu fat32 atau exFAT, jadi driver POPSTARTER harus dipilih. Tanya akan bertanya setiap kali; exFAT atau fat32 mengunci jawabannya dan melewati pertanyaan.
+  HINT_VCD_USB_BDMA: Hanya berlaku untuk peluncuran PS1 (VCD) dari flashdisk. PS2 tidak dapat mendeteksi apakah flashdisk itu fat32 atau exFAT, jadi driver POPSTARTER harus dipilih. Dengan pilihan Tanya, pertanyaan muncul setiap kali diluncurkan, sedangkan exFAT atau fat32 mengunci jawabannya dan melewatinya.
   VCD_USB_BDMA_ASK: Tanya
   SETTINGS_HDD_FALLBACK: 'Pengaturan HDD memakai lokasi cadangan yang aman: %s'
   HDD_BACKEND_RECONCILED: HDD internal APA dan exFAT sama-sama aktif -- salah satunya dinonaktifkan otomatis (lihat Pengaturan perangkat).

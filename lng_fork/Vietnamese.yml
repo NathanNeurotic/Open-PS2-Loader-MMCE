@@ -242,7 +242,7 @@ translations:
   HINT_POPSTARTER_RETROGEM_GAMEID: Hiển thị mã vạch quang học cho Pixel FX / RetroGEM / PS2Digital khi khởi chạy VCD PS1
   HINT_POPS_IMPORT: Đọc IPCONFIG.DAT và SMBCONFIG.DAT của POPSTARTER từ thư mục POPS trên chia sẻ SMB đang kết nối. Không có gì được ghi cho đến khi bạn xác nhận bằng OK.
   HINT_POPS_PORT: Cổng SMB trên máy chủ -- 445 là mặc định. Để 0 (hoặc 445) cho chia sẻ thông thường; dùng 139 cho máy chủ SMB1 cũ.
-  HINT_VCD_SHOW_PP_POPS: Chỉ HDD -- liệt kê các phân vùng chứa một trò chơi có tên PP.<ID>.POPS.<tên> (ví dụ PP.SCES-01492.POPS.MEDIEVIL) như trò chơi PS1. Chỉ liệt kê; cách khởi chạy không đổi. Các phân vùng PP.* khác (ứng dụng, trò chơi PS2) vẫn bị ẩn.
+  HINT_VCD_SHOW_PP_POPS: Chỉ HDD -- liệt kê các phân vùng chứa một trò chơi có tên PP.<ID>.POPS.<name> (ví dụ PP.SCES-01492.POPS.MEDIEVIL) như trò chơi PS1. Chỉ liệt kê; cách khởi chạy không đổi. Các phân vùng PP.* khác (ứng dụng, trò chơi PS2) vẫn bị ẩn.
   INTERFACE_SETTINGS: Giao diện
   MENU_NETWORK: Mạng
   NEUTRINO_DEFAULTS: Mặc định của Neutrino
@@ -288,7 +288,7 @@ translations:
   ERR_DEVICE_BUSY_TIMEOUT: 'Thiết bị đang bận: việc ghi cài đặt chưa hề bắt đầu. Hãy thử lại sau khi nạp xong.'
   BDMA_EQUIPPING: Đang chuẩn bị driver PS1 trên thẻ nhớ...
   VCD_USB_BDMA: Driver BDMA cho USB
-  HINT_VCD_USB_BDMA: Chỉ ảnh hưởng tới việc khởi chạy PS1 (VCD) từ USB. PS2 không thể phát hiện USB là fat32 hay exFAT, nên phải chọn driver của POPSTARTER. Hỏi sẽ hỏi mỗi lần khởi chạy; exFAT hoặc fat32 cố định câu trả lời và bỏ qua câu hỏi.
+  HINT_VCD_USB_BDMA: Chỉ ảnh hưởng tới việc khởi chạy PS1 (VCD) từ USB. PS2 không thể phát hiện USB là fat32 hay exFAT, nên phải chọn driver của POPSTARTER. Với tùy chọn Hỏi, câu hỏi xuất hiện mỗi lần khởi chạy, còn exFAT hoặc fat32 cố định câu trả lời và bỏ qua nó.
   VCD_USB_BDMA_ASK: Hỏi
   SETTINGS_HDD_FALLBACK: 'Cài đặt HDD đã dùng vị trí dự phòng an toàn: %s'
   HDD_BACKEND_RECONCILED: Ổ cứng trong APA và exFAT đều đang bật -- một trong hai đã bị tắt tự động (xem Cài đặt thiết bị).

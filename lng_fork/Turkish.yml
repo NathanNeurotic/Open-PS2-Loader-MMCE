@@ -242,7 +242,7 @@ translations:
   HINT_POPSTARTER_RETROGEM_GAMEID: PS1 VCD başlatılırken Pixel FX / RetroGEM / PS2Digital için optik barkod gösterir
   HINT_POPS_IMPORT: "POPSTARTER'ın IPCONFIG.DAT ve SMBCONFIG.DAT dosyalarını bağlı SMB paylaşımının POPS klasöründen okur. Tamam ile onaylayana kadar hiçbir şey yazılmaz."
   HINT_POPS_PORT: Sunucudaki SMB bağlantı noktası -- varsayılan 445. Normal bir paylaşım için 0 (veya 445) bırakın; eski SMB1 sunucuları için 139 kullanın.
-  HINT_VCD_SHOW_PP_POPS: Yalnızca HDD -- PP.<ID>.POPS.<ad> (ör. PP.SCES-01492.POPS.MEDIEVIL) adlı tek oyunluk bölümleri PS1 oyunu olarak listeler. Yalnızca listeleme; başlatma değişmez. Diğer PP.* bölümleri (uygulamalar, PS2 oyunları) gizli kalır.
+  HINT_VCD_SHOW_PP_POPS: Yalnızca HDD -- PP.<ID>.POPS.<name> (ör. PP.SCES-01492.POPS.MEDIEVIL) adlı tek oyunluk bölümleri PS1 oyunu olarak listeler. Yalnızca listeleme; başlatma değişmez. Diğer PP.* bölümleri (uygulamalar, PS2 oyunları) gizli kalır.
   INTERFACE_SETTINGS: Arayüz
   MENU_NETWORK: Ağ
   NEUTRINO_DEFAULTS: Neutrino varsayılanları
@@ -288,7 +288,7 @@ translations:
   ERR_DEVICE_BUSY_TIMEOUT: 'Aygıt meşgul: ayarların yazımı hiç başlamadı. Yükleme bitince tekrar deneyin.'
   BDMA_EQUIPPING: Hafıza kartında PS1 sürücüsü hazırlanıyor...
   VCD_USB_BDMA: USB BDMA sürücüsü
-  HINT_VCD_USB_BDMA: "Yalnızca USB bellekten PS1 (VCD) başlatmayı etkiler. PS2, belleğin fat32 mı exFAT mı olduğunu algılayamaz; bu yüzden POPSTARTER'ın sürücüsü seçilmelidir. Sor her başlatmada sorar; exFAT veya fat32 yanıtı sabitler ve soruyu atlar."
+  HINT_VCD_USB_BDMA: "Yalnızca USB bellekten PS1 (VCD) başlatmayı etkiler. PS2, belleğin fat32 mı exFAT mı olduğunu algılayamaz; bu yüzden POPSTARTER'ın sürücüsü seçilmelidir. Sor seçeneğinde her başlatmada sorulur; exFAT veya fat32 ise yanıtı sabitler ve soruyu atlar."
   VCD_USB_BDMA_ASK: Sor
   SETTINGS_HDD_FALLBACK: 'HDD ayarları güvenli yedek konumu kullandı: %s'
   HDD_BACKEND_RECONCILED: Dahili APA ve exFAT HDD birlikte etkindi -- biri otomatik olarak kapatıldı (Aygıt ayarlarına bakın).

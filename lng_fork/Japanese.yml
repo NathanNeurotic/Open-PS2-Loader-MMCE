@@ -242,7 +242,7 @@ translations:
   HINT_POPSTARTER_RETROGEM_GAMEID: PS1 の VCD 起動時に Pixel FX / RetroGEM / PS2Digital 用の光学バーコードを表示します
   HINT_POPS_IMPORT: 接続中の SMB 共有の POPS フォルダから POPSTARTER の IPCONFIG.DAT と SMBCONFIG.DAT を読み込みます。OK で確定するまで何も書き込まれません。
   HINT_POPS_PORT: サーバーの SMB ポート -- 既定は 445 です。通常の共有では 0 (または 445) のままにし、古い SMB1 サーバーでは 139 を指定します。
-  HINT_VCD_SHOW_PP_POPS: 'HDD のみ -- PP.<ID>.POPS.<名前> (例: PP.SCES-01492.POPS.MEDIEVIL) という名前の 1 本用パーティションを PS1 ゲームとして一覧に出します。一覧に出すだけで、起動方法は変わりません。ほかの PP.* パーティション (アプリや PS2 ゲーム) は非表示のままです。'
+  HINT_VCD_SHOW_PP_POPS: 'HDD のみ -- PP.<ID>.POPS.<name> (例: PP.SCES-01492.POPS.MEDIEVIL) という名前の 1 本用パーティションを PS1 ゲームとして一覧に出します。一覧に出すだけで、起動方法は変わりません。ほかの PP.* パーティション (アプリや PS2 ゲーム) は非表示のままです。'
   INTERFACE_SETTINGS: インターフェース
   MENU_NETWORK: ネットワーク
   NEUTRINO_DEFAULTS: Neutrino の既定値
@@ -288,7 +288,7 @@ translations:
   ERR_DEVICE_BUSY_TIMEOUT: 'デバイスがビジーです: 設定の書き込みが開始されませんでした。読み込みが終わってからもう一度お試しください。'
   BDMA_EQUIPPING: メモリーカードに PS1 ドライバを準備しています...
   VCD_USB_BDMA: USB BDMA ドライバ
-  HINT_VCD_USB_BDMA: USB メモリからの PS1 (VCD) 起動にのみ関係します。PS2 は USB メモリが fat32 か exFAT かを判別できないため、POPSTARTER のドライバを選ぶ必要があります。確認する は毎回たずねます。exFAT または fat32 を選ぶと答えが固定され、確認は省略されます。
+  HINT_VCD_USB_BDMA: USB メモリからの PS1 (VCD) 起動にのみ関係します。PS2 は USB メモリが fat32 か exFAT かを判別できないため、POPSTARTER のドライバを選ぶ必要があります。確認する を選ぶと毎回たずねられ、exFAT または fat32 を選ぶと答えが固定されて確認は省略されます。
   VCD_USB_BDMA_ASK: 確認する
   SETTINGS_HDD_FALLBACK: 'HDD の設定は安全な代替の保存先を使用しました: %s'
   HDD_BACKEND_RECONCILED: 内蔵 HDD の APA と exFAT が同時に有効でした -- 一方を自動的に無効にしました (デバイス設定を確認してください)。

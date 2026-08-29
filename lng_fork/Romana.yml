@@ -242,7 +242,7 @@ translations:
   HINT_POPSTARTER_RETROGEM_GAMEID: Afișează un cod de bare optic pentru Pixel FX / RetroGEM / PS2Digital la lansarea unui VCD de PS1
   HINT_POPS_IMPORT: Citește fișierele IPCONFIG.DAT și SMBCONFIG.DAT ale POPSTARTER din folderul POPS al partajării SMB conectate. Nu se scrie nimic până nu confirmi cu OK.
   HINT_POPS_PORT: Portul SMB de pe server -- 445 este cel implicit. Lasă 0 (sau 445) pentru o partajare obișnuită; folosește 139 pentru servere SMB1 mai vechi.
-  HINT_VCD_SHOW_PP_POPS: Doar HDD -- listează ca jocuri PS1 partițiile cu un singur joc numite PP.<ID>.POPS.<nume> (de ex. PP.SCES-01492.POPS.MEDIEVIL). Doar listarea; lansarea rămâne neschimbată. Celelalte partiții PP.* (aplicații, jocuri PS2) rămân ascunse.
+  HINT_VCD_SHOW_PP_POPS: Doar HDD -- listează ca jocuri PS1 partițiile cu un singur joc numite PP.<ID>.POPS.<name> (de ex. PP.SCES-01492.POPS.MEDIEVIL). Doar listarea; lansarea rămâne neschimbată. Celelalte partiții PP.* (aplicații, jocuri PS2) rămân ascunse.
   INTERFACE_SETTINGS: Interfață
   MENU_NETWORK: Rețea
   NEUTRINO_DEFAULTS: Valori implicite Neutrino
@@ -288,7 +288,7 @@ translations:
   ERR_DEVICE_BUSY_TIMEOUT: 'Dispozitiv ocupat: scrierea setărilor nu a început deloc. Încearcă din nou după ce se termină încărcarea.'
   BDMA_EQUIPPING: Se pregătește driverul PS1 pe cardul de memorie...
   VCD_USB_BDMA: Driver BDMA pentru USB
-  HINT_VCD_USB_BDMA: Se aplică doar la lansarea jocurilor PS1 (VCD) de pe un stick USB. PS2 nu poate detecta dacă un stick este fat32 sau exFAT, așa că driverul POPSTARTER trebuie ales. Întreabă pune întrebarea la fiecare lansare; exFAT sau fat32 fixează răspunsul și sare peste întrebare.
+  HINT_VCD_USB_BDMA: Se aplică doar la lansarea jocurilor PS1 (VCD) de pe un stick USB. PS2 nu poate detecta dacă un stick este fat32 sau exFAT, așa că driverul POPSTARTER trebuie ales. Cu opțiunea Întreabă întrebarea apare la fiecare lansare, în timp ce exFAT sau fat32 fixează răspunsul și o omit.
   VCD_USB_BDMA_ASK: Întreabă
   SETTINGS_HDD_FALLBACK: 'Setările HDD au folosit locația sigură de rezervă: %s'
   HDD_BACKEND_RECONCILED: HDD-ul intern APA și cel exFAT erau ambele activate -- unul a fost dezactivat automat (vezi Setări dispozitive).

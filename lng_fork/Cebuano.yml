@@ -242,7 +242,7 @@ translations:
   HINT_POPSTARTER_RETROGEM_GAMEID: Magpakita ug optical barcode para sa Pixel FX / RetroGEM / PS2Digital kon molunsad ug PS1 VCD
   HINT_POPS_IMPORT: Magbasa sa IPCONFIG.DAT ug SMBCONFIG.DAT sa POPSTARTER gikan sa POPS folder sa konektado nga SMB share. Walay isulat hangtod nga mokumpirma ka pinaagi sa OK.
   HINT_POPS_PORT: SMB port sa server -- 445 ang default. Ibilin nga 0 (o 445) para sa ordinaryong share; gamita ang 139 para sa mas daan nga SMB1 nga server.
-  HINT_VCD_SHOW_PP_POPS: HDD lamang -- ilista isip mga dula sa PS1 ang mga partisyon nga usa ra ka dula ug ginganlan ug PP.<ID>.POPS.<ngalan> (pananglitan PP.SCES-01492.POPS.MEDIEVIL). Paglista lamang; dili mausab ang paglunsad. Ang ubang PP.* nga partisyon (mga app, mga dula sa PS2) magpabiling tinago.
+  HINT_VCD_SHOW_PP_POPS: HDD lamang -- ilista isip mga dula sa PS1 ang mga partisyon nga usa ra ka dula ug ginganlan ug PP.<ID>.POPS.<name> (pananglitan PP.SCES-01492.POPS.MEDIEVIL). Paglista lamang; dili mausab ang paglunsad. Ang ubang PP.* nga partisyon (mga app, mga dula sa PS2) magpabiling tinago.
   INTERFACE_SETTINGS: Interface
   MENU_NETWORK: Network
   NEUTRINO_DEFAULTS: Mga Default sa Neutrino
@@ -288,7 +288,7 @@ translations:
   ERR_DEVICE_BUSY_TIMEOUT: 'Busy ang device: wala gani magsugod ang pagsulat sa mga setting. Sulayi pag-usab kon human na ang pag-load.'
   BDMA_EQUIPPING: Giandam ang PS1 driver sa memory card...
   VCD_USB_BDMA: USB BDMA Driver
-  HINT_VCD_USB_BDMA: Para lamang sa paglunsad sa PS1 (VCD) gikan sa USB. Dili matino sa PS2 kon fat32 ba o exFAT ang usa ka USB, mao nga kinahanglang pilion ang driver sa POPSTARTER. Ang Pangutana mangutana matag paglunsad; ang exFAT o fat32 magpirmi sa tubag ug molaktaw sa pangutana.
+  HINT_VCD_USB_BDMA: Para lamang sa paglunsad sa PS1 (VCD) gikan sa USB. Dili matino sa PS2 kon fat32 ba o exFAT ang usa ka USB, mao nga kinahanglang pilion ang driver sa POPSTARTER. Sa opsyon nga Pangutana, mangutana kini matag paglunsad, samtang ang exFAT o fat32 magpirmi sa tubag ug molaktaw niini.
   VCD_USB_BDMA_ASK: Pangutana
   SETTINGS_HDD_FALLBACK: 'Ang mga setting sa HDD migamit sa luwas nga pamuli nga lokasyon: %s'
   HDD_BACKEND_RECONCILED: Naka-on ang duha ka internal nga HDD nga APA ug exFAT -- awtomatik nga gi-off ang usa (tan-awa ang Mga Setting sa Device).

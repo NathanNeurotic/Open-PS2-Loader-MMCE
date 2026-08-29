@@ -242,7 +242,7 @@ translations:
   HINT_POPSTARTER_RETROGEM_GAMEID: Toont een optische barcode voor Pixel FX / RetroGEM / PS2Digital bij het starten van een PS1-VCD
   HINT_POPS_IMPORT: Leest IPCONFIG.DAT en SMBCONFIG.DAT van POPSTARTER uit de POPS-map van de verbonden SMB-share. Er wordt niets geschreven totdat je met OK bevestigt.
   HINT_POPS_PORT: SMB-poort op de server -- 445 is de standaard. Laat 0 (of 445) staan voor een gewone share; gebruik 139 voor oudere SMB1-servers.
-  HINT_VCD_SHOW_PP_POPS: Alleen HDD -- toont partities met één spel, genaamd PP.<ID>.POPS.<naam> (bijv. PP.SCES-01492.POPS.MEDIEVIL), als PS1-spellen. Alleen de lijst; het starten verandert niet. Andere PP.*-partities (apps, PS2-spellen) blijven verborgen.
+  HINT_VCD_SHOW_PP_POPS: Alleen HDD -- toont partities met één spel, genaamd PP.<ID>.POPS.<name> (bijv. PP.SCES-01492.POPS.MEDIEVIL), als PS1-spellen. Alleen de lijst; het starten verandert niet. Andere PP.*-partities (apps, PS2-spellen) blijven verborgen.
   INTERFACE_SETTINGS: Interface
   MENU_NETWORK: Netwerk
   NEUTRINO_DEFAULTS: Neutrino-standaarden
@@ -288,7 +288,7 @@ translations:
   ERR_DEVICE_BUSY_TIMEOUT: 'Apparaat bezet: het schrijven van de instellingen is nooit begonnen. Probeer het opnieuw zodra het laden klaar is.'
   BDMA_EQUIPPING: PS1-stuurprogramma wordt voorbereid op de memory card...
   VCD_USB_BDMA: USB-BDMA-stuurprogramma
-  HINT_VCD_USB_BDMA: Geldt alleen voor PS1-starts (VCD) vanaf een USB-stick. De PS2 kan niet detecteren of een stick fat32 of exFAT is, dus het stuurprogramma van POPSTARTER moet gekozen worden. Vragen vraagt het bij elke start; exFAT of fat32 leggen het antwoord vast en slaan de vraag over.
+  HINT_VCD_USB_BDMA: Geldt alleen voor PS1-starts (VCD) vanaf een USB-stick. De PS2 kan niet detecteren of een stick fat32 of exFAT is, dus het stuurprogramma van POPSTARTER moet gekozen worden. Bij de optie Vragen verschijnt de vraag bij elke start, terwijl exFAT of fat32 het antwoord vastleggen en de vraag overslaan.
   VCD_USB_BDMA_ASK: Vragen
   SETTINGS_HDD_FALLBACK: 'HDD-instellingen gebruikten de veilige reservelocatie: %s'
   HDD_BACKEND_RECONCILED: De interne APA- en exFAT-HDD stonden allebei aan -- één is automatisch uitgeschakeld (zie Apparaatinstellingen).

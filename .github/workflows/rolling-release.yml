@@ -948,43 +948,35 @@ jobs:
             done
             gh release edit "$TAG" --title "$TITLE" --notes-file notes.md $PREREL
             gh release upload "$TAG" rolling/* --clobber
-            # REFRESH THE RELEASE DATE. `gh release edit` updates the body and assets but never
-            # touches published_at, so the rolling release kept advertising the date it was FIRST
-            # published -- a package rebuilt today sat under "last month" on the releases page,
-            # which reads as abandoned rather than current.
+            # REFRESH THE ROLLING RELEASE DATE. `gh release edit` updates the body and the assets
+            # but never touches published_at, which is what GitHub renders as the relative time --
+            # so a package rebuilt today sat under "last month" and read as abandoned. Recreating
+            # the release would fix the date but reset the download counters, so it is patched in
+            # place.
             #
-            # Recreating the release would fix the date but reset the download counters, so it is
-            # patched in place instead. published_at is not in the documented body for "Update a
-            # release", so this does not trust it: it PATCHes, reads the value back, and only if
-            # the date did not move falls back to the documented behaviour -- published_at is set
-            # when a release transitions draft -> published, so a draft flip refreshes it. The
-            # release is re-marked with $PREREL afterwards because the flip can drop "latest".
+            # ROLLING ONLY. A refs/tags/v* run reaches this same branch for an existing release, and
+            # a stable release must keep the date it was actually published -- rewriting that would
+            # be a lie about history, not a cosmetic fix.
             #
-            # Never fatal: a stale date is cosmetic, and failing the publish over it would be worse
-            # than the problem.
-            RELEASE_ID=$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}" --jq .id 2>/dev/null || echo "")
-            if [ -n "$RELEASE_ID" ]; then
-              NOW_ISO=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-              TODAY=$(date -u +%Y-%m-%d)
-              gh api -X PATCH "repos/${GITHUB_REPOSITORY}/releases/${RELEASE_ID}" \
-                -f published_at="$NOW_ISO" >/dev/null 2>&1 || true
-              GOT=$(gh api "repos/${GITHUB_REPOSITORY}/releases/${RELEASE_ID}" --jq .published_at 2>/dev/null || echo "")
-              case "$GOT" in
-                "${TODAY}"*)
-                  echo "Release date refreshed to $GOT"
-                  ;;
-                *)
-                  echo "published_at PATCH did not take (got '$GOT'); flipping draft to republish"
-                  gh release edit "$TAG" --draft=true  >/dev/null 2>&1 || true
-                  gh release edit "$TAG" --draft=false >/dev/null 2>&1 || true
-                  gh release edit "$TAG" $PREREL       >/dev/null 2>&1 || true
-                  GOT=$(gh api "repos/${GITHUB_REPOSITORY}/releases/${RELEASE_ID}" --jq .published_at 2>/dev/null || echo "")
-                  case "$GOT" in
-                    "${TODAY}"*) echo "Release date refreshed to $GOT (draft flip)" ;;
-                    *)           echo "WARN: could not refresh the release date (published_at='$GOT')" >&2 ;;
-                  esac
-                  ;;
-              esac
+            # NO DRAFT FLIP. published_at is not in the documented body for "Update a release", so
+            # this may simply not take. The documented way to move it is a draft -> published
+            # transition, but that emits a `release: published` event, and release-normalize.yml
+            # subscribes to exactly that (on top of its workflow_run trigger) -- so the fallback
+            # would kick off a second, concurrent normalize of the release we are still publishing.
+            # A stale date is cosmetic; a re-entrant asset normalize is not. If the PATCH does not
+            # take, say so in the log and move on.
+            if [ "$TAG" = "rolling" ]; then
+              RELEASE_ID=$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}" --jq .id 2>/dev/null || echo "")
+              if [ -n "$RELEASE_ID" ]; then
+                TODAY=$(date -u +%Y-%m-%d)
+                gh api -X PATCH "repos/${GITHUB_REPOSITORY}/releases/${RELEASE_ID}" \
+                  -f published_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)" >/dev/null 2>&1 || true
+                GOT=$(gh api "repos/${GITHUB_REPOSITORY}/releases/${RELEASE_ID}" --jq .published_at 2>/dev/null || echo "")
+                case "$GOT" in
+                  "${TODAY}"*) echo "Release date refreshed to $GOT" ;;
+                  *)           echo "NOTE: published_at could not be updated (still '$GOT'); the release date will read stale" ;;
+                esac
+              fi
             fi
           else
             echo "Creating release: $TAG"

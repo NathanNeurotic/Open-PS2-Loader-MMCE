@@ -242,7 +242,7 @@ translations:
   HINT_POPSTARTER_RETROGEM_GAMEID: Optikai vonalkódot jelenít meg a Pixel FX / RetroGEM / PS2Digital számára PS1 VCD indításakor
   HINT_POPS_IMPORT: Beolvassa a POPSTARTER IPCONFIG.DAT és SMBCONFIG.DAT fájljait a csatlakoztatott SMB-megosztás POPS mappájából. Semmi sem íródik ki, amíg meg nem erősíted az OK gombbal.
   HINT_POPS_PORT: SMB-port a kiszolgálón -- az alapértelmezett a 445. Hagyd 0-n (vagy 445-ön) normál megosztáshoz; régebbi SMB1-kiszolgálókhoz használj 139-et.
-  HINT_VCD_SHOW_PP_POPS: Csak HDD -- PS1-játékként listázza a PP.<ID>.POPS.<név> nevű, egyetlen játékot tartalmazó partíciókat (pl. PP.SCES-01492.POPS.MEDIEVIL). Csak a listázás; az indítás nem változik. A többi PP.* partíció (alkalmazások, PS2-játékok) rejtve marad.
+  HINT_VCD_SHOW_PP_POPS: Csak HDD -- PS1-játékként listázza a PP.<ID>.POPS.<name> nevű, egyetlen játékot tartalmazó partíciókat (pl. PP.SCES-01492.POPS.MEDIEVIL). Csak a listázás; az indítás nem változik. A többi PP.* partíció (alkalmazások, PS2-játékok) rejtve marad.
   INTERFACE_SETTINGS: Kezelőfelület
   MENU_NETWORK: Hálózat
   NEUTRINO_DEFAULTS: Neutrino alapértékek
@@ -288,11 +288,11 @@ translations:
   ERR_DEVICE_BUSY_TIMEOUT: 'Az eszköz foglalt: a beállítások írása el sem kezdődött. Próbáld újra, ha a betöltés befejeződött.'
   BDMA_EQUIPPING: A PS1-illesztőprogram előkészítése a memóriakártyán...
   VCD_USB_BDMA: USB BDMA-illesztőprogram
-  HINT_VCD_USB_BDMA: Csak az USB-eszközről indított PS1 (VCD) játékokra vonatkozik. A PS2 nem tudja megállapítani, hogy az eszköz fat32 vagy exFAT, ezért a POPSTARTER illesztőprogramját ki kell választani. A Kérdez minden indításkor rákérdez; az exFAT vagy a fat32 rögzíti a választ, és kihagyja a kérdést.
+  HINT_VCD_USB_BDMA: Csak az USB-eszközről indított PS1 (VCD) játékokra vonatkozik. A PS2 nem tudja megállapítani, hogy az eszköz fat32 vagy exFAT, ezért a POPSTARTER illesztőprogramját ki kell választani. A Kérdez beállításnál a program minden indításkor rákérdez, az exFAT vagy a fat32 viszont rögzíti a választ, és kihagyja a kérdést.
   VCD_USB_BDMA_ASK: Kérdez
   SETTINGS_HDD_FALLBACK: 'A HDD-beállítások a biztonságos tartalék helyet használták: %s'
   HDD_BACKEND_RECONCILED: A belső APA és exFAT HDD egyszerre volt bekapcsolva -- az egyik automatikusan kikapcsolt (lásd az Eszközbeállításokat).
-  SETTINGS_SAVE_PROMPT: MENTED A BEÁLLÍTÁSOKAT?
+  SETTINGS_SAVE_PROMPT: BEÁLLÍTÁSOK MENTÉSE?
   SETTINGS_SAVE_PROMPT_LINE1: A módosításaid jelenleg aktívak.
   SETTINGS_SAVE_PROMPT_LINE2: Elmented őket a későbbi indításokhoz?
   SETTINGS_SAVE: Beállítások mentése

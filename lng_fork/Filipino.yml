@@ -242,7 +242,7 @@ translations:
   HINT_POPSTARTER_RETROGEM_GAMEID: Nagpapakita ng optical barcode para sa Pixel FX / RetroGEM / PS2Digital kapag naglulunsad ng PS1 VCD
   HINT_POPS_IMPORT: "Binabasa ang IPCONFIG.DAT at SMBCONFIG.DAT ng POPSTARTER mula sa POPS folder ng nakakonektang SMB share. Walang isusulat hangga't hindi ka nagko-confirm gamit ang OK."
   HINT_POPS_PORT: SMB port sa server -- 445 ang default. Iwanang 0 (o 445) para sa karaniwang share; gumamit ng 139 para sa mas lumang SMB1 na server.
-  HINT_VCD_SHOW_PP_POPS: HDD lamang -- inililista bilang mga larong PS1 ang mga partition na iisa ang laro at pinangalanang PP.<ID>.POPS.<pangalan> (hal. PP.SCES-01492.POPS.MEDIEVIL). Paglilista lamang; hindi nagbabago ang paglulunsad. Nananatiling nakatago ang iba pang PP.* na partition (mga app, larong PS2).
+  HINT_VCD_SHOW_PP_POPS: HDD lamang -- inililista bilang mga larong PS1 ang mga partition na iisa ang laro at pinangalanang PP.<ID>.POPS.<name> (hal. PP.SCES-01492.POPS.MEDIEVIL). Paglilista lamang; hindi nagbabago ang paglulunsad. Nananatiling nakatago ang iba pang PP.* na partition (mga app, larong PS2).
   INTERFACE_SETTINGS: Interface
   MENU_NETWORK: Network
   NEUTRINO_DEFAULTS: Mga default ng Neutrino
@@ -288,7 +288,7 @@ translations:
   ERR_DEVICE_BUSY_TIMEOUT: 'Abala ang device: hindi man lang nagsimula ang pagsulat ng mga setting. Subukan ulit kapag tapos na ang paglo-load.'
   BDMA_EQUIPPING: Inihahanda ang PS1 driver sa memory card...
   VCD_USB_BDMA: USB BDMA driver
-  HINT_VCD_USB_BDMA: Para lamang sa paglulunsad ng PS1 (VCD) mula sa USB. Hindi matukoy ng PS2 kung fat32 o exFAT ang isang USB, kaya kailangang piliin ang driver ng POPSTARTER. Ang Magtanong ay magtatanong sa bawat paglulunsad; ang exFAT o fat32 ay itinatakda ang sagot at nilalaktawan ang tanong.
+  HINT_VCD_USB_BDMA: Para lamang sa paglulunsad ng PS1 (VCD) mula sa USB. Hindi matukoy ng PS2 kung fat32 o exFAT ang isang USB, kaya kailangang piliin ang driver ng POPSTARTER. Sa opsyong Magtanong, nagtatanong ito sa bawat paglulunsad, samantalang itinatakda ng exFAT o fat32 ang sagot at nilalaktawan ang tanong.
   VCD_USB_BDMA_ASK: Magtanong
   SETTINGS_HDD_FALLBACK: 'Gumamit ang mga setting ng HDD ng ligtas na pamalit na lokasyon: %s'
   HDD_BACKEND_RECONCILED: Parehong naka-on ang internal na APA at exFAT na HDD -- awtomatikong na-off ang isa (tingnan ang Mga setting ng device).

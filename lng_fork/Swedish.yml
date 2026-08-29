@@ -242,7 +242,7 @@ translations:
   HINT_POPSTARTER_RETROGEM_GAMEID: Visar en optisk streckkod för Pixel FX / RetroGEM / PS2Digital när ett PS1-VCD startas
   HINT_POPS_IMPORT: Läser POPSTARTERs IPCONFIG.DAT och SMBCONFIG.DAT från POPS-mappen på den anslutna SMB-utdelningen. Inget skrivs förrän du bekräftar med OK.
   HINT_POPS_PORT: SMB-port på servern -- 445 är standard. Lämna 0 (eller 445) för en vanlig utdelning; använd 139 för äldre SMB1-servrar.
-  HINT_VCD_SHOW_PP_POPS: Endast HDD -- listar partitioner med ett enda spel som heter PP.<ID>.POPS.<namn> (t.ex. PP.SCES-01492.POPS.MEDIEVIL) som PS1-spel. Endast listningen; starten är oförändrad. Övriga PP.*-partitioner (appar, PS2-spel) förblir dolda.
+  HINT_VCD_SHOW_PP_POPS: Endast HDD -- listar partitioner med ett enda spel som heter PP.<ID>.POPS.<name> (t.ex. PP.SCES-01492.POPS.MEDIEVIL) som PS1-spel. Endast listningen; starten är oförändrad. Övriga PP.*-partitioner (appar, PS2-spel) förblir dolda.
   INTERFACE_SETTINGS: Gränssnitt
   MENU_NETWORK: Nätverk
   NEUTRINO_DEFAULTS: Standardvärden för Neutrino
@@ -278,7 +278,7 @@ translations:
   POPS_OVERWRITE_MSG: En POPSTARTER-nätverkskonfiguration finns redan. Ersätta den med dessa inställningar?
   POPS_KEEP_EXISTING: Behåll befintlig
   POPS_REPLACE: Ersätt
-  GSM_1080P_WARNING: VARNING -- att tvinga 1080p är experimentellt och overifierat. Det kan ge ingen bild alls eller, på viss hårdvara, belasta konsolen. Fortsätt på egen risk.
+  GSM_1080P_WARNING: VARNING -- att tvinga 1080p är experimentellt och overifierat. Det kan hända att ingen bild visas alls, och på viss hårdvara kan det belasta konsolen. Fortsätt på egen risk.
   GSM_1080P_PROCEED: Tvinga 1080p för det här spelet?
   GSM_1080P_SURE: Är du säker? Det experimentella 1080p-läget tillämpas på det här spelet.
   CUSTOM_SETTINGS_PATH: Egen sökväg för inställningar
@@ -288,7 +288,7 @@ translations:
   ERR_DEVICE_BUSY_TIMEOUT: 'Enheten är upptagen: skrivningen av inställningarna påbörjades aldrig. Försök igen när inläsningen är klar.'
   BDMA_EQUIPPING: Förbereder PS1-drivrutinen på minneskortet...
   VCD_USB_BDMA: USB-BDMA-drivrutin
-  HINT_VCD_USB_BDMA: Gäller bara PS1-start (VCD) från ett USB-minne. PS2:n kan inte avgöra om ett minne är fat32 eller exFAT, så POPSTARTERs drivrutin måste väljas. Fråga frågar vid varje start; exFAT eller fat32 låser svaret och hoppar över frågan.
+  HINT_VCD_USB_BDMA: Gäller bara PS1-start (VCD) från ett USB-minne. PS2:n kan inte avgöra om ett minne är fat32 eller exFAT, så POPSTARTERs drivrutin måste väljas. Med alternativet Fråga ställs frågan vid varje start, medan exFAT eller fat32 låser svaret och hoppar över den.
   VCD_USB_BDMA_ASK: Fråga
   SETTINGS_HDD_FALLBACK: 'HDD-inställningarna använde den säkra reservplatsen: %s'
   HDD_BACKEND_RECONCILED: Både APA- och exFAT-hårddisken var aktiverade -- den ena stängdes av automatiskt (se Enhetsinställningar).

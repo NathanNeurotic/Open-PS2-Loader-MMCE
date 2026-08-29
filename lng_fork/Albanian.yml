@@ -242,7 +242,7 @@ translations:
   HINT_POPSTARTER_RETROGEM_GAMEID: Shfaq një barkod optik për Pixel FX / RetroGEM / PS2Digital kur niset një VCD i PS1
   HINT_POPS_IMPORT: Lexon skedarët IPCONFIG.DAT dhe SMBCONFIG.DAT të POPSTARTER-it nga dosja POPS e ndarjes SMB të lidhur. Nuk shkruhet asgjë derisa ta konfirmosh me OK.
   HINT_POPS_PORT: Porta SMB në server -- 445 është e parazgjedhura. Lëre 0 (ose 445) për një ndarje normale; përdor 139 për serverë të vjetër SMB1.
-  HINT_VCD_SHOW_PP_POPS: Vetëm HDD -- rendit si lojëra PS1 ndarjet me një lojë të vetme të emërtuara PP.<ID>.POPS.<emri> (p.sh. PP.SCES-01492.POPS.MEDIEVIL). Vetëm renditja; nisja nuk ndryshon. Ndarjet e tjera PP.* (aplikacione, lojëra PS2) mbeten të fshehura.
+  HINT_VCD_SHOW_PP_POPS: Vetëm HDD -- rendit si lojëra PS1 ndarjet me një lojë të vetme të emërtuara PP.<ID>.POPS.<name> (p.sh. PP.SCES-01492.POPS.MEDIEVIL). Vetëm renditja; nisja nuk ndryshon. Ndarjet e tjera PP.* (aplikacione, lojëra PS2) mbeten të fshehura.
   INTERFACE_SETTINGS: Ndërfaqja
   MENU_NETWORK: Rrjeti
   NEUTRINO_DEFAULTS: Vlerat e parazgjedhura të Neutrino
@@ -288,7 +288,7 @@ translations:
   ERR_DEVICE_BUSY_TIMEOUT: 'Pajisja është e zënë: shkrimi i cilësimeve nuk nisi fare. Provo sërish pasi të përfundojë ngarkimi.'
   BDMA_EQUIPPING: Po përgatitet drejtuesi i PS1 në kartën e memories...
   VCD_USB_BDMA: Drejtuesi BDMA për USB
-  HINT_VCD_USB_BDMA: Vlen vetëm për nisjen e lojërave PS1 (VCD) nga një USB. PS2 nuk mund ta dallojë nëse një USB është fat32 apo exFAT, prandaj drejtuesi i POPSTARTER duhet zgjedhur. Pyet pyet në çdo nisje; exFAT ose fat32 e fiksojnë përgjigjen dhe e kapërcejnë pyetjen.
+  HINT_VCD_USB_BDMA: Vlen vetëm për nisjen e lojërave PS1 (VCD) nga një USB. PS2 nuk mund ta dallojë nëse një USB është fat32 apo exFAT, prandaj drejtuesi i POPSTARTER duhet zgjedhur. Me opsionin Pyet, pyetja shfaqet në çdo nisje, ndërsa exFAT ose fat32 e fiksojnë përgjigjen dhe e kapërcejnë atë.
   VCD_USB_BDMA_ASK: Pyet
   SETTINGS_HDD_FALLBACK: 'Cilësimet e HDD-së përdorën vendndodhjen e sigurt rezervë: %s'
   HDD_BACKEND_RECONCILED: HDD-ja e brendshme APA dhe ajo exFAT ishin të dyja të ndezura -- njëra u fik automatikisht (shih Cilësimet e pajisjeve).

@@ -242,7 +242,7 @@ translations:
   HINT_POPSTARTER_RETROGEM_GAMEID: Viser en optisk stregkode til Pixel FX / RetroGEM / PS2Digital, når et PS1-VCD startes
   HINT_POPS_IMPORT: Læser POPSTARTERs IPCONFIG.DAT og SMBCONFIG.DAT fra POPS-mappen på den tilsluttede SMB-share. Der skrives intet, før du bekræfter med OK.
   HINT_POPS_PORT: SMB-port på serveren -- 445 er standard. Lad den stå på 0 (eller 445) til en almindelig share; brug 139 til ældre SMB1-servere.
-  HINT_VCD_SHOW_PP_POPS: Kun HDD -- viser partitioner med ét spil ved navn PP.<ID>.POPS.<navn> (f.eks. PP.SCES-01492.POPS.MEDIEVIL) som PS1-spil. Kun visningen; starten er uændret. Andre PP.*-partitioner (apps, PS2-spil) forbliver skjulte.
+  HINT_VCD_SHOW_PP_POPS: Kun HDD -- viser partitioner med ét spil ved navn PP.<ID>.POPS.<name> (f.eks. PP.SCES-01492.POPS.MEDIEVIL) som PS1-spil. Kun visningen; starten er uændret. Andre PP.*-partitioner (apps, PS2-spil) forbliver skjulte.
   INTERFACE_SETTINGS: Grænseflade
   MENU_NETWORK: Netværk
   NEUTRINO_DEFAULTS: Neutrino-standarder
@@ -288,7 +288,7 @@ translations:
   ERR_DEVICE_BUSY_TIMEOUT: 'Enheden er optaget: skrivningen af indstillingerne blev aldrig påbegyndt. Prøv igen, når indlæsningen er færdig.'
   BDMA_EQUIPPING: Forbereder PS1-driveren på hukommelseskortet...
   VCD_USB_BDMA: USB-BDMA-driver
-  HINT_VCD_USB_BDMA: "Gælder kun PS1-start (VCD) fra en USB-nøgle. PS2'en kan ikke registrere, om en nøgle er fat32 eller exFAT, så POPSTARTERs driver skal vælges. Spørg spørger ved hver start; exFAT eller fat32 fastlåser svaret og springer spørgsmålet over."
+  HINT_VCD_USB_BDMA: "Gælder kun PS1-start (VCD) fra en USB-nøgle. PS2'en kan ikke registrere, om en nøgle er fat32 eller exFAT, så POPSTARTERs driver skal vælges. Med indstillingen Spørg stilles spørgsmålet ved hver start, mens exFAT eller fat32 fastlåser svaret og springer det over."
   VCD_USB_BDMA_ASK: Spørg
   SETTINGS_HDD_FALLBACK: 'HDD-indstillingerne brugte den sikre reserveplacering: %s'
   HDD_BACKEND_RECONCILED: Både den interne APA- og exFAT-HDD var slået til -- den ene blev slået fra automatisk (se Enhedsindstillinger).

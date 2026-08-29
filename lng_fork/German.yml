@@ -242,7 +242,7 @@ translations:
   HINT_POPSTARTER_RETROGEM_GAMEID: Zeigt beim Start eines PS1-VCD einen optischen Barcode für Pixel FX / RetroGEM / PS2Digital
   HINT_POPS_IMPORT: Liest IPCONFIG.DAT und SMBCONFIG.DAT von POPSTARTER aus dem POPS-Ordner der verbundenen SMB-Freigabe. Es wird nichts geschrieben, bis du mit OK bestätigst.
   HINT_POPS_PORT: SMB-Port des Servers -- 445 ist Standard. Für eine normale Freigabe auf 0 (oder 445) lassen; 139 für ältere SMB1-Server.
-  HINT_VCD_SHOW_PP_POPS: Nur HDD -- listet Einzelspiel-Partitionen mit dem Namen PP.<ID>.POPS.<Name> (z. B. PP.SCES-01492.POPS.MEDIEVIL) als PS1-Spiele. Nur die Auflistung; der Start bleibt unverändert. Andere PP.*-Partitionen (Apps, PS2-Spiele) bleiben ausgeblendet.
+  HINT_VCD_SHOW_PP_POPS: Nur HDD -- listet Einzelspiel-Partitionen mit dem Namen PP.<ID>.POPS.<name> (z. B. PP.SCES-01492.POPS.MEDIEVIL) als PS1-Spiele. Nur die Auflistung; der Start bleibt unverändert. Andere PP.*-Partitionen (Apps, PS2-Spiele) bleiben ausgeblendet.
   INTERFACE_SETTINGS: Oberfläche
   MENU_NETWORK: Netzwerk
   NEUTRINO_DEFAULTS: Neutrino-Standardwerte
@@ -288,7 +288,7 @@ translations:
   ERR_DEVICE_BUSY_TIMEOUT: 'Gerät belegt: Das Schreiben der Einstellungen hat nie begonnen. Versuche es erneut, sobald der Ladevorgang beendet ist.'
   BDMA_EQUIPPING: PS1-Treiber wird auf der Memory Card vorbereitet...
   VCD_USB_BDMA: USB-BDMA-Treiber
-  HINT_VCD_USB_BDMA: Betrifft nur PS1-Starts (VCD) von einem USB-Stick. Die PS2 kann nicht erkennen, ob ein Stick fat32 oder exFAT ist, daher muss der Treiber von POPSTARTER gewählt werden. Fragen fragt bei jedem USB-VCD-Start nach; exFAT oder fat32 legen die Antwort fest und überspringen die Abfrage.
+  HINT_VCD_USB_BDMA: Betrifft nur PS1-Starts (VCD) von einem USB-Stick. Die PS2 kann nicht erkennen, ob ein Stick fat32 oder exFAT ist, daher muss der Treiber von POPSTARTER gewählt werden. Mit der Option Fragen erscheint die Abfrage bei jedem USB-VCD-Start, während exFAT oder fat32 die Antwort festlegen und die Abfrage überspringen.
   VCD_USB_BDMA_ASK: Fragen
   SETTINGS_HDD_FALLBACK: 'HDD-Einstellungen nutzten den sicheren Ausweichort: %s'
   HDD_BACKEND_RECONCILED: APA- und exFAT-Interne-HDD waren beide aktiviert -- eine wurde automatisch deaktiviert (siehe Geräteeinstellungen).

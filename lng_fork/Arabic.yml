@@ -242,7 +242,7 @@ translations:
   HINT_POPSTARTER_RETROGEM_GAMEID: يعرض رمزًا شريطيًا بصريًا لأجهزة Pixel FX / RetroGEM / PS2Digital عند تشغيل VCD الخاص بـ PS1
   HINT_POPS_IMPORT: يقرأ ملفي IPCONFIG.DAT و SMBCONFIG.DAT الخاصين بـ POPSTARTER من مجلد POPS في مشاركة SMB المتصلة. لا يُكتب أي شيء حتى تؤكد بالضغط على موافق.
   HINT_POPS_PORT: منفذ SMB على الخادم -- الافتراضي هو 445. اترك 0 (أو 445) للمشاركة العادية، واستخدم 139 لخوادم SMB1 القديمة.
-  HINT_VCD_SHOW_PP_POPS: لأقراص HDD فقط -- يعرض أقسام اللعبة الواحدة المسماة PP.<ID>.POPS.<الاسم> (مثل PP.SCES-01492.POPS.MEDIEVIL) كألعاب PS1. مجرد إدراج في القائمة، وطريقة التشغيل لا تتغير. تبقى أقسام PP.* الأخرى (التطبيقات وألعاب PS2) مخفية.
+  HINT_VCD_SHOW_PP_POPS: لأقراص HDD فقط -- يعرض أقسام اللعبة الواحدة المسماة PP.<ID>.POPS.<name> (مثل PP.SCES-01492.POPS.MEDIEVIL) كألعاب PS1. مجرد إدراج في القائمة، وطريقة التشغيل لا تتغير. تبقى أقسام PP.* الأخرى (التطبيقات وألعاب PS2) مخفية.
   INTERFACE_SETTINGS: الواجهة
   MENU_NETWORK: الشبكة
   NEUTRINO_DEFAULTS: القيم الافتراضية لـ Neutrino
@@ -288,7 +288,7 @@ translations:
   ERR_DEVICE_BUSY_TIMEOUT: 'الجهاز مشغول: لم تبدأ كتابة الإعدادات إطلاقًا. أعد المحاولة بعد انتهاء التحميل.'
   BDMA_EQUIPPING: يجري تجهيز مشغّل PS1 على بطاقة الذاكرة...
   VCD_USB_BDMA: مشغّل BDMA لـ USB
-  HINT_VCD_USB_BDMA: يخص تشغيل ألعاب PS1 ‏(VCD) من ذاكرة USB فقط. لا يستطيع PS2 تحديد ما إذا كانت الذاكرة fat32 أم exFAT، لذا يجب اختيار مشغّل POPSTARTER. خيار اسأل يسأل عند كل تشغيل، أما exFAT أو fat32 فيثبّتان الإجابة ويتخطيان السؤال.
+  HINT_VCD_USB_BDMA: يخص تشغيل ألعاب PS1 ‏(VCD) من ذاكرة USB فقط. لا يستطيع PS2 تحديد ما إذا كانت الذاكرة fat32 أم exFAT، لذا يجب اختيار مشغّل POPSTARTER. مع خيار اسأل يظهر السؤال عند كل تشغيل، أما exFAT أو fat32 فيثبّتان الإجابة ويتخطيان السؤال.
   VCD_USB_BDMA_ASK: اسأل
   SETTINGS_HDD_FALLBACK: 'استخدمت إعدادات HDD الموقع الاحتياطي الآمن: %s'
   HDD_BACKEND_RECONCILED: كان قرصا APA و exFAT الداخليان مفعّلين معًا -- تم تعطيل أحدهما تلقائيًا (راجع إعدادات الأجهزة).

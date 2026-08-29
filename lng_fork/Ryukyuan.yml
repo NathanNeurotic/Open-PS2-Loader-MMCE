@@ -242,7 +242,7 @@ translations:
   HINT_POPSTARTER_RETROGEM_GAMEID: PS1 ぬ VCD 起動時に Pixel FX / RetroGEM / PS2Digital 用ぬ光学バーコード表示すん
   HINT_POPS_IMPORT: 繋がとーん SMB 共有ぬ POPS フォルダから POPSTARTER ぬ IPCONFIG.DAT とぅ SMBCONFIG.DAT 読むん。OK で決みるまでぃ何ん書ちゅんねーらん。
   HINT_POPS_PORT: サーバーぬ SMB ポート -- 既定や 445 やん。普通ぬ共有や 0 (または 445) ぬままにし、古さん SMB1 サーバーや 139 使い。
-  HINT_VCD_SHOW_PP_POPS: 'HDD ぬみ -- PP.<ID>.POPS.<名前> (例: PP.SCES-01492.POPS.MEDIEVIL) んでぃる名前ぬ一本用パーティション PS1 ゲームとぅし一覧に出しゅん。一覧に出しゅるだきやい、起動ぬ仕方や変わらん。他ぬ PP.* パーティション (アプリ、PS2 ゲーム) や隠りたまま。'
+  HINT_VCD_SHOW_PP_POPS: 'HDD ぬみ -- PP.<ID>.POPS.<name> (例: PP.SCES-01492.POPS.MEDIEVIL) んでぃる名前ぬ一本用パーティション PS1 ゲームとぅし一覧に出しゅん。一覧に出しゅるだきやい、起動ぬ仕方や変わらん。他ぬ PP.* パーティション (アプリ、PS2 ゲーム) や隠りたまま。'
   INTERFACE_SETTINGS: インターフェース
   MENU_NETWORK: ネットワーク
   NEUTRINO_DEFAULTS: Neutrino ぬ既定値
@@ -278,8 +278,8 @@ translations:
   POPS_OVERWRITE_MSG: POPSTARTER ぬネットワーク設定やなー有ん。くぬ設定さーに入り替いゆみ?
   POPS_KEEP_EXISTING: 今ぬまま
   POPS_REPLACE: 入り替いゆん
-  GSM_1080P_WARNING: 用心 -- 1080p 무理やり出しゅしぇー試しぬ段階やい確かみらってぃねーらん。画面ぬ出らん事ん有い、機械によーてぃや本体んかい負担かかゆん。自分ぬ責任さーに進み。
-  GSM_1080P_PROCEED: くぬゲームんかい 1080p 무理やり出しゅみ?
+  GSM_1080P_WARNING: 用心 -- 1080p 無理やり出しゅしぇー試しぬ段階やい確かみらってぃねーらん。画面ぬ出らん事ん有い、機械によーてぃや本体んかい負担かかゆん。自分ぬ責任さーに進み。
+  GSM_1080P_PROCEED: くぬゲームんかい 1080p 無理やり出しゅみ?
   GSM_1080P_SURE: 間違ーねーらんな? くぬゲームんかい試しぬ 1080p モード当てぃゆん。
   CUSTOM_SETTINGS_PATH: 設定ぬ保存先指定
   HINT_CUSTOM_SETTINGS_PATH: '好ちなフォルダんかい設定保存すん (例: mass0:/OPL)。空にしぇー OPL ぬ起動元フォルダ使ゆん。機器や要いる時に読まりーくとぅ、入力ぬ時にマウントさってぃをぅる必要やねーらん。'
@@ -288,7 +288,7 @@ translations:
   ERR_DEVICE_BUSY_TIMEOUT: '機器ぬ忙さん: 設定ぬ書ち込みぬ始まてぃねーらん。読み込み終わてぃからまた試しみそーり。'
   BDMA_EQUIPPING: メモリーカードんかい PS1 ドライバ準備そーん...
   VCD_USB_BDMA: USB BDMA ドライバ
-  HINT_VCD_USB_BDMA: USB メモリからぬ PS1 (VCD) 起動だきに関わゆん。PS2 や USB メモリぬ fat32 やみ exFAT やみ分からんくとぅ、POPSTARTER ぬドライバ選ばんでぃねーらん。確かみゆん や毎回聞ちゅん。exFAT やか fat32 選りば答い決まてぃ、確かみや飛ばさりゆん。
+  HINT_VCD_USB_BDMA: USB メモリからぬ PS1 (VCD) 起動だきに関わゆん。PS2 や USB メモリぬ fat32 やみ exFAT やみ分からんくとぅ、POPSTARTER ぬドライバ選ばんでぃねーらん。確かみゆん 選りば毎回聞ちゅん。exFAT やか fat32 選りば答い決まてぃ、確かみや飛ばさりゆん。
   VCD_USB_BDMA_ASK: 確かみゆん
   SETTINGS_HDD_FALLBACK: 'HDD ぬ設定や安全な代わいぬ保存先使たん: %s'
   HDD_BACKEND_RECONCILED: 内蔵 HDD ぬ APA とぅ exFAT ぬ両方入とーたん -- 片方や自動的に切らったん (機器設定確かみそーり)。

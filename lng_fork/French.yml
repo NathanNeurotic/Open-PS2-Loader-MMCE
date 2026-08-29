@@ -242,7 +242,7 @@ translations:
   HINT_POPSTARTER_RETROGEM_GAMEID: "Affiche un code-barres optique pour Pixel FX / RetroGEM / PS2Digital au lancement d'un VCD PS1"
   HINT_POPS_IMPORT: "Lit IPCONFIG.DAT et SMBCONFIG.DAT de POPSTARTER dans le dossier POPS du partage SMB connecté. Rien n'est écrit avant votre confirmation avec OK."
   HINT_POPS_PORT: Port SMB du serveur -- 445 par défaut. Laissez 0 (ou 445) pour un partage normal ; utilisez 139 pour les anciens serveurs SMB1.
-  HINT_VCD_SHOW_PP_POPS: HDD uniquement -- liste les partitions à jeu unique nommées PP.<ID>.POPS.<nom> (ex. PP.SCES-01492.POPS.MEDIEVIL) comme jeux PS1. Énumération seule ; le lancement est inchangé. Les autres partitions PP.* (applications, jeux PS2) restent masquées.
+  HINT_VCD_SHOW_PP_POPS: HDD uniquement -- liste les partitions à jeu unique nommées PP.<ID>.POPS.<name> (ex. PP.SCES-01492.POPS.MEDIEVIL) comme jeux PS1. Énumération seule ; le lancement est inchangé. Les autres partitions PP.* (applications, jeux PS2) restent masquées.
   INTERFACE_SETTINGS: Interface
   MENU_NETWORK: Réseau
   NEUTRINO_DEFAULTS: Valeurs par défaut Neutrino
@@ -288,7 +288,7 @@ translations:
   ERR_DEVICE_BUSY_TIMEOUT: 'Périphérique occupé : l''écriture des réglages n''a jamais démarré. Réessayez une fois le chargement terminé.'
   BDMA_EQUIPPING: Préparation du pilote PS1 sur la carte mémoire...
   VCD_USB_BDMA: Pilote BDMA USB
-  HINT_VCD_USB_BDMA: Concerne uniquement les lancements PS1 (VCD) depuis une clé USB. La PS2 ne peut pas détecter si une clé est en fat32 ou exFAT, il faut donc choisir le pilote de POPSTARTER. Demander pose la question à chaque lancement ; exFAT ou fat32 fixent la réponse et sautent la question.
+  HINT_VCD_USB_BDMA: Concerne uniquement les lancements PS1 (VCD) depuis une clé USB. La PS2 ne peut pas détecter si une clé est en fat32 ou exFAT, il faut donc choisir le pilote de POPSTARTER. L'option Demander pose la question à chaque lancement, tandis qu'exFAT ou fat32 fixent la réponse et la sautent.
   VCD_USB_BDMA_ASK: Demander
   SETTINGS_HDD_FALLBACK: 'Les réglages HDD ont utilisé l''emplacement de secours : %s'
   HDD_BACKEND_RECONCILED: "Les HDD internes APA et exFAT étaient tous deux activés -- l'un a été désactivé automatiquement (voir Paramètres des périphériques)."

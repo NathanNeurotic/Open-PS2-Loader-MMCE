@@ -242,7 +242,7 @@ translations:
   HINT_POPSTARTER_RETROGEM_GAMEID: Mostra um código de barras óptico para Pixel FX / RetroGEM / PS2Digital ao iniciar um VCD de PS1
   HINT_POPS_IMPORT: Lê o IPCONFIG.DAT e o SMBCONFIG.DAT do POPSTARTER na pasta POPS da partilha SMB ligada. Nada é escrito até confirmares com OK.
   HINT_POPS_PORT: Porta SMB no servidor -- 445 é a predefinida. Deixa 0 (ou 445) para uma partilha normal; usa 139 para servidores SMB1 antigos.
-  HINT_VCD_SHOW_PP_POPS: Apenas HDD -- lista as partições de um só jogo chamadas PP.<ID>.POPS.<nome> (p. ex. PP.SCES-01492.POPS.MEDIEVIL) como jogos de PS1. Só a listagem; o arranque não muda. As restantes partições PP.* (aplicações, jogos de PS2) continuam ocultas.
+  HINT_VCD_SHOW_PP_POPS: Apenas HDD -- lista as partições de um só jogo chamadas PP.<ID>.POPS.<name> (p. ex. PP.SCES-01492.POPS.MEDIEVIL) como jogos de PS1. Só a listagem; o arranque não muda. As restantes partições PP.* (aplicações, jogos de PS2) continuam ocultas.
   INTERFACE_SETTINGS: Interface
   MENU_NETWORK: Rede
   NEUTRINO_DEFAULTS: Predefinições do Neutrino
@@ -288,7 +288,7 @@ translations:
   ERR_DEVICE_BUSY_TIMEOUT: 'Dispositivo ocupado: a escrita das definições nunca começou. Tenta de novo quando o carregamento terminar.'
   BDMA_EQUIPPING: A preparar o controlador de PS1 no cartão de memória...
   VCD_USB_BDMA: Controlador BDMA por USB
-  HINT_VCD_USB_BDMA: Só afecta arranques de PS1 (VCD) a partir de uma pen USB. A PS2 não consegue detectar se uma pen é fat32 ou exFAT, por isso o controlador do POPSTARTER tem de ser escolhido. Perguntar pergunta em cada arranque; exFAT ou fat32 fixam a resposta e saltam a pergunta.
+  HINT_VCD_USB_BDMA: Só afecta arranques de PS1 (VCD) a partir de uma pen USB. A PS2 não consegue detectar se uma pen é fat32 ou exFAT, por isso o controlador do POPSTARTER tem de ser escolhido. Com a opção Perguntar a pergunta aparece em cada arranque, enquanto exFAT ou fat32 fixam a resposta e saltam a pergunta.
   VCD_USB_BDMA_ASK: Perguntar
   SETTINGS_HDD_FALLBACK: 'As definições do HDD usaram a localização segura de reserva: %s'
   HDD_BACKEND_RECONCILED: O HDD interno APA e o exFAT estavam ambos activados -- um foi desactivado automaticamente (vê Definições dos dispositivos).

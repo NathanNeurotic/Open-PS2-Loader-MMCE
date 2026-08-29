@@ -242,7 +242,7 @@ translations:
   HINT_POPSTARTER_RETROGEM_GAMEID: 啟動 PS1 VCD 時顯示供 Pixel FX / RetroGEM / PS2Digital 使用的光學條碼
   HINT_POPS_IMPORT: 從已連線 SMB 分享的 POPS 目錄讀取 POPSTARTER 的 IPCONFIG.DAT 與 SMBCONFIG.DAT。在你按下確定之前不會寫入任何內容。
   HINT_POPS_PORT: 伺服器上的 SMB 連接埠 -- 預設為 445。一般分享保持 0 (或 445) 即可；較舊的 SMB1 伺服器請使用 139。
-  HINT_VCD_SHOW_PP_POPS: 僅限 HDD -- 將名為 PP.<ID>.POPS.<名稱> (例如 PP.SCES-01492.POPS.MEDIEVIL) 的單一遊戲分割區列為 PS1 遊戲。只影響清單，啟動方式不變。其他 PP.* 分割區 (應用程式、PS2 遊戲) 仍然隱藏。
+  HINT_VCD_SHOW_PP_POPS: 僅限 HDD -- 將名為 PP.<ID>.POPS.<name> (例如 PP.SCES-01492.POPS.MEDIEVIL) 的單一遊戲分割區列為 PS1 遊戲。只影響清單，啟動方式不變。其他 PP.* 分割區 (應用程式、PS2 遊戲) 仍然隱藏。
   INTERFACE_SETTINGS: 介面
   MENU_NETWORK: 網路
   NEUTRINO_DEFAULTS: Neutrino 預設值
@@ -288,7 +288,7 @@ translations:
   ERR_DEVICE_BUSY_TIMEOUT: 裝置忙碌：設定寫入根本沒有開始。請在載入完成後重試。
   BDMA_EQUIPPING: 正在記憶卡上準備 PS1 驅動程式...
   VCD_USB_BDMA: USB BDMA 驅動程式
-  HINT_VCD_USB_BDMA: 僅影響從 USB 隨身碟啟動 PS1 (VCD)。PS2 無法偵測隨身碟是 fat32 還是 exFAT，因此必須指定 POPSTARTER 的驅動程式。詢問會在每次啟動時發問；選擇 exFAT 或 fat32 則固定答案並略過詢問。
+  HINT_VCD_USB_BDMA: 僅影響從 USB 隨身碟啟動 PS1 (VCD)。PS2 無法偵測隨身碟是 fat32 還是 exFAT，因此必須指定 POPSTARTER 的驅動程式。選擇 詢問 時每次啟動都會發問；選擇 exFAT 或 fat32 則固定答案並略過詢問。
   VCD_USB_BDMA_ASK: 詢問
   SETTINGS_HDD_FALLBACK: HDD 設定使用了安全的備用位置：%s
   HDD_BACKEND_RECONCILED: 內建硬碟的 APA 與 exFAT 同時啟用 -- 已自動關閉其中之一 (請查看裝置設定)。

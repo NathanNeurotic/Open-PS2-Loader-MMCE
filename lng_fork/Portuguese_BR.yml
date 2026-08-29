@@ -242,7 +242,7 @@ translations:
   HINT_POPSTARTER_RETROGEM_GAMEID: Exibe um código de barras óptico para Pixel FX / RetroGEM / PS2Digital ao iniciar um VCD de PS1
   HINT_POPS_IMPORT: Lê o IPCONFIG.DAT e o SMBCONFIG.DAT do POPSTARTER na pasta POPS do compartilhamento SMB conectado. Nada é gravado até você confirmar com OK.
   HINT_POPS_PORT: Porta SMB no servidor -- 445 é a padrão. Deixe 0 (ou 445) para um compartilhamento normal; use 139 para servidores SMB1 antigos.
-  HINT_VCD_SHOW_PP_POPS: 'Somente HDD -- lista as partições de um único jogo chamadas PP.<ID>.POPS.<nome> (ex.: PP.SCES-01492.POPS.MEDIEVIL) como jogos de PS1. Apenas a listagem; a inicialização não muda. As demais partições PP.* (aplicativos, jogos de PS2) continuam ocultas.'
+  HINT_VCD_SHOW_PP_POPS: 'Somente HDD -- lista as partições de um único jogo chamadas PP.<ID>.POPS.<name> (ex.: PP.SCES-01492.POPS.MEDIEVIL) como jogos de PS1. Apenas a listagem; a inicialização não muda. As demais partições PP.* (aplicativos, jogos de PS2) continuam ocultas.'
   INTERFACE_SETTINGS: Interface
   MENU_NETWORK: Rede
   NEUTRINO_DEFAULTS: Padrões do Neutrino
@@ -288,7 +288,7 @@ translations:
   ERR_DEVICE_BUSY_TIMEOUT: 'Dispositivo ocupado: a gravação das configurações nunca começou. Tente de novo quando o carregamento terminar.'
   BDMA_EQUIPPING: Preparando o driver de PS1 no cartão de memória...
   VCD_USB_BDMA: Driver BDMA por USB
-  HINT_VCD_USB_BDMA: Afeta apenas inicializações de PS1 (VCD) a partir de um pendrive. O PS2 não consegue detectar se um pendrive é fat32 ou exFAT, então o driver do POPSTARTER precisa ser escolhido. Perguntar pergunta a cada inicialização; exFAT ou fat32 fixam a resposta e pulam a pergunta.
+  HINT_VCD_USB_BDMA: Afeta apenas inicializações de PS1 (VCD) a partir de um pendrive. O PS2 não consegue detectar se um pendrive é fat32 ou exFAT, então o driver do POPSTARTER precisa ser escolhido. Com a opção Perguntar a pergunta aparece a cada inicialização, enquanto exFAT ou fat32 fixam a resposta e pulam a pergunta.
   VCD_USB_BDMA_ASK: Perguntar
   SETTINGS_HDD_FALLBACK: 'As configurações do HDD usaram o local seguro de reserva: %s'
   HDD_BACKEND_RECONCILED: O HDD interno APA e o exFAT estavam ambos ativados -- um foi desativado automaticamente (veja Configurações de dispositivos).

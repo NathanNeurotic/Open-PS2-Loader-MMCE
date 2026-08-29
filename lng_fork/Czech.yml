@@ -242,7 +242,7 @@ translations:
   HINT_POPSTARTER_RETROGEM_GAMEID: Zobrazí optický čárový kód pro Pixel FX / RetroGEM / PS2Digital při spuštění PS1 VCD
   HINT_POPS_IMPORT: Načte soubory IPCONFIG.DAT a SMBCONFIG.DAT POPSTARTERu ze složky POPS připojeného sdílení SMB. Nic se nezapíše, dokud nepotvrdíš tlačítkem OK.
   HINT_POPS_PORT: Port SMB na serveru -- 445 je výchozí. Pro běžné sdílení ponech 0 (nebo 445); pro starší servery SMB1 použij 139.
-  HINT_VCD_SHOW_PP_POPS: Pouze HDD -- zobrazí jako hry PS1 oddíly s jednou hrou pojmenované PP.<ID>.POPS.<název> (např. PP.SCES-01492.POPS.MEDIEVIL). Pouze výpis; spouštění se nemění. Ostatní oddíly PP.* (aplikace, hry PS2) zůstávají skryté.
+  HINT_VCD_SHOW_PP_POPS: Pouze HDD -- zobrazí jako hry PS1 oddíly s jednou hrou pojmenované PP.<ID>.POPS.<name> (např. PP.SCES-01492.POPS.MEDIEVIL). Pouze výpis; spouštění se nemění. Ostatní oddíly PP.* (aplikace, hry PS2) zůstávají skryté.
   INTERFACE_SETTINGS: Rozhraní
   MENU_NETWORK: Síť
   NEUTRINO_DEFAULTS: Výchozí hodnoty Neutrina
@@ -288,7 +288,7 @@ translations:
   ERR_DEVICE_BUSY_TIMEOUT: 'Zařízení je zaneprázdněno: zápis nastavení vůbec nezačal. Zkus to znovu po dokončení načítání.'
   BDMA_EQUIPPING: Připravuji ovladač PS1 na paměťové kartě...
   VCD_USB_BDMA: Ovladač BDMA pro USB
-  HINT_VCD_USB_BDMA: Týká se jen spouštění her PS1 (VCD) z USB disku. PS2 nedokáže zjistit, zda je disk fat32 nebo exFAT, takže ovladač POPSTARTERu je nutné zvolit. Zeptat se ptá při každém spuštění; exFAT nebo fat32 odpověď zafixují a dotaz přeskočí.
+  HINT_VCD_USB_BDMA: Týká se jen spouštění her PS1 (VCD) z USB disku. PS2 nedokáže zjistit, zda je disk fat32 nebo exFAT, takže ovladač POPSTARTERu je nutné zvolit. U volby Zeptat se se dotaz objeví při každém spuštění, zatímco exFAT nebo fat32 odpověď zafixují a dotaz přeskočí.
   VCD_USB_BDMA_ASK: Zeptat se
   SETTINGS_HDD_FALLBACK: 'Nastavení HDD použila bezpečné náhradní umístění: %s'
   HDD_BACKEND_RECONCILED: Interní disk APA i exFAT byly zapnuté současně -- jeden byl automaticky vypnut (viz Nastavení zařízení).

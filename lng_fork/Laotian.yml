@@ -242,7 +242,7 @@ translations:
   HINT_POPSTARTER_RETROGEM_GAMEID: ສະແດງບາໂຄດແບບແສງສຳລັບ Pixel FX / RetroGEM / PS2Digital ເມື່ອເປີດ VCD ຂອງ PS1
   HINT_POPS_IMPORT: ອ່ານໄຟລ໌ IPCONFIG.DAT ແລະ SMBCONFIG.DAT ຂອງ POPSTARTER ຈາກໂຟລເດີ POPS ໃນການແບ່ງປັນ SMB ທີ່ເຊື່ອມຕໍ່ຢູ່. ຈະບໍ່ມີການຂຽນຫຍັງຈົນກວ່າທ່ານຈະຢືນຢັນດ້ວຍ ຕົກລົງ.
   HINT_POPS_PORT: ພອດ SMB ຢູ່ເຊີບເວີ -- ຄ່າເລີ່ມຕົ້ນຄື 445. ໃຫ້ໄວ້ທີ່ 0 (ຫຼື 445) ສຳລັບການແບ່ງປັນທົ່ວໄປ; ໃຊ້ 139 ສຳລັບເຊີບເວີ SMB1 ຮຸ່ນເກົ່າ.
-  HINT_VCD_SHOW_PP_POPS: ສະເພາະ HDD -- ສະແດງພາທິຊັນທີ່ມີເກມດຽວຊື່ວ່າ PP.<ID>.POPS.<ຊື່> (ຕົວຢ່າງ PP.SCES-01492.POPS.MEDIEVIL) ເປັນເກມ PS1. ພຽງແຕ່ການລາຍຊື່ເທົ່ານັ້ນ; ວິທີການເປີດບໍ່ປ່ຽນແປງ. ພາທິຊັນ PP.* ອື່ນໆ (ແອັບ, ເກມ PS2) ຍັງຄົງເຊື່ອງຢູ່.
+  HINT_VCD_SHOW_PP_POPS: ສະເພາະ HDD -- ສະແດງພາທິຊັນທີ່ມີເກມດຽວຊື່ວ່າ PP.<ID>.POPS.<name> (ຕົວຢ່າງ PP.SCES-01492.POPS.MEDIEVIL) ເປັນເກມ PS1. ພຽງແຕ່ການລາຍຊື່ເທົ່ານັ້ນ; ວິທີການເປີດບໍ່ປ່ຽນແປງ. ພາທິຊັນ PP.* ອື່ນໆ (ແອັບ, ເກມ PS2) ຍັງຄົງເຊື່ອງຢູ່.
   INTERFACE_SETTINGS: ສ່ວນຕິດຕໍ່
   MENU_NETWORK: ເຄືອຂ່າຍ
   NEUTRINO_DEFAULTS: ຄ່າເລີ່ມຕົ້ນຂອງ Neutrino
@@ -288,7 +288,7 @@ translations:
   ERR_DEVICE_BUSY_TIMEOUT: 'ອຸປະກອນບໍ່ຫວ່າງ: ການຂຽນການຕັ້ງຄ່າຍັງບໍ່ໄດ້ເລີ່ມເລີຍ. ກະລຸນາລອງໃໝ່ເມື່ອການໂຫຼດແລ້ວໆ.'
   BDMA_EQUIPPING: ກຳລັງກຽມໄດເວີ PS1 ໃນກາດຄວາມຈຳ...
   VCD_USB_BDMA: ໄດເວີ BDMA ສຳລັບ USB
-  HINT_VCD_USB_BDMA: ໃຊ້ກັບການເປີດເກມ PS1 (VCD) ຈາກ USB ເທົ່ານັ້ນ. PS2 ບໍ່ສາມາດກວດວ່າ USB ເປັນ fat32 ຫຼື exFAT ດັ່ງນັ້ນຈຶ່ງຕ້ອງເລືອກໄດເວີຂອງ POPSTARTER. ຖາມ ຈະຖາມທຸກຄັ້ງທີ່ເປີດ; exFAT ຫຼື fat32 ຈະກຳນົດຄຳຕອບໄວ້ ແລະ ຂ້າມຄຳຖາມ.
+  HINT_VCD_USB_BDMA: ໃຊ້ກັບການເປີດເກມ PS1 (VCD) ຈາກ USB ເທົ່ານັ້ນ. PS2 ບໍ່ສາມາດກວດວ່າ USB ເປັນ fat32 ຫຼື exFAT ດັ່ງນັ້ນຈຶ່ງຕ້ອງເລືອກໄດເວີຂອງ POPSTARTER. ດ້ວຍຕົວເລືອກ ຖາມ ຈະມີການຖາມທຸກຄັ້ງທີ່ເປີດ, ສ່ວນ exFAT ຫຼື fat32 ຈະກຳນົດຄຳຕອບໄວ້ ແລະ ຂ້າມຄຳຖາມນັ້ນ.
   VCD_USB_BDMA_ASK: ຖາມ
   SETTINGS_HDD_FALLBACK: 'ການຕັ້ງຄ່າ HDD ໄດ້ໃຊ້ບ່ອນສຳຮອງທີ່ປອດໄພ: %s'
   HDD_BACKEND_RECONCILED: HDD ພາຍໃນແບບ APA ແລະ exFAT ຖືກເປີດພ້ອມກັນ -- ອັນໜຶ່ງຖືກປິດອັດຕະໂນມັດ (ເບິ່ງການຕັ້ງຄ່າອຸປະກອນ).

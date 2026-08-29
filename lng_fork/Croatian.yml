@@ -242,7 +242,7 @@ translations:
   HINT_POPSTARTER_RETROGEM_GAMEID: Prikazuje optički crtični kod za Pixel FX / RetroGEM / PS2Digital pri pokretanju PS1 VCD-a
   HINT_POPS_IMPORT: Čita POPSTARTER-ove datoteke IPCONFIG.DAT i SMBCONFIG.DAT iz mape POPS povezanog SMB dijeljenja. Ništa se ne zapisuje dok ne potvrdiš s U redu.
   HINT_POPS_PORT: SMB priključak na poslužitelju -- 445 je zadani. Za obično dijeljenje ostavi 0 (ili 445); za starije SMB1 poslužitelje koristi 139.
-  HINT_VCD_SHOW_PP_POPS: Samo HDD -- prikazuje kao PS1 igre particije s jednom igrom nazvane PP.<ID>.POPS.<naziv> (npr. PP.SCES-01492.POPS.MEDIEVIL). Samo popis; pokretanje se ne mijenja. Ostale PP.* particije (aplikacije, PS2 igre) ostaju skrivene.
+  HINT_VCD_SHOW_PP_POPS: Samo HDD -- prikazuje kao PS1 igre particije s jednom igrom nazvane PP.<ID>.POPS.<name> (npr. PP.SCES-01492.POPS.MEDIEVIL). Samo popis; pokretanje se ne mijenja. Ostale PP.* particije (aplikacije, PS2 igre) ostaju skrivene.
   INTERFACE_SETTINGS: Sučelje
   MENU_NETWORK: Mreža
   NEUTRINO_DEFAULTS: Zadane vrijednosti Neutrina
@@ -288,7 +288,7 @@ translations:
   ERR_DEVICE_BUSY_TIMEOUT: 'Uređaj je zauzet: zapisivanje postavki uopće nije započelo. Pokušaj ponovno kad učitavanje završi.'
   BDMA_EQUIPPING: Pripremam PS1 upravljački program na memorijskoj kartici...
   VCD_USB_BDMA: USB BDMA upravljački program
-  HINT_VCD_USB_BDMA: Odnosi se samo na pokretanje PS1 (VCD) igara s USB uređaja. PS2 ne može utvrditi je li uređaj fat32 ili exFAT, pa se POPSTARTER-ov upravljački program mora odabrati. Pitaj pita pri svakom pokretanju; exFAT ili fat32 fiksiraju odgovor i preskaču pitanje.
+  HINT_VCD_USB_BDMA: Odnosi se samo na pokretanje PS1 (VCD) igara s USB uređaja. PS2 ne može utvrditi je li uređaj fat32 ili exFAT, pa se POPSTARTER-ov upravljački program mora odabrati. Uz opciju Pitaj pitanje se postavlja pri svakom pokretanju, dok exFAT ili fat32 fiksiraju odgovor i preskaču ga.
   VCD_USB_BDMA_ASK: Pitaj
   SETTINGS_HDD_FALLBACK: 'Postavke HDD-a koristile su sigurnu rezervnu lokaciju: %s'
   HDD_BACKEND_RECONCILED: Interni APA i exFAT disk bili su istovremeno uključeni -- jedan je automatski isključen (provjeri Postavke uređaja).
