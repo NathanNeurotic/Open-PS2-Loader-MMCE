@@ -41,7 +41,7 @@ Review the LICENSE file for further details.<br><br>
 RiptOPL is intended to work with these maintained companion tools:
 
 - **[PS2-Servers](https://github.com/NathanNeurotic/PS2-Servers)** — all-in-one PC server launcher for **SMBv1, UDPFS and UDPBD**.
-- **[OrbitOPL Toolbox](https://github.com/Luden02/OrbitOPL-Toolbox)** — cross-platform PC library manager for importing discs, artwork/screenshots, ZSO compression, per-game settings and VMC management.
+- **[OrbitPS2 Manager](https://github.com/Luden02/OrbitPS2-Manager)** — cross-platform PC library manager for importing discs, artwork/screenshots, ZSO compression, per-game settings and VMC management.
 - **[OPL PS1 AIO Converter GUI](https://github.com/shaanhomebrew-cloud/OPL-PS1-AIO-Converter-GUI)** — Windows all-in-one PS1/POPStarter preparation tool for converting BIN/CUE backups to VCDs and installing them to USB, MX4SIO, MMCE, exFAT HDD, SMB and APA internal HDD.
 - **[PS2RD CHT Manager](https://github.com/TheRealNextria/PS2RD-CHT-Manager)** — PC manager for the PS2RD `.cht` cheat files RiptOPL reads from your device's `CHT` folder. A `PS2RD-CHT-Manager.url` shortcut ships in every release package.
 - **[Ember](https://github.com/Gageformer/Ember)** — a PS1 emulator that runs natively on the PS2, **created by Gageformer**, used as RiptOPL's **second PS1 core** alongside POPSTARTER. Unlike the others this one is not just a shortcut: an `EMBER/` folder ships **inside** the release package, ready to drop onto a device. It is bundled unmodified with the author's permission under the Ember Public Beta Testing Licence (`EMBER/LICENSE-BETA.txt` in the package); releases: <https://github.com/Gageformer/Ember/releases>.
@@ -266,11 +266,12 @@ This build layers several features on top of upstream OPL:
   under Neutrino it greys the panels Neutrino ignores (GSM, Cheats, PADEMU, OSD Language and the
   OPL-only compat modes) and offers a structured **Neutrino Video** picker (Off / 240p / 480p /
   1080i) plus a Neutrino-only **Mode 7** (`-gc=7`). See **[docs/NEUTRINO.md](docs/NEUTRINO.md)**.
-- **Category settings layout:** the start menu's settings are organized into category pages —
-  **Settings**, **Game Sources** (device selection + start modes), **Interface**, **Display**,
-  **Game Launching** (incl. the global Neutrino/OSD defaults), **POPStarter**, **MMCE**,
-  **Network**, **Controller**, **Audio**, **Security**, **Advanced** (debug, path prefixes,
-  storage/cache), **Tools** and **About** — each with chained sub-pages instead of one flat list.
+- **Category settings layout:** the start menu's settings are organised into eight category pages
+  instead of one flat list — **Game Sources** (device selection + start modes), **General & System**,
+  **Network**, **Interface** (theme, artwork, Coverflow, default game view), **Game Launching**
+  (incl. the global Neutrino/OSD defaults), **PS Emulation Settings** (both PS1 cores: POPSTARTER
+  and Ember), **Controller Settings** and **Audio Settings** — each with chained sub-pages, plus a
+  **Save Changes** entry at the foot of the index.
 - **DualSense / DualShock 5 (USB):** optional controller support — grab a ready-made
   `RIPTOPL-<version>-<SDK>-ds5.ELF` (one per SDK flavour) from the rolling release, or build
   with `make DUALSENSE=1`.
@@ -390,7 +391,7 @@ There are two release channels:
 
 | Channel | What it is |
 | --- | --- |
-| **Rolling pre-release** (the `rolling` tag) | Continuously rebuilt from `master` on every push — the bleeding edge. Each build publishes a full installable package zip (`RIPTOPL-<rel>-<sha>.zip`, containing both labeled SDK loader folders + the bundled Neutrino core + a `PS2-Servers.url` shortcut), the bare loader ELFs, a source snapshot, `SHA256SUMS.txt`, and a language pack. May be unstable. |
+| **Rolling pre-release** (the `rolling` tag) | Continuously rebuilt from the publishing branch on every push — currently `rebuild/main` — the bleeding edge. Each build publishes a full installable package zip (`RIPTOPL-<rel>-<sha>.zip`, containing both labeled SDK loader folders + the bundled Neutrino core + a `PS2-Servers.url` shortcut), the bare loader ELFs, a source snapshot, `SHA256SUMS.txt`, and a language pack. May be unstable. |
 | **Tagged releases** (`v*` tags) | Curated, known-good versions cut from a tag. Use these for stability. |
 
 See **[ROLLING_RELEASE.md](ROLLING_RELEASE.md)** for exactly what the rolling release
@@ -502,7 +503,7 @@ Sources**. For PS2, 48-bit LBA internal HDDs are supported. The HDD can be forma
 	- Enable **BDM HDD** in **Game Sources**. The exFAT HDD then mounts through the Block Device Manager (BDMAssault / "BDMA") into the shared `massN:` namespace — the same path as USB/MX4SIO — and appears as an **HDD (exFAT)** games list with the HDD icon.
 	- Files should be added contiguously or synchronously to avoid fragmentation. For example, drag and drop files one at a time, or ensure that files are added sequentially.
 	- When formatting drives for the exFAT filesystem, please make sure the `Allocation unit size` is set to `Default`.
-	- **PS1 games:** PS1 `*.VCD` titles in the HDD's `POPS/` folder list under the **L3** VCD view like any other device. To boot them, open **PS Emulation Settings → BDMA Settings** from the main menu. **VCD BDMA Apply on Launch** is on by default and equips the matching exFAT driver automatically; turn it off to reveal the manual **BDMA Source** / **BDMA Mode** pickers and set **BDMA Mode → HDD (exFAT)** by hand so POPSTARTER can read the exFAT volume. See **[docs/VCD.md](docs/VCD.md)**.
+	- **PS1 games:** PS1 `*.VCD` titles in the HDD's `POPS/` folder list under the **L3** PS1 view like any other device. To boot them, open **PS Emulation Settings → BDMA Settings** from the main menu. **VCD BDMA Apply on Launch** is on by default and equips the matching exFAT driver automatically; turn it off to reveal the manual **BDMA Source** / **BDMA Mode** pickers and set **BDMA Mode → HDD (exFAT)** by hand so POPSTARTER can read the exFAT volume. See **[docs/VCD.md](docs/VCD.md)**.
 
 ## APPS
 

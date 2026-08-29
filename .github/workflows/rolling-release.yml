@@ -603,7 +603,7 @@ jobs:
           #                                      says so. Peer of POPS/ -- both go to the device ROOT.
           #   neutrino/                       -- the official latest Neutrino core (rickgaiser/neutrino), extracted for drag-and-drop.
           #   PS2-Servers.url                 -- link to the UDPFS / SMB / UDPBD all-in-one PC server.
-          #   OrbitOPL-Toolbox.url            -- link to the cross-platform PC library manager.
+          #   OrbitPS2-Manager.url            -- link to the cross-platform PC library manager.
           #   OPL-PS1-AIO-Converter-GUI.url   -- link to the PS1/POPSTARTER preparation tool.
           #   PS2RD-CHT-Manager.url           -- link to the PS2RD cheat-file manager.
           PKG=riptopl_pkg
@@ -679,11 +679,11 @@ jobs:
           # embedded in the RiptOPL install package.
           test -f pc/PS2-Servers.url
           cp -f pc/PS2-Servers.url "$PKG/PS2-Servers.url"
-          # OrbitOPL Toolbox: the PC-side library manager (import discs, fetch covers/screenshots,
+          # OrbitPS2 Manager: the PC-side library manager (import discs, fetch covers/screenshots,
           # ZSO compression, per-game settings, VMC management). Shipped as a shortcut for the same
           # reason as PS2-Servers -- link the maintained tool, never vendor a copy of it.
-          test -f pc/OrbitOPL-Toolbox.url
-          cp -f pc/OrbitOPL-Toolbox.url "$PKG/OrbitOPL-Toolbox.url"
+          test -f pc/OrbitPS2-Manager.url
+          cp -f pc/OrbitPS2-Manager.url "$PKG/OrbitPS2-Manager.url"
           # The PS1 converter and PS2RD cheat manager are external companion repositories too.
           # Ship shortcuts for them alongside the other PC-side tools, never their binaries/source.
           test -f pc/OPL-PS1-AIO-Converter-GUI.url
@@ -734,7 +734,7 @@ jobs:
           ZIP="RIPTOPL-${REL}-${SHA}.zip"
           (
             cd "$PKG"
-            zip -r -X "../rolling/${ZIP}" APP_RIPTOPL-PS2DEVROLLING POPS EMBER PS2-Servers.url OrbitOPL-Toolbox.url OPL-PS1-AIO-Converter-GUI.url PS2RD-CHT-Manager.url >/dev/null
+            zip -r -X "../rolling/${ZIP}" APP_RIPTOPL-PS2DEVROLLING POPS EMBER PS2-Servers.url OrbitPS2-Manager.url OPL-PS1-AIO-Converter-GUI.url PS2RD-CHT-Manager.url >/dev/null
             if [ -d APP_RIPTOPL-PS2DEVPINNED ]; then zip -r -X "../rolling/${ZIP}" APP_RIPTOPL-PS2DEVPINNED >/dev/null; fi
             if [ -d APP_RIPTOPL-OFFICIALROLLING ]; then zip -r -X "../rolling/${ZIP}" APP_RIPTOPL-OFFICIALROLLING >/dev/null; fi
             if [ -d APP_RIPTOPL-OFFICIALPINNED ]; then zip -r -X "../rolling/${ZIP}" APP_RIPTOPL-OFFICIALPINNED >/dev/null; fi
@@ -845,7 +845,7 @@ jobs:
             printf 'UDPFS / SMBv1 / UDPBD all-in-one launcher. Follow its protocol-specific setup and\n'
             printf 'match RiptOPL network settings to the server you start.\n'
             # NOTE: the cover-art / metadata section ("Setting up cover art and game metadata",
-            # recommending OrbitOPL Toolbox) lives in the reusable notes block
+            # recommending OrbitPS2 Manager) lives in the reusable notes block
             # (.github/rolling-release-notes-block.md), cat'd in above -- it replaced the inline
             # "PC library manager" section that used to sit here, so the recommendation is edited
             # in ONE place and every rolling release carries it unchanged.
@@ -853,26 +853,21 @@ jobs:
             printf -- '- External Neutrino core option: per-game core selector + global/per-game launch args\n'
             printf -- '- Coverflow cover-art render mode (default theme)\n'
             printf -- '- Favourites tab (R3 toggles a game; star marker)\n'
-            printf -- '- PS1 via POPSTARTER (*.VCD) and Ember (*.cue) together in ONE per-device PS1 list (L3)\n'
-            printf -- '- EMBER/ folder in this package: drop it at a device ROOT beside POPS/, add your own\n'
-            printf -- '  512 KB PS1 bios.bin, then one folder per game under EMBER/games/\n'
-            printf -- '- Ember display mode (240p/480p) on the PS1 settings page, written to EMBER/settings.txt\n'
-            printf -- '- Ember is created by Gageformer -- https://github.com/Gageformer/Ember/releases\n'
-            printf -- '  -- bundled unmodified with permission under its beta licence. EMBER/LICENSE-BETA.txt\n'
-            printf -- '  ships in the package and governs that build; Ember is not our work.\n'
-            printf -- '- POPS/POPSTARTER VERSIONS/: MAIN, DEBUG and three USBDELAY builds of POPSTARTER to swap in by hand\n'
-            printf -- '- The redundant POPSTARTER/ folder is gone from this package; POPS/ already held all of it\n'
+            printf -- '- PS1 through TWO cores in one list: POPSTARTER (*.VCD) and Ember (*.cue), per device, L3\n'
+            printf -- '  -- setup, display mode, credit and licence under "Playing PS1 games" above\n'
+            printf -- '- POPS/POPSTARTER VERSIONS/: five POPSTARTER builds to swap in by hand; the redundant\n'
+            printf -- '  POPSTARTER/ folder is gone -- see "Alternate POPSTARTER builds" above\n'
             printf -- '- Category settings layout\n'
             printf -- '- Per-game VMC shared with Neutrino on writable BDM (honours OPL VMC groups)\n'
-            printf -- '- Visual GameID barcode for Pixel FX / RetroGEM / PS2Digital (Display page, OFF by default)\n'
-            printf -- '- RetroGEM Game ID optical barcode for POPStarter / PS1 VCD launches (POPStarter Settings page, ON by default)\n'
+            printf -- '- Visual GameID barcode for Pixel FX / RetroGEM / PS2Digital (Interface page, OFF by default)\n'
+            printf -- '- RetroGEM Game ID optical barcode for POPSTARTER / PS1 VCD launches (PS Emulation Settings, ON by default)\n'
 
             printf -- '- Neutrino args: prefix a flag with $ to disable it without deleting; "Test launch" boots without saving\n'
             printf -- '- DualSense / DS5 USB controller support\n'
             printf -- '- PS2-Servers.url: opens the maintained UDPFS / SMBv1 / UDPBD all-in-one PC launcher\n'
-            printf -- '- OrbitOPL-Toolbox.url: opens OrbitOPL Toolbox, the cross-platform PC library manager\n'
+            printf -- '- OrbitPS2-Manager.url: opens OrbitPS2 Manager, the cross-platform PC library manager\n'
             printf '\n## Needs testing -- please report from real hardware\n'
-            printf -- '- GameID barcode: enable it on the Display page, then confirm your Pixel FX / RetroGEM /\n'
+            printf -- '- GameID barcode: enable it on the Interface page, then confirm your Pixel FX / RetroGEM /\n'
             printf -- '  PS2Digital auto-loads the per-game profile (the HDMI latch is hardware-only -- not emulator-testable).\n'
             printf -- '- VMC -> Neutrino: confirm your save mounts when launching via Neutrino on USB / exFAT / MX4SIO.\n'
             printf -- '  (Neutrino cannot yet write a VMC to internal HDD APA/PFS -- upstream neutrino#132 -- so VMC\n'
