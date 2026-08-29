@@ -54,8 +54,8 @@ if the release build also works, the premise needs re-examining.
 5. Do `MC1.vmc` / `MC2.vmc` appear in the game folder afterwards? (Confirms it can write there.)
 6. Anything that looks like IOP memory exhaustion — a late, unexplained failure.
 
-Covers: an Ember row uses the device's normal `ART/<name>_COV.png` first, then falls back to
-`EMBER/games/<name>/cover.png`.
+Covers: an Ember row uses the device's normal `ART/<name>_COV.png`, and nothing else. **ART lives in
+the ART folder** — there is no second location for any game type.
 
 ## Part 0 — What Ember actually is (measured, not guessed)
 
@@ -234,8 +234,9 @@ read reports success — never block a launch on a failed probe.
 ### Art and per-game config
 
 Identity is the game folder name, so the device's normal rules apply unchanged:
-`<devroot>ART/<Name>_COV.png` and `<devroot>CFG/<Name>.cfg`. The Ember-specific fallback, peer of
-`vcdLoadPopsCover`, looks inside the game folder: `cover.png`, then `<Name>.png`.
+`<devroot>ART/<Name>_COV.png` and `<devroot>CFG/<Name>.cfg`. There is no Ember-specific art
+fallback. **One art location, ART/, for every game type; only the KEY differs** — a VCD keys on its
+filename, an Ember title on its folder name, an app on its filename, and a PS2 title is unchanged.
 
 Badges reuse `sbSetDiscAttributes(config, isPS1=1, isCD=1)` → `#System=PS1`, `#Media=CD`,
 `#DiscType=PS1CD`, so an Ember row looks right in every shipped theme on day one.
@@ -348,9 +349,9 @@ int cueFillGameList(const char *devPrefix, base_game_info_t **outGames);
 // length <= CUE_NAME_LAUNCH_MAX). Pure string work, no device access.
 int cueNameLaunchable(const char *name);
 
-// Cover fallback inside the game folder (cover.png, then <name>.png). Only called after the
-// device's own ART/ lookup misses, and only in the CUE view.
-int cueLoadFolderCover(const char *devPrefix, const char *value, const char *suffix, GSTEXTURE *tex);
+// NOTE: an earlier revision of this plan specified a cueLoadFolderCover() that searched inside the
+// game folder when the ART/ lookup missed. That was never asked for and has been removed: covers
+// come from ART/<name>_COV.png and nowhere else.
 ```
 
 `cueFillGameList` fills `base_game_info_t` per entry:

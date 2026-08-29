@@ -1223,18 +1223,10 @@ static config_set_t *mmceGetConfig(item_list_t *itemList, int id)
 static int mmceGetImage(item_list_t *itemList, char *folder, int isRelative, char *value, char *suffix, GSTEXTURE *resultTex, short psm)
 {
     int r = mmceTryLoadImage(mmceArtPrimary, folder, isRelative, value, suffix, resultTex);
-    if (r == ERR_BAD_FILE && isRelative && (libViewActive(itemList->mode) == LIB_VIEW_PS1)) {
-        // This runs on the ART thread while the list scan runs on the IO worker, so the root goes in
-        // a LOCAL -- a shared buffer would be rewritten underneath one of them by the other.
-        char ps1Root[sizeof(mmcePrefix)];
-        mmceGetDeviceRoot(ps1Root, sizeof(ps1Root));
-        // The cache hands us a NAME, so resolve which core owns the row against the published list
-        // (memory scan, no card IO on the art path). Unknown falls back to the POPSTARTER layout.
-        if (cueRowIsCueByName(mmcePs1Games, mmcePs1GameCount, value) == 1)
-            r = cueLoadFolderCover(ps1Root, value, suffix, resultTex);
-        else
-            r = vcdLoadPopsCover(ps1Root, value, suffix, resultTex);
-    }
+    // ART LIVES IN THE ART FOLDER, and nowhere else. A PS1 cover is
+    // ART/<name>_COV.png -- the same rule as a PS2 title -- which the texDiscoverLoad
+    // above already tried. A miss is simply "no cover": there is no second directory to
+    // search, which also means a missing cover costs one failed open instead of several.
     return r;
 }
 

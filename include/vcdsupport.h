@@ -74,11 +74,6 @@ int vcdResolvePopstarter(const char *devPrefix, char *out, int outSize);
 // Build the POPSTARTER argv[0] selector "<devPrefix>POPS/<prefix><name>.ELF" into out.
 void vcdBuildSelector(const char *devPrefix, const char *prefix, const char *name, char *out, int outSize);
 
-// VCD (PS1) cover FALLBACK to the POPSLoader-style "<scanPrefix>POPS/<value>.png" (suffixless, next to
-// the .VCD). Cover/icon suffixes only; a device getImage calls this ONLY after its own <dev>ART/<name>_
-// <suffix>.png misses, and only in the VCD view. `scanPrefix` = the prefix passed to vcdFillGameList.
-// Returns texDiscoverLoad's result (>= 0 hit, negative miss).
-int vcdLoadPopsCover(const char *scanPrefix, const char *value, const char *suffix, GSTEXTURE *resultTex);
 
 // ---- PS1 list display --------------------------------------------------------------
 // The view state itself lives in libview.h; ask libViewActive(mode) == LIB_VIEW_PS1. Note that one
