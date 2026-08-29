@@ -975,7 +975,12 @@ jobs:
                 gh api -X PATCH "repos/${GITHUB_REPOSITORY}/releases/${RELEASE_ID}" \
                   -f published_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)" >/dev/null 2>&1 || true
                 GOT=$(gh api "repos/${GITHUB_REPOSITORY}/releases/${RELEASE_ID}" --jq .published_at 2>/dev/null || echo "")
-                if [ -n "$GOT" ] && [ "$GOT" != "$WAS" ]; then
+                # Only a comparison between two SUCCESSFUL reads proves anything. A failed read
+                # leaves its variable empty, and empty-vs-anything would otherwise look like a
+                # change and log a success the patch never earned.
+                if [ -z "$WAS" ] || [ -z "$GOT" ]; then
+                  echo "NOTE: could not read published_at back (before='$WAS' after='$GOT'); date refresh unverified"
+                elif [ "$GOT" != "$WAS" ]; then
                   echo "Release date refreshed: $WAS -> $GOT"
                 else
                   echo "NOTE: published_at could not be updated (still '$WAS'); the release date will read stale"
