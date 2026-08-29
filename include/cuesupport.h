@@ -135,9 +135,14 @@ int cueScanDir(const char *devPrefix, cue_entry_t **outList);
 // equip leaves its marker beside POPSTARTER. Called on the LAUNCH path only, so the file lands on
 // the device actually being launched and nowhere else.
 //
-// EMBER_DISPLAY_LEAVE writes nothing at all, which is the default: a display preference must not
-// create a file on a user's device unless they asked for one, and it is the only setting that
-// leaves a hand-written settings.txt alone.
+// settings.txt is OPTIONAL, and this function keeps it that way:
+//
+//   EMBER_DISPLAY_LEAVE ("Default") never CREATES the file. If one exists it clears our display key
+//   out of it, and removes the file entirely when that key was the only thing in it. Default has to
+//   clear rather than merely abstain, or picking 240p once and changing back would strand
+//   display:240 on the device forever while the menu claimed Default.
+//
+//   EMBER_DISPLAY_240 / _480 create the file if absent, or update the key in place if present.
 //
 // Lines other than "display:" are PRESERVED. Ember ignores keys it does not know (it logs and moves
 // on), so a key it gains later, or one a user added, must survive us rewriting this file.

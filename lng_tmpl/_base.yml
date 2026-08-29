@@ -1167,4 +1167,4 @@ gui_strings:
 - label: EMBER_DISPLAY
   string: Ember Display Mode
 - label: HINT_EMBER_DISPLAY
-  string: Output mode Ember uses for PS1 games. Written to settings.txt in the device's EMBER folder when a game launches. Default leaves that file untouched.
+  string: Output mode Ember uses for PS1 games. 240p or 480p is written to settings.txt in the launched device's EMBER folder. Default removes that setting again, and the file too if it held nothing else.

@@ -232,11 +232,14 @@ This build layers several features on top of upstream OPL:
   supply your own, from hardware and media you lawfully own. Please report Ember problems to *us*
   first rather than to Gageformer: the launching is ours.
 
-  **Ember display mode.** The **PS1 settings** page carries an *Ember Display Mode* setting
-  (**Default** / **240p** / **480p**). On *Default* RiptOPL does not touch Ember's own configuration
-  at all. Choose 240p or 480p and it writes that key into `<device>:/EMBER/settings.txt` when you
-  launch an Ember title, on the launching device only, preserving any other lines already in that
-  file.
+  **Ember display mode.** The **PS Emulation Settings** page carries an *Ember Display Mode* setting
+  (**Default** / **240p** / **480p**). Ember's `settings.txt` is an optional file, and this keeps it
+  that way. Choose **240p** or **480p** and RiptOPL writes that key into
+  `<device>:/EMBER/settings.txt` when you launch an Ember title — creating the file if it is not
+  there, updating it in place if it is, and on the launching device only. Choose **Default** and it
+  goes back to having no setting: the key is removed, and so is the file if that key was all it
+  held. Any other lines you or a future Ember put in there are preserved throughout, and *Default*
+  never creates a file that was not already there.
 
 - **Alternate POPSTARTER builds:** the release package ships
   `POPS/POPSTARTER VERSIONS/` containing five builds of POPSTARTER — **MAIN**, **DEBUG**,
