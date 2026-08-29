@@ -39,6 +39,27 @@ static int bdm_is_ata_driver_name(const char *name)
 }
 #endif
 
+/* IEEE1394_bd is the ONLY transport that answers to TWO driver tokens: the SDK binary carries both
+   "sd" and "ilink", and OPL's own bdmDriverIsIlink() accepts either. Everything else has exactly one
+   ("usb", "ata"; mx4sio_bd's second string is not used as a block-device name).
+
+   That matters here because the launch binding is recorded in the MENU, from
+   USBMASS_IOCTL_GET_DRIVERNAME, while the block device the game sees is registered by a FRESH
+   IEEE1394_bd after the IOP reset. If those two disagree about which of its own aliases to use, the
+   strncmp below fails, g_bd is never attached, bdm_io_sema is never signalled, and the game waits on
+   it forever -- a silent hang with no error, on iLink only, while USB and ATA are unaffected.
+
+   Treating the two as one identity costs nothing: no other driver reports either token, so this can
+   never widen a match for USB, MX4SIO or ATA. */
+static int bdm_is_ilink_driver_name(const char *name)
+{
+    if (name == NULL)
+        return 0;
+    return (name[0] == 's' && name[1] == 'd' && name[2] == '\0') ||
+           (name[0] == 'i' && name[1] == 'l' && name[2] == 'i' && name[3] == 'n' &&
+            name[4] == 'k' && name[5] == '\0');
+}
+
 static int bdm_matches_launch_device(const struct block_device *bd)
 {
     if (bd == NULL)
@@ -54,9 +75,14 @@ static int bdm_matches_launch_device(const struct block_device *bd)
         return bdm_is_ata_driver_name(cdvdman_settings.bdDeviceDriver);
 #endif
 
-    return (bd->devNr == cdvdman_settings.bdDeviceId) &&
-           (bd->name != NULL) &&
-           (strncmp(bd->name, cdvdman_settings.bdDeviceDriver, sizeof(cdvdman_settings.bdDeviceDriver)) == 0);
+    if (bd->devNr != cdvdman_settings.bdDeviceId || bd->name == NULL)
+        return 0;
+
+    /* iLink answers to either of its own two tokens -- see bdm_is_ilink_driver_name above. */
+    if (bdm_is_ilink_driver_name(bd->name) && bdm_is_ilink_driver_name(cdvdman_settings.bdDeviceDriver))
+        return 1;
+
+    return strncmp(bd->name, cdvdman_settings.bdDeviceDriver, sizeof(cdvdman_settings.bdDeviceDriver)) == 0;
 }
 
 //
