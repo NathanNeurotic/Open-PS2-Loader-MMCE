@@ -362,6 +362,18 @@ Enormous thanks to the testers who run every rolling build on real consoles and 
 reports that shape the fixes — **eliminator1403, lucaslmgv, AndrewBento, AcidReach, bodvenomz,
 nuno6573, zackcage6 and Blade1984**.
 
+### The name (this fork)
+
+**RiptOPL is named by [Akilluminati47](https://github.com/akilluminati47)** — he came up with it
+before the project existed, and it stuck. Every release, every build, every thread carries a name
+he thought of first.
+
+### The name (this fork)
+
+**RiptOPL is named by [Akilluminati47](https://github.com/akilluminati47)** — he came up with it
+before the project existed, and it stuck. Every release, every build, every thread carries a name
+he thought of first.
+
 ### Financial support (this fork)
 
 Heartfelt thanks to **Akilluminati47** for generously **funding this fork's development** — a
