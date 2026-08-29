@@ -2340,17 +2340,10 @@ static int bdmGetImage(item_list_t *itemList, char *folder, int isRelative, char
     else
         snprintf(path, sizeof(path), "%s%s_%s", folder, value, suffix);
     int r = texDiscoverLoad(resultTex, path, -1);
-    if (r == ERR_BAD_FILE && isRelative && (libListViewActive(itemList) == LIB_VIEW_PS1)) {
-        char ps1Prefix[BDM_DEVICE_ROOT_MAX + 2];
-        bdmBuildPs1Prefix(ps1Prefix, sizeof(ps1Prefix), itemList->mode);
-        // The cache hands us a NAME, not the row, so resolve the kind against the published list
-        // (pure memory scan, no device IO on the art path). An unknown name falls back to the
-        // POPSTARTER layout, which is what every pre-Ember library is.
-        if (cueRowIsCueByName(pDeviceData->bdmPs1Games, pDeviceData->bdmPs1GameCount, value) == 1)
-            r = cueLoadFolderCover(ps1Prefix, value, suffix, resultTex);
-        else
-            r = vcdLoadPopsCover(ps1Prefix, value, suffix, resultTex);
-    }
+    // ART LIVES IN THE ART FOLDER, and nowhere else. A PS1 cover is
+    // ART/<name>_COV.png -- the same rule as a PS2 title -- which the texDiscoverLoad
+    // above already tried. A miss is simply "no cover": there is no second directory to
+    // search, which also means a missing cover costs one failed open instead of several.
     return r;
 }
 

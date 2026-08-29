@@ -371,6 +371,7 @@ void cueApplyDisplaySetting(const char *devPrefix)
             if (fd >= 0) {
                 int back = write(fd, before, len);
                 close(fd);
+                (void)back; // read only by LOG, which compiles to nothing in a release build
                 LOG("[CUE] write failed on %s -- original %s\n", path,
                     (back == len) ? "restored" : "COULD NOT be restored");
                 return;
@@ -625,33 +626,4 @@ int ps1FillGameList(const char *devPrefix, base_game_info_t **outGames)
 
     *outGames = merged;
     return total;
-}
-
-int cueLoadFolderCover(const char *devPrefix, const char *value, const char *suffix, GSTEXTURE *resultTex)
-{
-    char path[320];
-    char gamesDir[288];
-    int r;
-
-    // Cover/icon only, matching vcdLoadPopsCover: the other art suffixes have no in-folder
-    // convention and probing for them would be pure IO on the miss path.
-    if (devPrefix == NULL || value == NULL || suffix == NULL)
-        return ERR_BAD_FILE;
-    if (strcmp(suffix, "COV") != 0 && strcmp(suffix, "ICO") != 0)
-        return ERR_BAD_FILE;
-
-    cueBuildGamesDir(devPrefix, gamesDir, sizeof(gamesDir));
-    if (gamesDir[0] == '\0')
-        return ERR_BAD_FILE;
-
-    // "<games>/<name>/cover" first: one obvious filename a user can drop in without knowing the
-    // title's exact spelling. texDiscoverLoad appends the extension it supports.
-    snprintf(path, sizeof(path), "%s/%s/cover", gamesDir, value);
-    r = texDiscoverLoad(resultTex, path, -1);
-    if (r >= 0)
-        return r;
-
-    // Then "<games>/<name>/<name>", the POPSLoader-style suffixless peer of vcdLoadPopsCover.
-    snprintf(path, sizeof(path), "%s/%s/%s", gamesDir, value, value);
-    return texDiscoverLoad(resultTex, path, -1);
 }

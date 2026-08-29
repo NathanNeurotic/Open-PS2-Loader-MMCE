@@ -184,10 +184,5 @@ int cueRenameGame(const char *devPrefix, const char *oldName, const char *newNam
 // games prefix, is the right home for them.
 int ps1FillGameList(const char *devPrefix, base_game_info_t **outGames);
 
-// PS1 (Ember) cover FALLBACK inside the game's own folder: "<games>/<name>/cover.png", then
-// "<games>/<name>/<name>.png". Cover/icon suffixes only; a device getImage calls this ONLY after
-// its own <dev>ART/<name>_<suffix>.png misses, and only for a CUE row. The POPSTARTER peer is
-// vcdLoadPopsCover. Returns texDiscoverLoad's result (>= 0 hit, negative miss).
-int cueLoadFolderCover(const char *devPrefix, const char *value, const char *suffix, GSTEXTURE *resultTex);
 
 #endif

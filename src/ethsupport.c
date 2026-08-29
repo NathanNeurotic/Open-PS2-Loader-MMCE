@@ -1026,8 +1026,10 @@ static int ethGetImage(item_list_t *itemList, char *folder, int isRelative, char
     else
         snprintf(path, sizeof(path), "%s%s_%s", folder, value, suffix);
     int r = texDiscoverLoad(resultTex, path, -1);
-    if (r == ERR_BAD_FILE && isRelative && (libListViewActive(itemList) == LIB_VIEW_PS1))
-        r = vcdLoadPopsCover(ethPrefix, value, suffix, resultTex);
+    // ART LIVES IN THE ART FOLDER, and nowhere else. A PS1 cover is
+    // ART/<name>_COV.png -- the same rule as a PS2 title -- which the texDiscoverLoad
+    // above already tried. A miss is simply "no cover": there is no second directory to
+    // search, which also means a missing cover costs one failed open instead of several.
     return r;
 }
 

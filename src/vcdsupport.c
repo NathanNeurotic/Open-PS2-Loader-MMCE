@@ -784,29 +784,6 @@ int vcdRenameFile(const char *devPrefix, const char *oldName, const char *newNam
     return vcdRenameFileInDir(dirPath, oldName, newName);
 }
 
-// VCD (PS1) cover FALLBACK. OPL's own art (<dev>ART/<name>_COV.png) is the PRIMARY -- each device's
-// getImage tries it first; this only runs on a genuine miss. It loads the POPSLoader-style cover named
-// exactly like the .VCD (suffixless "<name>.png"), sitting NEXT TO the game in the same POPS/ folder the
-// VCD scan reads -- so a cover whose name matches the VCD minus the extension still shows (FifthFox, HW
-// 2026-07-16; the tier removed by 86da2023's #120 single-lookup simplification). `scanPrefix` MUST be the
-// SAME prefix the device passes to vcdFillGameList (the device root for BDM, mmcePrefix for MMCE, etc.),
-// so the cover is looked up beside the .VCD. COVER/ICON ONLY -- background/logo/screenshot must never
-// fall back to the single suffixless file or each would render the cover instead. Returns
-// texDiscoverLoad's result (>= 0 hit, negative miss). No miss-memo: kept deliberately simple -- callers
-// gate this on a genuine ERR_BAD_FILE + the VCD view, so a PS2 list and a hit never pay the extra probe.
-int vcdLoadPopsCover(const char *scanPrefix, const char *value, const char *suffix, GSTEXTURE *resultTex)
-{
-    char path[256];
-
-    if (scanPrefix == NULL || value == NULL || suffix == NULL || resultTex == NULL)
-        return ERR_BAD_FILE; // resultTex too: texDiscoverLoad dereferences it (CodeRabbit review of #203)
-    if (strcmp(suffix, "COV") != 0 && strcmp(suffix, "ICO") != 0)
-        return ERR_BAD_FILE; // only the cover/icon fall back to the suffixless POPS name
-
-    // Same directory the scan reads: "<scanPrefix>POPS<sep><value>"; texDiscoverLoad appends the extension.
-    snprintf(path, sizeof(path), "%s%s%c%s", scanPrefix, POPS_FOLDER, vcdSep(scanPrefix), value);
-    return texDiscoverLoad(resultTex, path, -1);
-}
 
 // Probe POPS/POPSTARTER.ELF on a device root given WITHOUT a trailing separator ("mass0", "mc0", "pfs0").
 // Tries "<root>:/POPS/..." then "<root>:POPS/..." and returns 1 with `out` filled on the first hit.
