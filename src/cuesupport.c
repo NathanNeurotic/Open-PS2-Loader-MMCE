@@ -340,8 +340,30 @@ void cueApplyDisplaySetting(const char *devPrefix)
         LOG("[CUE] cannot write %s -- launching without applying the display mode\n", path);
         return;
     }
-    if (write(fd, after, out) != out)
-        LOG("[CUE] short write on %s\n", path);
+    if (write(fd, after, out) != out) {
+        close(fd);
+        // O_TRUNC already emptied the file, so a failed or short write leaves it truncated with the
+        // user's other keys and comments gone -- the one outcome this whole function exists to
+        // avoid. We still hold the original bytes in `before` (the copy loop only ever read from
+        // it), so put them back.
+        //
+        // This is best-effort, not atomic: the restore can fail too. It is worth doing anyway
+        // because the realistic cause is a full card, and the truncate above just freed at least as
+        // many bytes as we are writing back. A temp-file-and-rename would be atomic but relies on
+        // rename() behaving across mass:/mmce:, which it does not do dependably here.
+        if (len > 0) {
+            fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+            if (fd >= 0) {
+                int back = write(fd, before, len);
+                close(fd);
+                LOG("[CUE] write failed on %s -- original %s\n", path,
+                    (back == len) ? "restored" : "COULD NOT be restored");
+                return;
+            }
+        }
+        LOG("[CUE] write failed on %s\n", path);
+        return;
+    }
     close(fd);
 }
 
