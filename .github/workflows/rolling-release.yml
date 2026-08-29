@@ -864,8 +864,10 @@ jobs:
 
             printf -- '- Neutrino args: prefix a flag with $ to disable it without deleting; "Test launch" boots without saving\n'
             printf -- '- DualSense / DS5 USB controller support\n'
-            printf -- '- PS2-Servers.url: opens the maintained UDPFS / SMBv1 / UDPBD all-in-one PC launcher\n'
-            printf -- '- OrbitPS2-Manager.url: opens OrbitPS2 Manager, the cross-platform PC library manager\n'
+            printf -- '- PS2-Servers.url: the UDPFS / SMBv1 / UDPBD all-in-one PC launcher, by Ripto\n'
+            printf -- '- OrbitPS2-Manager.url: OrbitPS2 Manager, the cross-platform PC library manager, by Luden\n'
+            printf -- '- OPL-PS1-AIO-Converter-GUI.url: BIN/CUE to VCD conversion and install, by shaan\n'
+            printf -- '- PS2RD-CHT-Manager.url: manager for the PS2RD .cht cheat files, by TheRealNextria\n'
             printf '\n## Needs testing -- please report from real hardware\n'
             printf -- '- GameID barcode: enable it on the Interface page, then confirm your Pixel FX / RetroGEM /\n'
             printf -- '  PS2Digital auto-loads the per-game profile (the HDMI latch is hardware-only -- not emulator-testable).\n'
@@ -946,6 +948,44 @@ jobs:
             done
             gh release edit "$TAG" --title "$TITLE" --notes-file notes.md $PREREL
             gh release upload "$TAG" rolling/* --clobber
+            # REFRESH THE RELEASE DATE. `gh release edit` updates the body and assets but never
+            # touches published_at, so the rolling release kept advertising the date it was FIRST
+            # published -- a package rebuilt today sat under "last month" on the releases page,
+            # which reads as abandoned rather than current.
+            #
+            # Recreating the release would fix the date but reset the download counters, so it is
+            # patched in place instead. published_at is not in the documented body for "Update a
+            # release", so this does not trust it: it PATCHes, reads the value back, and only if
+            # the date did not move falls back to the documented behaviour -- published_at is set
+            # when a release transitions draft -> published, so a draft flip refreshes it. The
+            # release is re-marked with $PREREL afterwards because the flip can drop "latest".
+            #
+            # Never fatal: a stale date is cosmetic, and failing the publish over it would be worse
+            # than the problem.
+            RELEASE_ID=$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}" --jq .id 2>/dev/null || echo "")
+            if [ -n "$RELEASE_ID" ]; then
+              NOW_ISO=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+              TODAY=$(date -u +%Y-%m-%d)
+              gh api -X PATCH "repos/${GITHUB_REPOSITORY}/releases/${RELEASE_ID}" \
+                -f published_at="$NOW_ISO" >/dev/null 2>&1 || true
+              GOT=$(gh api "repos/${GITHUB_REPOSITORY}/releases/${RELEASE_ID}" --jq .published_at 2>/dev/null || echo "")
+              case "$GOT" in
+                "${TODAY}"*)
+                  echo "Release date refreshed to $GOT"
+                  ;;
+                *)
+                  echo "published_at PATCH did not take (got '$GOT'); flipping draft to republish"
+                  gh release edit "$TAG" --draft=true  >/dev/null 2>&1 || true
+                  gh release edit "$TAG" --draft=false >/dev/null 2>&1 || true
+                  gh release edit "$TAG" $PREREL       >/dev/null 2>&1 || true
+                  GOT=$(gh api "repos/${GITHUB_REPOSITORY}/releases/${RELEASE_ID}" --jq .published_at 2>/dev/null || echo "")
+                  case "$GOT" in
+                    "${TODAY}"*) echo "Release date refreshed to $GOT (draft flip)" ;;
+                    *)           echo "WARN: could not refresh the release date (published_at='$GOT')" >&2 ;;
+                  esac
+                  ;;
+              esac
+            fi
           else
             echo "Creating release: $TAG"
             gh release create "$TAG" rolling/* \

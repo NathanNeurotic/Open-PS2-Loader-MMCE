@@ -121,7 +121,7 @@ install that a variant was equipped when it was not. Everything you need is in `
 ## Cover art and game metadata
 
 Most "looks wrong on my setup" reports come down to files not being named the way the loader looks
-for them. **OrbitPS2 Manager** writes the `ART` folder and per-game configs in exactly the layout
+for them. **OrbitPS2 Manager**, by **[Luden](https://github.com/Luden02)**, writes the `ART` folder and per-game configs in exactly the layout
 RiptOPL expects — open **`OrbitPS2-Manager.url`** from the package, or visit
 <https://github.com/Luden02/OrbitPS2-Manager>. It is a cross-platform (Windows / macOS / Linux)
 desktop app that also imports games from disc images, fetches cover art and screenshots, compresses
