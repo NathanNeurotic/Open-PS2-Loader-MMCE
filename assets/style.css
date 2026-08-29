@@ -157,11 +157,6 @@ blockquote{margin:1em 0;padding:.5em 1.1em;border-left:3px solid var(--ps-sq);co
   box-shadow:0 8px 26px rgba(46,98,230,.4)}
 .btn:hover{text-decoration:none;transform:translateY(-1px);filter:brightness(1.1)}
 .btn.ghost{background:rgba(20,32,72,.5);color:var(--accent2);box-shadow:none;font-weight:600}
-.stat-row{display:flex;flex-wrap:wrap;gap:14px 34px;margin:26px 0 8px}
-.stat{background:none;border:none;border-left:2px solid var(--line2);border-radius:0;padding:1px 0 1px 13px}
-.stat b{font-size:22px;color:var(--accent2);font-weight:800}
-.stat span{color:var(--ink3);font-size:11.5px;display:block;text-transform:uppercase;letter-spacing:.5px}
-
 /* ---- tiles (OSD menu items, face-button colour rhythm) ---- */
 .grid{display:grid;gap:15px;grid-template-columns:repeat(auto-fill,minmax(232px,1fr));margin:22px 0}
 .tile{display:block;padding:16px 18px;background:var(--panel);border:1px solid var(--line2);
