@@ -114,7 +114,7 @@ int cueNameLaunchable(const char *name)
 // then trusted it whenever it said DT_DIR. That is the unsafe direction of the same claim: a liar
 // answering DT_DIR about a FILE is precisely the failure mode, and it put stray files in the PS1
 // list with an X button that could not work. A liar is not half-trustworthy.
-static int cueEntryIsDir(const char *gamesDir, const struct dirent *de)
+static int cueEntryIsDir(const char *devPrefix, const char *gamesDir, const struct dirent *de)
 {
     char probe[320];
     DIR *d;
@@ -134,7 +134,11 @@ static int cueEntryIsDir(const char *gamesDir, const struct dirent *de)
     // This does NOT change what an Ember game IS. A game is still a FOLDER under EMBER/games/ --
     // that is Ember's own contract and it stays. All this decides is whether the thing we are
     // looking at really is a folder.
-    snprintf(probe, sizeof(probe), "%s/%s", gamesDir, de->d_name);
+    // Separator comes from the DEVICE, not a hardcoded slash. cueBuildGamesDir already builds
+    // gamesDir with cueSep(), so a prefix ending in a backslash would otherwise be probed as
+    // "smb0:\\EMBER\\games/NAME" -- mixed, and rejected by any handler that cares. Latent today
+    // (no backslash device lists Ember yet) and load-bearing the moment one does.
+    snprintf(probe, sizeof(probe), "%s%c%s", gamesDir, cueSep(devPrefix), de->d_name);
     d = opendir(probe);
     if (d == NULL)
         return 0;
@@ -224,7 +228,7 @@ int cueScanDir(const char *devPrefix, cue_entry_t **outList)
             LOG("[CUE] skip (name > %d chars): %s\n", ISO_GAME_NAME_MAX, de->d_name);
             continue;
         }
-        if (!cueEntryIsDir(gamesDir, de))
+        if (!cueEntryIsDir(devPrefix, gamesDir, de))
             continue; // loose files in games/ (a stray readme, a leftover archive) are not games
 
         snprintf(list[count].name, sizeof(list[count].name), "%s", de->d_name);
@@ -393,7 +397,7 @@ int cueGameHasImage(const char *devPrefix, const char *name)
     cueBuildGamesDir(devPrefix, gamesDir, sizeof(gamesDir));
     if (gamesDir[0] == '\0')
         return 0;
-    snprintf(gameDir, sizeof(gameDir), "%s/%s", gamesDir, name);
+    snprintf(gameDir, sizeof(gameDir), "%s%c%s", gamesDir, cueSep(devPrefix), name);
 
     dir = opendir(gameDir);
     if (dir == NULL) {
@@ -440,9 +444,9 @@ int cueRenameGame(const char *devPrefix, const char *oldName, const char *newNam
     cueBuildGamesDir(devPrefix, gamesDir, sizeof(gamesDir));
     if (gamesDir[0] == '\0')
         return -1;
-    if (snprintf(oldPath, sizeof(oldPath), "%s/%s", gamesDir, oldName) >= (int)sizeof(oldPath))
+    if (snprintf(oldPath, sizeof(oldPath), "%s%c%s", gamesDir, cueSep(devPrefix), oldName) >= (int)sizeof(oldPath))
         return -1;
-    if (snprintf(newPath, sizeof(newPath), "%s/%s", gamesDir, newName) >= (int)sizeof(newPath))
+    if (snprintf(newPath, sizeof(newPath), "%s%c%s", gamesDir, cueSep(devPrefix), newName) >= (int)sizeof(newPath))
         return -1;
 
     // Refuse to clobber an existing folder. rename() over a non-empty directory is not portable

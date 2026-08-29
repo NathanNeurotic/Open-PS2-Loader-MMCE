@@ -968,14 +968,18 @@ jobs:
             if [ "$TAG" = "rolling" ]; then
               RELEASE_ID=$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}" --jq .id 2>/dev/null || echo "")
               if [ -n "$RELEASE_ID" ]; then
-                TODAY=$(date -u +%Y-%m-%d)
+                # Compare against the value BEFORE the patch, not against today's date. A rolling
+                # release republished twice in one day already carries today's date, so a
+                # date-only test would report success for a PATCH that did nothing.
+                WAS=$(gh api "repos/${GITHUB_REPOSITORY}/releases/${RELEASE_ID}" --jq .published_at 2>/dev/null || echo "")
                 gh api -X PATCH "repos/${GITHUB_REPOSITORY}/releases/${RELEASE_ID}" \
                   -f published_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)" >/dev/null 2>&1 || true
                 GOT=$(gh api "repos/${GITHUB_REPOSITORY}/releases/${RELEASE_ID}" --jq .published_at 2>/dev/null || echo "")
-                case "$GOT" in
-                  "${TODAY}"*) echo "Release date refreshed to $GOT" ;;
-                  *)           echo "NOTE: published_at could not be updated (still '$GOT'); the release date will read stale" ;;
-                esac
+                if [ -n "$GOT" ] && [ "$GOT" != "$WAS" ]; then
+                  echo "Release date refreshed: $WAS -> $GOT"
+                else
+                  echo "NOTE: published_at could not be updated (still '$WAS'); the release date will read stale"
+                fi
               fi
             fi
           else
