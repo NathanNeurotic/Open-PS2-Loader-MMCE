@@ -26,7 +26,7 @@
 // the external Neutrino core (this device has no embedded OPL cdvdman backend), exactly like the "udp"
 // BDM transport in bdmsupport.c -- but here the mount is a filesystem, not a block device.
 static char udpfsPrefix[40]; // full path to the folder that holds all the games ("udpfs:/")
-static char *udpfsBase;      // device root ("udpfs:")
+static const char *udpfsBase; // device root ("udpfs:")
 static int udpfsULSizePrev = -2;
 static time_t udpfsModifiedCDPrev;
 static time_t udpfsModifiedDVDPrev;
@@ -34,8 +34,32 @@ static int udpfsGameCount = 0;
 static base_game_info_t *udpfsGames = NULL;
 static int udpfsIomanModLoaded = 0;
 
-// forward declaration
-static item_list_t udpfsGameList;
+// Forward declarations for the statics referenced by udpfsGameList's initialiser. C++ has no
+// tentative definitions, so keep the one initialised definition here instead of at file end.
+static int udpfsNeedsUpdate(item_list_t *itemList);
+static int udpfsUpdateGameList(item_list_t *itemList);
+static int udpfsGetGameCount(item_list_t *itemList);
+static void *udpfsGetGame(item_list_t *itemList, int id);
+static char *udpfsGetGameName(item_list_t *itemList, int id);
+static int udpfsGetGameNameLength(item_list_t *itemList, int id);
+static char *udpfsGetGameStartup(item_list_t *itemList, int id);
+static void udpfsDeleteGame(item_list_t *itemList, int id);
+static void udpfsRenameGame(item_list_t *itemList, int id, char *newName);
+static void udpfsLaunchVcd(item_list_t *itemList, const char *vcdName, config_set_t *configSet);
+static void udpfsLaunchGame(item_list_t *itemList, int id, config_set_t *configSet);
+static config_set_t *udpfsGetConfig(item_list_t *itemList, int id);
+static int udpfsGetImage(item_list_t *itemList, char *folder, int isRelative, char *value, char *suffix, GSTEXTURE *resultTex, short psm);
+static int udpfsGetTextId(item_list_t *itemList);
+static int udpfsGetIconId(item_list_t *itemList);
+static void udpfsCleanUp(item_list_t *itemList, int exception);
+static void udpfsShutdown(item_list_t *itemList);
+static int udpfsCheckVMC(item_list_t *itemList, char *name, int createSize);
+static char *udpfsGetPrefix(item_list_t *itemList);
+
+static item_list_t udpfsGameList = {
+    UDPFS_MODE, 1, 0, 0, MENU_MIN_INACTIVE_FRAMES, UDPFS_MODE_UPDATE_DELAY, NULL, NULL, &udpfsGetTextId, &udpfsGetPrefix, &udpfsInit, &udpfsNeedsUpdate,
+    &udpfsUpdateGameList, &udpfsGetGameCount, &udpfsGetGame, &udpfsGetGameName, &udpfsGetGameNameLength, &udpfsGetGameStartup, &udpfsDeleteGame, &udpfsRenameGame,
+    &udpfsLaunchGame, &udpfsGetConfig, &udpfsGetImage, &udpfsCleanUp, &udpfsShutdown, &udpfsCheckVMC, &udpfsGetIconId, &udpfsLaunchVcd};
 
 // Load the UDPFS ioman IRX chain ONCE per boot. Mirrors bdmsupport's udpfs_bd chain load
 // (bdmLoadBlockDeviceModules), but loads udpfs_ioman (the FILESYSTEM variant) instead of udpfs_bd (the
@@ -107,7 +131,7 @@ void udpfsInit(item_list_t *itemList)
     udpfsGameCount = 0;
     udpfsGames = NULL;
     udpfsGameList.delay = gArtDelay;
-    ioPutRequest(IO_CUSTOM_SIMPLEACTION, &udpfsLoadModules);
+    ioPutSimpleAction(&udpfsLoadModules);
     udpfsGameList.enabled = 1;
 }
 
@@ -418,8 +442,3 @@ static char *udpfsGetPrefix(item_list_t *itemList)
 {
     return udpfsPrefix;
 }
-
-static item_list_t udpfsGameList = {
-    UDPFS_MODE, 1, 0, 0, MENU_MIN_INACTIVE_FRAMES, UDPFS_MODE_UPDATE_DELAY, NULL, NULL, &udpfsGetTextId, &udpfsGetPrefix, &udpfsInit, &udpfsNeedsUpdate,
-    &udpfsUpdateGameList, &udpfsGetGameCount, &udpfsGetGame, &udpfsGetGameName, &udpfsGetGameNameLength, &udpfsGetGameStartup, &udpfsDeleteGame, &udpfsRenameGame,
-    &udpfsLaunchGame, &udpfsGetConfig, &udpfsGetImage, &udpfsCleanUp, &udpfsShutdown, &udpfsCheckVMC, &udpfsGetIconId, &udpfsLaunchVcd};

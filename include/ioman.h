@@ -33,6 +33,15 @@ int ioRegisterHandler(int type, io_request_handler_t handler);
  * @note The data are not freed! */
 int ioPutRequest(int type, void *data);
 
+/** Schedules a no-argument callback through IO_CUSTOM_SIMPLEACTION.
+ *
+ * The queue's historical ABI stores every payload in a void * slot. Function
+ * and object pointers are both 32-bit on the EE target, but C++ does not permit
+ * their implicit conversion. Keep that representation bridge in ioman instead
+ * of repeating implementation-defined casts at every device call site.
+ */
+int ioPutSimpleAction(io_simpleaction_t action);
+
 
 
 /** removes all requests of a given type from the queue

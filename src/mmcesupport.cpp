@@ -84,8 +84,32 @@ static unsigned char mmceFolderRetries = 0;
  * 500 ms wait gives a slow card time to reach the next safe checkpoint. */
 #define MMCE_ART_ABORT_WAIT_TICKS 500
 
-// forward declaration
-static item_list_t mmceGameList;
+// Forward declarations for the statics referenced by mmceGameList's initialiser. C++ has no
+// tentative definitions, so keep the one initialised definition here instead of at file end.
+static int mmceNeedsUpdate(item_list_t *itemList);
+static int mmceUpdateGameList(item_list_t *itemList);
+static int mmceGetGameCount(item_list_t *itemList);
+static void *mmceGetGame(item_list_t *itemList, int id);
+static char *mmceGetGameName(item_list_t *itemList, int id);
+static int mmceGetGameNameLength(item_list_t *itemList, int id);
+static char *mmceGetGameStartup(item_list_t *itemList, int id);
+static void mmceDeleteGame(item_list_t *itemList, int id);
+static void mmceRenameGame(item_list_t *itemList, int id, char *newName);
+static void mmceLaunchVcd(item_list_t *itemList, const char *vcdName, config_set_t *configSet);
+static config_set_t *mmceGetConfig(item_list_t *itemList, int id);
+static int mmceGetImage(item_list_t *itemList, char *folder, int isRelative, char *value, char *suffix, GSTEXTURE *resultTex, short psm);
+static int mmceGetTextId(item_list_t *itemList);
+static int mmceGetIconId(item_list_t *itemList);
+static void mmceCleanUp(item_list_t *itemList, int exception);
+static void mmceShutdown(item_list_t *itemList);
+static int mmceCheckVMC(item_list_t *itemList, char *name, int createSize);
+static char *mmceGetPrefix(item_list_t *itemList);
+
+static item_list_t mmceGameList = {
+    MMCE_MODE, 2, 0, 0, MENU_MIN_INACTIVE_FRAMES, MMCE_MODE_UPDATE_DELAY, NULL, NULL, &mmceGetTextId, &mmceGetPrefix, &mmceInit, &mmceNeedsUpdate,
+    &mmceUpdateGameList, &mmceGetGameCount, &mmceGetGame, &mmceGetGameName, &mmceGetGameNameLength, &mmceGetGameStartup, &mmceDeleteGame, &mmceRenameGame,
+    &mmceLaunchGame, &mmceGetConfig, &mmceGetImage, &mmceCleanUp, &mmceShutdown, &mmceCheckVMC, &mmceGetIconId, &mmceLaunchVcd};
+
 static void mmceGetDeviceRoot(char *root, size_t size);
 static int mmceModLoaded = 0;          // latched by mmceLoadModules; read by mmceSendGameID's arm check
 static char mmceGameIdTarget[8] = {0}; // last device a GameID 0x8 switch was SENT to (mmceGameIdSettle polls it)
@@ -315,7 +339,7 @@ static int mmceTryLoadImage(const char *prefix, char *folder, int isRelative, ch
     return texDiscoverLoad(resultTex, path, -1);
 }
 
-int mmceDetectSlot(void)
+extern "C" int mmceDetectSlot(void)
 {
     int ret = -1;
     if (fileXioDevctl("mmce0:/", 0x1, NULL, 0, NULL, 0) != -1) {
@@ -328,7 +352,7 @@ int mmceDetectSlot(void)
     return ret;
 }
 
-void mmceSetPrefix(void)
+extern "C" void mmceSetPrefix(void)
 {
     if (gMMCESlot == 0)
         snprintf(mmcePrefix, sizeof(mmcePrefix), "mmce0:/%s", gMMCEPrefix);
@@ -744,7 +768,7 @@ static void mmceLaunchVcd(item_list_t *itemList, const char *vcdName, config_set
 
 void mmceLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
 {
-    int i, index, compatmask = 0;
+    int index, compatmask = 0;
     int EnablePS2Logo = 0;
     int result;
 
@@ -791,7 +815,7 @@ void mmceLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
 
     // (The MMCE art quiesce runs ABOVE the VCD handoff now -- both launch paths are covered by the
     // single guard before any card IO.)
-    void *irx = &mmce_cdvdman_irx;
+    void **irx = mmce_cdvdman_irx;
     int irx_size = size_mmce_cdvdman_irx;
     compatmask = sbPrepare(game, configSet, irx_size, irx, &index);
     settings = (struct cdvdman_settings_mmce *)((u8 *)irx + index);
@@ -867,11 +891,11 @@ void mmceLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
         }
 
         u32 max_words = size_mmce_mcemu_irx / sizeof(u32);
-        for (i = 0; i < max_words; i++) {
-            if (((u32 *)&mmce_mcemu_irx)[i] == (0xC0DEFAC0 + vmc_id)) {
+        for (u32 word = 0; word < max_words; word++) {
+            if (((u32 *)&mmce_mcemu_irx)[word] == (0xC0DEFAC0 + vmc_id)) {
                 if (mmce_vmc_infos.active)
                     size_mcemu_irx = size_mmce_mcemu_irx;
-                memcpy(&((u32 *)&mmce_mcemu_irx)[i], &mmce_vmc_infos, sizeof(mmce_vmc_infos_t));
+                memcpy(&((u32 *)&mmce_mcemu_irx)[word], &mmce_vmc_infos, sizeof(mmce_vmc_infos_t));
                 break;
             }
         }
@@ -1167,8 +1191,3 @@ static char *mmceGetPrefix(item_list_t *itemList)
 {
     return mmcePrefix;
 }
-
-static item_list_t mmceGameList = {
-    MMCE_MODE, 2, 0, 0, MENU_MIN_INACTIVE_FRAMES, MMCE_MODE_UPDATE_DELAY, NULL, NULL, &mmceGetTextId, &mmceGetPrefix, &mmceInit, &mmceNeedsUpdate,
-    &mmceUpdateGameList, &mmceGetGameCount, &mmceGetGame, &mmceGetGameName, &mmceGetGameNameLength, &mmceGetGameStartup, &mmceDeleteGame, &mmceRenameGame,
-    &mmceLaunchGame, &mmceGetConfig, &mmceGetImage, &mmceCleanUp, &mmceShutdown, &mmceCheckVMC, &mmceGetIconId, &mmceLaunchVcd};

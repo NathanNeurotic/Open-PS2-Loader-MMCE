@@ -22,10 +22,14 @@
 #include <fileXio_rpc.h> // fileXioDevctl(ethBase, SMB_***)
 
 #include "include/nbns.h"
+// modules/network/common/httpclient.h is shared with the IOP module and stays guard-free;
+// give its declarations C linkage from here instead.
+extern "C" {
 #include "httpclient.h"
+}
 
 static char ethPrefix[40]; // Contains the full path to the folder where all the games are.
-static char *ethBase;
+static const char *ethBase;
 static int ethULSizePrev = -2;
 static time_t ethModifiedCDPrev;
 static time_t ethModifiedDVDPrev;
@@ -53,8 +57,33 @@ static struct ip4_addr lastIP;
 static struct ip4_addr lastNM;
 static struct ip4_addr lastGW;
 
-// forward declaration
-static item_list_t ethGameList;
+// Forward declarations for the statics referenced by ethGameList's initialiser. C++ has no
+// tentative definitions, so keep the one initialised definition here instead of at file end.
+static int ethNeedsUpdate(item_list_t *itemList);
+static int ethUpdateGameList(item_list_t *itemList);
+static int ethGetGameCount(item_list_t *itemList);
+static void *ethGetGame(item_list_t *itemList, int id);
+static char *ethGetGameName(item_list_t *itemList, int id);
+static int ethGetGameNameLength(item_list_t *itemList, int id);
+static char *ethGetGameStartup(item_list_t *itemList, int id);
+static void ethDeleteGame(item_list_t *itemList, int id);
+static void ethRenameGame(item_list_t *itemList, int id, char *newName);
+static void ethLaunchVcd(item_list_t *itemList, const char *vcdName, config_set_t *configSet);
+static void ethLaunchGame(item_list_t *itemList, int id, config_set_t *configSet);
+static config_set_t *ethGetConfig(item_list_t *itemList, int id);
+static int ethGetImage(item_list_t *itemList, char *folder, int isRelative, char *value, char *suffix, GSTEXTURE *resultTex, short psm);
+static int ethGetTextId(item_list_t *itemList);
+static int ethGetIconId(item_list_t *itemList);
+static void ethCleanUp(item_list_t *itemList, int exception);
+static void ethShutdown(item_list_t *itemList);
+static int ethCheckVMC(item_list_t *itemList, char *name, int createSize);
+static char *ethGetPrefix(item_list_t *itemList);
+
+static item_list_t ethGameList = {
+    ETH_MODE, 1, 0, 0, MENU_MIN_INACTIVE_FRAMES, ETH_MODE_UPDATE_DELAY, NULL, NULL, &ethGetTextId, &ethGetPrefix, &ethInit, &ethNeedsUpdate,
+    &ethUpdateGameList, &ethGetGameCount, &ethGetGame, &ethGetGameName, &ethGetGameNameLength, &ethGetGameStartup, &ethDeleteGame, &ethRenameGame,
+    &ethLaunchGame, &ethGetConfig, &ethGetImage, &ethCleanUp, &ethShutdown, &ethCheckVMC, &ethGetIconId, &ethLaunchVcd};
+
 static int ethWaitValidNetIFLinkState(void);
 static int ethWaitValidDHCPState(void);
 static int ethGetNetIFLinkStatus(void);
@@ -516,7 +545,7 @@ void ethInit(item_list_t *itemList)
         thmReinit(ethBase);
         ethULSizePrev = -2;
         ethGameCount = 0;
-        ioPutRequest(IO_CUSTOM_SIMPLEACTION, &ethInitSMB);
+        ioPutSimpleAction(&ethInitSMB);
     } else {
         LOG("ETHSUPPORT Init\n");
         ethBase = "smb0:";
@@ -527,7 +556,7 @@ void ethInit(item_list_t *itemList)
         ethGames = NULL;
         ethGameList.delay = gArtDelay;
         gNetworkStartup = ERROR_ETH_NOT_STARTED;
-        ioPutRequest(IO_CUSTOM_SIMPLEACTION, &smbLoadModules);
+        ioPutSimpleAction(&smbLoadModules);
         ethGameList.enabled = 1;
     }
 }
@@ -730,7 +759,7 @@ static void *ethGetGame(item_list_t *itemList, int id)
 static char *ethGetGameName(item_list_t *itemList, int id)
 {
     base_game_info_t *game = ethGameForView(itemList, id);
-    return game != NULL ? game->name : "";
+    return game != NULL ? game->name : (char *)"";
 }
 
 static int ethGetGameNameLength(item_list_t *itemList, int id)
@@ -745,7 +774,7 @@ static char *ethGetGameStartup(item_list_t *itemList, int id)
 {
     base_game_info_t *game = ethGameForView(itemList, id);
     if (game == NULL)
-        return "";
+        return (char *)"";
     // VCD view keys per-game data (CFG/art) off the VCD filename, not a disc ID (see sbPopulateConfig).
     if (vcdListViewActive(itemList))
         return game->name;
@@ -844,7 +873,7 @@ static void ethLaunchGame(item_list_t *itemList, int id, config_set_t *configSet
         ethULSizePrev = -2;
         ethGameCount = 0;
         ioPutRequest(IO_MENU_UPDATE_DEFFERED, &ethGameList.mode); // clear the share list
-        ioPutRequest(IO_CUSTOM_SIMPLEACTION, &ethInitSMB);
+        ioPutSimpleAction(&ethInitSMB);
         ioPutRequest(IO_MENU_UPDATE_DEFFERED, &ethGameList.mode); // reload the game list
         return;
     }
@@ -1090,11 +1119,6 @@ const char *ethGetSMBPrefix(void)
     return ethPrefix;
 }
 
-static item_list_t ethGameList = {
-    ETH_MODE, 1, 0, 0, MENU_MIN_INACTIVE_FRAMES, ETH_MODE_UPDATE_DELAY, NULL, NULL, &ethGetTextId, &ethGetPrefix, &ethInit, &ethNeedsUpdate,
-    &ethUpdateGameList, &ethGetGameCount, &ethGetGame, &ethGetGameName, &ethGetGameNameLength, &ethGetGameStartup, &ethDeleteGame, &ethRenameGame,
-    &ethLaunchGame, &ethGetConfig, &ethGetImage, &ethCleanUp, &ethShutdown, &ethCheckVMC, &ethGetIconId, &ethLaunchVcd};
-
 static int ethReadNetConfig(void)
 {
     t_ip_info ip_info;
@@ -1102,7 +1126,7 @@ static int ethReadNetConfig(void)
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wstrict-aliasing"
-    if ((result = ps2ip_getconfig("sm0", &ip_info)) >= 0) {
+    if ((result = ps2ip_getconfig((char *)"sm0", &ip_info)) >= 0) {
         lastIP = *(struct ip4_addr *)&ip_info.ipaddr;
         lastNM = *(struct ip4_addr *)&ip_info.netmask;
         lastGW = *(struct ip4_addr *)&ip_info.gw;
@@ -1183,7 +1207,7 @@ static int ethApplyIPConfig(void)
     const struct ip4_addr *dns_curr;
     int result;
 
-    if ((result = ps2ip_getconfig("sm0", &ip_info)) >= 0) {
+    if ((result = ps2ip_getconfig((char *)"sm0", &ip_info)) >= 0) {
         IP4_ADDR(&ipaddr, ps2_ip[0], ps2_ip[1], ps2_ip[2], ps2_ip[3]);
         IP4_ADDR(&netmask, ps2_netmask[0], ps2_netmask[1], ps2_netmask[2], ps2_netmask[3]);
         IP4_ADDR(&gw, ps2_gateway[0], ps2_gateway[1], ps2_gateway[2], ps2_gateway[3]);
@@ -1193,7 +1217,7 @@ static int ethApplyIPConfig(void)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wstrict-aliasing"
         // Check if it's the same. Otherwise, apply the new configuration.
-        if ((ps2_ip_use_dhcp != ip_info.dhcp_enabled) || (!ps2_ip_use_dhcp &&
+        if (((u32)ps2_ip_use_dhcp != ip_info.dhcp_enabled) || (!ps2_ip_use_dhcp &&
                                                           (!ip_addr_cmp(&ipaddr, (struct ip4_addr *)&ip_info.ipaddr) ||
                                                            !ip_addr_cmp(&netmask, (struct ip4_addr *)&ip_info.netmask) ||
                                                            !ip_addr_cmp(&gw, (struct ip4_addr *)&ip_info.gw) ||
@@ -1229,7 +1253,7 @@ int ethGetDHCPStatus(void)
     t_ip_info ip_info;
     int result;
 
-    if ((result = ps2ip_getconfig("sm0", &ip_info)) >= 0) {
+    if ((result = ps2ip_getconfig((char *)"sm0", &ip_info)) >= 0) {
         if (ip_info.dhcp_enabled) {
             result = (ip_info.dhcp_status == DHCP_STATE_BOUND || (ip_info.dhcp_status == DHCP_STATE_OFF));
         } else
