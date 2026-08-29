@@ -1034,9 +1034,8 @@ static int hddBuildVcdGameList(void)
                 continue;
             }
 
-            // cueScanDir gates itself on open()ing the core, so a partition with no EMBER folder
-            // costs this mount plus one failed open and returns 0. That is what makes it safe to
-            // scan __common unconditionally: the usual drive pays almost nothing for the attempt.
+            // cueScanDir gates itself on open()ing the core, so an __.EMBER partition that does
+            // not actually hold an install costs this mount plus one failed open and returns 0.
             cue_entry_t *cues = NULL;
             int n = cueScanDir("pfs1:/", &cues);
             fileXioUmount("pfs1:");

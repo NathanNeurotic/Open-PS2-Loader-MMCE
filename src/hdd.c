@@ -298,21 +298,17 @@ static int hddIsPopsContainerName(const char *name)
     return name[7] == '\0' || (name[7] >= '0' && name[7] <= '9' && name[8] == '\0');
 }
 
-// __.EMBER / __.EMBER0..9, plus the shared __common partition. Deliberately the same shape as the
-// __.POPS[0-9]? containers above, so a user who already understands where their PS1 library lives on
-// an APA drive does not have to learn a second convention.
+// __.EMBER / __.EMBER0..9 -- ONE library location, deliberately the same shape as the __.POPS[0-9]?
+// containers above, so a user who already knows where their PS1 library lives on an APA drive does
+// not have to learn a second convention.
 //
-// __common earns its place because POPSTARTER already lives there (hddResolveHddPopstarter mounts
-// it), so a drive that runs PS1 at all usually has one; a dedicated __.EMBER is for libraries too
-// big to sit in it. Both are scanned, and a partition with no EMBER folder costs one mount and one
-// open() before it is dropped -- cueScanDir gates itself on the core being readable.
+// NOT __common. That partition is the OPL DATA home (ART, config) and the place POPSTARTER.ELF is
+// loaded FROM by hddResolveHddPopstarter -- it is not where POPS keeps its games, and it is not
+// where Ember keeps its games either. An __.EMBER partition is self-contained: ember.elf, bios.bin
+// and games/ all sit at its root, so one mount serves the core and the library both.
 static int hddIsEmberContainerName(const char *name)
 {
-    if (name == NULL)
-        return 0;
-    if (strcmp(name, "__common") == 0)
-        return 1;
-    if (strncmp(name, "__.EMBER", 8) != 0)
+    if (name == NULL || strncmp(name, "__.EMBER", 8) != 0)
         return 0;
     return name[8] == '\0' || (name[8] >= '0' && name[8] <= '9' && name[9] == '\0');
 }

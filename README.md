@@ -224,18 +224,26 @@ This build layers several features on top of upstream OPL:
   APA/PFS hard drive.
 
   **On an internal APA/PFS drive**, where there is no filesystem root to copy a folder to, the
-  `EMBER/` folder goes on a partition instead. RiptOPL looks in two places and lists whatever it
-  finds in both:
+  `EMBER/` folder goes on a partition of its own: **`__.EMBER`**, or `__.EMBER0` … `__.EMBER9` if you
+  want more than one. That is deliberately the same naming shape as the `__.POPS` containers that
+  hold your `.VCD` files, so there is only one convention to remember.
 
-  - **`__common`** — the shared partition POPSTARTER already lives on. Simplest option, and the one
-    to use if your library is small enough to fit beside everything else that partition holds.
-  - **`__.EMBER`** (or `__.EMBER0` … `__.EMBER9`) — a partition you create for the purpose. Deliberately
-    the same naming shape as the `__.POPS` containers, and the right choice for a real library, since
-    PS1 disc images are large and `__common` usually is not.
+  The partition is self-contained — the layout inside it is exactly the one above, starting at the
+  partition root:
 
-  Inside the partition the layout is exactly the one above, starting at the partition root:
-  `EMBER/ember.elf`, `EMBER/bios.bin`, `EMBER/games/<Game Name>/`. Cover art is unchanged too —
-  `ART/<Game Name>_COV.png` on your OPL data partition, the same key a `.VCD` uses.
+  ```
+  hdd0:__.EMBER
+      EMBER/
+          ember.elf
+          bios.bin                   <- yours, 512 KB
+          games/
+              Spyro 2 (Ripto's Rage)/
+                  whatever.cue
+                  whatever.bin
+  ```
+
+  Cover art is unchanged and does **not** go here — `ART/<Game Name>_COV.png` on your OPL data
+  partition, the same place and the same key a `.VCD` uses.
 
   One difference is worth knowing about, because it is the reason this works at all: an APA Ember
   title is launched with its partition **still mounted**. Ember inherits that live mount instead of
