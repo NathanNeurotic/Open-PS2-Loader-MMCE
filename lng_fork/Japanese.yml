@@ -227,3 +227,93 @@ translations:
   "HINT_DEFAULT_CORE": "ゲームごとのLoader CoreがDefaultに設定されているゲームに使う、グローバルの既定コアです。<OPL> はネイティブコアで、Neutrinoは外部の neutrino.elf をチェーンします。ゲームごとの選択が常にこれを上書きします。"
   "VCD_SETTINGS": "VCD 設定"
   "FINANCIAL_SUPPORT": "資金援助"
+  ADVANCED_ARGUMENTS: 詳細な引数
+  ADVANCED_SETTINGS: 詳細設定
+  ARTWORK_SETTINGS: アートワーク設定
+  BDMA_SETTINGS: BDMA 設定
+  COLORS_SETTINGS: 配色
+  COMM_SETTINGS: 通信設定
+  CONTROLLER_EMULATION: コントローラーエミュレーション
+  CONTROLLER_MACROS: コントローラーマクロ
+  DISPLAY_SETTINGS: 画面
+  GAME_LAUNCHING: ゲームの起動
+  GAME_LIST_SETTINGS: ゲームリスト設定
+  GAME_SOURCES: ゲームの読み込み元
+  HINT_POPSTARTER_RETROGEM_GAMEID: PS1 の VCD 起動時に Pixel FX / RetroGEM / PS2Digital 用の光学バーコードを表示します
+  HINT_POPS_IMPORT: 接続中の SMB 共有の POPS フォルダから POPSTARTER の IPCONFIG.DAT と SMBCONFIG.DAT を読み込みます。OK で確定するまで何も書き込まれません。
+  HINT_POPS_PORT: サーバーの SMB ポート -- 既定は 445 です。通常の共有では 0 (または 445) のままにし、古い SMB1 サーバーでは 139 を指定します。
+  HINT_VCD_SHOW_PP_POPS: 'HDD のみ -- PP.<ID>.POPS.<名前> (例: PP.SCES-01492.POPS.MEDIEVIL) という名前の 1 本用パーティションを PS1 ゲームとして一覧に出します。一覧に出すだけで、起動方法は変わりません。ほかの PP.* パーティション (アプリや PS2 ゲーム) は非表示のままです。'
+  INTERFACE_SETTINGS: インターフェース
+  MENU_NETWORK: ネットワーク
+  NEUTRINO_DEFAULTS: Neutrino の既定値
+  OSD_DEFAULTS: OSD の既定値
+  PATH_PREFIXES: パスの接頭辞
+  PATH_SETTINGS: パス設定
+  POPSTARTER: PS エミュレーション設定
+  POPSTARTER_RETROGEM_GAMEID: RetroGEM ゲーム ID
+  POPSTARTER_NETWORK_SETTINGS: POPSTARTER ネットワーク設定
+  GAMEID_MODE_ALL: オン (すべて)
+  GAMEID_MODE_POPSTARTER: オン (POPSTARTER のみ)
+  GAMEID_MODE_PS2: オン (PS2 のみ)
+  GAMEID_MODE_OFF: オフ
+  POPS_IMPORT: SMB の POPS フォルダから取り込む
+  POPS_NONE_DETECTED: 既存の POPStarter SMB 設定は見つかりませんでした。新しく作成する前に、正しいネットワーク設定を入力してください。
+  POPS_SMB_SECTION: POPStarter SMB ネットワーク
+  SECURITY_SETTINGS: セキュリティ
+  STORAGE_CACHE: ストレージとキャッシュ
+  TOOLS: ツール
+  VCD_SHOW_PP_POPS: PP.<ID>.POPS パーティションのゲームを表示 (HDD)
+  VCD_USB_MODE_HINT: exFAT ではない USB メモリには fat32 を推奨します。
+  VCD_USB_MODE_QUESTION: USB モードは fat32 と exFAT のどちらですか?
+  VCD_USB_MODE_TITLE: USB VCD モード
+  MENU_CONTROLLER: コントローラー
+  MENU_AUDIO: サウンド
+  MMCE_GAMEID_UNSETTLED: MMCE カードの切り替えが確認できませんでした -- そのまま起動します
+  NEUTRINO_SMB_FALLBACK: SMB のゲームは Neutrino に対応していません -- OPL コアで起動します。
+  NEUTRINO_VMC_HDD_UNSUPPORTED: Neutrino は APA HDD 上の VMC を使用できません (pfs 非対応) -- VMC なしで起動します。
+  POPS_LOADED_FROM: '%s から読み込みました'
+  POPSTARTER_NET_INVALID: POPSTARTER のネットワーク設定が正しくありません。POPSTARTER ネットワーク設定で修正してください。
+  POPSTARTER_SMB_NEEDS_STATIC: POPSTARTER の SMB には固定 IP のネットワーク設定が必要です。先に POPSTARTER ネットワーク設定を行ってください。
+  POPS_OVERWRITE_TITLE: POPSTARTER の設定を置き換えますか?
+  POPS_OVERWRITE_MSG: POPSTARTER のネットワーク設定はすでに存在します。この内容で置き換えますか?
+  POPS_KEEP_EXISTING: 既存のまま
+  POPS_REPLACE: 置き換える
+  GSM_1080P_WARNING: 警告 -- 1080p の強制は実験的で未検証です。映像が出ない場合や、環境によっては本体に負荷がかかる場合があります。自己責任で実行してください。
+  GSM_1080P_PROCEED: このゲームで 1080p を強制しますか?
+  GSM_1080P_SURE: 本当によろしいですか? このゲームに実験的な 1080p モードが適用されます。
+  CUSTOM_SETTINGS_PATH: 設定の保存先を指定
+  HINT_CUSTOM_SETTINGS_PATH: '任意のフォルダに設定を保存します (例: mass0:/OPL)。空欄にすると OPL の起動元フォルダを使用します。デバイスは必要になった時点で読み込まれるため、入力時にマウントされている必要はありません。'
+  PERGAME_MIXED_SETTINGS: ゲームごと + 全体
+  GSM_DEFAULTS: GSM の既定値 (全ゲーム)
+  ERR_DEVICE_BUSY_TIMEOUT: 'デバイスがビジーです: 設定の書き込みが開始されませんでした。読み込みが終わってからもう一度お試しください。'
+  BDMA_EQUIPPING: メモリーカードに PS1 ドライバを準備しています...
+  VCD_USB_BDMA: USB BDMA ドライバ
+  HINT_VCD_USB_BDMA: USB メモリからの PS1 (VCD) 起動にのみ関係します。PS2 は USB メモリが fat32 か exFAT かを判別できないため、POPSTARTER のドライバを選ぶ必要があります。確認する は毎回たずねます。exFAT または fat32 を選ぶと答えが固定され、確認は省略されます。
+  VCD_USB_BDMA_ASK: 確認する
+  SETTINGS_HDD_FALLBACK: 'HDD の設定は安全な代替の保存先を使用しました: %s'
+  HDD_BACKEND_RECONCILED: 内蔵 HDD の APA と exFAT が同時に有効でした -- 一方を自動的に無効にしました (デバイス設定を確認してください)。
+  SETTINGS_SAVE_PROMPT: 設定を保存しますか?
+  SETTINGS_SAVE_PROMPT_LINE1: 変更内容は現在有効になっています。
+  SETTINGS_SAVE_PROMPT_LINE2: 次回以降の起動のために保存しますか?
+  SETTINGS_SAVE: 設定を保存
+  SETTINGS_EXIT_WITHOUT_SAVING: 保存せずに終了
+  SETTINGS_CONTINUE_EDITING: 編集を続ける
+  CONFIGURE: 設定
+  HDD_UNAVAILABLE_ERROR: '%d: ハードディスクを利用できません。'
+  HDD_PFS_UNAVAILABLE_ERROR: '%d: ハードディスクの PFS サポートを利用できません。'
+  POPS_LOADING_SETTINGS: POPSTARTER の設定を読み込んでいます...
+  POPS_SMB_NOT_CONNECTED: SMB に接続していません。
+  POPS_SMB_SETTINGS_NOT_FOUND: SMB の POPS フォルダに POPSTARTER の設定が見つかりません。
+  HDD_OPL_PLUS_NOT_FOUND: +OPL パーティションが見つかりません。
+  HDD_OPL_COMMON_NOT_FOUND: __common パーティションが見つかりません。
+  HDD_OPL_PARTITION_RESTART: 選択した OPL パーティションを適用するには RiptOPL を再起動してください。
+  HDD_OPL_PARTITION_CHECKING: HDD の OPL パーティションを確認しています...
+  HDD_OPL_PARTITION_BUSY: HDD がビジーです。読み込みが終わってからもう一度お試しください。
+  GENERAL_SYSTEM: 全般とシステム
+  EMBER_NOT_FOUND: ember.elf が見つかりません
+  EMBER_BIOS_MISSING: ember.elf の隣に bios.bin がありません
+  EMBER_BAD_NAME: Ember はこのフォルダ名を使用できません (スラッシュ、コロン、円記号は使えず、先頭のドットも使えません)。
+  EMBER_NO_DISC: この Ember ゲームフォルダに PS1 のディスクイメージがありません。
+  VIEW_APPS: アプリを表示中
+  EMBER_DISPLAY: Ember の表示モード
+  HINT_EMBER_DISPLAY: Ember が PS1 ゲームで使用する出力モードです。240p または 480p を選ぶと、起動したデバイスの EMBER フォルダ内の settings.txt に書き込まれます。既定 を選ぶとその設定は削除され、ほかに何も無ければファイルごと削除されます。

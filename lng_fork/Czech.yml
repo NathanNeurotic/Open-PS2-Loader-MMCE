@@ -227,3 +227,93 @@ translations:
   "HINT_DEFAULT_CORE": "Globální výchozí jádro pro hry, jejichž Loader Core pro danou hru je nastaven na Default. <OPL> je nativní jádro; Neutrino řetězí externí neutrino.elf. Volba u konkrétní hry toto vždy přepíše."
   "VCD_SETTINGS": "Nastavení VCD"
   "FINANCIAL_SUPPORT": "Finanční podpora"
+  ADVANCED_ARGUMENTS: Pokročilé argumenty
+  ADVANCED_SETTINGS: Pokročilé
+  ARTWORK_SETTINGS: Nastavení obalů
+  BDMA_SETTINGS: Nastavení BDMA
+  COLORS_SETTINGS: Barvy
+  COMM_SETTINGS: Nastavení komunikace
+  CONTROLLER_EMULATION: Emulace ovladače
+  CONTROLLER_MACROS: Makra ovladače
+  DISPLAY_SETTINGS: Zobrazení
+  GAME_LAUNCHING: Spouštění her
+  GAME_LIST_SETTINGS: Nastavení seznamu her
+  GAME_SOURCES: Zdroje her
+  HINT_POPSTARTER_RETROGEM_GAMEID: Zobrazí optický čárový kód pro Pixel FX / RetroGEM / PS2Digital při spuštění PS1 VCD
+  HINT_POPS_IMPORT: Načte soubory IPCONFIG.DAT a SMBCONFIG.DAT POPSTARTERu ze složky POPS připojeného sdílení SMB. Nic se nezapíše, dokud nepotvrdíš tlačítkem OK.
+  HINT_POPS_PORT: Port SMB na serveru -- 445 je výchozí. Pro běžné sdílení ponech 0 (nebo 445); pro starší servery SMB1 použij 139.
+  HINT_VCD_SHOW_PP_POPS: Pouze HDD -- zobrazí jako hry PS1 oddíly s jednou hrou pojmenované PP.<ID>.POPS.<název> (např. PP.SCES-01492.POPS.MEDIEVIL). Pouze výpis; spouštění se nemění. Ostatní oddíly PP.* (aplikace, hry PS2) zůstávají skryté.
+  INTERFACE_SETTINGS: Rozhraní
+  MENU_NETWORK: Síť
+  NEUTRINO_DEFAULTS: Výchozí hodnoty Neutrina
+  OSD_DEFAULTS: Výchozí hodnoty OSD
+  PATH_PREFIXES: Předpony cest
+  PATH_SETTINGS: Nastavení cest
+  POPSTARTER: Nastavení emulace PS
+  POPSTARTER_RETROGEM_GAMEID: Game ID RetroGEM
+  POPSTARTER_NETWORK_SETTINGS: Síťová nastavení POPSTARTERu
+  GAMEID_MODE_ALL: Zap. (vše)
+  GAMEID_MODE_POPSTARTER: Zap. (jen POPSTARTER)
+  GAMEID_MODE_PS2: Zap. (jen PS2)
+  GAMEID_MODE_OFF: Vyp.
+  POPS_IMPORT: Importovat ze složky POPS přes SMB
+  POPS_NONE_DETECTED: Nebyla nalezena žádná stávající konfigurace SMB POPStarteru. Než nějakou vytvoříš, zadej správná síťová nastavení.
+  POPS_SMB_SECTION: Síť SMB POPStarteru
+  SECURITY_SETTINGS: Zabezpečení
+  STORAGE_CACHE: Úložiště a mezipaměť
+  TOOLS: Nástroje
+  VCD_SHOW_PP_POPS: Zobrazit hry z oddílů PP.<ID>.POPS (HDD)
+  VCD_USB_MODE_HINT: fat32 se doporučuje pro USB disky bez exFAT.
+  VCD_USB_MODE_QUESTION: Režim USB fat32 nebo exFAT?
+  VCD_USB_MODE_TITLE: Režim VCD přes USB
+  MENU_CONTROLLER: Ovladač
+  MENU_AUDIO: Zvuk
+  MMCE_GAMEID_UNSETTLED: Přepnutí karty MMCE nepotvrzeno -- spouštím i tak
+  NEUTRINO_SMB_FALLBACK: Hry přes SMB nemají v Neutrinu podporu -- spouštím s jádrem OPL.
+  NEUTRINO_VMC_HDD_UNSUPPORTED: Neutrino nemůže použít VMC na disku APA (chybí podpora pfs) -- spouštím bez něj.
+  POPS_LOADED_FROM: Načteno z %s
+  POPSTARTER_NET_INVALID: Síťová konfigurace POPSTARTERu je neplatná. Oprav ji v síťových nastaveních POPSTARTERu.
+  POPSTARTER_SMB_NEEDS_STATIC: SMB v POPSTARTERu vyžaduje statickou konfiguraci sítě. Nejprve nastav síťová nastavení POPSTARTERu.
+  POPS_OVERWRITE_TITLE: Nahradit konfiguraci POPSTARTERu?
+  POPS_OVERWRITE_MSG: Síťová konfigurace POPSTARTERu už existuje. Nahradit ji těmito nastaveními?
+  POPS_KEEP_EXISTING: Ponechat stávající
+  POPS_REPLACE: Nahradit
+  GSM_1080P_WARNING: VAROVÁNÍ -- vynucení 1080p je experimentální a neověřené. Nemusí být žádný obraz nebo se na některém hardwaru může konzole přetěžovat. Pokračuješ na vlastní riziko.
+  GSM_1080P_PROCEED: Vynutit u této hry 1080p?
+  GSM_1080P_SURE: Určitě? Na tuto hru se použije experimentální režim 1080p.
+  CUSTOM_SETTINGS_PATH: Vlastní cesta k nastavení
+  HINT_CUSTOM_SETTINGS_PATH: Uloží nastavení do složky dle tvého výběru, např. mass0:/OPL. Ponech prázdné pro složku, ze které se OPL spustil. Zařízení se načítá na vyžádání, takže při psaní nemusí být připojené.
+  PERGAME_MIXED_SETTINGS: Na hru + globální
+  GSM_DEFAULTS: Výchozí hodnoty GSM (všechny hry)
+  ERR_DEVICE_BUSY_TIMEOUT: 'Zařízení je zaneprázdněno: zápis nastavení vůbec nezačal. Zkus to znovu po dokončení načítání.'
+  BDMA_EQUIPPING: Připravuji ovladač PS1 na paměťové kartě...
+  VCD_USB_BDMA: Ovladač BDMA pro USB
+  HINT_VCD_USB_BDMA: Týká se jen spouštění her PS1 (VCD) z USB disku. PS2 nedokáže zjistit, zda je disk fat32 nebo exFAT, takže ovladač POPSTARTERu je nutné zvolit. Zeptat se ptá při každém spuštění; exFAT nebo fat32 odpověď zafixují a dotaz přeskočí.
+  VCD_USB_BDMA_ASK: Zeptat se
+  SETTINGS_HDD_FALLBACK: 'Nastavení HDD použila bezpečné náhradní umístění: %s'
+  HDD_BACKEND_RECONCILED: Interní disk APA i exFAT byly zapnuté současně -- jeden byl automaticky vypnut (viz Nastavení zařízení).
+  SETTINGS_SAVE_PROMPT: ULOŽIT NASTAVENÍ?
+  SETTINGS_SAVE_PROMPT_LINE1: Tvoje změny jsou právě teď aktivní.
+  SETTINGS_SAVE_PROMPT_LINE2: Chceš je uložit pro příští spuštění?
+  SETTINGS_SAVE: Uložit nastavení
+  SETTINGS_EXIT_WITHOUT_SAVING: Ukončit bez uložení
+  SETTINGS_CONTINUE_EDITING: Pokračovat v úpravách
+  CONFIGURE: Nastavit
+  HDD_UNAVAILABLE_ERROR: '%d: pevný disk není k dispozici.'
+  HDD_PFS_UNAVAILABLE_ERROR: '%d: podpora PFS pevného disku není k dispozici.'
+  POPS_LOADING_SETTINGS: Načítám nastavení POPSTARTERu...
+  POPS_SMB_NOT_CONNECTED: SMB není připojeno.
+  POPS_SMB_SETTINGS_NOT_FOUND: Ve složce POPS přes SMB nebyla nalezena žádná nastavení POPSTARTERu.
+  HDD_OPL_PLUS_NOT_FOUND: Oddíl +OPL nebyl nalezen.
+  HDD_OPL_COMMON_NOT_FOUND: Oddíl __common nebyl nalezen.
+  HDD_OPL_PARTITION_RESTART: Restartuj RiptOPL, aby se zvolený oddíl OPL projevil.
+  HDD_OPL_PARTITION_CHECKING: Kontroluji oddíl OPL na disku...
+  HDD_OPL_PARTITION_BUSY: Disk je zaneprázdněn. Zkus to znovu po dokončení načítání.
+  GENERAL_SYSTEM: Obecné a systém
+  EMBER_NOT_FOUND: Chybí ember.elf
+  EMBER_BIOS_MISSING: Chybí bios.bin vedle ember.elf
+  EMBER_BAD_NAME: Ember nemůže použít tento název složky (bez lomítka, dvojtečky a zpětného lomítka a bez teček na začátku).
+  EMBER_NO_DISC: V této složce hry Ember není žádný obraz disku PS1.
+  VIEW_APPS: Zobrazeny aplikace
+  EMBER_DISPLAY: Režim zobrazení Ember
+  HINT_EMBER_DISPLAY: Výstupní režim, který Ember používá pro hry PS1. 240p nebo 480p se zapíše do souboru settings.txt ve složce EMBER spouštěného zařízení. Výchozí toto nastavení zase odstraní, a spolu s ním i soubor, pokud v něm nic dalšího nebylo.

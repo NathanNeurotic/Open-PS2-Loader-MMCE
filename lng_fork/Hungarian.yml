@@ -227,3 +227,93 @@ translations:
   "HINT_DEFAULT_CORE": "Globális alapértelmezett mag azokhoz a játékokhoz, amelyeknél a játékonkénti Betöltő Mag Alapértelmezettre van állítva. Az <OPL> a natív mag; a Neutrino a külső neutrino.elf fájlt láncolja. A játékonkénti választás mindig felülírja ezt."
   "VCD_SETTINGS": "VCD beállítások"
   "FINANCIAL_SUPPORT": "Anyagi támogatás"
+  ADVANCED_ARGUMENTS: Speciális argumentumok
+  ADVANCED_SETTINGS: Speciális
+  ARTWORK_SETTINGS: Borítóbeállítások
+  BDMA_SETTINGS: BDMA-beállítások
+  COLORS_SETTINGS: Színek
+  COMM_SETTINGS: Kommunikációs beállítások
+  CONTROLLER_EMULATION: Kontrolleremuláció
+  CONTROLLER_MACROS: Kontrollermakrók
+  DISPLAY_SETTINGS: Kép
+  GAME_LAUNCHING: Játékindítás
+  GAME_LIST_SETTINGS: Játéklista beállításai
+  GAME_SOURCES: Játékforrások
+  HINT_POPSTARTER_RETROGEM_GAMEID: Optikai vonalkódot jelenít meg a Pixel FX / RetroGEM / PS2Digital számára PS1 VCD indításakor
+  HINT_POPS_IMPORT: Beolvassa a POPSTARTER IPCONFIG.DAT és SMBCONFIG.DAT fájljait a csatlakoztatott SMB-megosztás POPS mappájából. Semmi sem íródik ki, amíg meg nem erősíted az OK gombbal.
+  HINT_POPS_PORT: SMB-port a kiszolgálón -- az alapértelmezett a 445. Hagyd 0-n (vagy 445-ön) normál megosztáshoz; régebbi SMB1-kiszolgálókhoz használj 139-et.
+  HINT_VCD_SHOW_PP_POPS: Csak HDD -- PS1-játékként listázza a PP.<ID>.POPS.<név> nevű, egyetlen játékot tartalmazó partíciókat (pl. PP.SCES-01492.POPS.MEDIEVIL). Csak a listázás; az indítás nem változik. A többi PP.* partíció (alkalmazások, PS2-játékok) rejtve marad.
+  INTERFACE_SETTINGS: Kezelőfelület
+  MENU_NETWORK: Hálózat
+  NEUTRINO_DEFAULTS: Neutrino alapértékek
+  OSD_DEFAULTS: OSD alapértékek
+  PATH_PREFIXES: Útvonal-előtagok
+  PATH_SETTINGS: Útvonalbeállítások
+  POPSTARTER: PS-emulációs beállítások
+  POPSTARTER_RETROGEM_GAMEID: RetroGEM Game ID
+  POPSTARTER_NETWORK_SETTINGS: POPSTARTER hálózati beállítások
+  GAMEID_MODE_ALL: Be (mind)
+  GAMEID_MODE_POPSTARTER: Be (csak POPSTARTER)
+  GAMEID_MODE_PS2: Be (csak PS2)
+  GAMEID_MODE_OFF: Ki
+  POPS_IMPORT: Importálás az SMB POPS mappából
+  POPS_NONE_DETECTED: Nem található meglévő POPStarter SMB-konfiguráció. Add meg a helyes hálózati beállításokat, mielőtt létrehozol egyet.
+  POPS_SMB_SECTION: POPStarter SMB-hálózat
+  SECURITY_SETTINGS: Biztonság
+  STORAGE_CACHE: Tárhely és gyorsítótár
+  TOOLS: Eszközök
+  VCD_SHOW_PP_POPS: PP.<ID>.POPS partíciók játékainak megjelenítése (HDD)
+  VCD_USB_MODE_HINT: Nem exFAT USB-eszközökhöz a fat32 ajánlott.
+  VCD_USB_MODE_QUESTION: USB-mód fat32 vagy exFAT?
+  VCD_USB_MODE_TITLE: USB VCD-mód
+  MENU_CONTROLLER: Kontroller
+  MENU_AUDIO: Hang
+  MMCE_GAMEID_UNSETTLED: Az MMCE-kártyaváltás nincs megerősítve -- indítás mindenképp
+  NEUTRINO_SMB_FALLBACK: Az SMB-játékokat a Neutrino nem támogatja -- indítás az OPL magjával.
+  NEUTRINO_VMC_HDD_UNSUPPORTED: A Neutrino nem tud VMC-t használni APA HDD-n (nincs pfs-támogatás) -- indítás nélküle.
+  POPS_LOADED_FROM: 'Betöltve innen: %s'
+  POPSTARTER_NET_INVALID: A POPSTARTER hálózati konfigurációja érvénytelen. Javítsd a POPSTARTER hálózati beállításokban.
+  POPSTARTER_SMB_NEEDS_STATIC: A POPSTARTER SMB-je statikus hálózati konfigurációt igényel. Előbb állítsd be a POPSTARTER hálózati beállításait.
+  POPS_OVERWRITE_TITLE: Lecseréled a POPSTARTER konfigurációt?
+  POPS_OVERWRITE_MSG: Már létezik POPSTARTER hálózati konfiguráció. Lecseréled ezekre a beállításokra?
+  POPS_KEEP_EXISTING: Meglévő megtartása
+  POPS_REPLACE: Csere
+  GSM_1080P_WARNING: FIGYELEM -- az 1080p kikényszerítése kísérleti és nem ellenőrzött. Előfordulhat, hogy nincs kép, vagy bizonyos hardvereken megterheli a konzolt. Saját felelősségre folytasd.
+  GSM_1080P_PROCEED: Kikényszeríted az 1080p-t ehhez a játékhoz?
+  GSM_1080P_SURE: Biztos vagy benne? A kísérleti 1080p mód lesz alkalmazva erre a játékra.
+  CUSTOM_SETTINGS_PATH: Egyéni beállítási útvonal
+  HINT_CUSTOM_SETTINGS_PATH: A beállításokat az általad választott mappába menti, pl. mass0:/OPL. Hagyd üresen, hogy az OPL indítási mappáját használja. Az eszköz igény szerint töltődik be, így gépeléskor nem kell csatolva lennie.
+  PERGAME_MIXED_SETTINGS: Játékonként + globális
+  GSM_DEFAULTS: GSM alapértékek (minden játék)
+  ERR_DEVICE_BUSY_TIMEOUT: 'Az eszköz foglalt: a beállítások írása el sem kezdődött. Próbáld újra, ha a betöltés befejeződött.'
+  BDMA_EQUIPPING: A PS1-illesztőprogram előkészítése a memóriakártyán...
+  VCD_USB_BDMA: USB BDMA-illesztőprogram
+  HINT_VCD_USB_BDMA: Csak az USB-eszközről indított PS1 (VCD) játékokra vonatkozik. A PS2 nem tudja megállapítani, hogy az eszköz fat32 vagy exFAT, ezért a POPSTARTER illesztőprogramját ki kell választani. A Kérdez minden indításkor rákérdez; az exFAT vagy a fat32 rögzíti a választ, és kihagyja a kérdést.
+  VCD_USB_BDMA_ASK: Kérdez
+  SETTINGS_HDD_FALLBACK: 'A HDD-beállítások a biztonságos tartalék helyet használták: %s'
+  HDD_BACKEND_RECONCILED: A belső APA és exFAT HDD egyszerre volt bekapcsolva -- az egyik automatikusan kikapcsolt (lásd az Eszközbeállításokat).
+  SETTINGS_SAVE_PROMPT: MENTED A BEÁLLÍTÁSOKAT?
+  SETTINGS_SAVE_PROMPT_LINE1: A módosításaid jelenleg aktívak.
+  SETTINGS_SAVE_PROMPT_LINE2: Elmented őket a későbbi indításokhoz?
+  SETTINGS_SAVE: Beállítások mentése
+  SETTINGS_EXIT_WITHOUT_SAVING: Kilépés mentés nélkül
+  SETTINGS_CONTINUE_EDITING: Szerkesztés folytatása
+  CONFIGURE: Beállítás
+  HDD_UNAVAILABLE_ERROR: '%d: A merevlemez nem érhető el.'
+  HDD_PFS_UNAVAILABLE_ERROR: '%d: A merevlemez PFS-támogatása nem érhető el.'
+  POPS_LOADING_SETTINGS: POPSTARTER-beállítások betöltése...
+  POPS_SMB_NOT_CONNECTED: Az SMB nincs csatlakoztatva.
+  POPS_SMB_SETTINGS_NOT_FOUND: Nem található POPSTARTER-beállítás az SMB POPS mappájában.
+  HDD_OPL_PLUS_NOT_FOUND: A +OPL partíció nem található.
+  HDD_OPL_COMMON_NOT_FOUND: A __common partíció nem található.
+  HDD_OPL_PARTITION_RESTART: Indítsd újra a RiptOPL-t a kiválasztott OPL-partíció alkalmazásához.
+  HDD_OPL_PARTITION_CHECKING: A HDD OPL-partíciójának ellenőrzése...
+  HDD_OPL_PARTITION_BUSY: A HDD foglalt. Próbáld újra, ha a betöltés befejeződött.
+  GENERAL_SYSTEM: Általános és rendszer
+  EMBER_NOT_FOUND: Hiányzik az ember.elf
+  EMBER_BIOS_MISSING: Hiányzik a bios.bin az ember.elf mellől
+  EMBER_BAD_NAME: Az Ember nem tudja használni ezt a mappanevet (nem lehet benne perjel, kettőspont vagy visszaperjel, és nem kezdődhet ponttal).
+  EMBER_NO_DISC: Nincs PS1 lemezkép ebben az Ember játékmappában.
+  VIEW_APPS: Alkalmazások megjelenítve
+  EMBER_DISPLAY: Ember képmód
+  HINT_EMBER_DISPLAY: Az a kimeneti mód, amelyet az Ember a PS1-játékokhoz használ. A 240p vagy 480p az indított eszköz EMBER mappájában lévő settings.txt fájlba íródik. Az Alapértelmezett eltávolítja ezt a beállítást, és a fájlt is, ha semmi más nem volt benne.

@@ -227,3 +227,93 @@ translations:
   "HINT_DEFAULT_CORE": "게임별 로더 코어가 Default로 설정된 게임에 사용할 전역 기본 코어입니다. <OPL>은 네이티브 코어이고, Neutrino는 외부 neutrino.elf 를 체인합니다. 게임별 선택은 항상 이 설정을 재정의합니다."
   "VCD_SETTINGS": "VCD 설정"
   "FINANCIAL_SUPPORT": "재정 지원"
+  ADVANCED_ARGUMENTS: 고급 인수
+  ADVANCED_SETTINGS: 고급
+  ARTWORK_SETTINGS: 아트워크 설정
+  BDMA_SETTINGS: BDMA 설정
+  COLORS_SETTINGS: 색상
+  COMM_SETTINGS: 통신 설정
+  CONTROLLER_EMULATION: 컨트롤러 에뮬레이션
+  CONTROLLER_MACROS: 컨트롤러 매크로
+  DISPLAY_SETTINGS: 화면
+  GAME_LAUNCHING: 게임 실행
+  GAME_LIST_SETTINGS: 게임 목록 설정
+  GAME_SOURCES: 게임 소스
+  HINT_POPSTARTER_RETROGEM_GAMEID: PS1 VCD 실행 시 Pixel FX / RetroGEM / PS2Digital용 광학 바코드를 표시합니다
+  HINT_POPS_IMPORT: 연결된 SMB 공유의 POPS 폴더에서 POPSTARTER의 IPCONFIG.DAT와 SMBCONFIG.DAT를 읽습니다. 확인을 누르기 전까지는 아무것도 기록되지 않습니다.
+  HINT_POPS_PORT: 서버의 SMB 포트 -- 기본값은 445입니다. 일반 공유는 0 (또는 445)으로 두고, 구형 SMB1 서버에는 139를 사용하세요.
+  HINT_VCD_SHOW_PP_POPS: 'HDD 전용 -- PP.<ID>.POPS.<이름> (예: PP.SCES-01492.POPS.MEDIEVIL) 형식의 단일 게임 파티션을 PS1 게임으로 표시합니다. 목록에만 표시되며 실행 방식은 그대로입니다. 다른 PP.* 파티션(앱, PS2 게임)은 계속 숨겨집니다.'
+  INTERFACE_SETTINGS: 인터페이스
+  MENU_NETWORK: 네트워크
+  NEUTRINO_DEFAULTS: Neutrino 기본값
+  OSD_DEFAULTS: OSD 기본값
+  PATH_PREFIXES: 경로 접두사
+  PATH_SETTINGS: 경로 설정
+  POPSTARTER: PS 에뮬레이션 설정
+  POPSTARTER_RETROGEM_GAMEID: RetroGEM 게임 ID
+  POPSTARTER_NETWORK_SETTINGS: POPSTARTER 네트워크 설정
+  GAMEID_MODE_ALL: 켬 (전체)
+  GAMEID_MODE_POPSTARTER: 켬 (POPSTARTER만)
+  GAMEID_MODE_PS2: 켬 (PS2만)
+  GAMEID_MODE_OFF: 끔
+  POPS_IMPORT: SMB POPS 폴더에서 가져오기
+  POPS_NONE_DETECTED: 기존 POPStarter SMB 구성을 찾을 수 없습니다. 새로 만들기 전에 올바른 네트워크 설정을 입력하세요.
+  POPS_SMB_SECTION: POPStarter SMB 네트워크
+  SECURITY_SETTINGS: 보안
+  STORAGE_CACHE: 저장소 및 캐시
+  TOOLS: 도구
+  VCD_SHOW_PP_POPS: PP.<ID>.POPS 파티션 게임 표시 (HDD)
+  VCD_USB_MODE_HINT: exFAT가 아닌 USB 저장소에는 fat32를 권장합니다.
+  VCD_USB_MODE_QUESTION: USB 모드가 fat32인가요, exFAT인가요?
+  VCD_USB_MODE_TITLE: USB VCD 모드
+  MENU_CONTROLLER: 컨트롤러
+  MENU_AUDIO: 오디오
+  MMCE_GAMEID_UNSETTLED: MMCE 카드 전환이 확인되지 않았습니다 -- 그래도 실행합니다
+  NEUTRINO_SMB_FALLBACK: SMB 게임은 Neutrino를 지원하지 않습니다 -- OPL 코어로 실행합니다.
+  NEUTRINO_VMC_HDD_UNSUPPORTED: Neutrino는 APA HDD의 VMC를 사용할 수 없습니다 (pfs 미지원) -- VMC 없이 실행합니다.
+  POPS_LOADED_FROM: '%s에서 불러옴'
+  POPSTARTER_NET_INVALID: POPSTARTER 네트워크 구성이 올바르지 않습니다. POPSTARTER 네트워크 설정에서 수정하세요.
+  POPSTARTER_SMB_NEEDS_STATIC: POPSTARTER의 SMB에는 고정 네트워크 구성이 필요합니다. 먼저 POPSTARTER 네트워크 설정을 구성하세요.
+  POPS_OVERWRITE_TITLE: POPSTARTER 구성을 바꿀까요?
+  POPS_OVERWRITE_MSG: POPSTARTER 네트워크 구성이 이미 있습니다. 이 설정으로 바꿀까요?
+  POPS_KEEP_EXISTING: 기존 유지
+  POPS_REPLACE: 바꾸기
+  GSM_1080P_WARNING: 경고 -- 1080p 강제는 실험적이며 검증되지 않았습니다. 화면이 나오지 않거나 일부 하드웨어에서는 본체에 부담을 줄 수 있습니다. 사용에 따른 책임은 본인에게 있습니다.
+  GSM_1080P_PROCEED: 이 게임에 1080p를 강제할까요?
+  GSM_1080P_SURE: 정말인가요? 이 게임에 실험적인 1080p 모드가 적용됩니다.
+  CUSTOM_SETTINGS_PATH: 사용자 지정 설정 경로
+  HINT_CUSTOM_SETTINGS_PATH: '원하는 폴더에 설정을 저장합니다 (예: mass0:/OPL). 비워 두면 OPL이 부팅된 폴더를 사용합니다. 장치는 필요할 때 불러오므로 입력하는 동안 마운트되어 있지 않아도 됩니다.'
+  PERGAME_MIXED_SETTINGS: 게임별 + 전역
+  GSM_DEFAULTS: GSM 기본값 (모든 게임)
+  ERR_DEVICE_BUSY_TIMEOUT: '장치가 사용 중입니다: 설정 기록이 시작되지 않았습니다. 불러오기가 끝난 뒤 다시 시도하세요.'
+  BDMA_EQUIPPING: 메모리 카드에 PS1 드라이버를 준비하는 중...
+  VCD_USB_BDMA: USB BDMA 드라이버
+  HINT_VCD_USB_BDMA: USB 저장소에서 PS1 (VCD)을 실행할 때만 해당됩니다. PS2는 저장소가 fat32인지 exFAT인지 판별할 수 없으므로 POPSTARTER의 드라이버를 지정해야 합니다. 확인은 실행할 때마다 묻고, exFAT 또는 fat32는 답을 고정해 질문을 건너뜁니다.
+  VCD_USB_BDMA_ASK: 확인
+  SETTINGS_HDD_FALLBACK: 'HDD 설정이 안전한 대체 위치를 사용했습니다: %s'
+  HDD_BACKEND_RECONCILED: 내장 HDD의 APA와 exFAT가 모두 켜져 있었습니다 -- 하나가 자동으로 꺼졌습니다 (장치 설정을 확인하세요).
+  SETTINGS_SAVE_PROMPT: 설정을 저장할까요?
+  SETTINGS_SAVE_PROMPT_LINE1: 변경 사항이 현재 적용되어 있습니다.
+  SETTINGS_SAVE_PROMPT_LINE2: 다음 실행을 위해 저장할까요?
+  SETTINGS_SAVE: 설정 저장
+  SETTINGS_EXIT_WITHOUT_SAVING: 저장하지 않고 나가기
+  SETTINGS_CONTINUE_EDITING: 계속 편집
+  CONFIGURE: 구성
+  HDD_UNAVAILABLE_ERROR: '%d: 하드디스크를 사용할 수 없습니다.'
+  HDD_PFS_UNAVAILABLE_ERROR: '%d: 하드디스크의 PFS 지원을 사용할 수 없습니다.'
+  POPS_LOADING_SETTINGS: POPSTARTER 설정을 불러오는 중...
+  POPS_SMB_NOT_CONNECTED: SMB가 연결되어 있지 않습니다.
+  POPS_SMB_SETTINGS_NOT_FOUND: SMB POPS 폴더에서 POPSTARTER 설정을 찾을 수 없습니다.
+  HDD_OPL_PLUS_NOT_FOUND: +OPL 파티션을 찾을 수 없습니다.
+  HDD_OPL_COMMON_NOT_FOUND: __common 파티션을 찾을 수 없습니다.
+  HDD_OPL_PARTITION_RESTART: 선택한 OPL 파티션을 적용하려면 RiptOPL을 다시 시작하세요.
+  HDD_OPL_PARTITION_CHECKING: HDD의 OPL 파티션을 확인하는 중...
+  HDD_OPL_PARTITION_BUSY: HDD가 사용 중입니다. 불러오기가 끝난 뒤 다시 시도하세요.
+  GENERAL_SYSTEM: 일반 및 시스템
+  EMBER_NOT_FOUND: ember.elf 없음
+  EMBER_BIOS_MISSING: ember.elf 옆에 bios.bin 없음
+  EMBER_BAD_NAME: Ember는 이 폴더 이름을 사용할 수 없습니다 (슬래시, 콜론, 역슬래시 불가, 앞에 점도 불가).
+  EMBER_NO_DISC: 이 Ember 게임 폴더에 PS1 디스크 이미지가 없습니다.
+  VIEW_APPS: 앱 표시 중
+  EMBER_DISPLAY: Ember 표시 모드
+  HINT_EMBER_DISPLAY: Ember가 PS1 게임에 사용하는 출력 모드입니다. 240p 또는 480p는 실행한 장치의 EMBER 폴더에 있는 settings.txt에 기록됩니다. 기본값은 그 설정을 다시 제거하며, 다른 내용이 없으면 파일도 함께 삭제합니다.

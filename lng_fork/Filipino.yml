@@ -227,3 +227,93 @@ translations:
   "HINT_DEFAULT_CORE": "Global na default na core para sa mga laro na naka-set sa Default ang per-game na Loader Core. Ang <OPL> ang native na core; ikinakadena ng Neutrino ang panlabas na neutrino.elf. Palaging pinapangibabawan ito ng per-game na pagpili."
   "VCD_SETTINGS": "Mga Setting ng VCD"
   "FINANCIAL_SUPPORT": "Suportang Pinansyal"
+  ADVANCED_ARGUMENTS: Mga advanced na argument
+  ADVANCED_SETTINGS: Advanced
+  ARTWORK_SETTINGS: Mga setting ng cover
+  BDMA_SETTINGS: Mga setting ng BDMA
+  COLORS_SETTINGS: Mga kulay
+  COMM_SETTINGS: Mga setting ng komunikasyon
+  CONTROLLER_EMULATION: Emulasyon ng controller
+  CONTROLLER_MACROS: Mga macro ng controller
+  DISPLAY_SETTINGS: Display
+  GAME_LAUNCHING: Paglulunsad ng laro
+  GAME_LIST_SETTINGS: Mga setting ng listahan ng laro
+  GAME_SOURCES: Mga pinagkukunan ng laro
+  HINT_POPSTARTER_RETROGEM_GAMEID: Nagpapakita ng optical barcode para sa Pixel FX / RetroGEM / PS2Digital kapag naglulunsad ng PS1 VCD
+  HINT_POPS_IMPORT: "Binabasa ang IPCONFIG.DAT at SMBCONFIG.DAT ng POPSTARTER mula sa POPS folder ng nakakonektang SMB share. Walang isusulat hangga't hindi ka nagko-confirm gamit ang OK."
+  HINT_POPS_PORT: SMB port sa server -- 445 ang default. Iwanang 0 (o 445) para sa karaniwang share; gumamit ng 139 para sa mas lumang SMB1 na server.
+  HINT_VCD_SHOW_PP_POPS: HDD lamang -- inililista bilang mga larong PS1 ang mga partition na iisa ang laro at pinangalanang PP.<ID>.POPS.<pangalan> (hal. PP.SCES-01492.POPS.MEDIEVIL). Paglilista lamang; hindi nagbabago ang paglulunsad. Nananatiling nakatago ang iba pang PP.* na partition (mga app, larong PS2).
+  INTERFACE_SETTINGS: Interface
+  MENU_NETWORK: Network
+  NEUTRINO_DEFAULTS: Mga default ng Neutrino
+  OSD_DEFAULTS: Mga default ng OSD
+  PATH_PREFIXES: Mga prefix ng path
+  PATH_SETTINGS: Mga setting ng path
+  POPSTARTER: Mga setting ng PS emulation
+  POPSTARTER_RETROGEM_GAMEID: RetroGEM Game ID
+  POPSTARTER_NETWORK_SETTINGS: Mga setting ng network ng POPSTARTER
+  GAMEID_MODE_ALL: Naka-on (lahat)
+  GAMEID_MODE_POPSTARTER: Naka-on (POPSTARTER lamang)
+  GAMEID_MODE_PS2: Naka-on (PS2 lamang)
+  GAMEID_MODE_OFF: Naka-off
+  POPS_IMPORT: Mag-import mula sa POPS folder sa SMB
+  POPS_NONE_DETECTED: Walang natagpuang umiiral na SMB configuration ng POPStarter. Ilagay muna ang tamang mga setting ng network bago gumawa ng isa.
+  POPS_SMB_SECTION: SMB network ng POPStarter
+  SECURITY_SETTINGS: Seguridad
+  STORAGE_CACHE: Imbakan at cache
+  TOOLS: Mga kasangkapan
+  VCD_SHOW_PP_POPS: Ipakita ang mga laro mula sa mga partition na PP.<ID>.POPS (HDD)
+  VCD_USB_MODE_HINT: Inirerekomenda ang fat32 para sa mga USB na hindi exFAT.
+  VCD_USB_MODE_QUESTION: USB mode ba ay fat32 o exFAT?
+  VCD_USB_MODE_TITLE: USB VCD mode
+  MENU_CONTROLLER: Controller
+  MENU_AUDIO: Audio
+  MMCE_GAMEID_UNSETTLED: Hindi nakumpirma ang paglipat ng MMCE card -- ilulunsad pa rin
+  NEUTRINO_SMB_FALLBACK: Hindi sinusuportahan ng Neutrino ang mga larong nasa SMB -- ilulunsad gamit ang OPL core.
+  NEUTRINO_VMC_HDD_UNSUPPORTED: Hindi kayang gamitin ng Neutrino ang VMC sa APA HDD (walang suporta sa pfs) -- ilulunsad nang wala ito.
+  POPS_LOADED_FROM: Nakuha mula sa %s
+  POPSTARTER_NET_INVALID: Hindi wasto ang network configuration ng POPSTARTER. Itama ito sa mga setting ng network ng POPSTARTER.
+  POPSTARTER_SMB_NEEDS_STATIC: Kailangan ng SMB ng POPSTARTER ang static na network configuration. Ayusin muna ang mga setting ng network ng POPSTARTER.
+  POPS_OVERWRITE_TITLE: Palitan ang configuration ng POPSTARTER?
+  POPS_OVERWRITE_MSG: May umiiral nang network configuration ang POPSTARTER. Palitan ito ng mga setting na ito?
+  POPS_KEEP_EXISTING: Panatilihin ang umiiral
+  POPS_REPLACE: Palitan
+  GSM_1080P_WARNING: BABALA -- eksperimental at hindi pa napapatunayan ang pagpilit sa 1080p. Maaaring walang lumabas na larawan o, sa ilang hardware, mapabigat ang console. Magpatuloy sa sarili mong panganib.
+  GSM_1080P_PROCEED: Piliting gawing 1080p ang larong ito?
+  GSM_1080P_SURE: Sigurado ka ba? Ilalapat sa larong ito ang eksperimental na 1080p mode.
+  CUSTOM_SETTINGS_PATH: Custom na path ng mga setting
+  HINT_CUSTOM_SETTINGS_PATH: Sine-save ang mga setting sa folder na pipiliin mo, hal. mass0:/OPL. Iwanang blangko para gamitin ang folder kung saan nag-boot ang OPL. Kinakarga ang device kapag kailangan, kaya hindi ito kailangang naka-mount habang nagta-type ka.
+  PERGAME_MIXED_SETTINGS: Bawat laro + global
+  GSM_DEFAULTS: Mga default ng GSM (lahat ng laro)
+  ERR_DEVICE_BUSY_TIMEOUT: 'Abala ang device: hindi man lang nagsimula ang pagsulat ng mga setting. Subukan ulit kapag tapos na ang paglo-load.'
+  BDMA_EQUIPPING: Inihahanda ang PS1 driver sa memory card...
+  VCD_USB_BDMA: USB BDMA driver
+  HINT_VCD_USB_BDMA: Para lamang sa paglulunsad ng PS1 (VCD) mula sa USB. Hindi matukoy ng PS2 kung fat32 o exFAT ang isang USB, kaya kailangang piliin ang driver ng POPSTARTER. Ang Magtanong ay magtatanong sa bawat paglulunsad; ang exFAT o fat32 ay itinatakda ang sagot at nilalaktawan ang tanong.
+  VCD_USB_BDMA_ASK: Magtanong
+  SETTINGS_HDD_FALLBACK: 'Gumamit ang mga setting ng HDD ng ligtas na pamalit na lokasyon: %s'
+  HDD_BACKEND_RECONCILED: Parehong naka-on ang internal na APA at exFAT na HDD -- awtomatikong na-off ang isa (tingnan ang Mga setting ng device).
+  SETTINGS_SAVE_PROMPT: I-SAVE ANG MGA SETTING?
+  SETTINGS_SAVE_PROMPT_LINE1: Aktibo sa ngayon ang mga pagbabago mo.
+  SETTINGS_SAVE_PROMPT_LINE2: Gusto mo bang i-save ang mga ito para sa susunod na paglulunsad?
+  SETTINGS_SAVE: I-save ang mga setting
+  SETTINGS_EXIT_WITHOUT_SAVING: Lumabas nang hindi nagse-save
+  SETTINGS_CONTINUE_EDITING: Magpatuloy sa pag-edit
+  CONFIGURE: I-configure
+  HDD_UNAVAILABLE_ERROR: '%d: Hindi available ang hard disk.'
+  HDD_PFS_UNAVAILABLE_ERROR: '%d: Hindi available ang suporta sa PFS ng hard disk.'
+  POPS_LOADING_SETTINGS: Nilo-load ang mga setting ng POPSTARTER...
+  POPS_SMB_NOT_CONNECTED: Hindi nakakonekta ang SMB.
+  POPS_SMB_SETTINGS_NOT_FOUND: Walang natagpuang mga setting ng POPSTARTER sa POPS folder sa SMB.
+  HDD_OPL_PLUS_NOT_FOUND: Hindi natagpuan ang partition na +OPL.
+  HDD_OPL_COMMON_NOT_FOUND: Hindi natagpuan ang partition na __common.
+  HDD_OPL_PARTITION_RESTART: I-restart ang RiptOPL para mailapat ang napiling OPL partition.
+  HDD_OPL_PARTITION_CHECKING: Sinusuri ang OPL partition ng HDD...
+  HDD_OPL_PARTITION_BUSY: Abala ang HDD. Subukan ulit kapag tapos na ang paglo-load.
+  GENERAL_SYSTEM: Pangkalahatan at sistema
+  EMBER_NOT_FOUND: Nawawala ang ember.elf
+  EMBER_BIOS_MISSING: Nawawala ang bios.bin sa tabi ng ember.elf
+  EMBER_BAD_NAME: Hindi magagamit ng Ember ang pangalang ito ng folder (walang slash, colon o backslash, at walang tuldok sa simula).
+  EMBER_NO_DISC: Walang PS1 disc image sa folder ng larong Ember na ito.
+  VIEW_APPS: Ipinapakita ang mga app
+  EMBER_DISPLAY: Display mode ng Ember
+  HINT_EMBER_DISPLAY: Ang output mode na ginagamit ng Ember para sa mga larong PS1. Isinusulat ang 240p o 480p sa settings.txt sa loob ng EMBER folder ng device na inilunsad. Ang Default ay inaalis muli ang setting na iyon, pati na ang file kung wala nang ibang laman.

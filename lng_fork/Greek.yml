@@ -227,3 +227,93 @@ translations:
   "HINT_DEFAULT_CORE": "Καθολικός προεπιλεγμένος πυρήνας για παιχνίδια των οποίων ο ανά παιχνίδι Loader Core έχει οριστεί σε Default. Το <OPL> είναι ο εγγενής πυρήνας· το Neutrino αλυσιδώνει το εξωτερικό neutrino.elf. Μια ανά παιχνίδι επιλογή υπερισχύει πάντα αυτού."
   "VCD_SETTINGS": "Ρυθμίσεις VCD"
   "FINANCIAL_SUPPORT": "Οικονομική Υποστήριξη"
+  ADVANCED_ARGUMENTS: Προηγμένα ορίσματα
+  ADVANCED_SETTINGS: Για προχωρημένους
+  ARTWORK_SETTINGS: Ρυθμίσεις εξωφύλλων
+  BDMA_SETTINGS: Ρυθμίσεις BDMA
+  COLORS_SETTINGS: Χρώματα
+  COMM_SETTINGS: Ρυθμίσεις επικοινωνίας
+  CONTROLLER_EMULATION: Εξομοίωση χειριστηρίου
+  CONTROLLER_MACROS: Μακροεντολές χειριστηρίου
+  DISPLAY_SETTINGS: Οθόνη
+  GAME_LAUNCHING: Εκκίνηση παιχνιδιών
+  GAME_LIST_SETTINGS: Ρυθμίσεις λίστας παιχνιδιών
+  GAME_SOURCES: Πηγές παιχνιδιών
+  HINT_POPSTARTER_RETROGEM_GAMEID: Εμφανίζει οπτικό γραμμωτό κώδικα για Pixel FX / RetroGEM / PS2Digital κατά την εκκίνηση VCD του PS1
+  HINT_POPS_IMPORT: Διαβάζει τα IPCONFIG.DAT και SMBCONFIG.DAT του POPSTARTER από τον φάκελο POPS του συνδεδεμένου κοινόχρηστου SMB. Δεν γράφεται τίποτα μέχρι να επιβεβαιώσετε με OK.
+  HINT_POPS_PORT: Θύρα SMB στον διακομιστή -- η προεπιλογή είναι 445. Αφήστε 0 (ή 445) για κανονικό κοινόχρηστο· χρησιμοποιήστε 139 για παλαιότερους διακομιστές SMB1.
+  HINT_VCD_SHOW_PP_POPS: Μόνο HDD -- εμφανίζει ως παιχνίδια PS1 τα διαμερίσματα ενός παιχνιδιού με όνομα PP.<ID>.POPS.<όνομα> (π.χ. PP.SCES-01492.POPS.MEDIEVIL). Μόνο η καταχώριση· η εκκίνηση παραμένει ίδια. Τα υπόλοιπα διαμερίσματα PP.* (εφαρμογές, παιχνίδια PS2) παραμένουν κρυφά.
+  INTERFACE_SETTINGS: Διεπαφή
+  MENU_NETWORK: Δίκτυο
+  NEUTRINO_DEFAULTS: Προεπιλογές Neutrino
+  OSD_DEFAULTS: Προεπιλογές OSD
+  PATH_PREFIXES: Προθέματα διαδρομών
+  PATH_SETTINGS: Ρυθμίσεις διαδρομών
+  POPSTARTER: Ρυθμίσεις εξομοίωσης PS
+  POPSTARTER_RETROGEM_GAMEID: Game ID RetroGEM
+  POPSTARTER_NETWORK_SETTINGS: Ρυθμίσεις δικτύου POPSTARTER
+  GAMEID_MODE_ALL: Ενεργό (όλα)
+  GAMEID_MODE_POPSTARTER: Ενεργό (μόνο POPSTARTER)
+  GAMEID_MODE_PS2: Ενεργό (μόνο PS2)
+  GAMEID_MODE_OFF: Ανενεργό
+  POPS_IMPORT: Εισαγωγή από τον φάκελο POPS μέσω SMB
+  POPS_NONE_DETECTED: Δεν εντοπίστηκε υπάρχουσα διαμόρφωση SMB του POPStarter. Εισαγάγετε τις σωστές ρυθμίσεις δικτύου πριν δημιουργήσετε μία.
+  POPS_SMB_SECTION: Δίκτυο SMB POPStarter
+  SECURITY_SETTINGS: Ασφάλεια
+  STORAGE_CACHE: Αποθήκευση και προσωρινή μνήμη
+  TOOLS: Εργαλεία
+  VCD_SHOW_PP_POPS: Εμφάνιση παιχνιδιών από διαμερίσματα PP.<ID>.POPS (HDD)
+  VCD_USB_MODE_HINT: Το fat32 συνιστάται για στικάκια USB που δεν είναι exFAT.
+  VCD_USB_MODE_QUESTION: Λειτουργία USB fat32 ή exFAT;
+  VCD_USB_MODE_TITLE: Λειτουργία VCD μέσω USB
+  MENU_CONTROLLER: Χειριστήριο
+  MENU_AUDIO: Ήχος
+  MMCE_GAMEID_UNSETTLED: Η εναλλαγή κάρτας MMCE δεν επιβεβαιώθηκε -- γίνεται εκκίνηση ούτως ή άλλως
+  NEUTRINO_SMB_FALLBACK: Τα παιχνίδια μέσω SMB δεν υποστηρίζονται από το Neutrino -- εκκίνηση με τον πυρήνα OPL.
+  NEUTRINO_VMC_HDD_UNSUPPORTED: Το Neutrino δεν μπορεί να χρησιμοποιήσει VMC σε δίσκο APA (χωρίς υποστήριξη pfs) -- εκκίνηση χωρίς αυτό.
+  POPS_LOADED_FROM: Φορτώθηκε από %s
+  POPSTARTER_NET_INVALID: Η διαμόρφωση δικτύου του POPSTARTER δεν είναι έγκυρη. Διορθώστε την στις ρυθμίσεις δικτύου POPSTARTER.
+  POPSTARTER_SMB_NEEDS_STATIC: Το SMB του POPSTARTER απαιτεί στατική διαμόρφωση δικτύου. Ρυθμίστε πρώτα τις ρυθμίσεις δικτύου POPSTARTER.
+  POPS_OVERWRITE_TITLE: Αντικατάσταση διαμόρφωσης POPSTARTER;
+  POPS_OVERWRITE_MSG: Υπάρχει ήδη διαμόρφωση δικτύου POPSTARTER. Να αντικατασταθεί με αυτές τις ρυθμίσεις;
+  POPS_KEEP_EXISTING: Διατήρηση υπάρχουσας
+  POPS_REPLACE: Αντικατάσταση
+  GSM_1080P_WARNING: ΠΡΟΣΟΧΗ -- η επιβολή 1080p είναι πειραματική και μη επαληθευμένη. Μπορεί να μην εμφανιστεί εικόνα ή, σε ορισμένο υλικό, να καταπονήσει την κονσόλα. Συνεχίστε με δική σας ευθύνη.
+  GSM_1080P_PROCEED: Να επιβληθεί 1080p σε αυτό το παιχνίδι;
+  GSM_1080P_SURE: Είστε βέβαιοι; Θα εφαρμοστεί η πειραματική λειτουργία 1080p σε αυτό το παιχνίδι.
+  CUSTOM_SETTINGS_PATH: Προσαρμοσμένη διαδρομή ρυθμίσεων
+  HINT_CUSTOM_SETTINGS_PATH: "Αποθηκεύει τις ρυθμίσεις σε φάκελο της επιλογής σας, π.χ. mass0:/OPL. Αφήστε το κενό για να χρησιμοποιηθεί ο φάκελος από τον οποίο ξεκίνησε το OPL. Η συσκευή φορτώνεται κατ' απαίτηση, οπότε δεν χρειάζεται να είναι προσαρτημένη την ώρα της πληκτρολόγησης."
+  PERGAME_MIXED_SETTINGS: Ανά παιχνίδι + καθολικές
+  GSM_DEFAULTS: Προεπιλογές GSM (όλα τα παιχνίδια)
+  ERR_DEVICE_BUSY_TIMEOUT: 'Η συσκευή είναι απασχολημένη: η εγγραφή των ρυθμίσεων δεν ξεκίνησε ποτέ. Δοκιμάστε ξανά μόλις ολοκληρωθεί η φόρτωση.'
+  BDMA_EQUIPPING: Προετοιμασία του οδηγού PS1 στην κάρτα μνήμης...
+  VCD_USB_BDMA: Οδηγός BDMA για USB
+  HINT_VCD_USB_BDMA: Αφορά μόνο εκκινήσεις PS1 (VCD) από στικάκι USB. Το PS2 δεν μπορεί να εντοπίσει αν ένα στικάκι είναι fat32 ή exFAT, οπότε ο οδηγός του POPSTARTER πρέπει να επιλεγεί. Το Ερώτηση ρωτά σε κάθε εκκίνηση· τα exFAT ή fat32 καθηλώνουν την απάντηση και παρακάμπτουν την ερώτηση.
+  VCD_USB_BDMA_ASK: Ερώτηση
+  SETTINGS_HDD_FALLBACK: 'Οι ρυθμίσεις HDD χρησιμοποίησαν την ασφαλή εφεδρική τοποθεσία: %s'
+  HDD_BACKEND_RECONCILED: Ο εσωτερικός δίσκος APA και ο exFAT ήταν και οι δύο ενεργοί -- ο ένας απενεργοποιήθηκε αυτόματα (δείτε τις Ρυθμίσεις συσκευών).
+  SETTINGS_SAVE_PROMPT: ΑΠΟΘΗΚΕΥΣΗ ΡΥΘΜΙΣΕΩΝ;
+  SETTINGS_SAVE_PROMPT_LINE1: Οι αλλαγές σας είναι ενεργές αυτή τη στιγμή.
+  SETTINGS_SAVE_PROMPT_LINE2: Θέλετε να αποθηκευτούν για μελλοντικές εκκινήσεις;
+  SETTINGS_SAVE: Αποθήκευση ρυθμίσεων
+  SETTINGS_EXIT_WITHOUT_SAVING: Έξοδος χωρίς αποθήκευση
+  SETTINGS_CONTINUE_EDITING: Συνέχεια επεξεργασίας
+  CONFIGURE: Διαμόρφωση
+  HDD_UNAVAILABLE_ERROR: '%d: Ο σκληρός δίσκος δεν είναι διαθέσιμος.'
+  HDD_PFS_UNAVAILABLE_ERROR: '%d: Η υποστήριξη PFS του σκληρού δίσκου δεν είναι διαθέσιμη.'
+  POPS_LOADING_SETTINGS: Φόρτωση ρυθμίσεων POPSTARTER...
+  POPS_SMB_NOT_CONNECTED: Το SMB δεν είναι συνδεδεμένο.
+  POPS_SMB_SETTINGS_NOT_FOUND: Δεν βρέθηκαν ρυθμίσεις POPSTARTER στον φάκελο POPS μέσω SMB.
+  HDD_OPL_PLUS_NOT_FOUND: Δεν βρέθηκε το διαμέρισμα +OPL.
+  HDD_OPL_COMMON_NOT_FOUND: Δεν βρέθηκε το διαμέρισμα __common.
+  HDD_OPL_PARTITION_RESTART: Επανεκκινήστε το RiptOPL για να εφαρμοστεί το επιλεγμένο διαμέρισμα OPL.
+  HDD_OPL_PARTITION_CHECKING: Έλεγχος του διαμερίσματος OPL στον δίσκο...
+  HDD_OPL_PARTITION_BUSY: Ο δίσκος είναι απασχολημένος. Δοκιμάστε ξανά μόλις ολοκληρωθεί η φόρτωση.
+  GENERAL_SYSTEM: Γενικά και σύστημα
+  EMBER_NOT_FOUND: Λείπει το ember.elf
+  EMBER_BIOS_MISSING: Λείπει το bios.bin δίπλα στο ember.elf
+  EMBER_BAD_NAME: Το Ember δεν μπορεί να χρησιμοποιήσει αυτό το όνομα φακέλου (χωρίς κάθετο, άνω-κάτω τελεία ή ανάποδη κάθετο, και χωρίς τελείες στην αρχή).
+  EMBER_NO_DISC: Δεν υπάρχει είδωλο δίσκου PS1 σε αυτόν τον φάκελο παιχνιδιού του Ember.
+  VIEW_APPS: Εμφάνιση εφαρμογών
+  EMBER_DISPLAY: Λειτουργία εικόνας Ember
+  HINT_EMBER_DISPLAY: Η λειτουργία εξόδου που χρησιμοποιεί το Ember για παιχνίδια PS1. Το 240p ή το 480p γράφεται στο settings.txt μέσα στον φάκελο EMBER της συσκευής που εκκινείται. Η Προεπιλογή αφαιρεί ξανά τη ρύθμιση, καθώς και το αρχείο αν δεν περιείχε τίποτα άλλο.

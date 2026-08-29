@@ -227,3 +227,93 @@ translations:
   "HINT_DEFAULT_CORE": "Global nga default nga core para sa mga dula kansang per-game Loader Core gi-set sa Default. Ang <OPL> mao ang lumad nga core; ang Neutrino nag-chain sa gawas nga neutrino.elf. Ang per-game nga pagpili kanunay mo-override niini."
   "VCD_SETTINGS": "Mga Setting sa VCD"
   "FINANCIAL_SUPPORT": "Suporta sa Panalapi"
+  ADVANCED_ARGUMENTS: Mga advanced nga argumento
+  ADVANCED_SETTINGS: Advanced
+  ARTWORK_SETTINGS: Mga Setting sa Cover
+  BDMA_SETTINGS: Mga Setting sa BDMA
+  COLORS_SETTINGS: Mga Kolor
+  COMM_SETTINGS: Mga Setting sa Komunikasyon
+  CONTROLLER_EMULATION: Emulasyon sa Controller
+  CONTROLLER_MACROS: Mga Macro sa Controller
+  DISPLAY_SETTINGS: Display
+  GAME_LAUNCHING: Paglunsad sa Dula
+  GAME_LIST_SETTINGS: Mga Setting sa Listahan sa Dula
+  GAME_SOURCES: Mga Tinubdan sa Dula
+  HINT_POPSTARTER_RETROGEM_GAMEID: Magpakita ug optical barcode para sa Pixel FX / RetroGEM / PS2Digital kon molunsad ug PS1 VCD
+  HINT_POPS_IMPORT: Magbasa sa IPCONFIG.DAT ug SMBCONFIG.DAT sa POPSTARTER gikan sa POPS folder sa konektado nga SMB share. Walay isulat hangtod nga mokumpirma ka pinaagi sa OK.
+  HINT_POPS_PORT: SMB port sa server -- 445 ang default. Ibilin nga 0 (o 445) para sa ordinaryong share; gamita ang 139 para sa mas daan nga SMB1 nga server.
+  HINT_VCD_SHOW_PP_POPS: HDD lamang -- ilista isip mga dula sa PS1 ang mga partisyon nga usa ra ka dula ug ginganlan ug PP.<ID>.POPS.<ngalan> (pananglitan PP.SCES-01492.POPS.MEDIEVIL). Paglista lamang; dili mausab ang paglunsad. Ang ubang PP.* nga partisyon (mga app, mga dula sa PS2) magpabiling tinago.
+  INTERFACE_SETTINGS: Interface
+  MENU_NETWORK: Network
+  NEUTRINO_DEFAULTS: Mga Default sa Neutrino
+  OSD_DEFAULTS: Mga Default sa OSD
+  PATH_PREFIXES: Mga Prefix sa Path
+  PATH_SETTINGS: Mga Setting sa Path
+  POPSTARTER: Mga Setting sa PS Emulation
+  POPSTARTER_RETROGEM_GAMEID: RetroGEM Game ID
+  POPSTARTER_NETWORK_SETTINGS: Mga Setting sa Network sa POPSTARTER
+  GAMEID_MODE_ALL: Naka-on (tanan)
+  GAMEID_MODE_POPSTARTER: Naka-on (POPSTARTER lamang)
+  GAMEID_MODE_PS2: Naka-on (PS2 lamang)
+  GAMEID_MODE_OFF: Naka-off
+  POPS_IMPORT: Import gikan sa POPS folder pinaagi sa SMB
+  POPS_NONE_DETECTED: Walay nakit-an nga naa nang SMB configuration sa POPStarter. Isulod una ang husto nga mga setting sa network sa dili pa maghimo ug bag-o.
+  POPS_SMB_SECTION: SMB Network sa POPStarter
+  SECURITY_SETTINGS: Seguridad
+  STORAGE_CACHE: Storage ug Cache
+  TOOLS: Mga Himan
+  VCD_SHOW_PP_POPS: Ipakita ang mga dula gikan sa mga partisyon nga PP.<ID>.POPS (HDD)
+  VCD_USB_MODE_HINT: Girekomendar ang fat32 para sa mga USB nga dili exFAT.
+  VCD_USB_MODE_QUESTION: USB mode ba kay fat32 o exFAT?
+  VCD_USB_MODE_TITLE: USB VCD Mode
+  MENU_CONTROLLER: Controller
+  MENU_AUDIO: Audio
+  MMCE_GAMEID_UNSETTLED: Wala makumpirma ang pag-ilis sa MMCE card -- ilunsad gihapon
+  NEUTRINO_SMB_FALLBACK: Ang mga dula pinaagi sa SMB dili suportado sa Neutrino -- ilunsad gamit ang OPL core.
+  NEUTRINO_VMC_HDD_UNSUPPORTED: Dili magamit sa Neutrino ang VMC sa APA HDD (walay pfs nga suporta) -- ilunsad nga wala kini.
+  POPS_LOADED_FROM: Gikarga gikan sa %s
+  POPSTARTER_NET_INVALID: Dili balido ang network configuration sa POPSTARTER. Ayoha kini sa mga setting sa network sa POPSTARTER.
+  POPSTARTER_SMB_NEEDS_STATIC: Ang SMB sa POPSTARTER nagkinahanglan ug static nga network configuration. I-set-up una ang mga setting sa network sa POPSTARTER.
+  POPS_OVERWRITE_TITLE: Ilisan ba ang configuration sa POPSTARTER?
+  POPS_OVERWRITE_MSG: Naa nay network configuration ang POPSTARTER. Ilisan kini niining mga setting?
+  POPS_KEEP_EXISTING: Ibilin ang naa na
+  POPS_REPLACE: Ilisan
+  GSM_1080P_WARNING: PASIDAAN -- eksperimental ug wala pa mapamatud-i ang pagpugos sa 1080p. Mahimong walay motungha nga imahe o, sa ubang hardware, mabug-atan ang console. Padayon sa imong kaugalingong risgo.
+  GSM_1080P_PROCEED: Pugson ba ang 1080p para niining dulaa?
+  GSM_1080P_SURE: Sigurado ka? Ipadapat ang eksperimental nga 1080p mode niining dulaa.
+  CUSTOM_SETTINGS_PATH: Custom nga Path sa Setting
+  HINT_CUSTOM_SETTINGS_PATH: I-save ang mga setting sa folder nga imong pilion, pananglitan mass0:/OPL. Ibilin nga blangko aron gamiton ang folder diin nag-boot ang OPL. Ang device gikarga kon gikinahanglan, mao nga dili kini kinahanglan naka-mount samtang nagtype ka.
+  PERGAME_MIXED_SETTINGS: Matag dula + global
+  GSM_DEFAULTS: Mga Default sa GSM (tanang dula)
+  ERR_DEVICE_BUSY_TIMEOUT: 'Busy ang device: wala gani magsugod ang pagsulat sa mga setting. Sulayi pag-usab kon human na ang pag-load.'
+  BDMA_EQUIPPING: Giandam ang PS1 driver sa memory card...
+  VCD_USB_BDMA: USB BDMA Driver
+  HINT_VCD_USB_BDMA: Para lamang sa paglunsad sa PS1 (VCD) gikan sa USB. Dili matino sa PS2 kon fat32 ba o exFAT ang usa ka USB, mao nga kinahanglang pilion ang driver sa POPSTARTER. Ang Pangutana mangutana matag paglunsad; ang exFAT o fat32 magpirmi sa tubag ug molaktaw sa pangutana.
+  VCD_USB_BDMA_ASK: Pangutana
+  SETTINGS_HDD_FALLBACK: 'Ang mga setting sa HDD migamit sa luwas nga pamuli nga lokasyon: %s'
+  HDD_BACKEND_RECONCILED: Naka-on ang duha ka internal nga HDD nga APA ug exFAT -- awtomatik nga gi-off ang usa (tan-awa ang Mga Setting sa Device).
+  SETTINGS_SAVE_PROMPT: I-SAVE ANG MGA SETTING?
+  SETTINGS_SAVE_PROMPT_LINE1: Aktibo karon ang imong mga kausaban.
+  SETTINGS_SAVE_PROMPT_LINE2: Gusto ba nimong i-save kini para sa sunod nga mga paglunsad?
+  SETTINGS_SAVE: I-save ang mga Setting
+  SETTINGS_EXIT_WITHOUT_SAVING: Gawas nga walay pag-save
+  SETTINGS_CONTINUE_EDITING: Padayon sa pag-edit
+  CONFIGURE: I-configure
+  HDD_UNAVAILABLE_ERROR: '%d: Dili magamit ang hard disk.'
+  HDD_PFS_UNAVAILABLE_ERROR: '%d: Dili magamit ang PFS nga suporta sa hard disk.'
+  POPS_LOADING_SETTINGS: Gikarga ang mga setting sa POPSTARTER...
+  POPS_SMB_NOT_CONNECTED: Wala konektado ang SMB.
+  POPS_SMB_SETTINGS_NOT_FOUND: Walay nakit-an nga mga setting sa POPSTARTER sa POPS folder pinaagi sa SMB.
+  HDD_OPL_PLUS_NOT_FOUND: Wala makit-i ang partisyon nga +OPL.
+  HDD_OPL_COMMON_NOT_FOUND: Wala makit-i ang partisyon nga __common.
+  HDD_OPL_PARTITION_RESTART: I-restart ang RiptOPL aron magamit ang gipiling OPL nga partisyon.
+  HDD_OPL_PARTITION_CHECKING: Gisusi ang OPL nga partisyon sa HDD...
+  HDD_OPL_PARTITION_BUSY: Busy ang HDD. Sulayi pag-usab kon human na ang pag-load.
+  GENERAL_SYSTEM: Kinatibuk-an ug Sistema
+  EMBER_NOT_FOUND: Nawala ang ember.elf
+  EMBER_BIOS_MISSING: Nawala ang bios.bin tapad sa ember.elf
+  EMBER_BAD_NAME: Dili magamit sa Ember kining ngalan sa folder (walay slash, colon o backslash, ug walay tulbok sa sinugdanan).
+  EMBER_NO_DISC: Walay PS1 disc image niining folder sa dula sa Ember.
+  VIEW_APPS: Gipakita ang mga app
+  EMBER_DISPLAY: Display Mode sa Ember
+  HINT_EMBER_DISPLAY: Ang output mode nga gamiton sa Ember para sa mga dula sa PS1. Ang 240p o 480p isulat sa settings.txt sulod sa EMBER folder sa device nga gilunsad. Ang Default magtangtang pag-usab niini nga setting, ug apil ang file kon wala nay laing sulod.

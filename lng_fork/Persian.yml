@@ -227,3 +227,93 @@ translations:
   "HINT_DEFAULT_CORE": "هسته پیش‌فرض سراسری برای بازی‌هایی که Loader Core مخصوص هر بازی آن‌ها روی Default تنظیم شده است. <OPL> هسته بومی است؛ Neutrino فایل خارجی neutrino.elf را زنجیره می‌کند. انتخاب مخصوص هر بازی همیشه این را بازنویسی می‌کند."
   "VCD_SETTINGS": "تنظیمات VCD"
   "FINANCIAL_SUPPORT": "حمایت مالی"
+  ADVANCED_ARGUMENTS: آرگومان‌های پیشرفته
+  ADVANCED_SETTINGS: پیشرفته
+  ARTWORK_SETTINGS: تنظیمات کاور
+  BDMA_SETTINGS: تنظیمات BDMA
+  COLORS_SETTINGS: رنگ‌ها
+  COMM_SETTINGS: تنظیمات ارتباط
+  CONTROLLER_EMULATION: شبیه‌سازی دسته
+  CONTROLLER_MACROS: ماکروهای دسته
+  DISPLAY_SETTINGS: نمایش
+  GAME_LAUNCHING: اجرای بازی‌ها
+  GAME_LIST_SETTINGS: تنظیمات فهرست بازی‌ها
+  GAME_SOURCES: منابع بازی
+  HINT_POPSTARTER_RETROGEM_GAMEID: هنگام اجرای VCD مربوط به PS1 یک بارکد نوری برای Pixel FX / RetroGEM / PS2Digital نمایش می‌دهد
+  HINT_POPS_IMPORT: فایل‌های IPCONFIG.DAT و SMBCONFIG.DAT مربوط به POPSTARTER را از پوشه POPS در اشتراک SMB متصل می‌خواند. تا زمانی که با تأیید موافقت نکنید چیزی نوشته نمی‌شود.
+  HINT_POPS_PORT: درگاه SMB روی سرور -- مقدار پیش‌فرض ۴۴۵ است. برای اشتراک معمولی روی 0 (یا 445) بگذارید؛ برای سرورهای قدیمی SMB1 از 139 استفاده کنید.
+  HINT_VCD_SHOW_PP_POPS: فقط HDD -- پارتیشن‌های تک‌بازی با نام PP.<ID>.POPS.<نام> (مثلاً PP.SCES-01492.POPS.MEDIEVIL) را به‌عنوان بازی PS1 فهرست می‌کند. فقط فهرست‌کردن؛ نحوه اجرا تغییری نمی‌کند. سایر پارتیشن‌های PP.* (برنامه‌ها و بازی‌های PS2) پنهان می‌مانند.
+  INTERFACE_SETTINGS: رابط کاربری
+  MENU_NETWORK: شبکه
+  NEUTRINO_DEFAULTS: مقادیر پیش‌فرض Neutrino
+  OSD_DEFAULTS: مقادیر پیش‌فرض OSD
+  PATH_PREFIXES: پیشوندهای مسیر
+  PATH_SETTINGS: تنظیمات مسیر
+  POPSTARTER: تنظیمات شبیه‌سازی PS
+  POPSTARTER_RETROGEM_GAMEID: شناسه بازی RetroGEM
+  POPSTARTER_NETWORK_SETTINGS: تنظیمات شبکه POPSTARTER
+  GAMEID_MODE_ALL: روشن (همه)
+  GAMEID_MODE_POPSTARTER: روشن (فقط POPSTARTER)
+  GAMEID_MODE_PS2: روشن (فقط PS2)
+  GAMEID_MODE_OFF: خاموش
+  POPS_IMPORT: وارد کردن از پوشه POPS از طریق SMB
+  POPS_NONE_DETECTED: هیچ پیکربندی SMB موجودی برای POPStarter یافت نشد. پیش از ساختن یکی، تنظیمات شبکه درست را وارد کنید.
+  POPS_SMB_SECTION: شبکه SMB مربوط به POPStarter
+  SECURITY_SETTINGS: امنیت
+  STORAGE_CACHE: ذخیره‌سازی و حافظه نهان
+  TOOLS: ابزارها
+  VCD_SHOW_PP_POPS: نمایش بازی‌های پارتیشن‌های PP.<ID>.POPS ‏(HDD)
+  VCD_USB_MODE_HINT: برای حافظه‌های USB که exFAT نیستند fat32 توصیه می‌شود.
+  VCD_USB_MODE_QUESTION: حالت USB ‏fat32 است یا exFAT؟
+  VCD_USB_MODE_TITLE: حالت VCD روی USB
+  MENU_CONTROLLER: دسته
+  MENU_AUDIO: صدا
+  MMCE_GAMEID_UNSETTLED: تعویض کارت MMCE تأیید نشد -- به‌هرحال اجرا می‌شود
+  NEUTRINO_SMB_FALLBACK: بازی‌های روی SMB در Neutrino پشتیبانی نمی‌شوند -- با هسته OPL اجرا می‌شود.
+  NEUTRINO_VMC_HDD_UNSUPPORTED: ‏Neutrino نمی‌تواند از VMC روی دیسک APA استفاده کند (بدون پشتیبانی pfs) -- بدون آن اجرا می‌شود.
+  POPS_LOADED_FROM: بارگذاری‌شده از %s
+  POPSTARTER_NET_INVALID: پیکربندی شبکه POPSTARTER نامعتبر است. آن را در تنظیمات شبکه POPSTARTER اصلاح کنید.
+  POPSTARTER_SMB_NEEDS_STATIC: ‏SMB در POPSTARTER به پیکربندی شبکه ثابت نیاز دارد. ابتدا تنظیمات شبکه POPSTARTER را انجام دهید.
+  POPS_OVERWRITE_TITLE: پیکربندی POPSTARTER جایگزین شود؟
+  POPS_OVERWRITE_MSG: پیکربندی شبکه POPSTARTER از پیش وجود دارد. با این تنظیمات جایگزین شود؟
+  POPS_KEEP_EXISTING: حفظ مورد موجود
+  POPS_REPLACE: جایگزینی
+  GSM_1080P_WARNING: هشدار -- اجبار به 1080p آزمایشی و تأییدنشده است. ممکن است هیچ تصویری نمایش داده نشود یا روی برخی سخت‌افزارها به دستگاه فشار بیاورد. با مسئولیت خودتان ادامه دهید.
+  GSM_1080P_PROCEED: ‏1080p برای این بازی اجبار شود؟
+  GSM_1080P_SURE: مطمئنید؟ حالت آزمایشی 1080p روی این بازی اعمال می‌شود.
+  CUSTOM_SETTINGS_PATH: مسیر سفارشی تنظیمات
+  HINT_CUSTOM_SETTINGS_PATH: تنظیمات را در پوشه‌ای که انتخاب می‌کنید ذخیره می‌کند، مثلاً mass0:/OPL. برای استفاده از پوشه‌ای که OPL از آن اجرا شده، خالی بگذارید. دستگاه در صورت نیاز بارگذاری می‌شود، پس لازم نیست هنگام تایپ متصل باشد.
+  PERGAME_MIXED_SETTINGS: به‌ازای بازی + سراسری
+  GSM_DEFAULTS: مقادیر پیش‌فرض GSM (همه بازی‌ها)
+  ERR_DEVICE_BUSY_TIMEOUT: 'دستگاه مشغول است: نوشتن تنظیمات اصلاً آغاز نشد. پس از پایان بارگذاری دوباره تلاش کنید.'
+  BDMA_EQUIPPING: در حال آماده‌سازی درایور PS1 روی کارت حافظه...
+  VCD_USB_BDMA: درایور BDMA برای USB
+  HINT_VCD_USB_BDMA: فقط به اجرای بازی‌های PS1 ‏(VCD) از حافظه USB مربوط است. ‏PS2 نمی‌تواند تشخیص دهد حافظه fat32 است یا exFAT، بنابراین باید درایور POPSTARTER انتخاب شود. گزینه بپرس در هر بار اجرا می‌پرسد؛ ‏exFAT یا fat32 پاسخ را ثابت می‌کنند و پرسش را رد می‌کنند.
+  VCD_USB_BDMA_ASK: بپرس
+  SETTINGS_HDD_FALLBACK: 'تنظیمات HDD از محل پشتیبان امن استفاده کرد: %s'
+  HDD_BACKEND_RECONCILED: هارد داخلی APA و exFAT هر دو فعال بودند -- یکی به‌طور خودکار غیرفعال شد (تنظیمات دستگاه‌ها را ببینید).
+  SETTINGS_SAVE_PROMPT: تنظیمات ذخیره شود؟
+  SETTINGS_SAVE_PROMPT_LINE1: تغییرات شما در حال حاضر فعال هستند.
+  SETTINGS_SAVE_PROMPT_LINE2: می‌خواهید برای اجراهای بعدی ذخیره شوند؟
+  SETTINGS_SAVE: ذخیره تنظیمات
+  SETTINGS_EXIT_WITHOUT_SAVING: خروج بدون ذخیره
+  SETTINGS_CONTINUE_EDITING: ادامه ویرایش
+  CONFIGURE: پیکربندی
+  HDD_UNAVAILABLE_ERROR: '%d: دیسک سخت در دسترس نیست.'
+  HDD_PFS_UNAVAILABLE_ERROR: '%d: پشتیبانی PFS دیسک سخت در دسترس نیست.'
+  POPS_LOADING_SETTINGS: در حال بارگذاری تنظیمات POPSTARTER...
+  POPS_SMB_NOT_CONNECTED: ‏SMB متصل نیست.
+  POPS_SMB_SETTINGS_NOT_FOUND: هیچ تنظیمی از POPSTARTER در پوشه POPS از طریق SMB یافت نشد.
+  HDD_OPL_PLUS_NOT_FOUND: پارتیشن +OPL یافت نشد.
+  HDD_OPL_COMMON_NOT_FOUND: پارتیشن __common یافت نشد.
+  HDD_OPL_PARTITION_RESTART: برای اعمال پارتیشن OPL انتخاب‌شده، RiptOPL را دوباره اجرا کنید.
+  HDD_OPL_PARTITION_CHECKING: در حال بررسی پارتیشن OPL روی دیسک...
+  HDD_OPL_PARTITION_BUSY: دیسک مشغول است. پس از پایان بارگذاری دوباره تلاش کنید.
+  GENERAL_SYSTEM: عمومی و سیستم
+  EMBER_NOT_FOUND: فایل ember.elf موجود نیست
+  EMBER_BIOS_MISSING: فایل bios.bin کنار ember.elf موجود نیست
+  EMBER_BAD_NAME: ‏Ember نمی‌تواند از این نام پوشه استفاده کند (بدون اسلش، دونقطه یا بک‌اسلش، و بدون نقطه در ابتدا).
+  EMBER_NO_DISC: در این پوشه بازی Ember هیچ ایمیج دیسک PS1 وجود ندارد.
+  VIEW_APPS: نمایش برنامه‌ها
+  EMBER_DISPLAY: حالت نمایش Ember
+  HINT_EMBER_DISPLAY: حالت خروجی‌ای که Ember برای بازی‌های PS1 استفاده می‌کند. مقدار 240p یا 480p در فایل settings.txt داخل پوشه EMBER دستگاهی که اجرا می‌شود نوشته می‌شود. گزینه پیش‌فرض این تنظیم را دوباره حذف می‌کند و اگر چیز دیگری در فایل نبود، خود فایل را هم حذف می‌کند.

@@ -227,3 +227,93 @@ translations:
   "HINT_DEFAULT_CORE": "Nucleul implicit global pentru jocurile al caror Nucleu de incarcare per joc este setat la Implicit. <OPL> este nucleul nativ; Neutrino inlantuie neutrino.elf extern. O alegere per joc suprascrie intotdeauna aceasta setare."
   "VCD_SETTINGS": "Setări VCD"
   "FINANCIAL_SUPPORT": "Sprijin financiar"
+  ADVANCED_ARGUMENTS: Argumente avansate
+  ADVANCED_SETTINGS: Avansat
+  ARTWORK_SETTINGS: Setări coperte
+  BDMA_SETTINGS: Setări BDMA
+  COLORS_SETTINGS: Culori
+  COMM_SETTINGS: Setări de comunicație
+  CONTROLLER_EMULATION: Emulare controler
+  CONTROLLER_MACROS: Macrocomenzi controler
+  DISPLAY_SETTINGS: Afișaj
+  GAME_LAUNCHING: Lansarea jocurilor
+  GAME_LIST_SETTINGS: Setările listei de jocuri
+  GAME_SOURCES: Surse de jocuri
+  HINT_POPSTARTER_RETROGEM_GAMEID: Afișează un cod de bare optic pentru Pixel FX / RetroGEM / PS2Digital la lansarea unui VCD de PS1
+  HINT_POPS_IMPORT: Citește fișierele IPCONFIG.DAT și SMBCONFIG.DAT ale POPSTARTER din folderul POPS al partajării SMB conectate. Nu se scrie nimic până nu confirmi cu OK.
+  HINT_POPS_PORT: Portul SMB de pe server -- 445 este cel implicit. Lasă 0 (sau 445) pentru o partajare obișnuită; folosește 139 pentru servere SMB1 mai vechi.
+  HINT_VCD_SHOW_PP_POPS: Doar HDD -- listează ca jocuri PS1 partițiile cu un singur joc numite PP.<ID>.POPS.<nume> (de ex. PP.SCES-01492.POPS.MEDIEVIL). Doar listarea; lansarea rămâne neschimbată. Celelalte partiții PP.* (aplicații, jocuri PS2) rămân ascunse.
+  INTERFACE_SETTINGS: Interfață
+  MENU_NETWORK: Rețea
+  NEUTRINO_DEFAULTS: Valori implicite Neutrino
+  OSD_DEFAULTS: Valori implicite OSD
+  PATH_PREFIXES: Prefixe de cale
+  PATH_SETTINGS: Setări de cale
+  POPSTARTER: Setări emulare PS
+  POPSTARTER_RETROGEM_GAMEID: Game ID RetroGEM
+  POPSTARTER_NETWORK_SETTINGS: Setări de rețea POPSTARTER
+  GAMEID_MODE_ALL: Pornit (toate)
+  GAMEID_MODE_POPSTARTER: Pornit (doar POPSTARTER)
+  GAMEID_MODE_PS2: Pornit (doar PS2)
+  GAMEID_MODE_OFF: Oprit
+  POPS_IMPORT: Importă din folderul POPS prin SMB
+  POPS_NONE_DETECTED: Nu a fost găsită nicio configurație SMB POPStarter existentă. Introdu setările de rețea corecte înainte de a crea una.
+  POPS_SMB_SECTION: Rețea SMB POPStarter
+  SECURITY_SETTINGS: Securitate
+  STORAGE_CACHE: Stocare și cache
+  TOOLS: Instrumente
+  VCD_SHOW_PP_POPS: Afișează jocurile din partițiile PP.<ID>.POPS (HDD)
+  VCD_USB_MODE_HINT: fat32 este recomandat pentru stickurile USB care nu sunt exFAT.
+  VCD_USB_MODE_QUESTION: Mod USB fat32 sau exFAT?
+  VCD_USB_MODE_TITLE: Mod VCD prin USB
+  MENU_CONTROLLER: Controler
+  MENU_AUDIO: Sunet
+  MMCE_GAMEID_UNSETTLED: Schimbarea cardului MMCE nu a fost confirmată -- se lansează oricum
+  NEUTRINO_SMB_FALLBACK: Jocurile prin SMB nu sunt acceptate de Neutrino -- se lansează cu nucleul OPL.
+  NEUTRINO_VMC_HDD_UNSUPPORTED: Neutrino nu poate folosi un VMC pe un HDD APA (fără suport pfs) -- se lansează fără el.
+  POPS_LOADED_FROM: Încărcat de la %s
+  POPSTARTER_NET_INVALID: Configurația de rețea a POPSTARTER nu este validă. Corectează-o în setările de rețea POPSTARTER.
+  POPSTARTER_SMB_NEEDS_STATIC: SMB-ul POPSTARTER necesită o configurație de rețea statică. Configurează mai întâi setările de rețea POPSTARTER.
+  POPS_OVERWRITE_TITLE: Înlocuiești configurația POPSTARTER?
+  POPS_OVERWRITE_MSG: Există deja o configurație de rețea POPSTARTER. O înlocuiești cu aceste setări?
+  POPS_KEEP_EXISTING: Păstrează cea existentă
+  POPS_REPLACE: Înlocuiește
+  GSM_1080P_WARNING: ATENȚIE -- forțarea 1080p este experimentală și neverificată. S-ar putea să nu apară imagine sau, pe anumite componente, să solicite consola. Continui pe propria răspundere.
+  GSM_1080P_PROCEED: Forțezi 1080p pentru acest joc?
+  GSM_1080P_SURE: Sigur? Modul experimental 1080p va fi aplicat acestui joc.
+  CUSTOM_SETTINGS_PATH: Cale personalizată pentru setări
+  HINT_CUSTOM_SETTINGS_PATH: Salvează setările într-un folder ales de tine, de ex. mass0:/OPL. Lasă gol pentru a folosi folderul din care a pornit OPL. Dispozitivul se încarcă la cerere, deci nu trebuie să fie montat când scrii.
+  PERGAME_MIXED_SETTINGS: Pe joc + global
+  GSM_DEFAULTS: Valori implicite GSM (toate jocurile)
+  ERR_DEVICE_BUSY_TIMEOUT: 'Dispozitiv ocupat: scrierea setărilor nu a început deloc. Încearcă din nou după ce se termină încărcarea.'
+  BDMA_EQUIPPING: Se pregătește driverul PS1 pe cardul de memorie...
+  VCD_USB_BDMA: Driver BDMA pentru USB
+  HINT_VCD_USB_BDMA: Se aplică doar la lansarea jocurilor PS1 (VCD) de pe un stick USB. PS2 nu poate detecta dacă un stick este fat32 sau exFAT, așa că driverul POPSTARTER trebuie ales. Întreabă pune întrebarea la fiecare lansare; exFAT sau fat32 fixează răspunsul și sare peste întrebare.
+  VCD_USB_BDMA_ASK: Întreabă
+  SETTINGS_HDD_FALLBACK: 'Setările HDD au folosit locația sigură de rezervă: %s'
+  HDD_BACKEND_RECONCILED: HDD-ul intern APA și cel exFAT erau ambele activate -- unul a fost dezactivat automat (vezi Setări dispozitive).
+  SETTINGS_SAVE_PROMPT: SALVEZI SETĂRILE?
+  SETTINGS_SAVE_PROMPT_LINE1: Modificările tale sunt active în acest moment.
+  SETTINGS_SAVE_PROMPT_LINE2: Vrei să le salvezi pentru pornirile viitoare?
+  SETTINGS_SAVE: Salvează setările
+  SETTINGS_EXIT_WITHOUT_SAVING: Ieși fără să salvezi
+  SETTINGS_CONTINUE_EDITING: Continuă editarea
+  CONFIGURE: Configurează
+  HDD_UNAVAILABLE_ERROR: '%d: Hard diskul nu este disponibil.'
+  HDD_PFS_UNAVAILABLE_ERROR: '%d: Suportul PFS al hard diskului nu este disponibil.'
+  POPS_LOADING_SETTINGS: Se încarcă setările POPSTARTER...
+  POPS_SMB_NOT_CONNECTED: SMB nu este conectat.
+  POPS_SMB_SETTINGS_NOT_FOUND: Nu au fost găsite setări POPSTARTER în folderul POPS prin SMB.
+  HDD_OPL_PLUS_NOT_FOUND: Partiția +OPL nu a fost găsită.
+  HDD_OPL_COMMON_NOT_FOUND: Partiția __common nu a fost găsită.
+  HDD_OPL_PARTITION_RESTART: Repornește RiptOPL pentru a aplica partiția OPL selectată.
+  HDD_OPL_PARTITION_CHECKING: Se verifică partiția OPL de pe HDD...
+  HDD_OPL_PARTITION_BUSY: HDD-ul este ocupat. Încearcă din nou după ce se termină încărcarea.
+  GENERAL_SYSTEM: General și sistem
+  EMBER_NOT_FOUND: Lipsește ember.elf
+  EMBER_BIOS_MISSING: Lipsește bios.bin lângă ember.elf
+  EMBER_BAD_NAME: Ember nu poate folosi acest nume de folder (fără bară oblică, două puncte sau bară inversă și fără puncte la început).
+  EMBER_NO_DISC: Nu există nicio imagine de disc PS1 în acest folder de joc Ember.
+  VIEW_APPS: Se afișează aplicațiile
+  EMBER_DISPLAY: Mod de afișare Ember
+  HINT_EMBER_DISPLAY: Modul de ieșire folosit de Ember pentru jocurile PS1. 240p sau 480p se scrie în settings.txt din folderul EMBER al dispozitivului lansat. Implicit elimină din nou setarea, împreună cu fișierul dacă nu mai conținea altceva.

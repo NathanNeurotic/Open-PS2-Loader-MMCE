@@ -227,3 +227,93 @@ translations:
   "HINT_DEFAULT_CORE": "Lõi mặc định toàn cục cho các game có Loader Core theo từng game được đặt thành Default. <OPL> là lõi gốc; Neutrino nối chuỗi tới neutrino.elf bên ngoài. Lựa chọn theo từng game luôn ghi đè giá trị này."
   "VCD_SETTINGS": "Cài đặt VCD"
   "FINANCIAL_SUPPORT": "Hỗ trợ tài chính"
+  ADVANCED_ARGUMENTS: Tham số nâng cao
+  ADVANCED_SETTINGS: Nâng cao
+  ARTWORK_SETTINGS: Cài đặt ảnh bìa
+  BDMA_SETTINGS: Cài đặt BDMA
+  COLORS_SETTINGS: Màu sắc
+  COMM_SETTINGS: Cài đặt kết nối
+  CONTROLLER_EMULATION: Giả lập tay cầm
+  CONTROLLER_MACROS: Macro tay cầm
+  DISPLAY_SETTINGS: Hiển thị
+  GAME_LAUNCHING: Khởi chạy trò chơi
+  GAME_LIST_SETTINGS: Cài đặt danh sách trò chơi
+  GAME_SOURCES: Nguồn trò chơi
+  HINT_POPSTARTER_RETROGEM_GAMEID: Hiển thị mã vạch quang học cho Pixel FX / RetroGEM / PS2Digital khi khởi chạy VCD PS1
+  HINT_POPS_IMPORT: Đọc IPCONFIG.DAT và SMBCONFIG.DAT của POPSTARTER từ thư mục POPS trên chia sẻ SMB đang kết nối. Không có gì được ghi cho đến khi bạn xác nhận bằng OK.
+  HINT_POPS_PORT: Cổng SMB trên máy chủ -- 445 là mặc định. Để 0 (hoặc 445) cho chia sẻ thông thường; dùng 139 cho máy chủ SMB1 cũ.
+  HINT_VCD_SHOW_PP_POPS: Chỉ HDD -- liệt kê các phân vùng chứa một trò chơi có tên PP.<ID>.POPS.<tên> (ví dụ PP.SCES-01492.POPS.MEDIEVIL) như trò chơi PS1. Chỉ liệt kê; cách khởi chạy không đổi. Các phân vùng PP.* khác (ứng dụng, trò chơi PS2) vẫn bị ẩn.
+  INTERFACE_SETTINGS: Giao diện
+  MENU_NETWORK: Mạng
+  NEUTRINO_DEFAULTS: Mặc định của Neutrino
+  OSD_DEFAULTS: Mặc định của OSD
+  PATH_PREFIXES: Tiền tố đường dẫn
+  PATH_SETTINGS: Cài đặt đường dẫn
+  POPSTARTER: Cài đặt giả lập PS
+  POPSTARTER_RETROGEM_GAMEID: Game ID RetroGEM
+  POPSTARTER_NETWORK_SETTINGS: Cài đặt mạng POPSTARTER
+  GAMEID_MODE_ALL: Bật (tất cả)
+  GAMEID_MODE_POPSTARTER: Bật (chỉ POPSTARTER)
+  GAMEID_MODE_PS2: Bật (chỉ PS2)
+  GAMEID_MODE_OFF: Tắt
+  POPS_IMPORT: Nhập từ thư mục POPS qua SMB
+  POPS_NONE_DETECTED: Không tìm thấy cấu hình SMB POPStarter nào. Hãy nhập cài đặt mạng đúng trước khi tạo mới.
+  POPS_SMB_SECTION: Mạng SMB của POPStarter
+  SECURITY_SETTINGS: Bảo mật
+  STORAGE_CACHE: Lưu trữ và bộ nhớ đệm
+  TOOLS: Công cụ
+  VCD_SHOW_PP_POPS: Hiển thị trò chơi từ phân vùng PP.<ID>.POPS (HDD)
+  VCD_USB_MODE_HINT: Nên dùng fat32 cho USB không phải exFAT.
+  VCD_USB_MODE_QUESTION: Chế độ USB là fat32 hay exFAT?
+  VCD_USB_MODE_TITLE: Chế độ VCD qua USB
+  MENU_CONTROLLER: Tay cầm
+  MENU_AUDIO: Âm thanh
+  MMCE_GAMEID_UNSETTLED: Chưa xác nhận việc chuyển thẻ MMCE -- vẫn khởi chạy
+  NEUTRINO_SMB_FALLBACK: Trò chơi qua SMB không được Neutrino hỗ trợ -- khởi chạy bằng nhân OPL.
+  NEUTRINO_VMC_HDD_UNSUPPORTED: Neutrino không thể dùng VMC trên ổ APA (không hỗ trợ pfs) -- khởi chạy mà không có nó.
+  POPS_LOADED_FROM: Đã nạp từ %s
+  POPSTARTER_NET_INVALID: Cấu hình mạng của POPSTARTER không hợp lệ. Hãy sửa trong cài đặt mạng POPSTARTER.
+  POPSTARTER_SMB_NEEDS_STATIC: SMB của POPSTARTER cần cấu hình mạng tĩnh. Hãy thiết lập cài đặt mạng POPSTARTER trước.
+  POPS_OVERWRITE_TITLE: Thay thế cấu hình POPSTARTER?
+  POPS_OVERWRITE_MSG: Đã có cấu hình mạng POPSTARTER. Thay thế bằng các cài đặt này?
+  POPS_KEEP_EXISTING: Giữ cấu hình hiện có
+  POPS_REPLACE: Thay thế
+  GSM_1080P_WARNING: CẢNH BÁO -- ép 1080p là tính năng thử nghiệm và chưa được kiểm chứng. Có thể không có hình, hoặc trên một số phần cứng sẽ gây tải cho máy. Bạn tự chịu rủi ro khi tiếp tục.
+  GSM_1080P_PROCEED: Ép 1080p cho trò chơi này?
+  GSM_1080P_SURE: Bạn chắc chứ? Chế độ 1080p thử nghiệm sẽ được áp dụng cho trò chơi này.
+  CUSTOM_SETTINGS_PATH: Đường dẫn cài đặt tùy chỉnh
+  HINT_CUSTOM_SETTINGS_PATH: Lưu cài đặt vào thư mục bạn chọn, ví dụ mass0:/OPL. Để trống để dùng thư mục mà OPL đã khởi động từ đó. Thiết bị được nạp khi cần, nên không bắt buộc phải gắn kết lúc bạn gõ.
+  PERGAME_MIXED_SETTINGS: Theo trò chơi + toàn cục
+  GSM_DEFAULTS: Mặc định GSM (mọi trò chơi)
+  ERR_DEVICE_BUSY_TIMEOUT: 'Thiết bị đang bận: việc ghi cài đặt chưa hề bắt đầu. Hãy thử lại sau khi nạp xong.'
+  BDMA_EQUIPPING: Đang chuẩn bị driver PS1 trên thẻ nhớ...
+  VCD_USB_BDMA: Driver BDMA cho USB
+  HINT_VCD_USB_BDMA: Chỉ ảnh hưởng tới việc khởi chạy PS1 (VCD) từ USB. PS2 không thể phát hiện USB là fat32 hay exFAT, nên phải chọn driver của POPSTARTER. Hỏi sẽ hỏi mỗi lần khởi chạy; exFAT hoặc fat32 cố định câu trả lời và bỏ qua câu hỏi.
+  VCD_USB_BDMA_ASK: Hỏi
+  SETTINGS_HDD_FALLBACK: 'Cài đặt HDD đã dùng vị trí dự phòng an toàn: %s'
+  HDD_BACKEND_RECONCILED: Ổ cứng trong APA và exFAT đều đang bật -- một trong hai đã bị tắt tự động (xem Cài đặt thiết bị).
+  SETTINGS_SAVE_PROMPT: LƯU CÀI ĐẶT?
+  SETTINGS_SAVE_PROMPT_LINE1: Các thay đổi của bạn đang có hiệu lực.
+  SETTINGS_SAVE_PROMPT_LINE2: Bạn có muốn lưu để dùng cho những lần chạy sau không?
+  SETTINGS_SAVE: Lưu cài đặt
+  SETTINGS_EXIT_WITHOUT_SAVING: Thoát mà không lưu
+  SETTINGS_CONTINUE_EDITING: Tiếp tục chỉnh sửa
+  CONFIGURE: Cấu hình
+  HDD_UNAVAILABLE_ERROR: '%d: Không dùng được ổ cứng.'
+  HDD_PFS_UNAVAILABLE_ERROR: '%d: Không dùng được hỗ trợ PFS của ổ cứng.'
+  POPS_LOADING_SETTINGS: Đang nạp cài đặt POPSTARTER...
+  POPS_SMB_NOT_CONNECTED: SMB chưa được kết nối.
+  POPS_SMB_SETTINGS_NOT_FOUND: Không tìm thấy cài đặt POPSTARTER trong thư mục POPS qua SMB.
+  HDD_OPL_PLUS_NOT_FOUND: Không tìm thấy phân vùng +OPL.
+  HDD_OPL_COMMON_NOT_FOUND: Không tìm thấy phân vùng __common.
+  HDD_OPL_PARTITION_RESTART: Hãy khởi động lại RiptOPL để áp dụng phân vùng OPL đã chọn.
+  HDD_OPL_PARTITION_CHECKING: Đang kiểm tra phân vùng OPL trên ổ cứng...
+  HDD_OPL_PARTITION_BUSY: Ổ cứng đang bận. Hãy thử lại sau khi nạp xong.
+  GENERAL_SYSTEM: Chung và hệ thống
+  EMBER_NOT_FOUND: Thiếu ember.elf
+  EMBER_BIOS_MISSING: Thiếu bios.bin bên cạnh ember.elf
+  EMBER_BAD_NAME: Ember không dùng được tên thư mục này (không có dấu gạch chéo, dấu hai chấm hay gạch chéo ngược, và không có dấu chấm ở đầu).
+  EMBER_NO_DISC: Không có ảnh đĩa PS1 trong thư mục trò chơi Ember này.
+  VIEW_APPS: Đang hiển thị ứng dụng
+  EMBER_DISPLAY: Chế độ hiển thị của Ember
+  HINT_EMBER_DISPLAY: Chế độ xuất hình mà Ember dùng cho trò chơi PS1. 240p hoặc 480p sẽ được ghi vào settings.txt trong thư mục EMBER của thiết bị được khởi chạy. Mặc định sẽ xóa lại cài đặt đó, và xóa luôn tập tin nếu nó không còn nội dung nào khác.

@@ -227,3 +227,93 @@ translations:
   "HINT_DEFAULT_CORE": "ຄอร์เริ່มต้นแบบ global สำหรับเกมที่ Loader Core ຕໍ່ເກມ ຖືກຕັ້ງເປັນ Default. <OPL> ແມ່ນຄอร์ພື້ນເມືອງ; Neutrino ຕໍ່ຫ່ວງໄປຫາ neutrino.elf ພາຍນອກ. ການເລືອກຕໍ່ເກມຈະລົບລ້າງຄ່ານີ້ສະເໝີ."
   "VCD_SETTINGS": "ຕັ້ງຄ່າ VCD"
   "FINANCIAL_SUPPORT": "ການສະໜັບສະໜູນທາງການເງິນ"
+  ADVANCED_ARGUMENTS: ອາກິວເມັນຂັ້ນສູງ
+  ADVANCED_SETTINGS: ຂັ້ນສູງ
+  ARTWORK_SETTINGS: ການຕັ້ງຄ່າຮູບປົກ
+  BDMA_SETTINGS: ການຕັ້ງຄ່າ BDMA
+  COLORS_SETTINGS: ສີ
+  COMM_SETTINGS: ການຕັ້ງຄ່າການສື່ສານ
+  CONTROLLER_EMULATION: ການຈຳລອງຕົວຄວບຄຸມ
+  CONTROLLER_MACROS: ມາໂຄຣຂອງຕົວຄວບຄຸມ
+  DISPLAY_SETTINGS: ການສະແດງຜົນ
+  GAME_LAUNCHING: ການເປີດເກມ
+  GAME_LIST_SETTINGS: ການຕັ້ງຄ່າລາຍການເກມ
+  GAME_SOURCES: ແຫຼ່ງເກມ
+  HINT_POPSTARTER_RETROGEM_GAMEID: ສະແດງບາໂຄດແບບແສງສຳລັບ Pixel FX / RetroGEM / PS2Digital ເມື່ອເປີດ VCD ຂອງ PS1
+  HINT_POPS_IMPORT: ອ່ານໄຟລ໌ IPCONFIG.DAT ແລະ SMBCONFIG.DAT ຂອງ POPSTARTER ຈາກໂຟລເດີ POPS ໃນການແບ່ງປັນ SMB ທີ່ເຊື່ອມຕໍ່ຢູ່. ຈະບໍ່ມີການຂຽນຫຍັງຈົນກວ່າທ່ານຈະຢືນຢັນດ້ວຍ ຕົກລົງ.
+  HINT_POPS_PORT: ພອດ SMB ຢູ່ເຊີບເວີ -- ຄ່າເລີ່ມຕົ້ນຄື 445. ໃຫ້ໄວ້ທີ່ 0 (ຫຼື 445) ສຳລັບການແບ່ງປັນທົ່ວໄປ; ໃຊ້ 139 ສຳລັບເຊີບເວີ SMB1 ຮຸ່ນເກົ່າ.
+  HINT_VCD_SHOW_PP_POPS: ສະເພາະ HDD -- ສະແດງພາທິຊັນທີ່ມີເກມດຽວຊື່ວ່າ PP.<ID>.POPS.<ຊື່> (ຕົວຢ່າງ PP.SCES-01492.POPS.MEDIEVIL) ເປັນເກມ PS1. ພຽງແຕ່ການລາຍຊື່ເທົ່ານັ້ນ; ວິທີການເປີດບໍ່ປ່ຽນແປງ. ພາທິຊັນ PP.* ອື່ນໆ (ແອັບ, ເກມ PS2) ຍັງຄົງເຊື່ອງຢູ່.
+  INTERFACE_SETTINGS: ສ່ວນຕິດຕໍ່
+  MENU_NETWORK: ເຄືອຂ່າຍ
+  NEUTRINO_DEFAULTS: ຄ່າເລີ່ມຕົ້ນຂອງ Neutrino
+  OSD_DEFAULTS: ຄ່າເລີ່ມຕົ້ນຂອງ OSD
+  PATH_PREFIXES: ຄຳນຳໜ້າເສັ້ນທາງ
+  PATH_SETTINGS: ການຕັ້ງຄ່າເສັ້ນທາງ
+  POPSTARTER: ການຕັ້ງຄ່າການຈຳລອງ PS
+  POPSTARTER_RETROGEM_GAMEID: Game ID ຂອງ RetroGEM
+  POPSTARTER_NETWORK_SETTINGS: ການຕັ້ງຄ່າເຄືອຂ່າຍ POPSTARTER
+  GAMEID_MODE_ALL: ເປີດ (ທັງໝົດ)
+  GAMEID_MODE_POPSTARTER: ເປີດ (ສະເພາະ POPSTARTER)
+  GAMEID_MODE_PS2: ເປີດ (ສະເພາະ PS2)
+  GAMEID_MODE_OFF: ປິດ
+  POPS_IMPORT: ນຳເຂົ້າຈາກໂຟລເດີ POPS ຜ່ານ SMB
+  POPS_NONE_DETECTED: ບໍ່ພົບການຕັ້ງຄ່າ SMB ຂອງ POPStarter ທີ່ມີຢູ່ແລ້ວ. ກະລຸນາໃສ່ການຕັ້ງຄ່າເຄືອຂ່າຍທີ່ຖືກຕ້ອງກ່ອນສ້າງໃໝ່.
+  POPS_SMB_SECTION: ເຄືອຂ່າຍ SMB ຂອງ POPStarter
+  SECURITY_SETTINGS: ຄວາມປອດໄພ
+  STORAGE_CACHE: ບ່ອນເກັບຂໍ້ມູນ ແລະ ແຄສ
+  TOOLS: ເຄື່ອງມື
+  VCD_SHOW_PP_POPS: ສະແດງເກມຈາກພາທິຊັນ PP.<ID>.POPS (HDD)
+  VCD_USB_MODE_HINT: ແນະນຳໃຫ້ໃຊ້ fat32 ສຳລັບ USB ທີ່ບໍ່ແມ່ນ exFAT.
+  VCD_USB_MODE_QUESTION: ໂໝດ USB ເປັນ fat32 ຫຼື exFAT?
+  VCD_USB_MODE_TITLE: ໂໝດ VCD ຜ່ານ USB
+  MENU_CONTROLLER: ຕົວຄວບຄຸມ
+  MENU_AUDIO: ສຽງ
+  MMCE_GAMEID_UNSETTLED: ການປ່ຽນກາດ MMCE ບໍ່ໄດ້ຮັບການຢືນຢັນ -- ຈະເປີດຕໍ່ໄປ
+  NEUTRINO_SMB_FALLBACK: ເກມຜ່ານ SMB ບໍ່ຮອງຮັບໃນ Neutrino -- ຈະເປີດດ້ວຍແກນ OPL.
+  NEUTRINO_VMC_HDD_UNSUPPORTED: Neutrino ບໍ່ສາມາດໃຊ້ VMC ເທິງ HDD APA (ບໍ່ຮອງຮັບ pfs) -- ຈະເປີດໂດຍບໍ່ໃຊ້ມັນ.
+  POPS_LOADED_FROM: ໂຫຼດຈາກ %s
+  POPSTARTER_NET_INVALID: ການຕັ້ງຄ່າເຄືອຂ່າຍຂອງ POPSTARTER ບໍ່ຖືກຕ້ອງ. ກະລຸນາແກ້ໄຂໃນການຕັ້ງຄ່າເຄືອຂ່າຍ POPSTARTER.
+  POPSTARTER_SMB_NEEDS_STATIC: SMB ຂອງ POPSTARTER ຕ້ອງການການຕັ້ງຄ່າເຄືອຂ່າຍແບບຄົງທີ່. ກະລຸນາຕັ້ງຄ່າເຄືອຂ່າຍ POPSTARTER ກ່ອນ.
+  POPS_OVERWRITE_TITLE: ປ່ຽນແທນການຕັ້ງຄ່າ POPSTARTER ບໍ?
+  POPS_OVERWRITE_MSG: ມີການຕັ້ງຄ່າເຄືອຂ່າຍ POPSTARTER ຢູ່ແລ້ວ. ຈະປ່ຽນແທນດ້ວຍການຕັ້ງຄ່າເຫຼົ່ານີ້ບໍ?
+  POPS_KEEP_EXISTING: ຮັກສາອັນທີ່ມີຢູ່
+  POPS_REPLACE: ປ່ຽນແທນ
+  GSM_1080P_WARNING: ຄຳເຕືອນ -- ການບັງຄັບ 1080p ເປັນການທົດລອງ ແລະ ຍັງບໍ່ໄດ້ຮັບການກວດສອບ. ອາດຈະບໍ່ມີພາບເລີຍ ຫຼື ໃນບາງອຸປະກອນອາດເຮັດໃຫ້ເຄື່ອງເຮັດວຽກໜັກ. ດຳເນີນຕໍ່ດ້ວຍຄວາມສ່ຽງຂອງທ່ານເອງ.
+  GSM_1080P_PROCEED: ຈະບັງຄັບ 1080p ສຳລັບເກມນີ້ບໍ?
+  GSM_1080P_SURE: ແນ່ໃຈບໍ? ໂໝດ 1080p ແບບທົດລອງຈະຖືກນຳໃຊ້ກັບເກມນີ້.
+  CUSTOM_SETTINGS_PATH: ເສັ້ນທາງການຕັ້ງຄ່າແບບກຳນົດເອງ
+  HINT_CUSTOM_SETTINGS_PATH: ບັນທຶກການຕັ້ງຄ່າໄວ້ໃນໂຟລເດີທີ່ທ່ານເລືອກ ເຊັ່ນ mass0:/OPL. ປະໄວ້ຫວ່າງເພື່ອໃຊ້ໂຟລເດີທີ່ OPL ເປີດຂຶ້ນມາ. ອຸປະກອນຈະຖືກໂຫຼດເມື່ອຕ້ອງການ ດັ່ງນັ້ນຈຶ່ງບໍ່ຈຳເປັນຕ້ອງເຊື່ອມຕໍ່ຢູ່ໃນຂະນະທີ່ພິມ.
+  PERGAME_MIXED_SETTINGS: ຕໍ່ເກມ + ທົ່ວໄປ
+  GSM_DEFAULTS: ຄ່າເລີ່ມຕົ້ນຂອງ GSM (ທຸກເກມ)
+  ERR_DEVICE_BUSY_TIMEOUT: 'ອຸປະກອນບໍ່ຫວ່າງ: ການຂຽນການຕັ້ງຄ່າຍັງບໍ່ໄດ້ເລີ່ມເລີຍ. ກະລຸນາລອງໃໝ່ເມື່ອການໂຫຼດແລ້ວໆ.'
+  BDMA_EQUIPPING: ກຳລັງກຽມໄດເວີ PS1 ໃນກາດຄວາມຈຳ...
+  VCD_USB_BDMA: ໄດເວີ BDMA ສຳລັບ USB
+  HINT_VCD_USB_BDMA: ໃຊ້ກັບການເປີດເກມ PS1 (VCD) ຈາກ USB ເທົ່ານັ້ນ. PS2 ບໍ່ສາມາດກວດວ່າ USB ເປັນ fat32 ຫຼື exFAT ດັ່ງນັ້ນຈຶ່ງຕ້ອງເລືອກໄດເວີຂອງ POPSTARTER. ຖາມ ຈະຖາມທຸກຄັ້ງທີ່ເປີດ; exFAT ຫຼື fat32 ຈະກຳນົດຄຳຕອບໄວ້ ແລະ ຂ້າມຄຳຖາມ.
+  VCD_USB_BDMA_ASK: ຖາມ
+  SETTINGS_HDD_FALLBACK: 'ການຕັ້ງຄ່າ HDD ໄດ້ໃຊ້ບ່ອນສຳຮອງທີ່ປອດໄພ: %s'
+  HDD_BACKEND_RECONCILED: HDD ພາຍໃນແບບ APA ແລະ exFAT ຖືກເປີດພ້ອມກັນ -- ອັນໜຶ່ງຖືກປິດອັດຕະໂນມັດ (ເບິ່ງການຕັ້ງຄ່າອຸປະກອນ).
+  SETTINGS_SAVE_PROMPT: ບັນທຶກການຕັ້ງຄ່າບໍ?
+  SETTINGS_SAVE_PROMPT_LINE1: ການປ່ຽນແປງຂອງທ່ານກຳລັງມີຜົນຢູ່ໃນຂະນະນີ້.
+  SETTINGS_SAVE_PROMPT_LINE2: ທ່ານຕ້ອງການບັນທຶກໄວ້ສຳລັບການເປີດຄັ້ງຕໍ່ໄປບໍ?
+  SETTINGS_SAVE: ບັນທຶກການຕັ້ງຄ່າ
+  SETTINGS_EXIT_WITHOUT_SAVING: ອອກໂດຍບໍ່ບັນທຶກ
+  SETTINGS_CONTINUE_EDITING: ແກ້ໄຂຕໍ່
+  CONFIGURE: ຕັ້ງຄ່າ
+  HDD_UNAVAILABLE_ERROR: '%d: ບໍ່ສາມາດໃຊ້ຮາດດິດໄດ້.'
+  HDD_PFS_UNAVAILABLE_ERROR: '%d: ບໍ່ສາມາດໃຊ້ການຮອງຮັບ PFS ຂອງຮາດດິດໄດ້.'
+  POPS_LOADING_SETTINGS: ກຳລັງໂຫຼດການຕັ້ງຄ່າ POPSTARTER...
+  POPS_SMB_NOT_CONNECTED: SMB ບໍ່ໄດ້ເຊື່ອມຕໍ່.
+  POPS_SMB_SETTINGS_NOT_FOUND: ບໍ່ພົບການຕັ້ງຄ່າ POPSTARTER ໃນໂຟລເດີ POPS ຜ່ານ SMB.
+  HDD_OPL_PLUS_NOT_FOUND: ບໍ່ພົບພາທິຊັນ +OPL.
+  HDD_OPL_COMMON_NOT_FOUND: ບໍ່ພົບພາທິຊັນ __common.
+  HDD_OPL_PARTITION_RESTART: ກະລຸນາເປີດ RiptOPL ໃໝ່ເພື່ອນຳໃຊ້ພາທິຊັນ OPL ທີ່ເລືອກ.
+  HDD_OPL_PARTITION_CHECKING: ກຳລັງກວດສອບພາທິຊັນ OPL ຂອງ HDD...
+  HDD_OPL_PARTITION_BUSY: HDD ບໍ່ຫວ່າງ. ກະລຸນາລອງໃໝ່ເມື່ອການໂຫຼດແລ້ວໆ.
+  GENERAL_SYSTEM: ທົ່ວໄປ ແລະ ລະບົບ
+  EMBER_NOT_FOUND: ບໍ່ມີ ember.elf
+  EMBER_BIOS_MISSING: ບໍ່ມີ bios.bin ຢູ່ຂ້າງ ember.elf
+  EMBER_BAD_NAME: Ember ບໍ່ສາມາດໃຊ້ຊື່ໂຟລເດີນີ້ໄດ້ (ຫ້າມມີເຄື່ອງໝາຍທັບ, ຈໍ້າສອງເມັດ ຫຼື ທັບກັບ ແລະ ຫ້າມມີຈຸດຢູ່ຕົ້ນຊື່).
+  EMBER_NO_DISC: ບໍ່ມີໄຟລ໌ອິມເມດແຜ່ນ PS1 ໃນໂຟລເດີເກມ Ember ນີ້.
+  VIEW_APPS: ກຳລັງສະແດງແອັບ
+  EMBER_DISPLAY: ໂໝດການສະແດງຜົນຂອງ Ember
+  HINT_EMBER_DISPLAY: ໂໝດການສົ່ງພາບທີ່ Ember ໃຊ້ສຳລັບເກມ PS1. ຄ່າ 240p ຫຼື 480p ຈະຖືກຂຽນລົງໃນ settings.txt ພາຍໃນໂຟລເດີ EMBER ຂອງອຸປະກອນທີ່ເປີດ. ຄ່າເລີ່ມຕົ້ນ ຈະລຶບການຕັ້ງຄ່ານັ້ນອອກ ແລະ ລຶບໄຟລ໌ນຳຖ້າບໍ່ມີຂໍ້ມູນອື່ນຢູ່ໃນນັ້ນ.

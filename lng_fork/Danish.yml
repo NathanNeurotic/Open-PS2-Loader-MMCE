@@ -227,3 +227,93 @@ translations:
   "HINT_DEFAULT_CORE": "Global standardkerne for spil, hvis Loader Core pr. spil er sat til Default. <OPL> er den native kerne; Neutrino kæder den eksterne neutrino.elf. Et valg pr. spil tilsidesætter altid dette."
   "VCD_SETTINGS": "VCD-indstillinger"
   "FINANCIAL_SUPPORT": "Økonomisk støtte"
+  ADVANCED_ARGUMENTS: Avancerede argumenter
+  ADVANCED_SETTINGS: Avanceret
+  ARTWORK_SETTINGS: Omslagsindstillinger
+  BDMA_SETTINGS: BDMA-indstillinger
+  COLORS_SETTINGS: Farver
+  COMM_SETTINGS: Kommunikationsindstillinger
+  CONTROLLER_EMULATION: Controller-emulering
+  CONTROLLER_MACROS: Controller-makroer
+  DISPLAY_SETTINGS: Skærm
+  GAME_LAUNCHING: Start af spil
+  GAME_LIST_SETTINGS: Indstillinger for spillisten
+  GAME_SOURCES: Spilkilder
+  HINT_POPSTARTER_RETROGEM_GAMEID: Viser en optisk stregkode til Pixel FX / RetroGEM / PS2Digital, når et PS1-VCD startes
+  HINT_POPS_IMPORT: Læser POPSTARTERs IPCONFIG.DAT og SMBCONFIG.DAT fra POPS-mappen på den tilsluttede SMB-share. Der skrives intet, før du bekræfter med OK.
+  HINT_POPS_PORT: SMB-port på serveren -- 445 er standard. Lad den stå på 0 (eller 445) til en almindelig share; brug 139 til ældre SMB1-servere.
+  HINT_VCD_SHOW_PP_POPS: Kun HDD -- viser partitioner med ét spil ved navn PP.<ID>.POPS.<navn> (f.eks. PP.SCES-01492.POPS.MEDIEVIL) som PS1-spil. Kun visningen; starten er uændret. Andre PP.*-partitioner (apps, PS2-spil) forbliver skjulte.
+  INTERFACE_SETTINGS: Grænseflade
+  MENU_NETWORK: Netværk
+  NEUTRINO_DEFAULTS: Neutrino-standarder
+  OSD_DEFAULTS: OSD-standarder
+  PATH_PREFIXES: Sti-præfikser
+  PATH_SETTINGS: Sti-indstillinger
+  POPSTARTER: PS-emuleringsindstillinger
+  POPSTARTER_RETROGEM_GAMEID: RetroGEM Game ID
+  POPSTARTER_NETWORK_SETTINGS: POPSTARTER-netværksindstillinger
+  GAMEID_MODE_ALL: Til (alle)
+  GAMEID_MODE_POPSTARTER: Til (kun POPSTARTER)
+  GAMEID_MODE_PS2: Til (kun PS2)
+  GAMEID_MODE_OFF: Fra
+  POPS_IMPORT: Importér fra SMB POPS-mappen
+  POPS_NONE_DETECTED: Der blev ikke fundet nogen eksisterende POPStarter-SMB-konfiguration. Indtast de korrekte netværksindstillinger, før du opretter en.
+  POPS_SMB_SECTION: POPStarter SMB-netværk
+  SECURITY_SETTINGS: Sikkerhed
+  STORAGE_CACHE: Lagring og cache
+  TOOLS: Værktøjer
+  VCD_SHOW_PP_POPS: Vis spil fra PP.<ID>.POPS-partitioner (HDD)
+  VCD_USB_MODE_HINT: fat32 anbefales til USB-nøgler, der ikke er exFAT.
+  VCD_USB_MODE_QUESTION: USB-tilstand fat32 eller exFAT?
+  VCD_USB_MODE_TITLE: USB-VCD-tilstand
+  MENU_CONTROLLER: Controller
+  MENU_AUDIO: Lyd
+  MMCE_GAMEID_UNSETTLED: MMCE-kortskiftet er ikke bekræftet -- starter alligevel
+  NEUTRINO_SMB_FALLBACK: SMB-spil understøttes ikke af Neutrino -- starter med OPL-kernen.
+  NEUTRINO_VMC_HDD_UNSUPPORTED: Neutrino kan ikke bruge en VMC på en APA-HDD (ingen pfs-understøttelse) -- starter uden.
+  POPS_LOADED_FROM: Indlæst fra %s
+  POPSTARTER_NET_INVALID: POPSTARTERs netværkskonfiguration er ugyldig. Ret den i POPSTARTER-netværksindstillingerne.
+  POPSTARTER_SMB_NEEDS_STATIC: POPSTARTERs SMB kræver en statisk netværkskonfiguration. Konfigurér POPSTARTER-netværksindstillingerne først.
+  POPS_OVERWRITE_TITLE: Erstat POPSTARTER-konfigurationen?
+  POPS_OVERWRITE_MSG: Der findes allerede en POPSTARTER-netværkskonfiguration. Skal den erstattes med disse indstillinger?
+  POPS_KEEP_EXISTING: Behold den eksisterende
+  POPS_REPLACE: Erstat
+  GSM_1080P_WARNING: ADVARSEL -- at tvinge 1080p er eksperimentelt og uverificeret. Det kan give intet billede eller, på noget hardware, belaste konsollen. Fortsæt på eget ansvar.
+  GSM_1080P_PROCEED: Skal 1080p tvinges for dette spil?
+  GSM_1080P_SURE: Er du sikker? Den eksperimentelle 1080p-tilstand anvendes på dette spil.
+  CUSTOM_SETTINGS_PATH: Egen sti til indstillinger
+  HINT_CUSTOM_SETTINGS_PATH: Gemmer indstillingerne i en mappe, du vælger, f.eks. mass0:/OPL. Lad feltet stå tomt for at bruge den mappe, OPL startede fra. Enheden indlæses efter behov, så den behøver ikke være monteret, mens du skriver.
+  PERGAME_MIXED_SETTINGS: Pr. spil + globalt
+  GSM_DEFAULTS: GSM-standarder (alle spil)
+  ERR_DEVICE_BUSY_TIMEOUT: 'Enheden er optaget: skrivningen af indstillingerne blev aldrig påbegyndt. Prøv igen, når indlæsningen er færdig.'
+  BDMA_EQUIPPING: Forbereder PS1-driveren på hukommelseskortet...
+  VCD_USB_BDMA: USB-BDMA-driver
+  HINT_VCD_USB_BDMA: "Gælder kun PS1-start (VCD) fra en USB-nøgle. PS2'en kan ikke registrere, om en nøgle er fat32 eller exFAT, så POPSTARTERs driver skal vælges. Spørg spørger ved hver start; exFAT eller fat32 fastlåser svaret og springer spørgsmålet over."
+  VCD_USB_BDMA_ASK: Spørg
+  SETTINGS_HDD_FALLBACK: 'HDD-indstillingerne brugte den sikre reserveplacering: %s'
+  HDD_BACKEND_RECONCILED: Både den interne APA- og exFAT-HDD var slået til -- den ene blev slået fra automatisk (se Enhedsindstillinger).
+  SETTINGS_SAVE_PROMPT: GEM INDSTILLINGERNE?
+  SETTINGS_SAVE_PROMPT_LINE1: Dine ændringer er aktive lige nu.
+  SETTINGS_SAVE_PROMPT_LINE2: Vil du gemme dem til fremtidige starter?
+  SETTINGS_SAVE: Gem indstillinger
+  SETTINGS_EXIT_WITHOUT_SAVING: Afslut uden at gemme
+  SETTINGS_CONTINUE_EDITING: Fortsæt redigering
+  CONFIGURE: Konfigurér
+  HDD_UNAVAILABLE_ERROR: '%d: Harddisken er ikke tilgængelig.'
+  HDD_PFS_UNAVAILABLE_ERROR: '%d: Harddiskens PFS-understøttelse er ikke tilgængelig.'
+  POPS_LOADING_SETTINGS: Indlæser POPSTARTER-indstillinger...
+  POPS_SMB_NOT_CONNECTED: SMB er ikke forbundet.
+  POPS_SMB_SETTINGS_NOT_FOUND: Der blev ikke fundet nogen POPSTARTER-indstillinger i SMB-POPS-mappen.
+  HDD_OPL_PLUS_NOT_FOUND: Partitionen +OPL blev ikke fundet.
+  HDD_OPL_COMMON_NOT_FOUND: Partitionen __common blev ikke fundet.
+  HDD_OPL_PARTITION_RESTART: Genstart RiptOPL for at anvende den valgte OPL-partition.
+  HDD_OPL_PARTITION_CHECKING: Kontrollerer OPL-partitionen på harddisken...
+  HDD_OPL_PARTITION_BUSY: Harddisken er optaget. Prøv igen, når indlæsningen er færdig.
+  GENERAL_SYSTEM: Generelt og system
+  EMBER_NOT_FOUND: ember.elf mangler
+  EMBER_BIOS_MISSING: bios.bin mangler ved siden af ember.elf
+  EMBER_BAD_NAME: Ember kan ikke bruge dette mappenavn (ingen skråstreg, kolon eller omvendt skråstreg, og ingen indledende punktummer).
+  EMBER_NO_DISC: Der er intet PS1-diskbillede i denne Ember-spilmappe.
+  VIEW_APPS: Viser apps
+  EMBER_DISPLAY: Ember-visningstilstand
+  HINT_EMBER_DISPLAY: Den udgangstilstand, Ember bruger til PS1-spil. 240p eller 480p skrives til settings.txt i EMBER-mappen på den enhed, der startes. Standard fjerner indstillingen igen -- og filen med, hvis den ikke indeholdt andet.

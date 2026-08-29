@@ -227,3 +227,93 @@ translations:
   "HINT_DEFAULT_CORE": "Oyuna özel Yükleyici Çekirdeği Default olarak ayarlanmış oyunlar için genel varsayılan çekirdek. <OPL> yerel çekirdektir; Neutrino harici neutrino.elf'i zincirler. Oyuna özel bir seçim bunu her zaman geçersiz kılar."
   "VCD_SETTINGS": "VCD Ayarları"
   "FINANCIAL_SUPPORT": "Mali Destek"
+  ADVANCED_ARGUMENTS: Gelişmiş argümanlar
+  ADVANCED_SETTINGS: Gelişmiş
+  ARTWORK_SETTINGS: Kapak ayarları
+  BDMA_SETTINGS: BDMA ayarları
+  COLORS_SETTINGS: Renkler
+  COMM_SETTINGS: İletişim ayarları
+  CONTROLLER_EMULATION: Kumanda emülasyonu
+  CONTROLLER_MACROS: Kumanda makroları
+  DISPLAY_SETTINGS: Görüntü
+  GAME_LAUNCHING: Oyun başlatma
+  GAME_LIST_SETTINGS: Oyun listesi ayarları
+  GAME_SOURCES: Oyun kaynakları
+  HINT_POPSTARTER_RETROGEM_GAMEID: PS1 VCD başlatılırken Pixel FX / RetroGEM / PS2Digital için optik barkod gösterir
+  HINT_POPS_IMPORT: "POPSTARTER'ın IPCONFIG.DAT ve SMBCONFIG.DAT dosyalarını bağlı SMB paylaşımının POPS klasöründen okur. Tamam ile onaylayana kadar hiçbir şey yazılmaz."
+  HINT_POPS_PORT: Sunucudaki SMB bağlantı noktası -- varsayılan 445. Normal bir paylaşım için 0 (veya 445) bırakın; eski SMB1 sunucuları için 139 kullanın.
+  HINT_VCD_SHOW_PP_POPS: Yalnızca HDD -- PP.<ID>.POPS.<ad> (ör. PP.SCES-01492.POPS.MEDIEVIL) adlı tek oyunluk bölümleri PS1 oyunu olarak listeler. Yalnızca listeleme; başlatma değişmez. Diğer PP.* bölümleri (uygulamalar, PS2 oyunları) gizli kalır.
+  INTERFACE_SETTINGS: Arayüz
+  MENU_NETWORK: Ağ
+  NEUTRINO_DEFAULTS: Neutrino varsayılanları
+  OSD_DEFAULTS: OSD varsayılanları
+  PATH_PREFIXES: Yol önekleri
+  PATH_SETTINGS: Yol ayarları
+  POPSTARTER: PS emülasyon ayarları
+  POPSTARTER_RETROGEM_GAMEID: RetroGEM Oyun Kimliği
+  POPSTARTER_NETWORK_SETTINGS: POPSTARTER ağ ayarları
+  GAMEID_MODE_ALL: Açık (tümü)
+  GAMEID_MODE_POPSTARTER: Açık (yalnızca POPSTARTER)
+  GAMEID_MODE_PS2: Açık (yalnızca PS2)
+  GAMEID_MODE_OFF: Kapalı
+  POPS_IMPORT: SMB POPS klasöründen içe aktar
+  POPS_NONE_DETECTED: Mevcut bir POPStarter SMB yapılandırması bulunamadı. Yeni bir tane oluşturmadan önce doğru ağ ayarlarını girin.
+  POPS_SMB_SECTION: POPStarter SMB ağı
+  SECURITY_SETTINGS: Güvenlik
+  STORAGE_CACHE: Depolama ve önbellek
+  TOOLS: Araçlar
+  VCD_SHOW_PP_POPS: PP.<ID>.POPS bölümlerindeki oyunları göster (HDD)
+  VCD_USB_MODE_HINT: exFAT olmayan USB bellekler için fat32 önerilir.
+  VCD_USB_MODE_QUESTION: USB modu fat32 mı exFAT mı?
+  VCD_USB_MODE_TITLE: USB VCD modu
+  MENU_CONTROLLER: Kumanda
+  MENU_AUDIO: Ses
+  MMCE_GAMEID_UNSETTLED: MMCE kart değişimi doğrulanmadı -- yine de başlatılıyor
+  NEUTRINO_SMB_FALLBACK: SMB oyunlarının Neutrino desteği yok -- OPL çekirdeğiyle başlatılıyor.
+  NEUTRINO_VMC_HDD_UNSUPPORTED: Neutrino APA HDD üzerinde VMC kullanamaz (pfs desteği yok) -- VMC olmadan başlatılıyor.
+  POPS_LOADED_FROM: '%s konumundan yüklendi'
+  POPSTARTER_NET_INVALID: POPSTARTER ağ yapılandırması geçersiz. POPSTARTER ağ ayarlarından düzeltin.
+  POPSTARTER_SMB_NEEDS_STATIC: POPSTARTER SMB, statik bir ağ yapılandırması gerektirir. Önce POPSTARTER ağ ayarlarını yapın.
+  POPS_OVERWRITE_TITLE: POPSTARTER yapılandırması değiştirilsin mi?
+  POPS_OVERWRITE_MSG: Zaten bir POPSTARTER ağ yapılandırması var. Bu ayarlarla değiştirilsin mi?
+  POPS_KEEP_EXISTING: Mevcut kalsın
+  POPS_REPLACE: Değiştir
+  GSM_1080P_WARNING: "UYARI -- 1080p'yi zorlamak deneyseldir ve doğrulanmamıştır. Görüntü hiç gelmeyebilir veya bazı donanımlarda konsolu zorlayabilir. Riski size aittir."
+  GSM_1080P_PROCEED: Bu oyun için 1080p zorlansın mı?
+  GSM_1080P_SURE: Emin misiniz? Bu oyuna deneysel 1080p modu uygulanacak.
+  CUSTOM_SETTINGS_PATH: Özel ayar yolu
+  HINT_CUSTOM_SETTINGS_PATH: "Ayarları seçtiğiniz bir klasöre kaydeder, ör. mass0:/OPL. OPL'nin açıldığı klasörü kullanmak için boş bırakın. Aygıt gerektiğinde yüklenir, bu yüzden yazarken bağlı olması gerekmez."
+  PERGAME_MIXED_SETTINGS: Oyun başına + genel
+  GSM_DEFAULTS: GSM varsayılanları (tüm oyunlar)
+  ERR_DEVICE_BUSY_TIMEOUT: 'Aygıt meşgul: ayarların yazımı hiç başlamadı. Yükleme bitince tekrar deneyin.'
+  BDMA_EQUIPPING: Hafıza kartında PS1 sürücüsü hazırlanıyor...
+  VCD_USB_BDMA: USB BDMA sürücüsü
+  HINT_VCD_USB_BDMA: "Yalnızca USB bellekten PS1 (VCD) başlatmayı etkiler. PS2, belleğin fat32 mı exFAT mı olduğunu algılayamaz; bu yüzden POPSTARTER'ın sürücüsü seçilmelidir. Sor her başlatmada sorar; exFAT veya fat32 yanıtı sabitler ve soruyu atlar."
+  VCD_USB_BDMA_ASK: Sor
+  SETTINGS_HDD_FALLBACK: 'HDD ayarları güvenli yedek konumu kullandı: %s'
+  HDD_BACKEND_RECONCILED: Dahili APA ve exFAT HDD birlikte etkindi -- biri otomatik olarak kapatıldı (Aygıt ayarlarına bakın).
+  SETTINGS_SAVE_PROMPT: AYARLAR KAYDEDİLSİN Mİ?
+  SETTINGS_SAVE_PROMPT_LINE1: Değişiklikleriniz şu anda etkin.
+  SETTINGS_SAVE_PROMPT_LINE2: Sonraki açılışlar için kaydetmek ister misiniz?
+  SETTINGS_SAVE: Ayarları kaydet
+  SETTINGS_EXIT_WITHOUT_SAVING: Kaydetmeden çık
+  SETTINGS_CONTINUE_EDITING: Düzenlemeye devam et
+  CONFIGURE: Yapılandır
+  HDD_UNAVAILABLE_ERROR: '%d: Sabit disk kullanılamıyor.'
+  HDD_PFS_UNAVAILABLE_ERROR: '%d: Sabit diskin PFS desteği kullanılamıyor.'
+  POPS_LOADING_SETTINGS: POPSTARTER ayarları yükleniyor...
+  POPS_SMB_NOT_CONNECTED: SMB bağlı değil.
+  POPS_SMB_SETTINGS_NOT_FOUND: SMB POPS klasöründe POPSTARTER ayarı bulunamadı.
+  HDD_OPL_PLUS_NOT_FOUND: +OPL bölümü bulunamadı.
+  HDD_OPL_COMMON_NOT_FOUND: __common bölümü bulunamadı.
+  HDD_OPL_PARTITION_RESTART: "Seçilen OPL bölümünü uygulamak için RiptOPL'yi yeniden başlatın."
+  HDD_OPL_PARTITION_CHECKING: HDD OPL bölümü denetleniyor...
+  HDD_OPL_PARTITION_BUSY: HDD meşgul. Yükleme bitince tekrar deneyin.
+  GENERAL_SYSTEM: Genel ve sistem
+  EMBER_NOT_FOUND: ember.elf eksik
+  EMBER_BIOS_MISSING: ember.elf yanında bios.bin eksik
+  EMBER_BAD_NAME: Ember bu klasör adını kullanamaz (eğik çizgi, iki nokta veya ters eğik çizgi olamaz ve başta nokta bulunamaz).
+  EMBER_NO_DISC: Bu Ember oyun klasöründe PS1 disk imajı yok.
+  VIEW_APPS: Uygulamalar gösteriliyor
+  EMBER_DISPLAY: Ember görüntü modu
+  HINT_EMBER_DISPLAY: "Ember'ın PS1 oyunları için kullandığı çıkış modu. 240p veya 480p, başlatılan aygıtın EMBER klasöründeki settings.txt dosyasına yazılır. Varsayılan bu ayarı yeniden kaldırır; dosyada başka bir şey yoksa dosyayı da siler."
