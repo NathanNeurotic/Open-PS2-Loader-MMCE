@@ -137,8 +137,17 @@ static void ResetIopSpecial(const char *args, unsigned int arglen)
         case HDD_MODE:
             break;
         case BDM_ILK_MODE:
-            LoadOPLModule(OPL_MODULE_ID_ILINK, 0, 0, NULL);
-            LoadOPLModule(OPL_MODULE_ID_ILINKBD, 0, 0, NULL);
+            // IEEE1394_bd requires iLinkman, exactly as mx4sio_bd requires sio2man below. Do not
+            // start it if that dependency failed: an IEEE1394_bd with no manager under it never
+            // brings the block device up, and cdvdman then waits on a device that will never
+            // arrive -- a hang with nothing on screen to explain it.
+            //
+            // Every other transport already checks this. The MX4SIO case below checks it, and the
+            // menu-side loader in bdmsupport.c checks it FOR iLink (it gates IEEE1394_BD on
+            // iLinkManModLoaded). This game-side path was the only one that did not, so a
+            // post-reset iLinkman failure was silent here and loud everywhere else.
+            if (LoadOPLModule(OPL_MODULE_ID_ILINK, 0, 0, NULL) > 0)
+                LoadOPLModule(OPL_MODULE_ID_ILINKBD, 0, 0, NULL);
             break;
         case BDM_M4S_MODE:
             // mx4sio_bd requires PS2SDK's sio2man. Do not start it if that dependency failed.
