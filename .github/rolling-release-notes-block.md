@@ -77,11 +77,12 @@ writable media.
 Available on USB, MX4SIO, iLink, exFAT-ATA and MMCE. SMB and the APA internal HDD are
 POPSTARTER-only for now.
 
-**Ember display mode.** Ember can run at 240p or 480p. There is a setting for it on the
-**PS1 settings** page — leave it on *Default* and RiptOPL does not touch Ember's own
-configuration at all. Pick 240p or 480p and it writes that choice to
-`<device>:/EMBER/settings.txt` when you launch a game, on that device only. Any other lines
-already in that file are left alone.
+**Ember display mode.** Ember can run at 240p or 480p, and there is a setting for it on the
+**PS Emulation Settings** page. Ember's `settings.txt` is optional and stays that way: pick
+240p or 480p and RiptOPL writes that choice to `<device>:/EMBER/settings.txt` when you launch
+a game — creating the file if needed, on that device only. Go back to *Default* and the
+setting is removed again, along with the file if that was all it contained. Any other lines
+in that file are left alone, and *Default* never creates one.
 
 ### Ember credit and licence
 

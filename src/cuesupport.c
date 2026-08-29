@@ -244,15 +244,18 @@ void cueApplyDisplaySetting(const char *devPrefix)
     const char *want;
     int fd, len = 0, out = 0, i, lineStart;
 
-    if (gEmberDisplay == EMBER_DISPLAY_LEAVE || devPrefix == NULL)
+    if (devPrefix == NULL)
         return;
     want = (gEmberDisplay == EMBER_DISPLAY_480) ? "display:480" : "display:240";
 
     snprintf(path, sizeof(path), "%s%s%c%s", devPrefix, cueEmberFolder(), cueSep(devPrefix),
              EMBER_SETTINGS_NAME);
 
-    // Read whatever is there. An absent file is the normal first-run case, not an error.
+    // Read whatever is there. An absent file is the normal first-run case, not an error: on 240/480
+    // we create it below, and on Default there is nothing to clear and nothing to create.
     fd = open(path, O_RDONLY);
+    if (fd < 0 && gEmberDisplay == EMBER_DISPLAY_LEAVE)
+        return;
     if (fd >= 0) {
         len = read(fd, before, sizeof(before) - 1);
         close(fd);
@@ -296,13 +299,35 @@ void cueApplyDisplaySetting(const char *devPrefix)
     // this is a path that writes to the user's memory card or USB stick. If our own line does not
     // fit, leave the file completely alone: a settings.txt we mangled is worse than one we never
     // touched, and Ember runs fine without the key.
-    {
+    //
+    // On Default we append NOTHING, so `out` now holds the file with our key stripped out. That is
+    // what makes Default mean default: setting 240p and then changing back would otherwise leave
+    // display:240 on the device forever, with the menu claiming Default while Ember still ran 240p.
+    if (gEmberDisplay != EMBER_DISPLAY_LEAVE) {
         int n = snprintf(&after[out], sizeof(after) - out, "%s\n", want);
         if (n < 0 || n >= (int)sizeof(after) - out) {
             LOG("[CUE] no room for the display line in %s -- left untouched\n", path);
             return;
         }
         out += n;
+    }
+
+    // Nothing left to write. The file existed only to carry the key we just cleared, so remove it
+    // rather than leave an empty one behind -- settings.txt is optional, and Default means there
+    // should not be one. Only ever reached on Default: every other value appended a line above.
+    //
+    // This deletes a file, so it is deliberately narrow. It cannot fire while ANY other line
+    // survived the copy (a comment, a key we do not know, a key a future Ember adds) -- those all
+    // count toward `out` and are rewritten instead. len > 0 keeps us from unlinking a file that was
+    // already empty when we found it, which would be deleting something we never wrote to.
+    if (out == 0) {
+        if (len > 0) {
+            if (unlink(path) == 0)
+                LOG("[CUE] nothing left to keep in %s -- removed for Default\n", path);
+            else
+                LOG("[CUE] cannot remove %s -- Ember keeps its previous display mode\n", path);
+        }
+        return;
     }
 
     // Only touch the device when the content actually changes. This runs on every Ember launch, and
@@ -315,8 +340,30 @@ void cueApplyDisplaySetting(const char *devPrefix)
         LOG("[CUE] cannot write %s -- launching without applying the display mode\n", path);
         return;
     }
-    if (write(fd, after, out) != out)
-        LOG("[CUE] short write on %s\n", path);
+    if (write(fd, after, out) != out) {
+        close(fd);
+        // O_TRUNC already emptied the file, so a failed or short write leaves it truncated with the
+        // user's other keys and comments gone -- the one outcome this whole function exists to
+        // avoid. We still hold the original bytes in `before` (the copy loop only ever read from
+        // it), so put them back.
+        //
+        // This is best-effort, not atomic: the restore can fail too. It is worth doing anyway
+        // because the realistic cause is a full card, and the truncate above just freed at least as
+        // many bytes as we are writing back. A temp-file-and-rename would be atomic but relies on
+        // rename() behaving across mass:/mmce:, which it does not do dependably here.
+        if (len > 0) {
+            fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+            if (fd >= 0) {
+                int back = write(fd, before, len);
+                close(fd);
+                LOG("[CUE] write failed on %s -- original %s\n", path,
+                    (back == len) ? "restored" : "COULD NOT be restored");
+                return;
+            }
+        }
+        LOG("[CUE] write failed on %s\n", path);
+        return;
+    }
     close(fd);
 }
 
