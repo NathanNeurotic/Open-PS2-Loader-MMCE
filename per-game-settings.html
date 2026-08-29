@@ -29,7 +29,7 @@
     <a href="hdd.html"><span class="em">💽</span>Internal HDD (APA &amp; exFAT)</a>
     <a href="network-boot.html"><span class="em">📡</span>Network Boot (UDPBD/UDPFS)</a>
     <h4>Features</h4>
-    <a href="ps1-vcd.html"><span class="em">💿</span>PS1 Games (VCD)</a>
+    <a href="ps1-vcd.html"><span class="em">💿</span>PS1 Games</a>
     <a href="neutrino.html"><span class="em">⚛️</span>Neutrino Core</a>
     <a href="coverflow.html"><span class="em">🎴</span>Coverflow</a>
     <a href="favourites.html"><span class="em">⭐</span>Favourites</a>
@@ -303,11 +303,14 @@ will be silently ignored at launch.</p>
   </tbody>
 </table>
 
-<div class="callout info"><div class="h">i PS1 / VCD games</div>
-PS1 titles shown via the <b>L3 VCD view</b> always launch through <b>POPSTARTER.ELF</b> — never
-OPL's core and never Neutrino. The Loader Core selector is pinned to <code>Default</code> and locked
-for VCD entries, since the choice is inert — no <code>$CoreLoader</code> key is written for them. For PS1-specific settings (IGR hotkeys, multi-disc,
-cheats), see the <a href="https://nathanneurotic.github.io/POPSLoader/">POPStarter docs</a>.
+<div class="callout info"><div class="h">i PS1 games</div>
+PS1 titles shown via the <b>L3 PS1 view</b> launch through their own core — <b>POPSTARTER.ELF</b>
+for a <code>*.VCD</code> row, <b>ember.elf</b> for an Ember row. Neither uses OPL's core or
+Neutrino, so the Loader Core selector is pinned to <code>Default</code> and locked on any PS1
+entry: the choice is inert and no <code>$CoreLoader</code> key is written. For POPSTARTER-specific
+settings (IGR hotkeys, multi-disc, cheats), see the
+<a href="https://nathanneurotic.github.io/POPSLoader/">POPStarter docs</a>; for Ember, see
+<a href="ps1-vcd.html#ember">Ember — the second PS1 core</a>.
 </div>
 
 <h2 id="save-test-remove">Save Changes, Test Changes, Remove Settings</h2>

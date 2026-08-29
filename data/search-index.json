@@ -158,7 +158,7 @@
  {
   "title": "MMCE: PS1 Games (VCD)",
   "cat": "devices",
-  "text": "Place *.VCD files and POPSTARTER.ELF in POPS/ on the SD card; press L3 on the MMCE Games tab to switch to the VCD list. MMCE is also a valid BDMA source for the exFAT POPSTARTER equip.",
+  "text": "Place *.VCD files and POPSTARTER.ELF in POPS/ on the SD card; press L3 on the MMCE Games tab to switch to the PS1 list. MMCE is also a valid BDMA source for the exFAT POPSTARTER equip.",
   "url": "mmce.html#ps1-vcd"
  },
  {
@@ -254,7 +254,7 @@
  {
   "title": "PS1 games on APA/PFS",
   "cat": "devices",
-  "text": "PS1 VCD files on an APA/PFS HDD live in dedicated __.POPS, __.POPS0–__.POPS9 APA partitions. Press L3 on the HDD tab to switch to the VCD view.",
+  "text": "PS1 VCD files on an APA/PFS HDD live in dedicated __.POPS, __.POPS0–__.POPS9 APA partitions. Press L3 on the HDD tab to switch to the PS1 view.",
   "url": "hdd.html#apa-ps1"
  },
  {
@@ -272,7 +272,7 @@
  {
   "title": "PS1 games on exFAT HDD (BDMA equip)",
   "cat": "devices",
-  "text": "Put *.VCD files in the POPS/ folder on the exFAT HDD. VCD BDMA Apply on Launch (Settings → VCD Settings) ships On, so RiptOPL auto-equips the HDD (exFAT) BDMAssault modules onto the memory card before each launch. Turn it Off to set BDMA Mode → HDD (exFAT) and BDMA Source → Internal HDD by hand.",
+  "text": "Put *.VCD files in the POPS/ folder on the exFAT HDD. VCD BDMA Apply on Launch (Settings → PS Emulation Settings) ships On, so RiptOPL auto-equips the HDD (exFAT) BDMAssault modules onto the memory card before each launch. Turn it Off to set BDMA Mode → HDD (exFAT) and BDMA Source → Internal HDD by hand.",
   "url": "hdd.html#exfat-ps1"
  },
  {
@@ -344,11 +344,11 @@
  {
   "title": "PS1 Games (VCD)",
   "cat": "ps1",
-  "text": "How to play PS1 games in RiptOPL via the VCD view (L3 toggle), POPSTARTER launcher, file layout for every device, and the BDMA exFAT equip.",
+  "text": "How to play PS1 games in RiptOPL via the PS1 view (L3 toggle), POPSTARTER launcher, file layout for every device, and the BDMA exFAT equip.",
   "url": "ps1-vcd.html"
  },
  {
-  "title": "The VCD view (press L3)",
+  "title": "The PS1 view (press L3)",
   "cat": "ps1",
   "text": "Press L3 on any device page to switch between its PS2 disc list and its PS1 VCD list. It is a view toggle on the same page, not a separate tab.",
   "url": "ps1-vcd.html#vcd-view"
@@ -356,7 +356,7 @@
  {
   "title": "Locking the view — Default game view",
   "cat": "ps1",
-  "text": "Settings → Display Settings → Default game view locks every device page to discs (ISO), VCDs (VCD), or keeps both accessible via L3 (Both, the default).",
+  "text": "Settings → Interface → Default game view locks every device page to discs (ISO), VCDs (VCD), or keeps both accessible via L3 (Both, the default).",
   "url": "ps1-vcd.html#default-game-view"
  },
  {
@@ -374,7 +374,7 @@
  {
   "title": "exFAT support — the BDMA equip",
   "cat": "ps1",
-  "text": "To boot PS1 games from an exFAT drive, RiptOPL copies the correct BDMAssault modules to mc?:/POPSTARTER/. VCD BDMA Apply on Launch (Settings → VCD Settings) ships On and equips them automatically before each launch; turn it Off to use the BDMA Mode and BDMA Source pickers yourself.",
+  "text": "To boot PS1 games from an exFAT drive, RiptOPL copies the correct BDMAssault modules to mc?:/POPSTARTER/. VCD BDMA Apply on Launch (Settings → PS Emulation Settings) ships On and equips them automatically before each launch; turn it Off to use the BDMA Mode and BDMA Source pickers yourself.",
   "url": "ps1-vcd.html#bdma"
  },
  {
@@ -458,7 +458,7 @@
  {
   "title": "Coverflow",
   "cat": "themes",
-  "text": "RiptOPL's built-in default theme — a centered cover-art carousel with an alpha-faded reflection, animated scrolling, and aspect-correct cover frames in 4:3 and widescreen. Tunable live via Coverflow Settings in Display Settings.",
+  "text": "RiptOPL's built-in default theme — a centered cover-art carousel with an alpha-faded reflection, animated scrolling, and aspect-correct cover frames in 4:3 and widescreen. Tunable live via Coverflow Settings in Interface.",
   "url": "coverflow.html"
  },
  {
@@ -470,7 +470,7 @@
  {
   "title": "Coverflow Settings",
   "cat": "themes",
-  "text": "Four live options: Cover Count (3 or 5), Center Scale (None/Small/Medium/Large), Animation Speed (Off/Fast/Normal/Slow), and Dim Side Covers. The button appears in Display Settings only while a Coverflow theme is active.",
+  "text": "Four live options: Cover Count (3 or 5), Center Scale (None/Small/Medium/Large), Animation Speed (Off/Fast/Normal/Slow), and Dim Side Covers. The button appears in Interface only while a Coverflow theme is active.",
   "url": "coverflow.html#coverflow-settings"
  },
  {
@@ -770,13 +770,13 @@
  {
   "title": "Settings Reference",
   "cat": "reference",
-  "text": "Every settings menu and option in RiptOPL, grouped by screen: General Settings, Device Settings, Display Settings, Audio, Controller, OSD, Parental Lock, and Network.",
+  "text": "Every settings menu and option in RiptOPL, grouped by screen: General Settings, Device Settings, Interface, Audio, Controller, OSD, Parental Lock, and Network.",
   "url": "settings.html"
  },
  {
   "title": "General Settings",
   "cat": "reference",
-  "text": "Debug Colors, PS2 Logo, IGR Path, Default Loader Core, global Neutrino Launch Args, Neutrino Device, Neutrino Video and GSM Compatibility, Write Operations, Last Played auto-start, folder browsing, menu vibration — plus the Prefix Paths and Cache & Storage splitters. The PS1/BDMA rows moved to VCD Settings.",
+  "text": "Debug Colors, PS2 Logo, IGR Path, Default Loader Core, global Neutrino Launch Args, Neutrino Device, Neutrino Video and GSM Compatibility, Write Operations, Last Played auto-start, folder browsing, menu vibration — plus the Prefix Paths and Cache & Storage splitters. The PS1/BDMA rows moved to PS Emulation Settings.",
   "url": "settings.html#general-settings"
  },
  {
@@ -786,7 +786,7 @@
   "url": "settings.html#device-settings"
  },
  {
-  "title": "Display Settings",
+  "title": "Interface",
   "cat": "reference",
   "text": "Theme, language, cover art, Default game view (Both/ISO/VCD), widescreen, video mode, screen offset, color pickers, GameID barcode, and Coverflow Settings sub-screen.",
   "url": "settings.html#display-settings"
@@ -1028,7 +1028,7 @@
  {
   "title": "Troubleshooting: PS1 / VCD list not showing after a settings change",
   "cat": "reference",
-  "text": "Press L3 on the device page to toggle and refresh the VCD view; confirm Default game view is not locked to ISO, and that VCD files are in the POPS/ folder at the device root.",
+  "text": "Press L3 on the device page to toggle and refresh the PS1 view; confirm Default game view is not locked to ISO, and that VCD files are in the POPS/ folder at the device root.",
   "url": "troubleshooting.html#vcd-list-not-showing"
  },
  {
