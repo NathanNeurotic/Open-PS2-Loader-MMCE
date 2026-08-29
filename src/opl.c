@@ -2718,7 +2718,6 @@ static void _loadConfig()
             configGetInt(configOPL, CONFIG_OPL_DEFAULT_GAME_VIEW, &gDefaultGameView);
             if (gDefaultGameView < GAME_VIEW_BOTH || gDefaultGameView > GAME_VIEW_VCD)
                 gDefaultGameView = GAME_VIEW_BOTH;
-            gEmberDisplay = EMBER_DISPLAY_LEAVE;
             if (!configGetInt(configOPL, CONFIG_OPL_EMBER_DISPLAY, &gEmberDisplay))
                 gEmberDisplay = EMBER_DISPLAY_LEAVE;
             if (gEmberDisplay < EMBER_DISPLAY_LEAVE || gEmberDisplay > EMBER_DISPLAY_480)
@@ -4409,6 +4408,7 @@ static void setDefaults(void)
     gPopstarterDevice = POPS_DEV_DEFAULT;
     gPopstarterPath[0] = '\0';
     gPopstarterRetroGemGameID = 1;
+    gEmberDisplay = EMBER_DISPLAY_LEAVE; // write nothing to a device's EMBER/settings.txt until asked
     gBdmaSource = VCD_BDMA_SRC_USB;
     gBdmaMode = VCD_BDMA_FAT32;
     gBdmaApplyOnLaunch = 1;             // auto-equip on launch by default
