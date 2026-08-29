@@ -32,8 +32,29 @@ struct app_info_linked
     app_info_t app;
 };
 
-// forward declaration
-static item_list_t appItemList;
+// Forward declarations for the statics referenced by appItemList's initialiser. C++ has no
+// tentative definitions, so the single initialised definition lives here at the top instead of
+// at the bottom of the file (appInit is non-static and already declared in appsupport.h).
+static int appGetTextId(item_list_t *itemList);
+static int appNeedsUpdate(item_list_t *itemList);
+static int appUpdateItemList(item_list_t *itemList);
+static int appGetItemCount(item_list_t *itemList);
+static char *appGetItemName(item_list_t *itemList, int id);
+static int appGetItemNameLength(item_list_t *itemList, int id);
+static char *appGetItemStartup(item_list_t *itemList, int id);
+static void appDeleteItem(item_list_t *itemList, int id);
+static void appRenameItem(item_list_t *itemList, int id, char *newName);
+static void appLaunchItem(item_list_t *itemList, int id, config_set_t *configSet);
+static config_set_t *appGetConfig(item_list_t *itemList, int id);
+static int appGetImage(item_list_t *itemList, char *folder, int isRelative, char *value, char *suffix, GSTEXTURE *resultTex, short psm);
+static int appGetIconId(item_list_t *itemList);
+static void appCleanUp(item_list_t *itemList, int exception);
+static void appShutdown(item_list_t *itemList);
+
+static item_list_t appItemList = {
+    APP_MODE, -1, 0, MODE_FLAG_NO_COMPAT | MODE_FLAG_NO_UPDATE, MENU_MIN_INACTIVE_FRAMES, APP_MODE_UPDATE_DELAY, NULL, NULL, &appGetTextId, NULL, &appInit, &appNeedsUpdate, &appUpdateItemList,
+    &appGetItemCount, NULL, &appGetItemName, &appGetItemNameLength, &appGetItemStartup, &appDeleteItem, &appRenameItem, &appLaunchItem,
+    &appGetConfig, &appGetImage, &appCleanUp, &appShutdown, NULL, &appGetIconId};
 
 static void appFreeList(void);
 static void appFreeArtLookup(void);
@@ -389,7 +410,7 @@ static int appBuildArtLookup(void)
     if (size < 2)
         size = 2;
 
-    appArtLookupTable = malloc(size * sizeof(int));
+    appArtLookupTable = (int *)malloc(size * sizeof(int));
     if (appArtLookupTable == NULL)
         return -1;
 
@@ -502,13 +523,13 @@ static int addAppsLegacyList(struct app_info_linked **appsLinkedList)
     cur = configApps->head;
     while (cur != NULL) {
         if (*appsLinkedList == NULL) {
-            app = malloc(sizeof(struct app_info_linked));
+            app = (struct app_info_linked *)malloc(sizeof(struct app_info_linked));
             if (app != NULL) {
                 app->next = NULL;
                 *appsLinkedList = app;
             }
         } else {
-            app = malloc(sizeof(struct app_info_linked));
+            app = (struct app_info_linked *)malloc(sizeof(struct app_info_linked));
             if (app != NULL) {
                 app->next = *appsLinkedList;
                 *appsLinkedList = app;
@@ -561,13 +582,13 @@ static int appScanCallback(const char *path, config_set_t *appConfig, void *arg)
 
     if (configGetStr(appConfig, APP_CONFIG_TITLE, &title) != 0 && configGetStr(appConfig, APP_CONFIG_BOOT, &boot) != 0) {
         if (*appsLinkedList == NULL) {
-            app = malloc(sizeof(struct app_info_linked));
+            app = (struct app_info_linked *)malloc(sizeof(struct app_info_linked));
             if (app != NULL) {
                 app->next = NULL;
                 *appsLinkedList = app;
             }
         } else {
-            app = malloc(sizeof(struct app_info_linked));
+            app = (struct app_info_linked *)malloc(sizeof(struct app_info_linked));
             if (app != NULL) {
                 app->next = *appsLinkedList;
                 *appsLinkedList = app;
@@ -624,7 +645,7 @@ static int appUpdateItemList(item_list_t *itemList)
 
     // Generate apps list
     if (appItemCount > 0) {
-        appsList = malloc(appItemCount * sizeof(app_info_t));
+        appsList = (app_info_t *)malloc(appItemCount * sizeof(app_info_t));
 
         if (appsList != NULL) {
             int i;
@@ -952,8 +973,3 @@ static void appShutdown(item_list_t *itemList)
         }
     }
 }
-
-static item_list_t appItemList = {
-    APP_MODE, -1, 0, MODE_FLAG_NO_COMPAT | MODE_FLAG_NO_UPDATE, MENU_MIN_INACTIVE_FRAMES, APP_MODE_UPDATE_DELAY, NULL, NULL, &appGetTextId, NULL, &appInit, &appNeedsUpdate, &appUpdateItemList,
-    &appGetItemCount, NULL, &appGetItemName, &appGetItemNameLength, &appGetItemStartup, &appDeleteItem, &appRenameItem, &appLaunchItem,
-    &appGetConfig, &appGetImage, &appCleanUp, &appShutdown, NULL, &appGetIconId};

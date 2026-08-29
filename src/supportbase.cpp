@@ -19,9 +19,15 @@
 #define NEWLIB_PORT_AWARE
 #include <fileXio_rpc.h> // fileXioMount("iso:", ***), fileXioUmount("iso:")
 #include <io_common.h>   // FIO_MT_RDONLY
+// SDK header without C++ linkage guards (declares lseek64): wrap at the use site.
+extern "C" {
 #include <ps2sdkapi.h>   // lseek64
+}
 
+// Module header without C++ linkage guards: wrap at the use site (modules/ is not edited).
+extern "C" {
 #include "../modules/isofs/zso.h"
+}
 
 /// internal linked list used to populate the list from directory listing
 struct game_list_t
@@ -157,7 +163,7 @@ static int loadISOGameListCache(const char *path, struct game_cache_list *cache)
 
         count = size / sizeof(base_game_info_t);
         if (count > 0) {
-            games = memalign(64, count * sizeof(base_game_info_t));
+            games = (base_game_info_t *)memalign(64, count * sizeof(base_game_info_t));
             if (games != NULL) {
                 if (fread(games, sizeof(base_game_info_t), count, file) == count) {
                     LOG("loadISOGameListCache: %d games loaded.\n", count);
@@ -330,7 +336,7 @@ static int scanForISO(char *path, char type, struct game_list_t **glist, struct 
                         DIR *probe = opendir(fullpath);
                         if (probe != NULL) {
                             closedir(probe);
-                            struct game_list_t *fnode = malloc(sizeof(struct game_list_t));
+                            struct game_list_t *fnode = (struct game_list_t *)malloc(sizeof(struct game_list_t));
                             if (fnode != NULL) {
                                 base_game_info_t *fg = &fnode->gameinfo;
                                 memset(fg, 0, sizeof(base_game_info_t));
@@ -355,7 +361,7 @@ static int scanForISO(char *path, char type, struct game_list_t **glist, struct 
 
             strcpy(fullpath + base_path_len + 1, dirent->d_name);
 
-            struct game_list_t *next = malloc(sizeof(struct game_list_t));
+            struct game_list_t *next = (struct game_list_t *)malloc(sizeof(struct game_list_t));
             if (!next)
                 break; // Out of memory
 
@@ -712,7 +718,11 @@ int sbProbeISO9660(const char *path, base_game_info_t *game, u32 layer1_offset)
     return result;
 }
 
-static const struct cdvdman_settings_common cdvdman_settings_common_sample = CDVDMAN_SETTINGS_DEFAULT_COMMON;
+// C++ cannot initialise the u8 DiscID[5] member from the "DSKID" string literal inside
+// CDVDMAN_SETTINGS_DEFAULT_COMMON (a modules/ header we do not edit), so the same bytes are
+// written out explicitly. Field order per modules/iopcore/common/cdvd_config.h:
+// NumParts, media, flags, layer1_start, DiscID[5], zso_cache, fakemodule_flags, padding.
+static const struct cdvdman_settings_common cdvdman_settings_common_sample = {0x68, 0x68, 0x1234, 0x39393939, {'D', 'S', 'K', 'I', 'D'}, 16, 8, 16};
 
 int sbPrepare(base_game_info_t *game, config_set_t *configSet, int size_cdvdman, void **cdvdman_irx, int *patchindex)
 {

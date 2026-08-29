@@ -16,7 +16,10 @@
 
 #include "include/hdd.h"
 
+// Module header without C++ linkage guards: wrap at the use site (modules/ is not edited).
+extern "C" {
 #include "../modules/isofs/zso.h"
+}
 
 extern int probed_fd;
 extern u32 probed_lba;
@@ -28,7 +31,7 @@ extern unsigned int size_icon_icn;
 
 static int mcID = -1;
 
-void guiWarning(const char *text, int count);
+extern "C" void guiWarning(const char *text, int count);
 
 int getmcID(void)
 {
@@ -552,7 +555,7 @@ int fromHex(char digit)
         return -1;
 }
 
-static const char htab[16] = "0123456789ABCDEF";
+static const char htab[16] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
 char toHex(int digit)
 {
     return htab[digit & 0x0F];
@@ -704,7 +707,7 @@ int sysDeleteFolder(const char *folder)
             if ((strcmp(dirent->d_name, ".") == 0) || ((strcmp(dirent->d_name, "..") == 0)))
                 continue;
 
-            path = malloc(strlen(folder) + strlen(dirent->d_name) + 2);
+            path = (char *)malloc(strlen(folder) + strlen(dirent->d_name) + 2);
             sprintf(path, "%s/%s", folder, dirent->d_name);
 
             if (dirent->d_type == DT_DIR) {
@@ -716,12 +719,12 @@ int sysDeleteFolder(const char *folder)
             } else {
                 free(path);
                 if (start == NULL) {
-                    head = malloc(sizeof(struct DirentToDelete));
+                    head = (struct DirentToDelete *)malloc(sizeof(struct DirentToDelete));
                     if (head == NULL)
                         break;
                     start = head;
                 } else {
-                    if ((head->next = malloc(sizeof(struct DirentToDelete))) == NULL)
+                    if ((head->next = (struct DirentToDelete *)malloc(sizeof(struct DirentToDelete))) == NULL)
                         break;
 
                     head = head->next;
@@ -729,7 +732,7 @@ int sysDeleteFolder(const char *folder)
 
                 head->next = NULL;
 
-                if ((head->filename = malloc(strlen(dirent->d_name) + 1)) != NULL)
+                if ((head->filename = (char *)malloc(strlen(dirent->d_name) + 1)) != NULL)
                     strcpy(head->filename, dirent->d_name);
                 else
                     break;
@@ -744,7 +747,7 @@ int sysDeleteFolder(const char *folder)
         /* Delete the files. */
         for (head = start; head != NULL; head = start) {
             if (head->filename != NULL) {
-                if ((path = malloc(strlen(folder) + strlen(head->filename) + 2)) != NULL) {
+                if ((path = (char *)malloc(strlen(folder) + strlen(head->filename) + 2)) != NULL) {
                     sprintf(path, "%s/%s", folder, head->filename);
                     result = unlink(path);
                     if (result < 0)

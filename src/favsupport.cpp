@@ -30,8 +30,31 @@
 
 int gFAVStartMode;
 
-// Forward declaration; the initialised definition is at the bottom of this file.
-static item_list_t favItemList;
+// Forward declarations for the statics referenced by favItemList's initialiser. C++ has no
+// tentative definitions, so the single initialised definition lives here at the top instead of
+// at the bottom of this file.
+static int favGetTextId(item_list_t *itemList);
+static int favGetIconId(item_list_t *itemList);
+static void favInit(item_list_t *itemList);
+static int favNeedsUpdate(item_list_t *itemList);
+static int favUpdateItemList(item_list_t *itemList);
+static int favGetItemCount(item_list_t *itemList);
+static char *favGetItemName(item_list_t *itemList, int id);
+static int favGetItemNameLength(item_list_t *itemList, int id);
+static char *favGetItemStartup(item_list_t *itemList, int id);
+static void favDeleteItem(item_list_t *itemList, int id);
+static void favRenameItem(item_list_t *itemList, int id, char *newName);
+static void favLaunchItem(item_list_t *itemList, int id, config_set_t *configSet);
+static config_set_t *favGetConfig(item_list_t *itemList, int id);
+static int favGetImage(item_list_t *itemList, char *folder, int isRelative, char *value, char *suffix, GSTEXTURE *resultTex, short psm);
+static void favCleanUp(item_list_t *itemList, int exception);
+static void favShutdown(item_list_t *itemList);
+static int favCheckVMC(item_list_t *itemList, char *name, int createSize);
+
+static item_list_t favItemList = {
+    FAV_MODE, -1, 0, 0, MENU_MIN_INACTIVE_FRAMES, FAV_MODE_UPDATE_DELAY, NULL, NULL, &favGetTextId, NULL, &favInit, &favNeedsUpdate, &favUpdateItemList,
+    &favGetItemCount, NULL, &favGetItemName, &favGetItemNameLength, &favGetItemStartup, &favDeleteItem, &favRenameItem, &favLaunchItem,
+    &favGetConfig, &favGetImage, &favCleanUp, &favShutdown, &favCheckVMC, &favGetIconId};
 
 // In-memory, validated favourites. Rebuilt by favUpdateItemList from favourites.bin; each
 // entry's owner/id are confirmed present in the source submenu, so proxying never goes OOB.
@@ -613,7 +636,7 @@ static int favOwnerHasId(item_list_t *o, int id)
 
 static char *favGetItemName(item_list_t *itemList, int id)
 {
-    return favValidIndex(id) ? favArray[id].text : "";
+    return favValidIndex(id) ? favArray[id].text : (char *)"";
 }
 
 static int favGetItemNameLength(item_list_t *itemList, int id)
@@ -971,8 +994,3 @@ item_list_t *favGetObject(int initOnly)
         return NULL;
     return &favItemList;
 }
-
-static item_list_t favItemList = {
-    FAV_MODE, -1, 0, 0, MENU_MIN_INACTIVE_FRAMES, FAV_MODE_UPDATE_DELAY, NULL, NULL, &favGetTextId, NULL, &favInit, &favNeedsUpdate, &favUpdateItemList,
-    &favGetItemCount, NULL, &favGetItemName, &favGetItemNameLength, &favGetItemStartup, &favDeleteItem, &favRenameItem, &favLaunchItem,
-    &favGetConfig, &favGetImage, &favCleanUp, &favShutdown, &favCheckVMC, &favGetIconId};

@@ -227,7 +227,7 @@ void ioInit(void)
     gIOThread.attr = 0;
     gIOThread.stack_size = THREAD_STACK_SIZE;
     gIOThread.gp_reg = &_gp;
-    gIOThread.func = &ioWorkerThread;
+    gIOThread.func = (void *)&ioWorkerThread;
     gIOThread.stack = thread_stack;
     // BELOW the GUI/pad thread (31), not above it.
     //

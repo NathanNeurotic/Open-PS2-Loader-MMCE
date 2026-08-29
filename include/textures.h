@@ -1,6 +1,10 @@
 #ifndef __TEXTURES_H
 #define __TEXTURES_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 enum INTERNAL_TEXTURE {
     LOAD0_ICON = 0,
     LOAD1_ICON,
@@ -158,5 +162,9 @@ extern int gTexLastMissOpenMs;
 void texDebugWorstOpen(int *ms, int *pending, int *wasMiss, int *menu, int *bgm);
 void texSetLoadAbortFlag(volatile int *abortRequested);
 void texFree(GSTEXTURE *texture);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

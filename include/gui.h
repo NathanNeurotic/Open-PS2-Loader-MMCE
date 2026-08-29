@@ -1,6 +1,10 @@
 #ifndef __GUI_H
 #define __GUI_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "include/iosupport.h"
 #include "include/opl.h"
 #include "include/texcache.h"
@@ -220,5 +224,9 @@ int guiConfirmVideoMode(void);
 int guiGameShowRemoveSettings(config_set_t *configSet, config_set_t *configGame);
 
 void guiManageCheats(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

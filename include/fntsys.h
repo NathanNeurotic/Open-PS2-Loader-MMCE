@@ -1,6 +1,10 @@
 #ifndef __FNTSYS_H
 #define __FNTSYS_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /// default (built-in) font id
 #define FNT_DEFAULT (0)
 /// Value returned on errors
@@ -40,5 +44,9 @@ void fntFitString(int id, char *string, size_t width);
 /** Calculates the width of the given text string
  * We can't use the height for alignment, as the horizontal center would depends of the contained text itself */
 int fntCalcDimensions(int id, const char *str);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

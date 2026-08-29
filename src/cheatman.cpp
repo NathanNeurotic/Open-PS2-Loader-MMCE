@@ -399,7 +399,7 @@ static inline char *read_text_file(const char *filename, int maxsize)
         return NULL;
     }
 
-    buf = malloc(filesize + 1);
+    buf = (char *)malloc(filesize + 1);
     if (buf == NULL) {
         LOG("%s: Unable to allocate %i bytes\n", __FUNCTION__, filesize + 1);
         close(fd);

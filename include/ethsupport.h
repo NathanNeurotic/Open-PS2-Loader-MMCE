@@ -1,6 +1,10 @@
 #ifndef __ETH_SUPPORT_H
 #define __ETH_SUPPORT_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "include/iosupport.h"
 
 #define ETH_MODE_UPDATE_DELAY 300
@@ -32,5 +36,9 @@ item_list_t *ethGetObject(int initOnly);
 // is showing VCDs. Read-only; never changes the visible ETH list or L3 view.
 int ethResolveIsoFavourite(int id, const char *name, int *outId);
 const char *ethGetSMBPrefix(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

@@ -1,6 +1,10 @@
 #ifndef __FAVSUPPORT_H
 #define __FAVSUPPORT_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "include/iosupport.h"
 
 #define FAV_MODE_UPDATE_DELAY 240
@@ -42,5 +46,9 @@ void favRemoveByIndex(int favIndex);
 
 // Cheap/idempotent: clears the FAV list + schedules its single deferred rebuild.
 void loadFavourites(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
