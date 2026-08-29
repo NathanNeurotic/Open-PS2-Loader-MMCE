@@ -227,3 +227,93 @@ translations:
   "HINT_DEFAULT_CORE": "當各遊戲的 Loader Core 設為 Default 時，套用的全域預設核心。<OPL> 為原生核心；Neutrino 會串接外部的 neutrino.elf。各遊戲的個別選擇一律優先於此設定。"
   "VCD_SETTINGS": "VCD 設定"
   "FINANCIAL_SUPPORT": "財務支持"
+  ADVANCED_ARGUMENTS: 進階參數
+  ADVANCED_SETTINGS: 進階
+  ARTWORK_SETTINGS: 封面設定
+  BDMA_SETTINGS: BDMA 設定
+  COLORS_SETTINGS: 色彩
+  COMM_SETTINGS: 通訊設定
+  CONTROLLER_EMULATION: 手把模擬
+  CONTROLLER_MACROS: 手把巨集
+  DISPLAY_SETTINGS: 顯示
+  GAME_LAUNCHING: 遊戲啟動
+  GAME_LIST_SETTINGS: 遊戲清單設定
+  GAME_SOURCES: 遊戲來源
+  HINT_POPSTARTER_RETROGEM_GAMEID: 啟動 PS1 VCD 時顯示供 Pixel FX / RetroGEM / PS2Digital 使用的光學條碼
+  HINT_POPS_IMPORT: 從已連線 SMB 分享的 POPS 目錄讀取 POPSTARTER 的 IPCONFIG.DAT 與 SMBCONFIG.DAT。在你按下確定之前不會寫入任何內容。
+  HINT_POPS_PORT: 伺服器上的 SMB 連接埠 -- 預設為 445。一般分享保持 0 (或 445) 即可；較舊的 SMB1 伺服器請使用 139。
+  HINT_VCD_SHOW_PP_POPS: 僅限 HDD -- 將名為 PP.<ID>.POPS.<name> (例如 PP.SCES-01492.POPS.MEDIEVIL) 的單一遊戲分割區列為 PS1 遊戲。只影響清單，啟動方式不變。其他 PP.* 分割區 (應用程式、PS2 遊戲) 仍然隱藏。
+  INTERFACE_SETTINGS: 介面
+  MENU_NETWORK: 網路
+  NEUTRINO_DEFAULTS: Neutrino 預設值
+  OSD_DEFAULTS: OSD 預設值
+  PATH_PREFIXES: 路徑前綴
+  PATH_SETTINGS: 路徑設定
+  POPSTARTER: PS 模擬設定
+  POPSTARTER_RETROGEM_GAMEID: RetroGEM 遊戲 ID
+  POPSTARTER_NETWORK_SETTINGS: POPSTARTER 網路設定
+  GAMEID_MODE_ALL: 開啟 (全部)
+  GAMEID_MODE_POPSTARTER: 開啟 (僅 POPSTARTER)
+  GAMEID_MODE_PS2: 開啟 (僅 PS2)
+  GAMEID_MODE_OFF: 關閉
+  POPS_IMPORT: 從 SMB 的 POPS 目錄匯入
+  POPS_NONE_DETECTED: 找不到現有的 POPStarter SMB 設定。請先輸入正確的網路設定，再建立設定。
+  POPS_SMB_SECTION: POPStarter SMB 網路
+  SECURITY_SETTINGS: 安全性
+  STORAGE_CACHE: 儲存與快取
+  TOOLS: 工具
+  VCD_SHOW_PP_POPS: 顯示 PP.<ID>.POPS 分割區的遊戲 (HDD)
+  VCD_USB_MODE_HINT: 非 exFAT 的 USB 隨身碟建議使用 fat32。
+  VCD_USB_MODE_QUESTION: USB 模式是 fat32 還是 exFAT？
+  VCD_USB_MODE_TITLE: USB VCD 模式
+  MENU_CONTROLLER: 手把
+  MENU_AUDIO: 音效
+  MMCE_GAMEID_UNSETTLED: MMCE 記憶卡切換未確認 -- 仍然啟動
+  NEUTRINO_SMB_FALLBACK: Neutrino 不支援 SMB 遊戲 -- 改用 OPL 核心啟動。
+  NEUTRINO_VMC_HDD_UNSUPPORTED: Neutrino 無法在 APA 硬碟上使用 VMC (不支援 pfs) -- 將不使用 VMC 啟動。
+  POPS_LOADED_FROM: 已從 %s 載入
+  POPSTARTER_NET_INVALID: POPSTARTER 的網路設定無效。請在 POPSTARTER 網路設定中修正。
+  POPSTARTER_SMB_NEEDS_STATIC: POPSTARTER 的 SMB 需要靜態網路設定。請先完成 POPSTARTER 網路設定。
+  POPS_OVERWRITE_TITLE: 取代 POPSTARTER 設定？
+  POPS_OVERWRITE_MSG: POPSTARTER 網路設定已存在。要用這些設定取代它嗎？
+  POPS_KEEP_EXISTING: 保留現有
+  POPS_REPLACE: 取代
+  GSM_1080P_WARNING: 警告 -- 強制 1080p 屬於實驗性功能且未經驗證。可能沒有畫面，在某些硬體上還會造成主機負擔。請自行承擔風險。
+  GSM_1080P_PROCEED: 要為這款遊戲強制 1080p 嗎？
+  GSM_1080P_SURE: 確定嗎？將對這款遊戲套用實驗性的 1080p 模式。
+  CUSTOM_SETTINGS_PATH: 自訂設定路徑
+  HINT_CUSTOM_SETTINGS_PATH: 將設定儲存到你指定的目錄，例如 mass0:/OPL。留空則使用 OPL 啟動所在的目錄。裝置會在需要時載入，因此輸入時不必已經掛載。
+  PERGAME_MIXED_SETTINGS: 單一遊戲 + 全域
+  GSM_DEFAULTS: GSM 預設值 (所有遊戲)
+  ERR_DEVICE_BUSY_TIMEOUT: 裝置忙碌：設定寫入根本沒有開始。請在載入完成後重試。
+  BDMA_EQUIPPING: 正在記憶卡上準備 PS1 驅動程式...
+  VCD_USB_BDMA: USB BDMA 驅動程式
+  HINT_VCD_USB_BDMA: 僅影響從 USB 隨身碟啟動 PS1 (VCD)。PS2 無法偵測隨身碟是 fat32 還是 exFAT，因此必須指定 POPSTARTER 的驅動程式。選擇 詢問 時每次啟動都會發問；選擇 exFAT 或 fat32 則固定答案並略過詢問。
+  VCD_USB_BDMA_ASK: 詢問
+  SETTINGS_HDD_FALLBACK: HDD 設定使用了安全的備用位置：%s
+  HDD_BACKEND_RECONCILED: 內建硬碟的 APA 與 exFAT 同時啟用 -- 已自動關閉其中之一 (請查看裝置設定)。
+  SETTINGS_SAVE_PROMPT: 儲存設定？
+  SETTINGS_SAVE_PROMPT_LINE1: 你的變更目前已生效。
+  SETTINGS_SAVE_PROMPT_LINE2: 要儲存以供日後啟動使用嗎？
+  SETTINGS_SAVE: 儲存設定
+  SETTINGS_EXIT_WITHOUT_SAVING: 不儲存並離開
+  SETTINGS_CONTINUE_EDITING: 繼續編輯
+  CONFIGURE: 設定
+  HDD_UNAVAILABLE_ERROR: '%d：硬碟無法使用。'
+  HDD_PFS_UNAVAILABLE_ERROR: '%d：硬碟的 PFS 支援無法使用。'
+  POPS_LOADING_SETTINGS: 正在載入 POPSTARTER 設定...
+  POPS_SMB_NOT_CONNECTED: SMB 未連線。
+  POPS_SMB_SETTINGS_NOT_FOUND: 在 SMB 的 POPS 目錄中找不到 POPSTARTER 設定。
+  HDD_OPL_PLUS_NOT_FOUND: 找不到 +OPL 分割區。
+  HDD_OPL_COMMON_NOT_FOUND: 找不到 __common 分割區。
+  HDD_OPL_PARTITION_RESTART: 請重新啟動 RiptOPL 以套用所選的 OPL 分割區。
+  HDD_OPL_PARTITION_CHECKING: 正在檢查硬碟的 OPL 分割區...
+  HDD_OPL_PARTITION_BUSY: 硬碟忙碌中。請在載入完成後重試。
+  GENERAL_SYSTEM: 一般與系統
+  EMBER_NOT_FOUND: 缺少 ember.elf
+  EMBER_BIOS_MISSING: ember.elf 旁邊缺少 bios.bin
+  EMBER_BAD_NAME: Ember 無法使用這個資料夾名稱 (不能有斜線、冒號或反斜線，開頭也不能有點)。
+  EMBER_NO_DISC: 這個 Ember 遊戲資料夾中沒有 PS1 光碟映像。
+  VIEW_APPS: 正在顯示應用程式
+  EMBER_DISPLAY: Ember 顯示模式
+  HINT_EMBER_DISPLAY: Ember 用於 PS1 遊戲的輸出模式。選擇 240p 或 480p 會寫入所啟動裝置 EMBER 目錄下的 settings.txt。預設會再次移除該設定；若檔案中沒有其他內容，檔案也會一併刪除。

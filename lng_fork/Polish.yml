@@ -227,3 +227,93 @@ translations:
   "HINT_DEFAULT_CORE": "Globalny domyślny rdzeń dla gier, których rdzeń ładujący na grę ustawiono na Domyślny. <OPL> to rdzeń natywny; Neutrino łączy zewnętrzny neutrino.elf. Wybór na grę zawsze to nadpisuje."
   "VCD_SETTINGS": "Ustawienia VCD"
   "FINANCIAL_SUPPORT": "Wsparcie finansowe"
+  ADVANCED_ARGUMENTS: Argumenty zaawansowane
+  ADVANCED_SETTINGS: Zaawansowane
+  ARTWORK_SETTINGS: Ustawienia okładek
+  BDMA_SETTINGS: Ustawienia BDMA
+  COLORS_SETTINGS: Kolory
+  COMM_SETTINGS: Ustawienia komunikacji
+  CONTROLLER_EMULATION: Emulacja kontrolera
+  CONTROLLER_MACROS: Makra kontrolera
+  DISPLAY_SETTINGS: Obraz
+  GAME_LAUNCHING: Uruchamianie gier
+  GAME_LIST_SETTINGS: Ustawienia listy gier
+  GAME_SOURCES: Źródła gier
+  HINT_POPSTARTER_RETROGEM_GAMEID: Wyświetla optyczny kod kreskowy dla Pixel FX / RetroGEM / PS2Digital przy uruchamianiu VCD PS1
+  HINT_POPS_IMPORT: Odczytuje pliki IPCONFIG.DAT i SMBCONFIG.DAT POPSTARTER-a z katalogu POPS podłączonego udziału SMB. Nic nie zostanie zapisane, dopóki nie potwierdzisz przyciskiem OK.
+  HINT_POPS_PORT: Port SMB na serwerze -- 445 jest domyślny. Zostaw 0 (lub 445) dla zwykłego udziału; użyj 139 dla starszych serwerów SMB1.
+  HINT_VCD_SHOW_PP_POPS: Tylko HDD -- pokazuje jako gry PS1 partycje z pojedynczą grą o nazwie PP.<ID>.POPS.<name> (np. PP.SCES-01492.POPS.MEDIEVIL). Tylko wykaz; uruchamianie bez zmian. Pozostałe partycje PP.* (aplikacje, gry PS2) pozostają ukryte.
+  INTERFACE_SETTINGS: Interfejs
+  MENU_NETWORK: Sieć
+  NEUTRINO_DEFAULTS: Domyślne ustawienia Neutrino
+  OSD_DEFAULTS: Domyślne ustawienia OSD
+  PATH_PREFIXES: Prefiksy ścieżek
+  PATH_SETTINGS: Ustawienia ścieżek
+  POPSTARTER: Ustawienia emulacji PS
+  POPSTARTER_RETROGEM_GAMEID: Game ID RetroGEM
+  POPSTARTER_NETWORK_SETTINGS: Ustawienia sieciowe POPSTARTER
+  GAMEID_MODE_ALL: Wł. (wszystkie)
+  GAMEID_MODE_POPSTARTER: Wł. (tylko POPSTARTER)
+  GAMEID_MODE_PS2: Wł. (tylko PS2)
+  GAMEID_MODE_OFF: Wył.
+  POPS_IMPORT: Importuj z katalogu POPS przez SMB
+  POPS_NONE_DETECTED: Nie wykryto istniejącej konfiguracji SMB POPStarter-a. Wprowadź poprawne ustawienia sieciowe, zanim ją utworzysz.
+  POPS_SMB_SECTION: Sieć SMB POPStarter
+  SECURITY_SETTINGS: Bezpieczeństwo
+  STORAGE_CACHE: Pamięć i bufor
+  TOOLS: Narzędzia
+  VCD_SHOW_PP_POPS: Pokaż gry z partycji PP.<ID>.POPS (HDD)
+  VCD_USB_MODE_HINT: "fat32 jest zalecany dla pendrive'ów bez exFAT."
+  VCD_USB_MODE_QUESTION: Tryb USB fat32 czy exFAT?
+  VCD_USB_MODE_TITLE: Tryb VCD przez USB
+  MENU_CONTROLLER: Kontroler
+  MENU_AUDIO: Dźwięk
+  MMCE_GAMEID_UNSETTLED: Zmiana karty MMCE niepotwierdzona -- uruchamianie mimo to
+  NEUTRINO_SMB_FALLBACK: Gry przez SMB nie są obsługiwane przez Neutrino -- uruchamianie z rdzeniem OPL.
+  NEUTRINO_VMC_HDD_UNSUPPORTED: Neutrino nie może użyć VMC na dysku APA (brak obsługi pfs) -- uruchamianie bez niego.
+  POPS_LOADED_FROM: Wczytano z %s
+  POPSTARTER_NET_INVALID: Konfiguracja sieciowa POPSTARTER-a jest nieprawidłowa. Popraw ją w ustawieniach sieciowych POPSTARTER.
+  POPSTARTER_SMB_NEEDS_STATIC: SMB w POPSTARTER wymaga statycznej konfiguracji sieci. Najpierw skonfiguruj ustawienia sieciowe POPSTARTER.
+  POPS_OVERWRITE_TITLE: Zastąpić konfigurację POPSTARTER?
+  POPS_OVERWRITE_MSG: Konfiguracja sieciowa POPSTARTER już istnieje. Zastąpić ją tymi ustawieniami?
+  POPS_KEEP_EXISTING: Zachowaj istniejącą
+  POPS_REPLACE: Zastąp
+  GSM_1080P_WARNING: UWAGA -- wymuszanie 1080p jest eksperymentalne i niesprawdzone. Może nie dać obrazu lub, na niektórym sprzęcie, obciążyć konsolę. Kontynuujesz na własne ryzyko.
+  GSM_1080P_PROCEED: Wymusić 1080p dla tej gry?
+  GSM_1080P_SURE: Na pewno? Do tej gry zostanie zastosowany eksperymentalny tryb 1080p.
+  CUSTOM_SETTINGS_PATH: Własna ścieżka ustawień
+  HINT_CUSTOM_SETTINGS_PATH: Zapisuje ustawienia w wybranym katalogu, np. mass0:/OPL. Zostaw puste, aby użyć katalogu, z którego uruchomiono OPL. Urządzenie jest ładowane na żądanie, więc nie musi być zamontowane podczas wpisywania.
+  PERGAME_MIXED_SETTINGS: Na grę + globalne
+  GSM_DEFAULTS: Domyślne ustawienia GSM (wszystkie gry)
+  ERR_DEVICE_BUSY_TIMEOUT: 'Urządzenie zajęte: zapis ustawień w ogóle się nie rozpoczął. Spróbuj ponownie po zakończeniu wczytywania.'
+  BDMA_EQUIPPING: Przygotowywanie sterownika PS1 na karcie pamięci...
+  VCD_USB_BDMA: Sterownik BDMA dla USB
+  HINT_VCD_USB_BDMA: "Dotyczy tylko uruchamiania gier PS1 (VCD) z pendrive'a. PS2 nie potrafi wykryć, czy pendrive to fat32 czy exFAT, więc sterownik POPSTARTER-a trzeba wskazać. Przy opcji Pytaj pytanie pojawia się za każdym uruchomieniem, natomiast exFAT lub fat32 ustalają odpowiedź i pomijają pytanie."
+  VCD_USB_BDMA_ASK: Pytaj
+  SETTINGS_HDD_FALLBACK: 'Ustawienia HDD użyły bezpiecznej lokalizacji zapasowej: %s'
+  HDD_BACKEND_RECONCILED: Wewnętrzny dysk APA i exFAT były włączone jednocześnie -- jeden został automatycznie wyłączony (sprawdź Ustawienia urządzeń).
+  SETTINGS_SAVE_PROMPT: ZAPISAĆ USTAWIENIA?
+  SETTINGS_SAVE_PROMPT_LINE1: Twoje zmiany są w tej chwili aktywne.
+  SETTINGS_SAVE_PROMPT_LINE2: Czy zapisać je na przyszłe uruchomienia?
+  SETTINGS_SAVE: Zapisz ustawienia
+  SETTINGS_EXIT_WITHOUT_SAVING: Wyjdź bez zapisywania
+  SETTINGS_CONTINUE_EDITING: Kontynuuj edycję
+  CONFIGURE: Konfiguruj
+  HDD_UNAVAILABLE_ERROR: '%d: dysk twardy niedostępny.'
+  HDD_PFS_UNAVAILABLE_ERROR: '%d: obsługa PFS dysku twardego niedostępna.'
+  POPS_LOADING_SETTINGS: Wczytywanie ustawień POPSTARTER...
+  POPS_SMB_NOT_CONNECTED: SMB nie jest połączone.
+  POPS_SMB_SETTINGS_NOT_FOUND: Nie znaleziono ustawień POPSTARTER w katalogu POPS przez SMB.
+  HDD_OPL_PLUS_NOT_FOUND: Nie znaleziono partycji +OPL.
+  HDD_OPL_COMMON_NOT_FOUND: Nie znaleziono partycji __common.
+  HDD_OPL_PARTITION_RESTART: Uruchom ponownie RiptOPL, aby zastosować wybraną partycję OPL.
+  HDD_OPL_PARTITION_CHECKING: Sprawdzanie partycji OPL na dysku...
+  HDD_OPL_PARTITION_BUSY: Dysk jest zajęty. Spróbuj ponownie po zakończeniu wczytywania.
+  GENERAL_SYSTEM: Ogólne i system
+  EMBER_NOT_FOUND: Brak pliku ember.elf
+  EMBER_BIOS_MISSING: Brak pliku bios.bin obok ember.elf
+  EMBER_BAD_NAME: Ember nie może użyć tej nazwy katalogu (bez ukośnika, dwukropka ani odwrotnego ukośnika i bez kropek na początku).
+  EMBER_NO_DISC: Brak obrazu płyty PS1 w tym katalogu gry Ember.
+  VIEW_APPS: Wyświetlanie aplikacji
+  EMBER_DISPLAY: Tryb obrazu Ember
+  HINT_EMBER_DISPLAY: Tryb wyjścia używany przez Ember dla gier PS1. 240p lub 480p zostaje zapisane w pliku settings.txt w katalogu EMBER uruchamianego urządzenia. Domyślnie usuwa to ustawienie, a także sam plik, jeśli nie zawierał nic więcej.

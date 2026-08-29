@@ -227,3 +227,93 @@ translations:
   "HINT_DEFAULT_CORE": "النواة الافتراضية العامة للألعاب التي تكون فيها نواة المُحمِّل (Loader Core) لكل لعبة مضبوطة على الافتراضي. <OPL> هي النواة الأصلية؛ وتقوم Neutrino بتسلسل neutrino.elf الخارجي. يتجاوز اختيار كل لعبة هذا الخيار دائماً."
   "VCD_SETTINGS": "إعدادات VCD"
   "FINANCIAL_SUPPORT": "الدعم المالي"
+  ADVANCED_ARGUMENTS: وسائط متقدمة
+  ADVANCED_SETTINGS: متقدم
+  ARTWORK_SETTINGS: إعدادات الأغلفة
+  BDMA_SETTINGS: إعدادات BDMA
+  COLORS_SETTINGS: الألوان
+  COMM_SETTINGS: إعدادات الاتصال
+  CONTROLLER_EMULATION: محاكاة وحدة التحكم
+  CONTROLLER_MACROS: وحدات ماكرو لوحدة التحكم
+  DISPLAY_SETTINGS: العرض
+  GAME_LAUNCHING: تشغيل الألعاب
+  GAME_LIST_SETTINGS: إعدادات قائمة الألعاب
+  GAME_SOURCES: مصادر الألعاب
+  HINT_POPSTARTER_RETROGEM_GAMEID: يعرض رمزًا شريطيًا بصريًا لأجهزة Pixel FX / RetroGEM / PS2Digital عند تشغيل VCD الخاص بـ PS1
+  HINT_POPS_IMPORT: يقرأ ملفي IPCONFIG.DAT و SMBCONFIG.DAT الخاصين بـ POPSTARTER من مجلد POPS في مشاركة SMB المتصلة. لا يُكتب أي شيء حتى تؤكد بالضغط على موافق.
+  HINT_POPS_PORT: منفذ SMB على الخادم -- الافتراضي هو 445. اترك 0 (أو 445) للمشاركة العادية، واستخدم 139 لخوادم SMB1 القديمة.
+  HINT_VCD_SHOW_PP_POPS: لأقراص HDD فقط -- يعرض أقسام اللعبة الواحدة المسماة PP.<ID>.POPS.<name> (مثل PP.SCES-01492.POPS.MEDIEVIL) كألعاب PS1. مجرد إدراج في القائمة، وطريقة التشغيل لا تتغير. تبقى أقسام PP.* الأخرى (التطبيقات وألعاب PS2) مخفية.
+  INTERFACE_SETTINGS: الواجهة
+  MENU_NETWORK: الشبكة
+  NEUTRINO_DEFAULTS: القيم الافتراضية لـ Neutrino
+  OSD_DEFAULTS: القيم الافتراضية لـ OSD
+  PATH_PREFIXES: بادئات المسارات
+  PATH_SETTINGS: إعدادات المسارات
+  POPSTARTER: إعدادات محاكاة PS
+  POPSTARTER_RETROGEM_GAMEID: معرّف اللعبة لـ RetroGEM
+  POPSTARTER_NETWORK_SETTINGS: إعدادات شبكة POPSTARTER
+  GAMEID_MODE_ALL: تشغيل (الكل)
+  GAMEID_MODE_POPSTARTER: تشغيل (POPSTARTER فقط)
+  GAMEID_MODE_PS2: تشغيل (PS2 فقط)
+  GAMEID_MODE_OFF: إيقاف
+  POPS_IMPORT: استيراد من مجلد POPS عبر SMB
+  POPS_NONE_DETECTED: لم يُعثر على أي إعداد SMB سابق لـ POPStarter. أدخل إعدادات الشبكة الصحيحة قبل إنشاء واحد.
+  POPS_SMB_SECTION: شبكة SMB الخاصة بـ POPStarter
+  SECURITY_SETTINGS: الأمان
+  STORAGE_CACHE: التخزين والذاكرة المؤقتة
+  TOOLS: الأدوات
+  VCD_SHOW_PP_POPS: عرض ألعاب أقسام PP.<ID>.POPS ‏(HDD)
+  VCD_USB_MODE_HINT: يُنصح باستخدام fat32 لذواكر USB غير المهيأة بـ exFAT.
+  VCD_USB_MODE_QUESTION: وضع USB هو fat32 أم exFAT؟
+  VCD_USB_MODE_TITLE: وضع VCD عبر USB
+  MENU_CONTROLLER: وحدة التحكم
+  MENU_AUDIO: الصوت
+  MMCE_GAMEID_UNSETTLED: لم يتم تأكيد تبديل بطاقة MMCE -- سيتم التشغيل على أي حال
+  NEUTRINO_SMB_FALLBACK: ألعاب SMB غير مدعومة في Neutrino -- سيتم التشغيل بنواة OPL.
+  NEUTRINO_VMC_HDD_UNSUPPORTED: لا يستطيع Neutrino استخدام VMC على قرص APA (لا يوجد دعم pfs) -- سيتم التشغيل بدونه.
+  POPS_LOADED_FROM: تم التحميل من %s
+  POPSTARTER_NET_INVALID: إعداد شبكة POPSTARTER غير صالح. صحّحه في إعدادات شبكة POPSTARTER.
+  POPSTARTER_SMB_NEEDS_STATIC: يتطلب SMB في POPSTARTER إعداد شبكة ثابتًا. اضبط إعدادات شبكة POPSTARTER أولًا.
+  POPS_OVERWRITE_TITLE: هل تريد استبدال إعداد POPSTARTER؟
+  POPS_OVERWRITE_MSG: يوجد بالفعل إعداد شبكة لـ POPSTARTER. هل تريد استبداله بهذه الإعدادات؟
+  POPS_KEEP_EXISTING: الإبقاء على الحالي
+  POPS_REPLACE: استبدال
+  GSM_1080P_WARNING: تحذير -- فرض دقة 1080p تجريبي وغير مُتحقق منه. قد لا تظهر صورة على الإطلاق، وقد يُجهد الجهاز على بعض العتاد. تابع على مسؤوليتك.
+  GSM_1080P_PROCEED: هل تريد فرض 1080p لهذه اللعبة؟
+  GSM_1080P_SURE: هل أنت متأكد؟ سيُطبَّق وضع 1080p التجريبي على هذه اللعبة.
+  CUSTOM_SETTINGS_PATH: مسار مخصص للإعدادات
+  HINT_CUSTOM_SETTINGS_PATH: يحفظ الإعدادات في مجلد تختاره، مثل mass0:/OPL. اتركه فارغًا لاستخدام المجلد الذي أُقلع منه OPL. يُحمَّل الجهاز عند الحاجة، لذا لا يلزم أن يكون موصولًا أثناء الكتابة.
+  PERGAME_MIXED_SETTINGS: لكل لعبة + عام
+  GSM_DEFAULTS: القيم الافتراضية لـ GSM (كل الألعاب)
+  ERR_DEVICE_BUSY_TIMEOUT: 'الجهاز مشغول: لم تبدأ كتابة الإعدادات إطلاقًا. أعد المحاولة بعد انتهاء التحميل.'
+  BDMA_EQUIPPING: يجري تجهيز مشغّل PS1 على بطاقة الذاكرة...
+  VCD_USB_BDMA: مشغّل BDMA لـ USB
+  HINT_VCD_USB_BDMA: يخص تشغيل ألعاب PS1 ‏(VCD) من ذاكرة USB فقط. لا يستطيع PS2 تحديد ما إذا كانت الذاكرة fat32 أم exFAT، لذا يجب اختيار مشغّل POPSTARTER. مع خيار اسأل يظهر السؤال عند كل تشغيل، أما exFAT أو fat32 فيثبّتان الإجابة ويتخطيان السؤال.
+  VCD_USB_BDMA_ASK: اسأل
+  SETTINGS_HDD_FALLBACK: 'استخدمت إعدادات HDD الموقع الاحتياطي الآمن: %s'
+  HDD_BACKEND_RECONCILED: كان قرصا APA و exFAT الداخليان مفعّلين معًا -- تم تعطيل أحدهما تلقائيًا (راجع إعدادات الأجهزة).
+  SETTINGS_SAVE_PROMPT: هل تريد حفظ الإعدادات؟
+  SETTINGS_SAVE_PROMPT_LINE1: تغييراتك مفعّلة في الوقت الحالي.
+  SETTINGS_SAVE_PROMPT_LINE2: هل تريد حفظها لعمليات التشغيل القادمة؟
+  SETTINGS_SAVE: حفظ الإعدادات
+  SETTINGS_EXIT_WITHOUT_SAVING: الخروج دون حفظ
+  SETTINGS_CONTINUE_EDITING: متابعة التحرير
+  CONFIGURE: تهيئة
+  HDD_UNAVAILABLE_ERROR: '%d: القرص الصلب غير متاح.'
+  HDD_PFS_UNAVAILABLE_ERROR: '%d: دعم PFS للقرص الصلب غير متاح.'
+  POPS_LOADING_SETTINGS: يجري تحميل إعدادات POPSTARTER...
+  POPS_SMB_NOT_CONNECTED: ‏SMB غير متصل.
+  POPS_SMB_SETTINGS_NOT_FOUND: لم يُعثر على إعدادات POPSTARTER في مجلد POPS عبر SMB.
+  HDD_OPL_PLUS_NOT_FOUND: لم يُعثر على القسم +OPL.
+  HDD_OPL_COMMON_NOT_FOUND: لم يُعثر على القسم __common.
+  HDD_OPL_PARTITION_RESTART: أعد تشغيل RiptOPL لتطبيق قسم OPL المحدد.
+  HDD_OPL_PARTITION_CHECKING: يجري فحص قسم OPL على القرص...
+  HDD_OPL_PARTITION_BUSY: القرص مشغول. أعد المحاولة بعد انتهاء التحميل.
+  GENERAL_SYSTEM: عام والنظام
+  EMBER_NOT_FOUND: الملف ember.elf مفقود
+  EMBER_BIOS_MISSING: الملف bios.bin مفقود بجوار ember.elf
+  EMBER_BAD_NAME: لا يستطيع Ember استخدام اسم المجلد هذا (بدون شرطة مائلة أو نقطتين أو شرطة مائلة عكسية، وبدون نقاط في البداية).
+  EMBER_NO_DISC: لا توجد نسخة قرص PS1 في مجلد لعبة Ember هذا.
+  VIEW_APPS: عرض التطبيقات
+  EMBER_DISPLAY: وضع عرض Ember
+  HINT_EMBER_DISPLAY: وضع الإخراج الذي يستخدمه Ember لألعاب PS1. تُكتب القيمة 240p أو 480p في ملف settings.txt داخل مجلد EMBER على الجهاز الذي يجري التشغيل منه. الخيار الافتراضي يزيل هذا الإعداد مجددًا، ويحذف الملف أيضًا إذا لم يكن يحتوي على شيء آخر.

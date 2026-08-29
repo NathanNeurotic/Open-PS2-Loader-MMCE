@@ -227,3 +227,93 @@ translations:
   "HINT_DEFAULT_CORE": "Global standardkärna för spel vars Loader Core per spel är inställd på Default. <OPL> är den inbyggda kärnan; Neutrino kedjar den externa neutrino.elf. Ett val per spel åsidosätter alltid detta."
   "VCD_SETTINGS": "VCD-inställningar"
   "FINANCIAL_SUPPORT": "Ekonomiskt stöd"
+  ADVANCED_ARGUMENTS: Avancerade argument
+  ADVANCED_SETTINGS: Avancerat
+  ARTWORK_SETTINGS: Omslagsinställningar
+  BDMA_SETTINGS: BDMA-inställningar
+  COLORS_SETTINGS: Färger
+  COMM_SETTINGS: Kommunikationsinställningar
+  CONTROLLER_EMULATION: Handkontrollsemulering
+  CONTROLLER_MACROS: Handkontrollsmakron
+  DISPLAY_SETTINGS: Bild
+  GAME_LAUNCHING: Spelstart
+  GAME_LIST_SETTINGS: Inställningar för spellistan
+  GAME_SOURCES: Spelkällor
+  HINT_POPSTARTER_RETROGEM_GAMEID: Visar en optisk streckkod för Pixel FX / RetroGEM / PS2Digital när ett PS1-VCD startas
+  HINT_POPS_IMPORT: Läser POPSTARTERs IPCONFIG.DAT och SMBCONFIG.DAT från POPS-mappen på den anslutna SMB-utdelningen. Inget skrivs förrän du bekräftar med OK.
+  HINT_POPS_PORT: SMB-port på servern -- 445 är standard. Lämna 0 (eller 445) för en vanlig utdelning; använd 139 för äldre SMB1-servrar.
+  HINT_VCD_SHOW_PP_POPS: Endast HDD -- listar partitioner med ett enda spel som heter PP.<ID>.POPS.<name> (t.ex. PP.SCES-01492.POPS.MEDIEVIL) som PS1-spel. Endast listningen; starten är oförändrad. Övriga PP.*-partitioner (appar, PS2-spel) förblir dolda.
+  INTERFACE_SETTINGS: Gränssnitt
+  MENU_NETWORK: Nätverk
+  NEUTRINO_DEFAULTS: Standardvärden för Neutrino
+  OSD_DEFAULTS: Standardvärden för OSD
+  PATH_PREFIXES: Sökvägsprefix
+  PATH_SETTINGS: Sökvägsinställningar
+  POPSTARTER: PS-emuleringsinställningar
+  POPSTARTER_RETROGEM_GAMEID: RetroGEM Game ID
+  POPSTARTER_NETWORK_SETTINGS: POPSTARTER-nätverksinställningar
+  GAMEID_MODE_ALL: På (alla)
+  GAMEID_MODE_POPSTARTER: På (endast POPSTARTER)
+  GAMEID_MODE_PS2: På (endast PS2)
+  GAMEID_MODE_OFF: Av
+  POPS_IMPORT: Importera från SMB POPS-mappen
+  POPS_NONE_DETECTED: Ingen befintlig POPStarter-SMB-konfiguration hittades. Ange rätt nätverksinställningar innan du skapar en.
+  POPS_SMB_SECTION: POPStarter SMB-nätverk
+  SECURITY_SETTINGS: Säkerhet
+  STORAGE_CACHE: Lagring och cache
+  TOOLS: Verktyg
+  VCD_SHOW_PP_POPS: Visa spel från PP.<ID>.POPS-partitioner (HDD)
+  VCD_USB_MODE_HINT: fat32 rekommenderas för USB-minnen som inte är exFAT.
+  VCD_USB_MODE_QUESTION: USB-läge fat32 eller exFAT?
+  VCD_USB_MODE_TITLE: USB-VCD-läge
+  MENU_CONTROLLER: Handkontroll
+  MENU_AUDIO: Ljud
+  MMCE_GAMEID_UNSETTLED: MMCE-kortbytet är inte bekräftat -- startar ändå
+  NEUTRINO_SMB_FALLBACK: SMB-spel stöds inte av Neutrino -- startar med OPL-kärnan.
+  NEUTRINO_VMC_HDD_UNSUPPORTED: Neutrino kan inte använda en VMC på en APA-HDD (inget pfs-stöd) -- startar utan.
+  POPS_LOADED_FROM: Läst in från %s
+  POPSTARTER_NET_INVALID: POPSTARTERs nätverkskonfiguration är ogiltig. Rätta den i POPSTARTER-nätverksinställningarna.
+  POPSTARTER_SMB_NEEDS_STATIC: POPSTARTERs SMB kräver en statisk nätverkskonfiguration. Ställ in POPSTARTER-nätverksinställningarna först.
+  POPS_OVERWRITE_TITLE: Ersätta POPSTARTER-konfigurationen?
+  POPS_OVERWRITE_MSG: En POPSTARTER-nätverkskonfiguration finns redan. Ersätta den med dessa inställningar?
+  POPS_KEEP_EXISTING: Behåll befintlig
+  POPS_REPLACE: Ersätt
+  GSM_1080P_WARNING: VARNING -- att tvinga 1080p är experimentellt och overifierat. Det kan hända att ingen bild visas alls, och på viss hårdvara kan det belasta konsolen. Fortsätt på egen risk.
+  GSM_1080P_PROCEED: Tvinga 1080p för det här spelet?
+  GSM_1080P_SURE: Är du säker? Det experimentella 1080p-läget tillämpas på det här spelet.
+  CUSTOM_SETTINGS_PATH: Egen sökväg för inställningar
+  HINT_CUSTOM_SETTINGS_PATH: Sparar inställningarna i en mapp du väljer, t.ex. mass0:/OPL. Lämna tomt för att använda mappen OPL startade från. Enheten läses in vid behov, så den behöver inte vara monterad när du skriver.
+  PERGAME_MIXED_SETTINGS: Per spel + globalt
+  GSM_DEFAULTS: GSM-standardvärden (alla spel)
+  ERR_DEVICE_BUSY_TIMEOUT: 'Enheten är upptagen: skrivningen av inställningarna påbörjades aldrig. Försök igen när inläsningen är klar.'
+  BDMA_EQUIPPING: Förbereder PS1-drivrutinen på minneskortet...
+  VCD_USB_BDMA: USB-BDMA-drivrutin
+  HINT_VCD_USB_BDMA: Gäller bara PS1-start (VCD) från ett USB-minne. PS2:n kan inte avgöra om ett minne är fat32 eller exFAT, så POPSTARTERs drivrutin måste väljas. Med alternativet Fråga ställs frågan vid varje start, medan exFAT eller fat32 låser svaret och hoppar över den.
+  VCD_USB_BDMA_ASK: Fråga
+  SETTINGS_HDD_FALLBACK: 'HDD-inställningarna använde den säkra reservplatsen: %s'
+  HDD_BACKEND_RECONCILED: Både APA- och exFAT-hårddisken var aktiverade -- den ena stängdes av automatiskt (se Enhetsinställningar).
+  SETTINGS_SAVE_PROMPT: SPARA INSTÄLLNINGARNA?
+  SETTINGS_SAVE_PROMPT_LINE1: Dina ändringar är aktiva just nu.
+  SETTINGS_SAVE_PROMPT_LINE2: Vill du spara dem till kommande starter?
+  SETTINGS_SAVE: Spara inställningar
+  SETTINGS_EXIT_WITHOUT_SAVING: Avsluta utan att spara
+  SETTINGS_CONTINUE_EDITING: Fortsätt redigera
+  CONFIGURE: Konfigurera
+  HDD_UNAVAILABLE_ERROR: '%d: Hårddisken är inte tillgänglig.'
+  HDD_PFS_UNAVAILABLE_ERROR: '%d: Hårddiskens PFS-stöd är inte tillgängligt.'
+  POPS_LOADING_SETTINGS: Läser in POPSTARTER-inställningar...
+  POPS_SMB_NOT_CONNECTED: SMB är inte anslutet.
+  POPS_SMB_SETTINGS_NOT_FOUND: Inga POPSTARTER-inställningar hittades i SMB-POPS-mappen.
+  HDD_OPL_PLUS_NOT_FOUND: Partitionen +OPL hittades inte.
+  HDD_OPL_COMMON_NOT_FOUND: Partitionen __common hittades inte.
+  HDD_OPL_PARTITION_RESTART: Starta om RiptOPL för att tillämpa den valda OPL-partitionen.
+  HDD_OPL_PARTITION_CHECKING: Kontrollerar OPL-partitionen på hårddisken...
+  HDD_OPL_PARTITION_BUSY: Hårddisken är upptagen. Försök igen när inläsningen är klar.
+  GENERAL_SYSTEM: Allmänt och system
+  EMBER_NOT_FOUND: ember.elf saknas
+  EMBER_BIOS_MISSING: bios.bin saknas bredvid ember.elf
+  EMBER_BAD_NAME: Ember kan inte använda det här mappnamnet (inget snedstreck, kolon eller omvänt snedstreck, och inga inledande punkter).
+  EMBER_NO_DISC: Ingen PS1-skivavbild i den här Ember-spelmappen.
+  VIEW_APPS: Visar appar
+  EMBER_DISPLAY: Ember-bildläge
+  HINT_EMBER_DISPLAY: Utmatningsläget som Ember använder för PS1-spel. 240p eller 480p skrivs till settings.txt i EMBER-mappen på enheten som startas. Standard tar bort inställningen igen, och även filen om den inte innehöll något annat.

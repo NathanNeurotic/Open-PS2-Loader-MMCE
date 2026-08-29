@@ -227,3 +227,93 @@ translations:
   "HINT_DEFAULT_CORE": "Core default global untuk game yang Loader Core per-game-nya diatur ke Default. <OPL> adalah core native; Neutrino merantai neutrino.elf eksternal. Pilihan per-game selalu menimpa pengaturan ini."
   "VCD_SETTINGS": "Pengaturan VCD"
   "FINANCIAL_SUPPORT": "Dukungan Finansial"
+  ADVANCED_ARGUMENTS: Argumen lanjutan
+  ADVANCED_SETTINGS: Lanjutan
+  ARTWORK_SETTINGS: Pengaturan sampul
+  BDMA_SETTINGS: Pengaturan BDMA
+  COLORS_SETTINGS: Warna
+  COMM_SETTINGS: Pengaturan komunikasi
+  CONTROLLER_EMULATION: Emulasi kontroler
+  CONTROLLER_MACROS: Makro kontroler
+  DISPLAY_SETTINGS: Tampilan
+  GAME_LAUNCHING: Peluncuran gim
+  GAME_LIST_SETTINGS: Pengaturan daftar gim
+  GAME_SOURCES: Sumber gim
+  HINT_POPSTARTER_RETROGEM_GAMEID: Menampilkan barcode optik untuk Pixel FX / RetroGEM / PS2Digital saat meluncurkan VCD PS1
+  HINT_POPS_IMPORT: Membaca IPCONFIG.DAT dan SMBCONFIG.DAT milik POPSTARTER dari folder POPS pada berbagi SMB yang terhubung. Tidak ada yang ditulis sampai Anda mengonfirmasi dengan OK.
+  HINT_POPS_PORT: Port SMB di server -- 445 adalah bawaannya. Biarkan 0 (atau 445) untuk berbagi biasa; gunakan 139 untuk server SMB1 lama.
+  HINT_VCD_SHOW_PP_POPS: Hanya HDD -- menampilkan partisi satu gim bernama PP.<ID>.POPS.<name> (mis. PP.SCES-01492.POPS.MEDIEVIL) sebagai gim PS1. Hanya pendaftaran; cara meluncurkan tidak berubah. Partisi PP.* lainnya (aplikasi, gim PS2) tetap tersembunyi.
+  INTERFACE_SETTINGS: Antarmuka
+  MENU_NETWORK: Jaringan
+  NEUTRINO_DEFAULTS: Bawaan Neutrino
+  OSD_DEFAULTS: Bawaan OSD
+  PATH_PREFIXES: Awalan jalur
+  PATH_SETTINGS: Pengaturan jalur
+  POPSTARTER: Pengaturan emulasi PS
+  POPSTARTER_RETROGEM_GAMEID: Game ID RetroGEM
+  POPSTARTER_NETWORK_SETTINGS: Pengaturan jaringan POPSTARTER
+  GAMEID_MODE_ALL: Aktif (semua)
+  GAMEID_MODE_POPSTARTER: Aktif (hanya POPSTARTER)
+  GAMEID_MODE_PS2: Aktif (hanya PS2)
+  GAMEID_MODE_OFF: Nonaktif
+  POPS_IMPORT: Impor dari folder POPS lewat SMB
+  POPS_NONE_DETECTED: Tidak ditemukan konfigurasi SMB POPStarter yang sudah ada. Masukkan pengaturan jaringan yang benar sebelum membuatnya.
+  POPS_SMB_SECTION: Jaringan SMB POPStarter
+  SECURITY_SETTINGS: Keamanan
+  STORAGE_CACHE: Penyimpanan dan singgahan
+  TOOLS: Peralatan
+  VCD_SHOW_PP_POPS: Tampilkan gim dari partisi PP.<ID>.POPS (HDD)
+  VCD_USB_MODE_HINT: fat32 disarankan untuk flashdisk yang bukan exFAT.
+  VCD_USB_MODE_QUESTION: Mode USB fat32 atau exFAT?
+  VCD_USB_MODE_TITLE: Mode VCD lewat USB
+  MENU_CONTROLLER: Kontroler
+  MENU_AUDIO: Audio
+  MMCE_GAMEID_UNSETTLED: Pergantian kartu MMCE belum dikonfirmasi -- tetap diluncurkan
+  NEUTRINO_SMB_FALLBACK: Gim lewat SMB tidak didukung Neutrino -- diluncurkan dengan inti OPL.
+  NEUTRINO_VMC_HDD_UNSUPPORTED: Neutrino tidak dapat memakai VMC di HDD APA (tanpa dukungan pfs) -- diluncurkan tanpa VMC.
+  POPS_LOADED_FROM: Dimuat dari %s
+  POPSTARTER_NET_INVALID: Konfigurasi jaringan POPSTARTER tidak valid. Perbaiki di pengaturan jaringan POPSTARTER.
+  POPSTARTER_SMB_NEEDS_STATIC: SMB POPSTARTER memerlukan konfigurasi jaringan statis. Atur dulu pengaturan jaringan POPSTARTER.
+  POPS_OVERWRITE_TITLE: Ganti konfigurasi POPSTARTER?
+  POPS_OVERWRITE_MSG: Konfigurasi jaringan POPSTARTER sudah ada. Ganti dengan pengaturan ini?
+  POPS_KEEP_EXISTING: Pertahankan yang ada
+  POPS_REPLACE: Ganti
+  GSM_1080P_WARNING: PERINGATAN -- memaksa 1080p bersifat eksperimental dan belum diverifikasi. Mungkin tidak ada gambar sama sekali atau, pada sebagian perangkat, membebani konsol. Lanjutkan dengan risiko Anda sendiri.
+  GSM_1080P_PROCEED: Paksa 1080p untuk gim ini?
+  GSM_1080P_SURE: Anda yakin? Mode 1080p eksperimental akan diterapkan pada gim ini.
+  CUSTOM_SETTINGS_PATH: Jalur pengaturan khusus
+  HINT_CUSTOM_SETTINGS_PATH: Menyimpan pengaturan ke folder pilihan Anda, mis. mass0:/OPL. Biarkan kosong untuk memakai folder tempat OPL dijalankan. Perangkat dimuat saat dibutuhkan, jadi tidak harus terpasang saat Anda mengetik.
+  PERGAME_MIXED_SETTINGS: Per gim + global
+  GSM_DEFAULTS: Bawaan GSM (semua gim)
+  ERR_DEVICE_BUSY_TIMEOUT: 'Perangkat sibuk: penulisan pengaturan tidak pernah dimulai. Coba lagi setelah pemuatan selesai.'
+  BDMA_EQUIPPING: Menyiapkan driver PS1 di kartu memori...
+  VCD_USB_BDMA: Driver BDMA USB
+  HINT_VCD_USB_BDMA: Hanya berlaku untuk peluncuran PS1 (VCD) dari flashdisk. PS2 tidak dapat mendeteksi apakah flashdisk itu fat32 atau exFAT, jadi driver POPSTARTER harus dipilih. Dengan pilihan Tanya, pertanyaan muncul setiap kali diluncurkan, sedangkan exFAT atau fat32 mengunci jawabannya dan melewatinya.
+  VCD_USB_BDMA_ASK: Tanya
+  SETTINGS_HDD_FALLBACK: 'Pengaturan HDD memakai lokasi cadangan yang aman: %s'
+  HDD_BACKEND_RECONCILED: HDD internal APA dan exFAT sama-sama aktif -- salah satunya dinonaktifkan otomatis (lihat Pengaturan perangkat).
+  SETTINGS_SAVE_PROMPT: SIMPAN PENGATURAN?
+  SETTINGS_SAVE_PROMPT_LINE1: Perubahan Anda sedang aktif saat ini.
+  SETTINGS_SAVE_PROMPT_LINE2: Simpan untuk peluncuran berikutnya?
+  SETTINGS_SAVE: Simpan pengaturan
+  SETTINGS_EXIT_WITHOUT_SAVING: Keluar tanpa menyimpan
+  SETTINGS_CONTINUE_EDITING: Lanjutkan menyunting
+  CONFIGURE: Konfigurasikan
+  HDD_UNAVAILABLE_ERROR: '%d: Hard disk tidak tersedia.'
+  HDD_PFS_UNAVAILABLE_ERROR: '%d: Dukungan PFS hard disk tidak tersedia.'
+  POPS_LOADING_SETTINGS: Memuat pengaturan POPSTARTER...
+  POPS_SMB_NOT_CONNECTED: SMB tidak terhubung.
+  POPS_SMB_SETTINGS_NOT_FOUND: Tidak ada pengaturan POPSTARTER di folder POPS lewat SMB.
+  HDD_OPL_PLUS_NOT_FOUND: Partisi +OPL tidak ditemukan.
+  HDD_OPL_COMMON_NOT_FOUND: Partisi __common tidak ditemukan.
+  HDD_OPL_PARTITION_RESTART: Mulai ulang RiptOPL untuk menerapkan partisi OPL yang dipilih.
+  HDD_OPL_PARTITION_CHECKING: Memeriksa partisi OPL pada HDD...
+  HDD_OPL_PARTITION_BUSY: HDD sedang sibuk. Coba lagi setelah pemuatan selesai.
+  GENERAL_SYSTEM: Umum dan sistem
+  EMBER_NOT_FOUND: ember.elf tidak ada
+  EMBER_BIOS_MISSING: bios.bin tidak ada di samping ember.elf
+  EMBER_BAD_NAME: Ember tidak dapat memakai nama folder ini (tanpa garis miring, titik dua, atau garis miring terbalik, dan tanpa titik di awal).
+  EMBER_NO_DISC: Tidak ada image cakram PS1 di folder gim Ember ini.
+  VIEW_APPS: Menampilkan aplikasi
+  EMBER_DISPLAY: Mode tampilan Ember
+  HINT_EMBER_DISPLAY: Mode keluaran yang dipakai Ember untuk gim PS1. 240p atau 480p ditulis ke settings.txt di folder EMBER pada perangkat yang diluncurkan. Bawaan menghapus pengaturan itu lagi, berikut berkasnya jika tidak berisi apa pun selain itu.

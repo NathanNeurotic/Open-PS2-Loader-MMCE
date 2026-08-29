@@ -227,3 +227,93 @@ translations:
   "HINT_DEFAULT_CORE": "针对将每个游戏的 Loader Core 设为 Default 的游戏所用的全局默认核心。<OPL> 为原生核心；Neutrino 会链式调用外部的 neutrino.elf。单个游戏的选择始终会覆盖此设置。"
   "VCD_SETTINGS": "VCD 设置"
   "FINANCIAL_SUPPORT": "资金支持"
+  ADVANCED_ARGUMENTS: 高级参数
+  ADVANCED_SETTINGS: 高级
+  ARTWORK_SETTINGS: 封面设置
+  BDMA_SETTINGS: BDMA 设置
+  COLORS_SETTINGS: 颜色
+  COMM_SETTINGS: 通信设置
+  CONTROLLER_EMULATION: 手柄模拟
+  CONTROLLER_MACROS: 手柄宏
+  DISPLAY_SETTINGS: 显示
+  GAME_LAUNCHING: 游戏启动
+  GAME_LIST_SETTINGS: 游戏列表设置
+  GAME_SOURCES: 游戏来源
+  HINT_POPSTARTER_RETROGEM_GAMEID: 启动 PS1 VCD 时显示用于 Pixel FX / RetroGEM / PS2Digital 的光学条码
+  HINT_POPS_IMPORT: 从已连接 SMB 共享的 POPS 目录读取 POPSTARTER 的 IPCONFIG.DAT 和 SMBCONFIG.DAT。在你按下确定之前不会写入任何内容。
+  HINT_POPS_PORT: 服务器上的 SMB 端口 -- 默认是 445。普通共享保持 0 (或 445) 即可；较旧的 SMB1 服务器请使用 139。
+  HINT_VCD_SHOW_PP_POPS: 仅限 HDD -- 把名为 PP.<ID>.POPS.<name> (例如 PP.SCES-01492.POPS.MEDIEVIL) 的单游戏分区列为 PS1 游戏。仅影响列表，启动方式不变。其他 PP.* 分区 (应用、PS2 游戏) 仍然隐藏。
+  INTERFACE_SETTINGS: 界面
+  MENU_NETWORK: 网络
+  NEUTRINO_DEFAULTS: Neutrino 默认值
+  OSD_DEFAULTS: OSD 默认值
+  PATH_PREFIXES: 路径前缀
+  PATH_SETTINGS: 路径设置
+  POPSTARTER: PS 模拟设置
+  POPSTARTER_RETROGEM_GAMEID: RetroGEM 游戏 ID
+  POPSTARTER_NETWORK_SETTINGS: POPSTARTER 网络设置
+  GAMEID_MODE_ALL: 开 (全部)
+  GAMEID_MODE_POPSTARTER: 开 (仅 POPSTARTER)
+  GAMEID_MODE_PS2: 开 (仅 PS2)
+  GAMEID_MODE_OFF: 关
+  POPS_IMPORT: 从 SMB 的 POPS 目录导入
+  POPS_NONE_DETECTED: 未检测到现有的 POPStarter SMB 配置。请先输入正确的网络设置，再创建配置。
+  POPS_SMB_SECTION: POPStarter SMB 网络
+  SECURITY_SETTINGS: 安全
+  STORAGE_CACHE: 存储与缓存
+  TOOLS: 工具
+  VCD_SHOW_PP_POPS: 显示 PP.<ID>.POPS 分区中的游戏 (HDD)
+  VCD_USB_MODE_HINT: 非 exFAT 的 U 盘建议使用 fat32。
+  VCD_USB_MODE_QUESTION: USB 模式是 fat32 还是 exFAT？
+  VCD_USB_MODE_TITLE: USB VCD 模式
+  MENU_CONTROLLER: 手柄
+  MENU_AUDIO: 声音
+  MMCE_GAMEID_UNSETTLED: MMCE 卡片切换未确认 -- 仍然启动
+  NEUTRINO_SMB_FALLBACK: Neutrino 不支持 SMB 游戏 -- 改用 OPL 内核启动。
+  NEUTRINO_VMC_HDD_UNSUPPORTED: Neutrino 无法在 APA 硬盘上使用 VMC (不支持 pfs) -- 将不使用 VMC 启动。
+  POPS_LOADED_FROM: 已从 %s 载入
+  POPSTARTER_NET_INVALID: POPSTARTER 的网络配置无效。请在 POPSTARTER 网络设置中修正。
+  POPSTARTER_SMB_NEEDS_STATIC: POPSTARTER 的 SMB 需要静态网络配置。请先完成 POPSTARTER 网络设置。
+  POPS_OVERWRITE_TITLE: 替换 POPSTARTER 配置？
+  POPS_OVERWRITE_MSG: POPSTARTER 网络配置已存在。要用这些设置替换它吗？
+  POPS_KEEP_EXISTING: 保留现有
+  POPS_REPLACE: 替换
+  GSM_1080P_WARNING: 警告 -- 强制 1080p 属于实验性功能且未经验证。可能没有画面，在某些硬件上还会给主机带来负担。请自行承担风险。
+  GSM_1080P_PROCEED: 要为这个游戏强制 1080p 吗？
+  GSM_1080P_SURE: 确定吗？将对这个游戏应用实验性的 1080p 模式。
+  CUSTOM_SETTINGS_PATH: 自定义设置路径
+  HINT_CUSTOM_SETTINGS_PATH: 把设置保存到你指定的目录，例如 mass0:/OPL。留空则使用 OPL 启动所在的目录。设备会按需加载，因此输入时不必已经挂载。
+  PERGAME_MIXED_SETTINGS: 单个游戏 + 全局
+  GSM_DEFAULTS: GSM 默认值 (所有游戏)
+  ERR_DEVICE_BUSY_TIMEOUT: 设备忙：设置写入根本没有开始。请在载入完成后重试。
+  BDMA_EQUIPPING: 正在记忆卡上准备 PS1 驱动...
+  VCD_USB_BDMA: USB BDMA 驱动
+  HINT_VCD_USB_BDMA: 仅影响从 U 盘启动 PS1 (VCD)。PS2 无法检测 U 盘是 fat32 还是 exFAT，因此必须指定 POPSTARTER 的驱动。选择 询问 时每次启动都会提问；选择 exFAT 或 fat32 则固定答案并跳过提问。
+  VCD_USB_BDMA_ASK: 询问
+  SETTINGS_HDD_FALLBACK: HDD 设置使用了安全的备用位置：%s
+  HDD_BACKEND_RECONCILED: 内置硬盘的 APA 与 exFAT 同时启用 -- 已自动关闭其中之一 (请查看设备设置)。
+  SETTINGS_SAVE_PROMPT: 保存设置？
+  SETTINGS_SAVE_PROMPT_LINE1: 你的更改目前已生效。
+  SETTINGS_SAVE_PROMPT_LINE2: 要保存它们以供以后启动使用吗？
+  SETTINGS_SAVE: 保存设置
+  SETTINGS_EXIT_WITHOUT_SAVING: 不保存并退出
+  SETTINGS_CONTINUE_EDITING: 继续编辑
+  CONFIGURE: 配置
+  HDD_UNAVAILABLE_ERROR: '%d：硬盘不可用。'
+  HDD_PFS_UNAVAILABLE_ERROR: '%d：硬盘的 PFS 支持不可用。'
+  POPS_LOADING_SETTINGS: 正在载入 POPSTARTER 设置...
+  POPS_SMB_NOT_CONNECTED: SMB 未连接。
+  POPS_SMB_SETTINGS_NOT_FOUND: 在 SMB 的 POPS 目录中找不到 POPSTARTER 设置。
+  HDD_OPL_PLUS_NOT_FOUND: 找不到 +OPL 分区。
+  HDD_OPL_COMMON_NOT_FOUND: 找不到 __common 分区。
+  HDD_OPL_PARTITION_RESTART: 请重启 RiptOPL 以应用所选的 OPL 分区。
+  HDD_OPL_PARTITION_CHECKING: 正在检查硬盘的 OPL 分区...
+  HDD_OPL_PARTITION_BUSY: 硬盘正忙。请在载入完成后重试。
+  GENERAL_SYSTEM: 常规与系统
+  EMBER_NOT_FOUND: 缺少 ember.elf
+  EMBER_BIOS_MISSING: ember.elf 旁边缺少 bios.bin
+  EMBER_BAD_NAME: Ember 无法使用这个文件夹名称 (不能有斜杠、冒号或反斜杠，开头也不能有点)。
+  EMBER_NO_DISC: 这个 Ember 游戏文件夹中没有 PS1 光盘镜像。
+  VIEW_APPS: 正在显示应用
+  EMBER_DISPLAY: Ember 显示模式
+  HINT_EMBER_DISPLAY: Ember 用于 PS1 游戏的输出模式。选择 240p 或 480p 会写入所启动设备 EMBER 目录下的 settings.txt。默认会再次移除该设置；若文件中没有其他内容，文件也会一并删除。

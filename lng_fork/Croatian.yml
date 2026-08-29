@@ -227,3 +227,93 @@ translations:
   "HINT_DEFAULT_CORE": "Globalno zadano jezgro za igre čije je pojedinačno Loader Core postavljeno na Default. <OPL> je izvorno jezgro; Neutrino povezuje vanjski neutrino.elf. Odabir po igri uvijek nadjačava ovo."
   "VCD_SETTINGS": "VCD postavke"
   "FINANCIAL_SUPPORT": "Financijska podrška"
+  ADVANCED_ARGUMENTS: Napredni argumenti
+  ADVANCED_SETTINGS: Napredno
+  ARTWORK_SETTINGS: Postavke omota
+  BDMA_SETTINGS: BDMA postavke
+  COLORS_SETTINGS: Boje
+  COMM_SETTINGS: Postavke komunikacije
+  CONTROLLER_EMULATION: Emulacija kontrolera
+  CONTROLLER_MACROS: Makronaredbe kontrolera
+  DISPLAY_SETTINGS: Prikaz
+  GAME_LAUNCHING: Pokretanje igara
+  GAME_LIST_SETTINGS: Postavke popisa igara
+  GAME_SOURCES: Izvori igara
+  HINT_POPSTARTER_RETROGEM_GAMEID: Prikazuje optički crtični kod za Pixel FX / RetroGEM / PS2Digital pri pokretanju PS1 VCD-a
+  HINT_POPS_IMPORT: Čita POPSTARTER-ove datoteke IPCONFIG.DAT i SMBCONFIG.DAT iz mape POPS povezanog SMB dijeljenja. Ništa se ne zapisuje dok ne potvrdiš s U redu.
+  HINT_POPS_PORT: SMB priključak na poslužitelju -- 445 je zadani. Za obično dijeljenje ostavi 0 (ili 445); za starije SMB1 poslužitelje koristi 139.
+  HINT_VCD_SHOW_PP_POPS: Samo HDD -- prikazuje kao PS1 igre particije s jednom igrom nazvane PP.<ID>.POPS.<name> (npr. PP.SCES-01492.POPS.MEDIEVIL). Samo popis; pokretanje se ne mijenja. Ostale PP.* particije (aplikacije, PS2 igre) ostaju skrivene.
+  INTERFACE_SETTINGS: Sučelje
+  MENU_NETWORK: Mreža
+  NEUTRINO_DEFAULTS: Zadane vrijednosti Neutrina
+  OSD_DEFAULTS: Zadane vrijednosti OSD-a
+  PATH_PREFIXES: Prefiksi putanja
+  PATH_SETTINGS: Postavke putanja
+  POPSTARTER: Postavke PS emulacije
+  POPSTARTER_RETROGEM_GAMEID: RetroGEM Game ID
+  POPSTARTER_NETWORK_SETTINGS: POPSTARTER mrežne postavke
+  GAMEID_MODE_ALL: Uključeno (sve)
+  GAMEID_MODE_POPSTARTER: Uključeno (samo POPSTARTER)
+  GAMEID_MODE_PS2: Uključeno (samo PS2)
+  GAMEID_MODE_OFF: Isključeno
+  POPS_IMPORT: Uvezi iz mape POPS putem SMB-a
+  POPS_NONE_DETECTED: Nije pronađena postojeća POPStarter SMB konfiguracija. Unesi ispravne mrežne postavke prije nego što je stvoriš.
+  POPS_SMB_SECTION: POPStarter SMB mreža
+  SECURITY_SETTINGS: Sigurnost
+  STORAGE_CACHE: Pohrana i predmemorija
+  TOOLS: Alati
+  VCD_SHOW_PP_POPS: Prikaži igre s particija PP.<ID>.POPS (HDD)
+  VCD_USB_MODE_HINT: fat32 se preporučuje za USB uređaje koji nisu exFAT.
+  VCD_USB_MODE_QUESTION: USB način fat32 ili exFAT?
+  VCD_USB_MODE_TITLE: USB VCD način
+  MENU_CONTROLLER: Kontroler
+  MENU_AUDIO: Zvuk
+  MMCE_GAMEID_UNSETTLED: Zamjena MMCE kartice nije potvrđena -- svejedno pokrećem
+  NEUTRINO_SMB_FALLBACK: Igre putem SMB-a nemaju podršku u Neutrinu -- pokrećem s OPL jezgrom.
+  NEUTRINO_VMC_HDD_UNSUPPORTED: Neutrino ne može koristiti VMC na APA disku (nema pfs podrške) -- pokrećem bez njega.
+  POPS_LOADED_FROM: Učitano s %s
+  POPSTARTER_NET_INVALID: POPSTARTER-ova mrežna konfiguracija nije valjana. Ispravi je u POPSTARTER mrežnim postavkama.
+  POPSTARTER_SMB_NEEDS_STATIC: POPSTARTER-ov SMB zahtijeva statičku mrežnu konfiguraciju. Prvo postavi POPSTARTER mrežne postavke.
+  POPS_OVERWRITE_TITLE: Zamijeniti POPSTARTER konfiguraciju?
+  POPS_OVERWRITE_MSG: POPSTARTER mrežna konfiguracija već postoji. Zamijeniti je ovim postavkama?
+  POPS_KEEP_EXISTING: Zadrži postojeću
+  POPS_REPLACE: Zamijeni
+  GSM_1080P_WARNING: UPOZORENJE -- prisiljavanje 1080p je eksperimentalno i neprovjereno. Slike možda uopće neće biti, a na nekom hardveru može opteretiti konzolu. Nastavljaš na vlastitu odgovornost.
+  GSM_1080P_PROCEED: Prisiliti 1080p za ovu igru?
+  GSM_1080P_SURE: Jesi li siguran? Na ovu igru primijenit će se eksperimentalni način 1080p.
+  CUSTOM_SETTINGS_PATH: Prilagođena putanja postavki
+  HINT_CUSTOM_SETTINGS_PATH: Sprema postavke u mapu po tvom izboru, npr. mass0:/OPL. Ostavi prazno za mapu iz koje se OPL pokrenuo. Uređaj se učitava po potrebi, pa ne mora biti montiran dok tipkaš.
+  PERGAME_MIXED_SETTINGS: Po igri + globalno
+  GSM_DEFAULTS: Zadane vrijednosti GSM-a (sve igre)
+  ERR_DEVICE_BUSY_TIMEOUT: 'Uređaj je zauzet: zapisivanje postavki uopće nije započelo. Pokušaj ponovno kad učitavanje završi.'
+  BDMA_EQUIPPING: Pripremam PS1 upravljački program na memorijskoj kartici...
+  VCD_USB_BDMA: USB BDMA upravljački program
+  HINT_VCD_USB_BDMA: Odnosi se samo na pokretanje PS1 (VCD) igara s USB uređaja. PS2 ne može utvrditi je li uređaj fat32 ili exFAT, pa se POPSTARTER-ov upravljački program mora odabrati. Uz opciju Pitaj pitanje se postavlja pri svakom pokretanju, dok exFAT ili fat32 fiksiraju odgovor i preskaču ga.
+  VCD_USB_BDMA_ASK: Pitaj
+  SETTINGS_HDD_FALLBACK: 'Postavke HDD-a koristile su sigurnu rezervnu lokaciju: %s'
+  HDD_BACKEND_RECONCILED: Interni APA i exFAT disk bili su istovremeno uključeni -- jedan je automatski isključen (provjeri Postavke uređaja).
+  SETTINGS_SAVE_PROMPT: SPREMITI POSTAVKE?
+  SETTINGS_SAVE_PROMPT_LINE1: Tvoje promjene trenutno su aktivne.
+  SETTINGS_SAVE_PROMPT_LINE2: Želiš li ih spremiti za buduća pokretanja?
+  SETTINGS_SAVE: Spremi postavke
+  SETTINGS_EXIT_WITHOUT_SAVING: Izađi bez spremanja
+  SETTINGS_CONTINUE_EDITING: Nastavi uređivati
+  CONFIGURE: Postavi
+  HDD_UNAVAILABLE_ERROR: '%d: Tvrdi disk nije dostupan.'
+  HDD_PFS_UNAVAILABLE_ERROR: '%d: PFS podrška tvrdog diska nije dostupna.'
+  POPS_LOADING_SETTINGS: Učitavam POPSTARTER postavke...
+  POPS_SMB_NOT_CONNECTED: SMB nije povezan.
+  POPS_SMB_SETTINGS_NOT_FOUND: U mapi POPS putem SMB-a nisu pronađene POPSTARTER postavke.
+  HDD_OPL_PLUS_NOT_FOUND: Particija +OPL nije pronađena.
+  HDD_OPL_COMMON_NOT_FOUND: Particija __common nije pronađena.
+  HDD_OPL_PARTITION_RESTART: Ponovno pokreni RiptOPL da bi se primijenila odabrana OPL particija.
+  HDD_OPL_PARTITION_CHECKING: Provjeravam OPL particiju na disku...
+  HDD_OPL_PARTITION_BUSY: Disk je zauzet. Pokušaj ponovno kad učitavanje završi.
+  GENERAL_SYSTEM: Općenito i sustav
+  EMBER_NOT_FOUND: Nedostaje ember.elf
+  EMBER_BIOS_MISSING: Nedostaje bios.bin uz ember.elf
+  EMBER_BAD_NAME: Ember ne može koristiti ovaj naziv mape (bez kose crte, dvotočke ili obrnute kose crte, i bez točaka na početku).
+  EMBER_NO_DISC: U ovoj mapi Ember igre nema slike PS1 diska.
+  VIEW_APPS: Prikazane aplikacije
+  EMBER_DISPLAY: Ember način prikaza
+  HINT_EMBER_DISPLAY: Izlazni način koji Ember koristi za PS1 igre. 240p ili 480p zapisuje se u settings.txt u mapi EMBER pokrenutog uređaja. Zadano ponovno uklanja tu postavku, kao i datoteku ako u njoj nije bilo ničega drugog.

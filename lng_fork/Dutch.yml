@@ -227,3 +227,93 @@ translations:
   "HINT_DEFAULT_CORE": "Globale standaardcore voor spellen waarvan de Loader Core per spel op Default is ingesteld. <OPL> is de native core; Neutrino koppelt de externe neutrino.elf. Een keuze per spel overschrijft dit altijd."
   "VCD_SETTINGS": "VCD-instellingen"
   "FINANCIAL_SUPPORT": "Financiële steun"
+  ADVANCED_ARGUMENTS: Geavanceerde argumenten
+  ADVANCED_SETTINGS: Geavanceerd
+  ARTWORK_SETTINGS: Hoesinstellingen
+  BDMA_SETTINGS: BDMA-instellingen
+  COLORS_SETTINGS: Kleuren
+  COMM_SETTINGS: Communicatie-instellingen
+  CONTROLLER_EMULATION: Controller-emulatie
+  CONTROLLER_MACROS: "Controllermacro's"
+  DISPLAY_SETTINGS: Beeld
+  GAME_LAUNCHING: Spellen starten
+  GAME_LIST_SETTINGS: Instellingen spellijst
+  GAME_SOURCES: Spelbronnen
+  HINT_POPSTARTER_RETROGEM_GAMEID: Toont een optische barcode voor Pixel FX / RetroGEM / PS2Digital bij het starten van een PS1-VCD
+  HINT_POPS_IMPORT: Leest IPCONFIG.DAT en SMBCONFIG.DAT van POPSTARTER uit de POPS-map van de verbonden SMB-share. Er wordt niets geschreven totdat je met OK bevestigt.
+  HINT_POPS_PORT: SMB-poort op de server -- 445 is de standaard. Laat 0 (of 445) staan voor een gewone share; gebruik 139 voor oudere SMB1-servers.
+  HINT_VCD_SHOW_PP_POPS: Alleen HDD -- toont partities met één spel, genaamd PP.<ID>.POPS.<name> (bijv. PP.SCES-01492.POPS.MEDIEVIL), als PS1-spellen. Alleen de lijst; het starten verandert niet. Andere PP.*-partities (apps, PS2-spellen) blijven verborgen.
+  INTERFACE_SETTINGS: Interface
+  MENU_NETWORK: Netwerk
+  NEUTRINO_DEFAULTS: Neutrino-standaarden
+  OSD_DEFAULTS: OSD-standaarden
+  PATH_PREFIXES: Padvoorvoegsels
+  PATH_SETTINGS: Padinstellingen
+  POPSTARTER: PS-emulatie-instellingen
+  POPSTARTER_RETROGEM_GAMEID: RetroGEM Game ID
+  POPSTARTER_NETWORK_SETTINGS: POPSTARTER-netwerkinstellingen
+  GAMEID_MODE_ALL: Aan (alle)
+  GAMEID_MODE_POPSTARTER: Aan (alleen POPSTARTER)
+  GAMEID_MODE_PS2: Aan (alleen PS2)
+  GAMEID_MODE_OFF: Uit
+  POPS_IMPORT: Importeren uit SMB-POPS-map
+  POPS_NONE_DETECTED: Er is geen bestaande POPStarter-SMB-configuratie gevonden. Voer eerst de juiste netwerkinstellingen in voordat je er een aanmaakt.
+  POPS_SMB_SECTION: POPStarter SMB-netwerk
+  SECURITY_SETTINGS: Beveiliging
+  STORAGE_CACHE: Opslag en cache
+  TOOLS: Hulpmiddelen
+  VCD_SHOW_PP_POPS: Spellen van PP.<ID>.POPS-partities tonen (HDD)
+  VCD_USB_MODE_HINT: fat32 wordt aanbevolen voor USB-sticks zonder exFAT.
+  VCD_USB_MODE_QUESTION: USB-modus fat32 of exFAT?
+  VCD_USB_MODE_TITLE: USB-VCD-modus
+  MENU_CONTROLLER: Controller
+  MENU_AUDIO: Geluid
+  MMCE_GAMEID_UNSETTLED: MMCE-kaartwissel niet bevestigd -- wordt toch gestart
+  NEUTRINO_SMB_FALLBACK: SMB-spellen worden niet ondersteund door Neutrino -- start met de OPL-kern.
+  NEUTRINO_VMC_HDD_UNSUPPORTED: Neutrino kan geen VMC op een APA-HDD gebruiken (geen pfs-ondersteuning) -- start zonder.
+  POPS_LOADED_FROM: Geladen van %s
+  POPSTARTER_NET_INVALID: De POPSTARTER-netwerkconfiguratie is ongeldig. Corrigeer deze in de POPSTARTER-netwerkinstellingen.
+  POPSTARTER_SMB_NEEDS_STATIC: POPSTARTER-SMB vereist een statische netwerkconfiguratie. Stel eerst de POPSTARTER-netwerkinstellingen in.
+  POPS_OVERWRITE_TITLE: POPSTARTER-configuratie vervangen?
+  POPS_OVERWRITE_MSG: Er bestaat al een POPSTARTER-netwerkconfiguratie. Vervangen door deze instellingen?
+  POPS_KEEP_EXISTING: Bestaande behouden
+  POPS_REPLACE: Vervangen
+  GSM_1080P_WARNING: WAARSCHUWING -- 1080p forceren is experimenteel en niet geverifieerd. Het kan geen beeld geven of, op sommige hardware, de console belasten. Doorgaan op eigen risico.
+  GSM_1080P_PROCEED: 1080p forceren voor dit spel?
+  GSM_1080P_SURE: Weet je het zeker? De experimentele 1080p-modus wordt op dit spel toegepast.
+  CUSTOM_SETTINGS_PATH: Eigen pad voor instellingen
+  HINT_CUSTOM_SETTINGS_PATH: Bewaart de instellingen in een map naar keuze, bijv. mass0:/OPL. Laat leeg om de map te gebruiken waaruit OPL is opgestart. Het apparaat wordt op aanvraag geladen, dus het hoeft niet gekoppeld te zijn terwijl je typt.
+  PERGAME_MIXED_SETTINGS: Per spel + globaal
+  GSM_DEFAULTS: GSM-standaarden (alle spellen)
+  ERR_DEVICE_BUSY_TIMEOUT: 'Apparaat bezet: het schrijven van de instellingen is nooit begonnen. Probeer het opnieuw zodra het laden klaar is.'
+  BDMA_EQUIPPING: PS1-stuurprogramma wordt voorbereid op de memory card...
+  VCD_USB_BDMA: USB-BDMA-stuurprogramma
+  HINT_VCD_USB_BDMA: Geldt alleen voor PS1-starts (VCD) vanaf een USB-stick. De PS2 kan niet detecteren of een stick fat32 of exFAT is, dus het stuurprogramma van POPSTARTER moet gekozen worden. Bij de optie Vragen verschijnt de vraag bij elke start, terwijl exFAT of fat32 het antwoord vastleggen en de vraag overslaan.
+  VCD_USB_BDMA_ASK: Vragen
+  SETTINGS_HDD_FALLBACK: 'HDD-instellingen gebruikten de veilige reservelocatie: %s'
+  HDD_BACKEND_RECONCILED: De interne APA- en exFAT-HDD stonden allebei aan -- één is automatisch uitgeschakeld (zie Apparaatinstellingen).
+  SETTINGS_SAVE_PROMPT: INSTELLINGEN OPSLAAN?
+  SETTINGS_SAVE_PROMPT_LINE1: Je wijzigingen zijn op dit moment actief.
+  SETTINGS_SAVE_PROMPT_LINE2: Wil je ze bewaren voor toekomstige starts?
+  SETTINGS_SAVE: Instellingen opslaan
+  SETTINGS_EXIT_WITHOUT_SAVING: Afsluiten zonder opslaan
+  SETTINGS_CONTINUE_EDITING: Verder bewerken
+  CONFIGURE: Configureren
+  HDD_UNAVAILABLE_ERROR: '%d: harde schijf niet beschikbaar.'
+  HDD_PFS_UNAVAILABLE_ERROR: '%d: PFS-ondersteuning van de harde schijf niet beschikbaar.'
+  POPS_LOADING_SETTINGS: POPSTARTER-instellingen worden geladen...
+  POPS_SMB_NOT_CONNECTED: SMB is niet verbonden.
+  POPS_SMB_SETTINGS_NOT_FOUND: Geen POPSTARTER-instellingen gevonden in de SMB-POPS-map.
+  HDD_OPL_PLUS_NOT_FOUND: Partitie +OPL niet gevonden.
+  HDD_OPL_COMMON_NOT_FOUND: Partitie __common niet gevonden.
+  HDD_OPL_PARTITION_RESTART: Start RiptOPL opnieuw om de gekozen OPL-partitie toe te passen.
+  HDD_OPL_PARTITION_CHECKING: HDD-OPL-partitie wordt gecontroleerd...
+  HDD_OPL_PARTITION_BUSY: De HDD is bezet. Probeer het opnieuw zodra het laden klaar is.
+  GENERAL_SYSTEM: Algemeen en systeem
+  EMBER_NOT_FOUND: ember.elf ontbreekt
+  EMBER_BIOS_MISSING: bios.bin ontbreekt naast ember.elf
+  EMBER_BAD_NAME: Ember kan deze mapnaam niet gebruiken (geen schuine streep, dubbele punt of backslash, en geen punt aan het begin).
+  EMBER_NO_DISC: Geen PS1-schijfimage in deze Ember-spelmap.
+  VIEW_APPS: Apps worden getoond
+  EMBER_DISPLAY: Ember-beeldmodus
+  HINT_EMBER_DISPLAY: Uitvoermodus die Ember voor PS1-spellen gebruikt. 240p of 480p wordt naar settings.txt in de EMBER-map van het gestarte apparaat geschreven. Standaard verwijdert die instelling weer, en ook het bestand als er verder niets in stond.

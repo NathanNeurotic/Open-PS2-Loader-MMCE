@@ -227,3 +227,93 @@ translations:
   "HINT_DEFAULT_CORE": "ゲームぐとぅぬLoader CoreぬDefaultんかいなとーるゲームぬグローバルなデフォルトコア。<OPL>ーネイティブぬコアやん。Neutrinoー外ぬneutrino.elfちなじゅん。ゲームぐとぅぬ選択ー、いちんくれー上書きすん。"
   "VCD_SETTINGS": "VCD 設定"
   "FINANCIAL_SUPPORT": "資金支援"
+  ADVANCED_ARGUMENTS: 詳しい引数
+  ADVANCED_SETTINGS: 詳しい設定
+  ARTWORK_SETTINGS: ジャケット設定
+  BDMA_SETTINGS: BDMA 設定
+  COLORS_SETTINGS: 色
+  COMM_SETTINGS: 通信設定
+  CONTROLLER_EMULATION: コントローラー模擬
+  CONTROLLER_MACROS: コントローラーマクロ
+  DISPLAY_SETTINGS: 画面
+  GAME_LAUNCHING: ゲーム起動
+  GAME_LIST_SETTINGS: ゲーム一覧設定
+  GAME_SOURCES: ゲームぬ取り所
+  HINT_POPSTARTER_RETROGEM_GAMEID: PS1 ぬ VCD 起動時に Pixel FX / RetroGEM / PS2Digital 用ぬ光学バーコード表示すん
+  HINT_POPS_IMPORT: 繋がとーん SMB 共有ぬ POPS フォルダから POPSTARTER ぬ IPCONFIG.DAT とぅ SMBCONFIG.DAT 読むん。OK で決みるまでぃ何ん書ちゅんねーらん。
+  HINT_POPS_PORT: サーバーぬ SMB ポート -- 既定や 445 やん。普通ぬ共有や 0 (または 445) ぬままにし、古さん SMB1 サーバーや 139 使い。
+  HINT_VCD_SHOW_PP_POPS: 'HDD ぬみ -- PP.<ID>.POPS.<name> (例: PP.SCES-01492.POPS.MEDIEVIL) んでぃる名前ぬ一本用パーティション PS1 ゲームとぅし一覧に出しゅん。一覧に出しゅるだきやい、起動ぬ仕方や変わらん。他ぬ PP.* パーティション (アプリ、PS2 ゲーム) や隠りたまま。'
+  INTERFACE_SETTINGS: インターフェース
+  MENU_NETWORK: ネットワーク
+  NEUTRINO_DEFAULTS: Neutrino ぬ既定値
+  OSD_DEFAULTS: OSD ぬ既定値
+  PATH_PREFIXES: パスぬ頭
+  PATH_SETTINGS: パス設定
+  POPSTARTER: PS 模擬設定
+  POPSTARTER_RETROGEM_GAMEID: RetroGEM ゲーム ID
+  POPSTARTER_NETWORK_SETTINGS: POPSTARTER ネットワーク設定
+  GAMEID_MODE_ALL: 入 (むる)
+  GAMEID_MODE_POPSTARTER: 入 (POPSTARTER だき)
+  GAMEID_MODE_PS2: 入 (PS2 だき)
+  GAMEID_MODE_OFF: 切
+  POPS_IMPORT: SMB ぬ POPS フォルダから取い込むん
+  POPS_NONE_DETECTED: 今ぬ POPStarter SMB 設定や見ぃ付からんたん。新しく作ゆる前に、正しさるネットワーク設定入りり。
+  POPS_SMB_SECTION: POPStarter SMB ネットワーク
+  SECURITY_SETTINGS: 安全
+  STORAGE_CACHE: 保存とぅキャッシュ
+  TOOLS: 道具
+  VCD_SHOW_PP_POPS: PP.<ID>.POPS パーティションぬゲーム表示 (HDD)
+  VCD_USB_MODE_HINT: exFAT やあらん USB メモリんかい fat32 勧みゆん。
+  VCD_USB_MODE_QUESTION: USB モードや fat32 やみ exFAT やみ?
+  VCD_USB_MODE_TITLE: USB VCD モード
+  MENU_CONTROLLER: コントローラー
+  MENU_AUDIO: 音
+  MMCE_GAMEID_UNSETTLED: MMCE カードぬ切り替い確かみらったんねーらん -- なまぬまま起動すん
+  NEUTRINO_SMB_FALLBACK: SMB ぬゲームや Neutrino んじ使いららん -- OPL ぬ核んじ起動すん。
+  NEUTRINO_VMC_HDD_UNSUPPORTED: Neutrino や APA HDD ぬ VMC 使いららん (pfs 非対応) -- VMC 無ーらんまま起動すん。
+  POPS_LOADED_FROM: '%s から読み込らったん'
+  POPSTARTER_NET_INVALID: POPSTARTER ぬネットワーク設定や正しこーねーらん。POPSTARTER ネットワーク設定んじ直しり。
+  POPSTARTER_SMB_NEEDS_STATIC: POPSTARTER ぬ SMB や固定ぬネットワーク設定要いん。先に POPSTARTER ネットワーク設定しり。
+  POPS_OVERWRITE_TITLE: POPSTARTER ぬ設定入り替いゆみ?
+  POPS_OVERWRITE_MSG: POPSTARTER ぬネットワーク設定やなー有ん。くぬ設定さーに入り替いゆみ?
+  POPS_KEEP_EXISTING: 今ぬまま
+  POPS_REPLACE: 入り替いゆん
+  GSM_1080P_WARNING: 用心 -- 1080p 無理やり出しゅしぇー試しぬ段階やい確かみらってぃねーらん。画面ぬ出らん事ん有い、機械によーてぃや本体んかい負担かかゆん。自分ぬ責任さーに進み。
+  GSM_1080P_PROCEED: くぬゲームんかい 1080p 無理やり出しゅみ?
+  GSM_1080P_SURE: 間違ーねーらんな? くぬゲームんかい試しぬ 1080p モード当てぃゆん。
+  CUSTOM_SETTINGS_PATH: 設定ぬ保存先指定
+  HINT_CUSTOM_SETTINGS_PATH: '好ちなフォルダんかい設定保存すん (例: mass0:/OPL)。空にしぇー OPL ぬ起動元フォルダ使ゆん。機器や要いる時に読まりーくとぅ、入力ぬ時にマウントさってぃをぅる必要やねーらん。'
+  PERGAME_MIXED_SETTINGS: ゲームぐとぅ + 全体
+  GSM_DEFAULTS: GSM ぬ既定値 (むるぬゲーム)
+  ERR_DEVICE_BUSY_TIMEOUT: '機器ぬ忙さん: 設定ぬ書ち込みぬ始まてぃねーらん。読み込み終わてぃからまた試しみそーり。'
+  BDMA_EQUIPPING: メモリーカードんかい PS1 ドライバ準備そーん...
+  VCD_USB_BDMA: USB BDMA ドライバ
+  HINT_VCD_USB_BDMA: USB メモリからぬ PS1 (VCD) 起動だきに関わゆん。PS2 や USB メモリぬ fat32 やみ exFAT やみ分からんくとぅ、POPSTARTER ぬドライバ選ばんでぃねーらん。確かみゆん 選りば毎回聞ちゅん。exFAT やか fat32 選りば答い決まてぃ、確かみや飛ばさりゆん。
+  VCD_USB_BDMA_ASK: 確かみゆん
+  SETTINGS_HDD_FALLBACK: 'HDD ぬ設定や安全な代わいぬ保存先使たん: %s'
+  HDD_BACKEND_RECONCILED: 内蔵 HDD ぬ APA とぅ exFAT ぬ両方入とーたん -- 片方や自動的に切らったん (機器設定確かみそーり)。
+  SETTINGS_SAVE_PROMPT: 設定保存すみ?
+  SETTINGS_SAVE_PROMPT_LINE1: 変わたる所や今使わってぃをぅん。
+  SETTINGS_SAVE_PROMPT_LINE2: 次から使ゆるくとぅに保存すみ?
+  SETTINGS_SAVE: 設定保存
+  SETTINGS_EXIT_WITHOUT_SAVING: 保存さんで終わゆん
+  SETTINGS_CONTINUE_EDITING: 直しぇー続きゆん
+  CONFIGURE: 設定
+  HDD_UNAVAILABLE_ERROR: '%d: ハードディスク使いららん。'
+  HDD_PFS_UNAVAILABLE_ERROR: '%d: ハードディスクぬ PFS 対応使いららん。'
+  POPS_LOADING_SETTINGS: POPSTARTER ぬ設定読み込どーん...
+  POPS_SMB_NOT_CONNECTED: SMB や繋がてぃねーらん。
+  POPS_SMB_SETTINGS_NOT_FOUND: SMB ぬ POPS フォルダんじ POPSTARTER ぬ設定見ぃ付からん。
+  HDD_OPL_PLUS_NOT_FOUND: +OPL パーティション見ぃ付からん。
+  HDD_OPL_COMMON_NOT_FOUND: __common パーティション見ぃ付からん。
+  HDD_OPL_PARTITION_RESTART: 選らったる OPL パーティション使ゆるくとぅに RiptOPL 立ち上ぎ直しり。
+  HDD_OPL_PARTITION_CHECKING: HDD ぬ OPL パーティション調びとーん...
+  HDD_OPL_PARTITION_BUSY: HDD ぬ忙さん。読み込み終わてぃからまた試しみそーり。
+  GENERAL_SYSTEM: 一般とぅシステム
+  EMBER_NOT_FOUND: ember.elf 無ーん
+  EMBER_BIOS_MISSING: ember.elf ぬ隣に bios.bin 無ーん
+  EMBER_BAD_NAME: Ember や くぬフォルダぬ名前使いららん (スラッシュ、コロン、円記号や使らんし、頭ぬ点ん使らん)。
+  EMBER_NO_DISC: くぬ Ember ぬゲームフォルダんじ PS1 ぬディスクイメージ無ーん。
+  VIEW_APPS: アプリ表示そーん
+  EMBER_DISPLAY: Ember ぬ表示モード
+  HINT_EMBER_DISPLAY: Ember ぬ PS1 ゲームんかい使ゆる出力モード。240p やか 480p 選りば、起動した機器ぬ EMBER フォルダぬ settings.txt んかい書かりゆん。既定 選りば ぬ設定や消さってぃ、他に何ん無ーらんねー ファイルまでぃ消さりゆん。

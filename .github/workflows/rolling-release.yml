@@ -864,8 +864,10 @@ jobs:
 
             printf -- '- Neutrino args: prefix a flag with $ to disable it without deleting; "Test launch" boots without saving\n'
             printf -- '- DualSense / DS5 USB controller support\n'
-            printf -- '- PS2-Servers.url: opens the maintained UDPFS / SMBv1 / UDPBD all-in-one PC launcher\n'
-            printf -- '- OrbitPS2-Manager.url: opens OrbitPS2 Manager, the cross-platform PC library manager\n'
+            printf -- '- PS2-Servers.url: the UDPFS / SMBv1 / UDPBD all-in-one PC launcher, by Ripto\n'
+            printf -- '- OrbitPS2-Manager.url: OrbitPS2 Manager, the cross-platform PC library manager, by Luden\n'
+            printf -- '- OPL-PS1-AIO-Converter-GUI.url: BIN/CUE to VCD conversion and install, by shaan\n'
+            printf -- '- PS2RD-CHT-Manager.url: manager for the PS2RD .cht cheat files, by TheRealNextria\n'
             printf '\n## Needs testing -- please report from real hardware\n'
             printf -- '- GameID barcode: enable it on the Interface page, then confirm your Pixel FX / RetroGEM /\n'
             printf -- '  PS2Digital auto-loads the per-game profile (the HDMI latch is hardware-only -- not emulator-testable).\n'
@@ -946,6 +948,45 @@ jobs:
             done
             gh release edit "$TAG" --title "$TITLE" --notes-file notes.md $PREREL
             gh release upload "$TAG" rolling/* --clobber
+            # REFRESH THE ROLLING RELEASE DATE. `gh release edit` updates the body and the assets
+            # but never touches published_at, which is what GitHub renders as the relative time --
+            # so a package rebuilt today sat under "last month" and read as abandoned. Recreating
+            # the release would fix the date but reset the download counters, so it is patched in
+            # place.
+            #
+            # ROLLING ONLY. A refs/tags/v* run reaches this same branch for an existing release, and
+            # a stable release must keep the date it was actually published -- rewriting that would
+            # be a lie about history, not a cosmetic fix.
+            #
+            # NO DRAFT FLIP. published_at is not in the documented body for "Update a release", so
+            # this may simply not take. The documented way to move it is a draft -> published
+            # transition, but that emits a `release: published` event, and release-normalize.yml
+            # subscribes to exactly that (on top of its workflow_run trigger) -- so the fallback
+            # would kick off a second, concurrent normalize of the release we are still publishing.
+            # A stale date is cosmetic; a re-entrant asset normalize is not. If the PATCH does not
+            # take, say so in the log and move on.
+            if [ "$TAG" = "rolling" ]; then
+              RELEASE_ID=$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}" --jq .id 2>/dev/null || echo "")
+              if [ -n "$RELEASE_ID" ]; then
+                # Compare against the value BEFORE the patch, not against today's date. A rolling
+                # release republished twice in one day already carries today's date, so a
+                # date-only test would report success for a PATCH that did nothing.
+                WAS=$(gh api "repos/${GITHUB_REPOSITORY}/releases/${RELEASE_ID}" --jq .published_at 2>/dev/null || echo "")
+                gh api -X PATCH "repos/${GITHUB_REPOSITORY}/releases/${RELEASE_ID}" \
+                  -f published_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)" >/dev/null 2>&1 || true
+                GOT=$(gh api "repos/${GITHUB_REPOSITORY}/releases/${RELEASE_ID}" --jq .published_at 2>/dev/null || echo "")
+                # Only a comparison between two SUCCESSFUL reads proves anything. A failed read
+                # leaves its variable empty, and empty-vs-anything would otherwise look like a
+                # change and log a success the patch never earned.
+                if [ -z "$WAS" ] || [ -z "$GOT" ]; then
+                  echo "NOTE: could not read published_at back (before='$WAS' after='$GOT'); date refresh unverified"
+                elif [ "$GOT" != "$WAS" ]; then
+                  echo "Release date refreshed: $WAS -> $GOT"
+                else
+                  echo "NOTE: published_at could not be updated (still '$WAS'); the release date will read stale"
+                fi
+              fi
+            fi
           else
             echo "Creating release: $TAG"
             gh release create "$TAG" rolling/* \

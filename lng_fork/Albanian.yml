@@ -227,3 +227,93 @@ translations:
   "HINT_DEFAULT_CORE": "Bërthama globale e paracaktuar për lojërat, bërthama e ngarkuesit e të cilave për çdo lojë është vendosur në Default. <OPL> është bërthama vendase; Neutrino zinxhiron neutrino.elf të jashtëm. Një zgjedhje për çdo lojë e mbivendos gjithmonë këtë."
   "VCD_SETTINGS": "Cilësimet VCD"
   "FINANCIAL_SUPPORT": "Mbështetje Financiare"
+  ADVANCED_ARGUMENTS: Argumente të avancuara
+  ADVANCED_SETTINGS: Të avancuara
+  ARTWORK_SETTINGS: Cilësimet e kopertinave
+  BDMA_SETTINGS: Cilësimet e BDMA
+  COLORS_SETTINGS: Ngjyrat
+  COMM_SETTINGS: Cilësimet e komunikimit
+  CONTROLLER_EMULATION: Emulimi i kontrolluesit
+  CONTROLLER_MACROS: Makrot e kontrolluesit
+  DISPLAY_SETTINGS: Ekrani
+  GAME_LAUNCHING: Nisja e lojërave
+  GAME_LIST_SETTINGS: Cilësimet e listës së lojërave
+  GAME_SOURCES: Burimet e lojërave
+  HINT_POPSTARTER_RETROGEM_GAMEID: Shfaq një barkod optik për Pixel FX / RetroGEM / PS2Digital kur niset një VCD i PS1
+  HINT_POPS_IMPORT: Lexon skedarët IPCONFIG.DAT dhe SMBCONFIG.DAT të POPSTARTER-it nga dosja POPS e ndarjes SMB të lidhur. Nuk shkruhet asgjë derisa ta konfirmosh me OK.
+  HINT_POPS_PORT: Porta SMB në server -- 445 është e parazgjedhura. Lëre 0 (ose 445) për një ndarje normale; përdor 139 për serverë të vjetër SMB1.
+  HINT_VCD_SHOW_PP_POPS: Vetëm HDD -- rendit si lojëra PS1 ndarjet me një lojë të vetme të emërtuara PP.<ID>.POPS.<name> (p.sh. PP.SCES-01492.POPS.MEDIEVIL). Vetëm renditja; nisja nuk ndryshon. Ndarjet e tjera PP.* (aplikacione, lojëra PS2) mbeten të fshehura.
+  INTERFACE_SETTINGS: Ndërfaqja
+  MENU_NETWORK: Rrjeti
+  NEUTRINO_DEFAULTS: Vlerat e parazgjedhura të Neutrino
+  OSD_DEFAULTS: Vlerat e parazgjedhura të OSD
+  PATH_PREFIXES: Parashtesat e shtigjeve
+  PATH_SETTINGS: Cilësimet e shtigjeve
+  POPSTARTER: Cilësimet e emulimit PS
+  POPSTARTER_RETROGEM_GAMEID: Game ID i RetroGEM
+  POPSTARTER_NETWORK_SETTINGS: Cilësimet e rrjetit të POPSTARTER
+  GAMEID_MODE_ALL: Ndezur (të gjitha)
+  GAMEID_MODE_POPSTARTER: Ndezur (vetëm POPSTARTER)
+  GAMEID_MODE_PS2: Ndezur (vetëm PS2)
+  GAMEID_MODE_OFF: Fikur
+  POPS_IMPORT: Importo nga dosja POPS përmes SMB
+  POPS_NONE_DETECTED: Nuk u gjet asnjë konfigurim ekzistues SMB i POPStarter. Fut cilësimet e sakta të rrjetit para se të krijosh një të tillë.
+  POPS_SMB_SECTION: Rrjeti SMB i POPStarter
+  SECURITY_SETTINGS: Siguria
+  STORAGE_CACHE: Ruajtja dhe memoria e fshehtë
+  TOOLS: Mjete
+  VCD_SHOW_PP_POPS: Shfaq lojërat nga ndarjet PP.<ID>.POPS (HDD)
+  VCD_USB_MODE_HINT: fat32 rekomandohet për USB që nuk janë exFAT.
+  VCD_USB_MODE_QUESTION: Modaliteti USB fat32 apo exFAT?
+  VCD_USB_MODE_TITLE: Modaliteti VCD përmes USB
+  MENU_CONTROLLER: Kontrolluesi
+  MENU_AUDIO: Zëri
+  MMCE_GAMEID_UNSETTLED: Ndërrimi i kartës MMCE nuk u konfirmua -- po niset gjithsesi
+  NEUTRINO_SMB_FALLBACK: Lojërat përmes SMB nuk mbështeten nga Neutrino -- po niset me bërthamën e OPL.
+  NEUTRINO_VMC_HDD_UNSUPPORTED: Neutrino nuk mund të përdorë një VMC në një HDD APA (pa mbështetje pfs) -- po niset pa të.
+  POPS_LOADED_FROM: U ngarkua nga %s
+  POPSTARTER_NET_INVALID: Konfigurimi i rrjetit i POPSTARTER është i pavlefshëm. Korrigjoje te cilësimet e rrjetit të POPSTARTER.
+  POPSTARTER_SMB_NEEDS_STATIC: SMB-ja e POPSTARTER kërkon një konfigurim statik të rrjetit. Konfiguro së pari cilësimet e rrjetit të POPSTARTER.
+  POPS_OVERWRITE_TITLE: Të zëvendësohet konfigurimi i POPSTARTER?
+  POPS_OVERWRITE_MSG: Konfigurimi i rrjetit i POPSTARTER ekziston tashmë. Të zëvendësohet me këto cilësime?
+  POPS_KEEP_EXISTING: Mbaj ekzistuesin
+  POPS_REPLACE: Zëvendëso
+  GSM_1080P_WARNING: KUJDES -- detyrimi i 1080p është eksperimental dhe i paverifikuar. Mund të mos japë fare pamje ose, në disa pajisje, të rëndojë konsolën. Vazhdo me përgjegjësinë tënde.
+  GSM_1080P_PROCEED: Të detyrohet 1080p për këtë lojë?
+  GSM_1080P_SURE: Je i sigurt? Modaliteti eksperimental 1080p do të zbatohet për këtë lojë.
+  CUSTOM_SETTINGS_PATH: Shteg i personalizuar i cilësimeve
+  HINT_CUSTOM_SETTINGS_PATH: Ruan cilësimet në një dosje që zgjedh ti, p.sh. mass0:/OPL. Lëre bosh për të përdorur dosjen nga e cila u nis OPL. Pajisja ngarkohet sipas nevojës, ndaj nuk ka nevojë të jetë e montuar kur shkruan.
+  PERGAME_MIXED_SETTINGS: Për lojë + globale
+  GSM_DEFAULTS: Vlerat e parazgjedhura të GSM (të gjitha lojërat)
+  ERR_DEVICE_BUSY_TIMEOUT: 'Pajisja është e zënë: shkrimi i cilësimeve nuk nisi fare. Provo sërish pasi të përfundojë ngarkimi.'
+  BDMA_EQUIPPING: Po përgatitet drejtuesi i PS1 në kartën e memories...
+  VCD_USB_BDMA: Drejtuesi BDMA për USB
+  HINT_VCD_USB_BDMA: Vlen vetëm për nisjen e lojërave PS1 (VCD) nga një USB. PS2 nuk mund ta dallojë nëse një USB është fat32 apo exFAT, prandaj drejtuesi i POPSTARTER duhet zgjedhur. Me opsionin Pyet, pyetja shfaqet në çdo nisje, ndërsa exFAT ose fat32 e fiksojnë përgjigjen dhe e kapërcejnë atë.
+  VCD_USB_BDMA_ASK: Pyet
+  SETTINGS_HDD_FALLBACK: 'Cilësimet e HDD-së përdorën vendndodhjen e sigurt rezervë: %s'
+  HDD_BACKEND_RECONCILED: HDD-ja e brendshme APA dhe ajo exFAT ishin të dyja të ndezura -- njëra u fik automatikisht (shih Cilësimet e pajisjeve).
+  SETTINGS_SAVE_PROMPT: TË RUHEN CILËSIMET?
+  SETTINGS_SAVE_PROMPT_LINE1: Ndryshimet e tua janë aktive për momentin.
+  SETTINGS_SAVE_PROMPT_LINE2: "Dëshiron t'i ruash për nisjet e ardhshme?"
+  SETTINGS_SAVE: Ruaj cilësimet
+  SETTINGS_EXIT_WITHOUT_SAVING: Dil pa ruajtur
+  SETTINGS_CONTINUE_EDITING: Vazhdo redaktimin
+  CONFIGURE: Konfiguro
+  HDD_UNAVAILABLE_ERROR: '%d: Disku i ngurtë nuk është i disponueshëm.'
+  HDD_PFS_UNAVAILABLE_ERROR: '%d: Mbështetja PFS e diskut të ngurtë nuk është e disponueshme.'
+  POPS_LOADING_SETTINGS: Po ngarkohen cilësimet e POPSTARTER...
+  POPS_SMB_NOT_CONNECTED: SMB nuk është i lidhur.
+  POPS_SMB_SETTINGS_NOT_FOUND: Nuk u gjetën cilësime të POPSTARTER në dosjen POPS përmes SMB.
+  HDD_OPL_PLUS_NOT_FOUND: Ndarja +OPL nuk u gjet.
+  HDD_OPL_COMMON_NOT_FOUND: Ndarja __common nuk u gjet.
+  HDD_OPL_PARTITION_RESTART: Rinis RiptOPL për të zbatuar ndarjen e zgjedhur OPL.
+  HDD_OPL_PARTITION_CHECKING: Po kontrollohet ndarja OPL e HDD-së...
+  HDD_OPL_PARTITION_BUSY: HDD-ja është e zënë. Provo sërish pasi të përfundojë ngarkimi.
+  GENERAL_SYSTEM: Të përgjithshme dhe sistemi
+  EMBER_NOT_FOUND: Mungon ember.elf
+  EMBER_BIOS_MISSING: Mungon bios.bin pranë ember.elf
+  EMBER_BAD_NAME: Ember nuk mund ta përdorë këtë emër dosjeje (pa vijë të pjerrët, dy pika ose vijë të kundërt, dhe pa pika në fillim).
+  EMBER_NO_DISC: Nuk ka asnjë imazh disku PS1 në këtë dosje loje të Ember.
+  VIEW_APPS: Po shfaqen aplikacionet
+  EMBER_DISPLAY: Modaliteti i pamjes i Ember
+  HINT_EMBER_DISPLAY: Modaliteti i daljes që Ember përdor për lojërat PS1. 240p ose 480p shkruhet në settings.txt brenda dosjes EMBER të pajisjes që niset. E parazgjedhura e heq sërish këtë cilësim, si dhe vetë skedarin nëse nuk përmbante gjë tjetër.
