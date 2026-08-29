@@ -29,7 +29,7 @@
     <a href="hdd.html"><span class="em">💽</span>Internal HDD (APA &amp; exFAT)</a>
     <a href="network-boot.html"><span class="em">📡</span>Network Boot (UDPBD/UDPFS)</a>
     <h4>Features</h4>
-    <a href="ps1-vcd.html"><span class="em">💿</span>PS1 Games (VCD)</a>
+    <a href="ps1-vcd.html"><span class="em">💿</span>PS1 Games</a>
     <a href="neutrino.html"><span class="em">⚛️</span>Neutrino Core</a>
     <a href="coverflow.html"><span class="em">🎴</span>Coverflow</a>
     <a href="favourites.html"><span class="em">⭐</span>Favourites</a>
@@ -183,6 +183,23 @@ this fork builds on top of it — traces directly back to that work.</p>
 </div>
 
 <div class="step">
+<h3>Gageformer — Ember (second PS1 core)</h3>
+<p>Author of <b><a href="https://github.com/Gageformer/Ember/releases">Ember</a></b>, an independent PlayStation 1 emulator written from
+scratch for the PlayStation 2 — original recompiler, memory model, geometry pipeline and graphics
+translation. Ember is <b>not</b> part of RiptOPL and is not our work; it ships inside the release
+package as an <code>EMBER/</code> folder and serves as RiptOPL's <b>second PS1 core</b> alongside
+POPSTARTER.</p>
+<p>It is bundled unmodified, with Gageformer's blessing, under the <b>Ember Public Beta Testing
+Licence</b> — included in the package as <code>EMBER/LICENSE-BETA.txt</code>, which governs the
+build it accompanies. He not only permitted RiptOPL driving <code>ember.elf</code> directly in place
+of his own launcher, he encouraged it. Please report Ember problems to
+<a href="https://github.com/NathanNeurotic/Open-PS2-Loader/issues">us</a> first, not to him: the
+launching is ours.</p>
+<p>Ember's own licence credits <b><a href="https://github.com/stenzek/duckstation">DuckStation</a></b>
+as a correctness reference for a small number of routines. Ember is not a fork or port of it.</p>
+</div>
+
+<div class="step">
 <h3>saildot4k — BDMA-ATA / exFAT HDD</h3>
 <p>Contributor of <b>BDMA-ATA</b> (exFAT internal-HDD block-device support via BDMAssault),
 plus the fixes, feedback, and ongoing oversight that shaped this fork's block-device work.
@@ -223,6 +240,35 @@ work described on this page would have been possible. Everything starts here.</p
 
 </div>
 
+<h2 id="companion-tools">Companion PC Tools</h2>
+
+<p>Every release package links to these rather than vendoring copies, so you always get the
+maintained version. All but the first are <b>third-party projects</b>, independently maintained and
+not part of RiptOPL — <b>please report issues with those to their own repository, not here.</b></p>
+
+<ul class="checklist">
+<li><b><a href="https://github.com/NathanNeurotic/PS2-Servers">PS2-Servers</a></b> —
+    all-in-one PC server launcher for <b>SMBv1, UDPFS and UDPBD</b>. This one is ours, from the same
+    author as RiptOPL, so its issues belong on its own tracker but are the same hands. Shipped as
+    <code>PS2-Servers.url</code>.</li>
+<li><b><a href="https://github.com/Luden02/OrbitPS2-Manager">OrbitPS2 Manager</a></b> —
+    cross-platform library manager: import games from disc images, fetch cover art and screenshots,
+    compress ISOs to ZSO, edit per-game settings and manage virtual memory cards. It writes the
+    <code>ART</code> folder and per-game configs in exactly the layout RiptOPL expects, which
+    resolves most "looks wrong on my setup" reports. Shipped as
+    <code>OrbitPS2-Manager.url</code>.</li>
+<li><b><a href="https://github.com/shaanhomebrew-cloud/OPL-PS1-AIO-Converter-GUI">OPL PS1 AIO
+    Converter GUI</a></b> — Windows all-in-one PS1 preparation tool: converts BIN/CUE backups to
+    <code>*.VCD</code> and installs them to USB, MX4SIO, MMCE, exFAT HDD, SMB and the APA internal
+    HDD. Shipped as <code>OPL-PS1-AIO-Converter-GUI.url</code>.</li>
+<li><b><a href="https://github.com/TheRealNextria/PS2RD-CHT-Manager">PS2RD CHT Manager</a></b> —
+    manages the PS2RD <code>.cht</code> cheat files RiptOPL reads from a device's <code>CHT</code>
+    folder. Shipped as <code>PS2RD-CHT-Manager.url</code>.</li>
+<li><b><a href="https://github.com/Gageformer/Ember/releases">Ember</a></b> — by <b>Gageformer</b>. The one exception to the shortcut rule:
+    Ember ships <em>inside</em> the package as an <code>EMBER/</code> folder, bundled unmodified
+    under its own licence. See above.</li>
+</ul>
+
 <h2 id="other-credits">Other Credits (from the OPL CREDITS file)</h2>
 
 <p>The full OPL CREDITS file records many more contributors. Selected entries relevant to
@@ -246,13 +292,24 @@ file in the canonical OPL repository.</p>
 
 <h2 id="ps1-note">A Note on PS1 Emulation</h2>
 
-<div class="callout info"><div class="h">ℹ POPS is Sony's emulator</div>
-PS1 game support in RiptOPL (and all OPL forks) runs through <b>POPS</b> — Sony's own
+<p>RiptOPL plays PS1 titles through <b>two independent cores</b>, and they work in completely
+different ways.</p>
+
+<div class="callout info"><div class="h">ℹ POPSTARTER uses POPS, Sony's own emulator</div>
+The <code>*.VCD</code> path in RiptOPL (and in all OPL forks) runs through <b>POPS</b> — Sony's own
 PS1 emulator built into PS2 firmware — combined with the open-source <b>POPSTARTER</b>
 launcher. POPS itself is not distributed here, and its use depends on your console's firmware.
 For the deep reference on PS1 / POPSTARTER internals — the 32-byte config table, IGR, cheats,
 multi-disc, and storage — see the sister site:
 <a href="https://nathanneurotic.github.io/POPSLoader/"><b>POPStarter docs</b></a>.
+</div>
+
+<div class="callout info"><div class="h">ℹ Ember is a real emulator, not a Sony component</div>
+The <code>*.cue</code> path runs through <b>Ember</b>, Gageformer's independent PS1 emulator for the
+PS2. It does not use POPS and does not depend on your console's firmware — but it does need
+<b>your own PS1 BIOS</b>, which you supply as <code>EMBER/bios.bin</code>. No BIOS and no game data
+are distributed with Ember or with RiptOPL. See <a href="ps1-vcd.html#ember">Ember — the second PS1
+core</a>.
 </div>
 
 <h2 id="license">License</h2>

@@ -29,7 +29,7 @@
     <a href="hdd.html" class="active"><span class="em">💽</span>Internal HDD (APA &amp; exFAT)</a>
     <a href="network-boot.html"><span class="em">📡</span>Network Boot (UDPBD/UDPFS)</a>
     <h4>Features</h4>
-    <a href="ps1-vcd.html"><span class="em">💿</span>PS1 Games (VCD)</a>
+    <a href="ps1-vcd.html"><span class="em">💿</span>PS1 Games</a>
     <a href="neutrino.html"><span class="em">⚛️</span>Neutrino Core</a>
     <a href="coverflow.html"><span class="em">🎴</span>Coverflow</a>
     <a href="favourites.html"><span class="em">⭐</span>Favourites</a>
@@ -151,7 +151,7 @@ direct APA partition editing can corrupt the drive if done incorrectly.</p>
 <h3 id="apa-ps1">PS1 games on APA/PFS</h3>
 <p>PS1 <code>*.VCD</code> files on an APA/PFS HDD live in dedicated <b><code>__.POPS</code></b> partitions (named
 <code>__.POPS</code>, <code>__.POPS0</code> … <code>__.POPS9</code>). Each partition holds its VCD files at the
-partition root. Press <b>L3</b> on the HDD tab to switch to the VCD view and see them listed. See
+partition root. Press <b>L3</b> on the HDD tab to switch to the PS1 view and see them listed. See
 <a href="ps1-vcd.html">PS1 Games (VCD)</a> for the full VCD workflow.</p>
 
 <h2 id="exfat-bdm">exFAT via Block Device Manager (BDMA)</h2>
@@ -166,7 +166,7 @@ namespace alongside any USB/MX4SIO devices.</p>
 <code>DVD/</code> or <code>CD/</code> folder, just like a USB drive.</li>
 <li><b>MBR up to 2 TB, GPT unlimited</b> — if your drive is larger than 2 TB, GPT breaks the APA ceiling.</li>
 <li><b>PS1 VCDs on the same drive</b> — put <code>*.VCD</code> files in the <code>POPS/</code> folder and they list
-under L3 VCD view exactly like a USB drive (with the BDMA equip for POPSTARTER — see below).</li>
+under L3 PS1 view exactly like a USB drive (with the BDMA equip for POPSTARTER — see below).</li>
 </ul>
 
 <h3 id="exfat-format">Formatting and partition table</h3>
@@ -224,16 +224,16 @@ In <code>conf_apps.cfg</code>, use <code>mass:</code> as the device prefix (the 
 
 <h3 id="exfat-ps1">PS1 games on exFAT (BDMA equip)</h3>
 <p>Put your <code>*.VCD</code> files in the drive's <code>POPS/</code> folder alongside
-<code>POPSTARTER.ELF</code>. Press <b>L3</b> on the HDD Games tab to switch to the VCD view.</p>
+<code>POPSTARTER.ELF</code>. Press <b>L3</b> on the HDD Games tab to switch to the PS1 view.</p>
 <p>POPSTARTER's stock driver only reads FAT32, so booting a PS1 game from the exFAT HDD needs the
 <b>HDD (exFAT)</b> BDMA driver modules equipped. RiptOPL does this <b>automatically by default</b>: the
-<b>VCD BDMA Apply on Launch</b> toggle (in <b>Settings &rarr; VCD Settings</b>) ships <b>On</b>, and each time you launch
+<b>VCD BDMA Apply on Launch</b> toggle (in <b>Settings &rarr; PS Emulation Settings</b>) ships <b>On</b>, and each time you launch
 a VCD it auto-equips that title's matching exFAT driver pair — copying the correct BDMAssault modules onto
 <code>mc?:/POPSTARTER/</code> for you — right before boot. You do not need to touch anything.</p>
 <div class="callout info"><div class="h">ℹ Manual equip (only after turning auto-equip Off)</div>
 The manual <b>BDMA Source</b> / <b>BDMA Mode</b> pickers are hidden while <b>VCD BDMA Apply on Launch</b> is On.
 If you turn that toggle <b>Off</b> to manage the equip yourself, they appear on the same
-<b>Settings &rarr; VCD Settings</b> page — set <b>BDMA Mode</b> to <b>HDD (exFAT)</b> and
+<b>Settings &rarr; PS Emulation Settings</b> page — set <b>BDMA Mode</b> to <b>HDD (exFAT)</b> and
 <b>BDMA Source</b> to <b>Internal HDD</b> (the source identifies your drive by its <code>ata</code> driver and
 reads its <code>POPS/usbd.irx.ata</code> + <code>POPS/usbhdfsd.irx.ata</code>).
 </div>

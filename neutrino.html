@@ -29,7 +29,7 @@
     <a href="hdd.html"><span class="em">💽</span>Internal HDD (APA &amp; exFAT)</a>
     <a href="network-boot.html"><span class="em">📡</span>Network Boot (UDPBD/UDPFS)</a>
     <h4>Features</h4>
-    <a href="ps1-vcd.html"><span class="em">💿</span>PS1 Games (VCD)</a>
+    <a href="ps1-vcd.html"><span class="em">💿</span>PS1 Games</a>
     <a href="neutrino.html" class="active"><span class="em">⚛️</span>Neutrino Core</a>
     <a href="coverflow.html"><span class="em">🎴</span>Coverflow</a>
     <a href="favourites.html"><span class="em">⭐</span>Favourites</a>
@@ -113,7 +113,7 @@ The <b>Loader Core</b> selector, the <b>Neutrino Device</b> picker, the structur
 <p>Unsupported sources fall back to the <code>&lt;OPL&gt;</code> core automatically with an on-screen warning. No manual intervention is needed — OPL detects the format and adjusts.</p>
 
 <div class="callout info"><div class="h">ℹ PS1 games are a separate path</div>
-PlayStation 1 titles (<code>*.VCD</code>) always boot through <b>POPSTARTER.ELF</b> — never OPL's core and never Neutrino. The Loader Core selector is locked and has no effect for PS1 games. See <a href="ps1-vcd.html">PS1 Games (VCD)</a>.
+PlayStation 1 titles always boot through their own core — <b>POPSTARTER.ELF</b> for <code>*.VCD</code>, <b>ember.elf</b> for Ember titles — never OPL's core and never Neutrino. The Loader Core selector is locked and has no effect for PS1 games. See <a href="ps1-vcd.html">PS1 Games (VCD)</a>.
 </div>
 
 <h2 id="neutrino-device">3. Neutrino Device picker</h2>

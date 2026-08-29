@@ -29,7 +29,7 @@
     <a href="hdd.html"><span class="em">💽</span>Internal HDD (APA &amp; exFAT)</a>
     <a href="network-boot.html"><span class="em">📡</span>Network Boot (UDPBD/UDPFS)</a>
     <h4>Features</h4>
-    <a href="ps1-vcd.html"><span class="em">💿</span>PS1 Games (VCD)</a>
+    <a href="ps1-vcd.html"><span class="em">💿</span>PS1 Games</a>
     <a href="neutrino.html"><span class="em">⚛️</span>Neutrino Core</a>
     <a href="coverflow.html"><span class="em">🎴</span>Coverflow</a>
     <a href="favourites.html"><span class="em">⭐</span>Favourites</a>
@@ -63,7 +63,7 @@ Artwork, themes, VMC files and <code>favourites.bin</code> remain shared.</div>
 <h2 id="general-settings">General Settings</h2>
 <p>Reached via <b>Settings &rarr; General Settings</b>. Contains launch-path helpers, global Neutrino
 configuration, housekeeping options, and — below their own splitters — the prefix paths and cache sizes.
-The PS1/BDMA plumbing now lives on its own <a href="#vcd-settings">VCD Settings</a> page.</p>
+The PS1/BDMA plumbing now lives on its own <a href="#vcd-settings">PS Emulation Settings</a> page.</p>
 
 <table data-sortable>
 <thead><tr><th>Option</th><th>Values</th><th>Description</th></tr></thead>
@@ -144,9 +144,9 @@ enabled, their start modes, and the network transport rows. Prefix paths and cac
 </tbody>
 </table>
 
-<h2 id="vcd-settings">VCD Settings</h2>
-<p>Reached via <b>Settings &rarr; VCD Settings</b>. PS1-via-POPSTARTER launch configuration, the BDMA exFAT
-driver equip, and the VCD list display options. See <a href="ps1-vcd.html">PS1 Games</a>.</p>
+<h2 id="vcd-settings">PS Emulation Settings</h2>
+<p>Reached via <b>Settings &rarr; PS Emulation Settings</b>. PS1-via-POPSTARTER launch configuration, the BDMA exFAT
+driver equip, and the PS1 list display options. See <a href="ps1-vcd.html">PS1 Games</a>.</p>
 
 <table data-sortable>
 <thead><tr><th>Option</th><th>Values</th><th>Description</th></tr></thead>
@@ -176,8 +176,8 @@ for full detail.</p>
 </tbody>
 </table>
 
-<h2 id="display-settings">Display Settings</h2>
-<p>Reached via <b>Settings &rarr; Display Settings</b>. Controls the visual appearance, video mode, and
+<h2 id="display-settings">Interface</h2>
+<p>Reached via <b>Settings &rarr; Interface</b>. Controls the visual appearance, video mode, and
 cover-art behavior.</p>
 
 <table data-sortable>
@@ -189,7 +189,7 @@ cover-art behavior.</p>
 <tr><td>Automatic Refresh</td><td>Off / On</td><td>Periodically re-scans for newly plugged-in devices and adds their games without requiring a manual refresh.</td></tr>
 <tr><td>Cover Art</td><td>Off / On</td><td>Enables cover-art display. When off, no cover images are loaded even if present.</td></tr>
 <tr><td>Cover Art .tar Archive</td><td>Off / On</td><td>Off by default. Opt-in loader that also reads cover art from an <code>ART/art.tar</code> archive alongside the loose image files.</td></tr>
-<tr><td>Default game view</td><td>Both / ISO / VCD</td><td>Controls which game list is shown by default on VCD-capable device tabs. <em>Both</em> keeps the per-device L3 toggle active (defaults to ISO). <em>ISO</em> locks every tab to disc games. <em>VCD</em> locks every tab to PS1 games. See <a href="ps1-vcd.html">PS1 Games</a>.</td></tr>
+<tr><td>Default game view</td><td>Both / PS2 / PS1</td><td>Controls which game list is shown by default on PS1-capable device tabs. <em>Both</em> keeps the per-device L3 toggle active (defaults to PS2). <em>PS2</em> locks every tab to disc games. <em>PS1</em> locks every tab to PS1 games (POPSTARTER and Ember together). See <a href="ps1-vcd.html">PS1 Games</a>.</td></tr>
 <tr><td>Notifications</td><td>Off / On</td><td>Shows brief on-screen notifications when a config, theme, or language file is loaded, or when a storage partition is mounted.</td></tr>
 <tr><td>Coverflow Settings</td><td>[sub-screen]</td><td>Opens the <a href="#coverflow-settings">Coverflow Settings</a> sub-screen. See below.</td></tr>
 <tr><td>Text Color</td><td>color picker</td><td>Color of normal UI text.</td></tr>
@@ -208,7 +208,7 @@ cover-art behavior.</p>
 </table>
 
 <h3 id="coverflow-settings">Coverflow Settings</h3>
-<p>Sub-screen opened from the <em>Coverflow Settings</em> button in Display Settings. Tunable live while the
+<p>Sub-screen opened from the <em>Coverflow Settings</em> button in Interface. Tunable live while the
 Coverflow theme is active. See <a href="coverflow.html">Coverflow</a> for full detail.</p>
 
 <table data-sortable>

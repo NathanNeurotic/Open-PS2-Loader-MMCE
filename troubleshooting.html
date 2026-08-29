@@ -29,7 +29,7 @@
     <a href="hdd.html"><span class="em">💽</span>Internal HDD (APA &amp; exFAT)</a>
     <a href="network-boot.html"><span class="em">📡</span>Network Boot (UDPBD/UDPFS)</a>
     <h4>Features</h4>
-    <a href="ps1-vcd.html"><span class="em">💿</span>PS1 Games (VCD)</a>
+    <a href="ps1-vcd.html"><span class="em">💿</span>PS1 Games</a>
     <a href="neutrino.html"><span class="em">⚛️</span>Neutrino Core</a>
     <a href="coverflow.html"><span class="em">🎴</span>Coverflow</a>
     <a href="favourites.html"><span class="em">⭐</span>Favourites</a>
@@ -129,7 +129,7 @@ If you saved an incompatible GSM (Graphics Synthesizer Mode) override and your s
 
 <h2 id="vcd-list-empty">PS1/VCD — "my VCDs don't show up" (works elsewhere)</h2>
 
-<p><b>Symptom:</b> A device lists PS2 games fine (or works in another loader), but its PS1/VCD view is empty — or a listed VCD does nothing when selected.</p>
+<p><b>Symptom:</b> A device lists PS2 games fine (or works in another loader), but its PS1/PS1 view is empty — or a listed VCD does nothing when selected.</p>
 
 <p>Work down this ladder; each step isolates a different stage:</p>
 
@@ -144,7 +144,7 @@ If you saved an incompatible GSM (Graphics Synthesizer Mode) override and your s
   </div>
   <div class="step">
     <h3>Press L3 on the device page</h3>
-    <p>The VCD view is per device and only reachable when <b>Default game view</b> is "Both" (or the page is locked to VCD).</p>
+    <p>The PS1 view is per device and only reachable when <b>Default game view</b> is "Both" (or the page is locked to VCD).</p>
   </div>
   <div class="step">
     <h3>Check the folder — root, not your games prefix</h3>
@@ -184,7 +184,7 @@ If you saved an incompatible GSM (Graphics Synthesizer Mode) override and your s
   </div>
   <div class="step">
     <h3>Re-apply the equip</h3>
-    <p>With the files in place, open <b>VCD Settings</b> from the main menu — BDMA has its own page, it is not under General Settings — set <b>BDMA Source</b> / <b>BDMA Mode</b>, and save. (The two manual pickers are hidden while <b>VCD BDMA Apply on Launch</b> is ON, because that option equips automatically; turn it off to set them by hand.) RiptOPL will copy the modules to <code>mc?:/POPSTARTER/</code> and record the equipped state in a marker file (compatible with POPSLoader).</p>
+    <p>With the files in place, open <b>PS Emulation Settings</b> from the main menu — BDMA has its own page, it is not under General Settings — set <b>BDMA Source</b> / <b>BDMA Mode</b>, and save. (The two manual pickers are hidden while <b>VCD BDMA Apply on Launch</b> is ON, because that option equips automatically; turn it off to set them by hand.) RiptOPL will copy the modules to <code>mc?:/POPSTARTER/</code> and record the equipped state in a marker file (compatible with POPSLoader).</p>
   </div>
 </div>
 
@@ -194,19 +194,19 @@ If you saved an incompatible GSM (Graphics Synthesizer Mode) override and your s
 
 <h2 id="vcd-list-not-showing">PS1 / VCD list not showing after a settings change</h2>
 
-<p><b>Symptom:</b> You have VCD files on a device but after changing a setting (such as <b>Default game view</b>, enabling a device, or changing BDMA settings) the VCD list is empty or appears to be stuck on the disc list.</p>
+<p><b>Symptom:</b> You have VCD files on a device but after changing a setting (such as <b>Default game view</b>, enabling a device, or changing BDMA settings) the PS1 list is empty or appears to be stuck on the disc list.</p>
 
 <p><b>Fix:</b> The view state sometimes needs a manual refresh after a settings change.</p>
 
 <ul class="checklist">
   <li>Navigate to the device page that should show your VCDs and press <b>L3</b> to toggle the view. If the view was already on VCDs it will switch to discs; press <b>L3</b> again to return to VCDs. This forces a list refresh.</li>
-  <li>If <b>Default game view</b> is set to <b>ISO</b>, the VCD toggle is disabled by design — L3 does nothing. Change <b>Default game view</b> to <b>Both</b> or <b>VCD</b> in <b>Settings → Display Settings</b>, then save and re-enter the device page.</li>
-  <li>If the VCD list still appears empty, confirm the <code>*.VCD</code> files are in a <code>POPS/</code> folder at the device root (USB / MMCE / MX4SIO / iLink / SMB) or, for the internal APA HDD, inside the correct <code>__.POPS</code> / <code>__.POPS0</code>–<code>__.POPS9</code> partitions. Files in any other location are not scanned.</li>
+  <li>If <b>Default game view</b> is set to <b>PS2</b>, the PS1 toggle is disabled by design — L3 does nothing. Change <b>Default game view</b> to <b>Both</b> or <b>PS1</b> in <b>Settings → Interface</b>, then save and re-enter the device page.</li>
+  <li>If the PS1 list still appears empty, confirm the <code>*.VCD</code> files are in a <code>POPS/</code> folder at the device root (USB / MMCE / MX4SIO / iLink / SMB) or, for the internal APA HDD, inside the correct <code>__.POPS</code> / <code>__.POPS0</code>–<code>__.POPS9</code> partitions. Files in any other location are not scanned.</li>
   <li>For exFAT HDD, confirm <b>HDD (GPT/MBR)</b> is enabled in <b>Device Settings</b> and that the HDD has mounted — the game list should show an <b>HDD Games</b> entry. VCDs on the exFAT HDD live in <code>massN:/POPS/</code>.</li>
 </ul>
 
 <div class="callout info"><div class="h">i Favourites follow the active view</div>
-Favourited VCD titles only appear in the Favourites list while a page is in VCD view mode. If you switch a page to disc view, those favourites are hidden until you switch back — they are not lost.
+Favourited VCD titles only appear in the Favourites list while a page is in PS1 view mode. If you switch a page to disc view, those favourites are hidden until you switch back — they are not lost.
 </div>
 
 <h2 id="quick-reference">Quick-reference button combos</h2>
