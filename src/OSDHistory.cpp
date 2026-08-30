@@ -32,7 +32,7 @@ extern unsigned char icon_sys_C[];
 
 #define DEBUG_PRINTF(args...)
 
-int CreateSystemDataFolder(const char *path, char FolderRegionLetter)
+extern "C" int CreateSystemDataFolder(const char *path, char FolderRegionLetter)
 {
     char fullpath[64];
     int fd, result, size;

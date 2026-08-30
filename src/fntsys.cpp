@@ -138,7 +138,7 @@ static void fntCacheFlush(font_t *font)
 static int fntPrepareGlyphCachePage(font_t *font, int pageid)
 {
     if (pageid > font->cacheMaxPageID) {
-        fnt_glyph_cache_entry_t **np = realloc(font->glyphCache, (pageid + 1) * sizeof(fnt_glyph_cache_entry_t *));
+        fnt_glyph_cache_entry_t **np = (fnt_glyph_cache_entry_t **)realloc(font->glyphCache, (pageid + 1) * sizeof(fnt_glyph_cache_entry_t *));
 
         if (!np)
             return 0;
@@ -146,7 +146,7 @@ static int fntPrepareGlyphCachePage(font_t *font, int pageid)
         font->glyphCache = np;
 
         unsigned int page;
-        for (page = font->cacheMaxPageID + 1; page <= pageid; ++page)
+        for (page = font->cacheMaxPageID + 1; page <= (unsigned int)pageid; ++page)
             font->glyphCache[page] = NULL;
 
         font->cacheMaxPageID = pageid;
@@ -157,7 +157,7 @@ static int fntPrepareGlyphCachePage(font_t *font, int pageid)
         return 1;
 
     // allocate the page
-    font->glyphCache[pageid] = malloc(sizeof(fnt_glyph_cache_entry_t) * GLYPH_CACHE_PAGE_SIZE);
+    font->glyphCache[pageid] = (fnt_glyph_cache_entry_t *)malloc(sizeof(fnt_glyph_cache_entry_t) * GLYPH_CACHE_PAGE_SIZE);
 
     int i;
     for (i = 0; i < GLYPH_CACHE_PAGE_SIZE; ++i) {
@@ -173,7 +173,7 @@ static void fntPrepareCLUT()
 {
     fontClut.PSM = GS_PSM_T8;
     fontClut.ClutPSM = GS_PSM_CT32;
-    fontClut.Clut = memalign(128, 256 * 4);
+    fontClut.Clut = (u32 *)memalign(128, 256 * 4);
     fontClut.VramClut = 0;
 
     // generate the clut table
