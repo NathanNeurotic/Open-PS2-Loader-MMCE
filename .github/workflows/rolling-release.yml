@@ -603,6 +603,7 @@ jobs:
           #                                      says so. Peer of POPS/ -- both go to the device ROOT.
           #   neutrino/                       -- the official latest Neutrino core (rickgaiser/neutrino), extracted for drag-and-drop.
           #   PS2-Servers.url                 -- link to the UDPFS / SMB / UDPBD all-in-one PC server.
+          #   udpfs-server.url                -- link to the Android UDPFS server (serve from a phone).
           #   OrbitPS2-Manager.url            -- link to the cross-platform PC library manager.
           #   OPL-PS1-AIO-Converter-GUI.url   -- link to the PS1/POPSTARTER preparation tool.
           #   PS2RD-CHT-Manager.url           -- link to the PS2RD cheat-file manager.
@@ -679,6 +680,11 @@ jobs:
           # embedded in the RiptOPL install package.
           test -f pc/PS2-Servers.url
           cp -f pc/PS2-Servers.url "$PKG/PS2-Servers.url"
+          # udpfs-server: the same job from a phone rather than a PC -- an Android UDPFS server,
+          # found by broadcast, built on pcm720's udpfsd. Shipped as a shortcut for the same reason
+          # as the rest: link the maintained tool, never vendor a copy of it.
+          test -f pc/udpfs-server.url
+          cp -f pc/udpfs-server.url "$PKG/udpfs-server.url"
           # OrbitPS2 Manager: the PC-side library manager (import discs, fetch covers/screenshots,
           # ZSO compression, per-game settings, VMC management). Shipped as a shortcut for the same
           # reason as PS2-Servers -- link the maintained tool, never vendor a copy of it.
@@ -734,7 +740,7 @@ jobs:
           ZIP="RIPTOPL-${REL}-${SHA}.zip"
           (
             cd "$PKG"
-            zip -r -X "../rolling/${ZIP}" APP_RIPTOPL-PS2DEVROLLING POPS EMBER PS2-Servers.url OrbitPS2-Manager.url OPL-PS1-AIO-Converter-GUI.url PS2RD-CHT-Manager.url >/dev/null
+            zip -r -X "../rolling/${ZIP}" APP_RIPTOPL-PS2DEVROLLING POPS EMBER PS2-Servers.url udpfs-server.url OrbitPS2-Manager.url OPL-PS1-AIO-Converter-GUI.url PS2RD-CHT-Manager.url >/dev/null
             if [ -d APP_RIPTOPL-PS2DEVPINNED ]; then zip -r -X "../rolling/${ZIP}" APP_RIPTOPL-PS2DEVPINNED >/dev/null; fi
             if [ -d APP_RIPTOPL-OFFICIALROLLING ]; then zip -r -X "../rolling/${ZIP}" APP_RIPTOPL-OFFICIALROLLING >/dev/null; fi
             if [ -d APP_RIPTOPL-OFFICIALPINNED ]; then zip -r -X "../rolling/${ZIP}" APP_RIPTOPL-OFFICIALPINNED >/dev/null; fi
@@ -865,6 +871,7 @@ jobs:
             printf -- '- Neutrino args: prefix a flag with $ to disable it without deleting; "Test launch" boots without saving\n'
             printf -- '- DualSense / DS5 USB controller support\n'
             printf -- '- PS2-Servers.url: the UDPFS / SMBv1 / UDPBD all-in-one PC launcher, by Ripto\n'
+            printf -- '- udpfs-server.url: an Android UDPFS server -- serve games from a phone, by YouKnow-sys\n'
             printf -- '- OrbitPS2-Manager.url: OrbitPS2 Manager, the cross-platform PC library manager, by Luden\n'
             printf -- '- OPL-PS1-AIO-Converter-GUI.url: BIN/CUE to VCD conversion and install, by shaan\n'
             printf -- '- PS2RD-CHT-Manager.url: manager for the PS2RD .cht cheat files, by TheRealNextria\n'
