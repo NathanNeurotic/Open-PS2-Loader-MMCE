@@ -30,6 +30,7 @@ jobs:
         shell: python
         run: |
           from pathlib import Path
+          import os
           import re
 
           ps2_servers = "https://github.com/NathanNeurotic/PS2-Servers"
@@ -43,6 +44,7 @@ jobs:
 
           readme = Path("README.md")
           text = readme.read_text(encoding="utf-8")
+          readme_before = text
           text = re.sub(r'^\[!\[CI\]\([^\n]+\)\]\([^\n]+\)$', badge, text, count=1, flags=re.MULTILINE)
           section = f'''## External Tools & Services\n\nRiptOPL is intended to work with these maintained companion tools:\n\n- **[PS2-Servers]({ps2_servers})** by **[Ripto](https://github.com/NathanNeurotic)** — all-in-one PC server launcher for **SMBv1, UDPFS and UDPBD**.\n- **[udpfs-server]({udpfs_server})** by **[YouKnow-sys](https://github.com/YouKnow-sys)** — the same idea **from a phone**: an Android app that shares folders and disk images to the PS2 over **UDPFS**, found by broadcast so there is no server address to type in on the console. Works over a router or a direct cable. Built on **[udpfsd](https://github.com/pcm720/udpfsd)** by **[pcm720](https://github.com/pcm720)**; MIT licensed. A `udpfs-server.url` shortcut ships in every release package.\n- **[OrbitPS2 Manager]({orbit})** by **[Luden](https://github.com/Luden02)** — cross-platform PC library manager for importing discs, artwork/screenshots, ZSO compression, per-game settings and VMC management.\n- **[OPL PS1 AIO Converter GUI]({ps1_converter})** by **[shaan](https://github.com/shaanhomebrew-cloud)** — Windows all-in-one PS1/POPStarter preparation tool for converting BIN/CUE backups to VCDs and installing them to USB, MX4SIO, MMCE, exFAT HDD, SMB and APA internal HDD.\n- **[PS2RD CHT Manager]({cht_manager})** by **[TheRealNextria](https://github.com/TheRealNextria)** — PC manager for the PS2RD `.cht` cheat files RiptOPL reads from your device's `CHT` folder. A `PS2RD-CHT-Manager.url` shortcut ships in every release package.\n- **[Ember]({ember})** by **[Gageformer](https://github.com/Gageformer)** — a PS1 emulator that runs natively on the PS2, used as RiptOPL's **second PS1 core** alongside POPSTARTER. Unlike the others this one is not just a shortcut: an `EMBER/` folder ships **inside** the release package, ready to drop onto a device. It is bundled unmodified with the author's permission under the Ember Public Beta Testing Licence (`EMBER/LICENSE-BETA.txt` in the package); releases: <https://github.com/Gageformer/Ember/releases>.\n- **[Neutrino]({neutrino})** by **[rickgaiser](https://github.com/rickgaiser)** — a *"Small, Fast and Modular PS2 Device Emulator"*, and RiptOPL's **second PS2 loader core** alongside OPL's own. Like Ember it is not a shortcut: a ready-to-use `neutrino/` folder ships **inside** the release package, drag-and-drop to `mc?:/neutrino/`. Neutrino is deliberately **UI-agnostic** — it has no interface of its own, which is exactly what lets a front-end like RiptOPL drive it per game. Licensed **AFL-3.0**; releases: <https://github.com/rickgaiser/neutrino/releases>.\n'''
           if "## External Tools & Services" in text:
@@ -53,14 +55,70 @@ jobs:
 
           pages = Path("../gh-pages")
           html_section = f'''<section class="callout info" id="external-tools"><div class="h">External Tools &amp; Services</div>\n<p><b><a href="{ps2_servers}">PS2-Servers</a></b> by <b><a href="https://github.com/NathanNeurotic">Ripto</a></b> — all-in-one PC server launcher for <b>SMBv1, UDPFS and UDPBD</b>.<br>\n<b><a href="{udpfs_server}">udpfs-server</a></b> by <b><a href="https://github.com/YouKnow-sys">YouKnow-sys</a></b> — the same idea from a phone: an <b>Android</b> app that shares folders and disk images to the PS2 over <b>UDPFS</b>, found by broadcast so there is no server address to type in on the console. Built on <a href="https://github.com/pcm720/udpfsd">udpfsd</a> by pcm720; MIT licensed.<br>\n<b><a href="{orbit}">OrbitPS2 Manager</a></b> by <b><a href="https://github.com/Luden02">Luden</a></b> — cross-platform PC library manager for importing discs, artwork/screenshots, ZSO compression, per-game settings and VMC management.<br>\n<b><a href="{ps1_converter}">OPL PS1 AIO Converter GUI</a></b> by <b><a href="https://github.com/shaanhomebrew-cloud">shaan</a></b> — Windows all-in-one PS1/POPStarter preparation tool for BIN/CUE → VCD conversion and installation to USB, MX4SIO, MMCE, exFAT HDD, SMB and APA internal HDD.<br>\n<b><a href="{cht_manager}">PS2RD CHT Manager</a></b> by <b><a href="https://github.com/TheRealNextria">TheRealNextria</a></b> — PC manager for the PS2RD <code>.cht</code> cheat files RiptOPL reads from your device's <code>CHT</code> folder.<br>\n<b><a href="{ember}">Ember</a></b> by <b><a href="https://github.com/Gageformer">Gageformer</a></b> — a PS1 emulator running natively on the PS2, used as RiptOPL's second PS1 core alongside POPSTARTER. Ships as an <code>EMBER/</code> folder inside the release package, bundled unmodified with permission under the Ember Public Beta Testing Licence (<code>EMBER/LICENSE-BETA.txt</code>); <a href="https://github.com/Gageformer/Ember/releases">releases</a>.<br>\n<b><a href="{neutrino}">Neutrino</a></b> by <b><a href="https://github.com/rickgaiser">rickgaiser</a></b> — a small, fast, modular PS2 device emulator, and RiptOPL's second PS2 loader core alongside OPL's own. Ships as a ready-to-use <code>neutrino/</code> folder inside the release package (drag-and-drop to <code>mc?:/neutrino/</code>), under the <b>AFL-3.0</b> licence; <a href="https://github.com/rickgaiser/neutrino/releases">releases</a>.</p></section>'''
+          pages_before = {}
           for name in ("index.html", "releases.html"):
               path = pages / name
               html = path.read_text(encoding="utf-8")
+              pages_before[name] = html
               if 'id="external-tools"' in html:
                   html = re.sub(r'<section class="callout info" id="external-tools">.*?</section>', html_section, html, count=1, flags=re.DOTALL)
               else:
                   html = html.replace('<main class="content">', '<main class="content">\n' + html_section, 1)
               path.write_text(html, encoding="utf-8")
+
+          # ---- honest commit messages -------------------------------------------------------------
+          # This job REWRITES generated sections wholesale, so it can remove an entry as easily as add
+          # one. It used to commit either outcome as "add companion tools", which is how two credit
+          # entries once disappeared under a message claiming the opposite. Say what actually changed.
+          def md_tools(s):
+              m = re.search(r'## External Tools & Services\n.*?(?=\n## |\Z)', s, re.DOTALL)
+              return re.findall(r'^- \*\*\[([^\]]+)\]', m.group(0), re.M) if m else []
+
+          def html_tools(s):
+              m = re.search(r'<section class="callout info" id="external-tools">.*?</section>', s, re.DOTALL)
+              return re.findall(r'<b><a href="[^"]+">([^<]+)</a></b> by', m.group(0)) if m else []
+
+          def delta(before, after):
+              gone = [x for x in before if x not in after]
+              new = [x for x in after if x not in before]
+              return gone, new
+
+          def message(what, before, after, extractor, extra=()):
+              gone, new = delta(extractor(before), extractor(after))
+              bits = list(extra)
+              if new:
+                  bits.append("+" + ", +".join(new))
+              if gone:
+                  bits.append("-" + ", -".join(gone))
+              subject = "docs: sync %s" % what
+              if bits:
+                  subject += " (%s)" % "; ".join(bits)
+              body = [
+                  "",
+                  "Regenerated from the templates in .github/workflows/docs-sync.yml.",
+                  "Edit that workflow, not this output -- hand edits here are overwritten.",
+                  "",
+                  "Companion tools added:   %s" % (", ".join(new) if new else "(none)"),
+                  "Companion tools REMOVED: %s" % (", ".join(gone) if gone else "(none)"),
+              ]
+              return subject + "\n" + "\n".join(body)
+
+          readme_after = readme.read_text(encoding="utf-8")
+          old_badge = re.search(r'^\[!\[CI\]\([^\n]+\)\]\([^\n]+\)$', readme_before, re.MULTILINE)
+          badge_changed = ("CI badge",) if (old_badge and old_badge.group(0) != badge) else ()
+          readme_msg = message("README", readme_before, readme_after, md_tools, badge_changed)
+
+          site_before = pages_before["index.html"]
+          site_after = (pages / "index.html").read_text(encoding="utf-8")
+          pages_msg = message("GitHub Pages external-tools block", site_before, site_after, html_tools)
+
+          # Hand both to the bash steps. A heredoc delimiter is the only safe way to pass a multi-line
+          # value through GITHUB_ENV; refuse rather than emit a value that could break out of it.
+          env_path = os.environ["GITHUB_ENV"]
+          with open(env_path, "a", encoding="utf-8") as fh:
+              for key, val in (("README_MSG", readme_msg), ("PAGES_MSG", pages_msg)):
+                  assert "DOCSYNC_EOF" not in val, "commit message would break the GITHUB_ENV heredoc"
+                  fh.write("%s<<DOCSYNC_EOF\n%s\nDOCSYNC_EOF\n" % (key, val))
 
       - name: Commit source-branch changes
         shell: bash
@@ -70,7 +128,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add README.md
           if ! git diff --cached --quiet; then
-            git commit -m "docs: fix CI badge and add companion tools"
+            git commit -m "$README_MSG"
             git push origin HEAD:${GITHUB_REF_NAME}
           else
             echo "README already synchronized."
@@ -85,7 +143,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add index.html releases.html
           if ! git diff --cached --quiet; then
-            git commit -m "docs: add companion tools"
+            git commit -m "$PAGES_MSG"
             git push origin gh-pages
           else
             echo "GitHub Pages already synchronized."
