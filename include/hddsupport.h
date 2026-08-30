@@ -87,6 +87,12 @@ int hddIsPopsPartitionGame(const char *name);
 // list; returns the count, 0 on a complete walk with none, or a negative error for an incomplete walk.
 // Free via hddFreePopsPartitionList.
 int hddGetPopsPartitionList(hdd_pops_list_t *list);
+// Enumerate the APA/PFS partitions that may hold an Ember install: __.EMBER[0-9]? and nothing else.
+// NOT __common -- that is the OPL data home and the partition POPSTARTER.ELF is loaded from, not a
+// place any PS1 library lives. Same walk, same return contract and the same
+// hddFreePopsPartitionList as the POPS list above -- the list type is a plain name array, not a
+// POPS-specific one.
+int hddGetEmberPartitionList(hdd_pops_list_t *list);
 void hddFreePopsPartitionList(hdd_pops_list_t *list);
 int hddSetHDLGameInfo(hdl_game_info_t *ginfo);
 int hddDeleteHDLGame(hdl_game_info_t *ginfo);

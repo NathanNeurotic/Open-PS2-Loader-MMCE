@@ -16,8 +16,9 @@ agent should read.
 | Phase 0 — prove the handoff | **code landed, HARDWARE PENDING** | `sysLaunchEmber()` + `cuesupport.c` + an OPLDIAG-only interception in `appLaunchItem`. See "How to run the Phase 0 test" below. |
 | Phase 1 — view engine | **landed** | `libview.c/.h` own the ring; the binary `vcdView` API is deleted, not shadowed. Both audit gates pass. |
 | One PS1 list, both cores | **landed** | `ps1FillGameList()`; row-kind dispatch for launch and art. Wired for **BDM and MMCE**. |
-| SMB / ETH | **deliberately POPSTARTER-only** | Risk R4 (RiptOPL uses `\`, Ember uses `/`) is untested. One line to flip once proven; the reason is in the code. |
-| APA-HDD, UDPFS | not started | HDD needs its own layout decision (APA has no filesystem root — `POPS` lives on `__common`). |
+| SMB / ETH | **landed** | R4 resolved: the Ember helpers build paths with `cueSep()`, so the separator follows the device. |
+| APA-HDD | **landed, HARDWARE PENDING** | `__.EMBER[0-9]?` partitions, self-contained. Needed a new `KEEPIOP_EXCEPTION` — see below. |
+| UDPFS | not started | |
 | Favourites (OFAV v3 `kind`) | not started | A CUE favourite currently has no way to record which core it belongs to. |
 | Ember settings page / `ember_folder` | not started | Nothing is required for basic operation — the list is driven by what is on disk, exactly like `POPS`. |
 
@@ -227,9 +228,26 @@ read reports success — never block a launch on a failed probe.
 | --- | --- |
 | USB / MX4SIO / iLink / exFAT-ATA (BDM) | `massN:/` — the device **root**, not `gBDMPrefix` |
 | MMCE | `mmceN:/` |
-| SMB / ETH | the share root — **POPSTARTER-only for now**, see R4 |
-| APA / PFS HDD | needs its own decision: APA has no filesystem root, and `POPS` lives on `__common` |
+| SMB / ETH | the share root |
+| APA / PFS HDD | `hdd0:__.EMBER[0-9]?` — a partition of its own, mounted on `pfs0:` and **kept mounted** across the handoff. Self-contained: `EMBER/ember.elf`, `EMBER/bios.bin` and `EMBER/games/` all start at the partition root. |
 | UDPBD / UDPFS | not enabled |
+
+#### ⛔ `__common` is NOT a library location — say what actually lives there
+
+An earlier draft of this document said *"`POPS` lives on `__common`"*, and that sentence is
+ambiguous enough to have produced a real bug: the first version of the APA implementation scanned
+`__common` for `EMBER/games/` on exactly that reasoning.
+
+Precisely:
+
+| Partition | Holds |
+| --- | --- |
+| `__common` | `POPS/POPSTARTER.ELF` — the **loader binary**, which `hddResolveHddPopstarter` mounts and loads. Also the OPL **data** home (`__common/OPL/ART/`, config) when `+OPL` is not in use. |
+| `__.POPS`, `__.POPS0`…`9`, `PP.*.POPS.*` | The **`.VCD` games**. This is the only place POPS titles come from. |
+| `__.EMBER`, `__.EMBER0`…`9` | The **Ember install and its games**, self-contained. |
+
+The rule generalises: one location per kind of thing. A second place being mountable is not a reason
+to look in it.
 
 ### Art and per-game config
 
@@ -781,9 +799,19 @@ config keys, the language labels appended to `_base.yml`, `docs/EMBER.md`.
 
 ### Phase 4 — Favourites v3 + APA HDD
 
-OFAV v3 with the `kind` byte and the v2 migration, and the Favourites ring PS2 → PS1 → APPS (Part 2);
-`hddsupport.c` (`pfs0:/EMBER/`). There is no merged-list setting — merging is the behaviour, see
-Part 4.
+OFAV v3 with the `kind` byte and the v2 migration, and the Favourites ring PS2 → PS1 → APPS (Part 2).
+There is no merged-list setting — merging is the behaviour, see Part 4.
+
+**APA HDD: landed.** `hddBuildVcdGameList` grows a second phase that mounts each `__.EMBER[0-9]?`
+partition on the `pfs1:` scan slot and hands it to `cueScanDir`; rows join the existing VCD arrays
+and are told apart by their `.CUE` extension. `hddDoLaunchEmber` quiesces art, remounts `pfs0:` on
+the owning partition **RDWR**, and hands off with that mount live.
+
+That last part needed a new teardown bit. `UNMOUNT_EXCEPTION` stops the `pfs0:` unmount, but
+`hddCleanUp` also issues `PDIOC_CLOSEALL`, which drops every pfs descriptor in the IOP — safe under
+its stated assumption that *"every path that reaches here hands off to an ELF that resets the IOP"*,
+which Ember is the first launch to break. `KEEPIOP_EXCEPTION` (`include/iosupport.h`, `0x02`) now
+gates that call.
 
 Validate the migration explicitly: take a v2 `favourites.bin` holding ISO, VCD **and** app
 favourites, confirm all three land on the right shelf after the upgrade, **and that a v3 file still

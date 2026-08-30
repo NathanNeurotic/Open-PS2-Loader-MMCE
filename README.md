@@ -220,7 +220,35 @@ This build layers several features on top of upstream OPL:
   settings — so `ART/Spyro 2 (Ripto's Rage)_COV.png` on that device just works, exactly as it does
   for a `.VCD`. Files inside can be named anything; `.cue` is preferred over `.exe` over `.bin`.
   Ember writes its per-game memory cards (`MC1.vmc`, `MC2.vmc`) into that same folder, so it must be
-  on writable media. Currently available on USB, MX4SIO, iLink, exFAT-ATA and MMCE.
+  on writable media. Available on USB, MX4SIO, iLink, exFAT-ATA, MMCE, SMB and the internal
+  APA/PFS hard drive.
+
+  **On an internal APA/PFS drive**, where there is no filesystem root to copy a folder to, the
+  `EMBER/` folder goes on a partition of its own: **`__.EMBER`**, or `__.EMBER0` … `__.EMBER9` if you
+  want more than one. That is deliberately the same naming shape as the `__.POPS` containers that
+  hold your `.VCD` files, so there is only one convention to remember.
+
+  The partition is self-contained — the layout inside it is exactly the one above, starting at the
+  partition root:
+
+  ```
+  hdd0:__.EMBER
+      EMBER/
+          ember.elf
+          bios.bin                   <- yours, 512 KB
+          games/
+              Spyro 2 (Ripto's Rage)/
+                  whatever.cue
+                  whatever.bin
+  ```
+
+  Cover art is unchanged and does **not** go here — `ART/<Game Name>_COV.png` on your OPL data
+  partition, the same place and the same key a `.VCD` uses.
+
+  One difference is worth knowing about, because it is the reason this works at all: an APA Ember
+  title is launched with its partition **still mounted**. Ember inherits that live mount instead of
+  re-opening the drive for itself, which is also why the partition is mounted read/write — Ember's
+  memory cards and `settings.txt` are written straight through it.
 
   **Credit and licence — Ember is created by [Gageformer](https://github.com/Gageformer), and its
   official release page is <https://github.com/Gageformer/Ember/releases>.** Ember is an

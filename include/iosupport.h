@@ -64,6 +64,14 @@ enum ERROR_CODE {
 
 #define NO_EXCEPTION      0x00
 #define UNMOUNT_EXCEPTION 0x01
+// The child ELF keeps the IOP: it inherits the live modules, mounts and file descriptors instead of
+// resetting them away. Set by the Ember launch paths, which hand off through sysLoadELFKeepIOP.
+//
+// UNMOUNT_EXCEPTION alone is not enough on APA. It stops the pfs0: UNMOUNT, but hddCleanUp also
+// issues PDIOC_CLOSEALL, which drops every pfs descriptor in the IOP -- fine when the next thing to
+// run resets the IOP anyway, fatal when it does not. A driver only OPL knows about is still the
+// driver Ember has to read its game through.
+#define KEEPIOP_EXCEPTION 0x02
 
 #define MODE_FLAG_NO_COMPAT  0x01 // no compat support
 #define MODE_FLAG_COMPAT_DMA 0x02 // Supports DMA compat flags
