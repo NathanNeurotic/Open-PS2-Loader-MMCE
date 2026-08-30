@@ -21,8 +21,10 @@
 #include "include/vmc_groups.h"
 
 #ifdef PADEMU
+extern "C" {
 #include <libds34bt.h>
 #include <libds34usb.h>
+}
 #endif
 
 #define NEWLIB_PORT_AWARE
@@ -546,7 +548,7 @@ void guiGameShowCheatConfig(void)
 // PADEMU
 #ifdef PADEMU
 // from https://www.bluetooth.com/specifications/assigned-numbers/host-controller-interface
-static char *bt_ver_str[] = {
+static const char *bt_ver_str[] = {
     "1.0b",
     "1.1",
     "1.2",
@@ -596,23 +598,23 @@ static const char button_enum_to_bit_number[] = {
 };
 
 static const char bit_number_to_button_enum[] = {
-    [BtnBit_Off] = 0, // Off
-    [DS2BtnBit_Up] = 1,
-    [DS2BtnBit_Down] = 2,
-    [DS2BtnBit_Left] = 3,
-    [DS2BtnBit_Right] = 4,
-    [DS2BtnBit_L1] = 5,
-    [DS2BtnBit_R1] = 6,
-    [DS2BtnBit_L2] = 7,
-    [DS2BtnBit_R2] = 8,
-    [DS2BtnBit_Cross] = 9,
-    [DS2BtnBit_Circle] = 10,
-    [DS2BtnBit_Square] = 11,
-    [DS2BtnBit_Triangle] = 12,
-    [DS2BtnBit_L3] = 13,
-    [DS2BtnBit_R3] = 14,
-    [DS2BtnBit_Start] = 15,
-    [DS2BtnBit_Select] = 16,
+    16, // DS2BtnBit_Select
+    13, // DS2BtnBit_L3
+    14, // DS2BtnBit_R3
+    15, // DS2BtnBit_Start
+    1,  // DS2BtnBit_Up
+    4,  // DS2BtnBit_Right
+    2,  // DS2BtnBit_Down
+    3,  // DS2BtnBit_Left
+    7,  // DS2BtnBit_L2
+    8,  // DS2BtnBit_R2
+    5,  // DS2BtnBit_L1
+    6,  // DS2BtnBit_R1
+    12, // DS2BtnBit_Triangle
+    10, // DS2BtnBit_Circle
+    9,  // DS2BtnBit_Cross
+    11, // DS2BtnBit_Square
+    0,  // BtnBit_Off
 };
 
 
