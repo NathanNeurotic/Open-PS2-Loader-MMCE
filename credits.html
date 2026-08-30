@@ -92,7 +92,7 @@ contributed code, ideas, or directly-ported features:</p>
 <tr>
   <td><b>Neutrino</b></td>
   <td>rickgaiser</td>
-  <td>The external EE/IOP game-loader core; the UDPBD block-device transport and the UDPFS network transports (a loose-ISO filesystem device plus a UDPFSBD block device); the bundled IRX chain</td>
+  <td><b>Launched, not derived from</b> — see <a href="#special-thanks">Special Thanks</a>. The external EE/IOP game-loader core RiptOPL hands games to per game, and the core behind the UDPBD block-device transport and the UDPFS network transports (a loose-ISO filesystem device plus a UDPFSBD block device), with its own IRX chain. Bundled in the release package.</td>
   <td><a href="https://github.com/rickgaiser/neutrino">GitHub</a></td>
 </tr>
 <tr>
@@ -183,6 +183,26 @@ this fork builds on top of it — traces directly back to that work.</p>
 </div>
 
 <div class="step">
+<h3>rickgaiser — Neutrino (second PS2 core)</h3>
+<p>Author of <b><a href="https://github.com/rickgaiser/neutrino">Neutrino</a></b>, a
+<i>"Small, Fast and Modular PS2 Device Emulator"</i> — and RiptOPL's <b>second PS2 loader core</b>
+alongside OPL's own. Neutrino is an independent project, <b>not</b> part of RiptOPL and not our work.
+Every release package bundles the official latest build, re-fetched from upstream at publish time, as
+a ready-to-use <code>neutrino/</code> folder.</p>
+<p>It is bundled under the <b>AFL-3.0</b> licence. One honest note on "unmodified": we add exactly one
+file, <code>config/bsd-udpfsbd.toml</code> — Neutrino ships <code>udpfs_bd.irx</code> without a
+matching <code>-bsd</code> token, and RiptOPL launches UDPFS as <code>-bsd=udpfsbd</code>. Nothing of
+rickgaiser's is altered or removed.</p>
+<p>Neutrino is deliberately <b>UI-agnostic</b> — it has no interface of its own, and that design
+choice is precisely what makes front-ends like this one possible. RiptOPL is one of several:
+<b>NHDDL</b>, <b>XEB+ Plugin</b>, <b>RETROLauncher</b>, <b>OSD-XMB</b> and <b>PSBBN/BBNL</b> drive the
+same core, and are worth a look if you want a different shape of launcher over it. Please report
+<i>launching</i> problems to
+<a href="https://github.com/NathanNeurotic/Open-PS2-Loader/issues">us</a> — building the arguments
+and handing off are ours — and genuine Neutrino bugs upstream.</p>
+</div>
+
+<div class="step">
 <h3>Gageformer — Ember (second PS1 core)</h3>
 <p>Author of <b><a href="https://github.com/Gageformer/Ember/releases">Ember</a></b>, an independent PlayStation 1 emulator written from
 scratch for the PlayStation 2 — original recompiler, memory model, geometry pipeline and graphics
@@ -252,17 +272,25 @@ precisely because it is on everything.</p>
 coming and is deeply appreciated.</p>
 </div>
 
-<h2 id="companion-tools">Companion PC Tools</h2>
+<h2 id="companion-tools">Companion Tools</h2>
 
-<p>Every release package links to these rather than vendoring copies, so you always get the
-maintained version. All but the first are <b>third-party projects</b>, independently maintained and
-not part of RiptOPL — <b>please report issues with those to their own repository, not here.</b></p>
+<p>Most of these the release package links to rather than vendoring, so you always get the maintained
+version; the two <b>cores</b> at the end are the exception and ship inside the package. All but
+PS2-Servers are <b>third-party projects</b>, independently maintained and not part of RiptOPL —
+<b>please report issues with those to their own repository, not here.</b></p>
 
 <ul class="checklist">
 <li><b><a href="https://github.com/NathanNeurotic/PS2-Servers">PS2-Servers</a></b> by <b><a href="https://github.com/NathanNeurotic">Ripto</a></b> —
     all-in-one PC server launcher for <b>SMBv1, UDPFS and UDPBD</b>. This one is ours, from the same
     author as RiptOPL, so its issues belong on its own tracker but are the same hands. Shipped as
     <code>PS2-Servers.url</code>.</li>
+<li><b><a href="https://github.com/YouKnow-sys/udpfs-server">udpfs-server</a></b> by <b><a href="https://github.com/YouKnow-sys">YouKnow-sys</a></b> —
+    the same idea <em>from a phone</em>: an <b>Android</b> app that shares folders and disk images to
+    the PS2 over <b>UDPFS</b>. It is found by broadcast, so there is no server address to type in on
+    the console, and it works over a router or a direct cable. Built on
+    <b><a href="https://github.com/pcm720/udpfsd">udpfsd</a></b> by
+    <b><a href="https://github.com/pcm720">pcm720</a></b>; MIT licensed. Reach for it when the games
+    live on a phone or tablet and there is no PC on the network.</li>
 <li><b><a href="https://github.com/Luden02/OrbitPS2-Manager">OrbitPS2 Manager</a></b> by <b><a href="https://github.com/Luden02">Luden</a></b> —
     cross-platform library manager: import games from disc images, fetch cover art and screenshots,
     compress ISOs to ZSO, edit per-game settings and manage virtual memory cards. It writes the
@@ -276,9 +304,13 @@ not part of RiptOPL — <b>please report issues with those to their own reposito
 <li><b><a href="https://github.com/TheRealNextria/PS2RD-CHT-Manager">PS2RD CHT Manager</a></b> by <b><a href="https://github.com/TheRealNextria">TheRealNextria</a></b> —
     manages the PS2RD <code>.cht</code> cheat files RiptOPL reads from a device's <code>CHT</code>
     folder. Shipped as <code>PS2RD-CHT-Manager.url</code>.</li>
-<li><b><a href="https://github.com/Gageformer/Ember/releases">Ember</a></b> by <b><a href="https://github.com/Gageformer">Gageformer</a></b> — The one exception to the shortcut rule:
-    Ember ships <em>inside</em> the package as an <code>EMBER/</code> folder, bundled unmodified
-    under its own licence. See above.</li>
+<li><b><a href="https://github.com/rickgaiser/neutrino">Neutrino</a></b> by <b><a href="https://github.com/rickgaiser">rickgaiser</a></b> — not a shortcut but a
+    <em>bundle</em>: ships <em>inside</em> the package as a ready-to-use <code>neutrino/</code>
+    folder (drag-and-drop to <code>mc?:/neutrino/</code>), under AFL-3.0. RiptOPL's second PS2
+    loader core. See above.</li>
+<li><b><a href="https://github.com/Gageformer/Ember/releases">Ember</a></b> by <b><a href="https://github.com/Gageformer">Gageformer</a></b> — likewise bundled rather than
+    linked: an <code>EMBER/</code> folder inside the package, unmodified, under its own licence.
+    RiptOPL's second PS1 core. See above.</li>
 </ul>
 
 <h2 id="other-credits">Other Credits (from the OPL CREDITS file)</h2>

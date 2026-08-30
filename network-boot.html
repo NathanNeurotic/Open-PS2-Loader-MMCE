@@ -103,7 +103,8 @@ table below, <b>Off</b> is row 1's value; the other three are row 2's.</p>
   <td>UDPRDMA</td>
   <td>a games source served over UDP — a <b>filesystem</b> (<code>udpfs:</code>, loose ISOs) or a
   <b>block device</b> (<code>massN:</code>, disk image), set by <b>Access</b> below</td>
-  <td><a href="https://github.com/NathanNeurotic/PS2-Servers">PS2 Servers</a> (recommended) / <code>udpfsd</code></td>
+  <td><a href="https://github.com/NathanNeurotic/PS2-Servers">PS2 Servers</a> (recommended, PC) /
+  <a href="https://github.com/YouKnow-sys/udpfs-server">udpfs-server</a> (Android) / <code>udpfsd</code></td>
   <td>Neutrino only</td>
 </tr>
 <tr>
@@ -176,8 +177,16 @@ the <code>udpfs_ioman</code> <b>filesystem</b> (<code>udpfs:</code>), IMG is the
 
 <p>Both ride the same UDPRDMA transport and the same server — <a href="https://github.com/pcm720/udpfsd">pcm720/udpfsd</a>,
 a single prebuilt Go binary (no Python) that serves both; just pass
-<code>-fsroot &lt;dir&gt;</code> for Files (the filesystem) or <code>-bdpath &lt;image&gt;</code> for IMG (the block image). A UDPBD-only
-<code>udpbd-server</code> (SUDPBDv2) will not talk to either. Because both backends bind the same
+<code>-fsroot &lt;dir&gt;</code> for Files (the filesystem) or <code>-bdpath &lt;image&gt;</code> for IMG (the block image).</p>
+
+<p><b>No PC on the network?</b> <b><a href="https://github.com/YouKnow-sys/udpfs-server">udpfs-server</a></b>
+by <b><a href="https://github.com/YouKnow-sys">YouKnow-sys</a></b> is an <b>Android</b> app that serves
+the same thing from a phone or tablet — folders <i>or</i> disk images, so it covers both Files and IMG.
+It is found by <b>broadcast</b>, so there is no server address to type in on the console, and it works
+over a router or a direct cable. Built on the same <code>udpfsd</code> underneath; MIT licensed.</p>
+
+<p>Whichever server you use, a UDPBD-only
+<code>udpbd-server</code> (SUDPBDv2) will not talk to either backend. Because both backends bind the same
 UDPRDMA port and the IOP can load only one per boot, you <b>can't run both at once</b> — Files vs IMG
 is a <b>config-time choice</b>, and switching between them needs an <b>OPL restart</b> to take effect
 (OPL shows the usual restart-to-apply notice).</p>
