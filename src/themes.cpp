@@ -176,7 +176,7 @@ static int thmParseDeviceList(const char *value, int quiet)
     if (value == NULL)
         return 0;
 
-    buf = malloc(strlen(value) + 1);
+    buf = (char *)malloc(strlen(value) + 1);
     if (buf == NULL)
         return 0;
     strcpy(buf, value);
@@ -1422,7 +1422,7 @@ static void drawAttributeImage(struct menu_list *menu, struct submenu_list *item
             } else {
                 // Keep the cache identity persistent so a missing optional glyph
                 // is memoized instead of being reopened every frame.
-                GSTEXTURE *texture = cacheGetTexture(attributeImage->cache, menu->item->userdata, &attributeImage->currentCacheId, &attributeImage->currentUid, attributeImage->currentValue);
+                GSTEXTURE *texture = cacheGetTexture(attributeImage->cache, (item_list_t *)menu->item->userdata, &attributeImage->currentCacheId, &attributeImage->currentUid, attributeImage->currentValue);
                 if (texture && texture->Mem) {
                     if (attributeImage->overlayTexture) {
                         rmDrawOverlayPixmap(&attributeImage->overlayTexture->source, elem->posX, elem->posY, elem->aligned, elem->width, elem->height, elem->scaled, gDefaultCol,
@@ -1667,7 +1667,7 @@ static void drawMenuText(struct menu_list *menu, struct submenu_list *item, conf
 
 static void drawBDMIndex(struct menu_list *menu, struct submenu_list *item, config_set_t *config, struct theme_element *elem)
 {
-    item_list_t *itemList = menu->item->userdata;
+    item_list_t *itemList = (item_list_t *)menu->item->userdata;
     // Only render for bdm modes and if current mode is visible
     if (itemList->mode >= ETH_MODE || menu->item->visible == 0)
         return;
@@ -1693,7 +1693,7 @@ static void drawItemsList(struct menu_list *menu, struct submenu_list *item, con
 
     if (item) {
         items_list_t *itemsList = (items_list_t *)elem->extended;
-        item_list_t *list = menu->item->userdata;
+        item_list_t *list = (item_list_t *)menu->item->userdata;
 
         int posX = elem->posX, posY = elem->posY;
         if (elem->aligned) {
@@ -1844,7 +1844,7 @@ static void initItemsList(const char *themePath, config_set_t *themeConfig, them
 static void drawItemText(struct menu_list *menu, struct submenu_list *item, config_set_t *config, struct theme_element *elem)
 {
     if (menu != NULL && menu->item != NULL && item != NULL) {
-        item_list_t *support = menu->item->userdata;
+        item_list_t *support = (item_list_t *)menu->item->userdata;
         if (support != NULL && support->itemGetStartup != NULL) {
             char *startup = support->itemGetStartup(support, item->item.id);
             if (startup != NULL) {
