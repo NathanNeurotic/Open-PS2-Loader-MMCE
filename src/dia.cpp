@@ -61,7 +61,7 @@ int diaShowKeyb(char *text, int maxLen, int hide_text, const char *title)
 {
     int i, j, len = strlen(text), selkeyb = 0, x, w;
     int selchar = 0, selcommand = -1;
-    char c[2] = "\0\0", *mask_buffer;
+    char c[2] = {'\0', '\0'}, *mask_buffer;
     static const char keyb0[KEYB_ITEMS] = {
         '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '=',
         'q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p', '[', ']',
@@ -85,7 +85,7 @@ int diaShowKeyb(char *text, int maxLen, int hide_text, const char *title)
     rmGetScreenExtents(&screenWidth, &screenHeight);
 
     if (hide_text) {
-        if ((mask_buffer = malloc(maxLen)) != NULL) {
+        if ((mask_buffer = (char *)malloc(maxLen)) != NULL) {
             memset(mask_buffer, '*', len);
             mask_buffer[len] = '\0';
         } else {
