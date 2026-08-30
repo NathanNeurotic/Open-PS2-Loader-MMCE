@@ -6,10 +6,32 @@ boot better under Neutrino, or for users who prefer Neutrino's loader and its la
 
 > The core selector and the launch-args fields described here are specific to this fork.
 
+## Credit and licence
+
+**Neutrino is created by [rickgaiser](https://github.com/rickgaiser)** — a *"Small, Fast and Modular
+PS2 Device Emulator"*. Home: <https://github.com/rickgaiser/neutrino>.
+
+It is an independent project, **not** part of RiptOPL and not our work. The RiptOPL release package
+bundles the official latest build, re-fetched from upstream at publish time, under Neutrino's
+**AFL-3.0** licence. We add exactly one file to that folder — `config/bsd-udpfsbd.toml`, because
+Neutrino ships `udpfs_bd.irx` without a matching `-bsd` token and RiptOPL launches UDPFS as
+`-bsd=udpfsbd`. Nothing of rickgaiser's is altered or removed.
+
+Neutrino is deliberately **UI-agnostic**: it has no interface of its own, and that is exactly what
+makes a front-end like this one possible. RiptOPL is one of several — **NHDDL**, **XEB+ Plugin**,
+**RETROLauncher**, **OSD-XMB** and **PSBBN/BBNL** all drive the same core.
+
+Report *launching* problems here — building the arguments and handing off are ours. Genuine Neutrino
+bugs belong on rickgaiser's tracker.
+
 ## 1. Install Neutrino
 
-Neutrino is **not bundled** with OPL — you supply it. Copy Neutrino's whole `neutrino/` folder,
-not just the ELF: OPL only accepts an install when `config/system.toml` (or a flat `system.toml`,
+**The RiptOPL release package ships a ready-to-use `neutrino/` folder** — drag it onto a memory card
+as `mc?:/neutrino/` and this is already done. (Upstream OPL does not bundle Neutrino; if you built
+RiptOPL yourself or are coming from another loader, supply it from
+<https://github.com/rickgaiser/neutrino/releases>.)
+
+Either way, copy Neutrino's **whole `neutrino/` folder**, not just the ELF: OPL only accepts an install when `config/system.toml` (or a flat `system.toml`,
 the SAS layout) sits beside `neutrino.elf`. An ELF-only folder is **skipped** and probing
 continues, so you get the `<OPL>` fallback even though the file exists.
 
@@ -150,7 +172,7 @@ reading, so an SMBv1-only server (including the bundled PS2-Servers tool) will l
 |---|---|---|---|---|
 | **Off** | — | no network device (default) | — | — |
 | **SMB** | SMBv1 (default) or SMB2 — **Network → SMB Version** | a mounted file share | OPL's *own* core (not Neutrino) | [PS2 Servers](https://github.com/NathanNeurotic/PS2-Servers) (recommended) / Samba |
-| **UDPFS** | UDPRDMA | a games source served over UDP (see **UDPFS Access** below) | Neutrino only | [PS2 Servers](https://github.com/NathanNeurotic/PS2-Servers) (recommended) / [`udpfsd`](https://github.com/pcm720/udpfsd) |
+| **UDPFS** | UDPRDMA | a games source served over UDP (see **UDPFS Access** below) | Neutrino only | [PS2 Servers](https://github.com/NathanNeurotic/PS2-Servers) (recommended, PC) / [udpfs-server](https://github.com/YouKnow-sys/udpfs-server) (Android) / [`udpfsd`](https://github.com/pcm720/udpfsd) |
 | **UDPBD** | SUDPBDv2 | a served disk image mounted as `massN:` | Neutrino only | [PS2 Servers](https://github.com/NathanNeurotic/PS2-Servers) (recommended) / [`udpbd-server`](https://github.com/israpps/udpbd-server) |
 
 > **SMB3 is reserved, not offered.** The dialect enum has a slot for it, but packet signing isn't
@@ -200,7 +222,12 @@ effect** (OPL shows the usual restart-to-apply notice).
 ### Requirements
 
 - A **PC-side UDPFS server** on the same LAN, matching the UDPFS Access mode you chose. RiptOPL does
-  **not** embed one. Use **[NathanNeurotic/PS2-Servers](https://github.com/NathanNeurotic/PS2-Servers)**,
+  **not** embed one. Serving from a **phone or tablet** instead of a PC?
+  **[udpfs-server](https://github.com/YouKnow-sys/udpfs-server)** by
+  **[YouKnow-sys](https://github.com/YouKnow-sys)** is an Android app that shares folders and disk
+  images over UDPFS and is found by broadcast, so there is no address to type on the console; it is
+  built on **[udpfsd](https://github.com/pcm720/udpfsd)** by **[pcm720](https://github.com/pcm720)**
+  and is MIT licensed. On a PC, use **[NathanNeurotic/PS2-Servers](https://github.com/NathanNeurotic/PS2-Servers)**,
   the maintained all-in-one launcher for UDPFS, SMBv1 and UDPBD; release packages include a
   `PS2-Servers.url` shortcut to it. Advanced users can instead run
   **[pcm720/udpfsd](https://github.com/pcm720/udpfsd)** directly. The old standalone `udpbd-server`
