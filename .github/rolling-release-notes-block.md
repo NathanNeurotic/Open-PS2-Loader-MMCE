@@ -95,6 +95,35 @@ or repackaging the build; and no BIOS or game content is included, ever.
 Please report Ember problems to *us* first rather than to Gageformer — the launching is ours, and
 most issues turn out to be on our side.
 
+## The Neutrino core
+
+The package ships a ready-to-use **`neutrino/`** folder — drag it onto your memory card as
+`mc?:/neutrino/` and per-game Neutrino launching works with nothing further to set up. It is the
+official latest build, re-fetched from upstream every time a release is published, so it does not go
+stale behind us.
+
+RiptOPL hands a game to Neutrino **per game**, not globally: everything else stays on OPL's own
+core. That is the whole point of having two — if a title dislikes one, switch that one title.
+
+### Neutrino credit and licence
+
+**Neutrino is created by rickgaiser.** Home: <https://github.com/rickgaiser/neutrino>
+
+Neutrino is an independent *"Small, Fast and Modular PS2 Device Emulator"*. It is **not** part of
+RiptOPL and is not our work. It is bundled here under its **AFL-3.0** licence.
+
+One honest note on "unmodified": we add exactly **one** file to the folder,
+`config/bsd-udpfsbd.toml`. Neutrino ships `udpfs_bd.irx` but no matching `-bsd` token for it, and
+RiptOPL launches UDPFS as `-bsd=udpfsbd`. Nothing of rickgaiser's is altered or removed.
+
+Neutrino is deliberately **UI-agnostic** — it has no interface of its own, which is precisely what
+lets a front-end drive it. RiptOPL is one of several: **NHDDL**, **XEB+ Plugin**, **RETROLauncher**,
+**OSD-XMB** and **PSBBN/BBNL** are others, and they are worth a look if you want a different shape
+of launcher over the same core.
+
+Please report *launching* problems to **us** — building the arguments and handing off are ours, and
+most reports land on our side of that line. Genuine Neutrino bugs belong upstream.
+
 ## Alternate POPSTARTER builds
 
 `POPS/POPSTARTER VERSIONS/` holds five builds. To switch, copy the `POPSTARTER.ELF` you want over

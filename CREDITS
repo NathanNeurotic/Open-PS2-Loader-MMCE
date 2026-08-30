@@ -68,7 +68,6 @@ RiptOPL is a direct agglomeration of the wider OPL family, bringing together
 features, code, and ideas from:
 
   - rickgaiser's OPL                https://github.com/rickgaiser/Open-PS2-Loader
-  - neutrino                        https://github.com/rickgaiser/neutrino
   - sOPL (mystyq)                   https://github.com/mystyq/Stable-Open-PS2-Loader
   - uOPL (Wolf3s)                   https://github.com/Wolf3s/uOPL
   - wOPL (KrahJohlito)              https://github.com/KrahJohlito/wOPL
@@ -78,6 +77,21 @@ features, code, and ideas from:
   - nhddl (pcm720)                  https://github.com/pcm720/nhddl
   - Modulo-R1 (AdityaKumar7209)     https://github.com/AdityaKumar7209/Modulo-R1-Beta-Preview---PS2
   - official OPL                    https://github.com/ps2homebrew/Open-PS2-Loader
+
+Bundled third-party software, shipped in the release package and NOT part of RiptOPL:
+
+  - Neutrino, by rickgaiser          https://github.com/rickgaiser/neutrino
+    A small, fast, modular PS2 device emulator, and RiptOPL's second PS2 loader
+    core. Bundled as a ready-to-use neutrino/ folder under the AFL-3.0 licence.
+    Deliberately UI-agnostic -- having no interface of its own is precisely what
+    lets a front-end drive it. RiptOPL adds only config/bsd-udpfsbd.toml, so that
+    UDPFS can be launched as -bsd=udpfsbd; nothing upstream is altered.
+
+  - Ember, by Gageformer             https://github.com/Gageformer/Ember
+    An independent PS1 emulator written from scratch for the PS2, and RiptOPL's
+    second PS1 core alongside POPSTARTER. Bundled unmodified with the author's
+    permission under the Ember Public Beta Testing Licence, shipped in the
+    package as EMBER/LICENSE-BETA.txt.
 
 Special and sincere thanks to:
 
