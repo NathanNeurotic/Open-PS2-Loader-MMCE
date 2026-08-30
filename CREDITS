@@ -93,6 +93,15 @@ Bundled third-party software, shipped in the release package and NOT part of Rip
     permission under the Ember Public Beta Testing Licence, shipped in the
     package as EMBER/LICENSE-BETA.txt.
 
+  - POPStarter, by krHACKen          https://www.psx-place.com/resources/popstarter.683/
+    A PS1 launcher built around Sony's native POPS emulator for the PS2, used as
+    RiptOPL's primary PS1 core alongside Ember. POPStarter provides the
+    compatibility and launch layer for running PS1 VCDs from USB, internal HDD,
+    and SMB. The official POPStarter r13 package contains no Sony emulator
+    binaries, libraries, or BIOS files; those components must be supplied
+    separately by the user. Official download, documentation, compatibility
+    information, and releases are maintained on PSX-Place.
+
 Special and sincere thanks to:
 
   - Wolf3s and KrahJohlito - the driving force behind uOPL / wOPL, where much of
@@ -117,10 +126,6 @@ by saildot4k
 Testing, bug reports and real-hardware feedback
 by eliminator1403, lucaslmgv, AndrewBento, AcidReach, bodvenomz, nuno6573, Blade1984
 and zackcage6
-
-The RiptOPL name
-by Akilluminati47 (https://github.com/akilluminati47)
-who coined it before the project existed
 
 The RiptOPL name
 by Akilluminati47 (https://github.com/akilluminati47)
