@@ -32,7 +32,7 @@
     <a href="ps1-vcd.html"><span class="em">💿</span>PS1 Games</a>
     <a href="neutrino.html"><span class="em">⚛️</span>Neutrino Core</a>
     <a href="coverflow.html"><span class="em">🎴</span>Coverflow</a>
-    <a href="favourites.html"><span class="em">⭐</span>Favourites</a>
+    <a href="favourites.html"><span class="em">⭐</span>Favorites</a>
     <a href="per-game-settings.html"><span class="em">🎚️</span>Per-game Settings</a>
     <a href="vmc.html"><span class="em">💾</span>VMC</a>
     <a href="cheats.html"><span class="em">🎮</span>Cheats</a>
@@ -126,9 +126,13 @@ APPS/       Homebrew ELF files
 </pre>
 
 <div class="callout info"><div class="h">i PS1 games on USB / MX4SIO / iLink</div>
-Put your <code>*.VCD</code> files in the <code>POPS/</code> folder. Press <b>L3</b> on the device's game page
-to toggle the VCD (PS1) view. See <a href="ps1-vcd.html">PS1 Games (VCD)</a> for the full setup — you will
-also need POPSTARTER on the same device.</div>
+Put your <code>*.VCD</code> files in the <code>POPS/</code> folder. <b>PS2/PS1 Game Display</b> can show
+separate PS2 / PS1 pages, a combined list, or one locked type; L3 is available only in <b>Both (L3)</b>
+and <b>Mixed</b>. See <a href="ps1-vcd.html">PS1 Games (VCD)</a> for the full setup — you will
+also need POPSTARTER on the same device. For iLink, keep the loose
+<code>usbd.irx.ilink</code> + <code>usbhdfsd.irx.ilink</code> pair in that <code>POPS/</code>
+folder; RiptOPL strips <code>.ilink</code> only when copying the pair to the memory card and launches
+with the normal <code>mass:/POPS/XX.&lt;game&gt;.ELF</code> selector.</div>
 
 <h2 id="fragmentation">Fragmentation</h2>
 <p>OPL's BDM driver supports <b>up to 64 fragments</b> per file (since OPL v1.2.0 beta rev1893). Games with

@@ -32,7 +32,7 @@
     <a href="ps1-vcd.html"><span class="em">💿</span>PS1 Games</a>
     <a href="neutrino.html"><span class="em">⚛️</span>Neutrino Core</a>
     <a href="coverflow.html"><span class="em">🎴</span>Coverflow</a>
-    <a href="favourites.html"><span class="em">⭐</span>Favourites</a>
+    <a href="favourites.html"><span class="em">⭐</span>Favorites</a>
     <a href="per-game-settings.html"><span class="em">🎚️</span>Per-game Settings</a>
     <a href="vmc.html"><span class="em">💾</span>VMC</a>
     <a href="cheats.html"><span class="em">🎮</span>Cheats</a>
@@ -86,7 +86,7 @@ RiptOPL saves its master settings to <code>settings_riptopl.cfg</code> — a dif
 <ul>
   <li><code>APP_RIPTOPL-PS2DEVLATESTSDK/RIPTOPL.ELF</code> — built with <code>ps2dev/ps2dev:latest</code>, the current SDK RiptOPL is developed and tested against. This is the recommended one.</li>
   <li><code>APP_RIPTOPL-PS2DEVPINNEDSDK/RIPTOPL.ELF</code> — the same ps2dev SDK, pinned by digest to a day it was known good. Use this if the recommended build has a regression on your console.</li>
-  <li><code>POPSTARTER/</code> and <code>POPS/</code> folders — structure for PS1 support. <code>POPSTARTER.ELF</code> and its BDMA <code>usbd</code> / <code>usbhdfsd</code> variants <b>are</b> bundled in <code>POPS/</code> (together with <code>PATCH_5.BIN</code>); <code>POPSTARTER/</code> carries the SMB network stack. Only <code>POPS.ELF</code> — Sony's PS1 emulator — is not distributed here.</li>
+  <li><code>POPS/</code> — the single canonical release folder for POPSTARTER support. It contains <code>POPSTARTER.ELF</code>, the SMB externals, <code>PATCH_5.BIN</code>, and every loose BDMA <code>usbd.irx.*</code> / <code>usbhdfsd.irx.*</code> pair, including <code>.ilink</code>. No BDMA pair is embedded in <code>RIPTOPL.ELF</code>, and there is no duplicate release-root <code>POPSTARTER/</code> folder. Only <code>POPS.ELF</code> — Sony's PS1 emulator — is not distributed here.</li>
   <li><code>neutrino/</code> — the bundled Neutrino external core, shipped extracted as a drag-and-drop folder (<code>neutrino.elf</code> + <code>config/</code> + <code>modules/</code>) used by the <b>network-boot (UDPBD/UDPFS)</b> subsystem (pre-populated with the UDPFS config). Copy it to <code>mc?:/neutrino/</code> — that path is exactly what <b>Neutrino ELF Path</b> auto-detect looks for, and the same copy serves both per-game Neutrino launching and network boot. No separate download is needed.</li>
   <li><code>PS2-Servers.url</code> — opens the maintained <a href="https://github.com/NathanNeurotic/PS2-Servers">PS2 Servers</a> UDPFS / SMBv1 / UDPBD all-in-one PC launcher. The server software itself is no longer embedded in the RiptOPL package.</li>
 </ul>

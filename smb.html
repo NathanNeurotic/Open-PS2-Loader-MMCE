@@ -32,7 +32,7 @@
     <a href="ps1-vcd.html"><span class="em">💿</span>PS1 Games</a>
     <a href="neutrino.html"><span class="em">⚛️</span>Neutrino Core</a>
     <a href="coverflow.html"><span class="em">🎴</span>Coverflow</a>
-    <a href="favourites.html"><span class="em">⭐</span>Favourites</a>
+    <a href="favourites.html"><span class="em">⭐</span>Favorites</a>
     <a href="per-game-settings.html"><span class="em">🎚️</span>Per-game Settings</a>
     <a href="vmc.html"><span class="em">💾</span>VMC</a>
     <a href="cheats.html"><span class="em">🎮</span>Cheats</a>
@@ -239,7 +239,7 @@ If you leave the <b>Share</b> field empty, OPL asks the driver to enumerate the 
 <div class="callout amber"><div class="h">⚠ The PS1 leg is SMBv1 regardless of the SMB Version row</div>
 The <b>SMB Version</b> setting governs OPL's own browsing and its in-game reader. It does not reach POPSTARTER: the module set OPL checks for on the memory card is the SMBv1 one (<code>smbman.irx</code>), and POPSTARTER reads its own <code>SMBCONFIG.DAT</code>, not OPL's dialect choice. So a PS1 VCD launched over SMB still needs a server that answers <b>SMBv1</b>, even if you have set OPL to SMB2 for PS2 games. If your server is SMB2-only, PS2 games over SMB will work and PS1 VCDs over SMB will not.</div>
 
-<p>For deeper PS1 coverage — cover art by PS1 disc ID, the Default game view lock, and BDMA module equipping for exFAT — see <a href="ps1-vcd.html">PS1 Games (VCD)</a>.</p>
+<p>For deeper PS1 coverage — cover art by PS1 disc ID, the four <b>PS2/PS1 Game Display</b> modes, and BDMA module equipping for block devices — see <a href="ps1-vcd.html">PS1 Games (VCD)</a>.</p>
 
 <details class="deep"><summary>Does the BDMA exFAT equip apply to SMB?</summary>
 <p>No. The BDMA equip copies block-device driver modules for POPSTARTER to use when reading an exFAT drive. SMB is a pure network path — there is no block device involved. The BDMA Mode and BDMA Source settings in General Settings have no effect on an SMB VCD launch. The only prerequisite for PS1 over SMB is the four network IRX modules above plus the POPSTARTER network config files.</p>

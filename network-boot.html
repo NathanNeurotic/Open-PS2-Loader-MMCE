@@ -32,7 +32,7 @@
     <a href="ps1-vcd.html"><span class="em">💿</span>PS1 Games</a>
     <a href="neutrino.html"><span class="em">⚛️</span>Neutrino Core</a>
     <a href="coverflow.html"><span class="em">🎴</span>Coverflow</a>
-    <a href="favourites.html"><span class="em">⭐</span>Favourites</a>
+    <a href="favourites.html"><span class="em">⭐</span>Favorites</a>
     <a href="per-game-settings.html"><span class="em">🎚️</span>Per-game Settings</a>
     <a href="vmc.html"><span class="em">💾</span>VMC</a>
     <a href="cheats.html"><span class="em">🎮</span>Cheats</a>
@@ -57,7 +57,7 @@ and <b>Access</b> (<b>Files</b> or <b>IMG</b>). Because the PS2 has one Ethernet
 transport is ever active, so the Protocol row is exclusive <i>by construction</i>. <b>UDPFS</b> is the modern
 network-boot protocol (Rick Gaiser's <b>UDPRDMA</b> transport); <b>UDPBD</b> is the older SUDPBDv2
 protocol, kept for users still running the <code>udpbd-server</code>. Both appear in RiptOPL as their own
-games list — with covers, Favourites, and per-game settings, just like a local drive — and always
+games list — with covers, Favorites, and per-game settings, just like a local drive — and always
 launch through <a href="neutrino.html">Neutrino</a> (there is no OPL built-in core fallback for them).
 SMB is the exception: it is a mounted file share served by OPL's own core, and needs no Neutrino.</p>
 
@@ -116,6 +116,20 @@ table below, <b>Off</b> is row 1's value; the other three are row 2's.</p>
 </tr>
 </tbody>
 </table>
+
+<div class="callout info"><div class="h">ℹ PS1 over UDP: Ember only</div>
+UDPFS and UDPBD now expose the same PS1 page as other game devices, but their scan is deliberately
+limited to <b>Ember</b> folders under <code>EMBER/games/</code>. Ember performs no IOP reset and inherits
+the live <code>udpfs:</code> or <code>massN:</code> network mount. POPSTARTER resets the IOP and cannot
+restore either transport, so <code>POPS/*.VCD</code> rows are not listed on these two pages.
+<b>Both (L3)</b> reaches this Ember-only PS1 view via L3; <b>Mixed</b> combines those Ember rows with
+PS2 titles and cycles Mixed / PS2 / PS1; <b>PS1</b> pins it directly.</div>
+
+<div class="callout info"><div class="h">ℹ Apply and retry without leaving the page</div>
+Confirming <b>Network Settings</b> applies the current values and begins a new connection attempt
+immediately. If a router or server was slow and the page reports a failed connection, press
+<b>Select / Refresh</b> on that network page to retry it; reopening settings or saving every setting
+is no longer required.</div>
 
 <p><b>UDPFS</b> is the one modern network-boot protocol (Rick Gaiser's <b>UDPRDMA</b> transport). It
 comes in two shapes, chosen with the <b>Access</b> row (see the comparison below): <b>Files</b>

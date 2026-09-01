@@ -32,7 +32,7 @@
     <a href="ps1-vcd.html"><span class="em">💿</span>PS1 Games</a>
     <a href="neutrino.html"><span class="em">⚛️</span>Neutrino Core</a>
     <a href="coverflow.html"><span class="em">🎴</span>Coverflow</a>
-    <a href="favourites.html"><span class="em">⭐</span>Favourites</a>
+    <a href="favourites.html"><span class="em">⭐</span>Favorites</a>
     <a href="per-game-settings.html"><span class="em">🎚️</span>Per-game Settings</a>
     <a href="vmc.html"><span class="em">💾</span>VMC</a>
     <a href="cheats.html"><span class="em">🎮</span>Cheats</a>
@@ -68,7 +68,7 @@ If <code>RIPTOPL.ELF</code> is already on your PS2 and booting, skip ahead to
 </ul>
 
 <details class="deep"><summary>Which release should I download?</summary>
-<p>The <b>rolling</b> pre-release is rebuilt from <code>master</code> on every push and normally includes the bundled Neutrino core. It may occasionally be unstable. Tagged <b>v*</b> releases are manually cut, known-good snapshots. Either way, the full installable package zip (<code>RIPTOPL-&lt;rel&gt;-&lt;sha&gt;.zip</code>) contains the ELF, the <code>POPSTARTER/</code> and <code>POPS/</code> folders, and the already-extracted <code>neutrino/</code> folder — download the zip rather than a bare ELF if you intend to use Neutrino. The language pack is a separate <code>RIPTOPL-LANGS-*.zip</code> release asset. See <a href="releases.html">Releases</a> for details.</p>
+<p>The <b>rolling</b> pre-release is rebuilt from <code>rebuild/main</code> on every push and normally includes the bundled Neutrino core. It may occasionally be unstable. Tagged <b>v*</b> releases are manually cut, known-good snapshots. Either way, the full installable package zip (<code>RIPTOPL-&lt;rel&gt;-&lt;sha&gt;.zip</code>) contains the loader folders, one canonical <code>POPS/</code> folder (including every loose BDMA pair and the iLink <code>.ilink</code> pair), <code>EMBER/</code>, and the already-extracted <code>neutrino/</code> folder. No duplicate release-root <code>POPSTARTER/</code> folder or embedded BDMA pair is used. The language pack is a separate <code>RIPTOPL-LANGS-*.zip</code> release asset. See <a href="releases.html">Releases</a> for details.</p>
 </details>
 
 <h2 id="pick-a-device">Pick a device</h2>
@@ -164,7 +164,7 @@ USB root
 <h3>5. Save your settings</h3>
 <p>After a successful launch, go back to the main menu (press <b>Start</b>) and choose <b>Save Changes</b>. This writes <code>settings_riptopl.cfg</code> to your storage device so RiptOPL remembers your configuration on every subsequent boot.</p>
 <div class="callout info"><div class="h">ℹ Where the config file lives</div>
-RiptOPL saves its master config as <code>settings_riptopl.cfg</code> — distinct from upstream OPL's <code>conf_opl.cfg</code>. Both builds can share the same memory card or storage device without overwriting each other's settings. Art, themes, VMCs, per-game configs, and favourites in the shared <code>OPL/</code> folders are visible to all OPL builds.</div>
+RiptOPL saves its master config as <code>settings_riptopl.cfg</code> — distinct from upstream OPL's <code>conf_opl.cfg</code>. Both builds can share the same memory card or storage device without overwriting each other's settings. Art, themes, VMCs, per-game configs, and favorites in the shared <code>OPL/</code> folders are visible to all OPL builds.</div>
 </div>
 
 </div>
