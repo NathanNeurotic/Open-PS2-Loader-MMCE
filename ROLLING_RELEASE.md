@@ -13,7 +13,7 @@ ELFs, DualSense loaders, and supporting files are published alongside it:
 
 | Asset | What it is |
 |---|---|
-| `RIPTOPL-<rel>-<sha>.zip` | **The installable package.** Contains four loader folders that differ ONLY by the SDK toolchain they were built with (the RiptOPL code in each is identical), each explicitly labeled: `APP_RIPTOPL-PS2DEVPINNED/RIPTOPL.ELF` (#1, recommended pinned ps2dev), `APP_RIPTOPL-OFFICIALPINNED/RIPTOPL.ELF` (#2, recommended pinned ps2homebrew), `APP_RIPTOPL-PS2DEVROLLING/RIPTOPL.ELF` (#3, rolling canary), and `APP_RIPTOPL-OFFICIALROLLING/RIPTOPL.ELF` (#4, rolling canary). Also includes a `POPS/` folder for PS1 support via POPSTARTER (which carries
+| `RIPTOPL-<rel>-<sha>.zip` | **The installable package.** Contains four loader folders that differ ONLY by the SDK toolchain they were built with (the RiptOPL code in each is identical), each explicitly labeled: `APP_RIPTOPL-PS2DEVPINNED/RIPTOPL.ELF` (#1, recommended pinned ps2dev), `APP_RIPTOPL-OFFICIALPINNED/RIPTOPL.ELF` (#2, recommended pinned ps2homebrew), `APP_RIPTOPL-PS2DEVROLLING/RIPTOPL.ELF` (#3, rolling canary), and `APP_RIPTOPL-OFFICIALROLLING/RIPTOPL.ELF` (#4, rolling canary). Also includes a `POPS/` folder for PS1 support via POPSTARTER (including all loose BDMA pairs—none are embedded in the loader—the new `usbd.irx.ilink` + `usbhdfsd.irx.ilink` pair for iLink VCD launches, and
 `POPS/POPSTARTER VERSIONS/`, the alternate POPSTARTER builds) and an `EMBER/` folder for PS1 support
 via **[Ember](https://github.com/Gageformer/Ember)** by **[Gageformer](https://github.com/Gageformer)**, the second PS1 core; the bundled **[Neutrino](https://github.com/rickgaiser/neutrino)** core by **[rickgaiser](https://github.com/rickgaiser)** as a ready-to-use `neutrino/` folder (drag-and-drop to `mc?:/`), plus `PS2-Servers.url`, `udpfs-server.url`, `OrbitPS2-Manager.url`, `OPL-PS1-AIO-Converter-GUI.url`, and `PS2RD-CHT-Manager.url`. Extract it, pick a folder and copy its `RIPTOPL.ELF` — see [Which build should I use?](#which-build-should-i-use) below. |
 | `RIPTOPL-<version>-PS2DEVPINNED.ELF` | Bare loader, digest-pinned `ps2dev/ps2dev` toolchain (**recommended / primary**; in-app version ends `-PS2DEVPINNED`). |
@@ -26,6 +26,15 @@ via **[Ember](https://github.com/Gageformer/Ember)** by **[Gageformer](https://g
 | `BUILD-MANIFEST.txt` | Detailed toolchain metadata, image digests, commit hashes, and compiler versions for each build. |
 | `RIPTOPL-LANGS-*.zip` | Extra UI language files (`.lng` + non-Latin fonts) — copy into your OPL folder. |
 | `RIPTOPL-VARIANTS-*.zip` / `RIPTOPL-DEBUG-*.zip` | Alternate build configs and debug builds across all toolchains — for testing/diagnostics. |
+
+The current UI presents the same **PS2/PS1 Game Display** setting on Interface and PS Emulation:
+**Both (L3)** switches separate device libraries; **Mixed** combines them and L3 cycles
+Mixed → PS2 → PS1; **PS2** and **PS1** lock one library and make L3 fully inert. APPS is independent:
+it can remain one Mixed ELF list or split Apps / `[PS1]`-titled ELFs across L3. Favorites is also
+independent and always cycles **All in One → PS2 → PS1 → ELF**. Returning from Start/Settings retains
+the page the user paused on. UDPFS and UDPBD PS1 views publish Ember titles only because POPSTARTER
+cannot restore those network transports after its IOP reset. Confirming Network Settings now applies
+the current values and reconnects immediately; Select / Refresh retries a failed network page.
 
 `<version>` is the `ps2dev:latest` build's `git describe` (e.g. `v1.2.0-Beta-2562-c553567`); each
 flavour carries the same version with its flavour suffix (`-PS2DEVPINNED`, `-OFFICIALPINNED`, `-PS2DEVROLLING`, `-OFFICIALROLLING`).

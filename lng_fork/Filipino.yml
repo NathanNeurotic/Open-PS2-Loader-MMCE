@@ -78,9 +78,9 @@ translations:
   LARGE: Malaki
   NORMAL: Normal
   FAV: Mga Paborito
-  FAVMODE: Favourites Start Mode
+  FAVMODE: Favorites Start Mode
   FAV_HINT: Paborito
-  FAV_MSG: '%s ay hindi pinapayagan sa Favourites Menu.'
+  FAV_MSG: '%s ay hindi pinapayagan sa Favorites Menu.'
   FAV_PERSISTENCE_MSG: '%s ay hindi pinapayagan habang naka-marka ang item bilang paborito.'
   NEUTRINO_DEVICE: Neutrino Device
   HINT_NEUTRINO_DEVICE: Device na naglalaman ng neutrino.elf (sa loob ng NEUTRINO/ o neutrino/ folder). Ang Auto ay nagsa-scan muna sa mc0 pagkatapos mc1.
@@ -219,9 +219,9 @@ translations:
   "HINT_NEUTRINO_BSDFS": "Piliting gamitin ang block-device filesystem ng Neutrino (-bsdfs). Auto = default kada device. Ang hdl/bd ay mga expert na opsyon; ipares ang mga ito sa katugmang -dvd= sa launch args kung hindi bagay ang hugis ng auto na path."
   "PLASCOLOR": "Kulay ng Plasma Blend"
   "VCD_HIDE_GAMEID": "Itago ang PS1 Game ID (VCD list)"
-  "HINT_VCD_HIDE_GAMEID": "Pangkosmetiko lamang -- itago ang nauunang game-ID prefix (hal. SLUS_005.51.) sa mga pangalan ng PS1/VCD list. Ang mga pangalang walang ID ay ipinapakita nang buo. Hindi binabago ang paglulunsad, cover art, o mga favourites."
+  "HINT_VCD_HIDE_GAMEID": "Pangkosmetiko lamang -- itago ang nauunang game-ID prefix (hal. SLUS_005.51.) sa mga pangalan ng PS1/VCD list. Ang mga pangalang walang ID ay ipinapakita nang buo. Hindi binabago ang paglulunsad, cover art, o mga favorites."
   "VCD_FIRST_DISC": "Unang disc lang (multi-disc PS1)"
-  "HINT_VCD_FIRST_DISC": "Ipakita lamang ang Disc 1 ng isang multi-disc na PS1 game sa mga listahan ng device (istilong POPSLoader). Itinatago ang mga file na pinangalanang (Disc 2), (CD 2), atbp. Nananatili ang lahat ng disc sa card para sa in-game na pagpapalit; hindi sinasala ang mga Favourites."
+  "HINT_VCD_FIRST_DISC": "Ipakita lamang ang Disc 1 ng isang multi-disc na PS1 game sa mga listahan ng device (istilong POPSLoader). Itinatago ang mga file na pinangalanang (Disc 2), (CD 2), atbp. Nananatili ang lahat ng disc sa card para sa in-game na pagpapalit; hindi sinasala ang mga Favorites."
   "GAMES_DEVICE": "Device ng Laro"
   "DEFAULT_CORE": "Default na Loader Core"
   "HINT_DEFAULT_CORE": "Global na default na core para sa mga laro na naka-set sa Default ang per-game na Loader Core. Ang <OPL> ang native na core; ikinakadena ng Neutrino ang panlabas na neutrino.elf. Palaging pinapangibabawan ito ng per-game na pagpili."

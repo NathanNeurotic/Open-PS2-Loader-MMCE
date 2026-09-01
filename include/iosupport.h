@@ -187,6 +187,18 @@ typedef struct _item_list_t
     /// APPENDED at the end: every support initialises item_list_t POSITIONALLY, so a member added
     /// anywhere else silently shifts every one of them.
     void (*itemLaunchCue)(item_list_t *itemList, const char *cueName, config_set_t *configSet);
+
+    /// Return the LIB_VIEW_* kind of one visible row. This differs from the page view when a page
+    /// is mixed (PS2 + PS1), when Favorites shows All, or when APPS displays tagged PS1 ELFs with
+    /// ordinary apps. NULL means the row has the page's active view.
+    /// APPENDED: all positional initializers written before mixed views default safely to NULL.
+    int (*itemGetView)(item_list_t *itemList, int id);
+
+    /// Translate one visible-row id to the id in that row's source list. Mixed device pages use a
+    /// single visible id range but Favorites must persist the original PS2/PS1 id; APPS likewise
+    /// keeps its master discovery id while showing a filtered subset. NULL means identity mapping.
+    /// APPENDED for positional-initializer compatibility.
+    int (*itemGetSourceId)(item_list_t *itemList, int id);
 } item_list_t;
 
 #define ITEM_VIEW_NATIVE    0

@@ -808,8 +808,8 @@ item_list_t *hddGetObject(int initOnly)
 // be removed/replaced without damaging the console"). While set, hddUpdateGameList's VCD branch reuses
 // the built arrays so an L3 toggle rebuilds only the submenu, never re-walks the partitions. A latch
 // (not hddVcdGames != NULL) so a drive whose candidates scanned to ZERO VCDs is also remembered.
-// hddGetPopsPartitionList distinguishes a successful zero-candidate walk from a failed APA walk;
-// only the former may replace/latch the current VCD list.
+// Each POPS/Ember partition enumerator distinguishes a successful zero-candidate walk from a failed
+// APA walk; only a complete two-phase scan may replace/latch the current combined PS1 list.
 // Cleared by hddFreeVcdGameList (covers rebuilds + hddCleanUp/hddShutdown teardown) and by
 // hddVcdInvalidateCache (the first-disc-only setting filters at scan time, so its change must rescan).
 // The generation counter keeps an invalidation from being SWALLOWED by a build already in flight on
@@ -893,12 +893,9 @@ static int hddBuildVcdGameList(void)
         hddVcdListBuilt = 0;
         return hddVcdGameCount;
     }
-    if (partCount == 0) {
-        // This time zero is authoritative: hdd0: opened and the complete APA walk found no candidates.
-        hddFreeVcdGameList();
-        hddVcdListBuilt = (genAtEntry == hddVcdCacheGen);
-        return 0;
-    }
+    // Zero POPSTARTER candidates is authoritative only for the POPS half of this combined PS1
+    // library. Do not publish an empty list yet: an Ember-only drive may still have __.EMBER or
+    // __.EMBER0..9 containers, which are collected by the second phase below.
 
     for (int p = 0; p < parts.count; p++) {
         char mountSrc[64];
@@ -1134,6 +1131,7 @@ static int hddNeedsUpdate(item_list_t *itemList)
 
 static int hddUpdateGameList(item_list_t *itemList)
 {
+    int view = libListViewActive(itemList);
     // GUI thread must never block on the 1 s ATA settle (hddLoadModules DelayThread).
     // If the base ATA stack has never completed (hddModulesLoadCount==0), defer and
     // ensure a deduplicated IO-worker retry is queued. hddLoadModules resets the count
@@ -1217,10 +1215,14 @@ static int hddUpdateGameList(item_list_t *itemList)
     if (!hddSupportModulesLoaded)
         LOG("HDDSUPPORT UpdateGameList: PFS support incomplete; attempting read-only APA enumeration anyway\n");
 
-    if (libListViewActive(itemList) == LIB_VIEW_PS1)
+    if (view == LIB_VIEW_PS1 || view == LIB_VIEW_MIXED) {
         // Reuse the session's built list on view flips; hddBuildVcdGameList runs only when never
         // built, invalidated (first-disc-only change), or freed by teardown (hddFreeVcdGameList).
-        return hddVcdListBuilt ? hddVcdGameCount : hddBuildVcdGameList();
+        if (!hddVcdListBuilt)
+            hddBuildVcdGameList();
+        if (view == LIB_VIEW_PS1)
+            return hddVcdGameCount;
+    }
 
     hdl_games_list_t cachedGames = {0};
     hdl_games_list_t hddGamesNew = {0};
@@ -1256,12 +1258,28 @@ static int hddUpdateGameList(item_list_t *itemList)
     hddFreeHDLGamelist(&hddGamesNew);
     hddForceUpdate = 1; // Subsequent refresh operations will cause the HDD to be scanned.
 
-    return hddGames.count;
+    return view == LIB_VIEW_MIXED ? (int)hddGames.count + hddVcdGameCount : (int)hddGames.count;
 }
 
 static int hddGetGameCount(item_list_t *itemList)
 {
-    return (libListViewActive(itemList) == LIB_VIEW_PS1) ? hddVcdGameCount : (int)hddGames.count;
+    int view = libListViewActive(itemList);
+    return view == LIB_VIEW_MIXED ? (int)hddGames.count + hddVcdGameCount :
+           view == LIB_VIEW_PS1   ? hddVcdGameCount :
+                                   (int)hddGames.count;
+}
+
+static int hddGetItemView(item_list_t *itemList, int id)
+{
+    int view = libListViewActive(itemList);
+    if (view == LIB_VIEW_MIXED)
+        return id >= 0 && id < (int)hddGames.count ? LIB_VIEW_ISO : LIB_VIEW_PS1;
+    return view;
+}
+
+static int hddGetSourceId(item_list_t *itemList, int id)
+{
+    return libListViewActive(itemList) == LIB_VIEW_MIXED && id >= (int)hddGames.count ? id - (int)hddGames.count : id;
 }
 
 // Toggle-window guard (Codex/Fable audit), mirroring mmceActiveGame. HDD_MODE has a VCD stop in its ring, so the L3
@@ -1288,29 +1306,36 @@ static hdl_game_info_t *hddActiveHdl(int id)
 
 static void *hddGetGame(item_list_t *itemList, int id)
 {
-    return (libListViewActive(itemList) == LIB_VIEW_PS1) ? (void *)hddActiveVcd(id) : (void *)hddActiveHdl(id);
+    int ps1 = hddGetItemView(itemList, id) == LIB_VIEW_PS1;
+    id = hddGetSourceId(itemList, id);
+    return ps1 ? (void *)hddActiveVcd(id) : (void *)hddActiveHdl(id);
 }
 
 static char *hddGetGameName(item_list_t *itemList, int id)
 {
-    return (libListViewActive(itemList) == LIB_VIEW_PS1) ? hddActiveVcd(id)->name : hddActiveHdl(id)->name;
+    int ps1 = hddGetItemView(itemList, id) == LIB_VIEW_PS1;
+    id = hddGetSourceId(itemList, id);
+    return ps1 ? hddActiveVcd(id)->name : hddActiveHdl(id)->name;
 }
 
 static int hddGetGameNameLength(item_list_t *itemList, int id)
 {
-    return (libListViewActive(itemList) == LIB_VIEW_PS1) ? VCD_NAME_MAX : (HDL_GAME_NAME_MAX + 1);
+    return hddGetItemView(itemList, id) == LIB_VIEW_PS1 ? VCD_NAME_MAX : (HDL_GAME_NAME_MAX + 1);
 }
 
 static char *hddGetGameStartup(item_list_t *itemList, int id)
 {
     // VCD view keys per-game CFG/art off the VCD filename (game->name), not a disc id.
-    return (libListViewActive(itemList) == LIB_VIEW_PS1) ? hddActiveVcd(id)->name : hddActiveHdl(id)->startup;
+    int ps1 = hddGetItemView(itemList, id) == LIB_VIEW_PS1;
+    id = hddGetSourceId(itemList, id);
+    return ps1 ? hddActiveVcd(id)->name : hddActiveHdl(id)->startup;
 }
 
 static void hddDeleteGame(item_list_t *itemList, int id)
 {
-    if (libListViewActive(itemList) == LIB_VIEW_PS1)
+    if (hddGetItemView(itemList, id) == LIB_VIEW_PS1)
         return; // a VCD is not an HDL partition -- no delete in VCD view
+    id = hddGetSourceId(itemList, id);
     hdl_game_info_t *game = hddActiveHdl(id);
     if (game == &hddEmptyHdl)
         return; // stale id in the VCD->ISO toggle window -> don't delete a wrong/OOB HDL partition
@@ -1622,10 +1647,11 @@ static void hddRenameVcd(int id, const char *newName)
 
 static void hddRenameGame(item_list_t *itemList, int id, char *newName)
 {
-    if (libListViewActive(itemList) == LIB_VIEW_PS1) {
-        hddRenameVcd(id, newName);
+    if (hddGetItemView(itemList, id) == LIB_VIEW_PS1) {
+        hddRenameVcd(hddGetSourceId(itemList, id), newName);
         return;
     }
+    id = hddGetSourceId(itemList, id);
     hdl_game_info_t *game = hddActiveHdl(id);
     if (game == &hddEmptyHdl)
         return; // stale id in the VCD->ISO toggle window -> don't rename a wrong/OOB HDL partition
@@ -1959,9 +1985,11 @@ void hddLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
     // POPSTARTER self-mounts it after the loader's IOP reset. HW-VALIDATE: POPSTARTER's exact HDD
     // selector/partition contract is hardware-testable -- POPSLoader proved the shape with a vendored
     // loader; we use the stock ps2sdk loader, the same one the shipping USB/MMCE/SMB VCD launch uses.
-    if (gAutoLaunchGame == NULL && (libListViewActive(itemList) == LIB_VIEW_PS1)) {
+    if (gAutoLaunchGame == NULL && (hddGetItemView(itemList, id) == LIB_VIEW_PS1)) {
         char vcdName[VCD_NAME_MAX];
         char vcdPart[APA_IDMAX + 1];
+
+        id = hddGetSourceId(itemList, id);
 
         guiLock();
         base_game_info_t *vcd = hddActiveVcd(id);
@@ -2185,8 +2213,8 @@ static config_set_t *hddGetConfig(item_list_t *itemList, int id)
     // VCD (PS1) view: `id` indexes hddVcdGames, NOT hddGames. The list itself is discoverable from
     // APA even when the persistent config/art PFS home is temporarily unavailable. In that state
     // return a runtime-only config instead of dereferencing a NULL prefix or hiding the whole list.
-    if (libListViewActive(itemList) == LIB_VIEW_PS1) {
-        base_game_info_t *g = hddActiveVcd(id);
+    if (hddGetItemView(itemList, id) == LIB_VIEW_PS1) {
+        base_game_info_t *g = hddActiveVcd(hddGetSourceId(itemList, id));
         if (gHDDPrefix != NULL)
             return sbPopulateConfig(g, gHDDPrefix, "/");
 
@@ -2202,7 +2230,7 @@ static config_set_t *hddGetConfig(item_list_t *itemList, int id)
         return config;
     }
 
-    hdl_game_info_t *game = hddActiveHdl(id);
+    hdl_game_info_t *game = hddActiveHdl(hddGetSourceId(itemList, id));
 
     if (gHDDPrefix != NULL) {
         snprintf(path, sizeof(path), "%sCFG/%s.cfg", gHDDPrefix, game->startup);
@@ -2474,4 +2502,5 @@ int hddGetArtArchivePath(item_list_t *itemList, char *out, int outSize)
 static item_list_t hddGameList = {
     HDD_MODE, 0, 0, MODE_FLAG_COMPAT_DMA, MENU_MIN_INACTIVE_FRAMES, HDD_MODE_UPDATE_DELAY, NULL, NULL, &hddGetTextId, &hddGetPrefix, &hddInit, &hddNeedsUpdate, &hddUpdateGameList,
     &hddGetGameCount, &hddGetGame, &hddGetGameName, &hddGetGameNameLength, &hddGetGameStartup, &hddDeleteGame, &hddRenameGame,
-    &hddLaunchGame, &hddGetConfig, &hddGetImage, &hddCleanUp, &hddShutdown, &hddCheckVMC, &hddGetIconId, &hddLaunchVcd, 0, &hddGetArtArchivePath};
+    &hddLaunchGame, &hddGetConfig, &hddGetImage, &hddCleanUp, &hddShutdown, &hddCheckVMC, &hddGetIconId, &hddLaunchVcd, 0, &hddGetArtArchivePath,
+    &hddLaunchVcd, &hddGetItemView, &hddGetSourceId};

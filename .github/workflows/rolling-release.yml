@@ -586,8 +586,8 @@ jobs:
           #   APP_RIPTOPL-PS2DEVPINNED/RIPTOPL.ELF   -- digest pin of ps2dev:latest; SAFE FALLBACK.
           #   APP_RIPTOPL-PS2DEVROLLING/RIPTOPL.ELF -- ps2dev:latest (bleeding-edge MOVING tag; may not
           #                                              boot, issue #102). No unlabeled default folder.
-          #   POPS/                           -- POPSTARTER.ELF + every auto-installed MC external + BDMA
-          #                                      variants, plus "POPSTARTER VERSIONS/" holding the alternate
+          #   POPS/                           -- POPSTARTER.ELF + every auto-installed MC external + loose BDMA
+          #                                      variants (including iLink), plus "POPSTARTER VERSIONS/" holding the alternate
           #                                      POPSTARTER builds (MAIN, DEBUG, USBDELAY*) for users to swap
           #                                      in by hand. Copied wholesale, so the subfolder needs no rule
           #                                      of its own -- only the assertion below that it arrived.
@@ -641,6 +641,20 @@ jobs:
             echo "WARN: officialsdk build missing this run; package ships without APP_RIPTOPL-OFFICIALROLLING" >&2
           fi
           cp -rf POPS/. "$PKG/POPS/"
+          # Every POPSTARTER BDMA family is intentionally loose-file-only: none of these payloads is
+          # embedded in RIPTOPL.ELF. Publishing an incomplete POPS/ stash would leave launch-time
+          # preparation with no pair to copy from the device to mc?:/POPSTARTER/.
+          for f in \
+            usbd.irx.usbexfat usbhdfsd.irx.usbexfat \
+            usbd.irx.mx4sio usbhdfsd.irx.mx4sio \
+            usbd.irx.mmce usbhdfsd.irx.mmce \
+            usbd.irx.ata usbhdfsd.irx.ata \
+            usbd.irx.ilink usbhdfsd.irx.ilink; do
+            if [ ! -s "$PKG/POPS/$f" ]; then
+              echo "ERROR: POPS/$f missing or empty -- the release must contain every loose BDMA pair" >&2
+              exit 1
+            fi
+          done
           # The alternate POPSTARTER builds ride along inside POPS/, so the copy above already has
           # them. Assert it anyway: `*.ELF` in .gitignore is one negation line away from swallowing
           # all five, and `git add` fails that way SILENTLY. Without this the package would ship an
@@ -858,12 +872,16 @@ jobs:
             printf '\n## In this build\n'
             printf -- '- External Neutrino core option: per-game core selector + global/per-game launch args\n'
             printf -- '- Coverflow cover-art render mode (default theme)\n'
-            printf -- '- Favourites tab (R3 toggles a game; star marker)\n'
-            printf -- '- PS1 through TWO cores in one list: POPSTARTER (*.VCD) and Ember (*.cue), per device, L3\n'
+            printf -- '- Favorites tab: R3 stars; its independent L3 ring always cycles All in One / PS2 / PS1 / ELF\n'
+            printf -- '- PS1 through TWO cores in one list: POPSTARTER (*.VCD) and Ember (*.cue); UDPFS/UDPBD list Ember only\n'
             printf -- '  -- setup, display mode, credit and licence under "Playing PS1 games" above\n'
+            printf -- '- iLink POPSTARTER VCD launches: .ilink BDMA pair in POPS/, automatic MC apply, XX. handoff\n'
             printf -- '- POPS/POPSTARTER VERSIONS/: five POPSTARTER builds to swap in by hand; the redundant\n'
             printf -- '  POPSTARTER/ folder is gone -- see "Alternate POPSTARTER builds" above\n'
-            printf -- '- Category settings layout\n'
+            printf -- '- Shared PS2/PS1 Game Display on Interface + PS Emulation: Both (L3), Mixed, PS2, or PS1\n'
+            printf -- '- Independent APPS display: one Mixed ELF list or Apps / [PS1]-titled ELF views via L3\n'
+            printf -- '- Network Settings OK applies/reconnects live; Select / Refresh retries a failed network page\n'
+            printf -- '- Category settings layout with return-to-paused-page retention\n'
             printf -- '- Per-game VMC shared with Neutrino on writable BDM (honours OPL VMC groups)\n'
             printf -- '- Visual GameID barcode for Pixel FX / RetroGEM / PS2Digital (Interface page, OFF by default)\n'
             printf -- '- RetroGEM Game ID optical barcode for POPSTARTER / PS1 VCD launches (PS Emulation Settings, ON by default)\n'

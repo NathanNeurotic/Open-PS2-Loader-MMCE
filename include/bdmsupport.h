@@ -114,7 +114,7 @@ int bdmIsUDPBDLoaded(void); // 1 if the UDPBD NIC stack is loaded (the SMB stack
 // not gNetBootProtocol, for anything DESCRIBING the live device -- the picker can change without a
 // reboot while the loaded IRX cannot.
 int bdmGetLoadedNetProtocol(void);
-int bdmSupportIsUDPBD(item_list_t *support); // 1 if this support is the UDPBD block device (its games are Neutrino-only)
+int bdmSupportIsUDPBD(const item_list_t *support); // 1 if this support is the UDPBD block device (its games are Neutrino-only)
 int bdmModeIsUDPBD(int mode);                // 1 if this BDM mode slot is the UDPBD block device
 
 // Re-evaluate every BDM device's presence + page visibility on the next refresh (bumps the latch

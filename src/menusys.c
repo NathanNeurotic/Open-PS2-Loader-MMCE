@@ -814,11 +814,21 @@ void menuAppendItem(menu_item_t *item)
 
 static void refreshMenuPosition(void)
 {
-    // Find the first menu in the list that is visible and set it as the active menu.
+    // Returning from Start/menu/settings must retain the page the user paused on. The old helper
+    // always selected the first visible tab here, which is commonly USB, even when the current page
+    // remained present. Fall back only when that exact menu vanished or became invisible.
     if (menu == NULL)
         return;
 
     menu_list_t *cur = menu;
+    while (cur != NULL) {
+        if (cur == selected_item && cur->item != NULL && cur->item->visible)
+            return;
+        cur = cur->next;
+    }
+
+    // The retained page is no longer usable: choose the first visible page deterministically.
+    cur = menu;
     while (cur->item->visible == 0 && cur->next)
         cur = cur->next;
 
@@ -1037,6 +1047,13 @@ void submenuSort(submenu_list_t **submenu, int mode)
 
     head = *submenu;
 
+    item_list_t *support = NULL;
+    if (mode >= 0 && mode < MODE_COUNT) {
+        opl_io_module_t *mod = oplGetModule(mode);
+        if (mod != NULL)
+            support = mod->support;
+    }
+
     while (!sorted) {
         sorted = 1;
 
@@ -1045,8 +1062,10 @@ void submenuSort(submenu_list_t **submenu, int mode)
         while (tip->next) {
             submenu_list_t *nxt = tip->next;
 
-            const char *txt1 = vcdDisplayName(mode, submenuItemGetText(&tip->item));
-            const char *txt2 = vcdDisplayName(mode, submenuItemGetText(&nxt->item));
+            const char *raw1 = submenuItemGetText(&tip->item);
+            const char *raw2 = submenuItemGetText(&nxt->item);
+            const char *txt1 = tip->item.isFolder ? raw1 : vcdDisplayNameForRow(support, tip->item.id, raw1);
+            const char *txt2 = nxt->item.isFolder ? raw2 : vcdDisplayNameForRow(support, nxt->item.id, raw2);
 
             // Folder browsing: folders group ahead of games; within each group sort by title.
             int cmp;
@@ -1458,6 +1477,14 @@ static int menuCanRequestItemConfig(item_list_t *list)
     return 1;
 }
 
+static int menuSelectedRowView(item_list_t *list)
+{
+    if (list != NULL && selected_item != NULL && selected_item->item != NULL &&
+        selected_item->item->current != NULL)
+        return libListRowView(list, selected_item->item->current->item.id);
+    return list != NULL ? libListViewActive(list) : LIB_VIEW_ISO;
+}
+
 static void menuRenderElements(theme_elems_t *elems)
 {
     // selected_item can't be NULL here as we only allow to switch to "Main" rendering when there is at least one device activated
@@ -1485,7 +1512,7 @@ static void menuRenderElements(theme_elems_t *elems)
     // Deep VCD ID inspection is cosmetic and must be explicit-theme-demand only. ItemText is
     // the sole render element that consumes vcdDisplayIdCached(), so a family without ItemText does
     // zero .VCD opens/seeks here. The resolver itself is opportunistic and yields to art/BGM.
-    if (elems->needsVcdDisplayId && list != NULL && (libViewActive(list->mode) == LIB_VIEW_PS1) &&
+    if (elems->needsVcdDisplayId && list != NULL && menuSelectedRowView(list) == LIB_VIEW_PS1 &&
         selected_item->item->current != NULL) {
         char *vcdName = list->itemGetStartup(list, selected_item->item->current->item.id);
         if (vcdName != NULL)
@@ -1512,7 +1539,7 @@ static void menuRenderElements(theme_elems_t *elems)
 // guard so the two paths cannot drift again.
 static theme_elems_t *menuGetInfoElems(item_list_t *list)
 {
-    if (list != NULL && (libViewActive(list->mode) == LIB_VIEW_PS1))
+    if (list != NULL && menuSelectedRowView(list) == LIB_VIEW_PS1)
         return gTheme->vcdInfoElems.first ? &gTheme->vcdInfoElems : &gTheme->infoElems;
     if (list != NULL && list->mode == FAV_MODE)
         return gTheme->favsInfoElems.first ? &gTheme->favsInfoElems : &gTheme->infoElems;
@@ -1647,7 +1674,7 @@ void menuRenderInfo(void)
 {
     item_list_t *list = selected_item->item->userdata;
 
-    if (libViewActive(list->mode) == LIB_VIEW_PS1) {
+    if (menuSelectedRowView(list) == LIB_VIEW_PS1) {
         menuRenderElements(menuGetInfoElems(list));
         gTheme->itemsList = thmResolveItemsList(&gTheme->vcdInfoElems, gTheme->vcdItemsList ? gTheme->vcdItemsList : gTheme->gamesItemsList, selected_item->item->icon_id);
     } else if (list->mode == FAV_MODE) {
@@ -1767,7 +1794,7 @@ static int gameMenuCoreIsNeutrino(void)
     // be blocked under a Neutrino global default.
     if (selected_item != NULL && selected_item->item != NULL) {
         item_list_t *support = (item_list_t *)selected_item->item->userdata;
-        if (support != NULL && ((libViewActive(support->mode) == LIB_VIEW_PS1) || support->mode == ETH_MODE))
+        if (support != NULL && ((menuSelectedRowView(support) == LIB_VIEW_PS1) || support->mode == ETH_MODE))
             return 0;
     }
     // UDPBD games are Neutrino-only even while $CoreLoader is still its OPL default.

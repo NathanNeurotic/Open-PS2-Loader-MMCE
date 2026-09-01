@@ -304,8 +304,8 @@ static int hddIsPopsContainerName(const char *name)
 //
 // NOT __common. That partition is the OPL DATA home (ART, config) and the place POPSTARTER.ELF is
 // loaded FROM by hddResolveHddPopstarter -- it is not where POPS keeps its games, and it is not
-// where Ember keeps its games either. An __.EMBER partition is self-contained: ember.elf, bios.bin
-// and games/ all sit at its root, so one mount serves the core and the library both.
+// where Ember keeps its games either. An __.EMBER partition is self-contained: its EMBER/ folder
+// holds ember.elf, bios.bin and games/, so one mount serves the core and the library both.
 static int hddIsEmberContainerName(const char *name)
 {
     if (name == NULL || strncmp(name, "__.EMBER", 8) != 0)
@@ -324,12 +324,14 @@ int hddIsPopsPartitionGame(const char *name)
     return !hddIsPopsContainerName(name);
 }
 
-// Enumerate the HDD's PS1/VCD APA partitions: exact __.POPS / __.POPS0..9 multi-VCD containers and
-// The candidate test the POPS walk has always applied, unchanged, now named so the shared walk
-// below can take it as a parameter.
+// Candidate test for the POPS walk, named so the shared APA enumerator below can take it as a
+// parameter. This includes exact __.POPS / __.POPS0..9 containers and eligible one-game labels.
 static int hddIsPopsCandidateName(const char *name)
 {
-    return hddIsPopsContainerName(name) || hddIsPopsPartitionGame(name);
+    // __.EMBER[0-9]? has the generic __.<name> shape, but it belongs exclusively to the dedicated
+    // Ember pass. Excluding it here keeps the two namespaces disjoint and makes a zero POPS result
+    // mean exactly "no POPSTARTER candidates", never "no PS1 content of either core".
+    return !hddIsEmberContainerName(name) && (hddIsPopsContainerName(name) || hddIsPopsPartitionGame(name));
 }
 
 // PP.<name> / __.<name> one-game installs. Mirror POPSLoader's APA-table filter: only main PFS records

@@ -1,6 +1,8 @@
 # Ember as a second PS1 core — integration plan
 
-**Status:** the PS1 list ships both cores on BDM and MMCE; the Ember launch itself is hardware-unproven.
+**Status:** ordinary device PS1 pages ship both cores in one list; UDPFS and UDPBD ship an
+Ember-only PS1 list because POPSTARTER cannot restore either network transport. Ember handoffs
+remain hardware-unproven unless a later test report says otherwise.
 **Base commit:** `291716d3` on `rebuild/main` (2026-08-27).
 **Permission:** Gage (author of Ember) has approved and encouraged this integration.
 
@@ -15,12 +17,12 @@ agent should read.
 | --- | --- | --- |
 | Phase 0 — prove the handoff | **code landed, HARDWARE PENDING** | `sysLaunchEmber()` + `cuesupport.c` + an OPLDIAG-only interception in `appLaunchItem`. See "How to run the Phase 0 test" below. |
 | Phase 1 — view engine | **landed** | `libview.c/.h` own the ring; the binary `vcdView` API is deleted, not shadowed. Both audit gates pass. |
-| One PS1 list, both cores | **landed** | `ps1FillGameList()`; row-kind dispatch for launch and art. Wired for **BDM and MMCE**. |
+| One PS1 list, both cores | **landed** | `ps1FillGameList()`; row-kind dispatch for launch and art. Wired for BDM, MMCE, SMB, and APA/PFS HDD. |
 | SMB / ETH | **landed** | R4 resolved: the Ember helpers build paths with `cueSep()`, so the separator follows the device. |
 | APA-HDD | **landed, HARDWARE PENDING** | `__.EMBER[0-9]?` partitions, self-contained. Needed a new `KEEPIOP_EXCEPTION` — see below. |
-| UDPFS | not started | |
-| Favourites (OFAV v3 `kind`) | not started | A CUE favourite currently has no way to record which core it belongs to. |
-| Ember settings page / `ember_folder` | not started | Nothing is required for basic operation — the list is driven by what is on disk, exactly like `POPS`. |
+| UDPFS / UDPBD | **landed, HARDWARE PENDING** | Their PS1 pages call `cueFillGameList()` directly and publish Ember rows only. POPSTARTER rows are deliberately excluded. |
+| Favorites (OFAV v3 `kind`) | **landed** | ISO, VCD, CUE, and ELF kinds; All in One / PS2 / PS1 / ELF shelves. The compatibility filename remains `favourites.bin`. |
+| Ember settings page | **landed** | Ember Display Mode lives on PS Emulation Settings; the library remains presence-driven by each device's `EMBER/` folder. |
 
 ### How to test Ember on hardware
 
@@ -36,8 +38,10 @@ mass0:/EMBER/bios.bin                               <- your own PS1 BIOS, exactl
 mass0:/EMBER/games/Spyro 2 (Ripto's Rage)/game.cue  (+ game.bin)
 ```
 
-Press **L3** on that device page to reach the PS1 list. Ember titles appear interleaved with your
-`.VCD` ones, sorted together. Launch one.
+With **PS2/PS1 Game Display** set to **Both (L3)**, press **L3** on that device page to reach the
+PS1 list. **Mixed** instead combines PS2 and PS1 rows and cycles Mixed → PS2 → PS1 with L3. Ember
+titles appear interleaved with your `.VCD` ones inside the PS1 portion, sorted together. On UDPFS
+and UDPBD, the PS1 portion contains Ember titles only. Launch one.
 
 **2. The OPLDIAG probe (the control experiment).** An APPS entry with `boot` =
 `mass0:/EMBER/ember.elf` and `argv1` = the folder name is handed over with the keep-IOP loader in an
@@ -230,7 +234,8 @@ read reports success — never block a launch on a failed probe.
 | MMCE | `mmceN:/` |
 | SMB / ETH | the share root |
 | APA / PFS HDD | `hdd0:__.EMBER[0-9]?` — a partition of its own, mounted on `pfs0:` and **kept mounted** across the handoff. Self-contained: `EMBER/ember.elf`, `EMBER/bios.bin` and `EMBER/games/` all start at the partition root. |
-| UDPBD / UDPFS | not enabled |
+| UDPFS Files | the served filesystem root (`udpfs:`); PS1 enumeration is Ember-only |
+| UDPFS IMG / UDPBD | the live `massN:` network block-device root; PS1 enumeration is Ember-only |
 
 #### ⛔ `__common` is NOT a library location — say what actually lives there
 
@@ -265,7 +270,7 @@ Badges reuse `sbSetDiscAttributes(config, isPS1=1, isCD=1)` → `#System=PS1`, `
 
 `src/vcdsupport.c` owned a **binary** per-mode view: `vcdView[mode]` (0 = ISO, 1 = VCD), a dirty
 flag consumed in each support's `itemNeedsUpdate`, and a global lock `gDefaultGameView`.
-`item_list_t.viewOverride` lets Favourites proxy a source device in a forced view without
+`item_list_t.viewOverride` lets Favorites proxy a source device in a forced view without
 disturbing that page's own L3 state.
 
 ### 2.2 What it becomes
@@ -276,24 +281,27 @@ The state moves to `libview.c`/`libview.h` and the second stop is renamed for wh
 enum LIB_VIEW {
     LIB_VIEW_ISO = 0, // PS2 disc games: ISO / ZSO / UL / HDL
     LIB_VIEW_PS1,     // PS1 titles -- BOTH cores in one list (Part 4)
+    LIB_VIEW_ELF,     // homebrew ELFs -- Favorites only
+    LIB_VIEW_ALL,     // every resolved favorite kind -- Favorites only
+    LIB_VIEW_MIXED,   // combined PS2 + PS1 device rows, or all APPS rows
+    LIB_VIEW_PS1_ELF, // APPS rows whose displayed title contains [PS1]
     LIB_VIEW_COUNT
 };
 ```
 
-**Still exactly two stops.** The rename is the point: the old name was one of the two cores, so
-every caller had to ask "is it VCD?" to mean "is it PS1?". That reads as a bug the moment a .cue row
-appears in the same list.
+Device-page rings now follow the four-value global display setting. Favorites always has four stops,
+and APPS has its own one- or two-stop setting. The old binary name was one of the two PS1 cores, so
+every caller had to ask "is it VCD?" to mean "is it PS1?"; the explicit enum also gives all mixed
+lists a row-aware launch/menu path.
 
 | Page | Ring |
 | --- | --- |
-| Device pages (BDM, MMCE, ETH, HDD) | `PS2 → PS1 →` wrap |
-| Favourites | `PS2 → PS1 →` wrap |
-| Apps | none — one list, L3 inert, no hint |
+| Device pages (BDM, MMCE, ETH, HDD, UDPFS) | **Both (L3):** `PS2 → PS1`; **Mixed:** `Mixed → PS2 → PS1`; locked PS2/PS1: one inert stop. UDPFS/UDPBD populate PS1 with Ember only |
+| Favorites | `All in One → PS2 → PS1 → ELF →` wrap |
+| Apps | **Mixed:** one inert list; **Apps / PS1ELF (L3):** `Apps → PS1ELF` using case-insensitive `[PS1]` title tagging |
 
-Favourites keeps its own independent slot, and app favourites stay where they have always been, in
-its PS2 list. (An earlier draft proposed a 4-stop ring with a separate ELF stop; that is superseded
-along with the CUE stop. If an ELF stop is ever wanted it is a UI decision on its own merits, not a
-consequence of supporting a second PS1 core.)
+Favorites keeps its own independent retained slot. **All in One** resolves each selected row's kind
+before opening menus or launching; the filtered stops show only one shelf.
 
 The ring machinery is deliberately kept general — supported-stop set, wrap-around advance — so
 adding a stop later needs no second rewrite.
@@ -311,8 +319,10 @@ void libViewMarkDirty(int mode);
 void libViewMarkAllDirty(void);
 ```
 
-`gDefaultGameView` is unchanged (`BOTH` / `ISO` / `VCD`); a lock pins every page that has the pinned
-stop and makes L3 inert. No new enum value is needed, because no new stop was added.
+`gDefaultGameView` preserves the existing stored values `BOTH` / `ISO` / `VCD` and appends `MIXED`;
+the UI shows **Both (L3) / Mixed / PS2 / PS1** on both Interface and PS Emulation. Both and Mixed
+enable their respective L3 rings. PS2 or PS1 pins applicable device pages and makes L3 fully inert.
+Favorites and APPS are independent of this setting.
 
 ### 2.3 The conversion rule
 
@@ -375,7 +385,7 @@ int cueNameLaunchable(const char *name);
 `cueFillGameList` fills `base_game_info_t` per entry:
 
 ```c
-snprintf(g->name,      sizeof(g->name),      "%s", dirName);  // identity: art, CFG, favourites
+snprintf(g->name,      sizeof(g->name),      "%s", dirName);  // identity: art, CFG, favorites
 snprintf(g->startup,   sizeof(g->startup),   "%s", dirName);
 snprintf(g->extension, sizeof(g->extension), ".CUE");         // the kind discriminator
 g->parts  = 1;
@@ -426,7 +436,7 @@ to key off "is this page in the VCD view" must key off the row instead:
 | --- | --- |
 | launch dispatch | `cueIsCueEntry(game)` → Ember, else POPSTARTER |
 | art fallback | same test; `cueLoadFolderCover` vs `vcdLoadPopsCover` |
-| favourite kind | same test, stored in the record |
+| favorite kind | same test, stored in the record |
 | `#Size` skip | neither PS1 kind has a meaningful size — skip for the whole PS1 view |
 
 The row-kind discriminator is `base_game_info_t.extension`: `".VCD"` or `".CUE"`.
@@ -561,7 +571,7 @@ after `itemGetArtArchivePath`, or every existing initialiser silently mis-assign
 
 ```c
     /// Launch a CUE (PS1/Ember) item by its stored folder name, regardless of the device's current
-    /// view. NULL for devices without a CUE view. Used by Favourites to launch a CUE favourite
+    /// view. NULL for devices without a CUE view. Used by Favorites to launch a CUE favorite
     /// while its source device page may be in another view.
     void (*itemLaunchCue)(item_list_t *itemList, const char *cueName, config_set_t *configSet);
 ```
@@ -591,7 +601,7 @@ We deliberately do **not** pre-verify a `.cue`/`.bin`/`.exe` inside the folder (
 
 ---
 
-## Part 6 — Settings, config keys, favourites format, docs
+## Part 6 — Settings, config keys, favorites format, docs
 
 ### 6.1 New globals (`include/opl.h`) and keys (`include/config.h`)
 
@@ -629,12 +639,12 @@ Changing `gEmberView` or `gEmberFolder` must call `libViewMarkAllDirty()` and
 then `oplQueueVcdDeviceUpdates()` (rename it `oplQueueLibraryDeviceUpdates`) — marking dirty alone
 is not enough for HDD, whose `updateDelay == -1` means a dirty view otherwise renders stale forever.
 
-### 6.3 Favourites file format — OFAV v3
+### 6.3 Favorites file format — OFAV v3
 
 `FAV_VERSION` 2 → **3**. The per-record `isVcd` byte becomes a `kind` byte:
 
 ```
-0 = ISO   1 = VCD   2 = CUE
+0 = ISO   1 = VCD   2 = CUE   3 = ELF
 ```
 
 Read compatibility:
@@ -645,16 +655,16 @@ Read compatibility:
 | v2 (`isVcd` byte) | `isVcd == 1` → VCD; else ISO — unchanged, no records move |
 | v3 | `kind` verbatim |
 
-No records move between stops. App favourites stay in the Favourites PS2 list exactly where they
-are today, so unlike the earlier 4-stop draft this migration has no user-visible effect at all — the
-`kind` byte only gains the ability to say "this PS1 favourite is an Ember title".
+The disk filename remains `favourites.bin` for compatibility. The four Favorites views filter the
+same records without rewriting or moving them: All in One accepts every kind, PS2 accepts ISO,
+PS1 accepts VCD/CUE, and ELF accepts homebrew apps.
 
 Record size line (`favsupport.c` ~L310) stays `17 + tlen` — one byte either way.
 
 `addFavouriteItem` / `removeFavouriteByIdAndText` take `int kind` instead of `int isVcd`; kind is
 part of the identity so an ISO, a VCD and a CUE of the same name never collide.
-`favResolve()`'s VCD branch generalises: a CUE favourite binds to a source providing
-`itemLaunchCue`; an ELF favourite binds to `APP_MODE`.
+`favResolve()`'s VCD branch generalises: a CUE favorite binds to a source providing
+`itemLaunchCue`; an ELF favorite binds to `APP_MODE`.
 
 ### 6.4 Docs
 
@@ -663,7 +673,7 @@ Per the standing rule (docs updated in the same effort the feature lands):
 * New `docs/EMBER.md` — user-facing, mirroring `docs/VCD.md`'s structure: what the CUE view is, the
   folder layout, where to put `bios.bin`, the L3 ring, the combined-PS1 setting, and an explicit
   "Ember vs POPSTARTER — which should I use?" section.
-* `docs/VCD.md` — update §1 and §2 (the view is no longer binary) and the Favourites paragraph.
+* `docs/VCD.md` — update §1 and §2 (the view is no longer binary) and the Favorites paragraph.
 * `README.md` — one line in the feature list.
 * Rolling release notes.
 
@@ -782,30 +792,34 @@ grep -rn "vcdViewActive\|vcdListViewActive\|vcdToggleView\|vcdConsumeDirty" src/
 git diff --stat origin/rebuild/main -- src/ include/
 ```
 
-### Phase 2 — CUE list on BDM only
+### Phase 2 — CUE list on BDM only (landed)
 
-`cuesupport.c`, the third array in `bdmsupport.c`, `bdmLaunchCue`, `LIB_VIEW_CUE` in the BDM ring
-under `gEmberView`. No favourites, no merged list, no settings page yet (hardcode `gEmberView =
-AUTO`, `gEmberFolder = "EMBER"`).
+This was the intentionally narrow first implementation. The shipped implementation now merges CUE
+and VCD rows in `LIB_VIEW_PS1`, records favorites by row kind, and uses the presence of `EMBER/`
+rather than a separate enable switch.
 
-Validate: the list populates; L3 rings PS2 → PS1 with Ember rows interleaved among the `.VCD` ones;
-art resolves from `<devroot>ART/`; launch works; a device with no `EMBER/` folder looks exactly as it
-did before.
+Validate: every display mode populates correctly; Both rings PS2 → PS1, Mixed rings
+Mixed → PS2 → PS1, and Ember rows remain interleaved among the `.VCD` rows in each PS1-containing
+view. Art resolves from `<devroot>ART/`; launch works; a device with no `EMBER/` folder looks exactly
+as it did before.
 
-### Phase 3 — MMCE + ETH, settings page, docs
+### Phase 3 — MMCE + ETH, settings page, docs (landed)
 
 Mirror into `mmcesupport.c` and (gated on R4) `ethsupport.c`. Add the Ember settings page, the
 config keys, the language labels appended to `_base.yml`, `docs/EMBER.md`.
 
-### Phase 4 — Favourites v3 + APA HDD
+### Phase 4 — Favorites v3 + APA HDD (landed; hardware pending)
 
-OFAV v3 with the `kind` byte and the v2 migration, and the Favourites ring PS2 → PS1 → APPS (Part 2).
-There is no merged-list setting — merging is the behaviour, see Part 4.
+OFAV v3 carries the `kind` byte and v2 migration. The current Favorites ring is
+All in One → PS2 → PS1 → ELF. There is no per-core merged-list setting — one PS1 view is the
+behavior, see Part 4.
 
 **APA HDD: landed.** `hddBuildVcdGameList` grows a second phase that mounts each `__.EMBER[0-9]?`
 partition on the `pfs1:` scan slot and hands it to `cueScanDir`; rows join the existing VCD arrays
 and are told apart by their `.CUE` extension. `hddDoLaunchEmber` quiesces art, remounts `pfs0:` on
-the owning partition **RDWR**, and hands off with that mount live.
+the owning partition **RDWR**, and hands off with that mount live. `__.EMBER[0-9]?` is explicitly
+excluded from the generic `__.<name>` POPSTARTER pass, and the Ember pass still runs when there are
+zero POPSTARTER candidates, so an Ember-only drive is not mistaken for an empty PS1 library.
 
 That last part needed a new teardown bit. `UNMOUNT_EXCEPTION` stops the `pfs0:` unmount, but
 `hddCleanUp` also issues `PDIOC_CLOSEALL`, which drops every pfs descriptor in the IOP — safe under
@@ -814,13 +828,14 @@ which Ember is the first launch to break. `KEEPIOP_EXCEPTION` (`include/iosuppor
 gates that call.
 
 Validate the migration explicitly: take a v2 `favourites.bin` holding ISO, VCD **and** app
-favourites, confirm all three land on the right shelf after the upgrade, **and that a v3 file still
+favorites, confirm all three land on the right shelf after the upgrade, **and that a v3 file still
 loads on the next boot** — the reader's accepted-version range and the writer's `FAV_VERSION` have
 to move together, and getting that wrong presents an empty tab that then overwrites the real list.
 
-### Phase 5 — Bonus surface
+### Phase 5 — Network surface (landed; hardware pending)
 
-UDPBD/UDPFS (R5), RetroGEM game-ID parity, `settings.txt` display passthrough as a per-game option.
+UDPFS and UDPBD now publish Ember-only PS1 views (R5); POPSTARTER remains unavailable on both.
+RetroGEM game-ID parity and `settings.txt` display passthrough remain separate concerns.
 
 ---
 

@@ -51,7 +51,7 @@ warning and falls back to the `<OPL>` core for that launch.
 
 **Game Launching → Neutrino Defaults → Default Device** picks the device *type* holding
 `<root>:/neutrino/neutrino.elf` — **Auto** / Memory Card / USB / MX4SIO / MMCE / HDD (exFAT) /
-HDD (APA) / **Game's Device**. A miss on the device you picked is not a dead end: OPL falls
+HDD (APA) / **Game's Device** / iLink. A miss on the device you picked is not a dead end: OPL falls
 through to the AUTO tiers above. The exception is **Game's Device**, which only ever looks on
 the game's own device and reports "not found" instead of falling back.
 

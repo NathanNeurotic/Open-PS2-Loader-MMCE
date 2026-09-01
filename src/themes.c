@@ -880,8 +880,6 @@ static theme_element_t *thmGetElemForItem(struct menu_list *menu, struct submenu
 static void drawGameImage(struct menu_list *menu, struct submenu_list *item, config_set_t *config, struct theme_element *elem)
 {
     if (item) {
-        item_list_t *list = (item_list_t *)menu->item->userdata;
-
         // On the Favourites tab an APP favourite draws with the theme's apps element (its own
         // dimensions, case overlay and art folder); games and every other tab use elem as-is.
         // The texture lookup stays on menu->item->userdata (favList) so favGetImage proxies by
@@ -1773,7 +1771,8 @@ static void drawItemsList(struct menu_list *menu, struct submenu_list *item, con
             else
                 color = elem->color;
 
-            const char *dispText = vcdDisplayName(list ? list->mode : -1, submenuItemGetText(&ps->item));
+            const char *dispText = ps->item.isFolder ? submenuItemGetText(&ps->item) :
+                                                      vcdDisplayNameForRow(list, ps->item.id, submenuItemGetText(&ps->item));
             char folderBuf[256];
             if (ps->item.isFolder) {
                 snprintf(folderBuf, sizeof(folderBuf), "%s/", dispText);
@@ -1855,7 +1854,7 @@ static void drawItemText(struct menu_list *menu, struct submenu_list *item, conf
                 // ONLY (vcdDisplayIdCached): the id is resolved off the render thread
                 // (vcdRequestDisplayId, menusys.c), so a slow device never blocks here; until it
                 // lands, the filename's own id prefix is shown, then the title as before.
-                if (libViewActive(support->mode) == LIB_VIEW_PS1) {
+                if (libListRowView(support, item->item.id) == LIB_VIEW_PS1) {
                     char vcdId[VCD_ID_MAX];
                     if (vcdDisplayIdCached(startup, vcdId, sizeof(vcdId)) ||
                         vcdExtractGameId(startup, vcdId, sizeof(vcdId))) {
@@ -1863,7 +1862,8 @@ static void drawItemText(struct menu_list *menu, struct submenu_list *item, conf
                         return;
                     }
                 }
-                fntRenderString(elem->font, elem->posX, elem->posY, elem->aligned, 0, 0, vcdDisplayName(support->mode, startup), elem->color);
+                fntRenderString(elem->font, elem->posX, elem->posY, elem->aligned, 0, 0,
+                                vcdDisplayNameForRow(support, item->item.id, startup), elem->color);
             }
         }
     }

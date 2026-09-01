@@ -91,6 +91,12 @@ const char *vcdSortKey(const char *name);
 // the result is for on-screen text only, never for launch/art/favourites/config lookups.
 const char *vcdDisplayName(int mode, const char *text);
 
+// Mixed lists cannot infer a row's kind from the page mode. This row-aware form applies the same
+// cosmetic prefix rule only when the selected/visible row resolves to LIB_VIEW_PS1. It leaves
+// PS2, APPS, PS1ELF and folder rows unchanged; callers remain responsible for passing only
+// launchable rows.
+const char *vcdDisplayNameForRow(item_list_t *itemList, int id, const char *text);
+
 // Fill a base_game_info_t list (memalign'd like sbReadList; frees *outGames first) from
 // <devPrefix>POPS/*.VCD. Returns the count. name/startup = VCD basename without the extension.
 int vcdFillGameList(const char *devPrefix, base_game_info_t **outGames);
@@ -124,23 +130,24 @@ enum {
     VCD_BDMA_MX4SIO,    // MX4SIO exFAT
     VCD_BDMA_MMCE,      // MMCE exFAT
     VCD_BDMA_ATA,       // internal ATA HDD exFAT (BDMAssault)
+    VCD_BDMA_ILINK,     // iLink / IEEE 1394 (appended so persisted mode values stay stable)
     VCD_BDMA_MODE_COUNT
 };
 // "BDMA SOURCE": which device holds the user-provided variant files in its POPS/ folder. The equip
-// resolves each BDM source to the mounted device whose DRIVER matches (USB / MX4SIO / internal-ATA-HDD),
-// reading from that device's typed root -- so they are differentiated, not blindly scanned. New values
+// resolves each BDM source to the mounted device whose DRIVER matches (USB / MX4SIO / internal-ATA-HDD / iLink),
+// reading from that device's mounted filesystem root -- so they are differentiated, not blindly scanned. New values
 // are APPENDED so persisted gBdmaSource ints stay stable.
 enum {
     VCD_BDMA_SRC_USB = 0, // BDM "usb" driver
     VCD_BDMA_SRC_MX4SIO,  // BDM "mx4sio"/sdc driver
     VCD_BDMA_SRC_MMCE,    // mmce0-1
     VCD_BDMA_SRC_HDD,     // internal exFAT HDD, BDM "ata" driver
+    VCD_BDMA_SRC_ILINK,   // BDM "ilink" driver (appended so persisted source values stay stable)
     VCD_BDMA_SRC_COUNT
 };
 // Equip the chosen variant (copy from SOURCE's POPS/, or remove for FAT32) + write the marker.
-//   0 ok, -1 bad args, -2 MC too full, -3 IO error, -4 = no source variant files on any seek-path
-//   device AND the embedded built-in pair could not be installed either (the embedded fallback makes
-//   plain "files not found" self-healing; -4 now means the fallback itself failed).
+//   0 ok, -1 bad args, -2 MC too full, -3 IO error, -4 = no source variant files in any seek-path
+//   device's POPS/ folder. BDMA pairs are loose release/device files and are never embedded in the ELF.
 // On -4, if diag != NULL it is filled with a human-readable summary (needed files + which source
 // devices were actually mounted) so the failure can be shown on screen / screenshotted to diagnose.
 int vcdEquipBdma(int source, int mode, char *diag, int diagSize);

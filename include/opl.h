@@ -160,7 +160,8 @@ enum { NEUTRINO_DEV_AUTO = 0,  // game device, then mc0/mc1 (legacy behaviour)
        NEUTRINO_DEV_MMCE,      // mmce0: / mmce1: (checklist item 1)
        NEUTRINO_DEV_EXFAT_HDD, // BDM "ata" internal exFAT HDD -> the mounted massN:
        NEUTRINO_DEV_APA_HDD,   // APA HDD: the mounted OPL data partition (pfs0:)
-       NEUTRINO_DEV_GAME };    // the active game's OWN device ONLY; appended last to keep saved ints stable
+       NEUTRINO_DEV_GAME,      // the active game's OWN device ONLY; retains its historical saved value
+       NEUTRINO_DEV_ILINK };   // BDM "ilink" -> the mounted massN:; appended to keep saved ints stable
 extern int gNeutrinoDevice;
 extern int gDefaultCoreLoader;
 extern int gNeutrinoVideoDefault;
@@ -172,9 +173,18 @@ extern char gNeutrinoPath[256];
 enum {
     GAME_VIEW_BOTH = 0, // both lists reachable via the per-device L3 toggle (default)
     GAME_VIEW_ISO,      // lock every VCD-capable page to its ISO/disc list
-    GAME_VIEW_VCD       // lock every VCD-capable page to its VCD (PS1) list
+    GAME_VIEW_VCD,      // lock every VCD-capable page to its PS1 list
+    // Appended so existing default_game_view values keep their meaning. The UI maps this stored
+    // value into the requested Both / Mixed / PS2 / PS1 display order.
+    GAME_VIEW_MIXED     // combined PS2 + PS1 list; L3 cycles Mixed -> PS2 -> PS1
 };
 extern int gDefaultGameView;
+
+enum {
+    APPS_DISPLAY_MIXED = 0, // all ELFs together; L3 disabled (back-compatible default)
+    APPS_DISPLAY_SPLIT      // Apps <-> PS1ELF via L3; [PS1] in the title selects PS1ELF
+};
+extern int gAppsDisplay;
 // Ember's own display mode, written to <EmberFolder>/settings.txt on the device being launched.
 // LEAVE is the default and writes NOTHING: a display preference must not create a file on a user's
 // device unless they asked for one, and it is also the only value that respects a settings.txt the
@@ -194,7 +204,8 @@ enum { POPS_DEV_DEFAULT = 0, // cwd (gBootDir) /POPS/, then the VCD's own device
        POPS_DEV_EXFAT_HDD,   // BDM "ata" internal exFAT HDD -> the mounted massN:
        POPS_DEV_APA_HDD,     // APA HDD: canonical hdd0:__common/POPS via the native HDD VCD resolver
        POPS_DEV_CUSTOM,      // free-text gPopstarterPath
-       POPS_DEV_GAME };      // the VCD's OWN device ONLY; appended last to keep saved ints stable
+       POPS_DEV_GAME,        // the VCD's OWN device ONLY
+       POPS_DEV_ILINK };     // BDM "ilink" -> mounted massN:; appended to keep every saved value stable
 extern int gPopstarterDevice;
 extern int gPopstarterRetroGemGameID;
 extern char gPopstarterPath[256];
@@ -204,7 +215,7 @@ extern int gBdmaApplyOnLaunch; // auto-equip the launched VCD's matching exFAT d
 // POPSTARTER's USB driver for PS1 (VCD) launches off a USB stick. The PS2 cannot detect whether a
 // stick is fat32 or exFAT, so the driver is chosen, not detected. ASK reproduces the original
 // behaviour exactly (prompt on every USB VCD launch, maintainer directive 2026-08-01); the two pinned
-// values skip the prompt. USB VCD launches ONLY -- MX4SIO/ATA VCDs equip by device type and never ask.
+// values skip the prompt. USB VCD launches ONLY -- MX4SIO/iLink/ATA VCDs equip by device type and never ask.
 enum VCD_USB_BDMA_MODE {
     VCD_USB_BDMA_ASK = 0,
     VCD_USB_BDMA_EXFAT = 1,

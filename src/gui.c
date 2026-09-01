@@ -949,6 +949,78 @@ static void guiFreeNameList(const char **list)
     free((void *)list);
 }
 
+// One persisted four-mode PS2/PS1 picker is presented on both Interface and PS Emulation. Keeping its
+// enum setup/readback here prevents two visually identical rows from acquiring different semantics.
+// Saved values keep their historical ABI (Both=0, PS2=1, PS1=2, Mixed=3), while the picker uses
+// the user-facing order requested by the display model.
+static const char *guiGameViewNames[] = {"Both (L3)", "Mixed", "PS2", "PS1", NULL};
+static const char *guiAppsViewNames[] = {"Mixed", "Apps / PS1ELF (L3)", NULL};
+
+static int guiGameViewToPicker(int view)
+{
+    return view == GAME_VIEW_MIXED ? 1 : view == GAME_VIEW_ISO ? 2 : view == GAME_VIEW_VCD ? 3 : 0;
+}
+
+static int guiPickerToGameView(int picker)
+{
+    return picker == 1 ? GAME_VIEW_MIXED : picker == 2 ? GAME_VIEW_ISO : picker == 3 ? GAME_VIEW_VCD : GAME_VIEW_BOTH;
+}
+
+static void guiSetGameViewPicker(struct UIItem *ui)
+{
+    diaSetEnum(ui, UICFG_GAMEVIEW, guiGameViewNames);
+    diaSetInt(ui, UICFG_GAMEVIEW, guiGameViewToPicker(gDefaultGameView));
+}
+
+static int guiReadGameViewPicker(struct UIItem *ui)
+{
+    int previousGameView = gDefaultGameView;
+
+    int picker;
+    diaGetInt(ui, UICFG_GAMEVIEW, &picker);
+    gDefaultGameView = guiPickerToGameView(picker);
+    if (gDefaultGameView == previousGameView)
+        return 0;
+
+    libViewMarkAllDirty();
+    return 1;
+}
+
+static void guiSetAppsViewPicker(struct UIItem *ui)
+{
+    diaSetEnum(ui, UICFG_APPSVIEW, guiAppsViewNames);
+    diaSetInt(ui, UICFG_APPSVIEW, gAppsDisplay);
+}
+
+static int guiReadAppsViewPicker(struct UIItem *ui)
+{
+    int previous = gAppsDisplay;
+
+    diaGetInt(ui, UICFG_APPSVIEW, &gAppsDisplay);
+    if (gAppsDisplay < APPS_DISPLAY_MIXED || gAppsDisplay > APPS_DISPLAY_SPLIT)
+        gAppsDisplay = APPS_DISPLAY_MIXED;
+    if (gAppsDisplay == previous)
+        return 0;
+
+    libViewMarkDirty(APP_MODE);
+    return 1;
+}
+
+static void guiRefreshGameViews(void)
+{
+    // libViewMarkAllDirty is intentionally side-effect-free; queue the actual source rebuilds and
+    // rebuild Favorites after them so its resolver sees the newly selected source views.
+    oplQueueLibraryDeviceUpdates();
+    loadFavourites();
+}
+
+static void guiRefreshAppsView(void)
+{
+    item_list_t *apps = appGetObject(0);
+    if (apps != NULL && apps->enabled)
+        ioPutRequest(IO_MENU_UPDATE_DEFFERED, &apps->mode);
+}
+
 void guiShowUIConfig(void)
 {
     int themeID = -1, langID = -1;
@@ -990,9 +1062,8 @@ reshow_ui:
     diaSetInt(diaUIConfig, UICFG_AUTOREFRESH, gAutoRefresh);
     diaSetInt(diaUIConfig, UICFG_NOTIFICATIONS, gEnableNotifications);
     diaSetVisible(diaUIConfig, UICFG_COVERFLOW_BUTTON, gTheme->coverflow != NULL);
-    const char *gameViewNames[] = {"Both", "PS2", "PS1", NULL};
-    diaSetEnum(diaUIConfig, UICFG_GAMEVIEW, gameViewNames);
-    diaSetInt(diaUIConfig, UICFG_GAMEVIEW, gDefaultGameView);
+    guiSetGameViewPicker(diaUIConfig);
+    guiSetAppsViewPicker(diaUIConfig);
     diaSetEnum(diaUIConfig, UICFG_VMODE, vmodeNames);
     diaSetInt(diaUIConfig, UICFG_VMODE, gVMode);
 
@@ -1030,12 +1101,8 @@ reshow_ui:
         diaGetInt(diaUIConfig, UICFG_AUTOSORT, &gAutosort);
         diaGetInt(diaUIConfig, UICFG_AUTOREFRESH, &gAutoRefresh);
         diaGetInt(diaUIConfig, UICFG_NOTIFICATIONS, &gEnableNotifications);
-        int previousGameView = gDefaultGameView;
-        diaGetInt(diaUIConfig, UICFG_GAMEVIEW, &gDefaultGameView);
-        int gameViewChanged = gDefaultGameView != previousGameView;
-        if (gameViewChanged) {
-            libViewMarkAllDirty(); // rebuild every VCD-capable page so the new default view takes effect
-        }
+        int gameViewChanged = guiReadGameViewPicker(diaUIConfig);
+        int appsViewChanged = guiReadAppsViewPicker(diaUIConfig);
         diaGetInt(diaUIConfig, UICFG_VMODE, &gVMode);
 
         if (previousTheme != themeID && isBgmPlaying())
@@ -1046,9 +1113,10 @@ reshow_ui:
             // applyConfig(..., skipDeviceRefresh=1) deliberately avoids device scans. Queue after it
             // returns so HDD (which has no automatic refresh) cannot retain PS2 rows while rendering
             // uses the new VCD view, without racing the theme/menu bookkeeping above.
-            oplQueueLibraryDeviceUpdates();
-            loadFavourites(); // queued after source pages so the FAV resolver sees their rebuilt rows
+            guiRefreshGameViews();
         }
+        if (appsViewChanged)
+            guiRefreshAppsView();
         sfxInit(0);
 
         if (gEnableBGM && !isBgmPlaying())
@@ -1300,10 +1368,15 @@ reshow_network:
         if (gNetworkProtocol != netProtocolWas && guiNetProtocolNeedsRestart())
             guiMsgBox(_l(_STR_NETBOOT_RESTART), 0, NULL);
 
-        if (result == NETCFG_RECONNECT && gNetworkStartup < ERROR_ETH_SMB_CONN)
-            gNetworkStartup = ERROR_ETH_SMB_LOGON;
-
         applyConfig(-1, -1, 0);
+
+        // OK is an Apply action for the live SMB stack, not merely a RAM/config edit. A failed
+        // startup may already have queued this through initAllSupport(); ethRequestReconnect
+        // coalesces the duplicate. Protocol changes that disagree with the resident NIC remain
+        // restart-only and are deliberately excluded here.
+        if (gNetworkProtocol == NET_PROTO_SMB && gETHStartMode != START_MODE_DISABLED &&
+            !guiNetProtocolNeedsRestart())
+            ethRequestReconnect();
     }
 
     guiSettingsEndDialog();
@@ -1366,13 +1439,14 @@ int guiShowVcdUsbMode(void)
 void guiShowVcdConfig(void)
 {
     // POPSTARTER.ELF device TYPE (POPS_DEV_*). MUST stay in sync with vcdResolvePopstarter() (vcdsupport.c).
-    const char *popsDevStrs[] = {_l(_STR_DEFAULT), "Memory Card", "USB", "MX4SIO", "MMCE", "HDD (exFAT)", "HDD (APA)", "Custom", _l(_STR_GAMES_DEVICE), NULL}; // "Game's Device" (POPS_DEV_GAME) appended last to match the enum tail
+    const char *popsDevStrs[] = {_l(_STR_DEFAULT), "Memory Card", "USB", "MX4SIO", "MMCE", "HDD (exFAT)", "HDD (APA)", "Custom", _l(_STR_GAMES_DEVICE), "iLink", NULL}; // iLink is appended after Game's Device to preserve every saved POPS_DEV_* value
     // diaSetEnum stores the ARRAY POINTER rather than copying, so this must outlive every render of
     // the dialog -- static, like the BDMA option arrays on the peer page.
     static const char *emberDisplayStrs[] = {NULL, "240p", "480p", NULL};
     emberDisplayStrs[0] = _l(_STR_DEFAULT);
     diaSetEnum(diaVcdConfig, CFG_EMBER_DISPLAY, emberDisplayStrs);
     diaSetInt(diaVcdConfig, CFG_EMBER_DISPLAY, gEmberDisplay);
+    guiSetGameViewPicker(diaVcdConfig);
 
     diaSetEnum(diaVcdConfig, CFG_POPSTARTER_DEVICE, popsDevStrs);
     diaSetInt(diaVcdConfig, CFG_POPSTARTER_DEVICE, gPopstarterDevice);
@@ -1400,6 +1474,7 @@ reshow_vcd:
         goto reshow_vcd;
     }
     if (ret) {
+        int gameViewChanged = guiReadGameViewPicker(diaVcdConfig);
         diaGetInt(diaVcdConfig, CFG_POPSTARTER_DEVICE, &gPopstarterDevice);
         diaGetInt(diaVcdConfig, CFG_POPSTARTER_RETROGEM_GAMEID, &gPopstarterRetroGemGameID);
         diaGetInt(diaVcdConfig, CFG_EMBER_DISPLAY, &gEmberDisplay);
@@ -1413,14 +1488,16 @@ reshow_vcd:
                 snprintf(gPopstarterPath, sizeof(gPopstarterPath), "%s", tmpPop);
         }
         applyConfig(-1, -1, 0);
+        if (gameViewChanged)
+            guiRefreshGameViews();
         menuReinitMainMenu();
     }
 }
 
 static void guiSetBdmaSettings(struct UIItem *ui)
 {
-    static const char *bdmaSourceStrs[] = {NULL, NULL, NULL, NULL, NULL};
-    static const char *bdmaModeStrs[] = {NULL, NULL, NULL, NULL, NULL, NULL};
+    static const char *bdmaSourceStrs[] = {NULL, NULL, NULL, NULL, NULL, NULL};
+    static const char *bdmaModeStrs[] = {NULL, NULL, NULL, NULL, NULL, NULL, NULL};
     // Order matches enum VCD_USB_BDMA_MODE: Ask / exFAT / fat32. The two driver labels are the ones the
     // per-launch prompt already uses, so the row and the dialog it replaces read identically.
     static const char *vcdUsbBdmaStrs[] = {NULL, NULL, NULL, NULL};
@@ -1431,11 +1508,13 @@ static void guiSetBdmaSettings(struct UIItem *ui)
     bdmaSourceStrs[1] = _l(_STR_BDMA_SRC_MX4SIO);
     bdmaSourceStrs[2] = _l(_STR_BDMA_SRC_MMCE);
     bdmaSourceStrs[3] = _l(_STR_BDMA_SRC_HDD);
+    bdmaSourceStrs[4] = _l(_STR_BDMA_SRC_ILINK);
     bdmaModeStrs[0] = _l(_STR_BDMA_MODE_FAT32);
     bdmaModeStrs[1] = _l(_STR_BDMA_MODE_USBEXFAT);
     bdmaModeStrs[2] = _l(_STR_BDMA_MODE_MX4SIO);
     bdmaModeStrs[3] = _l(_STR_BDMA_MODE_MMCE);
     bdmaModeStrs[4] = _l(_STR_BDMA_MODE_ATA);
+    bdmaModeStrs[5] = _l(_STR_BDMA_MODE_ILINK);
     vcdUsbBdmaStrs[0] = _l(_STR_VCD_USB_BDMA_ASK);
     vcdUsbBdmaStrs[1] = _l(_STR_VCD_USB_MODE_EXFAT);
     vcdUsbBdmaStrs[2] = _l(_STR_VCD_USB_MODE_FAT32);
@@ -1890,7 +1969,7 @@ void guiShowNeutrinoDefaults(void)
 {
     // Neutrino lives at <root>:/neutrino/neutrino.elf on ANY device -- offer the common roots.
     // MUST stay in sync with the roots[] table in sbResolveNeutrinoPath() (supportbase.c).
-    const char *neutrinoDevStrs[] = {_l(_STR_AUTO), "Memory Card", "USB", "MX4SIO", "MMCE", "HDD (exFAT)", "HDD (APA)", _l(_STR_GAMES_DEVICE), NULL}; // device TYPE holding /neutrino/neutrino.elf (NEUTRINO_DEV_*); "Game's Device" (NEUTRINO_DEV_GAME) appended last to match the enum tail
+    const char *neutrinoDevStrs[] = {_l(_STR_AUTO), "Memory Card", "USB", "MX4SIO", "MMCE", "HDD (exFAT)", "HDD (APA)", _l(_STR_GAMES_DEVICE), "iLink", NULL}; // device TYPE holding /neutrino/neutrino.elf (NEUTRINO_DEV_*); iLink is appended after Game's Device to preserve every saved value
     diaSetEnum(diaNeutrinoDefaults, CFG_NEUTRINO_DEVICE, neutrinoDevStrs);
     diaSetInt(diaNeutrinoDefaults, CFG_NEUTRINO_DEVICE, gNeutrinoDevice);
     // Global default Neutrino Video (-gsm) + comp half: same indices as the per-game picker
@@ -2815,7 +2894,6 @@ static int guiSettingsShowInterface(void)
 {
     const struct UIItem *parts[] = {diaUIConfig, diaDisplayConfig};
     const int skipIDs[] = {UICFG_VMODE};
-    const char *gameViewNames[] = {"Both", "PS2", "PS1", NULL};
     const char *vmodeNames[] = {_l(_STR_AUTO), "PAL 640x512i @50Hz 24bit", "NTSC 640x448i @60Hz 24bit",
                                 "EDTV 640x448p @60Hz 24bit", "EDTV 640x512p @50Hz 24bit", "VGA 640x480p @60Hz 24bit",
                                 "PAL 704x576i @50Hz 24bit (HIRES)", "NTSC 704x480i @60Hz 24bit (HIRES)",
@@ -2829,6 +2907,7 @@ static int guiSettingsShowInterface(void)
     const char **langNamesSnap = NULL;
     int themeID, langID, previousTheme, previousVMode, result;
     int gameViewChanged = 0;
+    int appsViewChanged = 0;
 
     if (ui == NULL)
         return 0;
@@ -2844,11 +2923,11 @@ static int guiSettingsShowInterface(void)
     guiUnlock();
     diaSetEnum(ui, UICFG_THEME, themeNamesSnap != NULL ? themeNamesSnap : (const char **)thmGetGuiList());
     diaSetEnum(ui, UICFG_LANG, langNamesSnap != NULL ? langNamesSnap : (const char **)lngGetGuiList());
-    diaSetEnum(ui, UICFG_GAMEVIEW, gameViewNames);
+    guiSetGameViewPicker(ui);
+    guiSetAppsViewPicker(ui);
     diaSetEnum(ui, UICFG_VMODE, vmodeNames);
     diaSetInt(ui, UICFG_THEME, thmGetGuiValue());
     diaSetInt(ui, UICFG_LANG, lngGetGuiValue());
-    diaSetInt(ui, UICFG_GAMEVIEW, gDefaultGameView);
     diaSetInt(ui, UICFG_AUTOSORT, gAutosort);
     diaSetInt(ui, UICFG_AUTOREFRESH, gAutoRefresh);
     diaSetInt(ui, UICFG_NOTIFICATIONS, gEnableNotifications);
@@ -2896,13 +2975,8 @@ reshow_interface:
         diaGetInt(ui, UICFG_AUTOSORT, &gAutosort);
         diaGetInt(ui, UICFG_AUTOREFRESH, &gAutoRefresh);
         diaGetInt(ui, UICFG_NOTIFICATIONS, &gEnableNotifications);
-        {
-            int previousGameView = gDefaultGameView;
-            diaGetInt(ui, UICFG_GAMEVIEW, &gDefaultGameView);
-            gameViewChanged = gDefaultGameView != previousGameView;
-            if (gameViewChanged)
-                libViewMarkAllDirty();
-        }
+        gameViewChanged = guiReadGameViewPicker(ui);
+        appsViewChanged = guiReadAppsViewPicker(ui);
         diaGetInt(ui, UICFG_VMODE, &gVMode);
         diaGetInt(ui, UICFG_WIDESCREEN, &gWideScreen);
         diaGetInt(ui, UICFG_XOFF, &gXOff);
@@ -2918,9 +2992,10 @@ reshow_interface:
             bgmStop();
         applyConfig(themeID, langID, 1);
         if (gameViewChanged) {
-            oplQueueLibraryDeviceUpdates();
-            loadFavourites();
+            guiRefreshGameViews();
         }
+        if (appsViewChanged)
+            guiRefreshAppsView();
         sfxInit(0);
         if (gEnableBGM && !isBgmPlaying())
             bgmStart();
@@ -2954,7 +3029,7 @@ static int guiSettingsShowLaunch(void)
     const struct UIItem *parts[] = {diaLaunchConfig, diaNeutrinoDefaults};
     const int skipIDs[] = {LAUNCH_NEUTRINO_DEFAULTS_BUTTON};
     const char *defaultCoreStrs[] = {"<OPL>", "Neutrino", NULL};
-    const char *neutrinoDevStrs[] = {_l(_STR_AUTO), "Memory Card", "USB", "MX4SIO", "MMCE", "HDD (exFAT)", "HDD (APA)", _l(_STR_GAMES_DEVICE), NULL};
+    const char *neutrinoDevStrs[] = {_l(_STR_AUTO), "Memory Card", "USB", "MX4SIO", "MMCE", "HDD (exFAT)", "HDD (APA)", _l(_STR_GAMES_DEVICE), "iLink", NULL};
     static const char *neutrinoVideoDefStrs[] = {"Off", "240p", "480p", "1080i x1", "1080i x2", "1080i x3", NULL};
     static const char *neutrinoGsmCompDefStrs[] = {"Off", "Type 1 (GSM/OPL)", "Type 2", "Type 3", NULL};
     struct UIItem *ui = guiSettingsCompose(parts, 2, skipIDs, 1, -1, 1);
@@ -3017,7 +3092,7 @@ static int guiSettingsShowPopstarter(void)
 {
     const struct UIItem *parts[] = {diaVcdConfig, diaBdmaConfig};
     const int skipIDs[] = {VCD_BDMA_BUTTON};
-    const char *popsDevStrs[] = {_l(_STR_DEFAULT), "Memory Card", "USB", "MX4SIO", "MMCE", "HDD (exFAT)", "HDD (APA)", "Custom", _l(_STR_GAMES_DEVICE), NULL};
+    const char *popsDevStrs[] = {_l(_STR_DEFAULT), "Memory Card", "USB", "MX4SIO", "MMCE", "HDD (exFAT)", "HDD (APA)", "Custom", _l(_STR_GAMES_DEVICE), "iLink", NULL};
     const char *emberDisplayStrs[] = {_l(_STR_DEFAULT), "240p", "480p", NULL};
     struct UIItem *ui = guiSettingsCompose(parts, 2, skipIDs, 1, -1, 1);
     int result;
@@ -3031,6 +3106,7 @@ static int guiSettingsShowPopstarter(void)
     // change, which is exactly the bug this line replaced.
     diaSetEnum(ui, CFG_EMBER_DISPLAY, emberDisplayStrs);
     diaSetInt(ui, CFG_EMBER_DISPLAY, gEmberDisplay);
+    guiSetGameViewPicker(ui);
 
     diaSetEnum(ui, CFG_POPSTARTER_DEVICE, popsDevStrs);
     diaSetInt(ui, CFG_POPSTARTER_DEVICE, gPopstarterDevice);
@@ -3057,6 +3133,7 @@ reshow_popstarter:
 
     if (result != UIID_BTN_CANCEL && result != -1) {
         char tmpPop[sizeof(gPopstarterPath)];
+        int gameViewChanged = guiReadGameViewPicker(ui);
 
         diaGetInt(ui, CFG_POPSTARTER_DEVICE, &gPopstarterDevice);
         diaGetInt(ui, CFG_POPSTARTER_RETROGEM_GAMEID, &gPopstarterRetroGemGameID);
@@ -3066,6 +3143,8 @@ reshow_popstarter:
             snprintf(gPopstarterPath, sizeof(gPopstarterPath), "%s", tmpPop);
         guiSaveBdmaSettings(ui);
         applyConfig(-1, -1, 0);
+        if (gameViewChanged)
+            guiRefreshGameViews();
         menuReinitMainMenu();
     }
 

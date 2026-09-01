@@ -2,23 +2,28 @@
   Copyright 2026, Open-PS2-Loader contributors
   Licenced under Academic Free License version 3.0
   Review OpenUsbLd README & LICENSE files for further details.
-
-  Library view state + the L3 ring. See include/libview.h for the contract.
-
-  Ported from the binary vcdView[]/vcdDirty[] pair that lived in vcdsupport.c. Behaviour is
-  deliberately IDENTICAL to that flag: the same two stops on the same pages. What changed is that
-  the second stop is now named for what it shows the user (PS1) rather than for one of the two
-  cores that can launch a row in it.
 */
 
-#include <string.h>
-
-#include "include/opl.h"        // gDefaultGameView + GAME_VIEW_*
-#include "include/bdmsupport.h" // bdmModeIsUDPBD -- the one BDM slot with no PS1 story
+#include "include/opl.h"
 #include "include/libview.h"
 
-static unsigned char libView[MODE_COUNT];  // current LIB_VIEW_* per mode (0 == LIB_VIEW_ISO)
-static unsigned char libDirty[MODE_COUNT]; // 1 = view just changed -> force one rescan
+// Both-mode device state, the Favorites ring, and the APPS split ring. Zero is the wanted default
+// for ordinary devices/APPS (PS2/Apps); Favorites intentionally begins at All.
+static unsigned char retainedView[MODE_COUNT] = {[FAV_MODE] = LIB_VIEW_ALL};
+
+// Mixed has a different three-stop ring from Both. Keep its position separately so switching the
+// setting to Mixed always enters the combined list the first time, while later visits retain the
+// user's Mixed/PS2/PS1 position.
+static unsigned char mixedView[MODE_COUNT];
+static unsigned char mixedViewInitialized[MODE_COUNT];
+static unsigned char libDirty[MODE_COUNT];
+
+static int libViewIsDeviceMode(int mode)
+{
+    if (mode >= BDM_MODE && mode <= BDM_MODE_LAST)
+        return 1;
+    return mode == MMCE_MODE || mode == ETH_MODE || mode == HDD_MODE || mode == UDPFS_MODE;
+}
 
 int libViewSupported(int mode, int view)
 {
@@ -27,38 +32,16 @@ int libViewSupported(int mode, int view)
 
     switch (view) {
         case LIB_VIEW_ISO:
-            // Every page's base list.
-            //
-            // APPS has one list and no ring, so it simply reports its base stop here and L3 stays
-            // inert on it -- exactly what the old flag did, and appsupport never asks for the view
-            // at all.
             return 1;
-
         case LIB_VIEW_PS1:
-            // USB / exFAT, MMCE, MX4SIO, iLink, SMB, ATA (BDM HDD), APA / PFS HDD, and FAV_MODE.
-            //
-            // FAV_MODE has a ring of its own: the Favourites tab swaps between disc favourites and
-            // PS1 favourites, and its slot is independent of any device's, so toggling Favourites
-            // never disturbs a device page's view.
-            //
-            // UDPBD is excluded, and the reason is POPSTARTER-specific: it cannot bring a network
-            // block device back up after its own IOP reset. Ember has no reset and keeps whatever
-            // mount it is handed, so an Ember title on UDPBD should in principle work. The stop is
-            // still withheld here because a PS1 page on UDPBD would list POPSTARTER titles that
-            // cannot launch alongside Ember ones that can -- half a working list is worse than
-            // none. Revisit as a per-ROW rule once the Ember launch is hardware-proven, not by
-            // flipping this line.
-            if (mode >= BDM_MODE && mode <= BDM_MODE_LAST)
-                return !bdmModeIsUDPBD(mode);
-            return mode == MMCE_MODE || mode == ETH_MODE || mode == HDD_MODE || mode == FAV_MODE;
-
+            return libViewIsDeviceMode(mode) || mode == FAV_MODE;
         case LIB_VIEW_ELF:
-            // FAVOURITES ONLY. A device page's ELFs live on the APPS tab, which is its own page --
-            // giving devices a third stop would duplicate that tab per device for no gain. But a
-            // saved app favourite had nowhere of its own and sat in the Favourites PS2 list, mixed
-            // in with disc games; this is the shelf it belongs on.
+        case LIB_VIEW_ALL:
             return mode == FAV_MODE;
-
+        case LIB_VIEW_MIXED:
+            return libViewIsDeviceMode(mode) || mode == APP_MODE;
+        case LIB_VIEW_PS1_ELF:
+            return mode == APP_MODE;
         default:
             return 0;
     }
@@ -66,92 +49,117 @@ int libViewSupported(int mode, int view)
 
 int libViewRingSize(int mode)
 {
-    int v, n = 0;
-
-    for (v = 0; v < LIB_VIEW_COUNT; v++) {
-        if (libViewSupported(mode, v))
-            n++;
-    }
-    return n;
+    if (mode < 0 || mode >= MODE_COUNT)
+        return 1;
+    if (mode == FAV_MODE)
+        return 4;
+    if (mode == APP_MODE)
+        return gAppsDisplay == APPS_DISPLAY_SPLIT ? 2 : 1;
+    if (!libViewIsDeviceMode(mode))
+        return 1;
+    if (gDefaultGameView == GAME_VIEW_BOTH)
+        return 2;
+    if (gDefaultGameView == GAME_VIEW_MIXED)
+        return 3;
+    return 1;
 }
 
-// The view every ringed page is pinned to by the global setting, or -1 when the setting leaves the
-// L3 ring free (GAME_VIEW_BOTH). A page that does not have the pinned stop is NOT pinned -- it
-// keeps showing its base list, which is what the old flag did for a non-VCD mode under the VCD
-// lock, and is what keeps APPS and UDPFS on their normal lists.
-static int libViewPinned(int mode)
+static int libViewMixedActive(int mode)
 {
-    // FAVOURITES IS NEVER PINNED, and this is load-bearing rather than a preference. The setting is
-    // "Default game view" -- it decides which list a GAME DEVICE page opens on. Favourites is not a
-    // device page: it is one shelf per kind of thing you saved, and its ring now has three stops.
-    // Pinning it to a single stop would make the APPS shelf permanently unreachable for anyone who
-    // locked the setting, silently hiding their app favourites with no way to get them back. When
-    // that shelf did not exist the question never arose; now it does, so Favourites keeps its own
-    // ring and L3 always works there.
-    if (mode == FAV_MODE)
-        return -1;
-
-    if (gDefaultGameView == GAME_VIEW_ISO)
-        return LIB_VIEW_ISO;
-    if (gDefaultGameView == GAME_VIEW_VCD)
-        return LIB_VIEW_PS1;
-    return -1;
+    if (!mixedViewInitialized[mode]) {
+        mixedView[mode] = LIB_VIEW_MIXED;
+        mixedViewInitialized[mode] = 1;
+    }
+    return mixedView[mode];
 }
 
 int libViewActive(int mode)
 {
-    int pin;
-
     if (mode < 0 || mode >= MODE_COUNT)
         return LIB_VIEW_ISO;
 
-    pin = libViewPinned(mode);
-    if (pin >= 0)
-        return libViewSupported(mode, pin) ? pin : LIB_VIEW_ISO;
+    // These two pages do not inherit the ordinary-device setting.
+    if (mode == FAV_MODE)
+        return retainedView[mode];
+    if (mode == APP_MODE)
+        return gAppsDisplay == APPS_DISPLAY_SPLIT ? retainedView[mode] : LIB_VIEW_MIXED;
 
-    return libView[mode];
+    if (!libViewIsDeviceMode(mode))
+        return LIB_VIEW_ISO;
+
+    switch (gDefaultGameView) {
+        case GAME_VIEW_ISO:
+            return LIB_VIEW_ISO;
+        case GAME_VIEW_VCD:
+            return LIB_VIEW_PS1;
+        case GAME_VIEW_MIXED:
+            return libViewMixedActive(mode);
+        case GAME_VIEW_BOTH:
+        default:
+            return retainedView[mode] == LIB_VIEW_PS1 ? LIB_VIEW_PS1 : LIB_VIEW_ISO;
+    }
 }
 
 int libListViewActive(const item_list_t *itemList)
 {
     if (itemList == NULL)
         return LIB_VIEW_ISO;
-
-    // A Favourites shallow proxy forces the view of the favourite it is resolving, so an ISO
-    // favourite reads its source's retained ISO array even while that source page shows VCD.
     if (itemList->viewOverride == ITEM_VIEW_FORCE_ISO)
         return LIB_VIEW_ISO;
     if (itemList->viewOverride == ITEM_VIEW_FORCE_PS1)
         return LIB_VIEW_PS1;
-
     return libViewActive(itemList->mode);
+}
+
+int libListRowView(item_list_t *itemList, int id)
+{
+    int view;
+
+    if (itemList == NULL)
+        return LIB_VIEW_ISO;
+    if (itemList->itemGetView != NULL) {
+        view = itemList->itemGetView(itemList, id);
+        if (view >= 0 && view < LIB_VIEW_COUNT)
+            return view;
+    }
+    return libListViewActive(itemList);
+}
+
+int libListSourceId(item_list_t *itemList, int id)
+{
+    if (itemList != NULL && itemList->itemGetSourceId != NULL)
+        return itemList->itemGetSourceId(itemList, id);
+    return id;
 }
 
 int libViewRingUsable(int mode)
 {
-    if (mode < 0 || mode >= MODE_COUNT)
-        return 0;
-    return libViewRingSize(mode) > 1 && libViewPinned(mode) < 0;
+    return mode >= 0 && mode < MODE_COUNT && libViewRingSize(mode) > 1;
 }
 
 void libViewAdvance(int mode)
 {
-    int cur, step, cand;
+    int cur;
 
-    if (mode < 0 || mode >= MODE_COUNT)
+    if (!libViewRingUsable(mode))
         return;
-    if (libViewPinned(mode) >= 0)
-        return; // globally pinned to one list -> the L3 ring is inert
-    if (libViewRingSize(mode) < 2)
-        return; // nothing to move between
 
-    cur = libView[mode];
-    for (step = 1; step <= LIB_VIEW_COUNT; step++) {
-        cand = (cur + step) % LIB_VIEW_COUNT;
-        if (libViewSupported(mode, cand)) {
-            libView[mode] = (unsigned char)cand;
-            break;
-        }
+    if (mode == FAV_MODE) {
+        // Explicit order: All -> PS2 -> PS1 -> ELF -> All.
+        cur = retainedView[mode];
+        retainedView[mode] = (cur == LIB_VIEW_ALL) ? LIB_VIEW_ISO :
+                             (cur == LIB_VIEW_ISO) ? LIB_VIEW_PS1 :
+                             (cur == LIB_VIEW_PS1) ? LIB_VIEW_ELF :
+                                                    LIB_VIEW_ALL;
+    } else if (mode == APP_MODE) {
+        retainedView[mode] = retainedView[mode] == LIB_VIEW_PS1_ELF ? LIB_VIEW_ISO : LIB_VIEW_PS1_ELF;
+    } else if (gDefaultGameView == GAME_VIEW_MIXED) {
+        cur = libViewMixedActive(mode);
+        mixedView[mode] = (cur == LIB_VIEW_MIXED) ? LIB_VIEW_ISO :
+                          (cur == LIB_VIEW_ISO)   ? LIB_VIEW_PS1 :
+                                                   LIB_VIEW_MIXED;
+    } else {
+        retainedView[mode] = retainedView[mode] == LIB_VIEW_PS1 ? LIB_VIEW_ISO : LIB_VIEW_PS1;
     }
 
     libDirty[mode] = 1;
@@ -167,14 +175,13 @@ int libViewConsumeDirty(int mode)
 
 void libViewMarkDirty(int mode)
 {
-    if (mode >= 0 && mode < MODE_COUNT && libViewRingSize(mode) > 1)
+    if (mode >= 0 && mode < MODE_COUNT)
         libDirty[mode] = 1;
 }
 
 void libViewMarkAllDirty(void)
 {
-    int m;
-
-    for (m = 0; m < MODE_COUNT; m++)
-        libViewMarkDirty(m);
+    int mode;
+    for (mode = 0; mode < MODE_COUNT; mode++)
+        libDirty[mode] = 1;
 }

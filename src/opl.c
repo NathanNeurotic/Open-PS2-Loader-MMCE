@@ -186,6 +186,7 @@ int gNeutrinoVideoDefault;   // global default Neutrino -gsm video mode (0=Off..
 int gNeutrinoGsmCompDefault; // global default -gsm ":c" field-flip half (0=off, 1-3=type)
 int gNeutrinoElfArg;         // default-on (settings key only, no UI): auto-emit -elf=cdrom0: on Neutrino launches
 int gDefaultGameView;
+int gAppsDisplay;
 int gEmberDisplay;
 char gPopstarterPath[256];         // custom POPSTARTER.ELF path (used only when gPopstarterDevice == POPS_DEV_CUSTOM)
 int gPopstarterDevice;             // POPSTARTER.ELF device (POPS_DEV_*); legacy path -> Custom
@@ -329,14 +330,19 @@ void moduleUpdateMenuInternal(opl_io_module_t *mod, int themeChanged, int langCh
         if (gFAVStartMode)
             menuAddHint(&mod->menuItem, _STR_FAV_HINT, R3_ICON);
 
-        // L3 moves the page around its ring of lists -- only under the "Both" default-view setting;
-        // a locked setting pins the page, so the toggle and its hint go away.
+        // L3 moves the page around its ring of lists. Both and Mixed expose rings; PS2/PS1 pin an
+        // ordinary device page, while Favorites and APPS retain their independent display rules.
         //
         // The question is "does this page have more than one list", NOT "does it have a VCD list".
         // Those were the same thing while every ring was ISO<->VCD, and stop being the same as soon
         // as a page offers a third; libViewRingSize keeps the hint honest either way.
-        if (libViewRingUsable(mod->support->mode))
-            menuAddHint(&mod->menuItem, _STR_VCD, L3_ICON);
+        if (libViewRingUsable(mod->support->mode)) {
+            int hint = _STR_VCD;
+            if (mod->support->mode == FAV_MODE || mod->support->mode == APP_MODE ||
+                gDefaultGameView == GAME_VIEW_MIXED)
+                hint = _STR_VIEW;
+            menuAddHint(&mod->menuItem, hint, L3_ICON);
+        }
     }
 
     menuHintsUnlock();
@@ -426,9 +432,18 @@ static void itemExecRefresh(struct menu_item *curMenu)
         // explicit user Refresh must invalidate that cache before posting the deferred update.
         if (support->mode == FAV_MODE) {
             loadFavourites();
+        } else if (support->mode == ETH_MODE && gNetworkStartup != 0) {
+            // A failed SMB page uses the same Select/Refresh gesture as every other list, but its
+            // failure is a connection state rather than stale directory metadata. Retry the full
+            // live apply/logon/open-share path so a slow router/server can recover in place.
+            ethRequestReconnect();
         } else {
-            if (support->mode == HDD_MODE && (libListViewActive(support) == LIB_VIEW_PS1))
+            if (support->mode == HDD_MODE &&
+                (libListViewActive(support) == LIB_VIEW_PS1 || libListViewActive(support) == LIB_VIEW_MIXED))
                 hddVcdInvalidateCache();
+            // Explicit Refresh must bypass per-device scan caches. This also ensures a Mixed list
+            // refreshes both of its backing stores instead of merely rebuilding the same rows.
+            libViewMarkDirty(support->mode);
             ioPutRequest(IO_MENU_UPDATE_DEFFERED, &support->mode);
         }
         sfxPlay(SFX_CONFIRM);
@@ -458,15 +473,36 @@ static void itemExecToggleView(struct menu_item *curMenu)
     cacheDropQueuedArt();
 
     sfxPlay(SFX_CONFIRM);
-    // Three shelves are possible now (Favourites rings PS2 -> PS1 -> APPS), so the toast names the
+    // Favorites has four stops (All -> PS2 -> PS1 -> ELF), so the toast names the
     // one you landed on rather than reading as an on/off flag.
     {
         int view = libViewActive(support->mode);
-        int msg = (view == LIB_VIEW_PS1) ? _STR_VCD_ON : (view == LIB_VIEW_ELF) ? _STR_VIEW_APPS :
-                                                                                  _STR_VCD_OFF;
+        int msg;
+        if (support->mode == FAV_MODE)
+            msg = (view == LIB_VIEW_PS1) ? _STR_VIEW_PS1 : (view == LIB_VIEW_ELF) ? _STR_VIEW_ELF :
+                                                              (view == LIB_VIEW_ALL) ? _STR_VIEW_ALL :
+                                                                                       _STR_VIEW_PS2;
+        else if (support->mode == APP_MODE)
+            msg = view == LIB_VIEW_PS1_ELF ? _STR_VIEW_PS1_ELF : _STR_VIEW_APPS;
+        else if (view == LIB_VIEW_MIXED)
+            msg = _STR_VIEW_MIXED;
+        else
+            msg = (view == LIB_VIEW_PS1) ? _STR_VCD_ON : _STR_VCD_OFF;
         guiWarning(_l(msg), 2);
     }
     ioPutRequest(IO_MENU_UPDATE_DEFFERED, &support->mode);
+}
+
+// Effective kind of the selected row. Every normal device page is homogeneous, so its active view
+// is enough. Favorites' All-in-One stop is intentionally mixed; there the stored row kind decides
+// whether Triangle opens PS2 options, the PS1 rename-only menu, or the ELF/app menu.
+static int itemSelectedView(struct menu_item *curMenu, item_list_t *support)
+{
+    if (support == NULL)
+        return LIB_VIEW_ISO;
+    if (curMenu != NULL && curMenu->current != NULL)
+        return libListRowView(support, curMenu->current->item.id);
+    return libListViewActive(support);
 }
 
 // Folder browsing: the cancel button (whichever of Cross/Circle is not Select) ascends a level.
@@ -515,7 +551,7 @@ static void itemExecSquare(struct menu_item *curMenu)
         // Direct HDD/HDL rows already carry their size in APA metadata (total_size_in_kb), so the
         // generic CFG+stat pass is redundant there. VCD rows likewise have no meaningful #Size.
         // Avoid putting either no-op read onto the shared IO worker merely for opening Info.
-        if (support == NULL || (libListViewActive(support) != LIB_VIEW_PS1 && support->mode != HDD_MODE))
+        if (support == NULL || (itemSelectedView(curMenu, support) != LIB_VIEW_PS1 && support->mode != HDD_MODE))
             menuRequestInfoSize();
         guiSwitchScreen(GUI_SCREEN_INFO);
     }
@@ -534,12 +570,14 @@ static void itemExecSquare(struct menu_item *curMenu)
 static int itemFavKind(item_list_t *support, int id, const char *text)
 {
     const base_game_info_t *game;
+    int rowView;
 
     if (support == NULL)
         return FAV_KIND_ISO;
     if (support->mode == APP_MODE)
         return FAV_KIND_ELF;
-    if (libViewActive(support->mode) != LIB_VIEW_PS1)
+    rowView = libListRowView(support, id);
+    if (rowView != LIB_VIEW_PS1)
         return FAV_KIND_ISO;
 
     // A PS1 page holds both cores, so the CORE comes from the row. Without itemGet there is nothing
@@ -584,11 +622,12 @@ static void itemExecFav(struct menu_item *curMenu)
         favRemoveByIndex(it->id);
     } else {
         int kind = itemFavKind(support, it->id, it->text);
+        int sourceId = libListSourceId(support, it->id);
         // Mid-rebuild: the row on screen is not the row the backing list would give us. Storing it
         // now would file the favourite under the wrong core, or under a name that is about to move.
         // Do nothing and let the user press R3 again once the list has settled -- the star is not
         // touched either, so nothing on screen lies about what was saved.
-        if (kind < 0)
+        if (kind < 0 || sourceId < 0)
             return;
         // Only store a favourite this device can actually resolve and launch later. A PS1 record
         // whose source has no hook for that core would be a permanently-hidden, unlaunchable entry.
@@ -597,10 +636,10 @@ static void itemExecFav(struct menu_item *curMenu)
         if (kind == FAV_KIND_CUE && support->itemLaunchCue == NULL)
             return;
         if (it->favourited) {
-            if (removeFavouriteByIdAndText(support->mode, it->id, it->text, kind))
+            if (removeFavouriteByIdAndText(support->mode, sourceId, it->text, kind))
                 it->favourited = 0; // only clear the star once the store write succeeded
         } else {
-            if (addFavouriteItem(support->mode, it->id, it->icon_id, it->text_id, it->text, kind))
+            if (addFavouriteItem(support->mode, sourceId, it->icon_id, it->text_id, it->text, kind))
                 it->favourited = 1; // only show the star once the store write succeeded
         }
     }
@@ -624,7 +663,7 @@ static void itemExecTriangle(struct menu_item *curMenu)
         // A VCD is a POPSTARTER title, not a PS2-loader title. Route before the generic per-game
         // settings branch: that branch loads/creates CFG state and exposes controls that can never
         // affect a POPSTARTER handoff. libListViewActive also covers a forced-VCD Favourites proxy.
-        if (libListViewActive(support) == LIB_VIEW_PS1) {
+        if (itemSelectedView(curMenu, support) == LIB_VIEW_PS1) {
             if (menuCheckParentalLock() == 0) {
                 menuInitVcdMenu();
                 guiSwitchScreen(GUI_SCREEN_APP_MENU);
@@ -834,7 +873,8 @@ void oplQueueLibraryDeviceUpdates(void)
     // otherwise keeps displaying the old submenu indefinitely while rendering uses the new view.
     for (int i = 0; i < MODE_COUNT; i++) {
         item_list_t *support = list_support[i].support;
-        if (support != NULL && support->enabled && support->mode != FAV_MODE && libViewRingSize(support->mode) > 1)
+        if (support != NULL && support->enabled && support->mode != FAV_MODE && support->mode != APP_MODE &&
+            libViewSupported(support->mode, LIB_VIEW_PS1))
             ioPutRequest(IO_MENU_UPDATE_DEFFERED, &support->mode);
     }
 }
@@ -2716,8 +2756,11 @@ static void _loadConfig()
             configGetInt(configOPL, CONFIG_OPL_FAV_MODE, &gFAVStartMode);
             configGetInt(configOPL, CONFIG_OPL_APPLY_GAMEID, &gApplyGameID);
             configGetInt(configOPL, CONFIG_OPL_DEFAULT_GAME_VIEW, &gDefaultGameView);
-            if (gDefaultGameView < GAME_VIEW_BOTH || gDefaultGameView > GAME_VIEW_VCD)
+            if (gDefaultGameView < GAME_VIEW_BOTH || gDefaultGameView > GAME_VIEW_MIXED)
                 gDefaultGameView = GAME_VIEW_BOTH;
+            configGetInt(configOPL, CONFIG_OPL_APPS_DISPLAY, &gAppsDisplay);
+            if (gAppsDisplay < APPS_DISPLAY_MIXED || gAppsDisplay > APPS_DISPLAY_SPLIT)
+                gAppsDisplay = APPS_DISPLAY_MIXED;
             if (!configGetInt(configOPL, CONFIG_OPL_EMBER_DISPLAY, &gEmberDisplay))
                 gEmberDisplay = EMBER_DISPLAY_LEAVE;
             if (gEmberDisplay < EMBER_DISPLAY_LEAVE || gEmberDisplay > EMBER_DISPLAY_480)
@@ -3243,6 +3286,7 @@ static void _saveConfig()
         configSetInt(configOPL, CONFIG_OPL_FAV_MODE, gFAVStartMode);
         configSetInt(configOPL, CONFIG_OPL_APPLY_GAMEID, gApplyGameID);
         configSetInt(configOPL, CONFIG_OPL_DEFAULT_GAME_VIEW, gDefaultGameView);
+        configSetInt(configOPL, CONFIG_OPL_APPS_DISPLAY, gAppsDisplay);
         configSetStr(configOPL, CONFIG_OPL_POPSTARTER_PATH, gPopstarterPath);
         configSetInt(configOPL, CONFIG_OPL_EMBER_DISPLAY, gEmberDisplay);
         configSetInt(configOPL, CONFIG_OPL_POPSTARTER_DEVICE, gPopstarterDevice);
@@ -4405,6 +4449,7 @@ static void setDefaults(void)
     gNeutrinoGsmCompDefault = 0;
     gNeutrinoElfArg = 1; // auto-emit the game ELF for Neutrino compatibility lookup by default
     gDefaultGameView = GAME_VIEW_BOTH;
+    gAppsDisplay = APPS_DISPLAY_MIXED;
     gPopstarterDevice = POPS_DEV_DEFAULT;
     gPopstarterPath[0] = '\0';
     gPopstarterRetroGemGameID = 1;

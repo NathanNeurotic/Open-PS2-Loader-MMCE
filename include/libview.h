@@ -3,29 +3,18 @@
   Licenced under Academic Free License version 3.0
   Review OpenUsbLd README & LICENSE files for further details.
 
-  Library view state: which of a page's several lists is on screen, and the L3 ring that moves
-  between them.
+  Library display state and L3 routing.
 
-  A device page has two stops: PS2 discs, and PS1. Favourites has three -- PS2, PS1, APPS -- so its
-  saved ELF entries get a shelf of their own instead of sharing the PS2 list. Rings are per-mode for
-  exactly this reason; nothing else needs to know. The PS1 stop is deliberately ONE list holding
-  BOTH PS1 cores' titles -- POPSTARTER *.VCD entries and Ember game folders, interleaved and sorted
-  together. A user thinks "PS1", not "which emulator", so the front end does too; which core launches
-  a given row is a property of the ROW, resolved at launch time, and never of the page.
+  Ordinary game devices follow PS2/PS1 Game Display:
+    Both  - separate PS2 and PS1 pages, toggled by L3.
+    Mixed - one combined page; L3 cycles Mixed -> PS2 -> PS1.
+    PS2   - PS2 only; L3 is completely inert.
+    PS1   - PS1 only; L3 is completely inert.
 
-  This replaces the binary per-mode VCD flag that used to live in vcdsupport.c. That flag was named
-  for one of the two cores, and every caller had to ask "is it VCD?" to mean "is it PS1?". The ring
-  machinery below is kept general (supported-stop set, wrap-around advance) so a genuinely separate
-  third list can be added later without another rewrite -- but adding one is a UI decision, not a
-  consequence of supporting another core.
-
-  A page's ring is the ordered set of views it supports. L3 advances one stop and wraps. The global
-  gDefaultGameView setting can PIN every page that has a given stop to it, which makes L3 inert --
-  that behaviour is unchanged, only generalised.
-
-  The dirty protocol is unchanged too, because every device support already consumes it: advancing
-  the view marks the mode dirty, the support's itemNeedsUpdate consumes the flag and forces one
-  rescan, and the deferred IO update rebuilds the submenu.
+  Favorites and APPS are deliberately independent. Favorites keeps its four-stop
+  All/PS2/PS1/ELF ring. APPS is either one unfiltered list (no L3) or Apps/PS1ELF, where [PS1]
+  in an ELF's displayed title chooses the PS1ELF side. A PS1 device row still chooses its actual
+  POPSTARTER/Ember core from row metadata; the display layer never changes launch semantics.
 */
 
 #ifndef __LIBVIEW_H
@@ -34,52 +23,44 @@
 #include "include/iosupport.h"
 
 enum LIB_VIEW {
-    LIB_VIEW_ISO = 0, // PS2 disc games: ISO / ZSO / UL / HDL
-    LIB_VIEW_PS1,     // PS1 titles, BOTH cores together (see the note above)
-    LIB_VIEW_ELF,     // homebrew ELFs -- a stop on the FAVOURITES ring only
+    LIB_VIEW_ISO = 0, // PS2 disc games; also the normal-Apps side of a split APPS page
+    LIB_VIEW_PS1,     // PS1 titles (POPSTARTER and Ember rows together)
+    LIB_VIEW_ELF,     // ELF Favorites shelf
+    LIB_VIEW_ALL,     // all Favorite kinds together
+    LIB_VIEW_MIXED,   // PS2 + PS1 device rows, or every APPS row
+    LIB_VIEW_PS1_ELF, // APPS rows whose displayed title contains [PS1]
     LIB_VIEW_COUNT
 };
 
-// Is `view` a stop in this mode's ring? This is the ONE place a page's ring is defined; nothing
-// else should hard-code which devices have which lists.
+// Whether a view can exist for a mode. This describes potential backing lists, not necessarily the
+// currently enabled L3 ring (libViewRingSize/libViewRingUsable describe that).
 int libViewSupported(int mode, int view);
 
-// How many stops this mode's ring has. 1 means there is nothing to toggle: L3 is inert and the
-// on-screen hint is suppressed. Callers that used to ask "does this device have a VCD view" to
-// decide whether to offer the toggle want THIS, not libViewSupported(mode, LIB_VIEW_PS1) -- the two
-// stopped meaning the same thing once a page could have more than two lists.
+// Number of live L3 stops under the current setting. A value of one means L3 has no hint, sound,
+// notification, pause, or state change.
 int libViewRingSize(int mode);
 
-// The view a page is currently showing. Always a stop in that page's ring; LIB_VIEW_ISO for a mode
-// with no ring of its own.
+// Page-level active view.
 int libViewActive(int mode);
 
-// The view an item list is showing. A normal source delegates to libViewActive(mode); a Favourites
-// shallow proxy may force a view through item_list_t.viewOverride without disturbing the real
-// source page's own L3 state.
+// A Favourites source proxy can force a homogeneous source list without changing that source
+// page's retained state.
 int libListViewActive(const item_list_t *itemList);
 
-// Can L3 do anything on this page -- more than one stop AND not pinned by the global setting?
-// The on-screen hint and the L3 handler must both ask THIS, or one will offer a toggle the other
-// refuses (or hide one that works). Favourites is never pinned; see libViewPinned in libview.c.
+// Row-level view/source identity. Mixed pages override these through optional item-list callbacks;
+// homogeneous legacy lists inherit their page view and visible id.
+int libListRowView(item_list_t *itemList, int id);
+int libListSourceId(item_list_t *itemList, int id);
+
+// Whether L3 is actionable on this page under the current independent settings.
 int libViewRingUsable(int mode);
 
-// L3: advance to the next supported stop, wrapping, and mark the mode dirty. No-op when the global
-// default-view setting pins the page, or when the ring has fewer than two stops.
+// Advance one L3 stop and mark the page dirty. No-op for a one-stop page.
 void libViewAdvance(int mode);
 
-// Returns 1 exactly once after an advance (and clears the flag). Call from the support's
-// itemNeedsUpdate so the forced rescan cannot be swallowed by per-generation device caching.
+// Dirty protocol consumed by support itemNeedsUpdate callbacks.
 int libViewConsumeDirty(int mode);
-
-// Mark one ringed mode dirty after its storage changes. Runtime callers still enqueue that
-// support's normal deferred update; this only makes the existing NeedsUpdate path rescan it.
 void libViewMarkDirty(int mode);
-
-// Mark every ringed mode dirty (one rescan each) -- used when a global setting changes what the
-// lists contain or how they sort. Deliberately side-effect-free: it also runs during early config
-// loading, before the IO worker and device modules exist, so runtime callers must additionally
-// enqueue the deferred updates themselves (oplQueueLibraryDeviceUpdates).
 void libViewMarkAllDirty(void);
 
 #endif

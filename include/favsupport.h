@@ -40,6 +40,10 @@ unsigned char favGetFlags(item_list_t *itemList);
 // theme engine to draw APP favourites with the apps element (proper art box + overlay).
 int favGetItemSourceMode(int id);
 
+// LIB_VIEW_ISO / PS1 / ELF kind of one displayed favorite, or -1 when id is invalid. The Favorites
+// All-in-One shelf uses this to keep row-specific menus honest even though the page view is ALL.
+int favGetItemView(int id);
+
 // Source device mode of the favourite whose art-cache value (source startup / VCD name) matches,
 // or -1 if none does. Used by texcache's cacheGetEffectiveMode so MMCE idle
 // deferral, abort, and worker-priority rules follow the device a FAV-tab read

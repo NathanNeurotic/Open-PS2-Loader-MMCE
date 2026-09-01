@@ -47,19 +47,21 @@ override only what differs and inherit the rest.
 |---|---|---|
 | `main0…` / `info0…` | The **games** list / info — the base layout | *(none — this is the base)* |
 | `appsMain0…` / `appsInfo0…` | The **apps** device list / info | → `mainN` / `infoN` |
-| `favsMain0…` / `favsInfo0…` | The **Favourites** tab list / info | → `mainN` / `infoN` |
-| `vcdMain0…` / `vcdInfo0…` | A device's **PS1/VCD view** (toggle with **L3**) list / info | main: → `appsMainN` → `mainN`  ·  info: → `infoN` |
+| `favsMain0…` / `favsInfo0…` | The **Favorites** tab list / info | → `mainN` / `infoN` |
+| `vcdMain0…` / `vcdInfo0…` | A device's homogeneous **PS1/VCD view**, plus selected PS1-row info in Mixed | main: → `appsMainN` → `mainN`  ·  info: → `infoN` |
 
-**The VCD family** (new in this fork) lets PS1/VCD games have their own look. When a device is
-switched to its PS1 `*.VCD` list (press **L3**), its covers render from `vcdMain*` and the info page
-from `vcdInfo*`. Because each `vcdMain` slot falls back to `appsMain` — a **square** box, matching
+**The VCD family** (new in this fork) lets PS1/VCD games have their own look. A device's homogeneous
+PS1 view renders from `vcdMain*`; in a combined Mixed view the shared list uses the base `main*`
+family, while opening a selected PS1 row still uses `vcdInfo*`. Because each `vcdMain` slot falls
+back to `appsMain` — a **square** box, matching
 PS1 jewel-case art — before `main`, a theme that defines *no* `vcdMain` blocks still shows PS1 games
 in the square apps box. So you only add `vcdMain` blocks to make PS1 covers *differ* from apps;
 `vcdInfo` falls back to the game `info` layout, preserving the rich PS1 metadata page.
 
 > The games / apps / favs families share one cover-art cache (deduplicated by `pattern`). The **PS1/VCD
-> view keeps its OWN cover cache**: an **L3** view reuses the device's game *list* (same item indices as
-> the ISO list), so a shared cache would thrash covers on every toggle. The VCD family automatically
+> view keeps its OWN cover cache**: separate PS2 and PS1 views reuse the device's game *list* indices,
+> so a shared cache would thrash covers on every toggle. A combined Mixed view instead uses the base
+> games list/cache for all visible rows. The VCD family automatically
 > claims its own (4th) `ItemsList` slot and a separate cover cache — one small extra cache; the rest is
 > shared. (A theme needs no extra `ItemsList` block for this; it is auto-claimed via the fallback.)
 
@@ -240,7 +242,7 @@ y=24
 | `udpbd` | UDPBD network boot |
 | `udpfs` | UDPFS network boot |
 | `app` | The Apps tab |
-| `fav` | The Favourites tab |
+| `fav` | The Favorites tab |
 | `bdm` | The generic BDM page before its driver is identified (auto/manual start) |
 
 Rules worth knowing:
@@ -382,7 +384,7 @@ While the user is idle, the carousel also *prefetches* the covers just outside t
 window (up to 4 positions each side of the selection, wrapping around the list ends), so a
 scroll step reveals a cover that is usually already loaded instead of the placeholder
 (issue #296). The prefetch only starts once the selection's own cover has loaded, and it is
-skipped entirely on MMCE-backed items (including MMCE-sourced favourites) to keep the shared
+skipped entirely on MMCE-backed items (including MMCE-sourced favorites) to keep the shared
 SIO2 bus quiet — those covers still load on selection, as before.
 
 ### Per-theme properties (in `conf_theme.cfg`)
