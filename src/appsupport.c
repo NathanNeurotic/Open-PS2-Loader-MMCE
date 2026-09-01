@@ -14,6 +14,7 @@
 #include "include/hddsupport.h"
 #include "include/texcache.h"
 #include "include/textures.h"
+#include "include/libview.h"
 
 #include <elf-loader.h>
 
@@ -26,6 +27,9 @@ static int appArtLookupTableSize = 0;
 
 static config_set_t *configApps;
 static app_info_t *appsList;
+static int *appVisibleIds;
+static int appVisibleCount;
+static int appViewOnlyUpdate;
 
 struct app_info_linked
 {
@@ -43,6 +47,55 @@ static void appFreeLinkedList(struct app_info_linked *appsLinkedList);
 static app_info_t *appLookupByStartup(const char *startup);
 static void appSetArtSource(app_info_t *app);
 static void appSetResolvedStartup(app_info_t *app);
+static int appRebuildVisibleList(void);
+
+static int appTitleIsPs1Elf(const char *title)
+{
+    int i;
+
+    if (title == NULL)
+        return 0;
+    for (i = 0; title[i] != '\0'; i++) {
+        if (title[i] == '[' && title[i + 1] != '\0' && title[i + 2] != '\0' &&
+            title[i + 3] != '\0' && title[i + 4] != '\0' &&
+            (title[i + 1] == 'P' || title[i + 1] == 'p') &&
+            (title[i + 2] == 'S' || title[i + 2] == 's') && title[i + 3] == '1' && title[i + 4] == ']')
+            return 1;
+    }
+    return 0;
+}
+
+static int appVisibleToMaster(item_list_t *itemList, int id)
+{
+    // Favorites owns a shallow forced-view proxy and stores master discovery ids, not whichever
+    // filtered APPS row number happens to be visible today.
+    if (itemList != NULL && itemList->viewOverride != ITEM_VIEW_NATIVE)
+        return (id >= 0 && id < appItemCount) ? id : -1;
+    return (appVisibleIds != NULL && id >= 0 && id < appVisibleCount) ? appVisibleIds[id] : -1;
+}
+
+static int appRebuildVisibleList(void)
+{
+    int i, view;
+
+    free(appVisibleIds);
+    appVisibleIds = NULL;
+    appVisibleCount = 0;
+    if (appsList == NULL || appItemCount <= 0)
+        return 0;
+
+    appVisibleIds = malloc(appItemCount * sizeof(*appVisibleIds));
+    if (appVisibleIds == NULL)
+        return 0;
+
+    view = libViewActive(APP_MODE);
+    for (i = 0; i < appItemCount; i++) {
+        int tagged = appTitleIsPs1Elf(appsList[i].title);
+        if (view == LIB_VIEW_MIXED || (view == LIB_VIEW_PS1_ELF && tagged) || (view == LIB_VIEW_ISO && !tagged))
+            appVisibleIds[appVisibleCount++] = i;
+    }
+    return appVisibleCount;
+}
 
 static struct config_value_t *appGetConfigValue(int id)
 {
@@ -489,6 +542,9 @@ void appInit(item_list_t *itemList)
         configFree(configApps);
     configApps = oplGetLegacyAppsConfig();
     appsList = NULL;
+    appVisibleIds = NULL;
+    appVisibleCount = 0;
+    appViewOnlyUpdate = 0;
     appItemList.enabled = 1;
 }
 
@@ -501,7 +557,7 @@ item_list_t *appGetObject(int initOnly)
 
 static int appNeedsUpdate(item_list_t *itemList)
 {
-    int update;
+    int update, viewChanged;
 
     update = 0;
     if (appForceUpdate) {
@@ -510,6 +566,13 @@ static int appNeedsUpdate(item_list_t *itemList)
     }
     if (oplShouldAppsUpdate())
         update = 1;
+
+    viewChanged = libViewConsumeDirty(APP_MODE);
+    if (viewChanged && !update) {
+        appViewOnlyUpdate = 1;
+        return 1;
+    }
+    appViewOnlyUpdate = 0;
 
     if (update) {
         if (configApps != NULL)
@@ -635,6 +698,11 @@ static int appUpdateItemList(item_list_t *itemList)
     struct app_info_linked *appsLinkedList;
     struct app_info_linked *appsLinkedListHead;
 
+    if (appViewOnlyUpdate) {
+        appViewOnlyUpdate = 0;
+        return appRebuildVisibleList();
+    }
+
     /* Drain any in-flight art worker requests that reference appsList /
      * appArtLookupTable before freeing them; without this the art worker
      * thread (gArtThreadId) can race against the free/realloc below via
@@ -691,9 +759,11 @@ static int appUpdateItemList(item_list_t *itemList)
 
     appFreeLinkedList(appsLinkedListHead);
 
+    appRebuildVisibleList();
+
     LOG("APPSUPPORT %d apps loaded\n", appItemCount);
 
-    return appItemCount;
+    return appVisibleCount;
 }
 
 static void appFreeLinkedList(struct app_info_linked *appsLinkedList)
@@ -714,17 +784,22 @@ static void appFreeList(void)
         appsList = NULL;
     }
 
+    free(appVisibleIds);
+    appVisibleIds = NULL;
+    appVisibleCount = 0;
+
     appItemCount = 0;
 }
 
 static int appGetItemCount(item_list_t *itemList)
 {
-    return appItemCount;
+    return itemList != NULL && itemList->viewOverride != ITEM_VIEW_NATIVE ? appItemCount : appVisibleCount;
 }
 
 static char *appGetItemName(item_list_t *itemList, int id)
 {
-    return appsList[id].title;
+    id = appVisibleToMaster(itemList, id);
+    return id >= 0 ? appsList[id].title : "";
 }
 
 static int appGetItemNameLength(item_list_t *itemList, int id)
@@ -736,11 +811,15 @@ static int appGetItemNameLength(item_list_t *itemList, int id)
    The path is used immediately, before a subsequent call to appGetItemStartup(). */
 static char *appGetItemStartup(item_list_t *itemList, int id)
 {
-    return appsList[id].startup;
+    id = appVisibleToMaster(itemList, id);
+    return id >= 0 ? appsList[id].startup : "";
 }
 
 static void appDeleteItem(item_list_t *itemList, int id)
 {
+    id = appVisibleToMaster(itemList, id);
+    if (id < 0)
+        return;
     if (appsList[id].legacy) {
         struct config_value_t *cur = appGetConfigValue(id);
         unlink(cur->val);
@@ -757,6 +836,10 @@ static void appDeleteItem(item_list_t *itemList, int id)
 static void appRenameItem(item_list_t *itemList, int id, char *newName)
 {
     char value[256];
+
+    id = appVisibleToMaster(itemList, id);
+    if (id < 0)
+        return;
 
     if (appsList[id].legacy) {
         struct config_value_t *cur = appGetConfigValue(id);
@@ -788,6 +871,10 @@ static void appLaunchItem(item_list_t *itemList, int id, config_set_t *configSet
     int fd;
     char filename[256];
     const char *argv1;
+
+    id = appVisibleToMaster(itemList, id);
+    if (id < 0)
+        return;
 
     // Retrieve configuration set by appGetConfig()
     configGetStrCopy(configSet, CONFIG_ITEM_STARTUP, filename, sizeof(filename));
@@ -912,6 +999,10 @@ static config_set_t *appGetConfig(item_list_t *itemList, int id)
     config_set_t *config;
     char tmp[8];
 
+    id = appVisibleToMaster(itemList, id);
+    if (id < 0)
+        return NULL;
+
     if (appsList[id].legacy) {
         struct config_value_t *cur = appGetConfigValue(id);
         config = oplGetLegacyAppsInfo(appGetELFName(cur->val));
@@ -987,6 +1078,19 @@ static int appGetIconId(item_list_t *itemList)
     return APP_ICON;
 }
 
+static int appGetItemView(item_list_t *itemList, int id)
+{
+    id = appVisibleToMaster(itemList, id);
+    if (id < 0)
+        return LIB_VIEW_ELF;
+    return appTitleIsPs1Elf(appsList[id].title) ? LIB_VIEW_PS1_ELF : LIB_VIEW_ELF;
+}
+
+static int appGetSourceId(item_list_t *itemList, int id)
+{
+    return appVisibleToMaster(itemList, id);
+}
+
 // This may be called, even if appInit() was not.
 static void appCleanUp(item_list_t *itemList, int exception)
 {
@@ -1018,4 +1122,5 @@ static void appShutdown(item_list_t *itemList)
 static item_list_t appItemList = {
     APP_MODE, -1, 0, MODE_FLAG_NO_COMPAT | MODE_FLAG_NO_UPDATE, MENU_MIN_INACTIVE_FRAMES, APP_MODE_UPDATE_DELAY, NULL, NULL, &appGetTextId, NULL, &appInit, &appNeedsUpdate, &appUpdateItemList,
     &appGetItemCount, NULL, &appGetItemName, &appGetItemNameLength, &appGetItemStartup, &appDeleteItem, &appRenameItem, &appLaunchItem,
-    &appGetConfig, &appGetImage, &appCleanUp, &appShutdown, NULL, &appGetIconId};
+    &appGetConfig, &appGetImage, &appCleanUp, &appShutdown, NULL, &appGetIconId,
+    NULL, ITEM_VIEW_NATIVE, NULL, NULL, &appGetItemView, &appGetSourceId};

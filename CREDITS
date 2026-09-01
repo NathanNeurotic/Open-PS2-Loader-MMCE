@@ -76,6 +76,7 @@ features, code, and ideas from:
   - OPL RetroGEM ID (CosmicScale)   https://github.com/CosmicScale/Open-PS2-Loader-Retro-GEM
   - nhddl (pcm720)                  https://github.com/pcm720/nhddl
   - Modulo-R1 (AdityaKumar7209)     https://github.com/AdityaKumar7209/Modulo-R1-Beta-Preview---PS2
+  - PS2-Launcher (Irfanlesnar)      https://github.com/Irfanlesnar/PS2-Launcher
   - official OPL                    https://github.com/ps2homebrew/Open-PS2-Loader
 
 Bundled third-party software, shipped in the release package and NOT part of RiptOPL:
@@ -102,6 +103,32 @@ Bundled third-party software, shipped in the release package and NOT part of Rip
     separately by the user. Official download, documentation, compatibility
     information, and releases are maintained on PSX-Place.
 
+Maintained companion PC & mobile tools:
+
+  - PS2-Servers, by Ripto (NathanNeurotic)
+    https://github.com/NathanNeurotic/PS2-Servers
+    All-in-one PC server launcher for SMBv1, UDPFS and UDPBD.
+
+  - udpfs-server, by YouKnow-sys
+    https://github.com/YouKnow-sys/udpfs-server
+    Android app that shares folders and disk images to the PS2 over UDPFS,
+    built on udpfsd by pcm720.
+
+  - OrbitPS2 Manager, by Luden (Luden02)
+    https://github.com/Luden02/OrbitPS2-Manager
+    Cross-platform desktop library manager for importing discs, cover art,
+    screenshots, ZSO compression, per-game settings and VMC management.
+
+  - OPL PS1 AIO Converter GUI, by shaan (shaanhomebrew-cloud)
+    https://github.com/shaanhomebrew-cloud/OPL-PS1-AIO-Converter-GUI
+    Windows all-in-one PS1/POPStarter preparation tool for converting BIN/CUE
+    backups to VCDs and installing them to USB, MX4SIO, MMCE, iLink, exFAT HDD,
+    SMB and APA internal HDD.
+
+  - PS2RD CHT Manager, by TheRealNextria
+    https://github.com/TheRealNextria/PS2RD-CHT-Manager
+    PC manager for the PS2RD .cht cheat files RiptOPL reads from device CHT folders.
+
 Special and sincere thanks to:
 
   - Wolf3s and KrahJohlito - the driving force behind uOPL / wOPL, where much of
@@ -117,21 +144,21 @@ Special and sincere thanks to:
   - AdityaKumar7209 - whose Modulo-R1 project inspired this fork's folder
     browsing in the game list. We didn't use their code; the idea of navigating
     game subfolders came from seeing it there.
+  - Irfanlesnar - creator of PS2-Launcher, for UI and feature ideas across the OPL
+    fork ecosystem.
+  - pcm720 - for udpfsd and nhddl, key foundations for modern PS2 streaming.
   - Ifcaro and jimmikaelkael - the original Open PS2 Loader authors - and every
     contributor across OPL's long history, all named above in this file.
 
-BDMA-ATA (exFAT internal-HDD block-device support), plus fixes, feedback and oversight
-by saildot4k
-
-Testing, bug reports and real-hardware feedback
+Testing, bug reports and real-hardware feedback:
 by eliminator1403, lucaslmgv, AndrewBento, AcidReach, bodvenomz, nuno6573, Blade1984
 and zackcage6
 
-The RiptOPL name
+The RiptOPL name:
 by Akilluminati47 (https://github.com/akilluminati47)
 who coined it before the project existed
 
-Financial support
+Financial support:
 by Akilluminati47
 
 If you want the canonical, actively-maintained project, it lives at

@@ -48,7 +48,7 @@ In such a case, you will need to edit all language yml files manually.
 ## Fork-specific strings (the `lng_fork/` overlay)
 
 This fork (RiptOPL) adds many UI strings that don't exist in upstream OPL — the
-Neutrino core, MMCE, BDMA, UDPBD, VCD, Coverflow, Favourites, and more. The shared
+Neutrino core, MMCE, BDMA, UDPBD, VCD, Coverflow, Favorites, and more. The shared
 upstream language repository above doesn't know about those labels, so without help
 they would show in **English** in every translated language.
 

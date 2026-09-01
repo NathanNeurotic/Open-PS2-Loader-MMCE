@@ -501,9 +501,9 @@ static int ps1RowCmp(const void *a, const void *b)
     return strcasecmp(ga->extension, gb->extension);
 }
 
-// Fill a list from EMBER/games/ alone. Static: every caller wants the merged PS1 list, and exposing
-// a "just the Ember half" entry point would invite a second place where the union is formed.
-static int cueFillGameList(const char *devPrefix, base_game_info_t **outGames)
+// Build the Ember half without sorting it yet. The merged PS1 path sorts the final union once;
+// standalone UDPFS/UDPBD callers go through cueFillGameList below, which sorts this list directly.
+static int cueFillGameListUnsorted(const char *devPrefix, base_game_info_t **outGames)
 {
     cue_entry_t *entries = NULL;
     base_game_info_t *games;
@@ -517,6 +517,7 @@ static int cueFillGameList(const char *devPrefix, base_game_info_t **outGames)
         return -1; // could not read the device -> caller preserves its list
     if (n == 0) {
         free(entries);
+        free(*outGames);
         *outGames = NULL;
         return 0;
     }
@@ -540,8 +541,20 @@ static int cueFillGameList(const char *devPrefix, base_game_info_t **outGames)
     }
 
     free(entries);
+    // The replacement is complete: only now release the published last-good list. On allocation or
+    // scan failure above it remains untouched for the caller to keep displaying.
+    free(*outGames);
     *outGames = games;
     return n;
+}
+
+int cueFillGameList(const char *devPrefix, base_game_info_t **outGames)
+{
+    int count = cueFillGameListUnsorted(devPrefix, outGames);
+
+    if (count > 1 && gAutosort)
+        qsort(*outGames, count, sizeof(base_game_info_t), &ps1RowCmp);
+    return count;
 }
 
 int ps1FillGameList(const char *devPrefix, base_game_info_t **outGames)
@@ -553,7 +566,7 @@ int ps1FillGameList(const char *devPrefix, base_game_info_t **outGames)
         return 0;
 
     vcdCount = vcdFillGameList(devPrefix, &vcdGames);
-    cueCount = cueFillGameList(devPrefix, &cueGames);
+    cueCount = cueFillGameListUnsorted(devPrefix, &cueGames);
 
     // ONLY BOTH halves failing means the device could not be read. This used to fail the whole scan
     // when EITHER half did, on the reasoning that publishing half a list looks like a user's titles

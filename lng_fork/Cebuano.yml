@@ -78,9 +78,9 @@ translations:
   LARGE: Dako
   NORMAL: Normal
   FAV: Mga Paborito
-  FAVMODE: Favourites Start Mode
+  FAVMODE: Favorites Start Mode
   FAV_HINT: Paborito
-  FAV_MSG: '%s dili pwede sa Favourites Menu.'
+  FAV_MSG: '%s dili pwede sa Favorites Menu.'
   FAV_PERSISTENCE_MSG: '%s dili pwede samtang ang item gimarkahan nga paborito.'
   NEUTRINO_DEVICE: Neutrino Device
   HINT_NEUTRINO_DEVICE: Device nga nagdala sa neutrino.elf (sa NEUTRINO/ o neutrino/ folder). Ang Auto mag-scan sa mc0 dayon mc1.
@@ -219,9 +219,9 @@ translations:
   "HINT_NEUTRINO_BSDFS": "Pugsa ang block-device filesystem sa Neutrino (-bsdfs). Ang Auto = default kada-device. Ang hdl/bd mga expert nga opsyon; ipares kini sa usa ka nahaom nga -dvd= sa launch args kung ang porma sa auto nga dalan dili mohaom."
   "PLASCOLOR": "Plasma Blend Color"
   "VCD_HIDE_GAMEID": "Itago ang PS1 Game ID (VCD list)"
-  "HINT_VCD_HIDE_GAMEID": "Cosmetic lamang -- itago ang nag-una nga game-ID prefix (pananglitan SLUS_005.51.) gikan sa mga ngalan sa listahan sa PS1/VCD. Ang mga ngalan nga walay ID ipakita nga sama sa naa. Wala kini mag-usab sa launch, cover art, o favourites."
+  "HINT_VCD_HIDE_GAMEID": "Cosmetic lamang -- itago ang nag-una nga game-ID prefix (pananglitan SLUS_005.51.) gikan sa mga ngalan sa listahan sa PS1/VCD. Ang mga ngalan nga walay ID ipakita nga sama sa naa. Wala kini mag-usab sa launch, cover art, o favorites."
   "VCD_FIRST_DISC": "Unang disc lang (multi-disc PS1)"
-  "HINT_VCD_FIRST_DISC": "Ipakita lamang ang Disc 1 sa usa ka daghang-disc nga PS1 nga dula sa mga listahan sa device (POPSLoader style). Itago ang mga file nga ginganlan og (Disc 2), (CD 2), ug uban pa. Ang tanang disc magpabilin sa card para sa pag-ilis samtang nagdula; ang mga Favourites dili sala-on."
+  "HINT_VCD_FIRST_DISC": "Ipakita lamang ang Disc 1 sa usa ka daghang-disc nga PS1 nga dula sa mga listahan sa device (POPSLoader style). Itago ang mga file nga ginganlan og (Disc 2), (CD 2), ug uban pa. Ang tanang disc magpabilin sa card para sa pag-ilis samtang nagdula; ang mga Favorites dili sala-on."
   "GAMES_DEVICE": "Device sa Dula"
   "DEFAULT_CORE": "Default nga Loader Core"
   "HINT_DEFAULT_CORE": "Global nga default nga core para sa mga dula kansang per-game Loader Core gi-set sa Default. Ang <OPL> mao ang lumad nga core; ang Neutrino nag-chain sa gawas nga neutrino.elf. Ang per-game nga pagpili kanunay mo-override niini."

@@ -378,6 +378,13 @@ struct UIItem diaVcdConfig[] = {
     {UI_HEADER, 0, 1, 1, -1, 0, 0, {.label = {NULL, _STR_POPSTARTER}}},
     {UI_SPLITTER},
 
+    // The same persisted global picker shown on Interface. Both templates use UICFG_GAMEVIEW, so
+    // either page edits one value and the L3 gate cannot drift between them.
+    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {NULL, _STR_GAME_VIEW_MODE}}},
+    {UI_SPACER},
+    {UI_ENUM, UICFG_GAMEVIEW, 1, 1, _STR_HINT_GAME_VIEW_MODE, 0, 0, {.intvalue = {0, 0}}},
+    {UI_BREAK},
+
     {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {NULL, _STR_POPSTARTER_DEVICE}}},
     {UI_SPACER},
     {UI_ENUM, CFG_POPSTARTER_DEVICE, 1, 1, _STR_HINT_POPSTARTER_DEVICE, 0, 0, {.intvalue = {0, 0}}},
@@ -622,9 +629,14 @@ struct UIItem diaUIConfig[] = {
     {UI_HEADER, 0, 1, 1, -1, 0, 0, {.label = {NULL, _STR_INTERFACE_SETTINGS}}},
     {UI_SPLITTER},
 
-    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {"ISO/VCD Games Lists", -1}}},
+    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {NULL, _STR_GAME_VIEW_MODE}}},
     {UI_SPACER},
-    {UI_ENUM, UICFG_GAMEVIEW, 1, 1, -1, 0, 0, {.intvalue = {0, 0}}},
+    {UI_ENUM, UICFG_GAMEVIEW, 1, 1, _STR_HINT_GAME_VIEW_MODE, 0, 0, {.intvalue = {0, 0}}},
+    {UI_BREAK},
+
+    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {NULL, _STR_APPS_DISPLAY}}},
+    {UI_SPACER},
+    {UI_ENUM, UICFG_APPSVIEW, 1, 1, _STR_HINT_APPS_DISPLAY, 0, 0, {.intvalue = {0, 0}}},
     {UI_BREAK},
 
     {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {NULL, _STR_VMODE}}},

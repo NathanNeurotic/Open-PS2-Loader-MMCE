@@ -29,8 +29,6 @@
 #include "include/util.h"        // checkMCSaveIconsDir -- browser icon pair for the POPSTARTER folder
 #include "include/lang.h"        // _l + _STR_BDMA_ERR_* (same texts the Settings-screen equip shows)
 #include "include/textures.h"    // texDiscoverLoad + ERR_BAD_FILE (VCD POPS cover fallback)
-#include "include/bdma_embed.h"  // embedded BDMAssault variant pairs (gzipped; PROVENANCE.md)
-#include <zlib.h>                // inflate for the embedded pairs (already linked via libpng)
 #include "include/vcdsupport.h"
 #include "include/libview.h" // which list a page is showing (the L3 ring)
 #include "include/retrogem.h"
@@ -179,6 +177,18 @@ const char *vcdDisplayName(int mode, const char *text)
     // filename convention. A CUE row's name is an Ember game FOLDER, which carries no such prefix
     // and must never be trimmed by this option.
     if (!gVcdHideGameId || text == NULL || libViewActive(mode) != LIB_VIEW_PS1)
+        return text;
+    n = vcdGameIdPrefixLen(text);
+    return n ? text + n : text;
+}
+
+const char *vcdDisplayNameForRow(item_list_t *itemList, int id, const char *text)
+{
+    int n;
+
+    // A Mixed page is not itself a PS1 page, so the legacy mode-only helper cannot identify its
+    // VCD rows. Ask the list for the row view; homogeneous pages fall back to their active view.
+    if (!gVcdHideGameId || text == NULL || itemList == NULL || libListRowView(itemList, id) != LIB_VIEW_PS1)
         return text;
     n = vcdGameIdPrefixLen(text);
     return n ? text + n : text;
@@ -808,7 +818,7 @@ int vcdResolvePopstarter(const char *devPrefix, char *out, int outSize)
         return 0;
 
     // POPSTARTER.ELF Device (gPopstarterDevice, General Settings): Custom free-text path | a device TYPE
-    // (mc/usb/mx4sio/mmce/exfat/apa) -> <root>:/POPS/POPSTARTER.ELF | Default -> the boot device (cwd)
+    // (mc/usb/mx4sio/mmce/ilink/exfat/apa) -> <root>:/POPS/POPSTARTER.ELF | Default -> the boot device (cwd)
     // then the VCD's own device. Each candidate is open()-probed; a miss falls through to the next tier.
     // NOTE: this serves the bdm/eth/mmce launch paths; the HDD VCD launch keeps its own freeze-guarded
     // hddResolveHddPopstarter (__common/POPS only), so HDD VCDs always load POPSTARTER from the
@@ -856,6 +866,9 @@ int vcdResolvePopstarter(const char *devPrefix, char *out, int outSize)
                 break;
             case POPS_DEV_MX4SIO:
                 bt = BDM_TYPE_SDC;
+                break;
+            case POPS_DEV_ILINK:
+                bt = BDM_TYPE_ILINK;
                 break;
             case POPS_DEV_EXFAT_HDD:
                 bt = BDM_TYPE_ATA;
@@ -1175,8 +1188,9 @@ int vcdSafeWriteFile(const char *dstPath, const void *buf, int len)
 
 // ---- BDMA (BDMAssault exFAT driver) equip -------------------------------------------
 // POPStarter loads its block-device driver from mc?:/POPSTARTER/{usbd.irx,usbhdfsd.irx}. We let the
-// user EQUIP one of three exFAT variants (or FAT32 = none) by copying THEIR OWN files from a source
-// device's POPS/ folder -- RiptOPL embeds nothing. "BDMA MODE" picks the variant; "BDMA SOURCE"
+// user EQUIP a device-specific variant (or FAT32 = none) by copying files from a source device's
+// POPS/ folder. Every pair stays loose in the release/device POPS/ folder; none is embedded in the
+// RiptOPL ELF. "BDMA MODE" picks the variant; "BDMA SOURCE"
 // picks which device family to read the loose variant files from (named usbd.irx.<suffix>, the
 // POPSLoader convention). The equip fires when either setting changes (opl.c), goes through the
 // free-space-gated safe-copy, and records the equipped variant in mc?:/POPSTARTER/bdma_config.txt so
@@ -1185,7 +1199,7 @@ int vcdSafeWriteFile(const char *dstPath, const void *buf, int len)
 // name bdma_config.txt with the variant suffix as its single-token contents.)
 
 // MODE -> variant suffix on the loose source files (usbd.irx.<suffix>) AND the marker token.
-static const char *vcdBdmaSuffix[VCD_BDMA_MODE_COUNT] = {"fat32", "usbexfat", "mx4sio", "mmce", "ata"};
+static const char *vcdBdmaSuffix[VCD_BDMA_MODE_COUNT] = {"fat32", "usbexfat", "mx4sio", "mmce", "ata", "ilink"};
 // The two driver files POPStarter loads, equipped onto the MC WITHOUT the .<suffix>.
 static const char *vcdBdmaModule[2] = {"usbd.irx", "usbhdfsd.irx"};
 
@@ -1266,84 +1280,6 @@ int vcdReadBdmaMode(void)
             return m;
     }
     return VCD_BDMA_FAT32;
-}
-
-// Embedded BDMAssault pair table, indexed by VCD_BDMA_* mode. usbexfat and mx4sio share ONE usbd
-// blob (byte-identical upstream, deduped -- see modules/bdmassault/PROVENANCE.md). FAT32 row NULL.
-typedef struct
-{
-    const void *usbdGz;
-    const int *usbdGzLen;
-    const void *hdfsdGz;
-    const int *hdfsdGzLen;
-} bdma_embedded_pair_t;
-
-static const bdma_embedded_pair_t vcdBdmaEmbedded[VCD_BDMA_MODE_COUNT] = {
-    {NULL, NULL, NULL, NULL},                                                                               // FAT32: POPStarter built-in driver
-    {bdma_usbd_usb_gz, &size_bdma_usbd_usb_gz, bdma_usbhdfsd_usbexfat_gz, &size_bdma_usbhdfsd_usbexfat_gz}, // usbexfat
-    {bdma_usbd_usb_gz, &size_bdma_usbd_usb_gz, bdma_usbhdfsd_mx4sio_gz, &size_bdma_usbhdfsd_mx4sio_gz},     // mx4sio (shared usbd)
-    {bdma_usbd_mmce_gz, &size_bdma_usbd_mmce_gz, bdma_usbhdfsd_mmce_gz, &size_bdma_usbhdfsd_mmce_gz},       // mmce
-    {bdma_usbd_ata_gz, &size_bdma_usbd_ata_gz, bdma_usbhdfsd_ata_gz, &size_bdma_usbhdfsd_ata_gz},           // ata
-};
-
-// Inflate one gzipped embedded blob. Raw size comes from the gzip ISIZE footer (last 4 bytes, LE),
-// sanity-capped at 256 KiB (largest real pair member is ~48.5 KiB). Caller frees *out on success.
-static int vcdInflateGzip(const unsigned char *gz, unsigned int gzLen, unsigned char **out, unsigned int *outLen)
-{
-    if (gz == NULL || gzLen < 18 || out == NULL || outLen == NULL)
-        return -1;
-    unsigned int rawLen = (unsigned int)gz[gzLen - 4] | ((unsigned int)gz[gzLen - 3] << 8) |
-                          ((unsigned int)gz[gzLen - 2] << 16) | ((unsigned int)gz[gzLen - 1] << 24);
-    if (rawLen == 0 || rawLen > 256 * 1024)
-        return -1;
-    unsigned char *buf = (unsigned char *)malloc(rawLen);
-    if (buf == NULL)
-        return -1;
-    z_stream z;
-    memset(&z, 0, sizeof(z));
-    if (inflateInit2(&z, 15 + 16) != Z_OK) { // 15+16 = expect a gzip wrapper
-        free(buf);
-        return -1;
-    }
-    z.next_in = (Bytef *)gz;
-    z.avail_in = gzLen;
-    z.next_out = buf;
-    z.avail_out = rawLen;
-    int zr = inflate(&z, Z_FINISH);
-    unsigned int got = (unsigned int)z.total_out;
-    inflateEnd(&z);
-    if (zr != Z_STREAM_END || got != rawLen) {
-        free(buf);
-        return -1;
-    }
-    *out = buf;
-    *outLen = rawLen;
-    return 0;
-}
-
-// Unpack the embedded pair for `mode` into the two staging paths, SEQUENTIALLY (one blob inflated at
-// a time caps the transient heap at ~48.5 KiB + zlib state). Writes go through the EXISTING
-// vcdSafeWriteFile (free-space check + partial-write cleanup -- Gemini review of #251: no redundant
-// weaker writer). Returns 0, -1 (no pair for mode / unpack failed), or vcdSafeWriteFile's -2 (card
-// full) / -3 (IO) so the caller's toast names the REAL problem.
-static int vcdStageEmbeddedPair(int mode, const char *tmp0, const char *tmp1)
-{
-    if (mode <= VCD_BDMA_FAT32 || mode >= VCD_BDMA_MODE_COUNT || vcdBdmaEmbedded[mode].usbdGz == NULL)
-        return -1;
-    unsigned char *buf = NULL;
-    unsigned int len = 0;
-    if (vcdInflateGzip((const unsigned char *)vcdBdmaEmbedded[mode].usbdGz, (unsigned int)*vcdBdmaEmbedded[mode].usbdGzLen, &buf, &len) != 0)
-        return -1;
-    int r = vcdSafeWriteFile(tmp0, buf, (int)len);
-    free(buf);
-    if (r != 0)
-        return r;
-    buf = NULL;
-    if (vcdInflateGzip((const unsigned char *)vcdBdmaEmbedded[mode].hdfsdGz, (unsigned int)*vcdBdmaEmbedded[mode].hdfsdGzLen, &buf, &len) != 0)
-        return -1;
-    r = vcdSafeWriteFile(tmp1, buf, (int)len);
-    free(buf);
-    return r;
 }
 
 int vcdEquipBdma(int source, int mode, char *diag, int diagSize)
@@ -1433,9 +1369,9 @@ int vcdEquipBdma(int source, int mode, char *diag, int diagSize)
     }
 
     // Resolve the SOURCE device(s) to read the variant files from. BDM sources are DIFFERENTIATED by
-    // driver: find EVERY mounted device whose driver matches the chosen type (USB / MX4SIO / internal
+    // driver: find EVERY mounted device whose driver matches the chosen type (USB / MX4SIO / iLink / internal
     // exFAT HDD) and read from its massN: FILESYSTEM root -- the same path the device pages browse. OPL
-    // never mounts a typed ata0:/usb0:/mx4sio0: filesystem (those are block-device identities used only
+    // never mounts a typed ata0:/usb0:/mx4sio0:/ilink0: filesystem (those are block-device identities used only
     // for launch binding), so the readable source path is always massN:/. Searching ALL matching slots,
     // not just the first, covers a source family with two same-type devices when the variant files sit
     // on the second one. MMCE has its own mmce0:/mmce1: slots. Skipped when the adaptive pre-probe
@@ -1461,8 +1397,10 @@ int vcdEquipBdma(int source, int mode, char *diag, int diagSize)
             cands[nc++] = "mmce1:/";
         }
     } else {
-        int wantType = (source == VCD_BDMA_SRC_MX4SIO) ? BDM_TYPE_SDC : (source == VCD_BDMA_SRC_HDD) ? BDM_TYPE_ATA :
-                                                                                                       BDM_TYPE_USB;
+        int wantType = (source == VCD_BDMA_SRC_MX4SIO) ? BDM_TYPE_SDC :
+                       (source == VCD_BDMA_SRC_HDD)    ? BDM_TYPE_ATA :
+                       (source == VCD_BDMA_SRC_ILINK)  ? BDM_TYPE_ILINK :
+                                                         BDM_TYPE_USB;
         // The source's transport driver may not be loaded if its device family is OFF for games (you can
         // keep the BDMA module files on a device you never browse). Force-load it + wait for the device
         // to mount -- otherwise the source path is dead and nothing can be read from it.
@@ -1492,17 +1430,13 @@ int vcdEquipBdma(int source, int mode, char *diag, int diagSize)
         found = 1;
         break;
     }
-    // EMBEDDED FINAL FALLBACK (maintainer directive 2026-07-21, POPSLoader parity: "modules embedded
-    // in the elf, pasted according to the VCD device"): when NO seek-path device carries the pair --
-    // the common case on an MC boot, where nothing has a POPS folder -- unpack the gzipped
-    // BDMAssault pair vendored in modules/bdmassault (PROVENANCE.md there). The seek order above is
-    // unchanged, so user-supplied newer files still WIN; embedded only fills the void that used to be
-    // a hard -4 "source files absent" failure.
-    int useEmbedded = 0;
     if (!found) {
-        LOG("[BDMA] %s.%s + %s.%s not found on any seek-path device (%s) -- using the embedded pair\n",
+        LOG("[BDMA] %s.%s + %s.%s not found in any seek-path POPS/ folder (%s)\n",
             vcdBdmaModule[0], suffix, vcdBdmaModule[1], suffix, nc ? cands[0] : "no matching device");
-        useEmbedded = 1;
+        if (diag != NULL && diagSize > 0)
+            snprintf(diag, diagSize, "Need %s.%s + %s.%s in a device POPS/ folder; searched %s.",
+                     vcdBdmaModule[0], suffix, vcdBdmaModule[1], suffix, nc ? cands[0] : "no matching device");
+        return -4;
     }
 
     // Stage BOTH replacements before touching either live module. vcdSafeCopyFile removes a partial
@@ -1515,27 +1449,13 @@ int vcdEquipBdma(int source, int mode, char *diag, int diagSize)
     unlink(tmp0);
     unlink(tmp1);
 
-    int r;
-    if (useEmbedded) {
-        r = vcdStageEmbeddedPair(mode, tmp0, tmp1);
-        if (r != 0) {
-            unlink(tmp0);
-            unlink(tmp1);
-            if (diag != NULL && diagSize > 0)
-                snprintf(diag, diagSize, "No %s BDMA files on any device, and the built-in pair could not be installed.", suffix);
-            // Propagate the REAL failure class (Gemini review of #251): -2 card full / -3 IO keep
-            // their specific toasts; only "no embedded pair / unpack failed" maps to -4 (source absent).
-            return (r == -2 || r == -3) ? r : -4;
-        }
-    } else {
-        r = vcdSafeCopyFile(src0, tmp0);
-        if (r == 0)
-            r = vcdSafeCopyFile(src1, tmp1);
-        if (r != 0) {
-            unlink(tmp0);
-            unlink(tmp1);
-            return r;
-        }
+    int r = vcdSafeCopyFile(src0, tmp0);
+    if (r == 0)
+        r = vcdSafeCopyFile(src1, tmp1);
+    if (r != 0) {
+        unlink(tmp0);
+        unlink(tmp1);
+        return r;
     }
 
     // Commit by COPY, not rename(): this dir is always on mc0:/mc1:, and the stock mcman.irx OPL embeds
@@ -1576,13 +1496,14 @@ typedef struct
     int hdfsdSize;
 } bdma_pair_sig_t;
 
-// Canonical BDMAssault driver pair byte lengths (from modules/bdmassault/PROVENANCE.md).
+// Canonical loose BDMAssault driver pair byte lengths, verified against the suffixed files in POPS/.
 static const bdma_pair_sig_t vcdBdmaPairSig[VCD_BDMA_MODE_COUNT] = {
     {0, 0},         // FAT32 (built-in, no external pair)
     {48500, 34508}, // usbexfat
     {48500, 14993}, // mx4sio
     {11841, 19733}, // mmce
-    {42749, 21837}  // ata
+    {42749, 21837}, // ata
+    {48500, 23452}  // iLink
 };
 
 // Returns file size in bytes, or -1 if absent / unreadable.

@@ -2,7 +2,7 @@
 
 Each `<Language>.yml` here is a small **overlay** that translates the UI strings this
 fork (RiptOPL) adds on top of upstream OPL — Neutrino, MMCE, BDMA, UDPBD, VCD, Coverflow,
-Favourites, and friends. Upstream's shared language repository doesn't carry those labels,
+Favorites, and friends. Upstream's shared language repository doesn't carry those labels,
 so this overlay is what keeps them from falling back to English.
 
 Format — a single `translations:` map of label → translated string:

@@ -96,6 +96,7 @@ enum CONFIG_INDEX {
 #define CONFIG_OPL_ART_DELAY                  "art_delay"
 #define CONFIG_OPL_WIDESCREEN                 "wide_screen"
 #define CONFIG_OPL_DEFAULT_GAME_VIEW          "default_game_view"
+#define CONFIG_OPL_APPS_DISPLAY               "apps_display"
 #define CONFIG_OPL_EMBER_DISPLAY              "ember_display" // EMBER_DISPLAY_*: Ember settings.txt display mode
 #define CONFIG_OPL_VMODE                      "vmode"
 #define CONFIG_OPL_XOFF                       "xoff"

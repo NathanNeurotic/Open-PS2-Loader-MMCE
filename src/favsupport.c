@@ -28,6 +28,7 @@
 #include "include/cuesupport.h" // CUE_ROW_EXTENSION -- a PS1 favourite names its core  // VCD favourites: name-addressed POPSTARTER launch helpers
 #include "include/libview.h"    // libViewActive / libListViewActive -- which list this page shows
 #include "include/ethsupport.h" // ETH ISO favourite resolution while the live source is in VCD view
+#include "include/bdmsupport.h" // bdmSupportIsUDPBD -- POPSTARTER favourites cannot bind to UDPBD
 #include "include/favsupport.h"
 
 int gFAVStartMode;
@@ -391,11 +392,29 @@ static void favFreeArray(void)
 // its submenu IS the VCD list, so light the star on the matching VCD item (by id+text). Misses
 // harmlessly (no star, no change) when the device is in ISO view or the VCD list index has since
 // shifted -- purely cosmetic on the source page; the FAV record + launch are unaffected either way.
+static submenu_list_t *favFindVisibleSource(opl_io_module_t *mod, int sourceId, const char *text, int wantedView)
+{
+    submenu_list_t *cur;
+
+    if (mod == NULL || mod->support == NULL || text == NULL)
+        return NULL;
+    for (cur = mod->subMenu; cur != NULL; cur = cur->next) {
+        int rowView = libListRowView(mod->support, cur->item.id);
+        int viewMatches = wantedView == LIB_VIEW_ELF ? (rowView == LIB_VIEW_ELF || rowView == LIB_VIEW_PS1_ELF) : rowView == wantedView;
+        if (!viewMatches || cur->item.text == NULL || strcmp(cur->item.text, text) != 0)
+            continue;
+        // Apps have title identity and PS1 records are name-addressed. ISO games retain the exact
+        // source-local id, even when the visible Mixed id is offset by the PS2-list length.
+        if (mod->support->mode == APP_MODE || wantedView == LIB_VIEW_PS1 ||
+            libListSourceId(mod->support, cur->item.id) == sourceId)
+            return cur;
+    }
+    return NULL;
+}
+
 static void favVcdMarkStar(opl_io_module_t *mod, int id, const char *text)
 {
-    if (mod == NULL || mod->support == NULL || libViewActive(mod->support->mode) != LIB_VIEW_PS1)
-        return;
-    submenu_list_t *src = submenuFindItemByIdAndText(mod->subMenu, id, text);
+    submenu_list_t *src = favFindVisibleSource(mod, id, text, LIB_VIEW_PS1);
     if (src != NULL)
         src->item.favourited = 1;
 }
@@ -411,19 +430,6 @@ static void favVcdMarkStar(opl_io_module_t *mod, int id, const char *text)
 static int favIdsMatchForMode(int mode, int recId, int liveId)
 {
     return (mode == APP_MODE) || (recId == liveId);
-}
-
-// Title-only submenu walk for the APP fallback: first row whose text matches wins. Titles are the
-// apps' identity key already (a duplicate title in conf_apps overwrites in config parsing).
-static submenu_list_t *favFindItemByText(submenu_list_t *sub, const char *text)
-{
-    if (text == NULL)
-        return NULL;
-    for (submenu_list_t *cur = sub; cur != NULL; cur = cur->next) {
-        if (cur->item.text != NULL && strcmp(cur->item.text, text) == 0)
-            return cur;
-    }
-    return NULL;
 }
 
 int favKindView(int kind)
@@ -451,9 +457,8 @@ static int favResolveStoredId(item_list_t *source, int id, const char *text, int
     if (source == NULL || text == NULL || outId == NULL || source->itemGetCount == NULL || source->itemGetName == NULL)
         return 0;
 
-    // ETH has one live backing array whose contents follow the source page's L3 state, so a shallow
-    // viewOverride cannot turn VCD-backed ethGames into the ISO list. Resolve that one mode through
-    // ETH's private read-only ISO backing probe. Every other device keeps the existing proxy path.
+    // ETH keeps permanent independent PS2/PS1 backing arrays. Use its direct resolver for the PS2
+    // identity so Favorites never depends on the source page's current view or visible mixed index.
     if (source->mode == ETH_MODE && kind == FAV_KIND_ISO)
         return ethResolveIsoFavourite(id, text, outId);
 
@@ -486,6 +491,11 @@ static int favResolveStoredId(item_list_t *source, int id, const char *text, int
 static int favSupportLaunches(const item_list_t *support, int needCue)
 {
     if (support == NULL)
+        return 0;
+    // Generic BDM supports carry one shared callback table, so UDPBD still has the POPSTARTER guard
+    // function even though that transport cannot launch it. Do not bind a saved VCD favorite to that
+    // slot merely because the pointer is non-NULL; Ember favorites remain valid there.
+    if (!needCue && bdmSupportIsUDPBD(support))
         return 0;
     return needCue ? (support->itemLaunchCue != NULL) : (support->itemLaunchVcd != NULL);
 }
@@ -537,11 +547,9 @@ static item_list_t *favResolve(int mode, int id, const char *text, int kind, int
                 continue;
             int liveId = id;
             if (favResolveStoredId(mod->support, id, text, 0, &liveId)) {
-                if (libViewActive(mod->support->mode) != LIB_VIEW_PS1) {
-                    submenu_list_t *src = submenuFindItemByIdAndText(mod->subMenu, liveId, text);
-                    if (src != NULL)
-                        src->item.favourited = 1;
-                }
+                submenu_list_t *src = favFindVisibleSource(mod, liveId, text, LIB_VIEW_ISO);
+                if (src != NULL)
+                    src->item.favourited = 1;
                 *outMode = m;
                 *outId = liveId;
                 return mod->support;
@@ -560,11 +568,10 @@ static item_list_t *favResolve(int mode, int id, const char *text, int kind, int
     if (!favResolveStoredId(mod->support, id, text, 0, &liveId))
         return NULL;
 
-    if (libViewActive(mod->support->mode) != LIB_VIEW_PS1) {
-        submenu_list_t *src = submenuFindItemByIdAndText(mod->subMenu, liveId, text);
-        if (src != NULL)
-            src->item.favourited = 1;
-    }
+    submenu_list_t *src = favFindVisibleSource(mod, liveId, text,
+                                               mode == APP_MODE ? LIB_VIEW_ELF : LIB_VIEW_ISO);
+    if (src != NULL)
+        src->item.favourited = 1;
     *outId = liveId;
     return mod->support;
 }
@@ -617,7 +624,7 @@ static int favUpdateItemList(item_list_t *itemList)
         return 0;
     }
 
-    // Resolve EVERY record before filtering the Favourites tab's independent ISO/VCD view. Resolution
+    // Resolve EVERY record before filtering the Favorites tab's independent view. Resolution
     // also restores the star on the source submenu. Filtering first meant a saved VCD record was never
     // resolved while FAV itself was in ISO view, so rebuilding the HDD list on an L3 toggle erased the
     // visible star and loadFavourites() could not put it back (#495).
@@ -627,9 +634,9 @@ static int favUpdateItemList(item_list_t *itemList)
         int resolvedId = recs[i].id;
         item_list_t *owner = favResolve(recs[i].mode, recs[i].id, recs[i].text, recs[i].kind, &resolvedMode, &resolvedId);
 
-        // The FAV page keeps its own L3 ring (PS2 / PS1 / APPS): resolution above is global
-        // star/state reconciliation; only display population is filtered to the current shelf.
-        if (favKindView(recs[i].kind) != favShelf)
+        // The FAV page keeps its own L3 ring (All / PS2 / PS1 / ELF): resolution above is global
+        // star/state reconciliation. All accepts every kind; the other stops filter one shelf.
+        if (favShelf != LIB_VIEW_ALL && favKindView(recs[i].kind) != favShelf)
             continue;
 
         if (owner == NULL) {
@@ -698,6 +705,17 @@ static item_list_t *favOwnerView(int id, item_list_t *view)
 int favGetItemSourceMode(int id)
 {
     return favValidIndex(id) ? favArray[id].mode : -1;
+}
+
+int favGetItemView(int id)
+{
+    return favValidIndex(id) ? favKindView(favArray[id].kind) : -1;
+}
+
+static int favGetRowView(item_list_t *itemList, int id)
+{
+    (void)itemList;
+    return favGetItemView(id);
 }
 
 // Guard the stored source id against the owner's CURRENT count -- the source list may have
@@ -1056,7 +1074,7 @@ void favRemoveByIndex(int favIndex)
     // is fine -- the record is still removed from the store.)
     opl_io_module_t *mod = oplGetModule(srcMode);
     if (mod != NULL) {
-        submenu_list_t *src = submenuFindItemByIdAndText(mod->subMenu, srcId, txt);
+        submenu_list_t *src = favFindVisibleSource(mod, srcId, txt, favKindView(srcKind));
         if (src != NULL)
             src->item.favourited = 0;
     }
@@ -1083,4 +1101,5 @@ item_list_t *favGetObject(int initOnly)
 static item_list_t favItemList = {
     FAV_MODE, -1, 0, 0, MENU_MIN_INACTIVE_FRAMES, FAV_MODE_UPDATE_DELAY, NULL, NULL, &favGetTextId, NULL, &favInit, &favNeedsUpdate, &favUpdateItemList,
     &favGetItemCount, NULL, &favGetItemName, &favGetItemNameLength, &favGetItemStartup, &favDeleteItem, &favRenameItem, &favLaunchItem,
-    &favGetConfig, &favGetImage, &favCleanUp, &favShutdown, &favCheckVMC, &favGetIconId};
+    &favGetConfig, &favGetImage, &favCleanUp, &favShutdown, &favCheckVMC, &favGetIconId,
+    NULL, ITEM_VIEW_NATIVE, NULL, NULL, &favGetRowView, NULL};

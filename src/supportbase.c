@@ -990,7 +990,7 @@ config_set_t *sbPopulateConfig(base_game_info_t *game, const char *prefix, const
     // no meaningful ISO size and its file lives in POPS/, not CD/DVD/, so statting the CD/DVD path always
     // misses, leaves sizeMB at 0, never caches, and re-probes the shared MMCE bus on every info entry (#120).
     // Hard-stop it by EXTENSION here (not mutable view state) so a .VCD can never reach the ISO stat path,
-    // even during the L3 view-toggle window (game->sizeMB stays 0 -> "0 MiB" is still written below).
+    // even for stale/invalid row state (game->sizeMB stays 0 -> "0 MiB" is still written below).
     // Folder browsing: prepend the current subpath so the stat resolves a game that lives inside a
     // subfolder. sbBrowseSub is "" at the device root, collapsing subseg away. Without this a
     // folder-nav game stats a path that does not exist and silently reports 0 MiB.
@@ -1445,8 +1445,8 @@ const char *sbResolveNeutrinoPath(const char *activePrefix)
 {
     // Neutrino Device (General Settings): a driver-accurate device TYPE (NEUTRINO_DEV_*) that holds
     // <root>:/neutrino/neutrino.elf. Resolve the type to its live device-name token(s) -- USB/MX4SIO/
-    // exFAT-HDD via the mounted BDM device, MC/MMCE by slot, APA-HDD via the mounted OPL data partition
-    // (pfs0:) -- then probe each first. The token has NO trailing ':' so the forms[] below add it.
+    // iLink/exFAT-HDD via the mounted BDM device, MC/MMCE by slot, APA-HDD via the mounted OPL data
+    // partition (pfs0:) -- then probe each first. The token has NO trailing ':' so the forms[] below add it.
     // GAME'S DEVICE: resolve ONLY on the active game's own device (co-located neutrino.elf); no
     // legacy-custom-path / MC fallback. A miss returns NULL so the launch path toasts "not found"
     // and aborts in a live menu (every caller handles NULL that way) rather than silently using an
@@ -1467,12 +1467,15 @@ const char *sbResolveNeutrinoPath(const char *activePrefix)
             break;
         case NEUTRINO_DEV_USB:
         case NEUTRINO_DEV_MX4SIO:
+        case NEUTRINO_DEV_ILINK:
         case NEUTRINO_DEV_EXFAT_HDD: {
             int bt = BDM_TYPE_ATA; // NEUTRINO_DEV_EXFAT_HDD
             if (gNeutrinoDevice == NEUTRINO_DEV_USB)
                 bt = BDM_TYPE_USB;
             else if (gNeutrinoDevice == NEUTRINO_DEV_MX4SIO)
                 bt = BDM_TYPE_SDC;
+            else if (gNeutrinoDevice == NEUTRINO_DEV_ILINK)
+                bt = BDM_TYPE_ILINK;
             char bdmRoot[BDM_DEVICE_ROOT_MAX];
             if (bdmGetDeviceRootByType(bt, bdmRoot, sizeof(bdmRoot))) {
                 char *colon = strchr(bdmRoot, ':'); // "massN:/" -> bare "massN" token

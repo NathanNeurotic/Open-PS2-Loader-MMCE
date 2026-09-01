@@ -173,10 +173,17 @@ int cueRowIsCueByName(const base_game_info_t *games, int count, const char *name
 // filesystem refusing a directory rename). Nothing is moved on failure.
 int cueRenameGame(const char *devPrefix, const char *oldName, const char *newName);
 
+// Fill a base_game_info_t list from EMBER/games/ only. This deliberately separate public entry
+// point is for transports on which Ember works but POPSTARTER cannot: UDPFS and UDPBD. It follows
+// the same last-good contract as ps1FillGameList: a read/allocation failure leaves *outGames intact
+// and returns -1; a successful empty scan frees the old list and returns 0.
+int cueFillGameList(const char *devPrefix, base_game_info_t **outGames);
+
 // Fill a base_game_info_t list with the device's COMPLETE PS1 library: POPSTARTER *.VCD entries and
-// Ember game folders, merged and sorted together as one list (frees *outGames first, memalign'd
-// like sbReadList). Returns the count, or -1 when EITHER half could not read the device -- the
-// caller then keeps its last-good list rather than blanking a page over a transient wedge.
+// Ember game folders, merged and sorted together as one list (publishes a memalign'd replacement
+// like sbReadList only after it is complete). Returns the count, or -1 when both halves could not
+// read the device -- the caller then keeps its last-good list rather than blanking a page over a
+// transient wedge.
 // This is the ONE place the two libraries are unioned.
 //
 // devPrefix is the device ROOT for BOTH libraries -- POPS/ and EMBER/ are peers there, on every

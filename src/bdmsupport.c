@@ -673,7 +673,7 @@ int bdmGetLoadedNetProtocol(void)
 
 // True when this support's device is the UDPBD block device (its games are Neutrino-only).
 // Returns 0 for non-BDM supports (incl. FAV-wrapped items, which have no source lookup here).
-int bdmSupportIsUDPBD(item_list_t *support)
+int bdmSupportIsUDPBD(const item_list_t *support)
 {
     if (support == NULL || support->priv == NULL)
         return 0;
@@ -1484,46 +1484,71 @@ static int bdmNeedsUpdate(item_list_t *itemList)
 static int bdmUpdateGameList(item_list_t *itemList)
 {
     bdm_device_data_t *pDeviceData = (bdm_device_data_t *)itemList->priv;
+    int view = libListViewActive(itemList);
+    int result = 0;
 
     // #120: each view scans into its OWN array (see bdm_device_data_t). Previously both shared
     // bdmGames, so a VCD scan reporting failure (r < 0) left the ISO list published under the VCD
     // view -- the L3 toggle then "never changed the list" (Nathan, HW, ATA/HDD_BD), and a device with
     // no POPS folder hit that on every single toggle.
-    if (libListViewActive(itemList) == LIB_VIEW_PS1) {
+    if (view == LIB_VIEW_PS1 || view == LIB_VIEW_MIXED) {
         char ps1Prefix[BDM_DEVICE_ROOT_MAX + 2];
         bdmBuildPs1Prefix(ps1Prefix, sizeof(ps1Prefix), itemList->mode); // device root, NOT gBDMPrefix
-        // ONE list, BOTH cores: ps1FillGameList unions POPS/*.VCD with EMBER/games/* and sorts them
-        // together. It reports failure only when a scan could not READ the device -- an absent POPS
-        // or EMBER folder is 0 -- so a device using just one core never preserves a stale list.
-        int r = ps1FillGameList(ps1Prefix, &pDeviceData->bdmPs1Games);
+        // Ordinary BDM devices merge both cores. UDPBD deliberately publishes Ember ONLY:
+        // POPSTARTER resets the IOP and cannot restore that network block device, while Ember keeps
+        // the live mount. A listed row must never be a title this transport cannot launch.
+        int r = (pDeviceData->bdmDeviceType == BDM_TYPE_UDPBD) ?
+                    cueFillGameList(ps1Prefix, &pDeviceData->bdmPs1Games) :
+                    ps1FillGameList(ps1Prefix, &pDeviceData->bdmPs1Games);
         if (r >= 0) // r < 0: transient scan failure -> keep THIS view's last-good (empty if never scanned)
             pDeviceData->bdmPs1GameCount = r;
-        return pDeviceData->bdmPs1GameCount;
+        result += pDeviceData->bdmPs1GameCount;
     }
-    sbReadList(&pDeviceData->bdmGames, pDeviceData->bdmPrefix, folderGetSub(itemList->mode), &pDeviceData->bdmULSizePrev, &pDeviceData->bdmGameCount);
-    return pDeviceData->bdmGameCount;
+    if (view == LIB_VIEW_ISO || view == LIB_VIEW_MIXED) {
+        sbReadList(&pDeviceData->bdmGames, pDeviceData->bdmPrefix, folderGetSub(itemList->mode), &pDeviceData->bdmULSizePrev, &pDeviceData->bdmGameCount);
+        result += pDeviceData->bdmGameCount;
+    }
+    return result;
 }
 
 static int bdmGetGameCount(item_list_t *itemList)
 {
     bdm_device_data_t *pDeviceData = (bdm_device_data_t *)itemList->priv;
 
-    return (libListViewActive(itemList) == LIB_VIEW_PS1) ? pDeviceData->bdmPs1GameCount : pDeviceData->bdmGameCount;
+    int view = libListViewActive(itemList);
+    return view == LIB_VIEW_MIXED ? pDeviceData->bdmGameCount + pDeviceData->bdmPs1GameCount :
+           view == LIB_VIEW_PS1   ? pDeviceData->bdmPs1GameCount :
+                                    pDeviceData->bdmGameCount;
 }
 
-// Toggle-window guard (mirrors mmceActiveGame). The L3 toggle changes the active view SYNCHRONOUSLY
-// (libViewAdvance) but rebuilds the submenu on the DEFERRED IO thread, so for a window the OLD submenu's
-// ids are still live while libViewActive() already reports the NEW view -- and an id from the old view
-// can index the freshly-switched other-view array, which may be NULL (never scanned), shorter, or
-// mid-scan. Resolve EVERY id through here: an out-of-range id yields a STATIC EMPTY entry, so a stale-id
-// READ is safe empty data instead of an OOB deref, and launch/delete/rename treat &bdmEmptyGame as
-// "nothing there". (The shared store this replaced could not OOB: one array + one count stayed
-// self-consistent -- splitting them is what makes this guard mandatory.)
+static int bdmGetItemView(item_list_t *itemList, int id)
+{
+    bdm_device_data_t *pDeviceData = (bdm_device_data_t *)itemList->priv;
+    int view = libListViewActive(itemList);
+
+    if (view == LIB_VIEW_MIXED)
+        return id >= 0 && id < pDeviceData->bdmGameCount ? LIB_VIEW_ISO : LIB_VIEW_PS1;
+    return view;
+}
+
+static int bdmGetSourceId(item_list_t *itemList, int id)
+{
+    bdm_device_data_t *pDeviceData = (bdm_device_data_t *)itemList->priv;
+    return libListViewActive(itemList) == LIB_VIEW_MIXED && id >= pDeviceData->bdmGameCount ? id - pDeviceData->bdmGameCount : id;
+}
+
+// Split-store guard (mirrors mmceActiveGame). L3 now stages the destination until the old submenu is
+// cleared, so its ordinary handoff cannot cross-wire row ids. Arrays can still be NULL (never scanned),
+// shorter after a failed/partial refresh, or absent during teardown. Resolve EVERY id through here:
+// an out-of-range id yields a STATIC EMPTY entry, so a stale read is safe empty data and
+// launch/delete/rename treat &bdmEmptyGame as "nothing there". (The shared store this replaced could
+// not OOB: one array + one count stayed self-consistent -- splitting them makes this guard mandatory.)
 static base_game_info_t bdmEmptyGame = {0};
 static base_game_info_t *bdmActiveGame(item_list_t *itemList, int id)
 {
     bdm_device_data_t *pDeviceData = (bdm_device_data_t *)itemList->priv;
-    int vcd = (libListViewActive(itemList) == LIB_VIEW_PS1);
+    int vcd = (bdmGetItemView(itemList, id) == LIB_VIEW_PS1);
+    id = bdmGetSourceId(itemList, id);
     base_game_info_t *arr = vcd ? pDeviceData->bdmPs1Games : pDeviceData->bdmGames;
     int count = vcd ? pDeviceData->bdmPs1GameCount : pDeviceData->bdmGameCount;
 
@@ -1555,7 +1580,7 @@ static char *bdmGetGameStartup(item_list_t *itemList, int id)
 
     // VCD view: identity is the filename, not a disc ID -> per-game data (CFG/art) keys off the
     // VCD name (matches sbPopulateConfig).
-    if (libListViewActive(itemList) == LIB_VIEW_PS1)
+    if (bdmGetItemView(itemList, id) == LIB_VIEW_PS1)
         return g->name;
     return g->startup;
 }
@@ -1564,11 +1589,12 @@ static void bdmDeleteGame(item_list_t *itemList, int id)
 {
     bdm_device_data_t *pDeviceData = (bdm_device_data_t *)itemList->priv;
 
-    if (libListViewActive(itemList) == LIB_VIEW_PS1)
+    if (bdmGetItemView(itemList, id) == LIB_VIEW_PS1)
         return; // #120: a VCD is not an ISO game -- no delete in VCD view (mirrors mmceDeleteGame)
     if (bdmActiveGame(itemList, id) == &bdmEmptyGame)
-        return;                                   // stale id in the toggle window: sbDelete does NOT bounds-check -> avoid an OOB/wrong unlink
+        return;                                   // stale/invalid id: sbDelete does NOT bounds-check -> avoid an OOB/wrong unlink
     sbSetBrowseSub(folderGetSub(itemList->mode)); // delete inside the current subfolder, not the root
+    id = bdmGetSourceId(itemList, id);
     sbDelete(&pDeviceData->bdmGames, pDeviceData->bdmPrefix, "/", pDeviceData->bdmGameCount, id);
     pDeviceData->bdmULSizePrev = -2;
     pDeviceData->ForceRefresh = 1;
@@ -1578,12 +1604,12 @@ static void bdmRenameGame(item_list_t *itemList, int id, char *newName)
 {
     bdm_device_data_t *pDeviceData = (bdm_device_data_t *)itemList->priv;
 
-    if (libListViewActive(itemList) == LIB_VIEW_PS1) {
+    if (bdmGetItemView(itemList, id) == LIB_VIEW_PS1) {
         base_game_info_t *game = bdmActiveGame(itemList, id);
         char vcdPrefix[BDM_DEVICE_ROOT_MAX + 2];
 
         if (game == &bdmEmptyGame)
-            return; // stale id in the toggle window
+            return; // stale/invalid id
         bdmBuildPs1Prefix(vcdPrefix, sizeof(vcdPrefix), itemList->mode);
         // The ROW picks the target, as the launch does. Dispatching on the view would hand an Ember
         // row to vcdRenameFile, which looks in POPS/ for "<name>.VCD" -- absent for an Ember title,
@@ -1595,7 +1621,8 @@ static void bdmRenameGame(item_list_t *itemList, int id, char *newName)
         return;
     }
     if (bdmActiveGame(itemList, id) == &bdmEmptyGame)
-        return;                                   // stale id in the toggle window (see bdmDeleteGame) -> avoid sbRename OOB
+        return; // stale/invalid id (see bdmDeleteGame) -> avoid sbRename OOB
+    id = bdmGetSourceId(itemList, id);
     sbSetBrowseSub(folderGetSub(itemList->mode)); // rename inside the current subfolder, not the root
     sbRename(&pDeviceData->bdmGames, pDeviceData->bdmPrefix, "/", pDeviceData->bdmGameCount, id, newName);
     pDeviceData->bdmULSizePrev = -2;
@@ -1615,6 +1642,7 @@ static void bdmLaunchCue(item_list_t *itemList, const char *cueName, config_set_
 {
     bdm_device_data_t *pDeviceData = (bdm_device_data_t *)itemList->priv;
     char ps1Prefix[64], emberElf[256], biosPath[288];
+    char launchName[CUE_NAME_MAX];
 
     (void)configSet; // an Ember title carries no per-game loader settings (see guigame.c)
 
@@ -1661,10 +1689,14 @@ static void bdmLaunchCue(item_list_t *itemList, const char *cueName, config_set_
         }
     }
 
+    // itemCleanUp frees the active BDM PS1 array during deinit, so preserve the folder-name argv
+    // before teardown. This is especially load-bearing for the newly reachable UDPBD Ember path.
+    snprintf(launchName, sizeof(launchName), "%s", cueName);
+
     // UNMOUNT_EXCEPTION is load-bearing here, not defensive: Ember never resets the IOP, so the
     // device it reads its game from must still be mounted when it starts.
     deinit(UNMOUNT_EXCEPTION, itemList->mode);
-    sysLaunchEmber(emberElf, cueName);
+    sysLaunchEmber(emberElf, launchName);
 }
 
 // Launch a PS1/.VCD entry BY NAME via POPSTARTER (the view-independent entry point used by both the
@@ -1714,7 +1746,7 @@ static void bdmLaunchVcd(item_list_t *itemList, const char *vcdName, config_set_
     // answer every single time.
     //
     // Back still cancels the LAUNCH, and only in ASK mode -- a pinned choice has no dialog to cancel.
-    // USB VCDs only; the MX4SIO and ATA cases equip by device type and have never asked.
+    // USB VCDs only; the MX4SIO, iLink and ATA cases equip by device type and never ask.
     int usbBdmaVariant = -1;
     if (pDeviceData->bdmDeviceType == BDM_TYPE_USB) {
         if (gVcdUsbBdmaMode == VCD_USB_BDMA_EXFAT) {
@@ -1750,13 +1782,16 @@ static void bdmLaunchVcd(item_list_t *itemList, const char *vcdName, config_set_
     // Best-effort card prep: POPSTARTER reloads its block-device driver pair from the MC after its OWN
     // IOP reset, so equip the device-matching BDMAssault variant. NEVER a launch gate -- the handoff
     // below always proceeds (POPSTARTER owns everything past the exec); a failed equip just toasts its
-    // diagnostic in passing. iLink/UDPBD/unknown have no BDMA variant and are left as-is.
+    // diagnostic in passing. UDPBD/unknown have no BDMA variant and are left as-is.
     switch (pDeviceData->bdmDeviceType) {
         case BDM_TYPE_USB:
             vcdApplyUsbModeForLaunch(usbBdmaVariant); // decided above, before anything was written
             break;
         case BDM_TYPE_SDC:
             vcdEnsureBdmaForLaunch(VCD_BDMA_SRC_MX4SIO, VCD_BDMA_MX4SIO);
+            break;
+        case BDM_TYPE_ILINK:
+            vcdEnsureBdmaForLaunch(VCD_BDMA_SRC_ILINK, VCD_BDMA_ILINK);
             break;
         case BDM_TYPE_ATA:
             vcdEnsureBdmaForLaunch(VCD_BDMA_SRC_HDD, VCD_BDMA_ATA);
@@ -1960,8 +1995,8 @@ void bdmLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
     if (gAutoLaunchBDMGame == NULL) {
         pDeviceData = (bdm_device_data_t *)itemList->priv;
         // Resolve through the ACTIVE view's array (#120 split): in the VCD view this yields the VCD
-        // entry whose name the POPSTARTER handoff below uses, and a stale toggle-window id yields the
-        // empty entry rather than indexing the other view's (possibly NULL/shorter) array.
+        // entry whose name the POPSTARTER handoff below uses, and any stale/invalid id yields the
+        // empty entry rather than indexing a possibly NULL/shorter array.
         game = bdmActiveGame(itemList, id);
         if (game == &bdmEmptyGame)
             return; // nothing there (stale id / not scanned) -- never launch a blank entry
@@ -1981,7 +2016,7 @@ void bdmLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
     // disc / Neutrino path below (which is entirely disc-specific). The BDM_TYPE_ATA internal exFAT HDD
     // still launches off the live massN: prefix, NOT ata0:/ (OPL never mounts an ata0: filesystem -- a
     // re-point there made LoadELFFromFile fail into an already-deinit'd OPL = black-screen freeze).
-    if (gAutoLaunchBDMGame == NULL && game != NULL && (libListViewActive(itemList) == LIB_VIEW_PS1)) {
+    if (gAutoLaunchBDMGame == NULL && game != NULL && (bdmGetItemView(itemList, id) == LIB_VIEW_PS1)) {
         // ONE PS1 list, TWO cores. Which one runs this title is a property of the ROW -- a .VCD row
         // goes to POPSTARTER, an Ember game folder to ember.elf -- and NEVER of the page, because
         // both kinds sit side by side in the same list. Asking the view here instead of the row is
@@ -2323,7 +2358,7 @@ static config_set_t *bdmGetConfig(item_list_t *itemList, int id)
     config_set_t *config;
 
     // Active view's array (#120 split) -- a VCD's per-game CFG keys off its own entry, and a stale
-    // toggle-window id resolves to the empty entry instead of the other view's array.
+    // id resolves to the empty entry instead of indexing outside either backing array.
     config = sbPopulateConfig(bdmActiveGame(itemList, id), pDeviceData->bdmPrefix, "/");
     bdmLogIdentityDiagnosticLive("config-create", itemList, config);
     return config;
@@ -2445,7 +2480,7 @@ static item_list_t bdmGameList = {
     BDM_MODE, 2, 0, 0, MENU_MIN_INACTIVE_FRAMES, BDM_MODE_UPDATE_DELAY, NULL, NULL, &bdmGetTextId, &bdmGetPrefix, &bdmInit, &bdmNeedsUpdate,
     &bdmUpdateGameList, &bdmGetGameCount, &bdmGetGame, &bdmGetGameName, &bdmGetGameNameLength, &bdmGetGameStartup, &bdmDeleteGame, &bdmRenameGame,
     &bdmLaunchGame, &bdmGetConfig, &bdmGetImage, &bdmCleanUp, &bdmShutdown, &bdmCheckVMC, &bdmGetIconId, &bdmLaunchVcd,
-    /* viewOverride */ 0, /* itemGetArtArchivePath */ NULL, &bdmLaunchCue};
+    /* viewOverride */ 0, /* itemGetArtArchivePath */ NULL, &bdmLaunchCue, &bdmGetItemView, &bdmGetSourceId};
 
 void bdmInitSemaphore()
 {

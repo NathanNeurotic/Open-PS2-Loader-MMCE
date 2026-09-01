@@ -709,15 +709,15 @@ gui_strings:
 - label: BOOT_READY
   string: Ready.
 - label: FAV
-  string: Favourites
+  string: Favorites
 - label: FAVMODE
-  string: Favourites Start Mode
+  string: Favorites Start Mode
 - label: FAV_HINT
-  string: Favourite
+  string: Favorite
 - label: FAV_MSG
-  string: "%s not allowed through Favourites Menu."
+  string: "%s not allowed through Favorites Menu."
 - label: FAV_PERSISTENCE_MSG
-  string: "%s is not allowed while the item is marked as favourite."
+  string: "%s is not allowed while the item is marked as favorite."
 - label: ADVANCED_ARGUMENTS
   string: Advanced Arguments
 - label: ADVANCED_SETTINGS
@@ -771,9 +771,9 @@ gui_strings:
 - label: HINT_BDMA_APPLY
   string: 'On: before a VCD launch, prepare the needed POPSTARTER BDMA memory-card environment when possible. POPSTARTER still launches if preparation fails. Off: manage the card drivers with the Source/Mode pickers below.'
 - label: HINT_BDMA_MODE
-  string: exFAT block-device driver POPSTARTER loads. Changing it copies the modules to the card; FAT32 = none (built-in driver).
+  string: Block-device driver POPSTARTER loads. Changing it copies the modules to the card; FAT32 = none (built-in driver).
 - label: HINT_BDMA_SOURCE
-  string: Device whose POPS folder holds your BDMAssault driver files (usbd.irx.* / usbhdfsd.irx.*).
+  string: Device whose POPS folder holds your BDMAssault driver files (usbd.irx.* / usbhdfsd.irx.*); iLink uses the .ilink suffix.
 - label: HINT_DEFAULT_CORE
   string: Global default core for games whose per-game Loader Core is set to Default. <OPL> is the native core; Neutrino chains the external neutrino.elf. A per-game choice always overrides this.
 - label: HINT_ENABLEIMAGE
@@ -811,9 +811,9 @@ gui_strings:
 - label: HINT_RUMBLE
   string: Short vibration when moving the cursor, confirming or going back -- needs a DualShock in analog mode
 - label: HINT_VCD_FIRST_DISC
-  string: Show only Disc 1 of a multi-disc PS1 game in the device lists (POPSLoader style). Hides files named (Disc 2), (CD 2), etc. All discs stay on the card for in-game swapping; Favourites are not filtered.
+  string: Show only Disc 1 of a multi-disc PS1 game in the device lists (POPSLoader style). Hides files named (Disc 2), (CD 2), etc. All discs stay on the card for in-game swapping; Favorites are not filtered.
 - label: HINT_VCD_HIDE_GAMEID
-  string: Cosmetic only -- hide a leading game-ID prefix (e.g. SLUS_005.51.) from PS1/VCD list names. Names without an ID are shown as-is. Does not change launch, cover art, or favourites.
+  string: Cosmetic only -- hide a leading game-ID prefix (e.g. SLUS_005.51.) from PS1/VCD list names. Names without an ID are shown as-is. Does not change launch, cover art, or favorites.
 - label: HINT_VCD_SHOW_PP_POPS
   string: HDD only -- list one-game partitions named PP.<ID>.POPS.<name> (e.g. PP.SCES-01492.POPS.MEDIEVIL) as PS1 games. Enumeration only; launch is unchanged. Other PP.* partitions (apps, PS2 games) stay hidden.
 - label: HINT_VMC_SLOT_DISABLE
@@ -1007,7 +1007,7 @@ gui_strings:
 - label: VCD_ON
   string: Showing PS1 games
 - label: VCD_OFF
-  string: Showing disc games
+  string: Showing PS2 games
 - label: BOOT_SCANNING_BDM
   string: Scanning USB / card / network drives...
 - label: BOOT_SCANNING_NET
@@ -1168,3 +1168,29 @@ gui_strings:
   string: Ember Display Mode
 - label: HINT_EMBER_DISPLAY
   string: Output mode Ember uses for PS1 games. 240p or 480p is written to settings.txt in the launched device's EMBER folder. Default removes that setting again, and the file too if it held nothing else.
+- label: BDMA_SRC_ILINK
+  string: iLink
+- label: BDMA_MODE_ILINK
+  string: iLink
+- label: GAME_VIEW_MODE
+  string: PS2/PS1 Game Display
+- label: HINT_GAME_VIEW_MODE
+  string: "Both mode uses separate PS2/PS1 pages toggled with L3. Mixed combines them and L3 cycles Mixed, PS2, PS1. PS2 or PS1 shows only that type and fully disables L3. APPS and Favorites use their own display rules."
+- label: VIEW_MIXED
+  string: Showing PS2 + PS1 games
+- label: VIEW_PS1_ELF
+  string: Showing PS1 ELF apps
+- label: APPS_DISPLAY
+  string: Applications Display
+- label: HINT_APPS_DISPLAY
+  string: "Mixed shows every ELF in one APPS list with L3 disabled. Apps / PS1ELF splits titles containing [PS1] into a second L3 page; launch behavior is unchanged."
+- label: VIEW
+  string: View
+- label: VIEW_PS2
+  string: Showing PS2 favorites
+- label: VIEW_PS1
+  string: Showing PS1 favorites
+- label: VIEW_ELF
+  string: Showing ELF favorites
+- label: VIEW_ALL
+  string: Showing all favorites

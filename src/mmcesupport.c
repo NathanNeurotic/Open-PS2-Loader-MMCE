@@ -535,10 +535,10 @@ static int mmceNeedsUpdate(item_list_t *itemList)
     // Folder browsing: descend/ascend forces one rescan (consumed before the NOUPDATE latch below).
     if (folderConsumeDirty(itemList->mode))
         return 1;
-    if (libViewActive(itemList->mode) == LIB_VIEW_PS1) {
+    if (libViewActive(itemList->mode) == LIB_VIEW_PS1 || libViewActive(itemList->mode) == LIB_VIEW_MIXED) {
         if (!mmcePs1Scanned) {
             mmceGameList.updateDelay = MMCE_MODE_UPDATE_DELAY;
-            return 1;
+            result = 1;
         }
         // A contended scan left the VCD page empty (S6): keep the ~2s refresh alive until a scan
         // succeeds or the bounded budget runs out (no endless bus churn -- #246 doctrine). Also
@@ -546,9 +546,10 @@ static int mmceNeedsUpdate(item_list_t *itemList)
         if (mmcePs1ScanFailed && mmcePs1ScanRetries < MMCE_VCD_SCAN_RETRY_MAX) {
             mmcePs1ScanRetries++;
             mmceGameList.updateDelay = MMCE_MODE_UPDATE_DELAY;
-            return 1;
+            result = 1;
         }
-        return 0;
+        if (libViewActive(itemList->mode) == LIB_VIEW_PS1)
+            return result;
     }
 
     if (mmceULSizePrev == -2) {
@@ -630,6 +631,8 @@ static int mmceNeedsUpdate(item_list_t *itemList)
 
 static int mmceUpdateGameList(item_list_t *itemList)
 {
+    int view = libListViewActive(itemList);
+    int result = 0;
     if (mmcePrefix[0] == '\0') {
         // Card absent / slot unresolved (Auto mode after removal). Actually CLEAR the list rather
         // than returning the stale count: mmceNeedsUpdate keeps reporting "update needed" while
@@ -655,7 +658,7 @@ static int mmceUpdateGameList(item_list_t *itemList)
 
     // Each view scans into its OWN array (#120): a failed rescan preserves only that view's last-good and
     // can never resurrect the other view's list (see the mmcePs1Games comment at the declarations).
-    if (libViewActive(itemList->mode) == LIB_VIEW_PS1) {
+    if (view == LIB_VIEW_PS1 || view == LIB_VIEW_MIXED) {
         // ONE list, BOTH cores -- POPS/*.VCD unioned with EMBER/games/*, both at the card root.
         char ps1Root[sizeof(mmcePrefix)];
         mmceGetDeviceRoot(ps1Root, sizeof(ps1Root));
@@ -669,21 +672,41 @@ static int mmceUpdateGameList(item_list_t *itemList)
             mmcePs1Scanned = 0;
             mmcePs1ScanFailed = 1; // arm mmceNeedsUpdate's bounded retry (S6)
         }
-        return mmcePs1GameCount;
+        result += mmcePs1GameCount;
     }
-    sbReadList(&mmceGames, mmcePrefix, folderGetSub(itemList->mode), &mmceULSizePrev, &mmceGameCount);
-    return mmceGameCount;
+    if (view == LIB_VIEW_ISO || view == LIB_VIEW_MIXED) {
+        sbReadList(&mmceGames, mmcePrefix, folderGetSub(itemList->mode), &mmceULSizePrev, &mmceGameCount);
+        result += mmceGameCount;
+    }
+    return result;
 }
 
 static int mmceGetGameCount(item_list_t *itemList)
 {
-    return (libViewActive(itemList->mode) == LIB_VIEW_PS1) ? mmcePs1GameCount : mmceGameCount;
+    int view = libListViewActive(itemList);
+    return view == LIB_VIEW_MIXED ? mmceGameCount + mmcePs1GameCount :
+           view == LIB_VIEW_PS1   ? mmcePs1GameCount :
+                                    mmceGameCount;
+}
+
+static int mmceGetItemView(item_list_t *itemList, int id)
+{
+    int view = libListViewActive(itemList);
+    if (view == LIB_VIEW_MIXED)
+        return id >= 0 && id < mmceGameCount ? LIB_VIEW_ISO : LIB_VIEW_PS1;
+    return view;
+}
+
+static int mmceGetSourceId(item_list_t *itemList, int id)
+{
+    return libListViewActive(itemList) == LIB_VIEW_MIXED && id >= mmceGameCount ? id - mmceGameCount : id;
 }
 
 static base_game_info_t mmceEmptyGame;
 static base_game_info_t *mmceActiveGame(item_list_t *itemList, int id)
 {
-    int vcd = (libViewActive(itemList->mode) == LIB_VIEW_PS1);
+    int vcd = (mmceGetItemView(itemList, id) == LIB_VIEW_PS1);
+    id = mmceGetSourceId(itemList, id);
     base_game_info_t *arr = vcd ? mmcePs1Games : mmceGames;
     int count = vcd ? mmcePs1GameCount : mmceGameCount;
     if (arr == NULL || id < 0 || id >= count)
@@ -711,30 +734,30 @@ static char *mmceGetGameStartup(item_list_t *itemList, int id)
 {
     // VCD view keys per-game data (CFG/art) off the VCD filename, not a disc ID (see sbPopulateConfig).
     base_game_info_t *g = mmceActiveGame(itemList, id);
-    if (libViewActive(itemList->mode) == LIB_VIEW_PS1)
+    if (mmceGetItemView(itemList, id) == LIB_VIEW_PS1)
         return g->name;
     return g->startup;
 }
 
 static void mmceDeleteGame(item_list_t *itemList, int id)
 {
-    if (libViewActive(itemList->mode) == LIB_VIEW_PS1)
+    if (mmceGetItemView(itemList, id) == LIB_VIEW_PS1)
         return; // #120: a VCD is not an ISO game -- no delete in VCD view
     if (mmceActiveGame(itemList, id) == &mmceEmptyGame)
-        return;                                   // stale id in the VCD->ISO toggle window (libViewActive already flipped, old VCD submenu id
-                                                  // still live): sbDelete does NOT bounds-check, so this avoids an OOB/NULL deref + wrong unlink
+        return;                                   // stale/invalid id: sbDelete does NOT bounds-check, so avoid an OOB/NULL deref + wrong unlink
     sbSetBrowseSub(folderGetSub(itemList->mode)); // delete inside the current subfolder, not the root
+    id = mmceGetSourceId(itemList, id);
     sbDelete(&mmceGames, mmcePrefix, "/", mmceGameCount, id);
     mmceULSizePrev = -2;
 }
 
 static void mmceRenameGame(item_list_t *itemList, int id, char *newName)
 {
-    if (libViewActive(itemList->mode) == LIB_VIEW_PS1) {
+    if (mmceGetItemView(itemList, id) == LIB_VIEW_PS1) {
         base_game_info_t *game = mmceActiveGame(itemList, id);
 
         if (game == &mmceEmptyGame)
-            return; // stale id in the PS2<->PS1 toggle window
+            return; // stale/invalid id
         // The ROW picks the target, exactly as the launch does. Dispatching on the view would send
         // an Ember row to vcdRenameFile, which searches POPS/ for "<name>.VCD" -- absent for an
         // Ember title, so the rename would quietly do nothing; and where a .VCD of the same name
@@ -754,7 +777,8 @@ static void mmceRenameGame(item_list_t *itemList, int id, char *newName)
         return;
     }
     if (mmceActiveGame(itemList, id) == &mmceEmptyGame)
-        return;                                   // stale id in the VCD->ISO toggle window (see mmceDeleteGame) -> avoid sbRename OOB
+        return; // stale/invalid id (see mmceDeleteGame) -> avoid sbRename OOB
+    id = mmceGetSourceId(itemList, id);
     sbSetBrowseSub(folderGetSub(itemList->mode)); // rename inside the current subfolder, not the root
     sbRename(&mmceGames, mmcePrefix, "/", mmceGameCount, id, newName);
     mmceULSizePrev = -2;
@@ -870,7 +894,7 @@ void mmceLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
     if (gAutoLaunchBDMGame == NULL) {
         game = mmceActiveGame(itemList, id);
         if (game == &mmceEmptyGame)
-            return; // stale id during the L3 toggle window (see mmceActiveGame) -> nothing to launch
+            return; // stale/invalid id (see mmceActiveGame) -> nothing to launch
     } else
         game = gAutoLaunchBDMGame;
 
@@ -896,7 +920,7 @@ void mmceLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
     }
 
     // VCD view: hand off to POPSTARTER (by name) instead of the disc path below. Menu-launch only.
-    if (gAutoLaunchBDMGame == NULL && game != NULL && (libViewActive(itemList->mode) == LIB_VIEW_PS1)) {
+    if (gAutoLaunchBDMGame == NULL && game != NULL && (mmceGetItemView(itemList, id) == LIB_VIEW_PS1)) {
         // The ROW picks the core, never the page -- both kinds share this one PS1 list.
         if (cueIsCueEntry(game))
             mmceLaunchCue(itemList, game->name, configSet);
@@ -1215,8 +1239,8 @@ void mmceLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
 static config_set_t *mmceGetConfig(item_list_t *itemList, int id)
 {
     // Config (CFG + #Format/#System/#DiscType badges) comes from the ACTIVE view's array; mmceActiveGame
-    // picks it (VCD keys off the basename) and returns a safe empty entry for a stale id during the toggle
-    // window -- so this can never index the wrong/NULL array out of range.
+    // picks it (VCD keys off the basename) and returns a safe empty entry for any stale/invalid id,
+    // so this can never index the wrong/NULL array out of range.
     return sbPopulateConfig(mmceActiveGame(itemList, id), mmcePrefix, "/");
 }
 
@@ -1290,4 +1314,4 @@ static item_list_t mmceGameList = {
     MMCE_MODE, 2, 0, 0, MENU_MIN_INACTIVE_FRAMES, MMCE_MODE_UPDATE_DELAY, NULL, NULL, &mmceGetTextId, &mmceGetPrefix, &mmceInit, &mmceNeedsUpdate,
     &mmceUpdateGameList, &mmceGetGameCount, &mmceGetGame, &mmceGetGameName, &mmceGetGameNameLength, &mmceGetGameStartup, &mmceDeleteGame, &mmceRenameGame,
     &mmceLaunchGame, &mmceGetConfig, &mmceGetImage, &mmceCleanUp, &mmceShutdown, &mmceCheckVMC, &mmceGetIconId, &mmceLaunchVcd,
-    /* viewOverride */ 0, /* itemGetArtArchivePath */ NULL, &mmceLaunchCue};
+    /* viewOverride */ 0, /* itemGetArtArchivePath */ NULL, &mmceLaunchCue, &mmceGetItemView, &mmceGetSourceId};

@@ -33,23 +33,10 @@ static time_t ethModifiedCDPrev;
 static time_t ethModifiedDVDPrev;
 static int ethGameCount = 0;
 static unsigned char ethModulesLoaded = 0;
+static unsigned char ethSmbModuleLoaded = 0;
 static base_game_info_t *ethGames = NULL;
-
-// Favourites needs to validate an ISO record even when the live ETH page currently owns the VCD
-// array. Keep that alternate backing list private to ETH instead of teaching generic viewOverride
-// to rescan or mutating the visible list. It is populated lazily, read-only, and invalidated by every
-// ETH list mutation/reconnect. No other device class uses this cache.
-static base_game_info_t *ethFavIsoGames = NULL;
-static int ethFavIsoGameCount = 0;
-static unsigned char ethFavIsoValid = 0;
-
-static void ethInvalidateFavIsoBacking(void)
-{
-    free(ethFavIsoGames);
-    ethFavIsoGames = NULL;
-    ethFavIsoGameCount = 0;
-    ethFavIsoValid = 0;
-}
+static int ethPs1GameCount = 0;
+static base_game_info_t *ethPs1Games = NULL;
 
 static struct ip4_addr lastIP;
 static struct ip4_addr lastNM;
@@ -65,6 +52,7 @@ static int ethApplyIPConfig(void);
 static int ethReadNetConfig(void);
 
 static int ethInitSemaID = -1;
+static unsigned char ethReconnectQueued = 0;
 
 // Initializes locking semaphore for network support (not for just SMB support, but for the network subsystem).
 static int ethInitSema(void)
@@ -166,16 +154,16 @@ static void ethSMBConnect(void)
 
 static int ethSMBDisconnect(void)
 {
-    int ret;
+    int shareRet, logoffRet;
 
-    // closing share
-    ret = fileXioDevctl(ethBase, SMB_DEVCTL_CLOSESHARE, NULL, 0, NULL, 0);
-    if (ret < 0)
+    // Always attempt both halves. CLOSESHARE legitimately fails after a connection/logon error or
+    // when LOGON succeeded but OPENSHARE did not; returning early there used to leave that partial
+    // session alive, so the next explicit reconnect was not actually a clean retry.
+    shareRet = fileXioDevctl(ethBase, SMB_DEVCTL_CLOSESHARE, NULL, 0, NULL, 0);
+    logoffRet = fileXioDevctl(ethBase, SMB_DEVCTL_LOGOFF, NULL, 0, NULL, 0);
+    if (shareRet < 0)
         return -1;
-
-    // logoff/close tcp connection from SMB server:
-    ret = fileXioDevctl(ethBase, SMB_DEVCTL_LOGOFF, NULL, 0, NULL, 0);
-    if (ret < 0)
+    if (logoffRet < 0)
         return -2;
 
     return 0;
@@ -397,6 +385,7 @@ void ethDeinitModules(void)
         nbnsDeinit();
         NetManDeinit();
         ethModulesLoaded = 0;
+        ethSmbModuleLoaded = 0;
         gNetworkStartup = ERROR_ETH_NOT_STARTED;
 
         if (ethInitSemaID >= 0) {
@@ -493,6 +482,7 @@ static void smbLoadModules(void)
         // this build speaks SMBv1 unconditionally, exactly like every pre-dialect build.
         LOG("[SMBMAN]:\n");
         if (sysLoadModuleBuffer((void *)&smbman_irx, size_smbman_irx, 0, NULL) >= 0) {
+            ethSmbModuleLoaded = 1;
             LOG("[NBNS]:\n");
             sysLoadModuleBuffer(&nbns_irx, size_nbns_irx, 0, NULL);
             nbnsInit();
@@ -506,19 +496,61 @@ static void smbLoadModules(void)
     ethDisplayErrorStatus();
 }
 
+static void ethReconnectSMB(void)
+{
+    // Runs on the serialized IO worker. Keep the old backing allocations alive until the normal
+    // deferred menu rebuild has detached their row text, but publish zero counts immediately so a
+    // button press during reconnect resolves to an inert row rather than launching stale data.
+    if (ethBase == NULL)
+        ethBase = "smb0:";
+
+    if (ethSmbModuleLoaded)
+        (void)ethSMBDisconnect();
+
+    thmReinit(ethBase);
+    ethULSizePrev = -2;
+    ethModifiedCDPrev = 0;
+    ethModifiedDVDPrev = 0;
+    ethGameCount = 0;
+    ethPs1GameCount = 0;
+    gNetworkStartup = ERROR_ETH_NOT_STARTED;
+
+    if (!ethModulesLoaded || !ethSmbModuleLoaded)
+        smbLoadModules();
+    else
+        ethInitSMB(); // applies link/IP settings before logging on and reopening the share
+
+    libViewMarkDirty(ETH_MODE);
+    ioPutRequest(IO_MENU_UPDATE_DEFFERED, &ethGameList.mode);
+    ethReconnectQueued = 0;
+}
+
+void ethRequestReconnect(void)
+{
+    // A protocol switch while another NIC stack is resident is restart-only. Do not let Refresh on
+    // a stale/hidden ETH page fight that interlock or revive SMB after Network Start was disabled.
+    if (gNetworkProtocol != NET_PROTO_SMB || gETHStartMode == START_MODE_DISABLED)
+        return;
+    if (ethReconnectQueued)
+        return;
+    if (ethInitSema() < 0)
+        return;
+
+    ethGameList.enabled = 1;
+    ethGameList.delay = gArtDelay;
+    ethReconnectQueued = 1;
+    if (ioPutRequest(IO_CUSTOM_SIMPLEACTION, &ethReconnectSMB) != IO_OK)
+        ethReconnectQueued = 0;
+}
+
 void ethInit(item_list_t *itemList)
 {
     if (ethInitSema() < 0)
         return;
 
-    ethInvalidateFavIsoBacking();
-
     if (gNetworkStartup >= ERROR_ETH_SMB_CONN) {
         LOG("ETHSUPPORT Re-Init\n");
-        thmReinit(ethBase);
-        ethULSizePrev = -2;
-        ethGameCount = 0;
-        ioPutRequest(IO_CUSTOM_SIMPLEACTION, &ethInitSMB);
+        ethRequestReconnect();
     } else {
         LOG("ETHSUPPORT Init\n");
         ethBase = "smb0:";
@@ -527,6 +559,8 @@ void ethInit(item_list_t *itemList)
         ethModifiedDVDPrev = 0;
         ethGameCount = 0;
         ethGames = NULL;
+        ethPs1GameCount = 0;
+        ethPs1Games = NULL;
         ethGameList.delay = gArtDelay;
         gNetworkStartup = ERROR_ETH_NOT_STARTED;
         ioPutRequest(IO_CUSTOM_SIMPLEACTION, &smbLoadModules);
@@ -586,15 +620,14 @@ static int ethNeedsUpdate(item_list_t *itemList)
 
 static int ethUpdateGameList(item_list_t *itemList)
 {
-    ethInvalidateFavIsoBacking();
+    int view = libListViewActive(itemList);
 
     if (gPCShareName[0]) {
         if (gNetworkStartup != 0)
             return 0;
 
-        if (libListViewActive(itemList) == LIB_VIEW_PS1) {
-            // POPSTARTER titles ONLY on SMB, deliberately: this is the one device class where the
-            // ONE list, BOTH cores -- the same union every other device page builds.
+        if (view == LIB_VIEW_PS1 || view == LIB_VIEW_MIXED) {
+            // One list, both cores -- the same union every other device page builds.
             //
             // This used to be POPSTARTER-only, on the reasoning that RiptOPL composes SMB paths
             // with '\' while Ember composes its own with '/', that smbman's tolerance for that was
@@ -608,12 +641,14 @@ static int ethUpdateGameList(item_list_t *itemList)
             // path composition does not work on a given server, the Ember half contributes nothing
             // and the POPSTARTER half is untouched -- which is exactly the "no half lists" rule it
             // wanted. The feature gates itself on a real file open.
-            int r = ps1FillGameList(ethPrefix, &ethGames);
+            int r = ps1FillGameList(ethPrefix, &ethPs1Games);
             if (r >= 0) // r < 0: transient scan failure -> preserve the last-good list
-                ethGameCount = r;
+                ethPs1GameCount = r;
             // NULL sub opts SMB/ETH out of folder-row collection: it uses a "\\" separator and does not
             // participate in folder browsing (see the folderlist gate in sbReadList).
-        } else if ((sbReadList(&ethGames, ethPrefix, /* sub: */ NULL, &ethULSizePrev, &ethGameCount)) < 0) {
+        }
+        if ((view == LIB_VIEW_ISO || view == LIB_VIEW_MIXED) &&
+            (sbReadList(&ethGames, ethPrefix, /* sub: */ NULL, &ethULSizePrev, &ethGameCount)) < 0) {
             gNetworkStartup = ERROR_ETH_SMB_LISTGAMES;
             ethDisplayErrorStatus();
         }
@@ -658,75 +693,51 @@ static int ethUpdateGameList(item_list_t *itemList)
             ethDisplayErrorStatus();
         }
     }
-    return ethGameCount;
+    if (!gPCShareName[0])
+        return ethGameCount;
+    return view == LIB_VIEW_MIXED ? ethGameCount + ethPs1GameCount :
+           view == LIB_VIEW_PS1   ? ethPs1GameCount :
+                                    ethGameCount;
 }
 
 int ethResolveIsoFavourite(int id, const char *name, int *outId)
 {
-    base_game_info_t *games;
-    int count;
-
     if (name == NULL || outId == NULL || id < 0 || !gPCShareName[0] || gNetworkStartup != 0)
         return 0;
 
-    if (libViewActive(ETH_MODE) != LIB_VIEW_PS1) {
-        // The live ETH backing store already IS the ISO list. Preserve the old id+name validation.
-        games = ethGames;
-        count = ethGameCount;
-    } else {
-        // The live backing store is VCD. Build a separate read-only ISO snapshot once for this ETH
-        // generation; sbReadList receives its own cache-size/count state and cannot replace ethGames.
-        if (!ethFavIsoValid) {
-            int probeSize = -2;
-            int probeCount = 0;
-            base_game_info_t *probeGames = NULL;
-
-            if (sbReadList(&probeGames, ethPrefix, NULL, &probeSize, &probeCount) < 0) {
-                free(probeGames);
-                return 0;
-            }
-            ethFavIsoGames = probeGames;
-            ethFavIsoGameCount = probeCount;
-            ethFavIsoValid = 1;
-        }
-        games = ethFavIsoGames;
-        count = ethFavIsoGameCount;
-    }
-
-    if (games == NULL || id >= count || strcmp(games[id].name, name) != 0)
+    // ISO and PS1 now have permanent independent stores, so Favorites never needs to rescan or
+    // borrow the visible page's backing array.
+    if (ethGames == NULL || id >= ethGameCount || strcmp(ethGames[id].name, name) != 0)
         return 0;
 
     *outId = id;
     return 1;
 }
 
-static base_game_info_t *ethBackingForView(item_list_t *itemList, int *count)
+static int ethGetItemView(item_list_t *itemList, int id)
 {
-    // A Favourites ISO owner is a stack-local copy with FORCE_ISO. If the visible ETH page currently
-    // owns the VCD array, the resolved favourite ID belongs to ethFavIsoGames instead. Never fall back
-    // to live ethGames when that snapshot was invalidated: returning an empty view is safer than using
-    // the same numeric ID against the wrong backing list, and the normal favourite rebuild will resolve
-    // it again after the ETH mutation/reconnect that invalidated the snapshot.
-    if (itemList != NULL && itemList->viewOverride == ITEM_VIEW_FORCE_ISO && (libViewActive(ETH_MODE) == LIB_VIEW_PS1)) {
-        if (!ethFavIsoValid || ethFavIsoGames == NULL) {
-            if (count != NULL)
-                *count = 0;
-            return NULL;
-        }
-        if (count != NULL)
-            *count = ethFavIsoGameCount;
-        return ethFavIsoGames;
-    }
+    int view;
 
-    if (count != NULL)
-        *count = ethGameCount;
-    return ethGames;
+    // Before a share is chosen, the page is a share picker regardless of the global game display.
+    if (!gPCShareName[0])
+        return LIB_VIEW_ISO;
+    view = libListViewActive(itemList);
+    if (view == LIB_VIEW_MIXED)
+        return id >= 0 && id < ethGameCount ? LIB_VIEW_ISO : LIB_VIEW_PS1;
+    return view;
+}
+
+static int ethGetSourceId(item_list_t *itemList, int id)
+{
+    return gPCShareName[0] && libListViewActive(itemList) == LIB_VIEW_MIXED && id >= ethGameCount ? id - ethGameCount : id;
 }
 
 static base_game_info_t *ethGameForView(item_list_t *itemList, int id)
 {
-    int count = 0;
-    base_game_info_t *games = ethBackingForView(itemList, &count);
+    int ps1 = ethGetItemView(itemList, id) == LIB_VIEW_PS1;
+    id = ethGetSourceId(itemList, id);
+    base_game_info_t *games = ps1 ? ethPs1Games : ethGames;
+    int count = ps1 ? ethPs1GameCount : ethGameCount;
     if (games == NULL || id < 0 || id >= count)
         return NULL;
     return &games[id];
@@ -734,9 +745,14 @@ static base_game_info_t *ethGameForView(item_list_t *itemList, int id)
 
 static int ethGetGameCount(item_list_t *itemList)
 {
-    int count = 0;
-    ethBackingForView(itemList, &count);
-    return count;
+    int view;
+
+    if (!gPCShareName[0])
+        return ethGameCount;
+    view = libListViewActive(itemList);
+    return view == LIB_VIEW_MIXED ? ethGameCount + ethPs1GameCount :
+           view == LIB_VIEW_PS1   ? ethPs1GameCount :
+                                    ethGameCount;
 }
 
 static void *ethGetGame(item_list_t *itemList, int id)
@@ -764,35 +780,36 @@ static char *ethGetGameStartup(item_list_t *itemList, int id)
     if (game == NULL)
         return "";
     // VCD view keys per-game data (CFG/art) off the VCD filename, not a disc ID (see sbPopulateConfig).
-    if (libListViewActive(itemList) == LIB_VIEW_PS1)
+    if (ethGetItemView(itemList, id) == LIB_VIEW_PS1)
         return game->name;
     return game->startup;
 }
 
 static void ethDeleteGame(item_list_t *itemList, int id)
 {
-    ethInvalidateFavIsoBacking();
+    if (ethGetItemView(itemList, id) == LIB_VIEW_PS1)
+        return;
+    id = ethGetSourceId(itemList, id);
     sbDelete(&ethGames, ethPrefix, "\\", ethGameCount, id);
     ethULSizePrev = -2;
 }
 
 static void ethRenameGame(item_list_t *itemList, int id, char *newName)
 {
-    if (libListViewActive(itemList) == LIB_VIEW_PS1) {
+    if (ethGetItemView(itemList, id) == LIB_VIEW_PS1) {
         base_game_info_t *game = ethGameForView(itemList, id);
 
         // Rename through the row's OWN core: an Ember title is a FOLDER under EMBER/games/, a
         // POPSTARTER title is a .VCD file in POPS/. Renaming one as the other silently fails.
         if (game != NULL &&
             (cueIsCueEntry(game) ? cueRenameGame(ethPrefix, game->name, newName) : vcdRenameFile(ethPrefix, game->name, newName)) == 0) {
-            ethInvalidateFavIsoBacking();
             // ETH otherwise treats its VCD list as toggle-only; consume this on the already queued
             // deferred update so the renamed POPS/ directory is scanned again.
             libViewMarkDirty(itemList->mode);
         }
         return;
     }
-    ethInvalidateFavIsoBacking();
+    id = ethGetSourceId(itemList, id);
     sbRename(&ethGames, ethPrefix, "\\", ethGameCount, id, newName);
     ethULSizePrev = -2;
 }
@@ -897,7 +914,7 @@ static void ethLaunchGame(item_list_t *itemList, int id, config_set_t *configSet
 
     // PS1 view (SMB): the row carries its own core, so dispatch on the ROW, not on the view.
     // A .cue row is Ember's; anything else on this list is a POPSTARTER .VCD.
-    if (gPCShareName[0] && game != NULL && (libListViewActive(itemList) == LIB_VIEW_PS1)) {
+    if (gPCShareName[0] && game != NULL && (ethGetItemView(itemList, id) == LIB_VIEW_PS1)) {
         if (cueIsCueEntry(game))
             ethLaunchCue(itemList, game->name, configSet);
         else
@@ -909,6 +926,7 @@ static void ethLaunchGame(item_list_t *itemList, int id, config_set_t *configSet
         memcpy(gPCShareName, game->name, sizeof(gPCShareName));
         ethULSizePrev = -2;
         ethGameCount = 0;
+        ethPs1GameCount = 0;
         ioPutRequest(IO_MENU_UPDATE_DEFFERED, &ethGameList.mode); // clear the share list
         ioPutRequest(IO_CUSTOM_SIMPLEACTION, &ethInitSMB);
         ioPutRequest(IO_MENU_UPDATE_DEFFERED, &ethGameList.mode); // reload the game list
@@ -1109,8 +1127,10 @@ static void ethCleanUp(item_list_t *itemList, int exception)
 
         free(ethGames);
         ethGames = NULL;
-        ethInvalidateFavIsoBacking();
-
+        free(ethPs1Games);
+        ethPs1Games = NULL;
+        ethGameCount = 0;
+        ethPs1GameCount = 0;
         // disconnect from the active SMB session
         if ((exception & UNMOUNT_EXCEPTION) == 0)
             ethSMBDisconnect();
@@ -1128,8 +1148,10 @@ static void ethShutdown(item_list_t *itemList)
 
         free(ethGames);
         ethGames = NULL;
-        ethInvalidateFavIsoBacking();
-
+        free(ethPs1Games);
+        ethPs1Games = NULL;
+        ethGameCount = 0;
+        ethPs1GameCount = 0;
         // disconnect from the active SMB session
         ethSMBDisconnect();
     }
@@ -1161,7 +1183,8 @@ const char *ethGetSMBPrefix(void)
 static item_list_t ethGameList = {
     ETH_MODE, 1, 0, 0, MENU_MIN_INACTIVE_FRAMES, ETH_MODE_UPDATE_DELAY, NULL, NULL, &ethGetTextId, &ethGetPrefix, &ethInit, &ethNeedsUpdate,
     &ethUpdateGameList, &ethGetGameCount, &ethGetGame, &ethGetGameName, &ethGetGameNameLength, &ethGetGameStartup, &ethDeleteGame, &ethRenameGame,
-    &ethLaunchGame, &ethGetConfig, &ethGetImage, &ethCleanUp, &ethShutdown, &ethCheckVMC, &ethGetIconId, &ethLaunchVcd};
+    &ethLaunchGame, &ethGetConfig, &ethGetImage, &ethCleanUp, &ethShutdown, &ethCheckVMC, &ethGetIconId, &ethLaunchVcd,
+    ITEM_VIEW_NATIVE, NULL, &ethLaunchCue, &ethGetItemView, &ethGetSourceId};
 
 static int ethReadNetConfig(void)
 {
