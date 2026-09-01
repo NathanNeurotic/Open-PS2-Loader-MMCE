@@ -686,7 +686,7 @@ static int mmceGetGameCount(item_list_t *itemList)
     int view = libListViewActive(itemList);
     return view == LIB_VIEW_MIXED ? mmceGameCount + mmcePs1GameCount :
            view == LIB_VIEW_PS1   ? mmcePs1GameCount :
-                                   mmceGameCount;
+                                    mmceGameCount;
 }
 
 static int mmceGetItemView(item_list_t *itemList, int id)
@@ -744,8 +744,7 @@ static void mmceDeleteGame(item_list_t *itemList, int id)
     if (mmceGetItemView(itemList, id) == LIB_VIEW_PS1)
         return; // #120: a VCD is not an ISO game -- no delete in VCD view
     if (mmceActiveGame(itemList, id) == &mmceEmptyGame)
-        return;                                   // stale id in the VCD->ISO toggle window (libViewActive already flipped, old VCD submenu id
-                                                  // still live): sbDelete does NOT bounds-check, so this avoids an OOB/NULL deref + wrong unlink
+        return;                                   // stale/invalid id: sbDelete does NOT bounds-check, so avoid an OOB/NULL deref + wrong unlink
     sbSetBrowseSub(folderGetSub(itemList->mode)); // delete inside the current subfolder, not the root
     id = mmceGetSourceId(itemList, id);
     sbDelete(&mmceGames, mmcePrefix, "/", mmceGameCount, id);
@@ -758,7 +757,7 @@ static void mmceRenameGame(item_list_t *itemList, int id, char *newName)
         base_game_info_t *game = mmceActiveGame(itemList, id);
 
         if (game == &mmceEmptyGame)
-            return; // stale id in the PS2<->PS1 toggle window
+            return; // stale/invalid id
         // The ROW picks the target, exactly as the launch does. Dispatching on the view would send
         // an Ember row to vcdRenameFile, which searches POPS/ for "<name>.VCD" -- absent for an
         // Ember title, so the rename would quietly do nothing; and where a .VCD of the same name
@@ -778,7 +777,7 @@ static void mmceRenameGame(item_list_t *itemList, int id, char *newName)
         return;
     }
     if (mmceActiveGame(itemList, id) == &mmceEmptyGame)
-        return;                                   // stale id in the VCD->ISO toggle window (see mmceDeleteGame) -> avoid sbRename OOB
+        return; // stale/invalid id (see mmceDeleteGame) -> avoid sbRename OOB
     id = mmceGetSourceId(itemList, id);
     sbSetBrowseSub(folderGetSub(itemList->mode)); // rename inside the current subfolder, not the root
     sbRename(&mmceGames, mmcePrefix, "/", mmceGameCount, id, newName);
@@ -895,7 +894,7 @@ void mmceLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
     if (gAutoLaunchBDMGame == NULL) {
         game = mmceActiveGame(itemList, id);
         if (game == &mmceEmptyGame)
-            return; // stale id during the L3 toggle window (see mmceActiveGame) -> nothing to launch
+            return; // stale/invalid id (see mmceActiveGame) -> nothing to launch
     } else
         game = gAutoLaunchBDMGame;
 
@@ -1240,8 +1239,8 @@ void mmceLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
 static config_set_t *mmceGetConfig(item_list_t *itemList, int id)
 {
     // Config (CFG + #Format/#System/#DiscType badges) comes from the ACTIVE view's array; mmceActiveGame
-    // picks it (VCD keys off the basename) and returns a safe empty entry for a stale id during the toggle
-    // window -- so this can never index the wrong/NULL array out of range.
+    // picks it (VCD keys off the basename) and returns a safe empty entry for any stale/invalid id,
+    // so this can never index the wrong/NULL array out of range.
     return sbPopulateConfig(mmceActiveGame(itemList, id), mmcePrefix, "/");
 }
 

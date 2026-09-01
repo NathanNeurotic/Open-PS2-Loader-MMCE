@@ -4,7 +4,7 @@
 #include "include/supportbase.h"
 #include "include/udpfssupport.h"
 #include "include/cuesupport.h" // Ember-only PS1 view: POPSTARTER cannot restore udpfs: after reset
-#include "include/libview.h" // libViewActive / libListViewActive -- which list this page shows
+#include "include/libview.h"    // libViewActive / libListViewActive -- which list this page shows
 #include "include/folderbrowse.h"
 #include "include/util.h"
 #include "include/renderman.h"
@@ -144,13 +144,12 @@ static int udpfsActiveGameCount(const item_list_t *itemList)
     int view = libListViewActive(itemList);
     return view == LIB_VIEW_MIXED ? udpfsGameCount + udpfsPs1GameCount :
            view == LIB_VIEW_PS1   ? udpfsPs1GameCount :
-                                   udpfsGameCount;
+                                    udpfsGameCount;
 }
 
-// L3 changes the active backing list synchronously and rebuilds the visible submenu on the deferred
-// IO worker. During that short window an old row id can be presented to callbacks while the newly
-// active list is NULL or shorter. Resolve every id through one bounds-checked sentinel, matching the
-// BDM support's split-list guard, so a fast input becomes an inert empty row instead of an OOB read.
+// Resolve every row through one bounds-checked sentinel, matching the BDM support's split-list
+// guard. L3 now stages its destination until the old submenu is cleared, but an unscanned, failed,
+// partial, or teardown refresh can still leave either array NULL/shorter than a stale id.
 static base_game_info_t udpfsEmptyGame = {0};
 static base_game_info_t *udpfsActiveGame(item_list_t *itemList, int id)
 {
@@ -357,7 +356,7 @@ static void udpfsLaunchGame(item_list_t *itemList, int id, config_set_t *configS
     base_game_info_t *game = udpfsActiveGame(itemList, id);
 
     if (game == &udpfsEmptyGame)
-        return; // stale id in the asynchronous L3-toggle window
+        return; // stale/invalid id
 
     // Folder browsing: a folder row is never launched (the dispatch descends first); guard defensively
     // and pin the path composers to the current subfolder so a nested game resolves.
@@ -366,7 +365,7 @@ static void udpfsLaunchGame(item_list_t *itemList, int id, config_set_t *configS
     sbSetBrowseSub(folderGetSub(itemList->mode));
 
     // PS1 view: UDPFS publishes Ember rows only. Keep the POPSTARTER guard as a defensive fallback
-    // for a stale row during the asynchronous toggle window.
+    // for stale or corrupt row state.
     if (game != NULL && (udpfsGetItemView(itemList, id) == LIB_VIEW_PS1)) {
         if (cueIsCueEntry(game))
             udpfsLaunchCue(itemList, game->name, configSet);

@@ -313,7 +313,11 @@ int  libViewSupported(int mode, int view);      // the single definition of a pa
 int  libViewRingSize(int mode);                 // what the hint and the toggle guard ask
 int  libViewActive(int mode);
 int  libListViewActive(const item_list_t *il);  // honours viewOverride
-void libViewAdvance(int mode);                  // next stop, wrapping; marks dirty
+int  libViewStageAdvance(int mode);             // stage next stop; old rows keep their old view
+int  libViewPending(int mode);
+int  libViewPendingTarget(int mode);            // destination used by the L3 notification
+void libViewCommitPending(int mode);            // after the old submenu has been cleared
+void libViewFinishPending(int mode);            // after replacement rows have been queued
 int  libViewConsumeDirty(int mode);
 void libViewMarkDirty(int mode);
 void libViewMarkAllDirty(void);
@@ -455,8 +459,9 @@ both cores is the *expected* case, and without a deterministic tie-break `qsort`
 rows on every rescan, making them appear to jump around.
 
 **Trap.** The PS1 array is a second store to free in every `itemCleanUp` and to bounds-guard in
-every `*ActiveGame()` helper. The toggle-window guard exists because the L3 flip is synchronous
-while the rebuild is deferred; extend it, do not copy-paste it.
+every `*ActiveGame()` helper. L3 stages its destination, clears the old submenu, then commits the
+new view before scanning; keep that shared handoff intact and retain the per-store bounds guards
+for failed, partial, or otherwise stale refreshes.
 
 
 ## Part 5 — Launch
@@ -829,8 +834,10 @@ gates that call.
 
 Validate the migration explicitly: take a v2 `favourites.bin` holding ISO, VCD **and** app
 favorites, confirm all three land on the right shelf after the upgrade, **and that a v3 file still
-loads on the next boot** — the reader's accepted-version range and the writer's `FAV_VERSION` have
-to move together, and getting that wrong presents an empty tab that then overwrites the real list.
+loads on the next boot**. The v2 byte is only `isVcd`, but the retained source mode completes the
+legacy mapping: `isVcd=1` becomes VCD, while `isVcd=0` becomes ELF for `APP_MODE` and ISO otherwise.
+The reader's accepted-version range and the writer's `FAV_VERSION` have to move together; getting
+that wrong presents an empty tab that then overwrites the real list.
 
 ### Phase 5 — Network surface (landed; hardware pending)
 

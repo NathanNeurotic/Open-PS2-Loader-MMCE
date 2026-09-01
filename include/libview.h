@@ -55,8 +55,14 @@ int libListSourceId(item_list_t *itemList, int id);
 // Whether L3 is actionable on this page under the current independent settings.
 int libViewRingUsable(int mode);
 
-// Advance one L3 stop and mark the page dirty. No-op for a one-stop page.
-void libViewAdvance(int mode);
+// Stage one L3 stop without changing the view that owns the rows currently on screen. The IO
+// rebuild commits that target only after it has cleared those rows, so a stale row id can never be
+// resolved through the next view's backing array. Returns 1 when a transition was staged.
+int libViewStageAdvance(int mode);
+int libViewPending(int mode);
+int libViewPendingTarget(int mode);
+void libViewCommitPending(int mode);
+void libViewFinishPending(int mode);
 
 // Dirty protocol consumed by support itemNeedsUpdate callbacks.
 int libViewConsumeDirty(int mode);

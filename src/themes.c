@@ -1772,7 +1772,7 @@ static void drawItemsList(struct menu_list *menu, struct submenu_list *item, con
                 color = elem->color;
 
             const char *dispText = ps->item.isFolder ? submenuItemGetText(&ps->item) :
-                                                      vcdDisplayNameForRow(list, ps->item.id, submenuItemGetText(&ps->item));
+                                                       vcdDisplayNameForRow(list, ps->item.id, submenuItemGetText(&ps->item));
             char folderBuf[256];
             if (ps->item.isFolder) {
                 snprintf(folderBuf, sizeof(folderBuf), "%s/", dispText);

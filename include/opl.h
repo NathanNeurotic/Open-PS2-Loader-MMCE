@@ -176,7 +176,7 @@ enum {
     GAME_VIEW_VCD,      // lock every VCD-capable page to its PS1 list
     // Appended so existing default_game_view values keep their meaning. The UI maps this stored
     // value into the requested Both / Mixed / PS2 / PS1 display order.
-    GAME_VIEW_MIXED     // combined PS2 + PS1 list; L3 cycles Mixed -> PS2 -> PS1
+    GAME_VIEW_MIXED // combined PS2 + PS1 list; L3 cycles Mixed -> PS2 -> PS1
 };
 extern int gDefaultGameView;
 

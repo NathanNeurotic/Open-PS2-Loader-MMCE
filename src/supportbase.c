@@ -990,7 +990,7 @@ config_set_t *sbPopulateConfig(base_game_info_t *game, const char *prefix, const
     // no meaningful ISO size and its file lives in POPS/, not CD/DVD/, so statting the CD/DVD path always
     // misses, leaves sizeMB at 0, never caches, and re-probes the shared MMCE bus on every info entry (#120).
     // Hard-stop it by EXTENSION here (not mutable view state) so a .VCD can never reach the ISO stat path,
-    // even during the L3 view-toggle window (game->sizeMB stays 0 -> "0 MiB" is still written below).
+    // even for stale/invalid row state (game->sizeMB stays 0 -> "0 MiB" is still written below).
     // Folder browsing: prepend the current subpath so the stat resolves a game that lives inside a
     // subfolder. sbBrowseSub is "" at the device root, collapsing subseg away. Without this a
     // folder-nav game stats a path that does not exist and silently reports 0 MiB.

@@ -958,12 +958,16 @@ static const char *guiAppsViewNames[] = {"Mixed", "Apps / PS1ELF (L3)", NULL};
 
 static int guiGameViewToPicker(int view)
 {
-    return view == GAME_VIEW_MIXED ? 1 : view == GAME_VIEW_ISO ? 2 : view == GAME_VIEW_VCD ? 3 : 0;
+    return view == GAME_VIEW_MIXED ? 1 : view == GAME_VIEW_ISO ? 2 :
+                                     view == GAME_VIEW_VCD     ? 3 :
+                                                                 0;
 }
 
 static int guiPickerToGameView(int picker)
 {
-    return picker == 1 ? GAME_VIEW_MIXED : picker == 2 ? GAME_VIEW_ISO : picker == 3 ? GAME_VIEW_VCD : GAME_VIEW_BOTH;
+    return picker == 1 ? GAME_VIEW_MIXED : picker == 2 ? GAME_VIEW_ISO :
+                                       picker == 3     ? GAME_VIEW_VCD :
+                                                         GAME_VIEW_BOTH;
 }
 
 static void guiSetGameViewPicker(struct UIItem *ui)

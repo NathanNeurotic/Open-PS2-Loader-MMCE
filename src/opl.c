@@ -450,19 +450,26 @@ static void itemExecRefresh(struct menu_item *curMenu)
     }
 }
 
-// L3: advance the page one stop around its ring of lists. Only pages with more than one list
-// respond. libViewAdvance marks the mode dirty; the deferred update + the support's NeedsUpdate
-// (libViewConsumeDirty) then force the rescan.
+// L3: stage the page's next list and let the deferred worker commit it only after clearing the old
+// submenu. Until that clear, callbacks and rendering must continue resolving the visible row ids
+// through the old view; otherwise a valid row 0 from one list can silently become row 0 of another.
 static void itemExecToggleView(struct menu_item *curMenu)
 {
     item_list_t *support = curMenu->userdata;
-    if (!support || !libViewRingUsable(support->mode))
+    if (!support || !libViewRingUsable(support->mode) || libViewPending(support->mode))
+        return;
+
+    // Queue before changing any view state. The IO worker is deliberately lower priority than this
+    // GUI thread, so it cannot inspect the request until this handler has staged its target. If the
+    // queue rejects the request, the visible view and its rows remain completely untouched.
+    if (ioPutRequest(IO_MENU_UPDATE_DEFFERED, &support->mode) != IO_OK)
         return;
 
     // Folder browsing: the VCD/POPS list has no folder tree, so drop any ISO-view subfolder position
     // back to root on a view toggle (the deferred rebuild below restores the plain device title).
     folderReset(support->mode);
-    libViewAdvance(support->mode);
+    if (!libViewStageAdvance(support->mode))
+        return;
 
     // Every cover already queued belongs to the view being discarded, and none of them will be
     // cancelled on their own: the loader's per-row cancellation keys on a row having scrolled away,
@@ -476,12 +483,12 @@ static void itemExecToggleView(struct menu_item *curMenu)
     // Favorites has four stops (All -> PS2 -> PS1 -> ELF), so the toast names the
     // one you landed on rather than reading as an on/off flag.
     {
-        int view = libViewActive(support->mode);
+        int view = libViewPendingTarget(support->mode);
         int msg;
         if (support->mode == FAV_MODE)
             msg = (view == LIB_VIEW_PS1) ? _STR_VIEW_PS1 : (view == LIB_VIEW_ELF) ? _STR_VIEW_ELF :
-                                                              (view == LIB_VIEW_ALL) ? _STR_VIEW_ALL :
-                                                                                       _STR_VIEW_PS2;
+                                                       (view == LIB_VIEW_ALL)     ? _STR_VIEW_ALL :
+                                                                                    _STR_VIEW_PS2;
         else if (support->mode == APP_MODE)
             msg = view == LIB_VIEW_PS1_ELF ? _STR_VIEW_PS1_ELF : _STR_VIEW_APPS;
         else if (view == LIB_VIEW_MIXED)
@@ -490,7 +497,6 @@ static void itemExecToggleView(struct menu_item *curMenu)
             msg = (view == LIB_VIEW_PS1) ? _STR_VCD_ON : _STR_VCD_OFF;
         guiWarning(_l(msg), 2);
     }
-    ioPutRequest(IO_MENU_UPDATE_DEFFERED, &support->mode);
 }
 
 // Effective kind of the selected row. Every normal device page is homogeneous, so its active view
@@ -561,12 +567,10 @@ static void itemExecSquare(struct menu_item *curMenu)
 // are ELF favourites, a PS1 page's rows are PS1 favourites), but for PS1 the CORE comes from the
 // ROW -- both cores share that one list, so asking the page which core to record would file every
 // Ember title as a POPSTARTER one and it would then launch through the wrong core.
-// `text` is the row as DRAWN. L3 changes the active backing list synchronously while the submenu is
-// rebuilt on the deferred IO thread, so for a short window the drawn rows belong to the old view
-// while itemGet already indexes the new one. Comparing the looked-up row's name against the drawn
-// text is what closes that window: they agree only when the row on screen is the row we resolved.
-// Returns -1 when they disagree, and the caller declines the action rather than writing a record
-// that names one game and launches another.
+// `text` is the row as DRAWN. Comparing the looked-up row's name against it is a final identity
+// check across asynchronous source refreshes: they agree only when the row on screen is the row we
+// resolved. Returns -1 when they disagree, and the caller declines the action rather than writing a
+// record that names one game and launches another.
 static int itemFavKind(item_list_t *support, int id, const char *text)
 {
     const base_game_info_t *game;
@@ -588,8 +592,8 @@ static int itemFavKind(item_list_t *support, int id, const char *text)
     game = (const base_game_info_t *)support->itemGet(support, id);
     if (game == NULL)
         return -1;
-    // The toggle-window guards hand back a static EMPTY entry for an id the new list cannot honour;
-    // its name is "", which no drawn row has, so the mismatch below catches that case too.
+    // Split-store guards hand back a static EMPTY entry for an id the list cannot honour; its name is
+    // "", which no drawn row has, so the mismatch below catches that case too.
     if (strcmp(game->name, text) != 0)
         return -1;
 
@@ -1132,8 +1136,14 @@ config_set_t *oplGetLegacyAppsInfo(char *name)
 // ----------------------------------------------------------
 static void updateMenuFromGameList(opl_io_module_t *mdl)
 {
+    int viewTransition;
+
     guiExecDeferredOps();
     clearMenuGameList(mdl);
+    // An L3 transition is staged while the old submenu is still live. Commit only after that submenu
+    // is gone, then every array read below and every newly queued row belongs to the same new view.
+    viewTransition = libViewPending(mdl->support->mode);
+    libViewCommitPending(mdl->support->mode);
 
     // NO cacheInvalidateFailMemo() HERE, and this is deliberate -- it used to sit on this line.
     //
@@ -1226,6 +1236,13 @@ static void updateMenuFromGameList(opl_io_module_t *mdl)
             guiDeferUpdate(gup);
         }
     }
+
+    if (viewTransition) {
+        // All rows for the committed view are now queued. The GUI may show none, some, or all of them
+        // on its next drain, but it can no longer expose a row backed by the discarded view. Do not
+        // clear a transition staged after this rebuild began; its own queued pass still has to run.
+        libViewFinishPending(mdl->support->mode);
+    }
 }
 
 void menuDeferredUpdate(void *data)
@@ -1250,6 +1267,14 @@ void menuDeferredUpdate(void *data)
         // against. Re-sync the FAV tab (cheap/idempotent; skipped when FAV is disabled).
         if (gFAVStartMode && mod->support->mode != FAV_MODE)
             loadFavourites();
+    } else if (libViewPending(mod->support->mode)) {
+        // A device can reject a scan before it consumes the view-dirty flag (for example, MMCE with
+        // no card inserted). Still retire the old rows and commit the retained destination so input
+        // does not remain locked and the next successful device scan uses the user's chosen view.
+        guiExecDeferredOps();
+        clearMenuGameList(mod);
+        libViewCommitPending(mod->support->mode);
+        libViewFinishPending(mod->support->mode);
     }
 }
 

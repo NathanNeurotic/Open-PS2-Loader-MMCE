@@ -17,6 +17,9 @@ static unsigned char retainedView[MODE_COUNT] = {[FAV_MODE] = LIB_VIEW_ALL};
 static unsigned char mixedView[MODE_COUNT];
 static unsigned char mixedViewInitialized[MODE_COUNT];
 static unsigned char libDirty[MODE_COUNT];
+static unsigned char pendingView[MODE_COUNT];
+static unsigned char pendingViewValid[MODE_COUNT];
+static unsigned char pendingViewUsesMixedRing[MODE_COUNT];
 
 static int libViewIsDeviceMode(int mode)
 {
@@ -137,32 +140,61 @@ int libViewRingUsable(int mode)
     return mode >= 0 && mode < MODE_COUNT && libViewRingSize(mode) > 1;
 }
 
-void libViewAdvance(int mode)
+int libViewStageAdvance(int mode)
 {
     int cur;
 
-    if (!libViewRingUsable(mode))
-        return;
+    if (!libViewRingUsable(mode) || pendingViewValid[mode])
+        return 0;
 
+    cur = libViewActive(mode);
     if (mode == FAV_MODE) {
         // Explicit order: All -> PS2 -> PS1 -> ELF -> All.
-        cur = retainedView[mode];
-        retainedView[mode] = (cur == LIB_VIEW_ALL) ? LIB_VIEW_ISO :
-                             (cur == LIB_VIEW_ISO) ? LIB_VIEW_PS1 :
-                             (cur == LIB_VIEW_PS1) ? LIB_VIEW_ELF :
+        pendingView[mode] = (cur == LIB_VIEW_ALL) ? LIB_VIEW_ISO :
+                            (cur == LIB_VIEW_ISO) ? LIB_VIEW_PS1 :
+                            (cur == LIB_VIEW_PS1) ? LIB_VIEW_ELF :
                                                     LIB_VIEW_ALL;
     } else if (mode == APP_MODE) {
-        retainedView[mode] = retainedView[mode] == LIB_VIEW_PS1_ELF ? LIB_VIEW_ISO : LIB_VIEW_PS1_ELF;
+        pendingView[mode] = cur == LIB_VIEW_PS1_ELF ? LIB_VIEW_ISO : LIB_VIEW_PS1_ELF;
     } else if (gDefaultGameView == GAME_VIEW_MIXED) {
-        cur = libViewMixedActive(mode);
-        mixedView[mode] = (cur == LIB_VIEW_MIXED) ? LIB_VIEW_ISO :
-                          (cur == LIB_VIEW_ISO)   ? LIB_VIEW_PS1 :
-                                                   LIB_VIEW_MIXED;
+        pendingView[mode] = (cur == LIB_VIEW_MIXED) ? LIB_VIEW_ISO :
+                            (cur == LIB_VIEW_ISO)   ? LIB_VIEW_PS1 :
+                                                      LIB_VIEW_MIXED;
     } else {
-        retainedView[mode] = retainedView[mode] == LIB_VIEW_PS1 ? LIB_VIEW_ISO : LIB_VIEW_PS1;
+        pendingView[mode] = cur == LIB_VIEW_PS1 ? LIB_VIEW_ISO : LIB_VIEW_PS1;
     }
 
+    pendingViewUsesMixedRing[mode] = mode != FAV_MODE && mode != APP_MODE && gDefaultGameView == GAME_VIEW_MIXED;
+    pendingViewValid[mode] = 1;
     libDirty[mode] = 1;
+    return 1;
+}
+
+int libViewPending(int mode)
+{
+    return mode >= 0 && mode < MODE_COUNT && pendingViewValid[mode];
+}
+
+int libViewPendingTarget(int mode)
+{
+    return libViewPending(mode) ? pendingView[mode] : libViewActive(mode);
+}
+
+void libViewCommitPending(int mode)
+{
+    if (!libViewPending(mode))
+        return;
+
+    if (pendingViewUsesMixedRing[mode])
+        mixedView[mode] = pendingView[mode];
+    else
+        retainedView[mode] = pendingView[mode];
+}
+
+void libViewFinishPending(int mode)
+{
+    if (mode >= 0 && mode < MODE_COUNT)
+        pendingViewValid[mode] = 0;
 }
 
 int libViewConsumeDirty(int mode)

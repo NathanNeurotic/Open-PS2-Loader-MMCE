@@ -1266,7 +1266,7 @@ static int hddGetGameCount(item_list_t *itemList)
     int view = libListViewActive(itemList);
     return view == LIB_VIEW_MIXED ? (int)hddGames.count + hddVcdGameCount :
            view == LIB_VIEW_PS1   ? hddVcdGameCount :
-                                   (int)hddGames.count;
+                                    (int)hddGames.count;
 }
 
 static int hddGetItemView(item_list_t *itemList, int id)
@@ -1282,13 +1282,11 @@ static int hddGetSourceId(item_list_t *itemList, int id)
     return libListViewActive(itemList) == LIB_VIEW_MIXED && id >= (int)hddGames.count ? id - (int)hddGames.count : id;
 }
 
-// Toggle-window guard (Codex/Fable audit), mirroring mmceActiveGame. HDD_MODE has a VCD stop in its ring, so the L3
-// toggle changes the active view SYNCHRONOUSLY ahead of the DEFERRED per-__.POPS pfs rebuild -- a WIDER window
-// than MMCE. During it an OLD-view id can index the freshly-switched other array (hddGames.games is {NULL,0}
-// on a PS1-only HDD; hddVcdGames NULL/shorter if that view never scanned) -> NULL/OOB deref + crash. Resolve
-// every id through these: an out-of-range id returns a static empty entry so a stale READ is safe empty data
-// and LAUNCH/delete/rename early-return on the sentinel. HDD needs TWO resolvers -- ISO is hdl_game_info_t,
-// VCD is base_game_info_t.
+// Split-store guard (Codex/Fable audit), mirroring mmceActiveGame. L3 stages its destination until
+// the old submenu is cleared, but either backing array can still be NULL/shorter when never scanned,
+// partially refreshed, or torn down. Resolve every id through these: an out-of-range id returns a
+// static empty entry so a stale read is safe empty data and launch/delete/rename early-return on the
+// sentinel. HDD needs TWO resolvers -- ISO is hdl_game_info_t, VCD is base_game_info_t.
 static base_game_info_t hddEmptyVcd = {.extension = ".VCD"};
 static hdl_game_info_t hddEmptyHdl = {0};
 static base_game_info_t *hddActiveVcd(int id)
@@ -1338,7 +1336,7 @@ static void hddDeleteGame(item_list_t *itemList, int id)
     id = hddGetSourceId(itemList, id);
     hdl_game_info_t *game = hddActiveHdl(id);
     if (game == &hddEmptyHdl)
-        return; // stale id in the VCD->ISO toggle window -> don't delete a wrong/OOB HDL partition
+        return; // stale/invalid id -> don't delete a wrong/OOB HDL partition
     hddDeleteHDLGame(game);
     hddForceUpdate = 1;
 }
@@ -1654,7 +1652,7 @@ static void hddRenameGame(item_list_t *itemList, int id, char *newName)
     id = hddGetSourceId(itemList, id);
     hdl_game_info_t *game = hddActiveHdl(id);
     if (game == &hddEmptyHdl)
-        return; // stale id in the VCD->ISO toggle window -> don't rename a wrong/OOB HDL partition
+        return; // stale/invalid id -> don't rename a wrong/OOB HDL partition
     strcpy(game->name, newName);
     hddSetHDLGameInfo(game);
     hddForceUpdate = 1;
@@ -1995,7 +1993,7 @@ void hddLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
         base_game_info_t *vcd = hddActiveVcd(id);
         if (vcd == &hddEmptyVcd) {
             guiUnlock();
-            return; // stale id in the L3 toggle window -> nothing to launch
+            return; // stale/invalid id -> nothing to launch
         }
         snprintf(vcdName, sizeof(vcdName), "%s", vcd->name);
         snprintf(vcdPart, sizeof(vcdPart), "%s", hddVcdParts[id]);
@@ -2012,7 +2010,7 @@ void hddLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
     if (gAutoLaunchGame == NULL) {
         game = hddActiveHdl(id);
         if (game == &hddEmptyHdl)
-            return; // stale id in the L3 toggle window -> nothing to launch
+            return; // stale/invalid id -> nothing to launch
     } else
         game = gAutoLaunchGame;
 

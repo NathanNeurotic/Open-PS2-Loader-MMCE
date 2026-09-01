@@ -1622,6 +1622,9 @@ static void menuNavigateDown()
 
 void menuHandleInputMain()
 {
+    item_list_t *support = selected_item != NULL && selected_item->item != NULL ? selected_item->item->userdata : NULL;
+    int viewPending = support != NULL && libViewPending(support->mode);
+
     if (getKey(KEY_LEFT)) {
         menuNavigateLeft();
     } else if (getKey(KEY_RIGHT)) {
@@ -1631,19 +1634,24 @@ void menuHandleInputMain()
     } else if (getKey(KEY_DOWN)) {
         menuNavigateDown();
     } else if (getKeyOn(KEY_CROSS)) {
-        selected_item->item->execCross(selected_item->item);
+        if (!viewPending)
+            selected_item->item->execCross(selected_item->item);
     } else if (getKeyOn(KEY_TRIANGLE)) {
-        selected_item->item->execTriangle(selected_item->item);
+        if (!viewPending)
+            selected_item->item->execTriangle(selected_item->item);
     } else if (getKeyOn(KEY_CIRCLE)) {
-        selected_item->item->execCircle(selected_item->item);
+        if (!viewPending)
+            selected_item->item->execCircle(selected_item->item);
     } else if (getKeyOn(KEY_SQUARE)) {
-        selected_item->item->execSquare(selected_item->item);
+        if (!viewPending)
+            selected_item->item->execSquare(selected_item->item);
     } else if (getKeyOn(KEY_START)) {
         // reinit main menu - show/hide items valid in the active context
         menuInitMainMenu();
         guiSwitchScreen(GUI_SCREEN_MENU);
     } else if (getKeyOn(KEY_SELECT)) {
-        selected_item->item->refresh(selected_item->item);
+        if (!viewPending)
+            selected_item->item->refresh(selected_item->item);
     } else if (getKey(KEY_L1)) {
         menuPrevPage();
     } else if (getKey(KEY_R1)) {
@@ -1653,15 +1661,15 @@ void menuHandleInputMain()
     } else if (getKeyOn(KEY_R2)) { // end
         menuLastPage();
     } else if (getKeyOn(KEY_R3)) { // toggle favourite
-        if (selected_item->item->fav)
+        if (!viewPending && selected_item->item->fav)
             selected_item->item->fav(selected_item->item);
-    } else if (getKeyOn(KEY_L3)) { // toggle VCD view (disc list <-> POPS/*.VCD; item 12)
-        if (selected_item->item->toggleView)
+    } else if (getKeyOn(KEY_L3)) { // advance the current page's library-view ring
+        if (!viewPending && selected_item->item->toggleView)
             selected_item->item->toggleView(selected_item->item);
     }
 
     // Last Played Auto Start
-    if (RemainSecs < 0) {
+    if (RemainSecs < 0 && !viewPending) {
         DisableCron = 1; // Disable Counter
         if (gSelectButton == KEY_CIRCLE)
             selected_item->item->execCircle(selected_item->item);

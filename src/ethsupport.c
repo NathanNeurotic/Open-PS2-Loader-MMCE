@@ -697,7 +697,7 @@ static int ethUpdateGameList(item_list_t *itemList)
         return ethGameCount;
     return view == LIB_VIEW_MIXED ? ethGameCount + ethPs1GameCount :
            view == LIB_VIEW_PS1   ? ethPs1GameCount :
-                                   ethGameCount;
+                                    ethGameCount;
 }
 
 int ethResolveIsoFavourite(int id, const char *name, int *outId)
@@ -752,7 +752,7 @@ static int ethGetGameCount(item_list_t *itemList)
     view = libListViewActive(itemList);
     return view == LIB_VIEW_MIXED ? ethGameCount + ethPs1GameCount :
            view == LIB_VIEW_PS1   ? ethPs1GameCount :
-                                   ethGameCount;
+                                    ethGameCount;
 }
 
 static void *ethGetGame(item_list_t *itemList, int id)
