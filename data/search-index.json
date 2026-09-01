@@ -506,7 +506,7 @@
  {
   "title": "Favorites — Quick start",
   "cat": "features",
-  "text": "How to enable the Favorites tab in Game Sources, star a game with R3, and open the aggregated Favorites page.",
+  "text": "How to enable the Favorites tab in Device Settings, star a game with R3, and open the aggregated Favorites page.",
   "url": "favourites.html#quick-start"
  },
  {
@@ -522,9 +522,9 @@
   "url": "favourites.html#persistence"
  },
  {
-  "title": "Favorites — Game Sources option",
+  "title": "Favorites — Device Settings option",
   "cat": "features",
-  "text": "The Favorites Start Mode setting (Off / Manual / Auto) in Game Sources controls whether the tab is visible and whether R3 is active. Off is the default; R3 does nothing while Off.",
+  "text": "The Favorites Start Mode setting (Off / Manual / Auto) in Device Settings controls whether the tab is visible and whether R3 is active. Off is the default; R3 does nothing while Off.",
   "url": "favourites.html#device-settings"
  },
  {
