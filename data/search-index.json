@@ -1070,7 +1070,7 @@
  {
   "title": "Credits & Sources",
   "cat": "reference",
-  "text": "The people and projects RiptOPL is built on — from the ps2homebrew foundation and PS2SDK through the wider OPL family (rickgaiser, neutrino, sOPL, uOPL, wOPL, OPL DB, POPSLoader, RetroGEM ID, nhddl) to special thanks for Wolf3s, KrahJohlito, bbsan2k, saildot4k, Berion, Ifcaro, jimmikaelkael, and testers eliminator1403, lucaslmgv, AndrewBento, AcidReach, bodvenomz, and nuno6573.",
+  "text": "The people and projects RiptOPL is built on — from the ps2homebrew foundation and PS2SDK through the wider OPL family (rickgaiser, neutrino, sOPL, uOPL, wOPL, OPL DB, POPSLoader, RetroGEM ID, nhddl, Modulo-R1 and PS2-Launcher) to special thanks for Wolf3s, KrahJohlito, bbsan2k, saildot4k, Irfanlesnar, pcm720, Berion, Ifcaro, jimmikaelkael, and the real-hardware testers.",
   "url": "credits.html"
  },
  {
@@ -1082,13 +1082,13 @@
  {
   "title": "Credits: The OPL Family",
   "cat": "reference",
-  "text": "RiptOPL is a direct agglomeration of rickgaiser OPL, Neutrino, sOPL, uOPL (Wolf3s), wOPL (KrahJohlito), OPL Daily Builds, POPSLoader, OPL RetroGEM ID (CosmicScale), nhddl, and canonical OPL — table with per-project source links.",
+  "text": "RiptOPL is a direct agglomeration of rickgaiser OPL, Neutrino, sOPL, uOPL (Wolf3s), wOPL (KrahJohlito), OPL Daily Builds, POPSLoader, OPL RetroGEM ID (CosmicScale), nhddl, Modulo-R1, PS2-Launcher, and canonical OPL — table with per-project source links.",
   "url": "credits.html#opl-family"
  },
  {
   "title": "Credits: Special Thanks",
   "cat": "reference",
-  "text": "Individual thanks to Wolf3s & KrahJohlito (uOPL/wOPL — Neutrino launcher, Coverflow, Favorites), bbsan2k (MMCE protocol), saildot4k (BDMA-ATA exFAT HDD), the testers eliminator1403, lucaslmgv, AndrewBento, AcidReach, bodvenomz and nuno6573 (testing & feedback), Berion (artwork & theme design), and Ifcaro & jimmikaelkael (original OPL authors).",
+  "text": "Individual thanks to Wolf3s & KrahJohlito (uOPL/wOPL — Neutrino launcher, Coverflow, Favorites), bbsan2k (MMCE protocol), saildot4k (BDMA-ATA exFAT HDD), Irfanlesnar (PS2-Launcher), pcm720 (udpfsd and nhddl), the real-hardware testers, Berion (artwork and theme design), and Ifcaro & jimmikaelkael (original OPL authors).",
   "url": "credits.html#special-thanks"
  },
  {
@@ -1102,6 +1102,12 @@
   "cat": "reference",
   "text": "PS1 support runs through Sony's POPS emulator and the open-source POPSTARTER launcher; POPS is not distributed by RiptOPL. Deep PS1/POPSTARTER reference lives at the sister POPStarter docs site.",
   "url": "credits.html#ps1-note"
+ },
+ {
+  "title": "Credits: Companion Tools",
+  "cat": "reference",
+  "text": "Maintained companion tools linked from the release: PS2-Servers for SMBv1, UDPFS and UDPBD; udpfs-server for Android UDPFS hosting; OrbitPS2 Manager for library management; OPL PS1 AIO Converter GUI for VCD conversion and installation including iLink; and PS2RD CHT Manager for cheat files.",
+  "url": "credits.html#companion-tools"
  },
  {
   "title": "Credits: License",
