@@ -74,7 +74,7 @@
  {
   "title": "Config file: settings_riptopl.cfg",
   "cat": "start",
-  "text": "RiptOPL saves to settings_riptopl.cfg so it coexists with OPL and wOPL on the same memory card without collision; art, themes, VMC, and favourites.bin remain shared.",
+  "text": "RiptOPL saves to settings_riptopl.cfg so it coexists with OPL and wOPL on the same memory card without collision; art, themes, VMC, and the compatibility file favourites.bin remain shared.",
   "url": "install.html#config-file"
  },
  {
@@ -254,7 +254,7 @@
  {
   "title": "PS1 games on APA/PFS",
   "cat": "devices",
-  "text": "PS1 VCD files on an APA/PFS HDD live in dedicated __.POPS, __.POPS0–__.POPS9 APA partitions. Press L3 on the HDD tab to switch to the PS1 view.",
+  "text": "APA/PFS PS1 support uses __.POPS through __.POPS9 for POPSTARTER and self-contained __.EMBER through __.EMBER9 for Ember. Ember-only drives are scanned and launch from a live read/write PFS mount.",
   "url": "hdd.html#apa-ps1"
  },
  {
@@ -291,6 +291,12 @@
   "title": "The Network rows",
   "cat": "devices",
   "text": "Device Settings carries four network rows: Network Protocol is the start mode (Off / Manual / Auto, default Off); Protocol picks SMB, UDPFS or UDPBD; SMB Version picks SMBv1 (default) or SMB2; Access picks Files or IMG. Because the PS2 has a single NIC, choosing one protocol automatically excludes the others.",
+  "url": "network-boot.html#protocols"
+ },
+ {
+  "title": "PS1 over UDPFS / UDPBD — Ember only",
+  "cat": "devices",
+  "text": "UDPFS and UDPBD expose a PS1 page that lists Ember folders only. Ember inherits the live network mount; POPSTARTER resets the IOP and cannot restore either transport, so VCD rows are deliberately excluded.",
   "url": "network-boot.html#protocols"
  },
  {
@@ -344,25 +350,25 @@
  {
   "title": "PS1 Games (VCD)",
   "cat": "ps1",
-  "text": "How to play PS1 games in RiptOPL via the PS1 view (L3 toggle), POPSTARTER launcher, file layout for every device, and the BDMA exFAT equip.",
+  "text": "How to play PS1 games in RiptOPL through POPSTARTER or Ember, choose Both, Mixed, PS2, or PS1 display, lay out every device, and equip external BDMA files.",
   "url": "ps1-vcd.html"
  },
  {
-  "title": "The PS1 view (press L3)",
+  "title": "PS2 and PS1 device libraries",
   "cat": "ps1",
-  "text": "Press L3 on any device page to switch between its PS2 disc list and its PS1 VCD list. It is a view toggle on the same page, not a separate tab.",
+  "text": "PS2/PS1 Game Display offers separate PS2 and PS1 views via Both (L3), a combined Mixed list whose L3 ring cycles Mixed, PS2, and PS1, or a locked PS2/PS1 library.",
   "url": "ps1-vcd.html#vcd-view"
  },
  {
-  "title": "Locking the view — Default game view",
+  "title": "PS2/PS1 Game Display",
   "cat": "ps1",
-  "text": "Settings → Interface → Default game view locks every device page to discs (ISO), VCDs (VCD), or keeps both accessible via L3 (Both, the default).",
+  "text": "The shared Interface and PS Emulation picker offers Both (L3), Mixed, PS2, and PS1. Locked PS2/PS1 modes make L3 fully inert. APPS and Favorites are independent.",
   "url": "ps1-vcd.html#default-game-view"
  },
  {
   "title": "How PS1 games launch (POPSTARTER only)",
   "cat": "ps1",
-  "text": "VCD titles always boot through POPSTARTER.ELF. The Loader Core selector, GSM, Cheats, and PADEMU options are inert for PS1 games.",
+  "text": "VCD titles always boot through POPSTARTER.ELF. iLink uses the normal local-device selector mass:/POPS/XX.<game>.ELF, with the same XX. rules as USB and MX4SIO. The Loader Core selector, GSM, Cheats, and PADEMU options are inert for PS1 games.",
   "url": "ps1-vcd.html#launch"
  },
  {
@@ -374,7 +380,7 @@
  {
   "title": "exFAT support — the BDMA equip",
   "cat": "ps1",
-  "text": "To boot PS1 games from an exFAT drive, RiptOPL copies the correct BDMAssault modules to mc?:/POPSTARTER/. VCD BDMA Apply on Launch (Settings → PS Emulation Settings) ships On and equips them automatically before each launch; turn it Off to use the BDMA Mode and BDMA Source pickers yourself.",
+  "text": "RiptOPL copies the correct loose BDMAssault pair from the source device's POPS/ folder to mc?:/POPSTARTER/. iLink uses usbd.irx.ilink + usbhdfsd.irx.ilink, with .ilink removed on the card. No BDMA pair is embedded. Apply on Launch equips automatically; turn it Off to use the Mode and Source pickers.",
   "url": "ps1-vcd.html#bdma"
  },
  {
@@ -422,7 +428,7 @@
  {
   "title": "Neutrino Device picker",
   "cat": "neutrino",
-  "text": "Pick the device TYPE that holds neutrino.elf: Auto / Memory Card / USB / MX4SIO / MMCE / HDD (exFAT) / HDD (APA) / Game's Device. OPL probes <root>:/neutrino/neutrino.elf on the chosen device type; Auto probes the active game device first, then a legacy custom path, then mc0/mc1. Game's Device probes only the game's own device — a miss aborts the launch.",
+  "text": "Pick the device TYPE that holds neutrino.elf: Auto / Memory Card / USB / MX4SIO / MMCE / HDD (exFAT) / HDD (APA) / Game's Device / iLink. OPL probes <root>:/neutrino/neutrino.elf on the chosen device type; Auto probes the active game device first, then a legacy custom path, then mc0/mc1. Game's Device probes only the game's own device — a miss aborts the launch.",
   "url": "neutrino.html#neutrino-device"
  },
  {
@@ -492,39 +498,45 @@
   "url": "coverflow.html#cfg-reference"
  },
  {
-  "title": "Favourites",
+  "title": "Favorites",
   "cat": "features",
-  "text": "Press R3 on any game to star it; a virtual Favourites page gathers starred titles from every connected device into one list. Stored in a shared favourites.bin that imports an existing uOPL or wOPL favourites file automatically.",
+  "text": "Press R3 on any game to star it; a virtual Favorites page gathers titles from every connected device. Its independent L3 ring always cycles All in One, PS2, PS1, and ELF. Stored in the shared compatibility file favourites.bin.",
   "url": "favourites.html"
  },
  {
-  "title": "Favourites — Quick start",
+  "title": "Favorites — Quick start",
   "cat": "features",
-  "text": "How to enable the Favourites tab in Device Settings, star a game with R3, and open the aggregated Favourites page.",
+  "text": "How to enable the Favorites tab in Game Sources, star a game with R3, and open the aggregated Favorites page.",
   "url": "favourites.html#quick-start"
  },
  {
-  "title": "Favourites — How it works",
+  "title": "Favorites — How it works",
   "cat": "features",
-  "text": "The Favourites page is a live proxy to each game's source device — launch, cover art, per-game settings, and Options all forward to the original device list. Starred titles on absent devices are hidden but not lost.",
+  "text": "The Favorites page is a live proxy to each game's source device — launch, cover art, per-game settings, and Options all forward to the original device list. Starred titles on absent devices are hidden but not lost.",
   "url": "favourites.html#how-it-works"
  },
  {
-  "title": "Favourites — Persistence and compatibility",
+  "title": "Favorites — Persistence and compatibility",
   "cat": "features",
-  "text": "Favourites are stored in favourites.bin in the shared OPL config directory. RiptOPL automatically imports an existing uOPL or wOPL favourites.bin as a one-way carry-over. The OFAV format holds up to 512 entries with a 255-character title limit.",
+  "text": "Favorites are stored in favourites.bin in the shared OPL config directory. RiptOPL automatically imports an existing uOPL or wOPL file as a one-way carry-over. OFAV v3 records ISO, VCD, CUE, and ELF kinds.",
   "url": "favourites.html#persistence"
  },
  {
-  "title": "Favourites — Device Settings options",
+  "title": "Favorites — Game Sources option",
   "cat": "features",
-  "text": "The Favourites Start Mode setting (Off / Manual / Auto) in Device Settings controls whether the tab is visible and whether R3 is active. Off is the default; R3 does nothing while Off.",
+  "text": "The Favorites Start Mode setting (Off / Manual / Auto) in Game Sources controls whether the tab is visible and whether R3 is active. Off is the default; R3 does nothing while Off.",
   "url": "favourites.html#device-settings"
  },
  {
-  "title": "Favourites — Theme support",
+  "title": "Favorites — Four L3 views",
   "cat": "features",
-  "text": "The Favourites page uses the standard game-list theme element family. App favourites use the apps element family for correct art geometry. The fav and fav_mark texture slots are overridable in custom themes.",
+  "text": "Favorites always cycles All in One, PS2, PS1, and ELF independently; the global PS2/PS1 Game Display setting does not pin or disable it.",
+  "url": "favourites.html#views"
+ },
+ {
+  "title": "Favorites — Theme support",
+  "cat": "features",
+  "text": "The Favorites page uses the standard game-list theme element family. App favorites use the apps element family for correct art geometry. The fav and fav_mark texture slots are overridable in custom themes.",
   "url": "favourites.html#theme-support"
  },
  {
@@ -768,9 +780,15 @@
   "url": "themes.html#regular-opl-compat"
  },
  {
-  "title": "Settings Reference",
+ "title": "Settings Reference",
+ "cat": "reference",
+ "text": "Every settings menu and option in RiptOPL, grouped by screen: General Settings, Device Settings, PS Emulation Settings, Interface, Audio, Controller, OSD, Parental Lock, and Network.",
+ "url": "settings.html"
+ },
+ {
+  "title": "Page return retention",
   "cat": "reference",
-  "text": "Every settings menu and option in RiptOPL, grouped by screen: General Settings, Device Settings, Interface, Audio, Controller, OSD, Parental Lock, and Network.",
+  "text": "Opening Start or Settings remembers the game or source page where you paused. Closing the menu returns to that same page when it is still available, rather than falling back to USB; only a removed or disabled source needs a fallback.",
   "url": "settings.html"
  },
  {
@@ -780,15 +798,21 @@
   "url": "settings.html#general-settings"
  },
  {
-  "title": "Device Settings",
+ "title": "Device Settings",
+ "cat": "reference",
+ "text": "Strictly device selection: Default Menu, BDM/HDD (APA)/Applications/Favorites/MMCE start modes, per-device enable toggles, and the four network rows. Prefix paths and cache sizes are on General Settings.",
+ "url": "settings.html#device-settings"
+ },
+ {
+  "title": "PS Emulation Settings",
   "cat": "reference",
-  "text": "Strictly device selection: Default Menu, BDM/HDD (APA)/Applications/Favourites/MMCE start modes, per-device enable toggles (USB/iLink/MX4SIO/HDD GPT-MBR), and the four network rows — Network Protocol (Off/Manual/Auto), Protocol (SMB/UDPFS/UDPBD), SMB Version (SMBv1/SMB2) and Access (Files/IMG). Prefix paths and cache sizes are on General Settings; the MMCE tuning rows have their own MMCE Settings page.",
-  "url": "settings.html#device-settings"
+  "text": "PS1 and POPSTARTER controls, including the shared PS2/PS1 Game Display picker (Both, Mixed, PS2, PS1), Ember Display Mode, external BDMA source/mode including iLink, and POPSTARTER path.",
+  "url": "settings.html#vcd-settings"
  },
  {
   "title": "Interface",
   "cat": "reference",
-  "text": "Theme, language, cover art, Default game view (Both/ISO/VCD), widescreen, video mode, screen offset, color pickers, GameID barcode, and Coverflow Settings sub-screen.",
+  "text": "Theme, language, cover art, PS2/PS1 Game Display (Both, Mixed, PS2, PS1), and Applications Display (Mixed or Apps/PS1ELF), plus video, colors, GameID barcode, and Coverflow settings.",
   "url": "settings.html#display-settings"
  },
  {
@@ -824,7 +848,7 @@
  {
   "title": "Network Settings",
   "cat": "reference",
-  "text": "PS2 IP address (Static/DHCP), subnet, gateway, DNS, Ethernet link mode, SMB server address/share/credentials, and Write POPSTARTER Network Config.",
+  "text": "PS2 IP, subnet, gateway, DNS, link mode, SMB server/share/credentials, and POPSTARTER network config. OK applies and reconnects immediately; Select/Refresh retries a failed page.",
   "url": "settings.html#network-settings"
  },
  {
@@ -962,7 +986,7 @@
  {
   "title": "Releases — What the rolling release contains",
   "cat": "reference",
-  "text": "Each rolling build publishes the installable package zip (two SDK-labelled loader folders, bundled Neutrino, POPSTARTER/POPS, and PS2-Servers.url), bare ELFs, ready-made -ds5 DualSense ELFs, VARIANTS and DEBUG zips, a source snapshot, a separate SHA256SUMS.txt asset, and languages.",
+  "text": "Each rolling build publishes an installable package zip with the loader folders, bundled Neutrino and Ember, one canonical POPS/ folder, companion-tool shortcuts, bare ELFs, VARIANTS and DEBUG zips, a source snapshot, checksums, and languages. Every BDMA pair stays loose in POPS/, including the iLink pair; none is embedded.",
   "url": "releases.html#rolling-assets"
  },
  {
@@ -1022,13 +1046,13 @@
  {
   "title": "Troubleshooting: BDMA — module files not found on source device",
   "cat": "reference",
-  "text": "The BDMA driver files for exFAT PS1 support must be placed in a POPS/ folder at the root of the BDMA Source device; the USB source scans the entire mass namespace including the internal exFAT HDD.",
+  "text": "The loose BDMA driver pair must be placed in POPS/ at the root of the selected Source device. Sources are driver-specific: USB, MX4SIO, iLink, MMCE, and internal ATA do not scan one another. For iLink use usbd.irx.ilink + usbhdfsd.irx.ilink; RiptOPL removes the suffix only on the memory-card copy.",
   "url": "troubleshooting.html#bdma-module-not-found"
  },
  {
   "title": "Troubleshooting: PS1 / VCD list not showing after a settings change",
   "cat": "reference",
-  "text": "Press L3 on the device page to toggle and refresh the PS1 view; confirm Default game view is not locked to ISO, and that VCD files are in the POPS/ folder at the device root.",
+  "text": "Check PS2/PS1 Game Display: Both (L3) switches separate PS2 and PS1 pages, Mixed cycles Mixed, PS2, and PS1, while PS2 or PS1 locks the page and completely disables L3. VCD files belong in POPS/ at the device root.",
   "url": "troubleshooting.html#vcd-list-not-showing"
  },
  {
@@ -1040,7 +1064,7 @@
  {
   "title": "PS1/VCD list is empty (works elsewhere)",
   "cat": "reference",
-  "text": "Triage ladder: device enables (APA vs exFAT auto-reconcile toast), PS2 ISOs prove the exFAT layer (byte-identical to wOPL), L3 + Default game view, VCDs scan from device-root /POPS not the games prefix, 160-char and POPSTARTER.VCD name rules, post-select failures are POPSTARTER-side.",
+  "text": "Triage ladder: confirm device enablement, choose a PS2/PS1 Game Display mode that includes PS1, scan VCDs from device-root /POPS rather than the games prefix, enforce the 160-character and POPSTARTER.VCD name rules, then treat post-selection failures as POPSTARTER-side.",
   "url": "troubleshooting.html#vcd-list-empty"
  },
  {
@@ -1064,7 +1088,7 @@
  {
   "title": "Credits: Special Thanks",
   "cat": "reference",
-  "text": "Individual thanks to Wolf3s & KrahJohlito (uOPL/wOPL — Neutrino launcher, Coverflow, Favourites), bbsan2k (MMCE protocol), saildot4k (BDMA-ATA exFAT HDD), the testers eliminator1403, lucaslmgv, AndrewBento, AcidReach, bodvenomz and nuno6573 (testing & feedback), Berion (artwork & theme design), and Ifcaro & jimmikaelkael (original OPL authors).",
+  "text": "Individual thanks to Wolf3s & KrahJohlito (uOPL/wOPL — Neutrino launcher, Coverflow, Favorites), bbsan2k (MMCE protocol), saildot4k (BDMA-ATA exFAT HDD), the testers eliminator1403, lucaslmgv, AndrewBento, AcidReach, bodvenomz and nuno6573 (testing & feedback), Berion (artwork & theme design), and Ifcaro & jimmikaelkael (original OPL authors).",
   "url": "credits.html#special-thanks"
  },
  {

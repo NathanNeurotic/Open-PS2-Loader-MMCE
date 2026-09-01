@@ -32,7 +32,7 @@
     <a href="ps1-vcd.html"><span class="em">💿</span>PS1 Games</a>
     <a href="neutrino.html"><span class="em">⚛️</span>Neutrino Core</a>
     <a href="coverflow.html"><span class="em">🎴</span>Coverflow</a>
-    <a href="favourites.html"><span class="em">⭐</span>Favourites</a>
+    <a href="favourites.html"><span class="em">⭐</span>Favorites</a>
     <a href="per-game-settings.html"><span class="em">🎚️</span>Per-game Settings</a>
     <a href="vmc.html"><span class="em">💾</span>VMC</a>
     <a href="cheats.html"><span class="em">🎮</span>Cheats</a>
@@ -149,10 +149,15 @@ direct APA partition editing can corrupt the drive if done incorrectly.</p>
 </details>
 
 <h3 id="apa-ps1">PS1 games on APA/PFS</h3>
-<p>PS1 <code>*.VCD</code> files on an APA/PFS HDD live in dedicated <b><code>__.POPS</code></b> partitions (named
-<code>__.POPS</code>, <code>__.POPS0</code> … <code>__.POPS9</code>). Each partition holds its VCD files at the
-partition root. Press <b>L3</b> on the HDD tab to switch to the PS1 view and see them listed. See
-<a href="ps1-vcd.html">PS1 Games (VCD)</a> for the full VCD workflow.</p>
+<p>POPSTARTER <code>*.VCD</code> files on an APA/PFS HDD live in dedicated <b><code>__.POPS</code></b>
+partitions (named <code>__.POPS</code>, <code>__.POPS0</code> … <code>__.POPS9</code>). Each partition
+holds its VCD files at the partition root.</p>
+<p>Ember uses a separate exact namespace: <b><code>__.EMBER</code></b> or
+<code>__.EMBER0</code> … <code>__.EMBER9</code>. Each is self-contained and holds
+<code>EMBER/ember.elf</code>, <code>EMBER/bios.bin</code>, and <code>EMBER/games/</code>. RiptOPL scans
+these partitions even when the drive has no POPSTARTER partitions, mounts them on <code>pfs1:</code>
+for listing, then remounts the selected one read/write on <code>pfs0:</code> and hands that live mount
+to Ember. See <a href="ps1-vcd.html">PS1 Games</a> for the display-mode and launch workflow.</p>
 
 <h2 id="exfat-bdm">exFAT via Block Device Manager (BDMA)</h2>
 <p>RiptOPL can also treat the internal HDD as a plain exFAT mass-storage device, mounted through the same
@@ -224,7 +229,8 @@ In <code>conf_apps.cfg</code>, use <code>mass:</code> as the device prefix (the 
 
 <h3 id="exfat-ps1">PS1 games on exFAT (BDMA equip)</h3>
 <p>Put your <code>*.VCD</code> files in the drive's <code>POPS/</code> folder alongside
-<code>POPSTARTER.ELF</code>. Press <b>L3</b> on the HDD Games tab to switch to the PS1 view.</p>
+<code>POPSTARTER.ELF</code>. Use <b>PS2/PS1 Game Display</b> to show the PS1 library separately,
+combined with PS2 rows, or pinned by itself.</p>
 <p>POPSTARTER's stock driver only reads FAT32, so booting a PS1 game from the exFAT HDD needs the
 <b>HDD (exFAT)</b> BDMA driver modules equipped. RiptOPL does this <b>automatically by default</b>: the
 <b>VCD BDMA Apply on Launch</b> toggle (in <b>Settings &rarr; PS Emulation Settings</b>) ships <b>On</b>, and each time you launch
@@ -248,7 +254,7 @@ including the BDMA Source setting.</p>
 <tr><td>Install method</td><td>HDL-Dump via NBD server</td><td>Copy files from PC (no tools)</td></tr>
 <tr><td>PS2 game format</td><td>HDLoader partitions</td><td>ISO / ZSO in <code>DVD/</code> or <code>CD/</code></td></tr>
 <tr><td>OPL data location</td><td>Standard folders at the OPL partition root (<code>pfs0:</code>)</td><td>Standard folders at drive root</td></tr>
-<tr><td>PS1 VCD support</td><td><code>__.POPS*</code> APA partitions</td><td><code>POPS/</code> folder + BDMA equip</td></tr>
+<tr><td>PS1 support</td><td><code>__.POPS*</code> (POPSTARTER) and <code>__.EMBER*</code> (Ember) APA partitions</td><td><code>POPS/</code> + BDMA equip, and/or <code>EMBER/</code></td></tr>
 <tr><td>Fragmentation risk</td><td>None (partition-based)</td><td>Yes — add files one at a time</td></tr>
 <tr><td>Tool ecosystem</td><td>HDL-Dump, pfs-shell, uLaunchELF</td><td>Any PC file manager</td></tr>
 <tr><td>Enable in RiptOPL</td><td>Device Settings → HDD (APA) Start Mode</td><td>Device Settings → HDD (GPT/MBR)</td></tr>

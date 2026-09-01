@@ -32,7 +32,7 @@
     <a href="ps1-vcd.html"><span class="em">💿</span>PS1 Games</a>
     <a href="neutrino.html"><span class="em">⚛️</span>Neutrino Core</a>
     <a href="coverflow.html"><span class="em">🎴</span>Coverflow</a>
-    <a href="favourites.html"><span class="em">⭐</span>Favourites</a>
+    <a href="favourites.html"><span class="em">⭐</span>Favorites</a>
     <a href="per-game-settings.html"><span class="em">🎚️</span>Per-game Settings</a>
     <a href="vmc.html"><span class="em">💾</span>VMC</a>
     <a href="cheats.html"><span class="em">🎮</span>Cheats</a>
@@ -53,10 +53,10 @@
 <p><b><a href="https://github.com/NathanNeurotic/PS2-Servers">PS2-Servers</a></b> by <b><a href="https://github.com/NathanNeurotic">Ripto</a></b> — all-in-one PC server launcher for <b>SMBv1, UDPFS and UDPBD</b>.<br>
 <b><a href="https://github.com/YouKnow-sys/udpfs-server">udpfs-server</a></b> by <b><a href="https://github.com/YouKnow-sys">YouKnow-sys</a></b> — the same idea from a phone: an <b>Android</b> app that shares folders and disk images to the PS2 over <b>UDPFS</b>, found by broadcast so there is no server address to type in on the console. Built on <a href="https://github.com/pcm720/udpfsd">udpfsd</a> by pcm720; MIT licensed.<br>
 <b><a href="https://github.com/Luden02/OrbitPS2-Manager">OrbitPS2 Manager</a></b> by <b><a href="https://github.com/Luden02">Luden</a></b> — cross-platform PC library manager for importing discs, artwork/screenshots, ZSO compression, per-game settings and VMC management.<br>
-<b><a href="https://github.com/shaanhomebrew-cloud/OPL-PS1-AIO-Converter-GUI">OPL PS1 AIO Converter GUI</a></b> by <b><a href="https://github.com/shaanhomebrew-cloud">shaan</a></b> — Windows all-in-one PS1/POPStarter preparation tool for BIN/CUE → VCD conversion and installation to USB, MX4SIO, MMCE, exFAT HDD, SMB and APA internal HDD.<br>
+<b><a href="https://github.com/shaanhomebrew-cloud/OPL-PS1-AIO-Converter-GUI">OPL PS1 AIO Converter GUI</a></b> by <b><a href="https://github.com/shaanhomebrew-cloud">shaan</a></b> — Windows all-in-one PS1/POPStarter preparation tool for BIN/CUE → VCD conversion and installation to USB, MX4SIO, MMCE, iLink, exFAT HDD, SMB and APA internal HDD.<br>
 <b><a href="https://github.com/TheRealNextria/PS2RD-CHT-Manager">PS2RD CHT Manager</a></b> by <b><a href="https://github.com/TheRealNextria">TheRealNextria</a></b> — PC manager for the PS2RD <code>.cht</code> cheat files RiptOPL reads from your device's <code>CHT</code> folder.<br>
 <b><a href="https://github.com/Gageformer/Ember">Ember</a></b> by <b><a href="https://github.com/Gageformer">Gageformer</a></b> — a PS1 emulator running natively on the PS2, used as RiptOPL's second PS1 core alongside POPSTARTER. Ships as an <code>EMBER/</code> folder inside the release package, bundled unmodified with permission under the Ember Public Beta Testing Licence (<code>EMBER/LICENSE-BETA.txt</code>); <a href="https://github.com/Gageformer/Ember/releases">releases</a>.<br>
-<b><a href="https://www.psx-place.com/resources/popstarter.683/">POPStarter</a></b> by <b>krHACKen</b> — a PS1 launcher built around Sony's native <b>POPS</b> emulator for the PS2, used as RiptOPL's primary PS1 core alongside Ember. POPStarter provides the compatibility and launch layer for running PS1 VCDs from USB, internal HDD, and SMB. The official POPStarter r13 package contains no Sony emulator binaries, libraries, or BIOS files; those components must be supplied separately by the user. Official download, documentation, compatibility information, and releases are maintained on <a href="https://www.psx-place.com/resources/popstarter.683/">PSX-Place</a>.<br>
+<b><a href="https://www.psx-place.com/resources/popstarter.683/">POPStarter</a></b> by <b>krHACKen</b> — a PS1 launcher built around Sony's native <b>POPS</b> emulator for the PS2, used as RiptOPL's primary PS1 core alongside Ember. POPStarter provides the compatibility and launch layer for running PS1 VCDs from USB, MX4SIO, MMCE, iLink, internal HDD, and SMB. The official POPStarter r13 package contains no Sony emulator binaries, libraries, or BIOS files; those components must be supplied separately by the user. Official download, documentation, compatibility information, and releases are maintained on <a href="https://www.psx-place.com/resources/popstarter.683/">PSX-Place</a>.<br>
 <b><a href="https://github.com/rickgaiser/neutrino">Neutrino</a></b> by <b><a href="https://github.com/rickgaiser">rickgaiser</a></b> — a small, fast, modular PS2 device emulator, and RiptOPL's second PS2 loader core alongside OPL's own. Ships as a ready-to-use <code>neutrino/</code> folder inside the release package (drag-and-drop to <code>mc?:/neutrino/</code>), under the <b>AFL-3.0</b> licence; <a href="https://github.com/rickgaiser/neutrino/releases">releases</a>.</p></section>
 <h1>Releases</h1>
 <p class="lead">RiptOPL ships on two channels: a continuously-rebuilt <b>rolling</b> pre-release (every
@@ -113,7 +113,9 @@ The headline item is a full installable package zip; all other assets are publis
   <td><b>The installable package.</b> Contains labeled SDK loader folders:
   <code>APP_RIPTOPL-PS2DEVLATESTSDK/RIPTOPL.ELF</code> (#1, built with the current <code>ps2dev/ps2dev:latest</code> SDK),
   and <code>APP_RIPTOPL-PS2DEVPINNEDSDK/RIPTOPL.ELF</code> (#2, built on a digest-pinned ps2dev SDK as the safe fallback),
-  the <code>POPSTARTER/</code> and <code>POPS/</code> folders for PS1 support, the bundled <code>neutrino/</code> folder, and a <code>PS2-Servers.url</code> shortcut.
+  one canonical <code>POPS/</code> folder for POPSTARTER support (every BDMA pair stays loose there,
+  including <code>usbd.irx.ilink</code> + <code>usbhdfsd.irx.ilink</code>; none is embedded),
+  the bundled <code>EMBER/</code> and <code>neutrino/</code> folders, and the companion-tool shortcuts.
   Extract it and use <code>APP_RIPTOPL-PS2DEVLATESTSDK/RIPTOPL.ELF</code>.</td>
 </tr>
 <tr>
@@ -259,8 +261,8 @@ copy to your memory card or USB drive root:</p>
   RIPTOPL.ELF          ← use this (ps2dev:latest, recommended)
 APP_RIPTOPL-PS2DEVPINNEDSDK/
   RIPTOPL.ELF          ← digest-pinned fallback if the recommended build misbehaves
-POPSTARTER/            ← SMB network stack + bdma_config.txt
-POPS/                  ← POPSTARTER.ELF and BDMA variants
+POPS/                  ← POPSTARTER.ELF and every loose BDMA variant (including .ilink)
+EMBER/                 ← official Ember core; add your own BIOS and games
 neutrino/              ← official Neutrino core (already extracted, drag-and-drop)
 PS2-Servers.url        ← link to the UDPFS / SMBv1 / UDPBD all-in-one PC launcher</pre>
 </div>

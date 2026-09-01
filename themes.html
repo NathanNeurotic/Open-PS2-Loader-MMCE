@@ -32,7 +32,7 @@
     <a href="ps1-vcd.html"><span class="em">💿</span>PS1 Games</a>
     <a href="neutrino.html"><span class="em">⚛️</span>Neutrino Core</a>
     <a href="coverflow.html"><span class="em">🎴</span>Coverflow</a>
-    <a href="favourites.html"><span class="em">⭐</span>Favourites</a>
+    <a href="favourites.html"><span class="em">⭐</span>Favorites</a>
     <a href="per-game-settings.html"><span class="em">🎚️</span>Per-game Settings</a>
     <a href="vmc.html"><span class="em">💾</span>VMC</a>
     <a href="cheats.html"><span class="em">🎮</span>Cheats</a>
@@ -106,7 +106,7 @@ chain — so you override only what differs and inherit the rest.</p>
 <tbody>
 <tr><td><code>main0…</code> / <code>info0…</code></td><td>The <b>games</b> list / info — the base layout</td><td><em>(none — this is the base)</em></td></tr>
 <tr><td><code>appsMain0…</code> / <code>appsInfo0…</code></td><td>The <b>apps</b> device list / info</td><td>→ <code>mainN</code> / <code>infoN</code></td></tr>
-<tr><td><code>favsMain0…</code> / <code>favsInfo0…</code></td><td>The <b>Favourites</b> tab list / info</td><td>→ <code>mainN</code> / <code>infoN</code></td></tr>
+<tr><td><code>favsMain0…</code> / <code>favsInfo0…</code></td><td>The <b>Favorites</b> tab list / info</td><td>→ <code>mainN</code> / <code>infoN</code></td></tr>
 <tr><td><code>vcdMain0…</code> / <code>vcdInfo0…</code></td><td>A device's <b>PS1 / VCD</b> view (toggle with <b>L3</b>)</td><td>main: → <code>appsMainN</code> → <code>mainN</code> · info: → <code>infoN</code></td></tr>
 </tbody>
 </table>
@@ -115,7 +115,7 @@ chain — so you override only what differs and inherit the rest.</p>
 <code>0…N</code> resolves every family against that chain. Practically:</p>
 <ul class="checklist">
 <li>A theme with <em>only</em> <code>main*</code>/<code>info*</code> blocks looks identical on the games, apps,
-Favourites and PS1 views — every family inherits the base.</li>
+Favorites and PS1 views — every family inherits the base.</li>
 <li>Define <code>appsMain5</code> to give the <b>apps</b> cover its own (square) box while games keep their
 portrait box; everything else still inherits <code>main*</code>.</li>
 <li>The <b>VCD/PS1</b> main family falls back to <code>appsMain</code> <em>before</em> <code>main</code>, so a
@@ -132,7 +132,7 @@ sequence. (A commented-out block counts as a deletion — re-number around it.)<
 <details class="deep"><summary>Why does a <code>Background</code> have to be element 0?</summary>
 The first element of a list <b>must</b> be the <code>Background</code> (the engine inserts a default plasma
 background if you forget). Likewise only the first <code>ItemsList</code> becomes the games list, the second the
-apps list, the third the Favourites list and the fourth the PS1/VCD list — so order matters beyond just draw
+apps list, the third the Favorites list and the fourth the PS1/VCD list — so order matters beyond just draw
 order. The PS1/VCD slot is optional: define only three lists and the PS1 view falls back to the games list,
 sharing its cover cache. Give it a fourth and it gets its own.</details>
 
@@ -221,7 +221,7 @@ work instead of hard-coding resolution-specific numbers.</p>
 <tr><td><code>AttributeImage</code> <b>(item)</b></td><td>A badge image chosen by a game attribute — see §6.</td></tr>
 <tr><td><code>MenuIcon</code></td><td>The current device/menu icon.</td></tr>
 <tr><td><code>MenuText</code></td><td>The current menu name, with left/right arrows when there are sibling menus.</td></tr>
-<tr><td><code>ItemsList</code> <b>(item)</b></td><td>The scrolling list of games/apps. First one = games list, second = apps, third = Favourites, fourth = PS1/VCD. Auto-added if omitted. A list with <code>devices=</code> is a per-device <em>override</em> and doesn't count toward those slots.</td></tr>
+<tr><td><code>ItemsList</code> <b>(item)</b></td><td>The scrolling list of games/apps. First one = games list, second = apps, third = Favorites, fourth = PS1/VCD. Auto-added if omitted. A list with <code>devices=</code> is a per-device <em>override</em> and doesn't count toward those slots.</td></tr>
 <tr><td><code>ItemIcon</code> <b>(item)</b></td><td>A per-item icon element (a <code>GameImage</code> bound to the <code>ICO</code> cache).</td></tr>
 <tr><td><code>ItemCover</code> <b>(item)</b></td><td>The selected item's cover (a <code>GameImage</code> bound to the <code>COV</code> cache), with optional overlay.</td></tr>
 <tr><td><code>ItemText</code> <b>(item)</b></td><td>The selected item's startup filename.</td></tr>
@@ -286,7 +286,7 @@ y=24</code></pre>
 <tr><td><code>udpbd</code></td><td>UDPBD network boot</td></tr>
 <tr><td><code>udpfs</code></td><td>UDPFS network boot</td></tr>
 <tr><td><code>app</code></td><td>The Apps tab</td></tr>
-<tr><td><code>fav</code></td><td>The Favourites tab</td></tr>
+<tr><td><code>fav</code></td><td>The Favorites tab</td></tr>
 <tr><td><code>bdm</code></td><td>The generic BDM page before its driver is identified (auto/manual start)</td></tr>
 </tbody>
 </table>
@@ -788,7 +788,7 @@ info15:
 <div class="grid">
 <a class="tile" href="coverflow.html"><span class="em">🎴</span><b>Coverflow</b><span>The default theme &amp; its live settings</span></a>
 <a class="tile" href="ps1-vcd.html"><span class="em">💿</span><b>PS1 / PS1 view</b><span>Where the vcdMain family is used</span></a>
-<a class="tile" href="favourites.html"><span class="em">⭐</span><b>Favourites</b><span>The favsMain/favsInfo family</span></a>
+<a class="tile" href="favourites.html"><span class="em">⭐</span><b>Favorites</b><span>The favsMain/favsInfo family</span></a>
 <a class="tile" href="settings.html"><span class="em">🔧</span><b>Settings Reference</b><span>Selecting &amp; applying a theme</span></a>
 <a class="tile" href="https://nathanneurotic.github.io/POPSLoader/"><span class="em">📚</span><b>POPStarter docs ↗</b><span>PS1 internals: config table, IGR, cheats, multi-disc</span></a>
 </div>

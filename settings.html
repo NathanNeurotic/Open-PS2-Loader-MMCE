@@ -32,7 +32,7 @@
     <a href="ps1-vcd.html"><span class="em">💿</span>PS1 Games</a>
     <a href="neutrino.html"><span class="em">⚛️</span>Neutrino Core</a>
     <a href="coverflow.html"><span class="em">🎴</span>Coverflow</a>
-    <a href="favourites.html"><span class="em">⭐</span>Favourites</a>
+    <a href="favourites.html"><span class="em">⭐</span>Favorites</a>
     <a href="per-game-settings.html"><span class="em">🎚️</span>Per-game Settings</a>
     <a href="vmc.html"><span class="em">💾</span>VMC</a>
     <a href="cheats.html"><span class="em">🎮</span>Cheats</a>
@@ -60,6 +60,11 @@ appears in the UI, with its values and a brief description. Options that open a 
 loaded from). RiptOPL uses its own file so it never collides with stock OPL or wOPL on the same card.
 Artwork, themes, VMC files and <code>favourites.bin</code> remain shared.</div>
 
+<div class="callout info"><div class="h">i Page return retention</div>
+Opening Start or Settings remembers the game/source page you paused on. Returning keeps that page
+selected while it is still visible; RiptOPL falls back to the first visible page only when the old
+page was disabled or removed.</div>
+
 <h2 id="general-settings">General Settings</h2>
 <p>Reached via <b>Settings &rarr; General Settings</b>. Contains launch-path helpers, global Neutrino
 configuration, housekeeping options, and — below their own splitters — the prefix paths and cache sizes.
@@ -73,7 +78,7 @@ The PS1/BDMA plumbing now lives on its own <a href="#vcd-settings">PS Emulation 
 <tr><td>IGR Path</td><td>text (path)</td><td>Path to a custom ELF that is loaded instead of returning to the browser on an in-game reset (IGR). Leave blank to return to the browser. Hint: <em>Boots custom ELF after an IGR.</em></td></tr>
 <tr><td>Default Loader Core</td><td>&lt;OPL&gt; / Neutrino</td><td>Global default core for games whose per-game <em>Loader Core</em> is set to <em>Default</em>. <em>&lt;OPL&gt;</em> (the default) is the native EE core; <em>Neutrino</em> chains the external <code>neutrino.elf</code>. A per-game choice always overrides this. See <a href="neutrino.html">Neutrino Core</a>.</td></tr>
 <tr><td>Neutrino Launch Args</td><td>[sub-screen]</td><td>Opens the structured global <a href="neutrino.html">Neutrino Args</a> editor. Flags set here apply to every game that uses the Neutrino core unless overridden per-game. Prefix a flag with <code>$</code> to disable it without deleting it.</td></tr>
-<tr><td>Neutrino Device</td><td>Auto / Memory Card / USB / MX4SIO / MMCE / HDD (exFAT) / HDD (APA) / Game's Device</td><td>Which device <em>type</em> to scan for <code>&lt;root&gt;:/neutrino/neutrino.elf</code>. <em>Auto</em> probes the active game device first, then a legacy custom path, then mc0 and mc1. <em>Game's Device</em> probes the game's own device <em>only</em> — there is no memory-card fallback, so a miss aborts the launch with a "not found" message. Choose a specific type if your ELF is on USB, MMCE, or an HDD. See <a href="neutrino.html">Neutrino Core</a>.</td></tr>
+<tr><td>Neutrino Device</td><td>Auto / Memory Card / USB / MX4SIO / MMCE / HDD (exFAT) / HDD (APA) / Game's Device / iLink</td><td>Which device <em>type</em> to scan for <code>&lt;root&gt;:/neutrino/neutrino.elf</code>. <em>Auto</em> probes the active game device first, then a legacy custom path, then mc0 and mc1. <em>Game's Device</em> probes the game's own device <em>only</em> — there is no memory-card fallback, so a miss aborts the launch with a "not found" message. Choose a specific type if your ELF is on USB, iLink, MMCE, or an HDD. See <a href="neutrino.html">Neutrino Core</a>.</td></tr>
 <tr><td>Neutrino Video</td><td>Off / 240p / 480p / 1080i x1 / 1080i x2 / 1080i x3</td><td>Global default for Neutrino's <code>-gsm</code> video mode. Games whose per-game <em>Neutrino Video</em> picker is left on <em>Default</em> follow this value. Off by default (no forced mode). See <a href="neutrino.html">Neutrino Core</a>.</td></tr>
 <tr><td>Neutrino GSM Compatibility</td><td>Off / Type 1 (GSM/OPL) / Type 2 / Type 3</td><td>Field-flipping fix for games that shake or tear under a forced Neutrino video mode — the <code>:c</code> half of <code>-gsm</code>. Only emitted when a video mode is actually set. Off by default.</td></tr>
 <tr><td>Write Operations</td><td>Off / On</td><td>Enables write access to storage media. Required for VMC creation and some other write operations. Disable if you want a read-only mode.</td></tr>
@@ -127,7 +132,7 @@ enabled, their start modes, and the network transport rows. Prefix paths and cac
 <table data-sortable>
 <thead><tr><th>Option</th><th>Values</th><th>Description</th></tr></thead>
 <tbody>
-<tr><td>Default Menu</td><td>BDM Games / ETH Games / HDD Games / Apps / MMCE / Favourites</td><td>Which tab is shown first on boot.</td></tr>
+<tr><td>Default Menu</td><td>BDM Games / ETH Games / HDD Games / Apps / MMCE / Favorites</td><td>Which tab is shown first on boot.</td></tr>
 <tr><td>BDM Start Mode</td><td>Off / Manual / Auto</td><td>Block-Device Manager (USB, MX4SIO, iLink) startup mode. <em>Auto</em> starts immediately; <em>Manual</em> waits for you to press Start; <em>Off</em> disables the whole BDM subsystem.</td></tr>
 <tr><td>USB</td><td>Off / On</td><td>Enables the USB mass-storage driver. Disabling frees IOP RAM. See <a href="usb.html">USB / MX4SIO / iLink</a>.</td></tr>
 <tr><td>iLink</td><td>Off / On</td><td>Enables the iLink (IEEE 1394) mass-storage driver.</td></tr>
@@ -139,7 +144,7 @@ enabled, their start modes, and the network transport rows. Prefix paths and cac
 <tr><td>SMB Version</td><td>SMBv1 / SMB2</td><td>Which SMB dialect to speak. <em>SMBv1</em> is the default. Live only while <em>Protocol</em> is SMB and greyed otherwise, but the chosen value is preserved rather than reset. It applies to both browsing and in-game reading, and takes effect on the next boot. See <a href="smb.html">SMB (network share)</a>.</td></tr>
 <tr><td>Access</td><td>Files / IMG</td><td><em>Files</em> uses the <code>udpfs_ioman</code> filesystem to serve loose ISOs from a folder (<code>-bsd=udpfs</code>); <em>IMG</em> uses the <code>udpfs_bd</code> block device to serve a served disk image (<code>-bsd=udpfsbd</code>). Only UDPFS lets you choose: SMB locks the row to <em>Files</em> and UDPBD locks it to <em>IMG</em> — greyed, not hidden. See <a href="network-boot.html">Network Boot</a>.</td></tr>
 <tr><td>Applications Start Mode</td><td>Off / Manual / Auto</td><td>Startup mode for the Apps tab.</td></tr>
-<tr><td>Favourites Start Mode</td><td>Off / Manual / Auto</td><td>Startup mode for the Favourites tab. Set to <em>Off</em> to hide the Favourites tab entirely. See <a href="favourites.html">Favourites</a>.</td></tr>
+<tr><td>Favorites Start Mode</td><td>Off / Manual / Auto</td><td>Startup mode for the Favorites tab. Set to <em>Off</em> to hide the Favorites tab entirely. See <a href="favourites.html">Favorites</a>.</td></tr>
 <tr><td>MMCE Start Mode</td><td>Off / Manual / Auto</td><td>Startup mode for MMCE (SD2PSX / MemCard PRO2) game loading. See <a href="mmce.html">MMCE</a>.</td></tr>
 </tbody>
 </table>
@@ -151,13 +156,15 @@ driver equip, and the PS1 list display options. See <a href="ps1-vcd.html">PS1 G
 <table data-sortable>
 <thead><tr><th>Option</th><th>Values</th><th>Description</th></tr></thead>
 <tbody>
-<tr><td>POPSTARTER Device</td><td>Default / Memory Card / USB / MX4SIO / MMCE / HDD (exFAT) / HDD (APA) / Custom / Game's Device</td><td>Which device <em>type</em> holds <code>POPS/POPSTARTER.ELF</code>. <em>Default</em> resolves the launch device automatically; <em>Game's Device</em> pins it to the device the PS1 game itself lives on. Selecting <em>Custom</em> reveals the free-text <em>POPSTARTER Path</em> field below. SMB PS1 VCDs additionally use an <code>SB.&lt;name&gt;.ELF</code> selector. See <a href="ps1-vcd.html">PS1 Games</a>.</td></tr>
+<tr><td>PS2/PS1 Game Display</td><td>Both (L3) / Mixed / PS2 / PS1</td><td>The same persisted picker shown on Interface. <em>Both (L3)</em> switches separate PS2 and PS1 views on each device. <em>Mixed</em> combines them and L3 cycles Mixed / PS2 / PS1. <em>PS2</em> or <em>PS1</em> locks applicable device pages and makes L3 fully inert — no hint, sound, notification, pause, or state change. APPS and Favorites are independent.</td></tr>
+<tr><td>POPSTARTER Device</td><td>Default / Memory Card / USB / MX4SIO / MMCE / HDD (exFAT) / HDD (APA) / Custom / Game's Device / iLink</td><td>Which device <em>type</em> holds <code>POPS/POPSTARTER.ELF</code>. <em>Default</em> resolves the launch device automatically; <em>Game's Device</em> pins it to the device the PS1 game itself lives on. Selecting <em>Custom</em> reveals the free-text <em>POPSTARTER Path</em> field below. SMB PS1 VCDs additionally use an <code>SB.&lt;name&gt;.ELF</code> selector. See <a href="ps1-vcd.html">PS1 Games</a>.</td></tr>
 <tr><td>POPSTARTER Path</td><td>text (path)</td><td>Custom path to <code>POPSTARTER.ELF</code> (up to 31 characters in the UI; longer paths can be set directly in <code>settings_riptopl.cfg</code>). Shown only when <em>POPSTARTER Device</em> is set to <em>Custom</em>. Blank silently falls back to the device POPS folder. See <a href="ps1-vcd.html">PS1 Games</a>.</td></tr>
 <tr><td>VCD BDMA Apply on Launch</td><td>Off / On</td><td>On by default. When on, launching a PS1 VCD auto-equips its matching exFAT driver to the memory card before boot, and the manual <em>BDMA Source</em> and <em>BDMA Mode</em> pickers below are hidden. Turn it off to manage those pickers yourself. See <a href="ps1-vcd.html">PS1 Games</a>.</td></tr>
-<tr><td>BDMA Source</td><td>USB / MX4SIO / MMCE / HDD</td><td>Which device holds the BDMAssault driver files (<code>usbd.irx.*</code>, <code>usbhdfsd.irx.*</code>). Only relevant when playing PS1 games from an exFAT drive. Shown only when <em>VCD BDMA Apply on Launch</em> is Off. See <a href="ps1-vcd.html">PS1 Games</a>.</td></tr>
-<tr><td>BDMA Mode</td><td>USB (FAT32) / USB (exFAT) / MX4SIO (exFAT) / MMCE (exFAT) / HDD (exFAT)</td><td>Block-device driver POPSTARTER loads for exFAT media. Changing this copies the appropriate modules to the memory card. FAT32 uses the built-in driver (no copy needed). Shown only when <em>VCD BDMA Apply on Launch</em> is Off. See <a href="ps1-vcd.html">PS1 Games</a>.</td></tr>
-<tr><td>Hide PS1 Game ID (VCD list)</td><td>Off / On</td><td>On by default. Cosmetic only — hides a leading game-ID prefix (e.g. <code>SLUS_005.51.</code>) from PS1/VCD list names, for both display and sorting. Names without an ID are shown as-is. Does not change launch, cover art, or favourites. See <a href="ps1-vcd.html">PS1 Games</a>.</td></tr>
-<tr><td>First disc only (multi-disc PS1)</td><td>Off / On</td><td>On by default. Shows only Disc 1 of a multi-disc PS1 game in the device lists (POPSLoader style), hiding files named <code>(Disc 2)</code>, <code>(CD 2)</code>, etc. All discs stay on the card for in-game swapping, and Favourites are not filtered. See <a href="ps1-vcd.html">PS1 Games</a>.</td></tr>
+<tr><td>BDMA Source</td><td>USB / MX4SIO / MMCE / HDD / iLink</td><td>Which device's <code>POPS/</code> folder holds the loose BDMAssault driver files (<code>usbd.irx.*</code>, <code>usbhdfsd.irx.*</code>). Shown only when <em>VCD BDMA Apply on Launch</em> is Off. See <a href="ps1-vcd.html">PS1 Games</a>.</td></tr>
+<tr><td>BDMA Mode</td><td>USB (FAT32) / USB (exFAT) / MX4SIO (exFAT) / MMCE (exFAT) / HDD (exFAT) / iLink</td><td>Block-device driver POPSTARTER loads for the selected transport. Changing this copies the matching loose pair from the source device's <code>POPS/</code> folder to the memory card; no BDMA pair is embedded in RiptOPL. FAT32 uses POPSTARTER's built-in driver. Shown only when <em>VCD BDMA Apply on Launch</em> is Off. See <a href="ps1-vcd.html">PS1 Games</a>.</td></tr>
+<tr><td>Ember Display Mode</td><td>Default / 240p / 480p</td><td>Writes Ember's display key to <code>EMBER/settings.txt</code> on the launching device. Default removes that key and removes an otherwise-empty file.</td></tr>
+<tr><td>Hide PS1 Game ID (VCD list)</td><td>Off / On</td><td>On by default. Cosmetic only — hides a leading game-ID prefix (e.g. <code>SLUS_005.51.</code>) from PS1/VCD list names, for both display and sorting. Names without an ID are shown as-is. Does not change launch, cover art, or favorites. See <a href="ps1-vcd.html">PS1 Games</a>.</td></tr>
+<tr><td>First disc only (multi-disc PS1)</td><td>Off / On</td><td>On by default. Shows only Disc 1 of a multi-disc PS1 game in the device lists (POPSLoader style), hiding files named <code>(Disc 2)</code>, <code>(CD 2)</code>, etc. All discs stay on the card for in-game swapping, and Favorites are not filtered. See <a href="ps1-vcd.html">PS1 Games</a>.</td></tr>
 </tbody>
 </table>
 
@@ -189,7 +196,8 @@ cover-art behavior.</p>
 <tr><td>Automatic Refresh</td><td>Off / On</td><td>Periodically re-scans for newly plugged-in devices and adds their games without requiring a manual refresh.</td></tr>
 <tr><td>Cover Art</td><td>Off / On</td><td>Enables cover-art display. When off, no cover images are loaded even if present.</td></tr>
 <tr><td>Cover Art .tar Archive</td><td>Off / On</td><td>Off by default. Opt-in loader that also reads cover art from an <code>ART/art.tar</code> archive alongside the loose image files.</td></tr>
-<tr><td>Default game view</td><td>Both / PS2 / PS1</td><td>Controls which game list is shown by default on PS1-capable device tabs. <em>Both</em> keeps the per-device L3 toggle active (defaults to PS2). <em>PS2</em> locks every tab to disc games. <em>PS1</em> locks every tab to PS1 games (POPSTARTER and Ember together). See <a href="ps1-vcd.html">PS1 Games</a>.</td></tr>
+<tr><td>PS2/PS1 Game Display</td><td>Both (L3) / Mixed / PS2 / PS1</td><td>The same persisted picker shown on PS Emulation Settings. <em>Both (L3)</em> switches separate PS2 and PS1 views. <em>Mixed</em> combines them and L3 cycles Mixed / PS2 / PS1. <em>PS2</em> and <em>PS1</em> lock applicable device pages and make L3 fully inert. APPS and Favorites remain independent. See <a href="ps1-vcd.html">PS1 Games</a>.</td></tr>
+<tr><td>Applications Display</td><td>Mixed / Apps / PS1ELF (L3)</td><td><em>Mixed</em> keeps every configured ELF together and disables L3. <em>Apps / PS1ELF (L3)</em> moves titles containing <code>[PS1]</code> (case-insensitive) to a second L3 view. Both sides remain ordinary ELF launches.</td></tr>
 <tr><td>Notifications</td><td>Off / On</td><td>Shows brief on-screen notifications when a config, theme, or language file is loaded, or when a storage partition is mounted.</td></tr>
 <tr><td>Coverflow Settings</td><td>[sub-screen]</td><td>Opens the <a href="#coverflow-settings">Coverflow Settings</a> sub-screen. See below.</td></tr>
 <tr><td>Text Color</td><td>color picker</td><td>Color of normal UI text.</td></tr>
@@ -312,9 +320,11 @@ An <em>Advanced Options</em> toggle reveals Ethernet link-mode controls.</p>
 </tbody>
 </table>
 
-<div class="callout info"><div class="h">i Reconnect button</div>After changing network settings you can press the
-<b>Reconnect</b> button to apply them immediately without closing the dialog. This re-attempts the SMB
-connection from the login stage.</div>
+<div class="callout info"><div class="h">i Apply and reconnect immediately</div>Confirming the Network
+Settings dialog applies the current values and begins a fresh SMB connection attempt immediately;
+the explicit <b>Reconnect</b> action does the same without leaving the dialog. If the network page
+already shows a failed connection, <b>Select / Refresh</b> retries it there, without reopening
+settings or saving the whole configuration.</div>
 
 <h2 id="per-game-reference">Per-game Settings (quick reference)</h2>
 <p>Per-game settings are opened by pressing <b>Triangle</b> on any game and choosing <b>Game Settings</b>.

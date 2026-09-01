@@ -32,7 +32,7 @@
     <a href="ps1-vcd.html"><span class="em">💿</span>PS1 Games</a>
     <a href="neutrino.html" class="active"><span class="em">⚛️</span>Neutrino Core</a>
     <a href="coverflow.html"><span class="em">🎴</span>Coverflow</a>
-    <a href="favourites.html"><span class="em">⭐</span>Favourites</a>
+    <a href="favourites.html"><span class="em">⭐</span>Favorites</a>
     <a href="per-game-settings.html"><span class="em">🎚️</span>Per-game Settings</a>
     <a href="vmc.html"><span class="em">💾</span>VMC</a>
     <a href="cheats.html"><span class="em">🎮</span>Cheats</a>
@@ -124,7 +124,7 @@ PlayStation 1 titles always boot through their own core — <b>POPSTARTER.ELF</b
 
 <h2 id="neutrino-device">3. Neutrino Device picker</h2>
 
-<p>Under <b>Settings &rarr; General Settings &rarr; Neutrino Device</b> you can pin Neutrino to a specific storage device <b>type</b>, or leave it on <b>Auto</b>. This is a device <em>type</em> (not a fixed device-name slot): OPL resolves the chosen type to its live device token(s) at launch — USB / MX4SIO / HDD (exFAT) resolve to <code>massN:</code>, MMCE resolves to <code>mmceN:</code>, and HDD (APA) resolves to a <code>pfs</code> mount. It then probes <code>&lt;root&gt;:/neutrino/neutrino.elf</code> (plus case variants) on that device type only. When set to <b>Auto</b>, OPL first probes the <b>active game device</b> for a co-located <code>neutrino.elf</code>, then honours a legacy custom Neutrino ELF path, and only then falls back to the <code>mc0</code>/<code>mc1</code> candidate list. A separate <b>Game's Device</b> choice narrows the search to the active game's own device and nothing else — no legacy custom path and no memory-card fallback.</p>
+<p>Under <b>Settings &rarr; Game Launching &rarr; Neutrino Defaults &rarr; Default Device</b> you can pin Neutrino to a specific storage device <b>type</b>, or leave it on <b>Auto</b>. This is a device <em>type</em> (not a fixed device-name slot): OPL resolves the chosen type to its live device token(s) at launch — USB / MX4SIO / iLink / HDD (exFAT) resolve to <code>massN:</code>, MMCE resolves to <code>mmceN:</code>, and HDD (APA) resolves to a <code>pfs</code> mount. It then probes <code>&lt;root&gt;:/neutrino/neutrino.elf</code> (plus case variants) on that device type. When set to <b>Auto</b>, OPL first probes the <b>active game device</b> for a co-located <code>neutrino.elf</code>, then honours a legacy custom Neutrino ELF path, and only then falls back to the <code>mc0</code>/<code>mc1</code> candidate list. A separate <b>Game's Device</b> choice narrows the search to the active game's own device and nothing else — no legacy custom path and no memory-card fallback.</p>
 
 <p>Available choices:</p>
 <ul class="checklist">
@@ -136,6 +136,7 @@ PlayStation 1 titles always boot through their own core — <b>POPSTARTER.ELF</b
 <li><b>HDD (exFAT)</b> — internal BDM/exFAT HDD (resolves to <code>massN:</code>)</li>
 <li><b>HDD (APA)</b> — internal APA HDD (resolves to a <code>pfs</code> mount)</li>
 <li><b>Game's Device</b> — resolves <em>only</em> on the active game's own device (a co-located <code>neutrino/neutrino.elf</code>); there is no legacy custom path and no <code>mc0</code>/<code>mc1</code> fallback, so a miss shows a "not found" message and aborts the launch</li>
+<li><b>iLink</b> — IEEE 1394 / SBP-2 storage (resolves to the matching mounted <code>massN:</code> device)</li>
 </ul>
 
 <p>In all cases the path searched on the chosen device type is <code>&lt;device&gt;:NEUTRINO/neutrino.elf</code> and its capitalisation variants; the leading-slash form <code>&lt;device&gt;:/neutrino/neutrino.elf</code> is also tried.</p>

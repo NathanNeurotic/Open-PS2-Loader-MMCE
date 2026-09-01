@@ -32,7 +32,7 @@
     <a href="ps1-vcd.html"><span class="em">💿</span>PS1 Games</a>
     <a href="neutrino.html"><span class="em">⚛️</span>Neutrino Core</a>
     <a href="coverflow.html"><span class="em">🎴</span>Coverflow</a>
-    <a href="favourites.html"><span class="em">⭐</span>Favourites</a>
+    <a href="favourites.html"><span class="em">⭐</span>Favorites</a>
     <a href="per-game-settings.html"><span class="em">🎚️</span>Per-game Settings</a>
     <a href="vmc.html"><span class="em">💾</span>VMC</a>
     <a href="cheats.html"><span class="em">🎮</span>Cheats</a>
@@ -80,7 +80,7 @@ on PSX-Place. For PS1 internals (IGR, cheats, multi-disc, config table), see the
 </div>
 
 <details class="deep"><summary>Why does RiptOPL have its own config file?</summary>
-<p>RiptOPL saves its master config as <code>settings_riptopl.cfg</code> (auto-migrated from the older <code>conf_riptopl.cfg</code>). This is intentionally separate from stock OPL's <code>conf_opl.cfg</code> so both builds can coexist on the same memory card without clobbering each other's settings. Everything else — artwork, themes, VMCs, per-game configs, and favourites — lives in the shared <code>OPL/</code> folder and is readable by all OPL-family builds.</p>
+<p>RiptOPL saves its master config as <code>settings_riptopl.cfg</code> (auto-migrated from the older <code>conf_riptopl.cfg</code>). This is intentionally separate from stock OPL's <code>conf_opl.cfg</code> so both builds can coexist on the same memory card without clobbering each other's settings. Everything else — artwork, themes, VMCs, per-game configs, and favorites — lives in the shared <code>OPL/</code> folder and is readable by all OPL-family builds.</p>
 </details>
 
 <h2 id="white-screen">Game stops on a white screen</h2>
@@ -129,7 +129,7 @@ If you saved an incompatible GSM (Graphics Synthesizer Mode) override and your s
 
 <h2 id="vcd-list-empty">PS1/VCD — "my VCDs don't show up" (works elsewhere)</h2>
 
-<p><b>Symptom:</b> A device lists PS2 games fine (or works in another loader), but its PS1/PS1 view is empty — or a listed VCD does nothing when selected.</p>
+<p><b>Symptom:</b> A device lists PS2 games fine (or works in another loader), but its PS1 view is empty — or a listed VCD does nothing when selected.</p>
 
 <p>Work down this ladder; each step isolates a different stage:</p>
 
@@ -143,8 +143,8 @@ If you saved an incompatible GSM (Graphics Synthesizer Mode) override and your s
     <p>If yes, the filesystem/mount layer is proven working, so "but it works in another loader" adds no new information past this step. Both published builds — <code>PS2DEVLATESTSDK</code> (recommended) and <code>PS2DEVPINNEDSDK</code> (the digest-pinned fallback) — take their exFAT/BDM drivers from the stock ps2dev SDK, so the flavour you picked does not change this answer.</p>
   </div>
   <div class="step">
-    <h3>Press L3 on the device page</h3>
-    <p>The PS1 view is per device and only reachable when <b>Default game view</b> is "Both" (or the page is locked to VCD).</p>
+    <h3>Check PS2/PS1 Game Display</h3>
+    <p><b>Both (L3)</b> switches separate PS2 and PS1 views. <b>Mixed</b> combines them and L3 cycles Mixed / PS2 / PS1. The locked <b>PS2</b> and <b>PS1</b> modes intentionally make L3 fully inert; choose PS1 to pin the PS1 view without L3.</p>
   </div>
   <div class="step">
     <h3>Check the folder — root, not your games prefix</h3>
@@ -162,25 +162,25 @@ If you saved an incompatible GSM (Graphics Synthesizer Mode) override and your s
 
 <h2 id="bdma-module-not-found">BDMA — "module files not found on source device"</h2>
 
-<p><b>Symptom:</b> You have set a <b>BDMA Mode</b> (e.g. <code>USB (exFAT)</code>, <code>MX4SIO (exFAT)</code>, or <code>HDD (exFAT)</code>) and a <b>BDMA Source</b>, but when you save or apply the equip RiptOPL reports that the module files were not found on the source device.</p>
+<p><b>Symptom:</b> You have set a <b>BDMA Mode</b> (e.g. <code>USB (exFAT)</code>, <code>MX4SIO (exFAT)</code>, <code>HDD (exFAT)</code>, or <code>iLink</code>) and a <b>BDMA Source</b>, but when you save or apply the equip RiptOPL reports that the module files were not found on the source device.</p>
 
 <p><b>Cause:</b> The BDMA module files (<code>.irx</code> driver pair for the chosen variant) are missing from or in the wrong location on the source device. RiptOPL does not embed these files — you supply them from the release's <code>POPS/</code> folder.</p>
 
 <div class="steps">
   <div class="step">
     <h3>Locate the module files</h3>
-    <p>The BDMA module files ship inside the RiptOPL release archive. Find the <code>POPS/</code> folder in the release zip — it contains the driver variants for each equip mode (e.g. the <code>.ata</code> files for the HDD exFAT variant, equivalent sets for USB exFAT and MX4SIO exFAT).</p>
+    <p>The BDMA module files ship loose inside the RiptOPL release archive; none is embedded in <code>RIPTOPL.ELF</code>. Find the <code>POPS/</code> folder in the release zip — it contains the driver variants for each equip mode, including <code>usbd.irx.ilink</code> + <code>usbhdfsd.irx.ilink</code> for iLink.</p>
   </div>
   <div class="step">
     <h3>Copy them to the correct location</h3>
-    <p>Place the module files in a <code>POPS/</code> folder at the root of whichever device you have set as the <b>BDMA Source</b> — USB, MX4SIO, MMCE, or Internal HDD. The path must be exactly:</p>
+    <p>Place the module files in a <code>POPS/</code> folder at the root of whichever device you have set as the <b>BDMA Source</b> — USB, MX4SIO, MMCE, iLink, or Internal HDD. The path must be exactly:</p>
     <pre>POPS/        ← folder at device root
   POPSTARTER.ELF
   &lt;module files for your chosen variant&gt;</pre>
   </div>
   <div class="step">
     <h3>Note: the source must match the device's driver</h3>
-    <p>RiptOPL resolves the <b>BDMA Source</b> by its block-device <b>driver</b>, not by scanning the whole <code>massN:</code> namespace. A <b>USB</b> source reads only from slots whose driver is <code>usb</code>; <b>MX4SIO</b> reads only <code>mx4sio</code> slots; <b>Internal HDD</b> reads only the <code>ata</code> (exFAT) HDD. So if your <code>POPS/</code> module folder sits on the internal HDD but the source is set to USB, the files will <b>not</b> be found — set the source to match the driver of the device the files actually live on.</p>
+    <p>RiptOPL resolves the <b>BDMA Source</b> by its block-device <b>driver</b>, not by scanning the whole <code>massN:</code> namespace. A <b>USB</b> source reads only <code>usb</code> slots; <b>MX4SIO</b> reads only <code>mx4sio</code> slots; <b>iLink</b> reads only <code>ilink</code> slots; and <b>Internal HDD</b> reads only the <code>ata</code> (exFAT) HDD. Set the source to match the driver of the device where the loose pair actually lives.</p>
   </div>
   <div class="step">
     <h3>Re-apply the equip</h3>
@@ -189,24 +189,30 @@ If you saved an incompatible GSM (Graphics Synthesizer Mode) override and your s
 </div>
 
 <details class="deep"><summary>What exactly does "equipping" BDMA do?</summary>
-<p>POPSTARTER's stock driver reads FAT32. To boot PS1 games from an exFAT volume, POPSTARTER needs extra block-device modules. When you change BDMA Mode or Source and save, RiptOPL copies the chosen variant's <code>.irx</code> driver pair from your source device's <code>POPS/</code> folder to <code>mc?:/POPSTARTER/</code>. On the next PS1 launch POPSTARTER finds and loads those modules from the memory card, giving it access to the exFAT volume. Setting <b>BDMA Mode</b> back to <code>USB (FAT32)</code> removes the exFAT modules so POPSTARTER falls back to its built-in FAT32 driver. SMB is excluded because it is network-only and has no block device to equip.</p>
+<p>POPSTARTER's built-in path handles ordinary USB FAT32; the other supported block transports use matching external modules. When you change BDMA Mode or Source and save, RiptOPL copies the chosen suffixed pair from your source device's <code>POPS/</code> folder to <code>mc?:/POPSTARTER/</code>, removing the variant suffix on the card. For example, <code>*.ilink</code> becomes plain <code>usbd.irx</code> + <code>usbhdfsd.irx</code>. Setting <b>BDMA Mode</b> back to <code>USB (FAT32)</code> removes the external pair so POPSTARTER falls back to its built-in driver. SMB is excluded because it is network-only and has no block device to equip.</p>
 </details>
 
 <h2 id="vcd-list-not-showing">PS1 / VCD list not showing after a settings change</h2>
 
-<p><b>Symptom:</b> You have VCD files on a device but after changing a setting (such as <b>Default game view</b>, enabling a device, or changing BDMA settings) the PS1 list is empty or appears to be stuck on the disc list.</p>
+<p><b>Symptom:</b> You have VCD files on a device but after changing <b>PS2/PS1 Game Display</b>, enabling a device, or changing BDMA settings, the PS1 list is empty or appears stuck on PS2.</p>
 
-<p><b>Fix:</b> The view state sometimes needs a manual refresh after a settings change.</p>
+<p><b>Fix:</b> First distinguish a pinned view from missing content:</p>
 
 <ul class="checklist">
-  <li>Navigate to the device page that should show your VCDs and press <b>L3</b> to toggle the view. If the view was already on VCDs it will switch to discs; press <b>L3</b> again to return to VCDs. This forces a list refresh.</li>
-  <li>If <b>Default game view</b> is set to <b>PS2</b>, the PS1 toggle is disabled by design — L3 does nothing. Change <b>Default game view</b> to <b>Both</b> or <b>PS1</b> in <b>Settings → Interface</b>, then save and re-enter the device page.</li>
+  <li>If <b>PS2/PS1 Game Display</b> is <b>PS2</b> or <b>PS1</b>, L3 is completely disabled by design — no hint, sound, notification, pause, or response. Choose <b>Both (L3)</b> or <b>Mixed</b> on either <b>Interface</b> or <b>PS Emulation Settings</b> to enable an L3 ring.</li>
+  <li>Under <b>Both (L3)</b>, L3 switches PS2 / PS1. Under <b>Mixed</b>, it cycles Mixed / PS2 / PS1. A setting change queues the affected lists automatically; a separate restart is not required.</li>
   <li>If the PS1 list still appears empty, confirm the <code>*.VCD</code> files are in a <code>POPS/</code> folder at the device root (USB / MMCE / MX4SIO / iLink / SMB) or, for the internal APA HDD, inside the correct <code>__.POPS</code> / <code>__.POPS0</code>–<code>__.POPS9</code> partitions. Files in any other location are not scanned.</li>
   <li>For exFAT HDD, confirm <b>HDD (GPT/MBR)</b> is enabled in <b>Device Settings</b> and that the HDD has mounted — the game list should show an <b>HDD Games</b> entry. VCDs on the exFAT HDD live in <code>massN:/POPS/</code>.</li>
 </ul>
 
-<div class="callout info"><div class="h">i Favourites follow the active view</div>
-Favourited VCD titles only appear in the Favourites list while a page is in PS1 view mode. If you switch a page to disc view, those favourites are hidden until you switch back — they are not lost.
+<div class="callout info"><div class="h">i UDPFS / UDPBD are Ember-only PS1 pages</div>
+No VCD rows on either network page is expected, not a failed scan. POPSTARTER cannot restore those
+connections after its IOP reset; Ember inherits the live mount, so only Ember titles are listed.
+</div>
+
+<div class="callout info"><div class="h">i Favorites always has four views</div>
+Press L3 on Favorites to cycle <b>All in One → PS2 → PS1 → ELF</b>. This independent ring is not
+pinned or disabled by PS2/PS1 Game Display.
 </div>
 
 <h2 id="quick-reference">Quick-reference button combos</h2>
