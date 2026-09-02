@@ -3,8 +3,11 @@ name: Sync Project Links & Badges
 on:
   push:
     branches:
+      # rebuild/main ONLY. This job regenerates the External Tools block and pushes it to BOTH the
+      # source branch and gh-pages, so running it from master -- the old lineage -- would rewrite the
+      # live documentation site from a stale template and silently revert whatever the rebuild line
+      # has since published there. Dropped 2026-09-02 alongside the rolling-release publish trigger.
       - rebuild/main
-      - master
   workflow_dispatch:
 
 permissions:

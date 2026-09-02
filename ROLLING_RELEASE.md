@@ -4,7 +4,8 @@ This fork publishes a continuously-updated **`rolling`** development release so 
 publishing-branch build can be pulled straight from GitHub as development progresses, without
 touching the curated `v*` tagged releases. `rolling` is a full (non-pre-release) release and
 intentionally owns GitHub's **Latest** marker. The publishing branch is `rebuild/main` during the
-rebuild and `master` after cutover.
+rebuild. `master` is the OLD LINEAGE and is no longer wired to the release workflow at all: a
+push to it builds nothing and publishes nothing.
 
 ## What the rolling release contains
 
@@ -80,8 +81,9 @@ whether the bleeding-edge build succeeded.
 
 [`.github/workflows/rolling-release.yml`](.github/workflows/rolling-release.yml):
 
-- Triggers on every push to `rebuild/main` or `master` (updates `rolling`), on every `v*` **tag** push (cuts a
+- Triggers on every push to `rebuild/main` (updates `rolling`), on every `v*` **tag** push (cuts a
   curated per-version release with identical packaging), and on manual **Run workflow** (workflow_dispatch).
+  `master` is deliberately absent from both the trigger list and the publish gate.
 - Builds four labelled flavours across two toolchain lineages: moving and digest-pinned
   `ps2dev/ps2dev`, plus moving and digest-pinned official `ps2homebrew/ps2homebrew`.
 - The `ps2dev/ps2dev:latest` build is **required to compile**: if it fails to build, the publish
@@ -93,20 +95,25 @@ whether the bleeding-edge build succeeded.
 - Publishes/updates the single `rolling` release from the host runner as GitHub Latest and explicitly
   clears the pre-release flag.
 - `concurrency` cancels superseded in-flight runs, so the release reflects the newest push.
+- Refreshes the rolling release's **date**. GitHub silently ignores `published_at` on the update
+  API, so the only mechanism that moves it is a draft → published flip; the workflow performs that
+  flip, guarded so the channel cannot be left sitting as an invisible draft, and
+  `promote-rolling-latest.yml` re-asserts the published state afterwards. Curated `v*` releases are
+  never re-dated — they keep the date they were actually published.
 
 ## One pipeline, two channels
 
 This workflow is the **single** place release packaging lives. The pushed ref picks the target:
 
-- **`rebuild/main` or `master` push** → updates the `rolling` Latest release (the development channel).
+- **`rebuild/main` push** → updates the `rolling` Latest release (the development channel).
 - **`v*` tag push** → cuts the **curated per-version release** for that tag (a full release; an
   `-rc*` tag stays a pre-release). Curated tags do not displace `rolling` from GitHub's Latest marker.
   It runs through the **same normalized asset pipeline** as rolling — the same installable bundle,
   source snapshot, VARIANTS archive, and DEBUG/language archives when produced, with the same
   best-effort flavour rules — so the two channels cannot drift into different package formats.
 
-`compilation.yml` no longer cuts releases (its release step is retired); on `master` it only runs
-CI + uploads run artifacts. Per-ref `concurrency` keeps a `master` push and a tag release from
+`compilation.yml` no longer cuts releases (its release step is retired); it only runs CI +
+uploads run artifacts. Per-ref `concurrency` keeps a `rebuild/main` push and a tag release from
 cancelling each other.
 
 ## Not a stable release

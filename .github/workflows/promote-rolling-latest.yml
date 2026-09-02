@@ -40,7 +40,14 @@ jobs:
 
       # rolling-release.yml sets this state itself. Keep this post-publish normalization as an
       # idempotent guard against GitHub or a future workflow edit leaving the moving channel stale.
-      - name: Enforce rolling as Latest and non-pre-release
+      #
+      # --draft=false is the important one now. rolling-release.yml refreshes published_at with a
+      # draft -> published flip (the only mechanism GitHub honours), and although that flip is
+      # trap-guarded on its own side, a hard runner failure between its two edits could still strand
+      # the moving channel as an invisible draft. This job runs after that workflow completes, so it
+      # is the natural second layer: asserting the published state here costs one idempotent call and
+      # closes the only window in which users could find the rolling download page missing.
+      - name: Enforce rolling as Latest, published and non-pre-release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -48,5 +55,16 @@ jobs:
           gh release edit rolling \
             --repo "$GITHUB_REPOSITORY" \
             --title "Rolling" \
+            --draft=false \
             --prerelease=false \
             --latest
+
+          # Report the settled state, and fail loudly rather than leaving a hidden release behind.
+          DRAFT=$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/rolling" --jq .draft)
+          PRE=$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/rolling" --jq .prerelease)
+          PUB=$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/rolling" --jq .published_at)
+          echo "rolling: draft=$DRAFT prerelease=$PRE published_at=$PUB"
+          if [ "$DRAFT" != "false" ] || [ "$PRE" != "false" ]; then
+            echo "ERROR: rolling did not settle as a published, non-pre-release" >&2
+            exit 1
+          fi
