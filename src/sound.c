@@ -85,6 +85,31 @@ static void sfxSetCursorChannelsVolume(int volume)
         audsrv_adpcm_set_volume_and_pan(sfxGetCursorChannel(i), volume, 0);
 }
 
+// THE ONE-SHOT UI SOUNDS SHARE A SINGLE CHANNEL, so only the newest is ever audible.
+//
+// Every sound used to play on a channel of its own (channel == id), which meant nothing could ever
+// interrupt anything: two sounds raised on the same frame simply played on top of each other, and a
+// long one kept going no matter what the user pressed next. Both reported problems are that one
+// fact. Confirming a game rename raises SFX_CONFIRM in diaShowKeyb and then, on the SAME frame,
+// SFX_TRANSITION from the guiSwitchScreen that follows -- two channels, stacked audio (#575). And a
+// sound already playing could not be cut short by the next button press (#504).
+//
+// Replaying a channel replaces whatever it held, so routing these four through one channel makes
+// the newest press win and collapses both cases. Any channel in 1..SFX_COUNT-1 carries gSFXVolume
+// (audioSetVolume), so reusing one costs no new channel and needs no volume work; the channels the
+// other three used simply fall idle.
+//
+// SFX_CURSOR is deliberately NOT in this group -- it owns the rotation channels below precisely so
+// rapid scrolling can overlap, and cutting it would make fast movement sound broken. SFX_BOOT keeps
+// channel 0 (its own gBootSndVolume), and the BD connect/disconnect pair stay separate because they
+// are asynchronous device events rather than a response to a button press.
+#define UI_ONESHOT_SFX_CHANNEL SFX_CONFIRM
+
+static int sfxIsUiOneShot(int id)
+{
+    return (id == SFX_CONFIRM) || (id == SFX_CANCEL) || (id == SFX_MESSAGE) || (id == SFX_TRANSITION);
+}
+
 // Returns 0 if the specified file was read. The sfxEffect structure will not be updated unless the file is successfully read.
 static int sfxRead(const char *full_path, struct sfxEffect *sfx)
 {
@@ -392,7 +417,8 @@ void sfxPlay(int id)
             // rotation channel replaces its old sample in one SIF RPC.
             audsrv_ch_play_adpcm(channel, &sfx[id]);
         } else {
-            audsrv_ch_play_adpcm(id, &sfx[id]);
+            // Shared channel for the UI one-shots (see sfxIsUiOneShot), own channel for the rest.
+            audsrv_ch_play_adpcm(sfxIsUiOneShot(id) ? UI_ONESHOT_SFX_CHANNEL : id, &sfx[id]);
         }
 
         unsigned int costMs = (unsigned int)((cpu_ticks() - sfxStartTicks) / SFX_CLOCKS_PER_MS);
