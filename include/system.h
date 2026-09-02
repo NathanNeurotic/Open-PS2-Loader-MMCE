@@ -75,5 +75,9 @@ int sysExecElf(const char *path);
 int sysLoadModuleBuffer(void *buffer, int size, int argc, char *argv);
 int sysCheckMC(void);
 int sysCheckVMC(const char *prefix, const char *sep, char *name, int createSize, vmc_superblock_t *vmc_superblock);
+// Layout of the VMC whose creation was last STARTED: 1 contiguous, 0 fragmented, -1 unknown.
+// Only meaningful once genvmc reports the job finished. -1 means "this backing store cannot say"
+// (mmce, APA/pfs, SMB, udpfs) and must be treated as silence -- never as a pass or a failure.
+int sysVMCContiguity(void);
 
 #endif
