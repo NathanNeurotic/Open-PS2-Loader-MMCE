@@ -136,11 +136,11 @@ If you saved an incompatible GSM (Graphics Synthesizer Mode) override and your s
 <div class="steps">
   <div class="step">
     <h3>Does the device page appear at all?</h3>
-    <p>If not, it's the device enables, not VCD. Every device ships <b>OFF</b> on a fresh install, so check <b>Device Settings</b> first: USB/MX4SIO/iLink need their own toggles on <em>and</em> <b>BDM Start Mode</b> set to Manual or Auto, and the <b>internal exFAT</b> page additionally needs <b>HDD (GPT/MBR)</b> ON. The two internal-HDD backends are <b>no longer mutually exclusive</b> — APA (HDD start mode) and exFAT/BDM-ATA may both be enabled at once, since one shared ATA stack serves both, so leaving APA on does not suppress the exFAT page.</p>
+    <p>If not, it's the device enables, not VCD. Every device ships <b>OFF</b> on a fresh install, so check <b>Game Sources</b> first: USB/MX4SIO/iLink need their own toggles on <em>and</em> <b>BDM Start Mode</b> set to Manual or Auto, and the <b>internal exFAT</b> page additionally needs <b>HDD (GPT/MBR)</b> ON. The two internal-HDD backends are <b>no longer mutually exclusive</b> — APA (HDD start mode) and exFAT/BDM-ATA may both be enabled at once, since one shared ATA stack serves both, so leaving APA on does not suppress the exFAT page.</p>
   </div>
   <div class="step">
     <h3>Do PS2 ISOs list from the device?</h3>
-    <p>If yes, the filesystem/mount layer is proven working, so "but it works in another loader" adds no new information past this step. Both published builds — <code>PS2DEVLATESTSDK</code> (recommended) and <code>PS2DEVPINNEDSDK</code> (the digest-pinned fallback) — take their exFAT/BDM drivers from the stock ps2dev SDK, so the flavour you picked does not change this answer.</p>
+    <p>If yes, the filesystem/mount layer is proven working, so "but it works in another loader" adds no new information past this step. The release publishes four labelled flavours: <code>PS2DEVPINNED</code>, <code>OFFICIALPINNED</code>, <code>PS2DEVROLLING</code>, and <code>OFFICIALROLLING</code>. Start with the pinned primary control, and report the exact in-app suffix if behavior differs across flavours.</p>
   </div>
   <div class="step">
     <h3>Check PS2/PS1 Game Display</h3>
@@ -159,6 +159,33 @@ If you saved an incompatible GSM (Graphics Synthesizer Mode) override and your s
     <p>Then scanning is fine and the handoff is the suspect: is <code>POPSTARTER.ELF</code> present in <code>/POPS</code> (or <code>__common/POPS</code> on APA)? On exFAT the BDMA equip below is best-effort — a failed equip toasts but the launch still proceeds and may land on the OSD.</p>
   </div>
 </div>
+
+<h2 id="ilink-handoff-status">iLink — revision 2692 handoff failures</h2>
+
+<p><b>Test control:</b> On an SCPH-39001 with the same IEEE 1394 HDD, Ember launched in all four
+revision 2692 flavours. Native OPL, Neutrino, and POPSTARTER did not. Both pinned and rolling builds
+from both SDK lineages failed, so the result is not isolated to one compiler image.</p>
+
+<ul class="checklist">
+  <li><b>What Ember proves:</b> RiptOPL can enumerate and read the iLink disk, select the title, and
+  transfer control while keeping the live stack. This rules out a blanket menu-side iLink or drive
+  visibility failure.</li>
+  <li><b>Neutrino:</b> revision 2692 sent <code>-bsd=ilink</code> but did not auto-send
+  <code>-qb</code>. The post-2692 build corrects that source-confirmed RiptOPL-side mismatch so its
+  inherited-stack handoff enters Neutrino's load environment directly. Hardware retest must still
+  establish whether that mismatch was the complete cause.</li>
+  <li><b>POPSTARTER:</b> after a failed attempt, confirm
+  <code>mc?:/POPSTARTER/bdma_config.txt</code> contains exactly <code>ilink</code>,
+  <code>usbd.irx</code> is 48,500 bytes (SHA-256
+  <code>5EA4818BA1CF5207F6D7CADB4C13B5AFA88C37C260750C21155B079A8C18F369</code>), and
+  <code>usbhdfsd.irx</code> is 23,452 bytes (SHA-256
+  <code>145CF1C0AF130EA7AC5CEC6696AA7E60B5C66A2AC46B8DEA94DB17BB3B911BCC</code>). A mismatch is on
+  RiptOPL's external-equip leg; exact files narrow the failure to POPSTARTER/BDMA after handoff.</li>
+  <li><b>Native OPL:</b> the existing iLink alias and dependency corrections are present, but the
+  revision 2692 failures show they were not sufficient. No regular IOP module is replaced by this
+  follow-up. The next useful control is current official OPL on the same console, adapter, disk, and
+  ISO; that separates an upstream iLink reinitialization limitation from a RiptOPL regression.</li>
+</ul>
 
 <h2 id="bdma-module-not-found">BDMA — "module files not found on source device"</h2>
 
@@ -202,7 +229,7 @@ If you saved an incompatible GSM (Graphics Synthesizer Mode) override and your s
   <li>If <b>PS2/PS1 Game Display</b> is <b>PS2</b> or <b>PS1</b>, L3 is completely disabled by design — no hint, sound, notification, pause, or response. Choose <b>Both (L3)</b> or <b>Mixed</b> on either <b>Interface</b> or <b>PS Emulation Settings</b> to enable an L3 ring.</li>
   <li>Under <b>Both (L3)</b>, L3 switches PS2 / PS1. Under <b>Mixed</b>, it cycles Mixed / PS2 / PS1. A setting change queues the affected lists automatically; a separate restart is not required.</li>
   <li>If the PS1 list still appears empty, confirm the <code>*.VCD</code> files are in a <code>POPS/</code> folder at the device root (USB / MMCE / MX4SIO / iLink / SMB) or, for the internal APA HDD, inside the correct <code>__.POPS</code> / <code>__.POPS0</code>–<code>__.POPS9</code> partitions. Files in any other location are not scanned.</li>
-  <li>For exFAT HDD, confirm <b>HDD (GPT/MBR)</b> is enabled in <b>Device Settings</b> and that the HDD has mounted — the game list should show an <b>HDD Games</b> entry. VCDs on the exFAT HDD live in <code>massN:/POPS/</code>.</li>
+  <li>For exFAT HDD, confirm <b>HDD (GPT/MBR)</b> is enabled in <b>Game Sources</b> and that the HDD has mounted — the game list should show an <b>HDD Games</b> entry. VCDs on the exFAT HDD live in <code>massN:/POPS/</code>.</li>
 </ul>
 
 <div class="callout info"><div class="h">i UDPFS / UDPBD are Ember-only PS1 pages</div>

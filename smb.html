@@ -50,10 +50,10 @@
   </nav>
   <main class="content">
 <h1>SMB (network share)</h1>
-<p class="lead">Load PS2 (and PS1) games directly from a shared folder on a Windows PC, Linux Samba server, or NAS over your local network. RiptOPL speaks <b>SMBv1</b> by default and can be switched to <b>SMB2</b> with the <b>SMB Version</b> row in Device Settings. No USB drive required — the PS2 mounts the share and reads ISOs straight off it.</p>
+<p class="lead">Load PS2 (and PS1) games directly from a shared folder on a Windows PC, Linux Samba server, or NAS over your local network. RiptOPL speaks <b>SMBv1</b> by default and can be switched to <b>SMB2</b> with the <b>SMB Version</b> row in Game Sources. No USB drive required — the PS2 mounts the share and reads ISOs straight off it.</p>
 
 <div class="callout info"><div class="h">ℹ SMB and Network Boot share the same adapter</div>
-The PS2 has one Ethernet port and one network driver. <b>SMB (ETH) and Network Boot (UDPBD/UDPFS) are mutually exclusive</b> — enabling one in <b>Device Settings</b> disables the other. If you switch, you must save and restart for the change to take effect. See <a href="network-boot.html">Network Boot</a> for the UDPBD/UDPFS alternative.</div>
+The PS2 has one Ethernet port and one network driver. <b>SMB (ETH) and Network Boot (UDPBD/UDPFS) are mutually exclusive</b> — selecting one in <b>Game Sources</b> excludes the others. If you switch, you must save and restart for the change to take effect. See <a href="network-boot.html">Network Boot</a> for the UDPBD/UDPFS alternative.</div>
 
 <h2 id="requirements">What you need</h2>
 <ul class="checklist">
@@ -69,7 +69,7 @@ visit <a href="https://github.com/NathanNeurotic/PS2-Servers">PS2 Servers</a>, c
 select your games folder and follow the protocol-specific IP, port, share and credential values the
 launcher displays. It implements the OPL-compatible SMBv1 subset directly and does not require you
 to enable Windows' built-in SMB1 feature. Because it serves <b>SMBv1 only</b>, leave
-<b>Device Settings → SMB Version</b> on <b>SMBv1</b> when you use it — set to SMB2 it lists no games
+<b>Game Sources → SMB Version</b> on <b>SMBv1</b> when you use it — set to SMB2 it lists no games
 at all. Samba/NAS users staying on SMBv1 may need <code>min protocol = NT1</code> if their server
 defaults have been tightened; that line is not needed when you run OPL on SMB2.</div>
 
@@ -106,7 +106,7 @@ another already-configured SMB server.</p>
    guest ok = yes
    min protocol = NT1</pre>
     <p>Then run <code>sudo systemctl restart smbd</code>. If you use a password, set up a Samba user with <code>sudo smbpasswd -a &lt;username&gt;</code> instead of using <code>guest ok = yes</code>.</p>
-    <p>The <code>min protocol = NT1</code> line above is only there to let a modern Samba still answer <b>SMBv1</b>. If you set <b>SMB Version</b> to <b>SMB2</b> in Device Settings, drop that line and leave Samba at its own defaults.</p>
+    <p>The <code>min protocol = NT1</code> line above is only there to let a modern Samba still answer <b>SMBv1</b>. If you set <b>SMB Version</b> to <b>SMB2</b> in Game Sources, drop that line and leave Samba at its own defaults.</p>
   </div>
   <div class="step">
     <h3>Place your game ISOs</h3>
@@ -153,9 +153,9 @@ If your share contains more than one OPL layout — for example you have multipl
 
 <p>After filling in the fields, press <b>OK</b> to save. The dialog also has a <b>Reconnect</b> button: it saves and immediately retries the SMB connection without a full restart. If anything changed on the server (new files, credentials updated), Reconnect refreshes the game list without rebooting.</p>
 
-<h2 id="enable-smb">3. Enable SMB in Device Settings</h2>
+<h2 id="enable-smb">3. Enable SMB in Game Sources</h2>
 
-<p>Network Settings stores the <em>how</em> (address, credentials). <b>Device Settings</b> stores the <em>whether</em> — open <b>Settings → Device Settings</b>. The network block is <b>four separate rows</b>, not one combined picker. For SMB you set the first row to Manual or Auto, the second to SMB, and the third to the dialect your server speaks:</p>
+<p>Network Settings stores the <em>how</em> (address, credentials). <b>Game Sources</b> stores the <em>whether</em> — open <b>Settings → Game Sources</b>. The network block is <b>four separate rows</b>, not one combined picker. For SMB you set the first row to Manual or Auto, the second to SMB, and the third to the dialect your server speaks:</p>
 
 <table data-sortable>
   <thead><tr><th>Row</th><th>Values</th><th>What it does</th></tr></thead>
@@ -251,10 +251,10 @@ The <b>SMB Version</b> setting governs OPL's own browsing and its in-game reader
 
 <ul class="checklist">
   <li><b>SMB active:</b> OPL loads its own network stack (NETMAN + SMAP + PS2IP) and connects to the share. UDPBD/UDPFS cannot load.</li>
-  <li><b>Network Boot active:</b> Neutrino's UDPBD or UDPFS driver owns the adapter. The SMB stack will not load (enforced both in the Device Settings UI and by a runtime guard in <code>ethsupport.c</code>).</li>
+  <li><b>Network Boot active:</b> Neutrino's UDPBD or UDPFS driver owns the adapter. The SMB stack will not load (enforced both in the Game Sources UI and by a runtime guard in <code>ethsupport.c</code>).</li>
 </ul>
 
-<p>To switch from SMB to Network Boot (or vice versa), go to <b>Device Settings</b>, change the <b>Protocol</b> row, save, and restart OPL. You do not need to change any hardware.</p>
+<p>To switch from SMB to Network Boot (or vice versa), go to <b>Game Sources</b>, change the <b>Protocol</b> row, save, and restart OPL. You do not need to change any hardware.</p>
 
 <p>The two approaches serve different use cases: SMB lets any device on the LAN (NAS, always-on PC, server) host your library with no special server software beyond a standard file share; Network Boot via UDPBD/UDPFS requires a dedicated server process running on a PC during play but streams the disc image at block-device level (Neutrino handles the disc emulation, not OPL's loader core). See <a href="network-boot.html">Network Boot (UDPBD/UDPFS)</a> for details.</p>
 
@@ -281,7 +281,7 @@ The <b>SMB Version</b> setting governs OPL's own browsing and its in-game reader
     </tr>
     <tr>
       <td>ETH Games tab lists nothing at all after switching to SMB2</td>
-      <td>Almost always a dialect mismatch: the server only speaks SMBv1. The session does not negotiate down, so nothing is listed. Set <b>Device Settings → SMB Version</b> back to <b>SMBv1</b> (required for the bundled PS2 Servers SMBv1 server), or point OPL at a server that speaks SMB2. If you just changed the row and nothing moved at all, restart OPL — see below.</td>
+      <td>Almost always a dialect mismatch: the server only speaks SMBv1. The session does not negotiate down, so nothing is listed. Set <b>Game Sources → SMB Version</b> back to <b>SMBv1</b> (required for the bundled PS2 Servers SMBv1 server), or point OPL at a server that speaks SMB2. If you just changed the row and nothing moved at all, restart OPL — see below.</td>
     </tr>
     <tr>
       <td>Changing SMB Version appears to do nothing</td>

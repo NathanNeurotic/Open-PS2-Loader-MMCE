@@ -52,29 +52,30 @@
 <h1>USB / MX4SIO / iLink</h1>
 <p class="lead">USB mass storage, MX4SIO SD cards (via memory-card slot adapter), and iLink (SBP2 over IEEE 1394)
 are OPL's three <b>BDM mass-device transports</b>. They share the same filesystem rules, folder layout, and
-Device Settings controls — all three mount into the <code>massN:</code> namespace and are handled by the
+Game Sources controls — all three mount into the <code>massN:</code> namespace and are handled by the
 Block Device Manager (BDM).</p>
 
 <div class="callout info"><div class="h">i All three ship off — you opt in</div>
 On a fresh install RiptOPL ships with <b>USB, iLink and MX4SIO all disabled</b> and <b>BDM Start Mode</b> set to
-<b>Off</b> — every device on the Devices page starts off so you enable exactly the hardware your rig has. Turn
-on the transport you use, and set a start mode, in <b>Device Settings</b>. Until you do, a fresh install boots
+<b>Off</b> — every device in Game Sources starts off so you enable exactly the hardware your rig has. Turn
+on the transport you use, and set a start mode, in <b>Game Sources</b>. Until you do, a fresh install boots
 to the start menu with no game-list tabs at all.</div>
 
 <h2 id="hardware">The three transports</h2>
 
 <h3>USB</h3>
-<p>Standard USB mass storage (the <code>usb</code> BDM driver). Any USB 1.1-compatible flash drive or hard
-drive works. The PS2's USB controller is USB 1.1 — real-world throughput is roughly 3–4 MB/s, which is enough
-for DVD-speed game streaming. High-speed USB 2.0 drives are compatible and will simply run at 1.1 speeds.</p>
-<p>Enable toggle in Device Settings: <b>USB → On/Off</b>.</p>
+<p>Standard USB mass storage (the <code>usb</code> BDM driver). The PS2's controller is USB 1.1, so a
+USB 2.0/3.x drive falls back to the console's slower bus speed; actual compatibility and throughput
+depend on the drive/enclosure. USB is substantially slower than the PS2 DVD drive, which is why some
+streaming-heavy games stutter even when the files are contiguous.</p>
+<p>Enable toggle in Game Sources: <b>USB → On/Off</b>.</p>
 
 <h3>MX4SIO</h3>
 <p>The MX4SIO adapter plugs into the memory-card slot (SIO2 bus) and accepts a standard SD or microSD card.
 OPL registers it under the <code>sdc</code> / <code>mx4sio</code> BDM driver name. From OPL's perspective
 the card behaves identically to a USB drive — same folder layout, same filesystem requirements, same per-game
 settings — but it connects through the memory-card port rather than USB.</p>
-<p>Enable toggle in Device Settings: <b>MX4SIO → On/Off</b>.</p>
+<p>Enable toggle in Game Sources: <b>MX4SIO → On/Off</b>.</p>
 
 <div class="callout info"><div class="h">i MX4SIO and MMCE are different</div>
 MX4SIO mounts the SD card directly as a FAT32/exFAT block device (games in <code>DVD/</code> and
@@ -86,7 +87,16 @@ volume — they use different IOP drivers and separate enable toggles. See <a hr
 devices are <code>sd</code> / <code>ilink</code>. Supported storage includes SBP-2 compliant hard drives and
 enclosures. This interface is only present on fat PS2 models that include the iLink port; slim PS2
 models do not have an iLink port.</p>
-<p>Enable toggle in Device Settings: <b>iLink → On/Off</b>.</p>
+<p>Enable toggle in Game Sources: <b>iLink → On/Off</b>.</p>
+
+<div class="callout amber"><div class="h">⚠ Revision 2692 iLink launch status</div>
+On an SCPH-39001, the same IEEE 1394 disk listed and launched Ember in all four SDK flavours, but
+native OPL, Neutrino, and POPSTARTER failed at their reset/handoff boundaries. The post-2692 build
+corrects a confirmed Neutrino handoff mismatch by auto-emitting <code>-qb</code> with
+<code>-bsd=ilink</code>; hardware retest must still prove whether that was the complete cause.
+POPSTARTER's loose <code>.ilink</code> equip is present but unconfirmed, and native OPL remains under investigation. See
+<a href="troubleshooting.html#ilink-handoff-status">the iLink isolation notes</a>.
+</div>
 
 <h2 id="filesystems">Supported filesystems</h2>
 <p>All three transports support <b>FAT32</b> and <b>exFAT</b>, both on an <b>MBR</b> partition table. GPT
@@ -108,14 +118,14 @@ format tool. Choosing a non-default cluster size can cause compatibility issues.
 <h2 id="folder-layout">Folder layout</h2>
 <p>OPL expects the following directory structure at the root of the drive (or inside the optional
 <a href="#prefix">BDM Prefix</a> subfolder). OPL creates most of these folders for you the first time it
-initialises the device <em>after you have enabled it in Device Settings</em> — not on first boot, and never
+initialises the device <em>after you have enabled it in Game Sources</em> — not on first boot, and never
 for a device you have not turned on. <code>POPS/</code> is the exception: OPL never creates it, so make it
 yourself if you want PS1/VCD games.</p>
 
 <pre>
 DVD/        PS2 DVD5/DVD9 ISO and ZSO images (also supports &gt;4 GB on exFAT)
 CD/         PS2 CD-ROM ISO images (blue-bottom discs)
-POPS/       PS1 VCD game images (*.VCD) — listed under the L3 PS1 view
+POPS/       PS1 VCD game images (*.VCD) — shown according to PS2/PS1 Game Display
 CFG/        Per-game configuration files
 ART/        Cover art images
 VMC/        Virtual Memory Card images
@@ -169,18 +179,19 @@ all games regardless of size. If your drive is FAT32, use USBExtreme for any gam
   <li>ZSO (compressed ISO) is also supported on both FAT32 and exFAT. See <a href="zso.html">ZSO Format</a>.</li>
 </ul>
 
-<h2 id="device-settings">Enabling devices in Device Settings</h2>
-<p>Open <b>Device Settings</b> (from the main OPL menu) for the start mode and the per-transport toggles. The
-cache and prefix rows are <em>not</em> on that screen — they were moved to <b>General Settings</b> so Device
-Settings is strictly device selection:</p>
+<span id="device-settings"></span>
+<h2 id="game-sources">Enabling devices in Game Sources</h2>
+<p>Open <b>Game Sources</b> from the Settings Index for the start mode and the per-transport toggles. The
+cache and prefix rows are <em>not</em> on that screen — they were moved to <b>General Settings</b> so Game
+Sources is strictly device selection:</p>
 
 <table data-sortable>
 <thead><tr><th>Setting</th><th>What it does</th><th>Default</th></tr></thead>
 <tbody>
-<tr><td><b>BDM Start Mode</b></td><td>Off / Manual / Auto — controls when OPL scans for mass devices (Device Settings)</td><td>Off</td></tr>
-<tr><td><b>USB</b></td><td>Enable/disable the USB mass storage driver (Device Settings)</td><td>Off</td></tr>
-<tr><td><b>iLink</b></td><td>Enable/disable the IEEE 1394 SBP-2 driver (Device Settings)</td><td>Off</td></tr>
-<tr><td><b>MX4SIO</b></td><td>Enable/disable the MX4SIO SD driver (Device Settings)</td><td>Off</td></tr>
+<tr><td><b>BDM Start Mode</b></td><td>Off / Manual / Auto — controls when OPL scans for mass devices (Game Sources)</td><td>Off</td></tr>
+<tr><td><b>USB</b></td><td>Enable/disable the USB mass storage driver (Game Sources)</td><td>Off</td></tr>
+<tr><td><b>iLink</b></td><td>Enable/disable the IEEE 1394 SBP-2 driver (Game Sources)</td><td>Off</td></tr>
+<tr><td><b>MX4SIO</b></td><td>Enable/disable the MX4SIO SD driver (Game Sources)</td><td>Off</td></tr>
 <tr><td><b>BDM Cache</b></td><td>Read-ahead cache size in sectors (0–32) — <b>General Settings → Cache &amp; Storage</b></td><td>16</td></tr>
 <tr><td><b>BDM Prefix</b></td><td>Optional subfolder inside the drive root where OPL looks for its folders — <b>General Settings → Prefix Paths</b></td><td>(empty)</td></tr>
 </tbody>
@@ -211,7 +222,7 @@ slots.</p>
 
 <details class="deep"><summary>Drive is not detected / game list is empty</summary>
 <ul>
-  <li>Confirm the correct transport is enabled in <b>Device Settings</b> (USB / iLink / MX4SIO).</li>
+  <li>Confirm the correct transport is enabled in <b>Game Sources</b> (USB / iLink / MX4SIO).</li>
   <li>Check that <b>BDM Start Mode</b> is not set to <b>Off</b>.</li>
   <li>Make sure the drive uses an <b>MBR</b> partition table (not GPT) and is formatted FAT32 or exFAT.</li>
   <li>Verify the folder structure — games must be in <code>DVD/</code> or <code>CD/</code> (case-sensitive).
@@ -232,13 +243,13 @@ OPLUtil / USBUtil) or reformat the drive as exFAT and use plain ISO files.</p>
 </details>
 
 <details class="deep"><summary>MX4SIO not detected</summary>
-<p>MX4SIO uses the memory-card port. Make sure <b>MX4SIO</b> is enabled in Device Settings. Note that
+<p>MX4SIO uses the memory-card port. Make sure <b>MX4SIO</b> is enabled in Game Sources. Note that
 MX4SIO and a physical memory card (or MMCE device) cannot share the same slot simultaneously.</p>
 </details>
 
 <details class="deep"><summary>iLink not detected</summary>
 <p>iLink is only available on larger PS2 models. Slim PS2 (PS2 Slim / 7000x and later) do not have the
-iLink port. If your model has the port, make sure <b>iLink</b> is enabled in Device Settings and the drive
+iLink port. If your model has the port, make sure <b>iLink</b> is enabled in Game Sources and the drive
 is SBP-2 compliant.</p>
 </details>
 </main>

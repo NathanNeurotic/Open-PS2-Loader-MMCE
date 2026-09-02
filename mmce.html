@@ -76,8 +76,8 @@ preferred for reliability.</p></div>
 <p>Insert the SD2PSX or MemCard PRO2 (with the SD card loaded) into a memory-card slot. Boot the PS2 and launch
 RiptOPL. OPL will detect the MMCE device automatically when MMCE Start Mode is set to <b>Auto</b>.</p></div>
 
-<div class="step"><h3>Enable MMCE in Device Settings</h3>
-<p>Open <b>Device Settings</b> from the RiptOPL main menu. Find the <b>MMCE Start Mode</b> option and set it to
+<div class="step"><h3>Enable MMCE in Game Sources</h3>
+<p>Open <b>Game Sources</b> from the RiptOPL Settings Index. Find the <b>MMCE Start Mode</b> option and set it to
 <b>Auto</b> (detects and mounts on boot) or <b>Manual</b> (shows the MMCE tab but only mounts when you navigate
 to it). Save settings. The <b>MMCE Games</b> tab appears in the game list once the device is detected.</p></div>
 
@@ -107,9 +107,10 @@ automatically on first launch.</p>
 <p>The device prefix is <code>mmce0:/</code> (slot 0) or <code>mmce1:/</code> (slot 1). In
 <code>conf_apps.cfg</code>, reference ELFs on the MMCE card as <code>mmce:APPS/MYAPP.ELF</code>.</p>
 
-<h2 id="device-settings">Where the MMCE settings live</h2>
+<span id="device-settings"></span>
+<h2 id="game-sources">Where the MMCE settings live</h2>
 <p>MMCE is configured across <b>three</b> pages of the RiptOPL main menu. <b>MMCE Start Mode</b> stays in
-<b>Device Settings</b>, alongside the other device start modes. The MMCE tuning rows — <b>Slot</b>,
+<b>Game Sources</b>, alongside the other device start modes. The MMCE tuning rows — <b>Slot</b>,
 <b>IGR Bootcard Slot(s)</b>, <b>Send GameID on Launch</b>, <b>Wait Cycles after /ACK low</b> and
 <b>Use Timeout Alarms</b> — moved out to their own <b>Settings &rarr; MMCE Settings</b> page.
 <b>MMCE Prefix Path</b> is on a third page: <b>Settings &rarr; General Settings</b>, under the
@@ -125,7 +126,7 @@ automatically on first launch.</p>
 <tr><td><b>Auto</b></td><td>Driver loads at boot and the tab is shown immediately if a device is detected.</td></tr>
 </tbody>
 </table>
-<p>Every device on the Devices page ships <b>Off</b>: a fresh install boots to the start menu with no tabs, and
+<p>Every device in Game Sources ships <b>Off</b>: a fresh install boots to the start menu with no tabs, and
 you enable exactly what your rig has. A saved config overrides the shipped default on load.</p>
 
 <h3 id="slot">MMCE Slot</h3>
@@ -140,7 +141,7 @@ you enable exactly what your rig has. A saved config overrides the shipped defau
 </table>
 
 <h3 id="prefix-path">MMCE Prefix Path</h3>
-<p><i>(<b>Settings &rarr; General Settings</b>, under <b>Prefix Paths</b> — not Device Settings or MMCE
+<p><i>(<b>Settings &rarr; General Settings</b>, under <b>Prefix Paths</b> — not Game Sources or MMCE
 Settings.)</i> An optional sub-path appended after the device root before OPL looks for game folders.
 Useful when your SD card serves multiple purposes and you want to keep OPL files in a subdirectory — for example, setting the prefix to
 <code>OPL</code> causes OPL to look for games in <code>mmce0:/OPL/DVD/</code> instead of
@@ -229,7 +230,7 @@ folders under the MMCE root (or the Prefix Path subdirectory if set).</li>
 <li>The config file (<code>settings_riptopl.cfg</code>) can be stored on the MMCE card. OPL probes MMCE before
 BDM devices during config discovery, so an MMCE-resident config is found reliably.</li>
 <li>MMCE is <b>not</b> MX4SIO. If your adapter uses the MX4SIO driver (rather than the bbsan2k MMCE protocol),
-it mounts as <code>massN:</code> via BDM — enable it with the USB/MX4SIO toggle in Device Settings, not the
+it mounts as <code>massN:</code> via BDM — enable it with the USB/MX4SIO toggle in Game Sources, not the
 MMCE Start Mode. See <a href="usb.html">USB / MX4SIO / iLink</a>.</li>
 </ul>
 

@@ -54,7 +54,7 @@
 no driver. Drop it where your PS2 boot method expects an ELF and you are done with the install step. This page covers exactly what to download, where to put it, what happens the first time it runs, and what the opinionated defaults mean for you.</p>
 
 <h2 id="what-is-riptopl-elf">What is RIPTOPL.ELF?</h2>
-<p>RiptOPL is a downstream fork of <a href="https://github.com/ps2homebrew/Open-PS2-Loader">Open PS2 Loader</a> compiled to a single PS2 ELF binary. The standard build includes GSM video-mode handling, DS3/DS4 pad emulation (PADEMU), Virtual Memory Cards (VMC), PS2RD cheats, and parental controls in one file. There are no per-feature variant builds to choose between for those; the one ELF does it all. Some build flags are left off by default. <b>In-game screenshots (IGS) and right-to-left (RTL) language support are not compiled into any of the ready-to-use loader ELFs</b> — the Makefile ships <code>EXTRA_FEATURES ?= 0</code> and both flags follow it, so the main, <code>-ds5</code>, and <code>1080p</code> downloads are all built without them. To get IGS or RTL you need an <code>-extra1</code> build from <code>RIPTOPL-VARIANTS-*.zip</code>, or your own <code>make EXTRA_FEATURES=1</code>. DualSense / DualShock 5 (USB) support ships as a ready-made <code>RIPTOPL-&lt;version&gt;-&lt;SDK&gt;-ds5.ELF</code> for each SDK flavour, and an experimental, hardware-unvalidated GSM 1080p mode ships as <code>RIPTOPL-PS2DEVLATESTSDK-1080p.ELF</code> (latest-SDK flavour only, gated behind a triple confirm in the GUI). You only need <code>make DUALSENSE=1</code> / <code>make GSM1080P=1</code> if you build your own — check the <a href="releases.html">Releases</a> page for the current variant availability.</p>
+<p>RiptOPL is a downstream fork of <a href="https://github.com/ps2homebrew/Open-PS2-Loader">Open PS2 Loader</a> compiled to a single PS2 ELF binary. The standard build includes GSM video-mode handling (including the hardware-confirmed forced-progressive 1080p mode), DS3/DS4 pad emulation (PADEMU), Virtual Memory Cards (VMC), PS2RD cheats, and parental controls in one file. There are no per-feature variant builds to choose between for those; the one ELF does it all. Some build flags are left off by default. <b>In-game screenshots (IGS) and right-to-left (RTL) language support are not compiled into the standard loader folders in the unified package</b> — the Makefile ships <code>EXTRA_FEATURES ?= 0</code> and both flags follow it. To get IGS or RTL, use a ready-made <code>-extra1</code> loader from <code>RIPTOPL-VARIANTS-*.zip</code> or build with <code>make EXTRA_FEATURES=1</code>. DualSense / DualShock 5 (USB) support ships as a ready-made <code>RIPTOPL-&lt;version&gt;-&lt;SDK&gt;-ds5.ELF</code> for each available SDK flavour inside <code>RIPTOPL-VARIANTS-*.zip</code>. The standard loaders already include 1080p; its picker is gated behind a triple confirmation, and holding <b>Triangle + Cross</b> during console boot forces safe 480p progressive recovery. You only need <code>make DUALSENSE=1</code> if you build your own DualSense loader — check the <a href="releases.html">Releases</a> page for current assets.</p>
 
 <div class="callout info"><div class="h">ℹ Private config, shared data</div>
 RiptOPL saves its master settings to <code>settings_riptopl.cfg</code> — a different filename from canonical OPL's <code>conf_opl.cfg</code> and from wOPL's config. That means RiptOPL, OPL, and wOPL can all sit on the same memory card without touching each other's settings. Everything else in the <code>OPL/</code> folder — cover art, themes, VMCs, per-game configs (<code>CFG/</code>), and the <code>favourites.bin</code> star list — is <strong>shared</strong> across all builds that understand those formats.
@@ -67,9 +67,9 @@ RiptOPL saves its master settings to <code>settings_riptopl.cfg</code> — a dif
 <thead><tr><th>Channel</th><th>Tag</th><th>When to use</th></tr></thead>
 <tbody>
 <tr>
-  <td><b>Rolling pre-release</b></td>
+  <td><b>Rolling (Latest)</b></td>
   <td><code>rolling</code></td>
-  <td>Latest code from <code>master</code>, rebuilt on every push. Best for eager testers who want new features as they land. May be unstable — release notes flag when the digest-pinned fallback build failed that run.</td>
+  <td>Latest code from the publishing branch (<code>rebuild/main</code> during the rebuild, then <code>master</code>), rebuilt on every push and published as GitHub's full, non-pre-release Latest release. Best for eager testers; it may be unstable.</td>
 </tr>
 <tr>
   <td><b>Tagged release</b></td>
@@ -79,18 +79,21 @@ RiptOPL saves its master settings to <code>settings_riptopl.cfg</code> — a dif
 </tbody>
 </table>
 
-<p>See <a href="releases.html">Releases</a> for the full asset listing, checksums, and pull instructions. The short version: download the <code>RIPTOPL-&lt;rel&gt;-&lt;sha&gt;.zip</code> installable package, unzip it, and use the <code>APP_RIPTOPL-PS2DEVLATESTSDK/RIPTOPL.ELF</code> inside.</p>
+<p>See <a href="releases.html">Releases</a> for the full asset listing and pull instructions. The short version: download the <code>RIPTOPL-&lt;rel&gt;-&lt;sha&gt;.zip</code> installable package, unzip it, and start with <code>APP_RIPTOPL-PS2DEVPINNED/RIPTOPL.ELF</code> when that best-effort flavour is present.</p>
 
 <details class="deep"><summary>What is inside the installable zip?</summary>
 <p>The <code>RIPTOPL-&lt;rel&gt;-&lt;sha&gt;.zip</code> package contains:</p>
 <ul>
-  <li><code>APP_RIPTOPL-PS2DEVLATESTSDK/RIPTOPL.ELF</code> — built with <code>ps2dev/ps2dev:latest</code>, the current SDK RiptOPL is developed and tested against. This is the recommended one.</li>
-  <li><code>APP_RIPTOPL-PS2DEVPINNEDSDK/RIPTOPL.ELF</code> — the same ps2dev SDK, pinned by digest to a day it was known good. Use this if the recommended build has a regression on your console.</li>
+  <li><code>APP_RIPTOPL-PS2DEVPINNED/RIPTOPL.ELF</code> — #1 recommended primary, built with a digest-pinned ps2dev SDK.</li>
+  <li><code>APP_RIPTOPL-OFFICIALPINNED/RIPTOPL.ELF</code> — #2 recommended official pinned control.</li>
+  <li><code>APP_RIPTOPL-PS2DEVROLLING/RIPTOPL.ELF</code> — #3 moving <code>ps2dev:latest</code> canary and the required-to-compile flavour.</li>
+  <li><code>APP_RIPTOPL-OFFICIALROLLING/RIPTOPL.ELF</code> — #4 moving official <code>ps2homebrew:main</code> canary.</li>
   <li><code>POPS/</code> — the single canonical release folder for POPSTARTER support. It contains <code>POPSTARTER.ELF</code>, the SMB externals, <code>PATCH_5.BIN</code>, and every loose BDMA <code>usbd.irx.*</code> / <code>usbhdfsd.irx.*</code> pair, including <code>.ilink</code>. No BDMA pair is embedded in <code>RIPTOPL.ELF</code>, and there is no duplicate release-root <code>POPSTARTER/</code> folder. Only <code>POPS.ELF</code> — Sony's PS1 emulator — is not distributed here.</li>
+  <li><code>EMBER/</code> — the bundled external Ember PS1 core, unmodified and ready for the user-supplied BIOS and games.</li>
   <li><code>neutrino/</code> — the bundled Neutrino external core, shipped extracted as a drag-and-drop folder (<code>neutrino.elf</code> + <code>config/</code> + <code>modules/</code>) used by the <b>network-boot (UDPBD/UDPFS)</b> subsystem (pre-populated with the UDPFS config). Copy it to <code>mc?:/neutrino/</code> — that path is exactly what <b>Neutrino ELF Path</b> auto-detect looks for, and the same copy serves both per-game Neutrino launching and network boot. No separate download is needed.</li>
-  <li><code>PS2-Servers.url</code> — opens the maintained <a href="https://github.com/NathanNeurotic/PS2-Servers">PS2 Servers</a> UDPFS / SMBv1 / UDPBD all-in-one PC launcher. The server software itself is no longer embedded in the RiptOPL package.</li>
+  <li>Five <code>.url</code> shortcuts — <a href="https://github.com/NathanNeurotic/PS2-Servers">PS2-Servers</a>, <a href="https://github.com/YouKnow-sys/udpfs-server">udpfs-server</a>, <a href="https://github.com/Luden02/OrbitPS2-Manager">OrbitPS2 Manager</a>, <a href="https://github.com/shaanhomebrew-cloud/OPL-PS1-AIO-Converter-GUI">OPL PS1 AIO Converter GUI</a>, and <a href="https://github.com/TheRealNextria/PS2RD-CHT-Manager">PS2RD CHT Manager</a>. These are links to the maintained external tools; the tools themselves are not embedded in the RiptOPL package.</li>
 </ul>
-<p>The bare <code>RIPTOPL-&lt;version&gt;-PS2DEVLATESTSDK.ELF</code> and <code>RIPTOPL-&lt;version&gt;-PS2DEVPINNEDSDK.ELF</code> files (both toolchains) are also published separately if you only want to drop a fresh ELF over an existing install. <code>SHA256SUMS.txt</code> — hashes of every published binary plus the source snapshot — is published alongside the zip as its own release asset, not as a file inside it.</p>
+<p>The final GitHub asset set contains up to five archives: the unified package, exact source snapshot, variants, and the language/debug packs when those optional jobs produce them. Bare loader ELFs and build/checksum manifests are not separate public assets; standard loaders are inside the unified package, and DualSense loaders are inside <code>RIPTOPL-VARIANTS-*.zip</code>.</p>
 </details>
 
 <h2 id="install">Getting RIPTOPL.ELF onto your PS2</h2>
@@ -99,11 +102,11 @@ RiptOPL saves its master settings to <code>settings_riptopl.cfg</code> — a dif
 <div class="steps">
   <div class="step">
     <h3>1. Download the package</h3>
-    <p>Go to the <a href="https://github.com/NathanNeurotic/Open-PS2-Loader/releases" target="_blank" rel="noopener">Releases page</a> and grab either the latest <code>rolling</code> pre-release or the most recent <code>v*</code> tagged release. Download the <code>RIPTOPL-*.zip</code> installable package and unzip it locally.</p>
+    <p>Go to the <a href="https://github.com/NathanNeurotic/Open-PS2-Loader/releases" target="_blank" rel="noopener">Releases page</a> and grab either the <code>rolling</code> Latest development release or a curated <code>v*</code> tagged release. Download the unified <code>RIPTOPL-&lt;rel&gt;-&lt;sha&gt;.zip</code> installable package (the archive without <code>LANGS</code>, <code>VARIANTS</code>, <code>DEBUG</code>, or <code>src</code> in its name) and unzip it locally.</p>
   </div>
   <div class="step">
     <h3>2. Copy RIPTOPL.ELF to your boot location</h3>
-    <p>Use the ELF from <code>APP_RIPTOPL-PS2DEVLATESTSDK/RIPTOPL.ELF</code> inside the zip. Where it goes depends on your boot method:</p>
+    <p>Use the ELF from <code>APP_RIPTOPL-PS2DEVPINNED/RIPTOPL.ELF</code> inside the zip when present; otherwise use the next available labelled flavour in the documented order. Where it goes depends on your boot method:</p>
     <ul>
       <li><b>FMCB</b> — copy <code>RIPTOPL.ELF</code> to a folder on a USB drive, memory card, or SMB share, then add a FMCB menu entry pointing to it. A common convention is <code>mass:/APPS/RIPTOPL/RIPTOPL.ELF</code> or <code>mc0:/RIPTOPL/RIPTOPL.ELF</code>.</li>
       <li><b>FHDB</b> — copy into an HDD partition the same way FHDB expects its launch targets.</li>
@@ -143,7 +146,7 @@ When you enable a device mode in OPL settings and exit back to the game list, OP
   </div>
   <div class="step">
     <h3>Enable your device</h3>
-    <p>Navigate to <b>Settings → Device Settings</b>. Enable the storage device(s) you want to use. Nothing is on by default: turn <b>USB</b> on and set the BDM tab's start mode to <b>Manual</b> or <b>Auto</b>, then save. Games in <code>DVD/</code> and <code>CD/</code> appear after the first scan. For SMB, HDD, MMCE, MX4SIO, iLink, or network boot, enable the corresponding toggle and fill in any required details (IP address for SMB/network boot, etc.).</p>
+    <p>Navigate to <b>Settings → Game Sources</b>. Enable the storage device(s) you want to use. Nothing is on by default: turn <b>USB</b> on and set the BDM tab's start mode to <b>Manual</b> or <b>Auto</b>, then save. Games in <code>DVD/</code> and <code>CD/</code> appear after the first scan. For SMB, HDD, MMCE, MX4SIO, iLink, or network boot, enable the corresponding toggle and fill in any required details (IP address for SMB/network boot, etc.).</p>
   </div>
   <div class="step">
     <h3>Save settings</h3>
@@ -168,18 +171,18 @@ When you enable a device mode in OPL settings and exit back to the game list, OP
 <tr><td>Sound effects (SFX)</td><td>ON (volume 80)</td><td>Audio Settings</td></tr>
 <tr><td>Boot sound</td><td>ON (volume 80)</td><td>Audio Settings</td></tr>
 <tr><td>BGM (background music)</td><td>ON (volume 70)</td><td>Audio Settings</td></tr>
-<tr><td>USB, iLink, MX4SIO, exFAT HDD, UDPBD</td><td>OFF</td><td>Device Settings</td></tr>
-<tr><td>Device start mode (all tabs)</td><td>Off (disabled)</td><td>Device Settings</td></tr>
+<tr><td>USB, iLink, MX4SIO, exFAT HDD, UDPBD</td><td>OFF</td><td>Game Sources</td></tr>
+<tr><td>Device start mode (all tabs)</td><td>Off (disabled)</td><td>Game Sources</td></tr>
 <tr><td>Video mode</td><td>Auto (0)</td><td>Interface / GSM</td></tr>
 <tr><td>Default theme</td><td>&lt;Coverflow&gt; (built-in)</td><td>Theme Settings</td></tr>
 <tr><td>Delete/rename games</td><td>Enabled</td><td>General Settings</td></tr>
 <tr><td>Visual GameID barcode</td><td>OFF</td><td>Interface</td></tr>
-<tr><td>UDPBD/UDPFS network boot</td><td>OFF</td><td>Device Settings</td></tr>
+<tr><td>UDPBD/UDPFS network boot</td><td>OFF</td><td>Game Sources</td></tr>
 </tbody>
 </table>
 
 <div class="callout info"><div class="h">ℹ Start modes</div>
-A fresh install ships with every device <b>Off</b>, so no device tabs appear until you enable one in Device Settings. Once a device is enabled, pick its start mode: <b>Manual</b> keeps the tab visible and only populates the game list when you navigate to that tab and explicitly trigger a scan — no automatic background scanning on boot — while <b>Auto</b> scans that tab when OPL starts.
+A fresh install ships with every device <b>Off</b>, so no device tabs appear until you enable one in Game Sources. Once a device is enabled, pick its start mode: <b>Manual</b> keeps the tab visible and only populates the game list when you navigate to that tab and explicitly trigger a scan — no automatic background scanning on boot — while <b>Auto</b> scans that tab when OPL starts.
 </div>
 
 <h2 id="config-file">Config file: settings_riptopl.cfg</h2>

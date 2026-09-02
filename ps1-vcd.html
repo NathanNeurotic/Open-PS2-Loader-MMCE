@@ -135,6 +135,13 @@ game <em>folder</em> and finds its own disc image inside it.</p>
 <code>mass:/POPS/XX.&lt;game&gt;.ELF</code>. The normal <code>XX.</code> filename rules therefore
 apply unchanged.</p>
 
+<div class="callout amber"><div class="h">⚠ iLink POPSTARTER is wired, not yet hardware-confirmed</div>
+Revision 2692 still returned POPSTARTER to wLaunchELF from iLink on an SCPH-39001 in all four SDK
+flavours, while Ember passed from the same drive. The selector and external equip documented here
+are present, but that test result is not a pass. Use the card-file checks below to distinguish a
+RiptOPL equip failure from a POPSTARTER/BDMA runtime failure after handoff.
+</div>
+
 <h3>POPSTARTER.ELF path</h3>
 <p>By default RiptOPL looks for <code>POPSTARTER.ELF</code> in each device's <code>POPS</code>
 folder. To pin it to one device instead, set
@@ -255,6 +262,16 @@ For iLink the loose source pair is <code>usbd.irx.ilink</code> +
 copies them to the card as <code>usbd.irx</code> + <code>usbhdfsd.irx</code>.
 </div>
 
+<div class="callout info"><div class="h">ℹ Verify an iLink equip after a failed launch</div>
+The card should contain <code>mc?:/POPSTARTER/bdma_config.txt</code> with exactly <code>ilink</code>,
+<code>usbd.irx</code> at 48,500 bytes (SHA-256
+<code>5EA4818BA1CF5207F6D7CADB4C13B5AFA88C37C260750C21155B079A8C18F369</code>), and
+<code>usbhdfsd.irx</code> at 23,452 bytes (SHA-256
+<code>145CF1C0AF130EA7AC5CEC6696AA7E60B5C66A2AC46B8DEA94DB17BB3B911BCC</code>). Missing or different
+files identify RiptOPL's external-equip leg; exact files narrow the remaining failure to the
+POPSTARTER/BDMA reinitialization leg.
+</div>
+
 <h3>BDMA Mode</h3>
 <p>Shown only when <b>VCD BDMA Apply on Launch</b> is <b>Off</b>. Selects which driver variant
 POPSTARTER should use:</p>
@@ -265,7 +282,7 @@ POPSTARTER should use:</p>
     <tr><td><b>USB (exFAT)</b></td><td>Equips the USB exFAT BDMAssault modules.</td></tr>
     <tr><td><b>MX4SIO (exFAT)</b></td><td>Equips the MX4SIO exFAT BDMAssault modules.</td></tr>
     <tr><td><b>MMCE (exFAT)</b></td><td>Equips the MMCE exFAT BDMAssault modules.</td></tr>
-    <tr><td><b>HDD (exFAT)</b></td><td>Equips the internal ATA HDD BDMAssault modules. Requires <em>HDD (GPT/MBR)</em> enabled in Device Settings.</td></tr>
+    <tr><td><b>HDD (exFAT)</b></td><td>Equips the internal ATA HDD BDMAssault modules. Requires <em>HDD (GPT/MBR)</em> enabled in Game Sources.</td></tr>
     <tr><td><b>iLink</b></td><td>Equips the iLink / IEEE 1394 BDMAssault modules from the <code>.ilink</code> pair.</td></tr>
   </tbody>
 </table>
@@ -336,7 +353,7 @@ hanging silently.</p>
   <code>__.POPS0</code> … <code>__.POPS9</code>). RiptOPL scans all of them and lists their
   <code>*.VCD</code> files in the HDD device's PS1 view. No BDMA equip is needed here because
   POPSTARTER reads PFS natively.</li>
-  <li><b>exFAT HDD (BDM)</b> — enable <em>HDD (GPT/MBR)</em> in Device Settings. The exFAT volume
+  <li><b>exFAT HDD (BDM)</b> — enable <em>HDD (GPT/MBR)</em> in Game Sources. The exFAT volume
   mounts as a normal BDM block device (one of the <code>massN:</code> slots) and its
   <code>POPS/</code> folder appears in the same PS1 view as USB. Equip the
   <b>HDD (exFAT)</b> BDMA mode so POPSTARTER can read back off the exFAT volume at launch time.</li>
