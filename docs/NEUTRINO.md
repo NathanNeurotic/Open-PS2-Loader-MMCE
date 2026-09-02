@@ -89,6 +89,12 @@ editor, set `neutrino_path` in `settings_riptopl.cfg` directly.
 | USB Extreme split images (`.ul`) | ❌ (falls back to `<OPL>`) | n/a |
 | Compressed ISO (`.zso`) | ❌ (falls back to `<OPL>`) | n/a |
 
+> **Upstream rates iLink lowest of every backend.** Neutrino's own backend table lists iLink /
+> IEEE1394 at a device-compatibility score of **10**, against 80 for USB, 60 for MX4SIO and 100 for
+> MMCE, ATA, UDPBD and UDPFS -- and restricts it to **FAT PS2 models**. So a passing `-qb` retest is
+> necessary but may not be sufficient: some iLink enclosures are expected to fail upstream too. Use
+> the isolation checks below rather than assuming any single fix makes iLink universally work.
+
 Unsupported cases fall back to the `<OPL>` core automatically with an on-screen warning.
 
 > **PS1 games are a separate path.** PlayStation 1 titles (`*.VCD`, shown according to the shared
