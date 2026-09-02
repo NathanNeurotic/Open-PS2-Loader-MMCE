@@ -133,6 +133,9 @@ typedef struct
 static short vmc_refresh;
 static int vmc_operation;
 static statusVMCparam_t vmc_status;
+// Armed when the user starts a creation, cleared if they abort it. Gates the one-shot contiguity
+// report below so an aborted job -- whose file is gone -- never draws a complaint about its layout.
+static short vmc_check_layout;
 
 int guiGameVmcNameHandler(char *text, int maxLen)
 {
@@ -264,9 +267,27 @@ static int guiGameShowVMCConfig(int id, item_list_t *support, char *VMCName, int
                     diaSetEnabled(diaVMC, VMC_SIZE, 0);
                     diaSetLabel(diaVMC, VMC_BUTTON_CREATE, _l(_STR_ABORT));
                     vmc_operation = OPERATION_CREATING;
+                    vmc_check_layout = 1;
                 } else
                     break;
             } else if (vmc_operation == OPERATION_ENDING) {
+                // Creation just finished. Ask the device how the file actually landed, because a
+                // fragmented VMC is silently DROPPED at launch (mcemu needs one unbroken file) and
+                // the game then saves to the real memory card instead. Reported here, while the
+                // user is still in the dialog that made it and can simply build it again.
+                //
+                // Raised from the loop rather than from guiGameVMCUpdater: the updater runs inside
+                // diaExecuteDialog, and opening a message box from there would re-enter the dialog
+                // system. This branch is where the existing delete confirmation already draws.
+                //
+                // Only a definite 0 speaks. -1 is "this backing store cannot answer" -- every
+                // non-fatfs device -- and a guess there would be worse than silence.
+                if (vmc_check_layout) {
+                    vmc_check_layout = 0;
+                    if (sysVMCContiguity() == 0)
+                        guiMsgBox(_l(_STR_VMC_FRAGMENTED_ON_CREATE), 0, diaVMC);
+                }
+
                 if (validate)
                     break; // directly close VMC config dialog
 
@@ -276,6 +297,7 @@ static int guiGameShowVMCConfig(int id, item_list_t *support, char *VMCName, int
             } else if (vmc_operation == OPERATION_CREATING) { // User canceled creation of VMC
                 fileXioDevctl("genvmc:", 0xC0DE0002, NULL, 0, NULL, 0);
                 vmc_operation = OPERATION_ABORTING;
+                vmc_check_layout = 0; // nothing was finished; do not report on a cancelled file
             }
         } else if (result == VMC_BUTTON_DELETE) {
             if (guiMsgBox(_l(_STR_DELETE_WARNING), 1, diaVMC)) {
