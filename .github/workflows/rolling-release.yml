@@ -2,11 +2,11 @@ name: Rolling Release
 
 # Continuously publishes the current build of the PUBLISHING BRANCH to a single "rolling"
 # development release. It is a full (non-pre-release) GitHub release marked Latest, and it can be
-# pulled directly from a stable URL as development progresses. The publishing branch is `master`
-# (after cutover) or `rebuild/main` (during
-# the rebuild): rebuild/main is the physical publish knob -- it is fast-forwarded to a
+# pulled directly from a stable URL as development progresses. The publishing branch is
+# `rebuild/main`, and only rebuild/main: it is the physical publish knob, fast-forwarded to a
 # tested step-chain tip exactly when Nathan wants a rolling build to go out, never
-# automatically per step. See the NOTE(rebuild) on the publish-rolling gate below.
+# automatically per step. `master` is the OLD LINEAGE and is deliberately not wired to this
+# workflow at all -- see the NOTE(rebuild) on the publish-rolling gate below.
 #
 # Builds four flavours across the ps2dev and official ps2homebrew toolchain lineages so a regression
 # in either moving SDK or either pinned control is visible from the rolling channel (and a hardware
@@ -46,7 +46,9 @@ name: Rolling Release
 on:
   push:
     branches:
-      - master
+      # rebuild/main is THE publishing branch. master is the old lineage: it is kept
+      # around for history, and a push to it must never republish the rolling channel with
+      # pre-rebuild code. Deliberately not a trigger.
       - rebuild/main
     tags:
       - 'v*'
@@ -454,13 +456,14 @@ jobs:
     needs: [build-rolling-pinned, build-rolling-ps2dev-latest, build-rolling-officialsdk, build-rolling-official-pinned]
     # NOTE(rebuild): publish gate. Downstream this job has NO ref check -- anything that is not a
     # v* tag falls through to TAG="rolling" and updates the PUBLIC rolling release (see the tag/title block
-    # below). The gate therefore names the branches allowed to publish: master (post-cutover) and
-    # rebuild/main (the rebuild-line publish knob -- fast-forwarded to a tested step tip only when
-    # a rolling build is meant to go out). Any OTHER ref -- a step branch, workflow_dispatch from
-    # one, a feature branch -- still runs the build jobs (the part worth rehearsing) and uploads
-    # their artifacts, while withholding only the publish. On master, rebuild/main and v* tags the
-    # condition is true, so shipping behaviour is byte-for-byte what the fork does today.
-    if: ${{ github.ref == 'refs/heads/master' || github.ref == 'refs/heads/rebuild/main' || startsWith(github.ref, 'refs/tags/v') }}
+    # below). The gate therefore names the only branch allowed to publish: rebuild/main (the
+    # publish knob -- fast-forwarded to a tested step tip only when a rolling build is meant to go
+    # out). Any OTHER ref -- master, a step branch, workflow_dispatch from one, a feature branch --
+    # still runs the build jobs (the part worth rehearsing) and uploads their artifacts, while
+    # withholding only the publish. master is excluded on purpose: it is the abandoned lineage, and
+    # a push to it publishing over the rolling channel would ship pre-rebuild code as Latest. This
+    # gate is belt-and-braces with the push trigger above, which no longer lists master either.
+    if: ${{ github.ref == 'refs/heads/rebuild/main' || startsWith(github.ref, 'refs/tags/v') }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -991,39 +994,71 @@ jobs:
             # REFRESH THE ROLLING RELEASE DATE. `gh release edit` updates the body and the assets
             # but never touches published_at, which is what GitHub renders as the relative time --
             # so a package rebuilt today sat under "last month" and read as abandoned. Recreating
-            # the release would fix the date but reset the download counters, so it is patched in
+            # the release would fix the date but reset the download counters, so it is moved in
             # place.
             #
             # ROLLING ONLY. A refs/tags/v* run reaches this same branch for an existing release, and
             # a stable release must keep the date it was actually published -- rewriting that would
             # be a lie about history, not a cosmetic fix.
             #
-            # NO DRAFT FLIP. published_at is not in the documented body for "Update a release", so
-            # this may simply not take. The documented way to move it is a draft -> published
-            # transition, but that emits a `release: published` event, and release-normalize.yml
-            # subscribes to exactly that (on top of its workflow_run trigger) -- so the fallback
-            # would kick off a second, concurrent normalize of the release we are still publishing.
-            # A stale date is cosmetic; a re-entrant asset normalize is not. If the PATCH does not
-            # take, say so in the log and move on.
+            # WHY A DRAFT FLIP. PATCHing published_at does not work: GitHub accepts the request,
+            # returns 200, and silently ignores the field -- measured 2026-09-02 against this very
+            # release, where the before and after reads were byte-identical. It is not in the
+            # documented body for "Update a release", so there is no error to catch and the previous
+            # implementation could only ever log that it had failed. The one documented way to move
+            # published_at is a draft -> published transition.
+            #
+            # WHY THE OLD OBJECTION TO THAT FLIP DID NOT HOLD. It was refused because the flip emits
+            # a `release: published` event and release-normalize.yml subscribes to that event, which
+            # read like a re-entrant normalize of the release still being published. It is not:
+            # GitHub does not start a workflow run from an event raised with GITHUB_TOKEN, and that
+            # is the only token this job holds. Confirmed against history as well as the docs --
+            # every one of the last 30 release-normalize runs was triggered by workflow_run and not
+            # one by a release event, over a window that includes the run which CREATED this release
+            # (a genuine publish that would have fired the event if it could).
+            #
+            # A HIDDEN ROLLING RELEASE IS WORSE THAN A STALE DATE, so the flip is bounded twice: a
+            # trap republishes if anything between the two edits dies, and the state is asserted
+            # afterwards -- still-draft fails the job loudly rather than leaving users with an
+            # invisible download page. promote-rolling-latest.yml re-asserts it again after this
+            # workflow finishes.
             if [ "$TAG" = "rolling" ]; then
               RELEASE_ID=$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}" --jq .id 2>/dev/null || echo "")
               if [ -n "$RELEASE_ID" ]; then
-                # Compare against the value BEFORE the patch, not against today's date. A rolling
+                # Compare against the value BEFORE the flip, not against today's date. A rolling
                 # release republished twice in one day already carries today's date, so a
-                # date-only test would report success for a PATCH that did nothing.
+                # date-only test would report success for a flip that did nothing.
                 WAS=$(gh api "repos/${GITHUB_REPOSITORY}/releases/${RELEASE_ID}" --jq .published_at 2>/dev/null || echo "")
-                gh api -X PATCH "repos/${GITHUB_REPOSITORY}/releases/${RELEASE_ID}" \
-                  -f published_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)" >/dev/null 2>&1 || true
+                # set -eu is active in this step, so a failed draft=true aborts the script: this
+                # trap is what puts the channel back. INT/TERM are covered too, because a cancelled
+                # job does not run a bare EXIT trap.
+                trap 'gh release edit "rolling" --draft=false --prerelease=false --latest >/dev/null 2>&1 || true' EXIT INT TERM
+                gh release edit "$TAG" --draft=true >/dev/null
+                # Re-assert the channel's intended state on the way back up: a draft cannot hold the
+                # Latest marker, so it has to be claimed again as part of republishing.
+                gh release edit "$TAG" --draft=false --prerelease=false --latest >/dev/null
+                trap - EXIT INT TERM
                 GOT=$(gh api "repos/${GITHUB_REPOSITORY}/releases/${RELEASE_ID}" --jq .published_at 2>/dev/null || echo "")
                 # Only a comparison between two SUCCESSFUL reads proves anything. A failed read
                 # leaves its variable empty, and empty-vs-anything would otherwise look like a
-                # change and log a success the patch never earned.
+                # change and log a success the flip never earned.
                 if [ -z "$WAS" ] || [ -z "$GOT" ]; then
                   echo "NOTE: could not read published_at back (before='$WAS' after='$GOT'); date refresh unverified"
                 elif [ "$GOT" != "$WAS" ]; then
                   echo "Release date refreshed: $WAS -> $GOT"
                 else
-                  echo "NOTE: published_at could not be updated (still '$WAS'); the release date will read stale"
+                  echo "NOTE: published_at did not move (still '$WAS'); the release date will read stale"
+                fi
+                # Visibility is not optional. Check it independently of whether the date moved.
+                DRAFT=$(gh api "repos/${GITHUB_REPOSITORY}/releases/${RELEASE_ID}" --jq .draft 2>/dev/null || echo "")
+                if [ "$DRAFT" = "true" ]; then
+                  echo "WARNING: rolling is still a draft after the refresh; republishing" >&2
+                  gh release edit "$TAG" --draft=false --prerelease=false --latest >/dev/null 2>&1 || true
+                  DRAFT=$(gh api "repos/${GITHUB_REPOSITORY}/releases/${RELEASE_ID}" --jq .draft 2>/dev/null || echo "")
+                fi
+                if [ "$DRAFT" = "true" ]; then
+                  echo "ERROR: rolling release is a DRAFT and could not be republished -- it is invisible to users" >&2
+                  exit 1
                 fi
               fi
             fi
@@ -1051,12 +1086,11 @@ jobs:
       # record, every rolling build is ALSO archived to MEGA as ONE immutable, self-contained
       # zip of the entire release payload. Runs AFTER Publish so the GitHub release is completely
       # unchanged and a MEGA hiccup can never block or alter it -- MEGA is purely additive. Gated to
-      # the publishing branches (master, rebuild/main) + secrets present, so v* tag cuts and
-      # secret-less forks skip it cleanly. rebuild/main included per Nathan 2026-08-13: the new
-      # lineage moves far faster than the old one ever did, so it needs the overwrite protection
-      # more, not less; per-run remote folders cannot collide.
+      # the publishing branch (rebuild/main) + secrets present, so v* tag cuts and secret-less
+      # forks skip it cleanly. master was dropped 2026-09-02 along with its publish trigger: the
+      # old lineage must not archive over the new one's history either.
       - name: Build all-in-one MEGA archive
-        if: (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/rebuild/main') && env.USERNAME != '' && env.PASSWORD != ''
+        if: github.ref == 'refs/heads/rebuild/main' && env.USERNAME != '' && env.PASSWORD != ''
         run: |
           set -eu
           # Validate the payload BEFORE archiving so a broken publish fails loudly instead of pushing
@@ -1132,7 +1166,7 @@ jobs:
           ls -la mega-out
 
       - name: Upload archive and regular ELFs in all 4 flavours to MEGA
-        if: (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/rebuild/main') && env.USERNAME != '' && env.PASSWORD != ''
+        if: github.ref == 'refs/heads/rebuild/main' && env.USERNAME != '' && env.PASSWORD != ''
         # Pinned to a full commit SHA rather than @master: this third-party action runs with the
         # MEGA credentials, so freeze it to a reviewed snapshot instead of trusting whatever is on
         # its master branch at build time. bf698c6 == the action's v1.4.0 release == the master HEAD
