@@ -126,6 +126,13 @@ failure. The post-2692 correction below still needs a hardware pass to prove whe
 complete cause; this page does not call it a pass yet.
 </div>
 
+<div class="callout info"><div class="h">i Upstream rates iLink lowest of every backend</div>
+Neutrino's own backend table scores iLink / IEEE1394 device compatibility at <b>10</b>, against 80 for
+USB, 60 for MX4SIO and 100 for MMCE, ATA, UDPBD and UDPFS, and lists it for <b>FAT PS2 models</b> only.
+A passing <code>-qb</code> retest is therefore necessary but may not be sufficient &mdash; some iLink
+enclosures are expected to fail upstream as well.
+</div>
+
 <p>Unsupported sources fall back to the <code>&lt;OPL&gt;</code> core automatically with an on-screen warning. No manual intervention is needed — OPL detects the format and adjusts.</p>
 
 <div class="callout info"><div class="h">ℹ PS1 games are a separate path</div>
