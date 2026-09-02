@@ -2676,6 +2676,17 @@ static int thmLoad(const char *themePath)
             newT->usedHeight = screenHeight;
     }
 
+    // THE TWO BUILT-IN THEMES MUST NOT CARRY THESE KEYS. guiShowColorsConfig offers <OPL> (id 0)
+    // and <Coverflow> as EDITABLE and stores their palette in gDefault*Color, so for those two the
+    // settings picker is the source of truth. thmSetColors() above has already applied it, and
+    // every override below silently beats it on each load -- which turns the picker into a control
+    // that appears to do nothing. That was issue #574: <Coverflow>'s embedded cfg set all four, so
+    // its colours reverted on every mode switch, and only re-opening the Colours page (which
+    // re-runs thmSetColors on the live theme, without a reload) put them back. <OPL>'s cfg has
+    // never carried them, which is exactly why List mode was unaffected.
+    //
+    // DISK themes are the opposite case and keep these overrides: their colours belong to the theme
+    // file, which is why the picker is greyed out read-only for them (issue #537).
     configGetColor(themeConfig, "bg_color", newT->bgColor);
     // absent key leaves the thmSetColors default (settings picker value; black out of the box)
     configGetColor(themeConfig, CONFIG_OPL_PLAS_BLEND_COLOR, newT->plasBlendColor);
