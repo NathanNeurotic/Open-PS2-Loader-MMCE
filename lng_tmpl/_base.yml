@@ -1057,11 +1057,11 @@ gui_strings:
 - label: BOOT_BUILDING_MENU
   string: Building menu...
 - label: GSM_1080P_WARNING
-  string: WARNING -- forcing 1080p is experimental and unverified. It may show no picture or, on some hardware, stress the console. Proceed at your own risk.
+  string: WARNING -- forced-progressive 1080p uses a non-standard GSM raster. It passed real-hardware testing, but your display may show no picture. Proceed at your own risk.
 - label: GSM_1080P_PROCEED
   string: Proceed with forcing 1080p for this game?
 - label: GSM_1080P_SURE
-  string: Are you sure? This applies the experimental 1080p mode to this game.
+  string: Are you sure? This applies forced-progressive 1080p to this game.
 - label: CUSTOM_SETTINGS_PATH
   string: Custom Settings Path
 - label: HINT_CUSTOM_SETTINGS_PATH
@@ -1087,7 +1087,7 @@ gui_strings:
 - label: GENERAL_SETTINGS
   string: General Settings
 - label: DEVICE_SETTINGS
-  string: Device Settings
+  string: Game Sources
 - label: MMCE_GAMES
   string: MMCE Games
 - label: MMCE_ADVANCED
@@ -1115,7 +1115,7 @@ gui_strings:
 - label: MMCE_GAMEID_NEUTRINO_SKIP
   string: MMCE GameID not applied -- neutrino.elf is on this card (switching it would unload Neutrino).
 - label: HDD_BACKEND_RECONCILED
-  string: APA and exFAT internal HDD were both enabled -- one was disabled automatically (check Device Settings).
+  string: APA and exFAT internal HDD are both enabled; each drive is selected by its partition layout (check Game Sources).
 - label: VCD_SETTINGS
   string: VCD Settings
 - label: SETTINGS_SAVE_PROMPT

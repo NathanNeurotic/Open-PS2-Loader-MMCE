@@ -1154,7 +1154,7 @@ static void updateMenuFromGameList(opl_io_module_t *mdl)
     // does not exist must walk the whole directory before it can answer.
     //
     // The retry now hangs off the event that can actually make absent art exist: a device generation
-    // change (hotplug, or a Device Settings apply) in menuUpdateHook, plus the deliberate
+    // change (hotplug, or a Game Sources apply) in menuUpdateHook, plus the deliberate
     // applyConfig invalidation. master keeps only the latter; ours keeps the hotplug case too, so
     // plugging in a stick with new art still picks it up without a reboot.
 

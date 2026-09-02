@@ -1,41 +1,44 @@
 name: Rolling Release
 
 # Continuously publishes the current build of the PUBLISHING BRANCH to a single "rolling"
-# pre-release so it can be pulled directly from GitHub at a stable URL as development
-# progresses. The publishing branch is `master` (after cutover) or `rebuild/main` (during
+# development release. It is a full (non-pre-release) GitHub release marked Latest, and it can be
+# pulled directly from a stable URL as development progresses. The publishing branch is `master`
+# (after cutover) or `rebuild/main` (during
 # the rebuild): rebuild/main is the physical publish knob -- it is fast-forwarded to a
 # tested step-chain tip exactly when Nathan wants a rolling build to go out, never
 # automatically per step. See the NOTE(rebuild) on the publish-rolling gate below.
 #
-# Builds with TWO toolchains so a regression in either is visible from the rolling channel
-# (and a hardware failure can be triaged by WHICH flavours reproduce it). Each ships as its own
-# labeled APP_RIPTOPL-<SDK>/ folder + bare ELF; recommended download order is by reliability:
-#   * ps2dev/ps2dev:latest       -> -PS2DEVROLLING  (current SDK, stock drivers; RECOMMENDED #1 --
-#                                                      what RiptOPL is developed and tested against)
-#   * ps2dev/ps2dev@sha256 (pin) -> -PS2DEVPINNED  (a DIGEST PIN of ps2dev:latest taken on a day it
-#                                                      was known good; SAFE FALLBACK for when the moving
-#                                                      latest tag regresses, see issue #102)
+# Builds four flavours across the ps2dev and official ps2homebrew toolchain lineages so a regression
+# in either moving SDK or either pinned control is visible from the rolling channel (and a hardware
+# failure can be triaged by WHICH flavours reproduce it). Each is packaged in its own labelled
+# APP_RIPTOPL-<SDK>/ folder. Raw staging also creates floating ELFs for release assembly and the
+# permanent archive; release-normalize.yml consolidates the public GitHub downloads into archives.
+# Recommended loader order is by reliability:
+#   * ps2dev/ps2dev@sha256 (pin)                  -> -PS2DEVPINNED    (RECOMMENDED #1)
+#   * ghcr.io/ps2homebrew/ps2homebrew@sha256      -> -OFFICIALPINNED (RECOMMENDED #2)
+#   * ps2dev/ps2dev:latest                        -> -PS2DEVROLLING   (moving canary #3)
+#   * ghcr.io/ps2homebrew/ps2homebrew:main        -> -OFFICIALROLLING (moving canary #4)
 #
 # A source snapshot (RIPTOPL-<version>-src.zip) of the exact built commit is also
 # published, so every rolling build is self-preserving: testers can restore and
 # rebuild precisely what they ran, even if history is later rewritten.
 #
 # Deliberately additive and self-contained:
-#   * Publishes ONLY to the "rolling" tag / pre-release (created on first run).
-#   * Does NOT modify the curated tagged releases, the existing "latest" pre-release
-#     managed by compilation.yml, or any branch. It only uploads release assets.
+#   * Publishing-branch pushes update ONLY the "rolling" tag/release (created on first run).
+#   * `rolling` stays the GitHub Latest release; curated v* tags do not displace it. Only -rc tags
+#     are pre-releases.
+#   * Does NOT modify any branch. It only uploads release assets.
 #   * Builds run inside their toolchain containers; publishing runs on the host
 #     runner, which ships the gh CLI.
 #
 # The WOPLSDK flavour (wOPL's digest-pinned ghcr.io container) was REMOVED 2026-07-27: it crashed
-# at the initial setup menu and was not worth fixing, since the two remaining flavours are healthy
-# and already cover both "pinned" and "bleeding-edge" triage (issue #270).
+# at the initial setup menu and was not worth fixing. The current four flavours pair pinned and
+# moving canaries across both maintained toolchain lineages (issue #270).
 #
 # GATING: the ps2dev:latest (PS2DEVROLLING) build must COMPILE -- if it fails to build the
-# publish FAILS loudly. Both flavours ship as their own labeled folder
-# (APP_RIPTOPL-PS2DEVPINNED / -PS2DEVROLLING) -- there is NO unlabeled default, so a
-# toolchain can never be swapped in silently. Each ELF self-identifies: the version string
-# carries "-PS2DEVPINNED" / "-PS2DEVROLLING" (LOCALVERSION). Note the compile gate
+# publish FAILS loudly. All available flavours ship as their own labeled folder; there is NO
+# unlabeled default, so a toolchain can never be swapped in silently. Each ELF self-identifies with
+# its PS2DEVPINNED, OFFICIALPINNED, PS2DEVROLLING, or OFFICIALROLLING version suffix. The compile gate
 # catches BUILD breakage only: ps2dev:latest tracks a MOVING tag whose ps2sdk drifts daily and
 # can yield a green-but-non-booting binary (issue #102), which is why the pinned PS2DEVPINNED flavour
 # is kept as the safe fallback -- see the release notes "Get started".
@@ -136,8 +139,8 @@ jobs:
       - name: Build + stage DualSense (DS5) loader (PS2DEVPINNED)
         # DualSense (DS5 USB) is HW-validated (maintainer, 2026-07-06) but kept OFF in the default
         # build by choice. Ship a ready-made DUALSENSE=1 loader for THIS SDK flavour as a named
-        # top-level asset so DS5 owners can pick their preferred (recommended) flavour without
-        # digging in the VARIANTS zip. Best-effort: a DS5 build hiccup must not sink the main flavour.
+        # staging file. release-normalize.yml moves it into the public VARIANTS archive. Best-effort:
+        # a DS5 build hiccup must not sink the main flavour.
         # LOCALVERSION carries "-PS2DEVPINNED-ds5" so hardware reports self-identify.
         run: |
           make --trace clean
@@ -229,11 +232,11 @@ jobs:
       - name: Detailed changelog
         run: sh ./make_changelog.sh
 
-      - name: Stage rolling assets (ps2dev-latest = primary)
+      - name: Stage rolling assets (ps2dev-latest = required version authority)
         run: |
           set -eu
           mkdir -p rolling
-          # Publish ONLY the stable, version-agnostic name for the primary build.
+          # Publish ONLY the stable, version-agnostic name for the required build.
           MAIN_ELF="$(ls RIPTOPL-*.ELF 2>/dev/null | head -n1)"
           if [ -z "${MAIN_ELF:-}" ] || [ ! -f "$MAIN_ELF" ]; then
             echo "No RIPTOPL ELF produced by the ps2dev-latest build" >&2
@@ -241,7 +244,7 @@ jobs:
           fi
           cp -f "$MAIN_ELF" rolling/RIPTOPL.ELF
           [ -f DETAILED_CHANGELOG ] && cp -f DETAILED_CHANGELOG rolling/ || true
-          # IRX provenance manifest for the primary container's SDK prebuilts (see the pinned job).
+          # IRX provenance manifest for the required container's SDK prebuilts (see the pinned job).
           sha256sum "$PS2SDK"/iop/irx/*.irx > rolling/IRX-MANIFEST-PS2DEVROLLING.txt 2>/dev/null || true
           # Standalone language pack (lang_*.lng + their non-Latin fonts, which are NOT embedded in the
           # ELF) -- build it off the just-built lng/ and stage it so 'rolling' carries it too. Soft-fail
@@ -258,7 +261,7 @@ jobs:
         # Named DUALSENSE=1 loader on the ps2dev:latest toolchain. Like the plain PS2DEVROLLING
         # build this rides the moving SDK tag (may not boot -- issue #102); DS5 owners who want a
         # reliable build should prefer the -PS2DEVPINNED-ds5 asset. Best-effort so a
-        # DS5 hiccup can't sink the required primary flavour. LOCALVERSION carries "-PS2DEVROLLING-ds5".
+        # DS5 hiccup can't sink the required canary flavour. LOCALVERSION carries "-PS2DEVROLLING-ds5".
         run: |
           make --trace clean
           rm -f RIPTOPL-*.ELF   # drop the main build's leftover named ELF (already staged) so the DS5 output is unambiguous
@@ -295,7 +298,7 @@ jobs:
     # compiles in (ghcr.io/ps2homebrew/ps2homebrew:main) -- a separate SDK lineage from
     # ps2dev/ps2dev, so hardware reports can split toolchain effects from RiptOPL code.
     # Best-effort by design (continue-on-error): main ELF + a named DS5 loader, no
-    # variants/debug extras; a failure here must never block the two ps2dev flavours
+    # variants/debug extras; a failure here must never block the required ps2dev flavour
     # from publishing.
     continue-on-error: true
     container: ghcr.io/ps2homebrew/ps2homebrew:main
@@ -345,7 +348,7 @@ jobs:
       - name: Build + stage DualSense (DS5) loader (OFFICIALROLLING)
         # Same DS5 policy as the ps2dev flavours, now in the official container (Nathan,
         # 2026-08-13: "there should be a ds5 build for all 4 flavours"). OFF by default;
-        # a ready-made DUALSENSE=1 loader ships as a named top-level asset. Best-effort:
+        # a ready-made DUALSENSE=1 loader is staged for insertion into the VARIANTS archive. Best-effort:
         # if DUALSENSE=1 cannot build in this container the WARN is loud and the flavour
         # simply ships without a DS5 asset, exactly like before this step existed.
         run: |
@@ -450,7 +453,7 @@ jobs:
   publish-rolling:
     needs: [build-rolling-pinned, build-rolling-ps2dev-latest, build-rolling-officialsdk, build-rolling-official-pinned]
     # NOTE(rebuild): publish gate. Downstream this job has NO ref check -- anything that is not a
-    # v* tag falls through to TAG="rolling" and cuts a PUBLIC prerelease (see the tag/title block
+    # v* tag falls through to TAG="rolling" and updates the PUBLIC rolling release (see the tag/title block
     # below). The gate therefore names the branches allowed to publish: master (post-cutover) and
     # rebuild/main (the rebuild-line publish knob -- fast-forwarded to a tested step tip only when
     # a rolling build is meant to go out). Any OTHER ref -- a step branch, workflow_dispatch from
@@ -481,7 +484,7 @@ jobs:
           fetch-depth: 1
 
       - name: Download ps2dev-latest rolling assets
-        # The PRIMARY build: required (its job failing already failed the workflow).
+        # The required version-authority build (its job failing already failed the workflow).
         uses: actions/download-artifact@v8
         with:
           name: rolling-assets-ps2dev-latest
@@ -515,9 +518,9 @@ jobs:
       - name: Name assets with the build version
         run: |
           set -eu
-          # Apply ONE authoritative version (from the primary ps2dev:latest build, which now
-          # resolves full git history) to BOTH toolchains. The source commit is identical, so
-          # the only difference is the toolchain-brand suffix (-PS2DEVPINNED / -PS2DEVROLLING).
+          # Apply ONE authoritative version (from the required ps2dev:latest build, which now
+          # resolves full git history) to all available flavours. The source commit is identical;
+          # the toolchain-brand suffix records which of the four build environments produced it.
           VER="${OPL_VERSION:-}"
           if [ -z "$VER" ]; then
             VER="rolling-${GITHUB_SHA}"
@@ -567,9 +570,9 @@ jobs:
       - name: Compute SHA256 checksums
         run: |
           set -eu
-          # Publish SHA256 of every binary + the source snapshot so each rolling build is
-          # verifiable for restoration/archival. SHA256SUMS.txt is uploaded as a release
-          # asset and the same hashes are listed in the release notes below.
+          # Compute SHA256 of every staged binary + the source snapshot for the release notes and
+          # permanent archive. release-normalize.yml removes the floating checksum file from the
+          # final GitHub asset list.
           cd rolling
           : > SHA256SUMS.txt
           for f in *.ELF *-src.zip; do
@@ -582,10 +585,12 @@ jobs:
         run: |
           set -eu
           # Full installable package the user copies to a memory card / device:
-          #                                              drivers (no coherent-mmce override); SAFE FALLBACK.
           #   APP_RIPTOPL-PS2DEVPINNED/RIPTOPL.ELF   -- digest pin of ps2dev:latest; SAFE FALLBACK.
-          #   APP_RIPTOPL-PS2DEVROLLING/RIPTOPL.ELF -- ps2dev:latest (bleeding-edge MOVING tag; may not
-          #                                              boot, issue #102). No unlabeled default folder.
+          #   APP_RIPTOPL-OFFICIALPINNED/RIPTOPL.ELF -- digest pin of the official ps2homebrew SDK.
+          #   APP_RIPTOPL-PS2DEVROLLING/RIPTOPL.ELF  -- ps2dev:latest (bleeding-edge MOVING tag; may
+          #                                              not boot, issue #102).
+          #   APP_RIPTOPL-OFFICIALROLLING/RIPTOPL.ELF -- official ps2homebrew:main moving canary.
+          #                                              There is no unlabeled default folder.
           #   POPS/                           -- POPSTARTER.ELF + every auto-installed MC external + loose BDMA
           #                                      variants (including iLink), plus "POPSTARTER VERSIONS/" holding the alternate
           #                                      POPSTARTER builds (MAIN, DEBUG, USBDELAY*) for users to swap
@@ -611,7 +616,7 @@ jobs:
           rm -rf "$PKG"
           mkdir -p "$PKG/APP_RIPTOPL-PS2DEVROLLING" "$PKG/POPS" "$PKG/EMBER"
           # PS2DEVROLLING is the required-to-build flavour (its build job failing already fails
-          # the workflow); the two pinned flavours are best-effort, each in its own labeled folder.
+          # the workflow); the other three flavours are best-effort, each in its own labelled folder.
           # This belt-and-braces check just asserts the PS2DEVROLLING ELF landed before packaging.
           LATEST_ELF="rolling/${VERSIONED_BASE}-PS2DEVROLLING.ELF"
           PINNED_ELF="rolling/${VERSIONED_BASE}-PS2DEVPINNED.ELF"
@@ -767,8 +772,8 @@ jobs:
       - name: Pack RIPTOPL VARIANTS + DEBUG zips
         run: |
           set -eu
-          # The EXTRA_FEATURES x PADEMU variants and the debug builds (each in BOTH SDK flavours:
-          # standard = -PS2DEVROLLING, plus -PS2DEVPINNED) -> two separate release zips. Remove the
+          # The EXTRA_FEATURES x PADEMU x DUALSENSE variants and debug builds for the two ps2dev
+          # flavours (-PS2DEVROLLING and -PS2DEVPINNED) become two separate release zips. Remove the
           # loose dirs afterward so the final 'gh release upload rolling/*' stays file-only.
           REL="${OPL_VERSION:-rolling}"
           for kind in variants debug; do
@@ -834,7 +839,7 @@ jobs:
             printf '  * **APP_RIPTOPL-PS2DEVROLLING/** -- built on the ps2dev:latest toolchain (version ends\n'
             printf '     "-PS2DEVROLLING"): the current SDK, but a MOVING tag that can occasionally regress\n'
             printf '     on some consoles (see issue #102). A triage build: a PS2DEVROLLING-only failure\n'
-            printf '     points at the SDK; a failure on both points at RiptOPL code.\n'
+            printf '     points at the SDK; a failure across pinned and moving flavours points at RiptOPL code.\n'
             if [ "$HAS_OFFICIALROLLING" = yes ]; then
               printf '  * **APP_RIPTOPL-OFFICIALROLLING/** -- the same official container tracking its moving\n'
               printf '     "main" tag (ghcr.io/ps2homebrew/ps2homebrew:main; version ends "-OFFICIALROLLING").\n'
@@ -843,11 +848,12 @@ jobs:
             printf '\n'
             printf 'When something misbehaves on hardware, please say WHICH flavour you ran (the in-app version\n'
             printf 'string suffix tells you). A PS2DEVROLLING-only failure points at an SDK regression; a\n'
-            printf 'both-flavour failure points at RiptOPL code. Those bits triple the value of a report.\n'
+            printf 'failure across multiple pinned and moving flavours points at RiptOPL code. Those bits\n'
+            printf 'triple the value of a report.\n'
             printf '\n'
-            printf '**DualSense / DS5 (USB) owners:** each flavour also ships a ready-made DUALSENSE=1 loader as\n'
-            printf 'a named `RIPTOPL-<version>-<SDK>-ds5.ELF` asset (see "Other downloads"). Same reliability order\n'
-            printf 'applies -- prefer `-PS2DEVPINNED-ds5`. The default builds keep DualSense OFF.\n'
+            printf '**DualSense / DS5 (USB) owners:** `RIPTOPL-VARIANTS-*.zip` contains a ready-made\n'
+            printf 'DUALSENSE=1 loader for each available flavour. The same reliability order applies -- prefer\n'
+            printf '`-PS2DEVPINNED-ds5`. The default loaders in the unified package keep DualSense OFF.\n'
             printf '\n## Bundled Neutrino core\n'
             printf 'Required for the per-game Neutrino launch mode. From the official repo:\n'
             printf '  https://github.com/rickgaiser/neutrino\n'
@@ -875,7 +881,7 @@ jobs:
             printf -- '- Favorites tab: R3 stars; its independent L3 ring always cycles All in One / PS2 / PS1 / ELF\n'
             printf -- '- PS1 through TWO cores in one list: POPSTARTER (*.VCD) and Ember (*.cue); UDPFS/UDPBD list Ember only\n'
             printf -- '  -- setup, display mode, credit and licence under "Playing PS1 games" above\n'
-            printf -- '- iLink POPSTARTER VCD launches: .ilink BDMA pair in POPS/, automatic MC apply, XX. handoff\n'
+            printf -- '- iLink POPSTARTER handoff plumbing (hardware retest pending): .ilink pair, automatic MC apply, XX. selector\n'
             printf -- '- POPS/POPSTARTER VERSIONS/: five POPSTARTER builds to swap in by hand; the redundant\n'
             printf -- '  POPSTARTER/ folder is gone -- see "Alternate POPSTARTER builds" above\n'
             printf -- '- Shared PS2/PS1 Game Display on Interface + PS Emulation: Both (L3), Mixed, PS2, or PS1\n'
@@ -899,14 +905,16 @@ jobs:
             printf -- '- VMC -> Neutrino: confirm your save mounts when launching via Neutrino on USB / exFAT / MX4SIO.\n'
             printf -- '  (Neutrino cannot yet write a VMC to internal HDD APA/PFS -- upstream neutrino#132 -- so VMC\n'
             printf -- '  sharing is block-device only for now.)\n'
+            printf -- '- iLink: retest Neutrino with the post-2692 automatic -qb handoff; for POPSTARTER, report the\n'
+            printf -- '  mc?:/POPSTARTER ilink marker plus both installed module sizes/hashes. Native OPL remains open.\n'
             printf -- '- PC network servers: use the linked PS2 Servers AIO, match the settings shown by its launcher,\n'
             printf -- '  and confirm the game list populates and an ISO boots over your chosen protocol on real hardware.\n'
             printf '\n## Other downloads\n'
             if [ -f "rolling/RIPTOPL-VARIANTS-${OPL_VERSION:-rolling}.zip" ]; then
-              printf -- '- RIPTOPL-VARIANTS-*.zip: EXTRA_FEATURES x PADEMU build configs, both SDK flavours\n'
+              printf -- '- RIPTOPL-VARIANTS-*.zip: EXTRA_FEATURES x PADEMU x DUALSENSE configs for the two ps2dev flavours\n'
             fi
             if [ -f "rolling/RIPTOPL-DEBUG-${OPL_VERSION:-rolling}.zip" ]; then
-              printf -- '- RIPTOPL-DEBUG-*.zip: debug builds (iopcore/ingame/eesio/ppctty/DTL_T10000), both SDKs -- diagnostics\n'
+              printf -- '- RIPTOPL-DEBUG-*.zip: debug builds for the two ps2dev flavours (iopcore/ingame/eesio/ppctty/DTL_T10000)\n'
             fi
             if [ "$HAS_PS2DEVPINNED" = yes ]; then
               printf -- '- %s-PS2DEVPINNED.ELF: bare loader, digest-pinned ps2dev snapshot %s (SAFE FALLBACK -- pinned, boots reliably)\n' "$VERSIONED_BASE" "$SDK_VER"
@@ -959,9 +967,14 @@ jobs:
           # can never diverge again.
           if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
             TAG="${GITHUB_REF_NAME}"; TITLE="${GITHUB_REF_NAME}"; TARGET=""
-            case "${GITHUB_REF}" in *-rc*) PREREL="--prerelease";; *) PREREL="--latest";; esac
+            # The moving rolling channel intentionally owns GitHub's Latest marker. Curated tags
+            # remain directly addressable without displacing it; only -rc tags are pre-releases.
+            case "${GITHUB_REF}" in
+              *-rc*) RELEASE_FLAGS="--prerelease --latest=false";;
+              *) RELEASE_FLAGS="--prerelease=false --latest=false";;
+            esac
           else
-            TAG="rolling"; TITLE="Rolling"; PREREL="--prerelease --latest"; TARGET="--target $GITHUB_SHA"
+            TAG="rolling"; TITLE="Rolling"; RELEASE_FLAGS="--prerelease=false --latest"; TARGET="--target $GITHUB_SHA"
           fi
           if gh release view "$TAG" >/dev/null 2>&1; then
             echo "Updating existing release: $TAG"
@@ -971,7 +984,7 @@ jobs:
               echo "Deleting old asset: $asset"
               gh release delete-asset "$TAG" "$asset" --yes || true
             done
-            gh release edit "$TAG" --title "$TITLE" --notes-file notes.md $PREREL
+            gh release edit "$TAG" --title "$TITLE" --notes-file notes.md $RELEASE_FLAGS
             gh release upload "$TAG" rolling/* --clobber
             # REFRESH THE ROLLING RELEASE DATE. `gh release edit` updates the body and the assets
             # but never touches published_at, which is what GitHub renders as the relative time --
@@ -1017,7 +1030,7 @@ jobs:
             gh release create "$TAG" rolling/* \
               --title "$TITLE" \
               --notes-file notes.md \
-              $PREREL \
+              $RELEASE_FLAGS \
               $TARGET
           fi
           # The tag must follow the publish, on BOTH paths: `gh release edit/upload` never
@@ -1064,8 +1077,8 @@ jobs:
           #
           # Archive the INSTALLABLE + REPRODUCIBLE payload only. The two big diagnostic BUNDLES are
           # deliberately EXCLUDED from the permanent MEGA copy:
-          #   RIPTOPL-VARIANTS-*.zip  (~120 MB -- every PADEMU x EXTRA_FEATURES x DUALSENSE combo, both SDKs)
-          #   RIPTOPL-DEBUG-*.zip     (~91 MB  -- iopcore/ingame/eesio/ppctty/DTL debug builds, both SDKs)
+          #   RIPTOPL-VARIANTS-*.zip  (~120 MB -- every PADEMU x EXTRA_FEATURES x DUALSENSE combo, two ps2dev flavours)
+          #   RIPTOPL-DEBUG-*.zip     (~91 MB  -- iopcore/ingame/eesio/ppctty/DTL debug builds, two ps2dev flavours)
           # They dominate the size (~10x: ~233 MB -> ~22 MB), they still ship on the GitHub rolling
           # release for the CURRENT build, and a *permanent* per-build archive is for restoring or
           # rebuilding an installable build -- not for old diagnostic permutations (when you debug,

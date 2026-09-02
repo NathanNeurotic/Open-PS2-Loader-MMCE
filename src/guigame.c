@@ -1064,9 +1064,10 @@ static int coreNeverNeutrino = 0;
 #ifdef GSM_1080P
 #define GSM_VMODE_1080P_IDX 29
 
-// 1080p is GSM-synthetic and hardware-unvalidated: force a THREE-STEP confirmation before it can
-// reach disk, because a display that cannot sync leaves the user with a black screen and no way to
-// undo it from the console. Only fires when the user actually chose 1080p AND left GSM enabled.
+// 1080p is GSM-synthetic and hardware-confirmed, but it remains a non-standard raster that not every
+// display accepts. Force a THREE-STEP confirmation before it can reach disk, because a display that
+// cannot sync leaves the user with a black screen and no way to undo it from the console. Only fires
+// when the user actually chose 1080p AND left GSM enabled.
 // Shared by the per-game and the global save legs -- the global one is the wider blast radius of
 // the two, since it is what every game with no GSM keys of its own inherits.
 static void guiGameConfirmGSM1080p(void)

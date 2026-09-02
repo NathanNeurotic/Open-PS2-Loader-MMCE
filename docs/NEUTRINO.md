@@ -80,7 +80,8 @@ editor, set `neutrino_path` in `settings_riptopl.cfg` directly.
 
 | Source | Neutrino? | VMC under Neutrino? |
 |---|---|---|
-| USB / iLink / MX4SIO / internal ATA (BDM) | ✅ | ✅ `-mcN=massN:…VMC/<name>.bin` |
+| USB / MX4SIO / internal ATA (BDM) | ✅ | ✅ `-mcN=massN:…VMC/<name>.bin` |
+| iLink / IEEE 1394 (**FAT PS2 models only**) | ⚠️ supported and wired; the post-2692 build adds quick boot for RiptOPL's inherited-stack handoff, pending hardware retest | ⚠️ `-mcN=massN:…VMC/<name>.bin` is emitted; the overall iLink launch is pending retest |
 | Internal HDD (APA → HDL) | ✅ | ❌ **games boot, VMC is dropped with a warning** — Neutrino has no APA/pfs backing store to open the `.bin` from (NHDDL's HDL backend has the same no-VMC rule). The OPL core honors the same VMC normally. |
 | MMCE | ✅ | ✅ `-mcN=mmceN:/…VMC/<name>.bin` |
 | UDPFS (network boot — Files or Image) | ✅ **required** — no OPL core, Neutrino only (see §4) | ✅ `-mcN=udpfs:/VMC/<name>.bin` — the PC server must **not** run read-only, or saves fail |
@@ -90,8 +91,8 @@ editor, set `neutrino_path` in `settings_riptopl.cfg` directly.
 
 Unsupported cases fall back to the `<OPL>` core automatically with an on-screen warning.
 
-> **PS1 games are a separate path.** PlayStation 1 titles (`*.VCD`, shown via the **L3 "VCD"
-> per-device view**) always boot through **POPSTARTER.ELF** — never OPL's core and never Neutrino
+> **PS1 games are a separate path.** PlayStation 1 titles (`*.VCD`, shown according to the shared
+> **PS2/PS1 Game Display** setting) always boot through **POPSTARTER.ELF** — never OPL's core and never Neutrino
 > — so the per-game Loader Core selector is locked/inert for them. See **[VCD.md](VCD.md)**.
 
 ## 3. Launch arguments
@@ -105,10 +106,19 @@ settings:
 | `-bsdfs=hdl` | internal HDD (APA) only |
 | `-bsdfs=<exfat\|hdl\|bd>` | only if the per-game **Neutrino Filesystem** picker (Compatibility screen) is set off Auto; block-backed devices only (never mmce/udpfs — no filesystem layer there). `hdl`/`bd` also reshape `-dvd` to `hdl:`/`bdfs:`; a hand-typed `-bsdfs=`/`-dvd=` in the args always wins |
 | `-dvd=<path>` / `-dvd=hdl:<partition>` | always (the game image/partition) |
+| `-qb` | USB and iLink. RiptOPL's no-reset ELF bridge deliberately preserves the already-mounted BDM environment; quick boot makes Neutrino enter its load environment without resetting that inherited stack away. A user-supplied active `-qb` is never duplicated |
 | `-gc=<modes>` | only if the game has OPL compatibility modes set |
 | `-dbc` | only if **Debug Colors** is enabled |
 | `-logo` | only if **PS2 Logo** is enabled |
 | `-gsm=<mode>[:<comp>]` | only if a **Neutrino Video** mode resolves for the game (per-game picker, or the global **Settings → Neutrino Video** default when the per-game picker is "Default"). The `:<comp>` half is appended only when a **Neutrino GSM Compatibility** type is set — it is never emitted on its own |
+
+> **Revision 2692 iLink result:** Neutrino failed on an SCPH-39001 from iLink in all four SDK
+> flavours. That build emitted the documented `-bsd=ilink` token but, unlike its USB handoff, did not
+> emit `-qb`. Because RiptOPL's bridge intentionally preserves the mounted iLink environment and
+> Neutrino documents `-qb` as direct entry into its load environment, that omission is a
+> source-confirmed handoff mismatch consistent with the observed reset-boundary symptom. The
+> post-2692 change corrects the mismatch; only a new hardware pass can establish whether it was the
+> complete cause, so this remains **pending retest** rather than being documented as proven.
 
 On top of those, you can pass **extra Neutrino flags** (e.g. media-type or video tweaks)
 in two places. Both are **appended after** the auto-built arguments; **global first, then
@@ -129,6 +139,10 @@ field: **Quick Boot** (`-qb`), **Debug Colors** (`-dbc`), **PS2 Logo** (`-logo`)
 (`-cwd`), **Config** (`-cfg`), **Boot ELF** (`-elf`), `-ata0`, `-ata0id`, `-ata1`, plus a
 free-text **Extra** field for everything else. OPL reassembles the fields in the order Neutrino
 accepts, with the Extra / `--b` tail last.
+
+Quick Boot means **enter Neutrino's load environment directly**; it is not merely a boot-screen
+toggle. RiptOPL supplies it automatically for USB and iLink handoffs, so enabling the field yourself
+on those devices changes nothing and does not add a duplicate.
 
 The stored format is unchanged — a space-separated string, e.g.:
 
@@ -274,9 +288,9 @@ When a game's core is **Neutrino**:
   > **The "1080p impression" trick:** on 1080-class displays, `1080i x3` (`-gsm=1080ix3`) is the
   > community workaround for progressive-looking output — the same effect people previously got by
   > launching Neutrino from PS2BBLE/OSDmenu with `-gsm=1080ix3`. Set it per game, or globally via
-  > **Settings → Neutrino Video** and leave games on "Default". (True 1080p does not exist in any
-  > OPL/GS mode table — the GS outputs `1080i`, and OPL's own UI lacks the VRAM for a 1080p
-  > framebuffer.)
+  > **Settings → Neutrino Video** and leave games on "Default". Neutrino itself exposes only the
+  > listed `1080i` modes; it does not expose RiptOPL's separate, GSM-synthetic forced-progressive
+  > 1080p mode used by the native OPL core.
   OPL compat **mode 4 (Skip Videos)** and **mode 6 (Disable IGR)** are greyed —
   they're OPL ee-core features with **no Neutrino equivalent** (Neutrino has no in-game reset, and
   no PSS/BIK video-skip), so OPL never forwards them. **DL Defaults** is greyed too (it pulls

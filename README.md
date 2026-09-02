@@ -46,7 +46,7 @@ RiptOPL is intended to work with these maintained companion tools:
 - **[OPL PS1 AIO Converter GUI](https://github.com/shaanhomebrew-cloud/OPL-PS1-AIO-Converter-GUI)** by **[shaan](https://github.com/shaanhomebrew-cloud)** — Windows all-in-one PS1/POPStarter preparation tool for converting BIN/CUE backups to VCDs and installing them to USB, MX4SIO, MMCE, iLink, exFAT HDD, SMB and APA internal HDD.
 - **[PS2RD CHT Manager](https://github.com/TheRealNextria/PS2RD-CHT-Manager)** by **[TheRealNextria](https://github.com/TheRealNextria)** — PC manager for the PS2RD `.cht` cheat files RiptOPL reads from your device's `CHT` folder. A `PS2RD-CHT-Manager.url` shortcut ships in every release package.
 - **[Ember](https://github.com/Gageformer/Ember)** by **[Gageformer](https://github.com/Gageformer)** — a PS1 emulator that runs natively on the PS2, used as RiptOPL's **second PS1 core** alongside POPSTARTER. Unlike the others this one is not just a shortcut: an `EMBER/` folder ships **inside** the release package, ready to drop onto a device. It is bundled unmodified with the author's permission under the Ember Public Beta Testing Licence (`EMBER/LICENSE-BETA.txt` in the package); releases: <https://github.com/Gageformer/Ember/releases>.
-- **[POPStarter](https://www.psx-place.com/resources/popstarter.683/)** by **krHACKen** — a PS1 launcher built around Sony's native **POPS** emulator for the PS2, used as RiptOPL's **primary PS1 core** alongside Ember. POPStarter provides the compatibility and launch layer for running PS1 VCDs from USB, MX4SIO, MMCE, iLink, internal HDD, and SMB. The official POPStarter r13 package contains **no Sony emulator binaries, libraries, or BIOS files**; those components must be supplied separately by the user. Official download, documentation, compatibility information, and releases are maintained on **[PSX-Place](https://www.psx-place.com/resources/popstarter.683/)**.
+- **[POPStarter](https://www.psx-place.com/resources/popstarter.683/)** by **krHACKen** — a PS1 launcher built around Sony's native **POPS** emulator for the PS2, used as RiptOPL's **primary PS1 core** alongside Ember. POPStarter provides the compatibility and launch layer for running PS1 VCDs from USB, MX4SIO, MMCE, iLink, internal HDD, and SMB; RiptOPL's iLink handoff is wired but still awaiting a passing hardware retest. The official POPStarter r13 package contains **no Sony emulator binaries, libraries, or BIOS files**; those components must be supplied separately by the user. Official download, documentation, compatibility information, and releases are maintained on **[PSX-Place](https://www.psx-place.com/resources/popstarter.683/)**.
 - **[Neutrino](https://github.com/rickgaiser/neutrino)** by **[rickgaiser](https://github.com/rickgaiser)** — a *"Small, Fast and Modular PS2 Device Emulator"*, and RiptOPL's **second PS2 loader core** alongside OPL's own. Like Ember it is not a shortcut: a ready-to-use `neutrino/` folder ships **inside** the release package, drag-and-drop to `mc?:/neutrino/`. Neutrino is deliberately **UI-agnostic** — it has no interface of its own, which is exactly what lets a front-end like RiptOPL drive it per game. Licensed **AFL-3.0**; releases: <https://github.com/rickgaiser/neutrino/releases>.
 ## Contents
 
@@ -100,7 +100,7 @@ For an updated compatibility list, you can visit the OPL-CL site at:\
 
 - [ ] A PlayStation 2 or backward-compatible PlayStation 3.
 - [ ] One storage option: USB drive, MMCE or MX4SIO SD setup, iLink storage, SMB network share, or internal HDD (APA/PFS or exFAT).
-- [ ] A RiptOPL build (`RIPTOPL.ELF`) — a tagged `v*` release for stability, or the `rolling` pre-release for the latest features.
+- [ ] A RiptOPL build (`RIPTOPL.ELF`) — a tagged `v*` release for stability, or the `rolling` Latest development release for the newest features.
 - [ ] Optional: network access (recommended for SMB and remote file management).
 
 ### Minimal startup path
@@ -312,12 +312,14 @@ This build layers several features on top of upstream OPL:
   lock every applicable device page to one library and make L3 fully inert (no hint, sound,
   notification, or pause). APPS and Favorites remain independent. A `*.VCD` row boots through
   **POPSTARTER** — never OPL's own core and never Neutrino, so the Loader Core selector is inert for
-  it. POPSTARTER VCDs work on USB / MMCE / MX4SIO / iLink / SMB **and the internal HDD** — both APA
+  it. POPSTARTER VCDs work on USB / MMCE / MX4SIO / SMB **and the internal HDD** — both APA
   (exact `__.POPS[0-9]?` containers plus `PP.<name>` / `__.<name>` one-game partitions containing
   `IMAGE0.VCD`) and **exFAT** (BDMA; PS1 games in `massN:/POPS/`). Ember's half of the list has its
-  own device coverage, noted above. On iLink, RiptOPL reads `POPS/usbd.irx.ilink` and
+  own device coverage, noted above. The iLink POPSTARTER path is wired but still awaiting a passing
+  hardware test: RiptOPL reads `POPS/usbd.irx.ilink` and
   `POPS/usbhdfsd.irx.ilink`, copies them to the memory card without the `.ilink` suffix, and hands
-  POPSTARTER the normal local-device `XX.` selector. Every BDMA pair ships as loose files in
+  POPSTARTER the normal local-device `XX.` selector, but revision 2692 returned to wLaunchELF in all
+  four SDK flavours. Every BDMA pair ships as loose files in
   `POPS/`; none is embedded in `RIPTOPL.ELF`. UDPFS and UDPBD also expose a PS1 view, but those
   network pages list **Ember titles only**: Ember inherits the live connection, while POPSTARTER's
   IOP reset cannot restore either network transport. See **[docs/VCD.md](docs/VCD.md)**.
@@ -325,7 +327,9 @@ This build layers several features on top of upstream OPL:
   under Neutrino it greys the panels Neutrino ignores (GSM, Cheats, PADEMU, OSD Language and the
   OPL-only compat modes) and offers a structured **Neutrino Video** picker (Off / 240p / 480p /
   1080i) plus a Neutrino-only **Mode 7** (`-gc=7`). Its global **Default Device** picker can also
-  target a complete `neutrino/` folder on iLink explicitly. See **[docs/NEUTRINO.md](docs/NEUTRINO.md)**.
+  target a complete `neutrino/` folder on iLink explicitly. iLink is a FAT-model Neutrino backend;
+  post-2692 builds automatically pair `-bsd=ilink` with `-qb` so Neutrino keeps the mounted iLink
+  environment RiptOPL hands it. See **[docs/NEUTRINO.md](docs/NEUTRINO.md)**.
 - **Category settings layout:** the start menu's settings are organised into eight category pages
   instead of one flat list — **Game Sources** (device selection + start modes), **General & System**,
   **Network**, **Interface** (theme, artwork, Coverflow, PS2/PS1 Game Display), **Game Launching**
@@ -452,7 +456,7 @@ There are two release channels:
 
 | Channel | What it is |
 | --- | --- |
-| **Rolling pre-release** (the `rolling` tag) | Continuously rebuilt from the publishing branch on every push — currently `rebuild/main` — the bleeding edge. Each build publishes a full installable package zip (`RIPTOPL-<rel>-<sha>.zip`, containing all four labeled SDK loader folders + the bundled Neutrino core + the bundled Ember PS1 core + the POPStarter folders + companion tool shortcuts), the bare loader ELFs, a source snapshot, `SHA256SUMS.txt`, and a language pack. May be unstable. |
+| **Rolling (Latest)** (the `rolling` tag) | Continuously rebuilt from the publishing branch on every push — currently `rebuild/main` — and intentionally published as GitHub's **Latest**, full (non-pre-release) development release. Its final download set has up to five archives: the full installable package (`RIPTOPL-<rel>-<sha>.zip`, normally containing all four labelled SDK loader folders + the bundled Neutrino and Ember cores + the canonical POPS folder + five companion-tool shortcuts), plus VARIANTS, exact source, and the DEBUG/language archives when those optional jobs produce them. Best-effort flavours and optional packs are called out if omitted. Floating ELFs, checksums, and SDK/IRX manifests are deliberately removed from GitHub release assets by the normalizer. It is the bleeding edge and may be unstable. |
 | **Tagged releases** (`v*` tags) | Curated, known-good versions cut from a tag. Use these for stability. |
 
 See **[ROLLING_RELEASE.md](ROLLING_RELEASE.md)** for exactly what the rolling release
@@ -468,7 +472,7 @@ contains and how to pull it.
 > 4. **`APP_RIPTOPL-OFFICIALROLLING/`** (`-OFFICIALROLLING`) — **bleeding-edge official canary.** Tracks `ps2homebrew:main`.
 > See [Which build should I use?](ROLLING_RELEASE.md#which-build-should-i-use).
 
-> 🗄️ **Permanent archive (MEGA):** the GitHub `rolling` pre-release only ever holds the *latest*
+> 🗄️ **Permanent archive (MEGA):** the GitHub `rolling` release only ever holds the *latest*
 > build — every push overwrites it. So **every** rolling build is also archived permanently to MEGA
 > as one self-contained zip of the installable payload (all four loader ELFs, the installable
 > package zip, the source snapshot, `SHA256SUMS.txt`, and the IRX manifests — the large VARIANTS
@@ -510,6 +514,16 @@ HDDs are also able to be formatted as exFAT to avoid the 2TB limitation.  Please
 
 Supported file systems:
 exFAT (since OPL v1.2.0 beta - rev1880) and FAT32, both use the MBR partition table. This section applies to MMCE and MX4SIO SD setups, USB storage, and iLink SBP2 storage.
+
+> [!WARNING]
+> **Revision 2692 iLink status is not a blanket pass.** On an SCPH-39001, Ember passed from the same
+> IEEE 1394 disk in all four SDK flavours, while the native OPL core, Neutrino, and POPSTARTER failed
+> at their reset/handoff boundaries. The next build corrects a confirmed RiptOPL-side Neutrino
+> handoff mismatch (`-qb` was not auto-emitted for iLink); only hardware retesting can establish
+> whether that was the complete cause. POPSTARTER's
+> external `.ilink` BDMA equip and `mass:/POPS/XX.<name>.ELF` handoff are present, but remain
+> unconfirmed, and the native OPL iLink reset path is still under investigation. See
+> [Neutrino](docs/NEUTRINO.md) and [PS1/VCD](docs/VCD.md) for the exact status and isolation checks.
 
 > [!NOTE]
 > MX4SIO game launch requires the matching PS2SDK `freesio2` module to load before
