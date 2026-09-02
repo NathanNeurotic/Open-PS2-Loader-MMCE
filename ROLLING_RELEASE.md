@@ -1,29 +1,30 @@
 # Rolling Release
 
-This fork publishes a continuously-updated **`rolling`** pre-release so the current
-`master` build can be pulled straight from GitHub as development progresses, without
-touching the curated `v*` tagged releases. `rolling` is the **only** channel updated on
-each `master` push.
+This fork publishes a continuously-updated **`rolling`** development release so the current
+publishing-branch build can be pulled straight from GitHub as development progresses, without
+touching the curated `v*` tagged releases. `rolling` is a full (non-pre-release) release and
+intentionally owns GitHub's **Latest** marker. The publishing branch is `rebuild/main` during the
+rebuild and `master` after cutover.
 
 ## What the rolling release contains
 
-Every push to `rebuild/main` (or `master`) rebuilds and republishes the `rolling` pre-release. The headline
-asset is a **full installable package** (built with all four toolchain flavours); the bare loader
-ELFs, DualSense loaders, and supporting files are published alongside it:
+Every push to the publishing branch rebuilds and republishes the `rolling` release. The headline
+asset is a **full installable package** (built across four toolchain flavours, with best-effort
+flavours called out if omitted). A post-publish normalizer consolidates the public download set into
+up to five archives (DEBUG and language packs are listed when produced):
 
 | Asset | What it is |
 |---|---|
-| `RIPTOPL-<rel>-<sha>.zip` | **The installable package.** Contains four loader folders that differ ONLY by the SDK toolchain they were built with (the RiptOPL code in each is identical), each explicitly labeled: `APP_RIPTOPL-PS2DEVPINNED/RIPTOPL.ELF` (#1, recommended pinned ps2dev), `APP_RIPTOPL-OFFICIALPINNED/RIPTOPL.ELF` (#2, recommended pinned ps2homebrew), `APP_RIPTOPL-PS2DEVROLLING/RIPTOPL.ELF` (#3, rolling canary), and `APP_RIPTOPL-OFFICIALROLLING/RIPTOPL.ELF` (#4, rolling canary). Also includes a `POPS/` folder for PS1 support via POPSTARTER (including all loose BDMA pairs—none are embedded in the loader—the new `usbd.irx.ilink` + `usbhdfsd.irx.ilink` pair for iLink VCD launches, and `POPS/POPSTARTER VERSIONS/`, the alternate POPSTARTER builds) and an `EMBER/` folder for PS1 support via **[Ember](https://github.com/Gageformer/Ember)** by **[Gageformer](https://github.com/Gageformer)**, the second PS1 core; the bundled **[Neutrino](https://github.com/rickgaiser/neutrino)** core by **[rickgaiser](https://github.com/rickgaiser)** as a ready-to-use `neutrino/` folder (drag-and-drop to `mc?:/`), plus `PS2-Servers.url`, `udpfs-server.url`, `OrbitPS2-Manager.url`, `OPL-PS1-AIO-Converter-GUI.url`, and `PS2RD-CHT-Manager.url`. Extract it, pick a folder and copy its `RIPTOPL.ELF` — see [Which build should I use?](#which-build-should-i-use) below. |
-| `RIPTOPL-<version>-PS2DEVPINNED.ELF` | Bare loader, digest-pinned `ps2dev/ps2dev` toolchain (**recommended / primary**; in-app version ends `-PS2DEVPINNED`). |
-| `RIPTOPL-<version>-OFFICIALPINNED.ELF` | Bare loader, digest-pinned `ps2homebrew/ps2homebrew` toolchain (**recommended / alternative pin**; in-app version ends `-OFFICIALPINNED`). |
-| `RIPTOPL-<version>-PS2DEVROLLING.ELF` | Bare loader, `ps2dev/ps2dev:latest` toolchain (canary / early warning; in-app version ends `-PS2DEVROLLING`). |
-| `RIPTOPL-<version>-OFFICIALROLLING.ELF` | Bare loader, `ps2homebrew:main` toolchain (canary / early warning; in-app version ends `-OFFICIALROLLING`). |
-| `RIPTOPL-<version>-<SDK>-ds5.ELF` | Same as the bare loader for each of the four SDK flavours, **with DualSense (DS5 USB) pad support** compiled in (`DUALSENSE=1`). One per flavour (`-PS2DEVPINNED-ds5`, `-OFFICIALPINNED-ds5`, `-PS2DEVROLLING-ds5`, `-OFFICIALROLLING-ds5`). The default builds keep DualSense OFF. |
+| `RIPTOPL-<rel>-<sha>.zip` | **The installable package.** Normally contains four loader folders that differ ONLY by the SDK toolchain they were built with (the RiptOPL code in each is identical), each explicitly labeled: `APP_RIPTOPL-PS2DEVPINNED/RIPTOPL.ELF` (#1, recommended pinned ps2dev), `APP_RIPTOPL-OFFICIALPINNED/RIPTOPL.ELF` (#2, recommended pinned ps2homebrew), `APP_RIPTOPL-PS2DEVROLLING/RIPTOPL.ELF` (#3, rolling canary), and `APP_RIPTOPL-OFFICIALROLLING/RIPTOPL.ELF` (#4, rolling canary). A best-effort flavour can be absent when its build fails, and the release notes identify it. Also includes a `POPS/` folder for PS1 support via POPSTARTER (including all loose BDMA pairs—none are embedded in the loader—the new `usbd.irx.ilink` + `usbhdfsd.irx.ilink` pair for iLink VCD launches, and `POPS/POPSTARTER VERSIONS/`, the alternate POPSTARTER builds) and an `EMBER/` folder for PS1 support via **[Ember](https://github.com/Gageformer/Ember)** by **[Gageformer](https://github.com/Gageformer)**, the second PS1 core; the bundled **[Neutrino](https://github.com/rickgaiser/neutrino)** core by **[rickgaiser](https://github.com/rickgaiser)** as a ready-to-use `neutrino/` folder (drag-and-drop to `mc?:/`), plus `PS2-Servers.url`, `udpfs-server.url`, `OrbitPS2-Manager.url`, `OPL-PS1-AIO-Converter-GUI.url`, and `PS2RD-CHT-Manager.url`. Extract it, pick a folder and copy its `RIPTOPL.ELF` — see [Which build should I use?](#which-build-should-i-use) below. |
 | `RIPTOPL-<version>-src.zip` | Source snapshot to rebuild this exact commit. |
-| `SHA256SUMS.txt` | SHA256 of every published binary + the source snapshot. |
-| `BUILD-MANIFEST.txt` | Detailed toolchain metadata, image digests, commit hashes, and compiler versions for each build. |
 | `RIPTOPL-LANGS-*.zip` | Extra UI language files (`.lng` + non-Latin fonts) — copy into your OPL folder. |
-| `RIPTOPL-VARIANTS-*.zip` / `RIPTOPL-DEBUG-*.zip` | Alternate build configs and debug builds across all toolchains — for testing/diagnostics. |
+| `RIPTOPL-VARIANTS-*.zip` | Alternate build configs across the moving and pinned ps2dev flavours; the normalizer also adds one ready-made DualSense (`DUALSENSE=1`) loader for each available official flavour. |
+| `RIPTOPL-DEBUG-*.zip` | Diagnostic builds across the moving and pinned ps2dev flavours, when produced. |
+
+The final GitHub release intentionally has no floating `.ELF`, `SHA256SUMS.txt`, detailed changelog,
+or SDK/IRX manifest assets. Standard loaders live in the unified package, DualSense loaders live in
+VARIANTS, and build checksums remain in the workflow log/immutable MEGA archive rather than beside the
+public archives.
 
 The current UI presents the same **PS2/PS1 Game Display** setting on Interface and PS Emulation:
 **Both (L3)** switches separate device libraries; **Mixed** combines them and L3 cycles
@@ -79,27 +80,30 @@ whether the bleeding-edge build succeeded.
 
 [`.github/workflows/rolling-release.yml`](.github/workflows/rolling-release.yml):
 
-- Triggers on every push to `master` (updates `rolling`), on every `v*` **tag** push (cuts a
+- Triggers on every push to `rebuild/main` or `master` (updates `rolling`), on every `v*` **tag** push (cuts a
   curated per-version release with identical packaging), and on manual **Run workflow** (workflow_dispatch).
-- Builds with two toolchains — `ps2dev/ps2dev:latest` (the moving target/canary) and a
-  digest pin of that same `ps2dev/ps2dev` image — the same images as the main CI build.
+- Builds four labelled flavours across two toolchain lineages: moving and digest-pinned
+  `ps2dev/ps2dev`, plus moving and digest-pinned official `ps2homebrew/ps2homebrew`.
 - The `ps2dev/ps2dev:latest` build is **required to compile**: if it fails to build, the publish
   fails loudly. Note this guards against *build* breakage only — because `ps2dev:latest` tracks a
   moving SDK tag, a green build can still produce a binary that does not boot on hardware (see
   [Which build should I use?](#which-build-should-i-use)), which is why the pinned
-  `-PS2DEVPINNEDSDK` flavour is kept as the safe fallback. The pinned build is best-effort
-  (`continue-on-error`); when one fails, the package ships without that folder and the notes say so.
-- Publishes/updates the single `rolling` pre-release from the host runner.
+  `-PS2DEVPINNED` flavour is kept as the safe fallback. The other three flavours are best-effort;
+  when one fails, the package ships without that folder and the notes say so.
+- Publishes/updates the single `rolling` release from the host runner as GitHub Latest and explicitly
+  clears the pre-release flag.
 - `concurrency` cancels superseded in-flight runs, so the release reflects the newest push.
 
 ## One pipeline, two channels
 
 This workflow is the **single** place release packaging lives. The pushed ref picks the target:
 
-- **`master` push** → updates the `rolling` pre-release (the development channel).
+- **`rebuild/main` or `master` push** → updates the `rolling` Latest release (the development channel).
 - **`v*` tag push** → cuts the **curated per-version release** for that tag (a full release; an
-  `-rc*` tag stays a pre-release). It publishes the **identical** asset set as rolling — same `.zip`
-  installable bundle, both toolchains, `src.zip`, `SHA256SUMS` — so the two channels can't drift.
+  `-rc*` tag stays a pre-release). Curated tags do not displace `rolling` from GitHub's Latest marker.
+  It runs through the **same normalized asset pipeline** as rolling — the same installable bundle,
+  source snapshot, VARIANTS archive, and DEBUG/language archives when produced, with the same
+  best-effort flavour rules — so the two channels cannot drift into different package formats.
 
 `compilation.yml` no longer cuts releases (its release step is retired); on `master` it only runs
 CI + uploads run artifacts. Per-ref `concurrency` keeps a `master` push and a tag release from

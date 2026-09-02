@@ -77,6 +77,7 @@ jobs:
           unzip -q "$MAIN_ZIP" -d package-work
 
           printf '%s\r\n' '[InternetShortcut]' 'URL=https://github.com/NathanNeurotic/PS2-Servers' > package-work/PS2-Servers.url
+          printf '%s\r\n' '[InternetShortcut]' 'URL=https://github.com/YouKnow-sys/udpfs-server' > package-work/udpfs-server.url
           printf '%s\r\n' '[InternetShortcut]' 'URL=https://github.com/Luden02/OrbitPS2-Manager' > package-work/OrbitPS2-Manager.url
           printf '%s\r\n' '[InternetShortcut]' 'URL=https://github.com/shaanhomebrew-cloud/OPL-PS1-AIO-Converter-GUI' > package-work/OPL-PS1-AIO-Converter-GUI.url
           printf '%s\r\n' '[InternetShortcut]' 'URL=https://github.com/TheRealNextria/PS2RD-CHT-Manager' > package-work/PS2RD-CHT-Manager.url
@@ -86,7 +87,7 @@ jobs:
             cd package-work
             zip -qr -X "../$(basename "$MAIN_ZIP")" .
           )
-          echo "Rebuilt $(basename "$MAIN_ZIP") with all four external-tool shortcuts."
+          echo "Rebuilt $(basename "$MAIN_ZIP") with all five companion-tool shortcuts."
 
       - name: Add all DS5 loaders to the variants archive
         shell: bash

@@ -68,8 +68,8 @@ A VCD favorite launches through POPSTARTER straight from the Favorites tab — e
 source device page is currently showing its disc list — and carries its PS1 cover art and
 disc badge with it.
 
-This works on **every device with a VCD view** — USB, MX4SIO, iLink, the internal exFAT HDD, SMB, MMCE,
-and the **APA-formatted internal HDD**. (On the APA HDD the PS1 games are spread across multiple
+The favorite handoff is wired on **every device with a VCD view** — USB, MX4SIO, iLink, the internal
+exFAT HDD, SMB, MMCE, and the **APA-formatted internal HDD**. (On the APA HDD the PS1 games are spread across multiple
 APA partitions, so opening one of its VCD favorites re-scans those partitions to find the game —
 the first launch may take a moment.)
 
@@ -87,6 +87,11 @@ mount that partition and boot its fixed `IMAGE0.VCD`.
 Every local block-device VCD handoff, including iLink, uses POPSTARTER's normal local selector:
 `mass:/POPS/XX.<name>.ELF`. OPL's live mount may be `massN:`, but POPSTARTER resets the IOP and
 re-registers the selected device driver as bare `mass:` before it resolves that `XX.` argument.
+
+> **Current iLink hardware status:** the selector and external equip are present, but revision 2692
+> still returned POPSTARTER to wLaunchELF on an SCPH-39001 in all four SDK flavours. Ember passed on
+> the same iLink disk. Treat iLink POPSTARTER as **wired but not hardware-confirmed** until a later
+> build passes; the statement above documents the argument contract, not a claimed successful boot.
 
 Where `POPSTARTER.ELF` is loaded from is set by **PS Emulation Settings →
 POPSTARTER.ELF Device** — a driver-accurate picker (matching the Neutrino Device picker):
@@ -181,8 +186,9 @@ staged before the live pair is changed, so a failed copy leaves the previous pai
   its block-device driver from the memory card, so the right exFAT variant must already be on
   the card or the game drops to OSDSYS. When **On**, RiptOPL equips the variant matching the
   PS1 game you're launching (read from that game's own device) automatically, right before
-  boot — so an MX4SIO / iLink / HDD exFAT game just works with no manual step. Turn it **Off** to
-  manage the driver yourself; that reveals the **BDMA Source** / **BDMA Mode** pickers below.
+  boot. Turn it **Off** to manage the driver yourself; that reveals the **BDMA Source** / **BDMA
+  Mode** pickers below. Automatic equip proves only that the right files were staged; it does not
+  turn the still-failing revision 2692 iLink POPSTARTER result into a pass.
 - **USB launches always ask** — the PS2 cannot detect whether a USB stick is fat32 or exFAT
   formatted, so every USB .VCD launch first shows a **"fat32 or exFAT USB Mode?"** dialog
   (fat32 is recommended for non-exFAT USB users). Picking **fat32** de-equips to POPSTARTER's
@@ -255,7 +261,13 @@ Work down this ladder; each step isolates a different stage (from the #154 foren
    suspect: `POPSTARTER.ELF` present in `/POPS` (or `__common/POPS` on APA)? On a BDMA-backed device, the BDMA
    equip (§5) is best-effort — a failed equip toasts but the launch still proceeds and may land
    on OSDSYS.
-7. **UDPFS or UDPBD shows Ember but no VCDs?** That is expected. POPSTARTER cannot restore either
+7. **iLink returns to wLaunchELF?** Inspect the card after the attempt. A successful RiptOPL equip
+   leaves `mc?:/POPSTARTER/bdma_config.txt` containing exactly `ilink`, plus `usbd.irx` (48,500 bytes;
+   SHA-256 `5EA4818BA1CF5207F6D7CADB4C13B5AFA88C37C260750C21155B079A8C18F369`) and `usbhdfsd.irx`
+   (23,452 bytes; SHA-256 `145CF1C0AF130EA7AC5CEC6696AA7E60B5C66A2AC46B8DEA94DB17BB3B911BCC`). Missing or different files
+   put the defect on RiptOPL's external-equip side; exact files narrow it to POPSTARTER/BDMA runtime
+   reinitialization after the handoff.
+8. **UDPFS or UDPBD shows Ember but no VCDs?** That is expected. POPSTARTER cannot restore either
    network transport after its IOP reset, so those two PS1 pages intentionally publish Ember rows
    only.
 

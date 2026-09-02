@@ -3,10 +3,11 @@
 #   * the EXTRA_FEATURES x PADEMU x DUALSENSE variant matrix -> rolling/variants/
 #   * the debug configs                          -> rolling/debug/
 #
-# Called by EACH SDK build job in rolling-release.yml. $1 is the SDK suffix appended to each
+# Called by each ps2dev build job in rolling-release.yml. $1 is the SDK suffix appended to each
 # filename: "-PS2DEVPINNED" for the digest-pinned ps2dev snapshot
 # build, "-PS2DEVROLLING" for the ps2dev:latest build -- so the VARIANTS and DEBUG zips carry
-# every SDK flavour of every build. $2 is the LOCALVERSION
+# both ps2dev flavours. Official-flavour DS5 loaders are added separately by the release normalizer.
+# $2 is the LOCALVERSION
 # toolchain brand ("PS2DEVPINNED"/"PS2DEVROLLING") embedded in each ELF's version string: filenames get renamed
 # and moved to cards, and the debug/variant builds are exactly the ones that show up in bug
 # reports -- the on-screen version must self-identify the toolchain like the main builds do.

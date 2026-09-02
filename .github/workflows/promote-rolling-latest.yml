@@ -1,8 +1,10 @@
-name: Promote Rolling Release
+name: Enforce Rolling as Latest
 
 on:
   push:
     branches:
+      # rebuild/main is the publishing branch. master is old lineage and must never
+      # drive the rolling channel, so it is deliberately NOT a trigger here.
       - rebuild/main
   workflow_dispatch:
 
@@ -14,13 +16,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Wait for Rolling Release publish
+        if: github.event_name == 'push'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -eu
           run_id=""
-          for attempt in $(seq 1 120); do
-            run_id="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow "Rolling Release" --branch rebuild/main --limit 20 --json databaseId,headSha,status --jq '.[] | select(.headSha == "'"$GITHUB_SHA"'") | .databaseId' | head -n1 || true)"
+          for _ in $(seq 1 120); do
+            run_id="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow "Rolling Release" --branch "$GITHUB_REF_NAME" --limit 20 --json databaseId,headSha,status --jq '.[] | select(.headSha == "'"$GITHUB_SHA"'") | .databaseId' | head -n1 || true)"
             if [ -n "$run_id" ]; then
               echo "Found Rolling Release run $run_id for $GITHUB_SHA"
               break
@@ -35,7 +38,9 @@ jobs:
 
           gh run watch "$run_id" --repo "$GITHUB_REPOSITORY" --exit-status
 
-      - name: Promote rolling release to Latest
+      # rolling-release.yml sets this state itself. Keep this post-publish normalization as an
+      # idempotent guard against GitHub or a future workflow edit leaving the moving channel stale.
+      - name: Enforce rolling as Latest and non-pre-release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

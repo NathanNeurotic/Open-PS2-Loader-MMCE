@@ -138,7 +138,7 @@ RiptOPL's perf/arch is **already highly mature.** Verified at parity or ahead: s
 1. **`gCheats` BSS ≈ 1.05 MB (HIGH, M).** `gCheats[MAX_CODES=250]` × `code_t codes[MAX_CHEATLIST=510]` ≈ 4.2 KB/entry → ~1.05 MB of always-resident BSS, held even when cheats are off (the default). Largest single static allocation. **Fix:** either drop `MAX_CODES`/`MAX_CHEATLIST` to realistic values (few games approach 250×510), or lazily `malloc`/`free` the buffer only when `GetCheatsEnabled()` and a `.cht` is actually loaded (`cheatman.c` `load_cheats`/`set_cheats_list`, free on deinit). Reclaims ~1 MB of 32 MB — headroom against OOM on large lists / big themes / coverflow caches.
 2. **Persistent on-disk cover/title cache (low, L).** RiptOPL's art cache is entirely in-RAM (torn down at deinit). NHDDL persists a title-ID cache (`nhddl/cache.bin`, magic "NIDC"). A decoded-cover staging cache would mainly help re-entry and slow devices (MMCE/SMB). Only worth doing device-selectively; **not** a title-ID cache (OPL has no ISO-probe step to accelerate).
 
-**At parity — no change warranted:** launch-path length / IOP lifetime (Δ7/Δ8 already deliver it), boot device scan (costly transports default-OFF; naive parallelization is unsafe on the single-IOP RPC model — see the device-page-reliability note), digest-pinned SDK (already shipping), native-core `-qb` (a Neutrino-only concept; deliberately **not** emitted after a menu session per the parity doc).
+**At parity — no change warranted:** launch-path length / IOP lifetime (Δ7/Δ8 already deliver it), boot device scan (costly transports default-OFF; naive parallelization is unsafe on the single-IOP RPC model — see the device-page-reliability note), and digest-pinned SDK (already shipping). **Later evidence superseded this report's blanket `-qb` conclusion:** the Neutrino-only flag is now auto-emitted for the proven USB and iLink no-reset BDM handoffs, not for every backend.
 
 ---
 
@@ -212,7 +212,7 @@ only — never the game device, hard size cap, mtime-keyed invalidation) per the
 class of risk. The queue is otherwise EMPTY.
 
 ### Non-goals (do NOT queue — deliberate fork decisions)
-- **Native-core `-qb` quickboot** — `-qb` is Neutrino-only; deliberately not emitted after a menu session (mixed IOP state is what Neutrino's reset exists to erase). Parity doc §4.2.
+- **Native-core `-qb` quickboot** — `-qb` remains Neutrino-only and is never passed to OPL's native core. For Neutrino, the old blanket prohibition is superseded: USB and iLink auto-emit it because those direct handoffs intentionally preserve the live BDM environment; other backends retain normal reset behavior pending evidence. Parity doc §4.2.
 - **Dropping `-mc` VMC files** (parity doc §4.3), **libconfig backend migration** (prior decision), **trimming OPL breadth** (PS1/POPS/cheats/PADEMU) to chase NHDDL minimalism, and a **headless pure-forwarder entry** (adds a path, low value for a full launcher — OPL's breadth is the point).
 
 ---

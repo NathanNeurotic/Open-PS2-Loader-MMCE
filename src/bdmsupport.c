@@ -774,7 +774,7 @@ static void bdmDiagFlushPendingIopState(item_list_t *itemList)
 // Bump the device generation the per-device refresh latch keys off, exactly as a real hotplug event
 // (bdmEventHandler) does. This invalidates every device's bdmDeviceTick so the next bdmNeedsUpdate
 // pass re-evaluates presence + page visibility instead of short-circuiting on the latch. Called when
-// the user applies Device Settings, so a BDM page that was force-hidden while its enable flag read 0
+// the user applies Game Sources, so a BDM page that was force-hidden while its enable flag read 0
 // (e.g. an exFAT ATA tab, or a UDPBD tab) re-shows as soon as the device is re-enabled and present --
 // without needing a physical replug.
 void bdmForceDeviceRefresh(void)
@@ -1077,8 +1077,8 @@ static void bdmLoadBlockDeviceModules(void)
     // the auto-hotplug thing" unprompted, on a console with MX4SIO switched off entirely -- i.e. the
     // fix for the MX4SIO double-tap was firing for transports that had nothing to do with it.
     //
-    // The case that actually needed the bump is a LATE load: the user enabling a transport in Device
-    // Settings, where the generation is bumped before the driver exists. Late passes are exactly the
+    // The case that actually needed the bump is a LATE load: the user enabling a transport in Game
+    // Sources, where the generation is bumped before the driver exists. Late passes are exactly the
     // non-first ones.
     static int moduleLoadFirstPassDone = 0;
     int wasFirstPass = !moduleLoadFirstPassDone;
@@ -1087,7 +1087,7 @@ static void bdmLoadBlockDeviceModules(void)
     SignalSema(bdmLoadModuleLock);
 
     // A DRIVER THAT ARRIVED LATE NEEDS ONE MORE LOOK, and without this it does not get one. Enabling
-    // a transport from Device Settings runs, in this order:
+    // a transport from Game Sources runs, in this order:
     //
     //   guiShowDeviceSettings -> bdmForceDeviceRefresh()   generation bumps HERE
     //                         -> applyConfig -> bdmEnumerateDevices
@@ -1377,7 +1377,7 @@ static int bdmNeedsUpdate(item_list_t *itemList)
     //
     // Keying on BdmGeneration keeps that retryability exactly where it was wanted and removes it where
     // it was not. The generation moves on a REAL device event -- bdmEventHandler's hotplug, or
-    // bdmForceDeviceRefresh() when Device Settings are applied -- so plugging the drive in, or
+    // bdmForceDeviceRefresh() when Game Sources is applied -- so plugging the drive in, or
     // toggling the transport, still gets an immediate retry. Sitting idle no longer buys one.
     static unsigned int lastModuleLoadGen = (unsigned int)-1;
     if (bdmShouldQueueModuleLoad() && lastModuleLoadGen != BdmGeneration) {

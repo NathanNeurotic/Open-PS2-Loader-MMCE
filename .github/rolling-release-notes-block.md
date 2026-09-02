@@ -72,19 +72,31 @@ toggle.
 network mount. POPSTARTER resets the IOP and cannot restore either network transport, so VCD rows
 are deliberately excluded instead of showing titles that cannot launch.
 
-**iLink now works with both PS1 cores.** Ember already launched from iLink; POPSTARTER VCD rows now
-prepare the matching iLink BDMA pair before handoff too. The package's `POPS/` folder contains the
-two source files, `usbd.irx.ilink` and `usbhdfsd.irx.ilink`. On an iLink VCD launch RiptOPL copies
-them to `mc?:/POPSTARTER/` as `usbd.irx` and `usbhdfsd.irx` (the `.ilink` suffix selects the variant
-but is removed on the card), then passes POPSTARTER the normal local-device selector
-`mass:/POPS/XX.<game>.ELF`.
+**iLink PS1 status is split, not a blanket pass.** Ember passes from iLink. RiptOPL now prepares the
+POPSTARTER iLink handoff too: the package's `POPS/` folder contains the two loose source files,
+`usbd.irx.ilink` and `usbhdfsd.irx.ilink`; RiptOPL copies them to `mc?:/POPSTARTER/` as `usbd.irx`
+and `usbhdfsd.irx` (removing only `.ilink`) and passes the normal local-device selector
+`mass:/POPS/XX.<game>.ELF`. However, revision 2692 hardware testing still returned POPSTARTER to
+wLaunchELF on iLink in every SDK flavour. The external equip/handoff is present, but it is **not yet
+a hardware-confirmed POPSTARTER iLink success**.
 
 All BDMA pairs stay as separate files in `POPS/`; none is embedded in `RIPTOPL.ELF`. Keep the
 package's `POPS/` contents together when copying it to a device.
 
 Neutrino's **Default Device** picker also has an explicit **iLink** option for a complete
 `neutrino/` folder stored on IEEE 1394 media. Existing saved picker values keep their meanings;
-iLink was appended as a new choice, and launches continue to use Neutrino's `-bsd=ilink` backend.
+iLink was appended as a new choice. Revision 2692 already emitted Neutrino's documented
+`-bsd=ilink` backend, but its inherited-stack handoff had a concrete mismatch: RiptOPL preserved the
+mounted iLink stack into Neutrino without sending `-qb`, leaving Neutrino free to reset that stack
+away. This build auto-emits `-qb` for iLink, matching Neutrino's quick-boot contract and NHDDL's
+iLink handoff. The four-flavour failure pattern makes that a strong candidate, not a proven complete
+cause; the correction still needs a new hardware retest before it is called a pass.
+
+The native OPL core also remains **unconfirmed on iLink**: all four revision 2692 flavours failed at
+the game handoff (browser return or black screen; one test powered the drive down). Because Ember
+passes and both SDK lineages fail, this does not look compiler-specific or like a menu-side mount
+failure. No regular iLink IOP module was replaced or repackaged in this follow-up; the native reset
+path remains under investigation.
 
 **Setting Ember up.** Copy this package's `EMBER/` folder to the **root** of a device, beside
 `POPS/`. Then add **your own PS1 BIOS** as `EMBER/bios.bin`, exactly 512 KB — a BIOS is copyrighted
@@ -199,7 +211,7 @@ are certain you do not need SMB; the alternates are here mainly for the `USBDELA
 files `POPS/` already contains, plus a `bdma_config.txt` reading `fat32` — a marker RiptOPL *writes
 itself* to record which BDMAssault variant it installed, so shipping it pre-filled told a fresh
 install that a variant was equipped when it was not. Everything you need is in `POPS/`, including
-the separate `.ilink` pair used for iLink POPSTARTER launches.
+the separate `.ilink` pair used for iLink POPSTARTER handoff preparation (hardware retest pending).
 
 ## Cover art and game metadata
 
