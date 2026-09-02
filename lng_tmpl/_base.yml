@@ -1115,7 +1115,7 @@ gui_strings:
 - label: MMCE_GAMEID_NEUTRINO_SKIP
   string: MMCE GameID not applied -- neutrino.elf is on this card (switching it would unload Neutrino).
 - label: HDD_BACKEND_RECONCILED
-  string: APA and exFAT internal HDD are both enabled; each drive is selected by its partition layout (check Game Sources).
+  string: Both APA and exFAT internal HDD backends are enabled; each drive is selected by its partition layout (check Game Sources).
 - label: VCD_SETTINGS
   string: VCD Settings
 - label: SETTINGS_SAVE_PROMPT

@@ -22,7 +22,7 @@ jobs:
         run: |
           set -eu
           run_id=""
-          for attempt in $(seq 1 120); do
+          for _ in $(seq 1 120); do
             run_id="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow "Rolling Release" --branch "$GITHUB_REF_NAME" --limit 20 --json databaseId,headSha,status --jq '.[] | select(.headSha == "'"$GITHUB_SHA"'") | .databaseId' | head -n1 || true)"
             if [ -n "$run_id" ]; then
               echo "Found Rolling Release run $run_id for $GITHUB_SHA"
