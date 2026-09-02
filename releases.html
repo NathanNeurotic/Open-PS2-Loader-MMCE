@@ -56,12 +56,14 @@
 <b><a href="https://github.com/shaanhomebrew-cloud/OPL-PS1-AIO-Converter-GUI">OPL PS1 AIO Converter GUI</a></b> by <b><a href="https://github.com/shaanhomebrew-cloud">shaan</a></b> — Windows all-in-one PS1/POPStarter preparation tool for BIN/CUE → VCD conversion and installation to USB, MX4SIO, MMCE, iLink, exFAT HDD, SMB and APA internal HDD.<br>
 <b><a href="https://github.com/TheRealNextria/PS2RD-CHT-Manager">PS2RD CHT Manager</a></b> by <b><a href="https://github.com/TheRealNextria">TheRealNextria</a></b> — PC manager for the PS2RD <code>.cht</code> cheat files RiptOPL reads from your device's <code>CHT</code> folder.<br>
 <b><a href="https://github.com/Gageformer/Ember">Ember</a></b> by <b><a href="https://github.com/Gageformer">Gageformer</a></b> — a PS1 emulator running natively on the PS2, used as RiptOPL's second PS1 core alongside POPSTARTER. Ships as an <code>EMBER/</code> folder inside the release package, bundled unmodified with permission under the Ember Public Beta Testing Licence (<code>EMBER/LICENSE-BETA.txt</code>); <a href="https://github.com/Gageformer/Ember/releases">releases</a>.<br>
-<b><a href="https://www.psx-place.com/resources/popstarter.683/">POPStarter</a></b> by <b>krHACKen</b> — a PS1 launcher built around Sony's native <b>POPS</b> emulator for the PS2, used as RiptOPL's primary PS1 core alongside Ember. POPStarter provides the compatibility and launch layer for running PS1 VCDs from USB, MX4SIO, MMCE, iLink, internal HDD, and SMB. The official POPStarter r13 package contains no Sony emulator binaries, libraries, or BIOS files; those components must be supplied separately by the user. Official download, documentation, compatibility information, and releases are maintained on <a href="https://www.psx-place.com/resources/popstarter.683/">PSX-Place</a>.<br>
+<b><a href="https://www.psx-place.com/resources/popstarter.683/">POPStarter</a></b> by <b>krHACKen</b> — a PS1 launcher built around Sony's native <b>POPS</b> emulator for the PS2, used as RiptOPL's primary PS1 core alongside Ember. POPStarter provides the compatibility and launch layer for running PS1 VCDs from USB, MX4SIO, MMCE, iLink, internal HDD, and SMB; RiptOPL's iLink handoff is wired but still awaiting a passing hardware retest. The official POPStarter r13 package contains no Sony emulator binaries, libraries, or BIOS files; those components must be supplied separately by the user. Official download, documentation, compatibility information, and releases are maintained on <a href="https://www.psx-place.com/resources/popstarter.683/">PSX-Place</a>.<br>
 <b><a href="https://github.com/rickgaiser/neutrino">Neutrino</a></b> by <b><a href="https://github.com/rickgaiser">rickgaiser</a></b> — a small, fast, modular PS2 device emulator, and RiptOPL's second PS2 loader core alongside OPL's own. Ships as a ready-to-use <code>neutrino/</code> folder inside the release package (drag-and-drop to <code>mc?:/neutrino/</code>), under the <b>AFL-3.0</b> licence; <a href="https://github.com/rickgaiser/neutrino/releases">releases</a>.</p></section>
 <h1>Releases</h1>
-<p class="lead">RiptOPL ships on two channels: a continuously-rebuilt <b>rolling</b> pre-release (every
-<code>master</code> push) and curated <b>v* tagged</b> releases. Both are produced by the same
-pipeline and carry the same asset set, so they can never silently diverge.</p>
+<p class="lead">RiptOPL ships on two channels: a continuously-rebuilt <b>rolling</b> development release
+(published as GitHub <b>Latest</b>) and curated <b>v* tagged</b> releases. The publishing branch is
+<code>rebuild/main</code> during the rebuild and <code>master</code> after cutover. Both channels use
+the same normalized package pipeline and best-effort rules, so their public formats cannot silently
+diverge even when an optional pack or flavour is absent from a particular run.</p>
 
 <div class="callout info"><div class="h">ℹ One full-feature build</div>
 RiptOPL ships a single standard ELF that includes <b>GSM</b> video-mode handling,
@@ -69,12 +71,12 @@ RiptOPL ships a single standard ELF that includes <b>GSM</b> video-mode handling
 <b>PS2RD cheats</b>, and <b>parental controls</b>. There are no stripped-down per-feature variants
 to juggle. One optional extra is <b>DualSense / DualShock 5 (USB)</b> support: it is off in the
 standard ELF, but you do not have to build it yourself — the rolling release publishes a ready-made
-<code>RIPTOPL-&lt;version&gt;-PS2DEVLATESTSDK-ds5.ELF</code> (and the matching
-<code>-PS2DEVPINNEDSDK-ds5.ELF</code>). <code>make DUALSENSE=1</code> is only needed if you compile
-your own. A second, <b>experimental</b> extra — a forced-<b>1080p</b> GSM video mode — ships only as
-<code>RIPTOPL-PS2DEVLATESTSDK-1080p.ELF</code> (published without a version in the filename, unlike
-the rest; latest-SDK flavour only, gated behind a three-step in-GUI confirmation; the raster is
-hardware-unvalidated). Every other asset is 1080p-free.</div>
+<code>RIPTOPL-&lt;version&gt;-&lt;SDK&gt;-ds5.ELF</code> for each available SDK flavour inside
+<code>RIPTOPL-VARIANTS-*.zip</code>.
+<code>make DUALSENSE=1</code> is only needed if you compile your own. Forced-progressive
+<b>1080p</b> GSM support is hardware-confirmed and built into every standard loader. Selecting it is
+guarded by a three-step in-GUI confirmation, and holding <b>Triangle + Cross</b> during console boot
+forces the safe 480p progressive recovery mode.</div>
 
 <h2 id="channels">Release channels</h2>
 
@@ -82,7 +84,7 @@ hardware-unvalidated). Every other asset is 1080p-free.</div>
 <thead><tr><th>Channel</th><th>Tag</th><th>When to use</th><th>Stability</th></tr></thead>
 <tbody>
 <tr>
-  <td><b>Rolling pre-release</b></td>
+  <td><b>Rolling (Latest)</b></td>
   <td><code>rolling</code></td>
   <td>Latest features, actively tested builds, eager testers</td>
   <td>Development builds — <em>may be unstable</em></td>
@@ -97,46 +99,39 @@ hardware-unvalidated). Every other asset is 1080p-free.</div>
 </table>
 
 <p>Release notes on the rolling channel show the source commit, build version, build timestamp, and
-the CI run that produced it. Release candidates use an <code>-rc*</code> suffix and stay as
-pre-releases; a bare <code>v*</code> tag produces a full (non-pre-release) release.</p>
+the CI run that produced it. The rolling channel is a full (non-pre-release) development release and
+intentionally owns GitHub's Latest marker. Release candidates use an <code>-rc*</code> suffix and stay
+as pre-releases; a bare <code>v*</code> tag produces a full curated release without displacing rolling.</p>
 
 <h2 id="rolling-assets">What the rolling release contains</h2>
 
-<p>Every push to <code>master</code> wipes the previous rolling assets and republishes a fresh set.
-The headline item is a full installable package zip; all other assets are published alongside it.</p>
+<p>Every push to the publishing branch (<code>rebuild/main</code> during the rebuild, then
+<code>master</code>) wipes the previous rolling assets and republishes a fresh set. The headline item
+is a full installable package zip. After normalization, the public download set has up to five
+archives: package, exact source, variants, and the language/debug packs when those optional jobs
+produce them.</p>
 
 <table data-sortable>
 <thead><tr><th>Asset</th><th>What it is</th></tr></thead>
 <tbody>
 <tr>
   <td><code>RIPTOPL-&lt;rel&gt;-&lt;sha&gt;.zip</code></td>
-  <td><b>The installable package.</b> Contains labeled SDK loader folders:
-  <code>APP_RIPTOPL-PS2DEVLATESTSDK/RIPTOPL.ELF</code> (#1, built with the current <code>ps2dev/ps2dev:latest</code> SDK),
-  and <code>APP_RIPTOPL-PS2DEVPINNEDSDK/RIPTOPL.ELF</code> (#2, built on a digest-pinned ps2dev SDK as the safe fallback),
+  <td><b>The installable package.</b> Normally contains four explicitly labelled SDK loader folders
+  (a best-effort flavour can be absent when its build fails, and the release notes identify it):
+  <code>APP_RIPTOPL-PS2DEVPINNED/</code> (#1, recommended pinned ps2dev),
+  <code>APP_RIPTOPL-OFFICIALPINNED/</code> (#2, recommended official pin),
+  <code>APP_RIPTOPL-PS2DEVROLLING/</code> (#3, moving ps2dev canary), and
+  <code>APP_RIPTOPL-OFFICIALROLLING/</code> (#4, moving official canary),
   one canonical <code>POPS/</code> folder for POPSTARTER support (every BDMA pair stays loose there,
   including <code>usbd.irx.ilink</code> + <code>usbhdfsd.irx.ilink</code>; none is embedded),
-  the bundled <code>EMBER/</code> and <code>neutrino/</code> folders, and the companion-tool shortcuts.
-  Extract it and use <code>APP_RIPTOPL-PS2DEVLATESTSDK/RIPTOPL.ELF</code>.</td>
-</tr>
-<tr>
-  <td><code>RIPTOPL-&lt;version&gt;-PS2DEVLATESTSDK.ELF</code></td>
-  <td>Bare loader ELF, <code>ps2dev/ps2dev:latest</code> toolchain (#1 recommended).</td>
-</tr>
-<tr>
-  <td><code>RIPTOPL-&lt;version&gt;-PS2DEVPINNEDSDK.ELF</code></td>
-  <td>Bare loader ELF, digest-pinned <code>ps2dev/ps2dev</code> toolchain (#2 safe fallback).</td>
-</tr>
-<tr>
-  <td><code>RIPTOPL-&lt;version&gt;-&lt;SDK&gt;-ds5.ELF</code></td>
-  <td>DualSense (DS5 USB) pad support loader ELFs for each SDK toolchain flavour (<code>DUALSENSE=1</code>).</td>
+  the bundled <code>EMBER/</code> and <code>neutrino/</code> folders, and five companion-tool shortcuts.
+  Start with <code>APP_RIPTOPL-PS2DEVPINNED/RIPTOPL.ELF</code> when that best-effort flavour is present.
+  The presence of the loose iLink pair documents package contents, not a hardware pass: revision
+  2692's POPSTARTER iLink launch still returned to wLaunchELF in every flavour.</td>
 </tr>
 <tr>
   <td><code>RIPTOPL-&lt;version&gt;-src.zip</code></td>
   <td>Source snapshot of the exact built commit — you can rebuild this precise revision later.</td>
-</tr>
-<tr>
-  <td><code>SHA256SUMS.txt</code></td>
-  <td>SHA256 checksums for every published binary and the source snapshot.</td>
 </tr>
 <tr>
   <td><code>RIPTOPL-LANGS-*.zip</code></td>
@@ -144,43 +139,48 @@ The headline item is a full installable package zip; all other assets are publis
 </tr>
 <tr>
   <td><code>RIPTOPL-VARIANTS-*.zip</code></td>
-  <td>Alternate build configs and variants for testing or diagnostics.</td>
+  <td>The full <code>EXTRA_FEATURES</code> × <code>PADEMU</code> × <code>DUALSENSE</code> matrix for the
+  two ps2dev flavours, plus one ready-made DualSense (<code>DUALSENSE=1</code>) loader for each
+  available official flavour.</td>
 </tr>
 <tr>
   <td><code>RIPTOPL-DEBUG-*.zip</code></td>
-  <td>Debug builds (<code>iopcore</code>, <code>ingame</code>, <code>eesio</code>, <code>iopcore_ppctty</code>, <code>ingame_ppctty</code>,
-  <code>DTL_T10000</code> variants). For diagnostics only.</td>
+  <td>Debug builds for the two ps2dev flavours (<code>iopcore</code>, <code>ingame</code>,
+  <code>eesio</code>, <code>iopcore_ppctty</code>, <code>ingame_ppctty</code>, and
+  <code>DTL_T10000</code>). For diagnostics only.</td>
 </tr>
 </tbody>
 </table>
 
 <p><code>&lt;version&gt;</code> is the build's <code>git describe</code> output, e.g.
-<code>v1.2.0-Beta-2559-bb25a00</code> — one authoritative version, taken from the recommended
-<code>ps2dev:latest</code> build and applied to both flavours. <code>&lt;sha&gt;</code> is the first
-16 hex characters of the recommended ELF's SHA256 — a uniqueness tag, not a security guarantee. The
-full checksums are in <code>SHA256SUMS.txt</code>.</p>
+<code>v1.2.0-Beta-2559-bb25a00</code> — one authoritative version, taken from the required
+<code>ps2dev:latest</code> build and applied to all four flavours. <code>&lt;sha&gt;</code> is the first
+16 hex characters of the required <code>PS2DEVROLLING</code> ELF's SHA256 — a uniqueness tag, not a
+security guarantee.</p>
 
-<h2 id="two-toolchains">Two toolchains, one recommended</h2>
+<div class="callout info"><div class="h">ℹ Archive-only public downloads</div>
+The normalizer deliberately removes floating loader ELFs, checksum lists, detailed changelogs, and
+SDK/IRX manifests from the GitHub asset list. Standard loaders are inside the unified package;
+DualSense loaders are inside <code>RIPTOPL-VARIANTS-*.zip</code>.</div>
 
-<p>Every build runs under two PS2 toolchains simultaneously:</p>
+<span id="two-toolchains"></span>
+<h2 id="four-flavours">Four toolchain flavours, ordered for testing</h2>
+
+<p>Every release attempts four labelled flavours of the same RiptOPL source, in this recommended order:</p>
 <ul class="checklist">
-  <li><b><code>ps2dev/ps2dev:latest</code></b> — the current SDK, and the build RiptOPL is developed
-  and tested against. This is the <b>recommended ELF</b>, in
-  <code>APP_RIPTOPL-PS2DEVLATESTSDK/RIPTOPL.ELF</code>. Because it tracks a moving tag it can
-  occasionally regress on hardware (issue #102), which is what the pinned flavour is for.</li>
-  <li><b><code>ps2dev/ps2dev@sha256</code> (digest pin)</b> — the <em>same</em> ps2dev SDK, pinned to
-  a day it was known good. Its output goes into <code>APP_RIPTOPL-PS2DEVPINNEDSDK/RIPTOPL.ELF</code>.
-  Use it if the recommended build black-screens or the cursor is dead on your console.</li>
+  <li><b><code>APP_RIPTOPL-PS2DEVPINNED/</code></b> — digest-pinned ps2dev; recommended primary control.</li>
+  <li><b><code>APP_RIPTOPL-OFFICIALPINNED/</code></b> — digest-pinned official ps2homebrew toolchain.</li>
+  <li><b><code>APP_RIPTOPL-PS2DEVROLLING/</code></b> — moving <code>ps2dev:latest</code> canary.</li>
+  <li><b><code>APP_RIPTOPL-OFFICIALROLLING/</code></b> — moving official <code>ps2homebrew:main</code> canary.</li>
 </ul>
-<p>The recommended <code>ps2dev:latest</code> build must compile — if it fails, the publish fails
-loudly rather than shipping a partial release. The digest-pinned fallback is <em>best-effort</em>: if
-it fails, the release still updates without it and the notes say so.
-The <code>SHA256SUMS.txt</code> covers whichever ELFs were actually produced.</p>
+<p>The <code>PS2DEVROLLING</code> canary must compile — if it fails, the publish fails loudly rather
+than shipping without its required build. The other three flavours are <em>best-effort</em>: if one
+fails, the release still updates without that folder and the notes identify the omission.</p>
 
 <h2 id="bundled-neutrino">Bundled Neutrino core</h2>
 
-<p>The installable package ships the latest official
-<a href="https://github.com/rickgaiser/neutrino">rickgaiser/neutrino</a> pre-release as an
+<p>The installable package ships the latest published official
+<a href="https://github.com/rickgaiser/neutrino">rickgaiser/neutrino</a> build as an
 already-extracted <code>neutrino/</code> folder at the package root (holding
 <code>neutrino.elf</code> plus the <code>config/</code> and <code>modules/</code> folders) — no
 zip-in-zip, so you just drag-and-drop it. RiptOPL adds only one file —
@@ -199,12 +199,7 @@ inside). See <a href="neutrino.html">Neutrino Core</a> for the full setup guide.
 published:</p>
 
 <pre># Everything in the current rolling release
-gh release download rolling --repo NathanNeurotic/Open-PS2-Loader --clobber
-
-# The zips only: the installable package plus the src / LANGS / VARIANTS / DEBUG extras
-# (the version string itself contains dashes, so this glob matches all of them)
-gh release download rolling --repo NathanNeurotic/Open-PS2-Loader \
-  --pattern 'RIPTOPL-*-*-*.zip' --clobber</pre>
+gh release download rolling --repo NathanNeurotic/Open-PS2-Loader --clobber</pre>
 
 <p>Or download directly from the release page:<br>
 <a href="https://github.com/NathanNeurotic/Open-PS2-Loader/releases/tag/rolling">github.com/NathanNeurotic/Open-PS2-Loader/releases/tag/rolling</a></p>
@@ -220,33 +215,34 @@ GitHub) are the only exception.</div>
 release packaging lives. The pushed ref picks the publish target:</p>
 
 <ul class="checklist">
-  <li><b>Push to <code>master</code></b> → updates the <code>rolling</code> pre-release (the
-  development channel).</li>
+  <li><b>Push to <code>rebuild/main</code> or <code>master</code></b> → updates the
+  <code>rolling</code> full development release, explicitly clears its pre-release flag, and keeps it
+  marked as GitHub Latest.</li>
   <li><b>Push of a <code>v*</code> tag</b> → cuts a curated per-version release for that tag,
-  publishing the <em>identical</em> asset set. An <code>-rc*</code> tag stays a pre-release; a
-  bare <code>v*</code> tag makes a full release.</li>
+  using the same normalized package format and best-effort rules. An <code>-rc*</code> tag stays a
+  pre-release; a bare <code>v*</code> tag makes a full release. Neither displaces rolling from the
+  Latest marker.</li>
   <li><b>Manual <code>workflow_dispatch</code></b> → re-runs as rolling.</li>
 </ul>
 
 <p>A <code>concurrency</code> group cancels in-flight rolling runs when a newer push arrives, so the
-release always reflects the freshest commit. A <code>master</code> push and a simultaneous
+release always reflects the freshest commit. A publishing-branch push and a simultaneous
 <code>v*</code> tag release run in separate concurrency groups and do not cancel each other.</p>
 
-<details class="deep"><summary>Why are there two toolchain builds in the same release?</summary>
-<p>The PS2 toolchain (<code>ps2dev/ps2dev:latest</code>) is a moving tag: it advances continuously
-and occasionally introduces regressions (issue #102). The same commit is therefore also built against
-a digest pin of that SDK, so you can fall back instantly without waiting for a fix commit: if a game
-stops booting, use <code>APP_RIPTOPL-PS2DEVPINNEDSDK/RIPTOPL.ELF</code> instead of
-<code>APP_RIPTOPL-PS2DEVLATESTSDK/RIPTOPL.ELF</code> on your memory card or USB drive and retry.
-Report which flavour reproduced it so the regression gets fixed for everyone.
+<details class="deep"><summary>Why are there four toolchain flavours in the same release?</summary>
+<p>The moving ps2dev and official toolchain tags can advance independently and occasionally introduce
+regressions. Each lineage therefore has a digest-pinned control beside its moving canary. Start with
+<code>APP_RIPTOPL-PS2DEVPINNED/RIPTOPL.ELF</code>; if hardware behavior differs, test the other
+labelled folders and report the exact in-app flavour suffix so application and SDK regressions can be
+separated.
 </p></details>
 
 <details class="deep"><summary>When should I use the VARIANTS or DEBUG zips?</summary>
-<p><b>VARIANTS</b> cover the full cross-product of <code>EXTRA_FEATURES</code> (on/off) ×
-<code>PADEMU</code> (on/off) × <code>DUALSENSE</code> (on/off) in both SDK flavours — useful
-if you want to isolate a compatibility difference introduced by one of those build flags.
-<b>DEBUG</b> builds
-(<code>iopcore</code>, <code>ingame</code>, <code>eesio</code>, <code>iopcore_ppctty</code>, <code>ingame_ppctty</code>,
+<p><b>VARIANTS</b> contain the full <code>EXTRA_FEATURES</code> × <code>PADEMU</code> ×
+<code>DUALSENSE</code> matrix for the moving and pinned ps2dev flavours. The normalizer also adds a
+ready-made DualSense loader for each available official flavour; it does not build the complete
+official-toolchain matrix. <b>DEBUG</b> builds are produced for the two ps2dev flavours only. Those
+configurations (<code>iopcore</code>, <code>ingame</code>, <code>eesio</code>, <code>iopcore_ppctty</code>, <code>ingame_ppctty</code>,
 <code>DTL_T10000</code>) emit diagnostic output over a UART/TTY; they are only useful if you
 have the hardware or emulator setup to capture it. Do not use debug builds for normal gaming —
 they are significantly slower.</p></details>
@@ -257,20 +253,24 @@ they are significantly slower.</p></details>
 <div class="step"><h3>Extract the package zip</h3>
 <p>Unzip <code>RIPTOPL-&lt;rel&gt;-&lt;sha&gt;.zip</code>. The contents are ready to
 copy to your memory card or USB drive root:</p>
-<pre>APP_RIPTOPL-PS2DEVLATESTSDK/
-  RIPTOPL.ELF          ← use this (ps2dev:latest, recommended)
-APP_RIPTOPL-PS2DEVPINNEDSDK/
-  RIPTOPL.ELF          ← digest-pinned fallback if the recommended build misbehaves
+<pre>APP_RIPTOPL-PS2DEVPINNED/
+  RIPTOPL.ELF          ← #1 recommended pinned control
+APP_RIPTOPL-OFFICIALPINNED/
+  RIPTOPL.ELF          ← #2 official pinned control
+APP_RIPTOPL-PS2DEVROLLING/
+  RIPTOPL.ELF          ← #3 moving ps2dev canary
+APP_RIPTOPL-OFFICIALROLLING/
+  RIPTOPL.ELF          ← #4 moving official canary
 POPS/                  ← POPSTARTER.ELF and every loose BDMA variant (including .ilink)
 EMBER/                 ← official Ember core; add your own BIOS and games
 neutrino/              ← official Neutrino core (already extracted, drag-and-drop)
 PS2-Servers.url        ← link to the UDPFS / SMBv1 / UDPBD all-in-one PC launcher</pre>
 </div>
 <div class="step"><h3>Install the ELF via your launch method</h3>
-<p>Copy <code>APP_RIPTOPL-PS2DEVLATESTSDK/RIPTOPL.ELF</code> to wherever your launch method (FMCB,
-FHDB, or equivalent) expects it. The shipped folders carry an SDK-flavour suffix so the two builds
-can sit side by side; the <code>APP_</code> prefix is the OPL convention for homebrew apps stored on
-your device.</p>
+<p>Copy <code>APP_RIPTOPL-PS2DEVPINNED/RIPTOPL.ELF</code> to wherever your launch method (FMCB,
+FHDB, or equivalent) expects it. If that best-effort folder is absent in a run, use the next available
+flavour in the order above. The labelled folders can sit side by side; the <code>APP_</code> prefix is
+the OPL convention for homebrew apps stored on your device.</p>
 </div>
 <div class="step"><h3>Set up Neutrino (optional)</h3>
 <p>The <code>neutrino/</code> folder is already extracted — just copy the whole folder

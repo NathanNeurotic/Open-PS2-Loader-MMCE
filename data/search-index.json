@@ -38,19 +38,19 @@
  {
   "title": "Install & First Boot",
   "cat": "start",
-  "text": "How to get RIPTOPL.ELF onto your PS2 via FMCB/FHDB or any ELF launcher, what the installable package contains (including the PS2 Servers AIO shortcut), and what happens on first boot.",
+  "text": "How to get RIPTOPL.ELF onto your PS2 via FMCB/FHDB or any ELF launcher, what the installable package contains (including five external companion-tool shortcuts), and what happens on first boot.",
   "url": "install.html"
  },
  {
   "title": "What is RIPTOPL.ELF?",
   "cat": "start",
-  "text": "RIPTOPL.ELF is a single self-contained PS2 executable including GSM, PADEMU, VMC, cheats, and parental controls in one build. Several build flags stay off by default: EXTRA_FEATURES=0 leaves IGS (In-Game Screenshot) and RTL out of every published main ELF — those come from RIPTOPL-VARIANTS-*.zip; DualSense ships as a ready-made -ds5.ELF for each SDK flavour, and the experimental GSM 1080p loader ships as RIPTOPL-PS2DEVLATESTSDK-1080p.ELF (latest-SDK only).",
+  "text": "RIPTOPL.ELF is a single self-contained PS2 executable including GSM, the hardware-confirmed forced-progressive 1080p mode, PADEMU, VMC, cheats, and parental controls in one build. EXTRA_FEATURES=0 leaves IGS and RTL out of published standard loaders; those and the ready-made DualSense loaders are inside RIPTOPL-VARIANTS-*.zip.",
   "url": "install.html#what-is-riptopl-elf"
  },
  {
   "title": "Release channels (rolling vs tagged)",
   "cat": "start",
-  "text": "RiptOPL ships a continuously-rebuilt rolling pre-release from master and curated v* tagged releases; both use the same pipeline and package format.",
+  "text": "RiptOPL ships a continuously-rebuilt rolling development release, intentionally marked GitHub Latest and non-pre-release, plus curated v* tagged releases. Both use the same pipeline and package format.",
   "url": "install.html#release-channels"
  },
  {
@@ -80,13 +80,13 @@
  {
   "title": "USB / MX4SIO / iLink",
   "cat": "devices",
-  "text": "USB mass storage, MX4SIO SD cards (via memory-card slot adapter), and iLink (SBP2 over IEEE 1394) are OPL's three BDM mass-device transports, sharing the same FAT32/exFAT filesystem rules, folder layout, and Device Settings controls.",
+  "text": "USB mass storage, MX4SIO SD cards (via memory-card slot adapter), and iLink (SBP2 over IEEE 1394) are OPL's three BDM mass-device transports, sharing the same FAT32/exFAT filesystem rules, folder layout, and Game Sources controls.",
   "url": "usb.html"
  },
  {
   "title": "USB / MX4SIO / iLink — The three transports",
   "cat": "devices",
-  "text": "USB uses the usb BDM driver; MX4SIO uses sdc/mx4sio via the memory-card SIO2 slot; iLink uses sd/ilink over IEEE 1394 SBP-2. Each has its own enable toggle in Device Settings.",
+  "text": "USB uses the usb BDM driver; MX4SIO uses sdc/mx4sio via the memory-card SIO2 slot; iLink uses sd/ilink over IEEE 1394 SBP-2. Each has its own enable toggle in Game Sources.",
   "url": "usb.html#hardware"
  },
  {
@@ -114,21 +114,21 @@
   "url": "usb.html#usbextreme"
  },
  {
-  "title": "USB / MX4SIO / iLink — Device Settings",
+  "title": "USB / MX4SIO / iLink — Game Sources",
   "cat": "devices",
-  "text": "Device Settings holds BDM Start Mode (Off/Manual/Auto) and the per-transport enable toggles (USB/iLink/MX4SIO, plus HDD (GPT/MBR)). BDM Cache size (0–32, default 16) and BDM Prefix live on General Settings.",
-  "url": "usb.html#device-settings"
+  "text": "Game Sources holds BDM Start Mode (Off/Manual/Auto) and the per-transport enable toggles (USB/iLink/MX4SIO, plus HDD (GPT/MBR)). BDM Cache size (0–32, default 16) and BDM Prefix live on General Settings.",
+  "url": "usb.html#game-sources"
  },
  {
   "title": "MMCE (SD2PSX / MemCard PRO2)",
   "cat": "devices",
-  "text": "Complete guide to Memory Card Mass Storage Emulation (bbsan2k protocol) — SD2PSX and MemCard PRO2 in the PS2 memory-card slot. Covers setup, folder layout, all Device Settings options, IGR Bootcard Slot, and advanced timing tuners.",
+  "text": "Complete guide to Memory Card Mass Storage Emulation (bbsan2k protocol) — SD2PSX and MemCard PRO2 in the PS2 memory-card slot. Covers setup, folder layout, the Game Sources start mode, IGR Bootcard Slot, and advanced timing tuners.",
   "url": "mmce.html"
  },
  {
   "title": "MMCE: Quick Start",
   "cat": "devices",
-  "text": "Step-by-step walkthrough: format and populate the SD card, seat the device, enable MMCE Start Mode in Device Settings, and launch your first game.",
+  "text": "Step-by-step walkthrough: format and populate the SD card, seat the device, enable MMCE Start Mode in Game Sources, and launch your first game.",
   "url": "mmce.html#quick-start"
  },
  {
@@ -140,8 +140,8 @@
  {
   "title": "MMCE: Where the MMCE settings live",
   "cat": "devices",
-  "text": "MMCE Start Mode (Off/Manual/Auto, default Off) stays in Device Settings; MMCE Slot (0/1/Auto), IGR Bootcard Slot(s), Send GameID on Launch and the timing tuners moved to their own Settings → MMCE Settings page. MMCE Prefix Path sets a sub-path under the card root.",
-  "url": "mmce.html#device-settings"
+  "text": "MMCE Start Mode (Off/Manual/Auto, default Off) stays in Game Sources; MMCE Slot (0/1/Auto), IGR Bootcard Slot(s), Send GameID on Launch and the timing tuners moved to their own Settings → MMCE Settings page. MMCE Prefix Path sets a sub-path under the card root.",
+  "url": "mmce.html#game-sources"
  },
  {
   "title": "MMCE: IGR Bootcard Slot(s)",
@@ -170,7 +170,7 @@
  {
   "title": "SMB (network share)",
   "cat": "devices",
-  "text": "Load PS2 and PS1 games over SMB with the recommended PS2 Servers AIO launcher, Samba, or a compatible NAS. Device Settings carries an SMB Version row — SMBv1 (default) or SMB2 — and the choice must match your server. Covers share setup, Network Settings, and PS1 VCD over SMB.",
+  "text": "Load PS2 and PS1 games over SMB with the recommended PS2 Servers AIO launcher, Samba, or a compatible NAS. Game Sources carries an SMB Version row — SMBv1 (default) or SMB2 — and the choice must match your server. Covers share setup, Network Settings, and PS1 VCD over SMB.",
   "url": "smb.html"
  },
  {
@@ -192,9 +192,9 @@
   "url": "smb.html#network-settings"
  },
  {
-  "title": "SMB — Enable SMB in Device Settings",
+  "title": "SMB — Enable SMB in Game Sources",
   "cat": "devices",
-  "text": "In Device Settings set Network Protocol to Manual or Auto, Protocol to SMB, and SMB Version to SMBv1 or SMB2; Access is locked to Files while Protocol is SMB. SMB and the UDP boot protocols share the one NIC — only one can be active at a time.",
+  "text": "In Game Sources set Network Protocol to Manual or Auto, Protocol to SMB, and SMB Version to SMBv1 or SMB2; Access is locked to Files while Protocol is SMB. SMB and the UDP boot protocols share the one NIC — only one can be active at a time.",
   "url": "smb.html#enable-smb"
  },
  {
@@ -212,7 +212,7 @@
  {
   "title": "SMB — NIC interlock with Network Boot",
   "cat": "devices",
-  "text": "SMB and Network Boot (SMB/UDP) both require the PS2's single Ethernet adapter and are mutually exclusive. Switching requires a save and restart; the interlock is enforced in both the Device Settings UI and at runtime.",
+  "text": "SMB and Network Boot (SMB/UDP) both require the PS2's single Ethernet adapter and are mutually exclusive. Switching requires a save and restart; the interlock is enforced in both the Game Sources UI and at runtime.",
   "url": "smb.html#nic-exclusive"
  },
  {
@@ -260,7 +260,7 @@
  {
   "title": "exFAT HDD via Block Device Manager (BDMA)",
   "cat": "devices",
-  "text": "Enable HDD (GPT/MBR) in Device Settings to mount the internal HDD as an exFAT mass-storage device in the massN: namespace, listed as an HDD Games tab. Supports MBR (up to 2 TB) or GPT (unlimited); format with Allocation unit size set to Default and add files one at a time to avoid fragmentation.",
+  "text": "Enable HDD (GPT/MBR) in Game Sources to mount the internal HDD as an exFAT mass-storage device in the massN: namespace, listed as an HDD Games tab. Supports MBR (up to 2 TB) or GPT (unlimited); format with Allocation unit size set to Default and add files one at a time to avoid fragmentation.",
   "url": "hdd.html#exfat-bdm"
  },
  {
@@ -284,13 +284,13 @@
  {
   "title": "Network Boot (SMB / UDP)",
   "cat": "devices",
-  "text": "Stream your PS2 game library from a PC over the LAN. Device Settings carries four network rows — Network Protocol (Off / Manual / Auto), Protocol (SMB / UDPFS / UDPBD), SMB Version (SMBv1 / SMB2) and Access (Files / IMG) — and the linked PS2 Servers AIO launcher provides all three PC-side protocols.",
+  "text": "Stream your PS2 game library from a PC over the LAN. Game Sources carries four network rows — Network Protocol (Off / Manual / Auto), Protocol (SMB / UDPFS / UDPBD), SMB Version (SMBv1 / SMB2) and Access (Files / IMG) — and the linked PS2 Servers AIO launcher provides all three PC-side protocols.",
   "url": "network-boot.html"
  },
  {
   "title": "The Network rows",
   "cat": "devices",
-  "text": "Device Settings carries four network rows: Network Protocol is the start mode (Off / Manual / Auto, default Off); Protocol picks SMB, UDPFS or UDPBD; SMB Version picks SMBv1 (default) or SMB2; Access picks Files or IMG. Because the PS2 has a single NIC, choosing one protocol automatically excludes the others.",
+  "text": "Game Sources carries four network rows: Network Protocol is the start mode (Off / Manual / Auto, default Off); Protocol picks SMB, UDPFS or UDPBD; SMB Version picks SMBv1 (default) or SMB2; Access picks Files or IMG. Because the PS2 has a single NIC, choosing one protocol automatically excludes the others.",
   "url": "network-boot.html#protocols"
  },
  {
@@ -302,7 +302,7 @@
  {
   "title": "Access — Files vs IMG",
   "cat": "devices",
-  "text": "The Access row is always present in Device Settings, but it is only free to change while Protocol = UDPFS — under SMB it is value-locked to Files and under UDPBD to IMG, greyed in both cases. Its two values are Files (default) and IMG. They are the same UDPFS protocol in two shapes: Files is the udpfs_ioman filesystem, IMG is the block-device disk image.",
+  "text": "The Access row is always present in Game Sources, but it is only free to change while Protocol = UDPFS — under SMB it is value-locked to Files and under UDPBD to IMG, greyed in both cases. Its two values are Files (default) and IMG. They are the same UDPFS protocol in two shapes: Files is the udpfs_ioman filesystem, IMG is the block-device disk image.",
   "url": "network-boot.html#udpfs-vs-udpfsbd"
  },
  {
@@ -344,7 +344,7 @@
  {
   "title": "Troubleshooting",
   "cat": "devices",
-  "text": "Symptom Likely cause Fix No network games list appears Network Protocol is Off, or the IOP module failed to load (no network link at boot). Check Device Settings → Network Protocol is set to your chos",
+  "text": "Symptom Likely cause Fix No network games list appears Network Protocol is Off, or the IOP module failed to load (no network link at boot). Check Game Sources → Network Protocol is set to your chos",
   "url": "network-boot.html#troubleshooting"
  },
  {
@@ -368,7 +368,7 @@
  {
   "title": "How PS1 games launch (POPSTARTER only)",
   "cat": "ps1",
-  "text": "VCD titles always boot through POPSTARTER.ELF. iLink uses the normal local-device selector mass:/POPS/XX.<game>.ELF, with the same XX. rules as USB and MX4SIO. The Loader Core selector, GSM, Cheats, and PADEMU options are inert for PS1 games.",
+  "text": "VCD titles always boot through POPSTARTER.ELF. iLink uses the normal local-device selector mass:/POPS/XX.<game>.ELF, with the same XX. rules as USB and MX4SIO; revision 2692 has the handoff wired but did not pass hardware. The Loader Core selector, GSM, Cheats, and PADEMU options are inert for PS1 games.",
   "url": "ps1-vcd.html#launch"
  },
  {
@@ -380,7 +380,7 @@
  {
   "title": "exFAT support — the BDMA equip",
   "cat": "ps1",
-  "text": "RiptOPL copies the correct loose BDMAssault pair from the source device's POPS/ folder to mc?:/POPSTARTER/. iLink uses usbd.irx.ilink + usbhdfsd.irx.ilink, with .ilink removed on the card. No BDMA pair is embedded. Apply on Launch equips automatically; turn it Off to use the Mode and Source pickers.",
+  "text": "RiptOPL copies the correct loose BDMAssault pair from the source device's POPS/ folder to mc?:/POPSTARTER/. iLink uses usbd.irx.ilink + usbhdfsd.irx.ilink, with .ilink removed on the card. No BDMA pair is embedded. Apply on Launch equips automatically, but revision 2692 iLink POPSTARTER remains unconfirmed on hardware.",
   "url": "ps1-vcd.html#bdma"
  },
  {
@@ -410,7 +410,7 @@
  {
   "title": "Install Neutrino",
   "cat": "neutrino",
-  "text": "Neutrino is not bundled — place neutrino.elf at mc0:NEUTRINO/neutrino.elf or mc1:NEUTRINO/neutrino.elf, or set a custom path in General Settings. Auto-detection checks case variants.",
+  "text": "The installable package bundles a ready-to-use complete neutrino/ folder. Copy the whole folder to a supported device, or use mc0:NEUTRINO/neutrino.elf / mc1:NEUTRINO/neutrino.elf or a custom path. Auto-detection checks case variants and validates the accompanying config.",
   "url": "neutrino.html#install"
  },
  {
@@ -422,7 +422,7 @@
  {
   "title": "Where Neutrino works",
   "cat": "neutrino",
-  "text": "Neutrino works with USB, iLink, MX4SIO, internal ATA (BDM), internal HDD (APA/HDL), MMCE, UDPBD, and UDPFS. SMB, .ul split images, and .zso compressed ISOs fall back to the OPL core.",
+  "text": "Neutrino works with USB, MX4SIO, internal ATA (BDM), internal HDD (APA/HDL), MMCE, UDPBD, and UDPFS. iLink is a FAT-model backend; post-2692 builds add -qb for RiptOPL's inherited-stack handoff and await hardware retest. SMB, .ul split images, and .zso compressed ISOs fall back to OPL.",
   "url": "neutrino.html#where-it-works"
  },
  {
@@ -434,7 +434,7 @@
  {
   "title": "Neutrino Launch Arguments",
   "cat": "neutrino",
-  "text": "OPL auto-emits -bsd, -dvd, -gc, -gsm, -mc, -dbc, and -logo from game settings. Extra flags go in Global or per-game Neutrino Launch Args fields (config keys neutrino_args / $NeutrinoArgs), appended after the auto-built args.",
+  "text": "OPL auto-emits -bsd, -dvd, -gc, -gsm, -mc, -dbc, and -logo from game settings, plus -qb for USB and iLink so Neutrino keeps the inherited BDM environment. Extra flags go in global or per-game Neutrino Launch Args.",
   "url": "neutrino.html#launch-args"
  },
  {
@@ -506,7 +506,7 @@
  {
   "title": "Favorites — Quick start",
   "cat": "features",
-  "text": "How to enable the Favorites tab in Device Settings, star a game with R3, and open the aggregated Favorites page.",
+  "text": "How to enable the Favorites tab in Game Sources, star a game with R3, and open the aggregated Favorites page.",
   "url": "favourites.html#quick-start"
  },
  {
@@ -522,10 +522,10 @@
   "url": "favourites.html#persistence"
  },
  {
-  "title": "Favorites — Device Settings option",
+  "title": "Favorites — Game Sources option",
   "cat": "features",
-  "text": "The Favorites Start Mode setting (Off / Manual / Auto) in Device Settings controls whether the tab is visible and whether R3 is active. Off is the default; R3 does nothing while Off.",
-  "url": "favourites.html#device-settings"
+  "text": "The Favorites Start Mode setting (Off / Manual / Auto) in Game Sources controls whether the tab is visible and whether R3 is active. Off is the default; R3 does nothing while Off.",
+  "url": "favourites.html#game-sources"
  },
  {
   "title": "Favorites — Four L3 views",
@@ -782,7 +782,7 @@
  {
  "title": "Settings Reference",
  "cat": "reference",
- "text": "Every settings menu and option in RiptOPL, grouped by screen: General Settings, Device Settings, PS Emulation Settings, Interface, Audio, Controller, OSD, Parental Lock, and Network.",
+ "text": "Every settings menu and option in RiptOPL, grouped by screen, including Game Sources, General & System, Network, Interface, Game Launching, PS Emulation Settings, Controller Settings, and Audio Settings.",
  "url": "settings.html"
  },
  {
@@ -798,10 +798,10 @@
   "url": "settings.html#general-settings"
  },
  {
- "title": "Device Settings",
+ "title": "Game Sources",
  "cat": "reference",
  "text": "Strictly device selection: Default Menu, BDM/HDD (APA)/Applications/Favorites/MMCE start modes, per-device enable toggles, and the four network rows. Prefix paths and cache sizes are on General Settings.",
- "url": "settings.html#device-settings"
+ "url": "settings.html#game-sources"
  },
  {
   "title": "PS Emulation Settings",
@@ -974,26 +974,26 @@
  {
   "title": "Releases",
   "cat": "reference",
-  "text": "RiptOPL ships on two channels: a continuously-rebuilt rolling pre-release (every master push) and curated v* tagged releases. Both channels carry the same full-feature asset set produced by one pipeline.",
+  "text": "RiptOPL ships on two channels: a continuously-rebuilt rolling development release marked GitHub Latest, and curated v* tagged releases. Both channels use the same normalized package pipeline and best-effort rules.",
   "url": "releases.html"
  },
  {
   "title": "Releases — Release channels",
   "cat": "reference",
-  "text": "The rolling tag is rebuilt on every master push and may be unstable; v* tagged releases are curated, known-good versions. Both channels publish the identical asset set.",
+  "text": "The rolling tag is rebuilt on every publishing-branch push, is explicitly non-pre-release and GitHub Latest, and may be unstable. Curated v* tags do not displace it; both channels use the same normalized package format.",
   "url": "releases.html#channels"
  },
  {
   "title": "Releases — What the rolling release contains",
   "cat": "reference",
-  "text": "Each rolling build publishes an installable package zip with the loader folders, bundled Neutrino and Ember, one canonical POPS/ folder, companion-tool shortcuts, bare ELFs, VARIANTS and DEBUG zips, a source snapshot, checksums, and languages. Every BDMA pair stays loose in POPS/, including the iLink pair; none is embedded.",
+  "text": "A normalized rolling release normally exposes up to five archives: unified package, exact source, languages, VARIANTS, and DEBUG. Optional packs can be absent. Standard loaders are in the package, DualSense loaders are in VARIANTS, and no bare ELF or checksum/build manifest remains public. Every BDMA pair stays loose in POPS/; none is embedded.",
   "url": "releases.html#rolling-assets"
  },
  {
-  "title": "Releases — Two toolchains, one recommended",
+  "title": "Releases — Four toolchain flavours",
   "cat": "reference",
-  "text": "Two toolchains: APP_RIPTOPL-PS2DEVLATESTSDK (ps2dev/ps2dev:latest, the recommended build) and APP_RIPTOPL-PS2DEVPINNEDSDK (the same ps2dev SDK pinned by digest, the safe fallback if the moving tag regresses). There is no unlabeled default folder.",
-  "url": "releases.html#two-toolchains"
+  "text": "Four labelled flavours are ordered for testing: APP_RIPTOPL-PS2DEVPINNED, APP_RIPTOPL-OFFICIALPINNED, APP_RIPTOPL-PS2DEVROLLING, and APP_RIPTOPL-OFFICIALROLLING. Pinned controls separate application failures from regressions in moving SDK tags; there is no unlabeled default folder.",
+  "url": "releases.html#four-flavours"
  },
  {
   "title": "Releases — Bundled Neutrino core",
@@ -1010,7 +1010,7 @@
  {
   "title": "Releases — How the pipeline works",
   "cat": "reference",
-  "text": "One workflow file (rolling-release.yml) handles both channels: a master push updates rolling, a v* tag push cuts a curated release with the identical asset set.",
+  "text": "One workflow file (rolling-release.yml) handles both channels: a rebuild/main or master push updates rolling as GitHub Latest, while a v* tag push cuts a curated release through the same normalized package pipeline without displacing rolling.",
   "url": "releases.html#pipeline"
  },
  {
@@ -1042,6 +1042,12 @@
   "cat": "reference",
   "text": "Hold Triangle + Cross while OPL boots to force a saved incompatible video mode (or GSM override) to 480p progressive; works for both blank-screen-on-boot and locked GSM mistakes.",
   "url": "troubleshooting.html#no-display"
+ },
+ {
+  "title": "Troubleshooting: iLink revision 2692 handoff status",
+  "cat": "reference",
+  "text": "On SCPH-39001 revision 2692, Ember passed in all four SDK flavours while native OPL, Neutrino, and POPSTARTER failed at reset/handoff. Post-2692 Neutrino adds -qb; POPSTARTER can be isolated by checking the external MC pair and ilink marker; native OPL still needs an official-OPL control.",
+  "url": "troubleshooting.html#ilink-handoff-status"
  },
  {
   "title": "Troubleshooting: BDMA — module files not found on source device",

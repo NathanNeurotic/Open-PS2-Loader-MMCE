@@ -63,12 +63,12 @@ If <code>RIPTOPL.ELF</code> is already on your PS2 and booting, skip ahead to
   <li>A PlayStation 2 (any model) or a backward-compatible PlayStation 3.</li>
   <li>A way to launch homebrew ELFs — Free McBoot (FMCB), Free HD Boot (FHDB), a modchip, or equivalent.</li>
   <li>At least one storage option: USB drive, MMCE / MX4SIO SD card, iLink storage, SMB network share, or an internal HDD.</li>
-  <li>A RiptOPL build — download <code>RIPTOPL.ELF</code> from the <a href="releases.html">Releases</a> page. Use a tagged <code>v*</code> release for stability, or the <code>rolling</code> pre-release for the latest features.</li>
+  <li>A RiptOPL build — download <code>RIPTOPL.ELF</code> from the <a href="releases.html">Releases</a> page. Use a tagged <code>v*</code> release for stability, or the <code>rolling</code> Latest development release for the newest features.</li>
   <li>At least one PS2 game image in ISO or ZSO format.</li>
 </ul>
 
 <details class="deep"><summary>Which release should I download?</summary>
-<p>The <b>rolling</b> pre-release is rebuilt from <code>rebuild/main</code> on every push and normally includes the bundled Neutrino core. It may occasionally be unstable. Tagged <b>v*</b> releases are manually cut, known-good snapshots. Either way, the full installable package zip (<code>RIPTOPL-&lt;rel&gt;-&lt;sha&gt;.zip</code>) contains the loader folders, one canonical <code>POPS/</code> folder (including every loose BDMA pair and the iLink <code>.ilink</code> pair), <code>EMBER/</code>, and the already-extracted <code>neutrino/</code> folder. No duplicate release-root <code>POPSTARTER/</code> folder or embedded BDMA pair is used. The language pack is a separate <code>RIPTOPL-LANGS-*.zip</code> release asset. See <a href="releases.html">Releases</a> for details.</p>
+<p>The <b>rolling</b> channel is rebuilt from <code>rebuild/main</code> on every push during the rebuild and is intentionally published as GitHub's full, non-pre-release <b>Latest</b> release. It may occasionally be unstable. Tagged <b>v*</b> releases are manually cut, known-good snapshots. Either way, the full installable package zip (<code>RIPTOPL-&lt;rel&gt;-&lt;sha&gt;.zip</code>) normally contains four labelled loader folders (the notes identify any omitted best-effort flavour), one canonical <code>POPS/</code> folder (including every loose BDMA pair and the iLink <code>.ilink</code> pair), <code>EMBER/</code>, and the already-extracted <code>neutrino/</code> folder. No duplicate release-root <code>POPSTARTER/</code> folder or embedded BDMA pair is used. The language pack is a separate optional <code>RIPTOPL-LANGS-*.zip</code> release asset. See <a href="releases.html">Releases</a> for details.</p>
 </details>
 
 <h2 id="pick-a-device">Pick a device</h2>
@@ -82,7 +82,7 @@ If <code>RIPTOPL.ELF</code> is already on your PS2 and booting, skip ahead to
 <tr><td><b>MX4SIO</b></td><td>MX4SIO adapter + SD card in the memory-card slot (FAT32 or exFAT)</td><td><a href="usb.html">USB / MX4SIO / iLink</a></td></tr>
 <tr><td><b>MMCE</b></td><td>SD2PSX, MemCard PRO2, or compatible MMCE device in the memory-card slot</td><td><a href="mmce.html">MMCE</a></td></tr>
 <tr><td><b>iLink</b></td><td>IEEE 1394 (FireWire) SBP2 storage device</td><td><a href="usb.html">USB / MX4SIO / iLink</a></td></tr>
-<tr><td><b>SMB</b></td><td>A network share on a PC or NAS (SMBv1 or SMB2 — pick it with the <b>SMB Version</b> setting in Device Settings; SMBv1 is the default); PS2 needs a network adapter</td><td><a href="smb.html">SMB</a></td></tr>
+<tr><td><b>SMB</b></td><td>A network share on a PC or NAS (SMBv1 or SMB2 — pick it with the <b>SMB Version</b> setting in Game Sources; SMBv1 is the default); PS2 needs a network adapter</td><td><a href="smb.html">SMB</a></td></tr>
 <tr><td><b>Internal HDD (APA)</b></td><td>Internal ATA HDD formatted with APA/PFS — classic PS2 HDD setup</td><td><a href="hdd.html">Internal HDD</a></td></tr>
 <tr><td><b>Internal HDD (exFAT)</b></td><td>Internal ATA HDD formatted exFAT — BDM path, same folder layout as USB</td><td><a href="hdd.html">Internal HDD</a></td></tr>
 <tr><td><b>Network boot (UDPBD / UDPFS)</b></td><td>PS2 network adapter + a PC running the server; requires Neutrino</td><td><a href="network-boot.html">Network Boot</a></td></tr>

@@ -1,7 +1,7 @@
 <!doctype html><html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Network Boot (SMB/UDP) · RiptOPL Docs</title>
-<meta name="description" content="Stream games from a PC over the LAN with four Device Settings rows — Network Protocol (Off / Manual / Auto), Protocol (SMB / UDPFS / UDPBD), SMB Version, and Access (Files / IMG).">
+<meta name="description" content="Stream games from a PC over the LAN with four Game Sources rows — Network Protocol (Off / Manual / Auto), Protocol (SMB / UDPFS / UDPBD), SMB Version, and Access (Files / IMG).">
 <link rel="stylesheet" href="assets/style.css">
 </head><body data-base="">
 <header class="topbar">
@@ -51,7 +51,7 @@
   <main class="content">
 <h1>Network Boot (SMB / UDP)</h1>
 <p class="lead">Stream your PS2 game library from a PC over the LAN. RiptOPL configures the network with
-<b>four rows</b> in <b>Device Settings</b>: <b>Network Protocol</b> (the start mode — <b>Off / Manual /
+<b>four rows</b> in <b>Game Sources</b>: <b>Network Protocol</b> (the start mode — <b>Off / Manual /
 Auto</b>), <b>Protocol</b> (<b>SMB / UDPFS / UDPBD</b>), <b>SMB Version</b> (<b>SMBv1</b> or <b>SMB2</b>)
 and <b>Access</b> (<b>Files</b> or <b>IMG</b>). Because the PS2 has one Ethernet adapter, exactly one
 transport is ever active, so the Protocol row is exclusive <i>by construction</i>. <b>UDPFS</b> is the modern
@@ -73,7 +73,7 @@ PC-side server. Pick a protocol only when you have those pieces in place. Local 
 
 <h2 id="protocols">The Network rows</h2>
 
-<p><b>Settings &rarr; Device Settings</b> carries four network rows. Row 1 <b>Network Protocol</b> is the
+<p><b>Settings &rarr; Game Sources</b> carries four network rows. Row 1 <b>Network Protocol</b> is the
 start mode (<b>Off / Manual / Auto</b>); while it is <b>Off</b>, the other three grey out. Row 2
 <b>Protocol</b> picks the transport — because the PS2 has a single NIC, choosing one automatically
 excludes the others. Row 3 <b>SMB Version</b> is live only while Protocol = SMB, and keeps its value
@@ -93,7 +93,7 @@ table below, <b>Off</b> is row 1's value; the other three are row 2's.</p>
 </tr>
 <tr>
   <td><b>SMB</b></td>
-  <td>SMBv1 or SMB2 (Device Settings &rarr; SMB Version; default SMBv1)</td>
+  <td>SMBv1 or SMB2 (Game Sources &rarr; SMB Version; default SMBv1)</td>
   <td>a mounted file share</td>
   <td><a href="https://github.com/NathanNeurotic/PS2-Servers">PS2 Servers</a> (recommended) / Samba</td>
   <td>OPL's <b>own</b> core (not Neutrino)</td>
@@ -170,7 +170,7 @@ switch to SMB2, switch back to SMBv1 or point RiptOPL at a server that speaks SM
 
 <h2 id="udpfs-vs-udpfsbd">Access — Files vs IMG</h2>
 
-<p>The <b>Access</b> row is always present in Device Settings, but it is only free to change while
+<p>The <b>Access</b> row is always present in Game Sources, but it is only free to change while
 <b>Protocol</b> = <b>UDPFS</b> — under SMB it is value-locked to <b>Files</b> and under UDPBD to
 <b>IMG</b>, greyed in both cases. Its two values are <b>Files</b> (default) and <b>IMG</b>.
 They are the <b>same UDPFS protocol</b> in two shapes: Files is
@@ -264,8 +264,8 @@ the RiptOPL source tree into your <code>neutrino/config/</code> folder.</p>
 <ul class="checklist">
   <li><b>Static PS2 IP address</b> (UDPFS only). The UDPFS IOP modules (both Files and IMG)
   have no DHCP client — they read the IP set in <b>Settings &rarr; Network Config</b> and use it
-  directly. If DHCP is currently on there, RiptOPL warns you when you select UDPFS in Device
-  Settings. (SMB can use DHCP or a static IP; it keeps its own address/port/share/credentials fields
+  directly. If DHCP is currently on there, RiptOPL warns you when you select UDPFS in Game
+  Sources. (SMB can use DHCP or a static IP; it keeps its own address/port/share/credentials fields
   on the Network Config page, hidden automatically when UDPFS is selected.)</li>
   <li><b>PC-side UDPFS server running on the same LAN</b>, matching the Access mode you chose.
   RiptOPL does <b>not</b> embed one. Open the package's <code>PS2-Servers.url</code> shortcut or visit
@@ -304,7 +304,7 @@ module-load time and have no way to acquire a lease later. (SMB can stay on DHCP
 </div>
 <div class="step">
 <h3>Pick your Network Protocol (and Access)</h3>
-<p>In <b>Settings &rarr; Device Settings</b>, set <b>Network Protocol</b> (row 1) to <b>Manual</b> or
+<p>In <b>Settings &rarr; Game Sources</b>, set <b>Network Protocol</b> (row 1) to <b>Manual</b> or
 <b>Auto</b>, then set <b>Protocol</b> (row 2) to <b>SMB</b>, <b>UDPFS</b>, or <b>UDPBD</b>; set row 1 back
 to <b>Off</b> to disable networking. When Protocol = <b>SMB</b>, pick the <b>SMB Version</b> — <b>SMBv1</b>
 (default) or <b>SMB2</b>. The <b>Access</b> row (<b>Files</b> / <b>IMG</b>) is always present, but it is
@@ -449,7 +449,7 @@ in IMG mode, only standard ISO images work.</p>
 <tr>
   <td>No network games list appears</td>
   <td>Network Protocol is Off, or the IOP module failed to load (no network link at boot).</td>
-  <td>Check <b>Device Settings &rarr; Network Protocol</b> is <b>Manual</b> or <b>Auto</b> (not Off),
+  <td>Check <b>Game Sources &rarr; Network Protocol</b> is <b>Manual</b> or <b>Auto</b> (not Off),
   and that <b>Protocol</b> is set to your chosen transport.
   Verify the PS2 has a physical Ethernet link before power-on.</td>
 </tr>
@@ -488,7 +488,7 @@ in IMG mode, only standard ISO images work.</p>
   <td>Existing UDPBD setup stopped working after updating</td>
   <td>The <b>Protocol</b> row is set to something other than <b>UDPBD</b> (UDPBD is
   wire-incompatible with UDPFS, so a UDPFS pick won't talk to <code>udpbd-server</code>).</td>
-  <td>Set <b>Device Settings &rarr; Protocol</b> back to <b>UDPBD</b> (with <b>Network Protocol</b> on
+  <td>Set <b>Game Sources &rarr; Protocol</b> back to <b>UDPBD</b> (with <b>Network Protocol</b> on
   <b>Manual</b> or <b>Auto</b>) and keep running the same
   <code>udpbd-server</code> on the PC — a config saved as UDPBD is preserved as-is, never migrated.
   (Alternatively, switch to <b>UDPFS</b> and run <code>udpfsd</code> instead — but that is a different

@@ -132,7 +132,7 @@ device to the OS. See the <a href="nbd.html">NBD Server</a> page for full client
 <pre>hdl_dump inject_dvd ps2/nbd "Game Title" ./GAME.ISO</pre>
 <p>HDL-Dump writes the game directly into a new APA partition on the PS2's HDD. Disconnect the NBD client when done.</p></div>
 <div class="step"><h3>Enable HDD mode in RiptOPL</h3>
-<p>In <b>Device Settings</b>, set <b>HDD (APA) Start Mode</b> to Manual or Auto. On the next boot the game list appears as the
+<p>In <b>Game Sources</b>, set <b>HDD (APA) Start Mode</b> to Manual or Auto. On the next boot the game list appears as the
 <b>HDD Games</b> tab.</p></div>
 </div>
 
@@ -196,7 +196,7 @@ use or reformat and re-copy.</p>
 <h3 id="exfat-enable">Enabling BDM HDD in RiptOPL</h3>
 <div class="steps">
 <div class="step"><h3>Enable HDD (GPT/MBR)</h3>
-<p>Go to <b>Device Settings</b> and enable <b>HDD (GPT/MBR)</b>. On the next boot (or scan) the exFAT HDD mounts into
+<p>Go to <b>Game Sources</b> and enable <b>HDD (GPT/MBR)</b>. On the next boot (or scan) the exFAT HDD mounts into
 the <code>massN:</code> namespace and an <b>HDD Games</b> tab appears in the game list.</p></div>
 <div class="step"><h3>Copy your games</h3>
 <p>On your PC, place PS2 ISO/ZSO files in the <code>DVD/</code> (for DVD-format discs) or <code>CD/</code> (for
@@ -257,14 +257,14 @@ including the BDMA Source setting.</p>
 <tr><td>PS1 support</td><td><code>__.POPS*</code> (POPSTARTER) and <code>__.EMBER*</code> (Ember) APA partitions</td><td><code>POPS/</code> + BDMA equip, and/or <code>EMBER/</code></td></tr>
 <tr><td>Fragmentation risk</td><td>None (partition-based)</td><td>Yes — add files one at a time</td></tr>
 <tr><td>Tool ecosystem</td><td>HDL-Dump, pfs-shell, uLaunchELF</td><td>Any PC file manager</td></tr>
-<tr><td>Enable in RiptOPL</td><td>Device Settings → HDD (APA) Start Mode</td><td>Device Settings → HDD (GPT/MBR)</td></tr>
+<tr><td>Enable in RiptOPL</td><td>Game Sources → HDD (APA) Start Mode</td><td>Game Sources → HDD (GPT/MBR)</td></tr>
 </tbody>
 </table>
 
 <h2 id="notes">Notes &amp; limitations</h2>
 <ul class="checklist">
-<li>APA/PFS HDD mode and the exFAT BDM HDD now <b>coexist</b> in RiptOPL — both rows stay enabled in Device
-Settings and a single boot can serve both. The driver arbitrates per drive at mount time: APA is refused on a
+<li>APA/PFS HDD mode and the exFAT BDM HDD now <b>coexist</b> in RiptOPL — both rows stay enabled in Game
+Sources and a single boot can serve both. The driver arbitrates per drive at mount time: APA is refused on a
 non-Sony (MBR/GPT/exFAT) disk as a corruption guard.</li>
 <li>The exFAT HDD mounts as <code>massN:</code> — it shares that namespace with USB/MX4SIO devices. If you have
 both a USB drive and the exFAT HDD connected, they each occupy a separate <code>massN</code> slot.</li>

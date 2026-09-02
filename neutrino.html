@@ -105,7 +105,8 @@ The <b>Loader Core</b> selector, the <b>Neutrino Device</b> picker, the structur
 <table data-sortable>
 <thead><tr><th>Game source</th><th>Neutrino?</th></tr></thead>
 <tbody>
-<tr><td>USB / iLink / MX4SIO</td><td>Yes</td></tr>
+<tr><td>USB / MX4SIO</td><td>Yes</td></tr>
+<tr><td>iLink / IEEE 1394 (FAT PS2 models only)</td><td>Supported and wired; the post-2692 build adds quick boot for RiptOPL's inherited-stack handoff and is pending hardware retest</td></tr>
 <tr><td>Internal ATA (BDM block device)</td><td>Yes</td></tr>
 <tr><td>Internal HDD (APA partition &rarr; HDL)</td><td>Yes</td></tr>
 <tr><td>MMCE (SD2PSX / MemCard PRO2)</td><td>Yes</td></tr>
@@ -115,6 +116,15 @@ The <b>Loader Core</b> selector, the <b>Neutrino Device</b> picker, the structur
 <tr><td>Compressed ISO (<code>.zso</code>)</td><td>No — falls back to <code>&lt;OPL&gt;</code></td></tr>
 </tbody>
 </table>
+
+<div class="callout amber"><div class="h">⚠ Revision 2692 iLink result</div>
+On an SCPH-39001, Neutrino failed from iLink in all four SDK flavours. Revision 2692 emitted the
+documented <code>-bsd=ilink</code> token but did not add <code>-qb</code>. RiptOPL's bridge deliberately
+preserves the mounted iLink environment, while Neutrino documents <code>-qb</code> as direct entry into
+its load environment, so that omission is a source-confirmed handoff mismatch consistent with the
+failure. The post-2692 correction below still needs a hardware pass to prove whether it was the
+complete cause; this page does not call it a pass yet.
+</div>
 
 <p>Unsupported sources fall back to the <code>&lt;OPL&gt;</code> core automatically with an on-screen warning. No manual intervention is needed — OPL detects the format and adjusts.</p>
 
@@ -136,7 +146,7 @@ PlayStation 1 titles always boot through their own core — <b>POPSTARTER.ELF</b
 <li><b>HDD (exFAT)</b> — internal BDM/exFAT HDD (resolves to <code>massN:</code>)</li>
 <li><b>HDD (APA)</b> — internal APA HDD (resolves to a <code>pfs</code> mount)</li>
 <li><b>Game's Device</b> — resolves <em>only</em> on the active game's own device (a co-located <code>neutrino/neutrino.elf</code>); there is no legacy custom path and no <code>mc0</code>/<code>mc1</code> fallback, so a miss shows a "not found" message and aborts the launch</li>
-<li><b>iLink</b> — IEEE 1394 / SBP-2 storage (resolves to the matching mounted <code>massN:</code> device)</li>
+<li><b>iLink</b> — IEEE 1394 / SBP-2 storage on FAT PS2 models (resolves to the matching mounted <code>massN:</code> device)</li>
 </ul>
 
 <p>In all cases the path searched on the chosen device type is <code>&lt;device&gt;:NEUTRINO/neutrino.elf</code> and its capitalisation variants; the leading-slash form <code>&lt;device&gt;:/neutrino/neutrino.elf</code> is also tried.</p>
@@ -151,6 +161,7 @@ PlayStation 1 titles always boot through their own core — <b>POPSTARTER.ELF</b
 <tr><td><code>-bsd=&lt;usb|ilink|mx4sio|ata|mmce|udpbd|udpfsbd|udpfs&gt;</code></td><td>Always (the storage backend)</td></tr>
 <tr><td><code>-bsdfs=hdl</code></td><td>Internal HDD (APA) only</td></tr>
 <tr><td><code>-dvd=&lt;path&gt;</code> / <code>-dvd=hdl:&lt;partition&gt;</code></td><td>Always (the game image or partition)</td></tr>
+<tr><td><code>-qb</code></td><td>USB and iLink. RiptOPL's no-reset bridge preserves the mounted BDM environment; quick boot enters Neutrino's load environment without resetting that inherited stack away. An active user-supplied copy is never duplicated.</td></tr>
 <tr><td><code>-gc=&lt;modes&gt;</code></td><td>Only when OPL compat modes are set for the game</td></tr>
 <tr><td><code>-dbc</code></td><td>Only when <b>Debug Colors</b> is enabled</td></tr>
 <tr><td><code>-logo</code></td><td>Only when <b>PS2 Logo</b> is enabled</td></tr>
@@ -182,7 +193,7 @@ Both the global and per-game Neutrino Launch Args open a <b>structured sub-scree
 <table data-sortable>
 <thead><tr><th>Field</th><th>Argument emitted</th><th>Notes</th></tr></thead>
 <tbody>
-<tr><td>Quick Boot (-qb)</td><td><code>-qb</code></td><td>Suppress Neutrino's boot screen; emitted first if enabled</td></tr>
+<tr><td>Quick Boot (-qb)</td><td><code>-qb</code></td><td>Enter Neutrino's load environment directly; emitted first if enabled and supplied automatically for USB/iLink</td></tr>
 <tr><td>Debug Colors (-dbc)</td><td><code>-dbc</code></td><td>Neutrino's debug colour output; forwarding it here suppresses OPL's own auto-emitted copy</td></tr>
 <tr><td>PS2 Logo (-logo)</td><td><code>-logo</code></td><td>Show the PS2 logo; forwarding it here suppresses OPL's own auto-emitted copy</td></tr>
 <tr><td>Working Dir (-cwd)</td><td><code>-cwd=&lt;path&gt;</code></td><td>Override Neutrino's working directory</td></tr>
@@ -224,10 +235,10 @@ Both the global and per-game Neutrino Launch Args open a <b>structured sub-scree
 <b>1080i x3</b> (<code>-gsm=1080ix3</code>) is the community workaround for progressive-looking output —
 the same effect previously reached by launching Neutrino from PS2BBLE/OSDmenu with
 <code>-gsm=1080ix3</code>. Set it per game, or globally and leave games on “Default”. True 1080p is not
-one of Neutrino's <code>-gsm</code> modes — the GS outputs <code>1080i</code>, and OPL's own UI lacks the
-VRAM for a 1080p framebuffer. (An experimental forced-1080p raster exists on the <em>OPL</em> core
-only, compiled into the separate <code>RIPTOPL-PS2DEVLATESTSDK-1080p.ELF</code> release asset and
-nothing else.)</div>
+one of Neutrino's <code>-gsm</code> modes — its option remains <code>1080i</code>. RiptOPL's native
+<em>OPL</em> core separately provides a hardware-confirmed forced-progressive 1080p GSM mode in every
+standard loader; it is guarded by a three-step confirmation, with <b>Triangle + Cross</b> at console
+boot as the safe 480p progressive recovery chord.</div>
 <p>The picker is the <em>default</em> source for <code>-gsm</code>. If you manually type <code>-gsm=&lt;value&gt;</code> into the <b>Neutrino Launch Args</b> field, that value wins — OPL emits only one <code>-gsm</code> argument, because Neutrino aborts on a duplicate or malformed value.</p>
 
 <h3 id="mode7">Mode 7 — fix IOP buffer overrun (<code>-gc=7</code>)</h3>
