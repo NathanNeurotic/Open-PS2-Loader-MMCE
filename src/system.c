@@ -1942,6 +1942,14 @@ int sysCheckVMC(const char *prefix, const char *sep, char *name, int createSize,
     char path[256];
     snprintf(path, sizeof(path), "%sVMC%s%s.bin", prefix, sep, name);
 
+    // Invalidate the completion probe up front on any create request. The creation below is
+    // CONDITIONAL -- a file already at the requested size is left alone -- while the GUI arms its
+    // check before knowing that. Without this, a skipped creation would leave the path of some
+    // EARLIER VMC in place and the probe would answer about the wrong file. Cleared here and set
+    // only where genvmc is actually invoked, so "no creation" reads as unknown and stays silent.
+    if (createSize > 0)
+        gVMCCreatePath[0] = '\0';
+
     if (createSize == -1)
         unlink(path);
     else {
