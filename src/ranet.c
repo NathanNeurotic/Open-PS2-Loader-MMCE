@@ -510,7 +510,7 @@ int raNetTestLink(char *line1, int sz1, char *line2, int sz2)
 
     if (!found) {
         snprintf(line1, sz1, "No PC client answered within 3 seconds");
-        snprintf(line2, sz2, "Console%s. Check that ps2ra runs and UDP 18194 is open", myaddr);
+        snprintf(line2, sz2, "Console%s. Check that xerabora runs and UDP 18194 is open", myaddr);
         return 0;
     }
 

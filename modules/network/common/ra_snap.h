@@ -61,4 +61,36 @@ struct ra_snap
    64-byte cache line so the EE buffer shares no line with other data */
 #define RA_SNAP_TOTAL ((RA_SNAP_DMA_SIZE(RA_SNAP_MAX_BYTES) + 63) & ~63)
 
+/* PC -> game side: raudp DMAs this 16-byte record into an ee_core buffer
+   whose address came as a load argument; the VBLANK handler treats a new
+   seq as a new event. */
+#define RA_EVENT_MAGIC 0x52414531 /* "RAE1" */
+
+#define RA_EVENT_UNLOCK 1 /* an achievement unlocked; arg is its id */
+
+struct ra_event
+{
+    unsigned int magic; /* RA_EVENT_MAGIC */
+    unsigned int seq;   /* increments per event; 0 means none yet */
+    unsigned int kind;  /* RA_EVENT_* */
+    unsigned int arg;
+};
+
+/* The badge: 64x64 PSMCT16 pixels pushed as "RAB1 <idx> <total> " + 512 raw
+   bytes per datagram; raudp DMAs the completed struct into a second ee_core
+   buffer. Experimental. */
+#define RA_BADGE_MAGIC  0x52414231 /* "RAB1" */
+#define RA_BADGE_BYTES  8192
+#define RA_BADGE_CHUNK  512
+#define RA_BADGE_CHUNKS (RA_BADGE_BYTES / RA_BADGE_CHUNK)
+
+struct ra_badge
+{
+    unsigned int magic; /* RA_BADGE_MAGIC, written last */
+    unsigned int len;   /* RA_BADGE_BYTES */
+    unsigned int seq;   /* increments per completed badge */
+    unsigned int pad;
+    unsigned char px[RA_BADGE_BYTES];
+};
+
 #endif /* __RA_SNAP_H__ */

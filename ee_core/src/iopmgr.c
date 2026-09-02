@@ -17,6 +17,7 @@
 #include "syshook.h"
 #include "coreconfig.h"
 #include "../../modules/network/common/ra_snap.h"
+#include "ra_overlay.h"
 
 extern int _iop_reboot_count;
 /* RetroAchievements: LoadOPLModule() results for the two modules the
@@ -205,24 +206,30 @@ static void ResetIopSpecial(const char *args, unsigned int arglen)
         void *snap = SifAllocIopHeap(RA_SNAP_TOTAL);
 
         if (snap != NULL) {
-            /* Arguments: the buffer address as eight hex digits, then the
-               same ipconfig strings SMAP received (own IP, netmask,
-               gateway, each NUL-terminated). raudp reads argv[1] and
-               argv[2]. The PC address is not passed: raudp discovers it
-               on its own when the game starts. */
-            char args[9 + IPCONFIG_MAX_LEN];
+            /* argv[1]: IOP snapshot, EE event and EE badge buffers, eight
+               hex digits each, comma-separated; argv[2]: SMAP's ipconfig
+               strings. raudp finds the PC itself. */
+            char args[27 + IPCONFIG_MAX_LEN];
             int k;
 
             ra_snap_iop = (unsigned int)snap;
             ra_hex32(ra_snap_iop, snap_arg);
             for (k = 0; k < 8; k++)
                 args[k] = snap_arg[k];
-            args[8] = '\0';
+            args[8] = ',';
+            ra_hex32((unsigned int)RA_OverlayEventBuffer(), snap_arg);
+            for (k = 0; k < 8; k++)
+                args[9 + k] = snap_arg[k];
+            args[17] = ',';
+            ra_hex32((unsigned int)RA_OverlayBadgeBuffer(), snap_arg);
+            for (k = 0; k < 8; k++)
+                args[18 + k] = snap_arg[k];
+            args[26] = '\0';
 
             for (k = 0; k < g_ipconfig_len && k < IPCONFIG_MAX_LEN; k++)
-                args[9 + k] = g_ipconfig[k];
+                args[27 + k] = g_ipconfig[k];
 
-            ra_raudp_result = LoadOPLModule(OPL_MODULE_ID_RAUDP, 0, 9 + k, args);
+            ra_raudp_result = LoadOPLModule(OPL_MODULE_ID_RAUDP, 0, 27 + k, args);
         } else {
             ra_snap_iop = 0;
             ra_raudp_result = LoadOPLModule(OPL_MODULE_ID_RAUDP, 0, 0, NULL);

@@ -24,3 +24,7 @@ ps2ip_IMPORTS_end
 loadcore_IMPORTS_start
 I_RegisterLibraryEntries
 loadcore_IMPORTS_end
+
+sifman_IMPORTS_start
+I_sceSifSetDma
+sifman_IMPORTS_end

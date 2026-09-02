@@ -5,6 +5,7 @@
 
 /* Please keep these in alphabetical order!  */
 #include "loadcore.h"
+#include "sifman.h"
 #include "smap_tx.h"
 #include "smstcpip.h"
 #include "thbase.h"

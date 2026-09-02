@@ -15,6 +15,7 @@
 #include "ee_core.h"
 #include "coreconfig.h"
 #include "ra.h"
+#include "ra_overlay.h"
 #include <sifdma.h>
 #include "../../modules/network/common/ra_snap.h"
 #include "../../modules/network/common/ra_watch.h"
@@ -154,9 +155,13 @@ static void ra_snap_send(void)
 void RA_OnVblank(void)
 {
     ra_frames++;
+
+    /* The unlock notice has its own schedule and does not wait for the
+       watch list, so it runs before the start delay returns. */
+    RA_OverlayOnVblank(ra_frames);
+
     if (ra_frames <= RA_START_DELAY)
         return;
-
 
     ra_snap_send();
 }
