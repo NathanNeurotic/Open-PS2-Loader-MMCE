@@ -87,7 +87,22 @@ typedef struct load_image_request
 // Teardown join budgets in MILLISECONDS -- the join sleeps via DelayThread(1000) = 1 ms, NOT via
 // util.c's delay(), whose "tick" is a ~0.25 s NOP spin (the units trap that made the old
 // LAUNCH_IO_DRAIN_TICKS "10 s" actually forty minutes).
-#define ART_JOIN_MS_LAUNCH      500
+// THE LAUNCH BUDGET MUST OUTLAST A FAILING COVER OPEN, and it did not. A cover open that MISSES
+// costs ~4.3 s (measured: 4292/4399 ms on USB, against 53 ms for a hit -- a fixed driver-side
+// timeout, not a slow read). Joining with 500 ms therefore could not succeed against the exact
+// case that matters, so a worker parked in a miss was abandoned nearly every time.
+//
+// Abandoning is only harmless if the handoff resets the IOP -- which is precisely what cacheEnd's
+// own comment below assumed. THE KEEP-IOP PATHS BREAK THAT ASSUMPTION: Ember and the other elfldr
+// handoffs deliberately do NOT reset the IOP, so ExecPS2 tears the EE thread down while its fileXio
+// RPC is still in flight and the target inherits a half-used channel on the very device it has to
+// read from. Ember's answer to a read that returns nothing is to run the PS1 BIOS shell, silently.
+//
+// The budgets were also inverted against the risk: TERMINAL (safe -- the console is powering off)
+// had 1500 ms while LAUNCH (dangerous) had 500. The join is a poll that exits the moment the worker
+// stops, so a larger cap costs nothing when art is idle or hitting; it is paid only when a real
+// miss is in flight, and deinit already holds "Please wait" on screen for the whole teardown.
+#define ART_JOIN_MS_LAUNCH      6000
 #define ART_JOIN_MS_TERMINAL    1500
 #define ART_FOREGROUND_DRAIN_MS 500
 
@@ -1137,9 +1152,17 @@ int cacheEnd(int forceStop)
     if (gArtRunning) {
         // ABANDON, never TerminateThread. Killing a thread parked inside fileXio leaves the shared
         // IOP RPC channel half-used, and every later fileXio call from ANY thread is then undefined.
-        // Every caller of this is on its way to an IOP reset or a power-off, so the leaked thread
-        // cannot outlive the handoff. We leak strictly less than the fork does -- there is no
-        // semaphore to reclaim, because this design has none.
+        // We leak strictly less than the fork does -- there is no semaphore to reclaim, because
+        // this design has none.
+        //
+        // ⚠ THIS IS NOT FREE ON THE KEEP-IOP PATHS. The older claim here was that "every caller is
+        // on its way to an IOP reset or a power-off, so the leaked thread cannot outlive the
+        // handoff" -- that is no longer true. Ember and the other sysLoadELFKeepIOP handoffs
+        // deliberately keep the IOP, so ExecPS2 destroys the EE thread while its RPC is still in
+        // flight and the target inherits exactly the half-used channel described above, on the
+        // device it is about to read. Reaching here at all is now the anomaly, not the routine
+        // case: the launch budget was raised past the measured worst-case open so that a miss in
+        // flight can actually be waited out. Treat this log line as a real diagnostic.
         gArtShutdownAbandoned = 1;
         LOG("cacheEnd: art worker still running after %d ms -- abandoned, not terminated\n",
             forceStop ? ART_JOIN_MS_TERMINAL : ART_JOIN_MS_LAUNCH);
