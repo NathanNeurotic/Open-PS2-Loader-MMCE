@@ -163,6 +163,25 @@ int diaShowKeyb(char *text, int maxLen, int hide_text, const char *title)
                 diaDrawBoundingBox(x, 170 + 3 * UI_SPACING_H * i, w, UI_SPACING_H, 0);
         }
 
+        // Caret hint, laid out as the Settings peer-page footer does it: [L1] label [R1], using the
+        // button TEXTURES rather than a written "L1"/"R1" so disk themes can restyle them. Without
+        // this the caret is undiscoverable -- nothing else on this screen uses the shoulder buttons.
+        {
+            GSTEXTURE *l1Tex = thmGetTexture(L1_ICON);
+            GSTEXTURE *r1Tex = thmGetTexture(R1_ICON);
+            int l1W = l1Tex ? (l1Tex->Width * 20) / l1Tex->Height : 0;
+            int r1W = r1Tex ? (r1Tex->Width * 20) / r1Tex->Height : 0;
+            int hintX = 50;
+
+            if (l1Tex && l1Tex->Mem)
+                rmDrawPixmap(l1Tex, hintX, 417, ALIGN_NONE, l1W, 20, SCALING_RATIO, gDefaultCol, 0);
+            hintX += rmWideScale(l1W) + 8;
+            hintX = fntRenderString(gTheme->fonts[0], hintX, 417, ALIGN_NONE, 0, 0, _l(_STR_KEYB_MOVE_CURSOR), gTheme->selTextColor);
+            hintX += 8;
+            if (r1Tex && r1Tex->Mem)
+                rmDrawPixmap(r1Tex, hintX, 417, ALIGN_NONE, r1W, 20, SCALING_RATIO, gDefaultCol, 0);
+        }
+
         guiDrawIconAndText(gSelectButton == KEY_CIRCLE ? CROSS_ICON : CIRCLE_ICON, _STR_CANCEL, gTheme->fonts[0], 500, 417, gTheme->selTextColor);
 
         rmEndFrame();
