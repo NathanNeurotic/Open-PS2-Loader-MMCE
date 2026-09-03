@@ -41,11 +41,13 @@ static struct UIItem *diaSettingsShellUI;
 static const char *diaSettingsIndicator;
 static int diaSettingsContext;
 
+// Right edge available to the keyboard's caret hint: CANCEL is drawn at x=500 on the same row.
+#define KEYB_HINT_END 490
 // Utility stuff
-#define KEYB_MODE   2
-#define KEYB_WIDTH  12
-#define KEYB_HEIGHT 4
-#define KEYB_ITEMS  (KEYB_WIDTH * KEYB_HEIGHT)
+#define KEYB_MODE     2
+#define KEYB_WIDTH    12
+#define KEYB_HEIGHT   4
+#define KEYB_ITEMS    (KEYB_WIDTH * KEYB_HEIGHT)
 
 static void diaDrawBoundingBox(int x, int y, int w, int h, int focus)
 {
@@ -124,15 +126,15 @@ int diaShowKeyb(char *text, int maxLen, int hide_text, const char *title)
             const char *shown = hide_text ? mask_buffer : text;
             fntRenderString(gTheme->fonts[0], 50, 120, ALIGN_NONE, 0, 0, shown, gTheme->textColor);
 
-            // Caret. Drawn by measuring the substring to its LEFT rather than assuming a character
-            // width -- the theme font is proportional, so a fixed advance would drift along the
-            // line. Rendered as a thin filled rect so it reads as a caret and not as a typed '|'.
+            // Caret. Measured from the substring to its LEFT rather than assuming a character width,
+            // because the theme font is proportional. Full row height -- UI_SPACING_H is HALF a row,
+            // which is the "half cursor" reported on #466 -- and blinking, as the request asked.
             char pre[maxLen];
             int n = (caret < len) ? caret : len;
             memcpy(pre, shown, n);
             pre[n] = '\0';
-            int caretX = 50 + rmUnScaleX(fntCalcDimensions(gTheme->fonts[0], pre));
-            rmDrawRect(caretX, 120, 2, UI_SPACING_H, gColWhite);
+            if ((guiFrameId >> 4) & 1)
+                rmDrawRect(50 + rmUnScaleX(fntCalcDimensions(gTheme->fonts[0], pre)), 120, 2, 20, gColWhite);
         }
 
         // separating line for simpler orientation
@@ -161,6 +163,29 @@ int diaShowKeyb(char *text, int maxLen, int hide_text, const char *title)
             w = fntRenderString(gTheme->fonts[0], x, 170 + 3 * UI_SPACING_H * i, ALIGN_NONE, 0, 0, commands[i], gTheme->uiTextColor) - x;
             if (i == selcommand)
                 diaDrawBoundingBox(x, 170 + 3 * UI_SPACING_H * i, w, UI_SPACING_H, 0);
+        }
+
+        // Caret hint, laid out as the Settings peer-page footer does it: [L1] label [R1], using the
+        // button TEXTURES rather than a written "L1"/"R1" so disk themes can restyle them. Without
+        // this the caret is undiscoverable -- nothing else on this screen uses the shoulder buttons.
+        {
+            GSTEXTURE *l1Tex = thmGetTexture(L1_ICON);
+            GSTEXTURE *r1Tex = thmGetTexture(R1_ICON);
+            int l1W = l1Tex ? (l1Tex->Width * 20) / l1Tex->Height : 0;
+            int r1W = r1Tex ? (r1Tex->Width * 20) / r1Tex->Height : 0;
+            int hintX = 50;
+
+            if (l1Tex && l1Tex->Mem)
+                rmDrawPixmap(l1Tex, hintX, 417, ALIGN_NONE, l1W, 20, SCALING_RATIO, gDefaultCol, 0);
+            hintX += rmWideScale(l1W) + 8;
+            // Clip the label so a long translation cannot push R1 into CANCEL at x=500 or off the
+            // edge. fntRenderString honours a width, so hand it what is actually left.
+            hintX = fntRenderString(gTheme->fonts[0], hintX, 417, ALIGN_NONE,
+                                    KEYB_HINT_END - rmWideScale(r1W) - 8 - hintX, 20,
+                                    _l(_STR_KEYB_MOVE_CURSOR), gTheme->selTextColor);
+            hintX += 8;
+            if (r1Tex && r1Tex->Mem && hintX + rmWideScale(r1W) <= KEYB_HINT_END)
+                rmDrawPixmap(r1Tex, hintX, 417, ALIGN_NONE, r1W, 20, SCALING_RATIO, gDefaultCol, 0);
         }
 
         guiDrawIconAndText(gSelectButton == KEY_CIRCLE ? CROSS_ICON : CIRCLE_ICON, _STR_CANCEL, gTheme->fonts[0], 500, 417, gTheme->selTextColor);

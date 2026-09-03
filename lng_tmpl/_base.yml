@@ -1199,3 +1199,5 @@ gui_strings:
   string: Showing all favorites
 - label: VMC_FRAGMENTED_ON_CREATE
   string: VMC created, but it is fragmented. Memory card emulation needs one unbroken file, so this VMC will be skipped at launch and the real card used instead. Free up space and make it again, or copy one in from another device.
+- label: KEYB_MOVE_CURSOR
+  string: Move cursor
