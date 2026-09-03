@@ -11,9 +11,16 @@
 #include <delaythread.h> // DelayThread for the bounded disc re-detect polls in sysLaunchDisc
 #include <time.h>        // clock()/CLOCKS_PER_SEC -- the disc waits are budgeted by wall clock
 
-// Disc-probe budgets (issue #465). Both are TOTAL wall-clock caps, not per-poll ones.
+// Disc-probe budgets (issue #465). All are TOTAL wall-clock caps, not per-poll ones.
 #define SYS_DISC_DETECT_MS   1000 // first "still identifying" settle
 #define SYS_DISC_REDETECT_MS 4000 // spin-up + re-detect after a NODISC report
+// Empty-tray shortcut inside the re-detect budget above. A drive that is actually working on a
+// disc reports SCECdDETCT ("identifying") while it spins up; a drive with nothing in it only ever
+// answers NODISC. So NODISC that has never once been punctuated by DETCT means an empty tray, and
+// waiting out the rest of the re-detect budget only makes the user stare at a frozen-looking menu.
+// Generous on purpose: this is a floor for a cold drive to reach DETCT, not a tuned timeout. Once
+// DETCT is seen the FULL budget applies again, so a slow-but-working drive is unaffected.
+#define SYS_DISC_NODISC_MS   2000
 #include "include/opl.h"
 #include "include/gui.h"
 #include "include/lang.h" // _l(_STR_...) -- Neutrino preflight abort toasts
@@ -546,14 +553,22 @@ int sysLaunchDisc(void (*progress)(void))
            frozen UI. That is issue #465's "extended read/poll loop", and the nesting was the whole
            of it: each layer was individually bounded, and the PRODUCT was not. */
         deadline = clock() + (clock_t)SYS_DISC_REDETECT_MS * (CLOCKS_PER_SEC / 1000);
+        clock_t nodiscDeadline = clock() + (clock_t)SYS_DISC_NODISC_MS * (CLOCKS_PER_SEC / 1000);
+        int sawDetct = 0;
         while (clock() < deadline) {
             spin++;
             type = sceCdGetDiskType();
             if (type != SCECdNODISC && type != SCECdDETCT)
                 break;
+            if (type == SCECdDETCT)
+                sawDetct = 1; // the drive is working on something -- it has earned the full budget
+            // Nothing to identify: unbroken NODISC past the shorter cap is an empty tray, and the
+            // remaining budget buys only dead time. See SYS_DISC_NODISC_MS.
+            if (!sawDetct && clock() >= nodiscDeadline)
+                break;
             sysDiscProbeWait(progress);
         }
-        LOG("[DISC] after tray-close re-detect: type=%d (%d re-polls)\n", type, spin);
+        LOG("[DISC] after tray-close re-detect: type=%d (%d re-polls, sawDetct=%d)\n", type, spin, sawDetct);
     }
 
     if (type != SCECdPS2DVD && type != SCECdPS2CD) // no disc / not a PS2 game disc
