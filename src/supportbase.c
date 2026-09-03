@@ -1106,7 +1106,15 @@ static void sbCreateFoldersFromList(const char *path, const char **folders)
 
 void sbCreateFolders(const char *path, int createDiscImgFolders)
 {
-    const char *basicFolders[] = {"CFG", "THM", "LNG", "ART", "VMC", "CHT", "APPS", "POPS", NULL};
+    const char *basicFolders[] = {"CFG", "THM", "LNG", "ART", "VMC", "CHT", "APPS", "POPS",
+#ifdef RETROACHIEVEMENTS
+                                  // RA watch lists, one <startup>.wl per tracked game. Sits at the
+                                  // root of each activated device exactly like CHT/, per the
+                                  // folders-vs-settings rule: library folders go to the device
+                                  // root, never to the memory card and never to the CWD.
+                                  "RA",
+#endif
+                                  NULL};
     const char *discImgFolders[] = {"CD", "DVD", NULL};
 
     sbCreateFoldersFromList(path, basicFolders);
