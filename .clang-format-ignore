@@ -2,3 +2,6 @@
 ./modules/isofs/lz4.h
 ./modules/network/lwNBD
 ./thirdparty/clang-format-lint-action
+./src/md5.c
+./include/md5.h
+./modules/network/ps2ips-ra/ps2ips.c

@@ -37,6 +37,21 @@ for pad in PADEMU=0 PADEMU=1; do
     done
   done
 done
+# RetroAchievements flavour. Deliberately its OWN short loop rather than a fourth dimension of the
+# matrix above: folding it in would take 8 builds per SDK flavour to 16 (32 in total) and roughly
+# double the rolling job for a feature most users will not run. Two builds -- PADEMU is the only
+# axis a RA user still cares about; EXTRA_FEATURES=1 is fixed on because the RA build is opt-in
+# already and there is no reason to ship a cut-down one.
+echo "== Building RIPTOPL RetroAchievements variant (suffix='${SDK_SUFFIX}') =="
+for ra_pad in PADEMU=0 PADEMU=1; do
+  make clean >/dev/null 2>&1 || true
+  if make --trace RETROACHIEVEMENTS=1 $ra_pad EXTRA_FEATURES=1 NOT_PACKED=1 $BRAND_ARG && [ -f opl.elf ]; then
+    mv opl.elf "rolling/variants/RIPTOPL-ra-pademu${ra_pad#PADEMU=}${SDK_SUFFIX}.ELF"
+  else
+    echo "WARN: RA variant '$ra_pad'${SDK_SUFFIX} failed to build; skipping it"
+  fi
+done
+
 echo "Variants present:"; ls -la rolling/variants || true
 
 echo "== Building RIPTOPL debug builds (suffix='${SDK_SUFFIX}') =="

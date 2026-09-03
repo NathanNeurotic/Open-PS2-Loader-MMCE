@@ -56,6 +56,21 @@ DUALSENSE ?= 0
 #The mode itself stays gated behind the triple-confirm in the GUI.
 GSM1080P ?= 1
 
+#Enables/disables RetroAchievements support: the menu-side "is this game tracked?" check and the
+#in-game memory telemetry that feeds a PC client running rcheevos. Builds its OWN release flavour
+#(see .github/scripts/build_rolling_extras.sh); the default ELF must stay byte-for-byte unaffected,
+#so every RA source file is wrapped in #ifdef RETROACHIEVEMENTS and every call site in a shared
+#file sits inside one too.
+#
+#A FLAG IS NOT A DEPENDENCY: make cannot see that flipping this changes the meaning of an object
+#file, so run "make clean" when switching it. This bites hardest on EECoreConfig_t and
+#OPL_MODULE_ID, where a stale .o silently loads the wrong module blob.
+#
+#Only the four launch legs that go through sysLaunchLoaderElf (BDM/ETH/HDD/MMCE) can ever carry
+#telemetry -- Neutrino-core games, UDPFS and PS1/VCD hand off to an external ELF and never load
+#ee_core at all. See docs/RETROACHIEVEMENTS-INTEGRATION-PLAN.md.
+RETROACHIEVEMENTS ?= 0
+
 #Enables/disables building of an edition of OPL that will support the DTL-T10000 (SDK v2.3+)
 DTL_T10000 ?= 0
 
@@ -227,6 +242,17 @@ ifeq ($(PADEMU),1)
   PADEMU_FLAGS = PADEMU=1
 else
   PADEMU_FLAGS = PADEMU=0
+endif
+
+# RetroAchievements flavour. Everything the feature adds hangs off this one switch, on BOTH sides
+# of the EE/ee_core split -- the define reaches the menu build directly and ee_core through
+# EECORE_EXTRA_FLAGS, because ee_core is a separate $(MAKE) invocation that inherits nothing.
+# Grows one entry at a time as each phase lands its files, so the flavour always builds.
+ifeq ($(RETROACHIEVEMENTS),1)
+  EE_CFLAGS += -DRETROACHIEVEMENTS
+  EECORE_EXTRA_FLAGS += RETROACHIEVEMENTS=1
+  # md5 (vendored, zlib licence): the game hash the PC client keys achievements on.
+  FRONTEND_OBJS += md5.o
 endif
 
 # A DEBUG build implies the field diagnostics: it already has a TTY, so withholding the on-screen
