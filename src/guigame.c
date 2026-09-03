@@ -271,23 +271,13 @@ static int guiGameShowVMCConfig(int id, item_list_t *support, char *VMCName, int
                 } else
                     break;
             } else if (vmc_operation == OPERATION_ENDING) {
-                // Creation just finished. Ask the device how the file actually landed, because a
-                // fragmented VMC is silently DROPPED at launch (mcemu needs one unbroken file) and
-                // the game then saves to the real memory card instead. Reported here, while the
-                // user is still in the dialog that made it and can simply build it again.
+                // Creation finished: a fragmented VMC is silently dropped at launch, so say so now,
+                // in the dialog that made it. Raised from the loop, not guiGameVMCUpdater, which
+                // runs inside diaExecuteDialog and cannot open a message box.
                 //
-                // Raised from the loop rather than from guiGameVMCUpdater: the updater runs inside
-                // diaExecuteDialog, and opening a message box from there would re-enter the dialog
-                // system. This branch is where the existing delete confirmation already draws.
-                //
-                // Only a definite 0 speaks. -1 is "this backing store cannot answer" -- every
-                // non-fatfs device -- and a guess there would be worse than silence.
-                //
-                // VMC_error must be clear too. The updater moves here as soon as genvmc goes idle
-                // and only LOGS a nonzero error, so a creation that actually FAILED (out of space,
-                // write error) lands in this branch as well, leaving a partial file behind. Calling
-                // that file "fragmented" would blame the layout for a failure that was not about
-                // layout at all, and point the user at the wrong fix.
+                // Only a definite 0 speaks: -1 means the backing store cannot answer. VMC_error
+                // must be clear too -- the updater lands here on a FAILED creation as well, and
+                // blaming "fragmented" for an out-of-space would point at the wrong fix.
                 if (vmc_check_layout) {
                     vmc_check_layout = 0;
                     if (vmc_status.VMC_error == 0 && sysVMCContiguity() == 0)
