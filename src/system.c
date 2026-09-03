@@ -1434,13 +1434,11 @@ void sysLaunchNeutrino(const char *driver, const char *path, const char *startup
            did its job) and then the screen stays black, because Neutrino reset away the stack the
            game path depends on. -qb keeps the inherited environment and skips that reset.
 
-           USB AND ILINK ONLY, deliberately. Both launch through this inherited BDM environment, and
-           revision 2692 hardware produced the same reset-boundary symptom on iLink that originally
-           established the USB exception. This also matches Neutrino's documented quick-boot contract
-           and NHDDL's iLink forward-boot behavior. The new iLink leg still needs a hardware retest to
-           prove that this mismatch was the complete cause. Other backends stay on the normal boot path
-           until hardware gives a reason to move them. A user-typed -qb in either the global or per-game
-           args wins -- do not emit a second copy.
+           USB AND ILINK ONLY, deliberately: both launch through this inherited BDM environment, and
+           rev 2692 hardware showed the same reset-boundary symptom on iLink that established the USB
+           exception (iLink leg still needs a retest to prove it was the whole cause). Other backends
+           stay on the normal boot path until hardware says otherwise. A user-typed -qb in the global
+           or per-game args wins -- do not emit a second copy.
 
            Emitted ABOVE coreArgc so the pool-fit drop loop can never shed it: a dropped -qb would
            silently reinstate the reset and reproduce the black screen with no way to tell why. */
@@ -1907,20 +1905,13 @@ int sysCheckMC(void)
 // genvmc's own single-slot status devctl already makes -- so one slot is enough.
 static char gVMCCreatePath[256] = {0};
 
-// Did the VMC we just created land as ONE contiguous cluster chain?
+// Did the VMC just created land as ONE contiguous chain? mcemu needs that, and genvmc does not
+// defragment, so on a used volume a fresh VMC can land in pieces -- which the user otherwise only
+// learns mid-launch, as an error about a card they thought they had just made.
 //
-// OPL's own mcemu can only emulate a memory card from a contiguous file. The launch path gates on
-// USBMASS_IOCTL_CHECK_CHAIN and, when that fails, drops the VMC and falls back to the real memory
-// card. genvmc does not defragment, so on a well-used volume a fresh 8-64 MB VMC can land in
-// pieces -- and today the user only discovers that later, mid-launch, as a fragmentation error
-// about a card they believed they had just made. Asking here moves the answer to creation time,
-// where the fix (free space, or build it elsewhere and copy it over) is still cheap.
-//
-// Returns 1 contiguous, 0 FRAGMENTED, -1 unknown. GET_LBA is probed first for the same reason the
-// launch path does it: bdmfs_fatfs answers CHECK_CHAIN with a bare 1/0 and never an error code, so
-// a backing store that cannot do LBA lookups at all (mmce, APA/pfs, SMB, udpfs) could otherwise
-// return a 0 that reads as "fragmented" when it only ever meant "not my ioctl". Unknown is the
-// honest answer there, and callers must stay silent on it rather than guess.
+// 1 contiguous, 0 FRAGMENTED, -1 unknown. GET_LBA is probed first because bdmfs_fatfs answers
+// CHECK_CHAIN with a bare 1/0 and never an error, so a store that cannot do LBA lookups at all
+// (mmce, pfs, SMB, udpfs) would otherwise return a 0 meaning only "not my ioctl".
 int sysVMCContiguity(void)
 {
     u64 startingLBA;

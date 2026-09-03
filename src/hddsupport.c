@@ -2289,11 +2289,8 @@ static void hddCleanUp(item_list_t *itemList, int exception)
     // is how a clean exit becomes a black-screen hang: the next read returns permanent EOF and the
     // thread that owns it never comes back, so whoever waits for it waits forever.
     //
-    // Skipping both is the safe side of this trade either way, but the REASON has narrowed. This
-    // used to say every path here hands off to an ELF that RESETS the IOP, reclaiming the mounts
-    // and descriptors wholesale. That is not true of the keep-IOP handoffs -- Ember and the elfldr
-    // paths inherit whatever we leave behind. Leaving the mount up is still right for them; what
-    // would never be right is unmounting under a live reader.
+    // Skipping both is safe either way. NOT because the handoff resets the IOP -- the keep-IOP
+    // paths inherit whatever we leave behind -- but because unmounting under a live reader never is.
     if (gArtAbandoned) {
         LOG("HDDSUPPORT CleanUp: art worker abandoned mid-read -- leaving pfs mounted\n");
         if (hddGameList.enabled) {
