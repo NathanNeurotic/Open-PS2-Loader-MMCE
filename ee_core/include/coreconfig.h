@@ -45,8 +45,11 @@ struct EECoreConfig_t
     char g_ps2_gateway[16];
     unsigned char g_ps2_ETHOpMode;
 
-    u32 *gCheatList; // Store hooks/codes addr+val pairs
-    u32 *gImage;     // Prebuilt PS2RD cheat image (.img) patch words, or NULL
+    // const: the producer hands over a const buffer (GetCheatsList) and ee_core only READS this --
+    // cheat_api.c indexes it, main.c and padhook.c NULL-test it. Without the qualifier the
+    // assignment in sysLaunchLoaderElf silently discarded it (-Wdiscarded-qualifiers).
+    const u32 *gCheatList; // Store hooks/codes addr+val pairs
+    u32 *gImage;           // Prebuilt PS2RD cheat image (.img) patch words, or NULL
 
     void *eeloadCopy;
     void *initUserMemory;

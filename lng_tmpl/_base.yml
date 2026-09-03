@@ -1114,6 +1114,9 @@ gui_strings:
   string: UDPFS Access
 - label: MMCE_GAMEID_NEUTRINO_SKIP
   string: MMCE GameID not applied -- neutrino.elf is on this card (switching it would unload Neutrino).
+# UNUSED / RESERVED: no source call site -- it survives only in the generated lang_autogen.h.
+# It CANNOT be deleted: .lng files are consumed by LINE POSITION, so removing a label shifts
+# every later index and silently corrupts all 31 translations. Wire it up or leave it be.
 - label: HDD_BACKEND_RECONCILED
   string: Both APA and exFAT internal HDD backends are enabled; each drive is selected by its partition layout (check Game Sources).
 - label: VCD_SETTINGS
