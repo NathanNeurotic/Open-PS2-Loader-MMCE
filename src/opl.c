@@ -1140,6 +1140,17 @@ static void updateMenuFromGameList(opl_io_module_t *mdl)
     int viewTransition;
 
     guiExecDeferredOps();
+
+    // Remember where the cursor was, so a rebuild does not dump the user back at the top of
+    // the list (#589). Keyed on the game's startup id, not its row index: a rescan is exactly
+    // the thing that renumbers rows. Folder rows have no startup and are skipped.
+    char keepStartup[128] = {0};
+    if (mdl->menuItem.current != NULL && !mdl->menuItem.current->item.isFolder) {
+        const char *s = mdl->support->itemGetStartup(mdl->support, mdl->menuItem.current->item.id);
+        if (s != NULL)
+            snprintf(keepStartup, sizeof(keepStartup), "%s", s);
+    }
+
     clearMenuGameList(mdl);
     // An L3 transition is staged while the old submenu is still live. Commit only after that submenu
     // is gone, then every array read below and every newly queued row belongs to the same new view.
@@ -1219,9 +1230,13 @@ static void updateMenuFromGameList(opl_io_module_t *mdl)
                 gup->submenu.selected = 0;
                 gup->submenu.isFolder = isFolderRow;
 
-                // Last-played auto-select never targets a folder row (its startup is empty).
-                if (gRememberLastPlayed && temp && !isFolderRow && strcmp(temp, mdl->support->itemGetStartup(mdl->support, i)) == 0) {
-                    gup->submenu.selected = 1; // Select Last Played Game
+                // Neither auto-select targets a folder row (no startup). The remembered cursor
+                // wins over last-played: it is where the user actually was.
+                if (!isFolderRow) {
+                    const char *st = mdl->support->itemGetStartup(mdl->support, i);
+                    if (st != NULL && ((keepStartup[0] && strcmp(keepStartup, st) == 0) ||
+                                       (!keepStartup[0] && gRememberLastPlayed && temp && strcmp(temp, st) == 0)))
+                        gup->submenu.selected = 1;
                 }
 
                 guiDeferUpdate(gup);
