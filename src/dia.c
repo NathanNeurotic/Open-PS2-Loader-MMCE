@@ -175,17 +175,20 @@ int diaShowKeyb(char *text, int maxLen, int hide_text, const char *title)
             int r1W = r1Tex ? (r1Tex->Width * 20) / r1Tex->Height : 0;
             int hintX = 50;
 
-            if (l1Tex && l1Tex->Mem)
-                rmDrawPixmap(l1Tex, hintX, 417, ALIGN_NONE, l1W, 20, SCALING_RATIO, gDefaultCol, 0);
-            hintX += rmWideScale(l1W) + 8;
-            // Clip the label so a long translation cannot push R1 into CANCEL at x=500 or off the
-            // edge. fntRenderString honours a width, so hand it what is actually left.
-            hintX = fntRenderString(gTheme->fonts[0], hintX, 417, ALIGN_NONE,
-                                    KEYB_HINT_END - rmWideScale(r1W) - 8 - hintX, 20,
-                                    _l(_STR_KEYB_MOVE_CURSOR), gTheme->selTextColor);
-            hintX += 8;
-            if (r1Tex && r1Tex->Mem && hintX + rmWideScale(r1W) <= KEYB_HINT_END)
-                rmDrawPixmap(r1Tex, hintX, 417, ALIGN_NONE, r1W, 20, SCALING_RATIO, gDefaultCol, 0);
+            // fntRenderString's width is size_t, and 0 means UNBOUNDED -- so a negative budget
+            // would wrap to a huge value and disable the very clipping this computes. Work it out
+            // signed first and draw nothing at all if it does not fit.
+            int avail = KEYB_HINT_END - rmWideScale(l1W) - rmWideScale(r1W) - 16 - hintX;
+            if (avail > 0) {
+                if (l1Tex && l1Tex->Mem)
+                    rmDrawPixmap(l1Tex, hintX, 417, ALIGN_NONE, l1W, 20, SCALING_RATIO, gDefaultCol, 0);
+                hintX += rmWideScale(l1W) + 8;
+                hintX = fntRenderString(gTheme->fonts[0], hintX, 417, ALIGN_NONE, avail, 20,
+                                        _l(_STR_KEYB_MOVE_CURSOR), gTheme->selTextColor);
+                hintX += 8;
+                if (r1Tex && r1Tex->Mem && hintX + rmWideScale(r1W) <= KEYB_HINT_END)
+                    rmDrawPixmap(r1Tex, hintX, 417, ALIGN_NONE, r1W, 20, SCALING_RATIO, gDefaultCol, 0);
+            }
         }
 
         guiDrawIconAndText(gSelectButton == KEY_CIRCLE ? CROSS_ICON : CIRCLE_ICON, _STR_CANCEL, gTheme->fonts[0], 500, 417, gTheme->selTextColor);
