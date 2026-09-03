@@ -49,7 +49,7 @@ struct EECoreConfig_t
     // cheat_api.c indexes it, main.c and padhook.c NULL-test it. Without the qualifier the
     // assignment in sysLaunchLoaderElf silently discarded it (-Wdiscarded-qualifiers).
     const u32 *gCheatList; // Store hooks/codes addr+val pairs
-    u32 *gImage;     // Prebuilt PS2RD cheat image (.img) patch words, or NULL
+    u32 *gImage;           // Prebuilt PS2RD cheat image (.img) patch words, or NULL
 
     void *eeloadCopy;
     void *initUserMemory;

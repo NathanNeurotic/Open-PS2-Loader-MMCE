@@ -28,4 +28,6 @@ downloads = '''## Release downloads
 
 No bare ELF files or SDK/IRX manifests are published as release assets; they are kept inside the appropriate archives where needed.'''
 
-print(f'{banner}\n\n{body}\n\n{downloads}\n\n{resources}', end='')
+# Banner LAST: a release page should open on what the reader came for -- the notes and the
+# download list -- not on artwork they scroll past on every build.
+print(f'{body}\n\n{downloads}\n\n{resources}\n\n{banner}', end='')
