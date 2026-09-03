@@ -3,3 +3,5 @@
 ./modules/network/lwNBD
 ./thirdparty/clang-format-lint-action
 ./modules/network/ps2ips/ps2ips.c
+./src/md5.c
+./include/md5.h
