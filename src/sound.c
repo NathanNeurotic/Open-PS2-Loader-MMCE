@@ -85,25 +85,18 @@ static void sfxSetCursorChannelsVolume(int volume)
         audsrv_adpcm_set_volume_and_pan(sfxGetCursorChannel(i), volume, 0);
 }
 
-// THE ONE-SHOT UI SOUNDS SHARE A SINGLE CHANNEL, so only the newest is ever audible.
+// COALESCE the one-shot UI sounds instead of interrupting them.
 //
-// Every sound used to play on a channel of its own (channel == id), which meant nothing could ever
-// interrupt anything: two sounds raised on the same frame simply played on top of each other, and a
-// long one kept going no matter what the user pressed next. Both reported problems are that one
-// fact. Confirming a game rename raises SFX_CONFIRM in diaShowKeyb and then, on the SAME frame,
-// SFX_TRANSITION from the guiSwitchScreen that follows -- two channels, stacked audio (#575). And a
-// sound already playing could not be cut short by the next button press (#504).
+// #575 is two of these raised on the SAME frame -- confirming a rename plays SFX_CONFIRM in
+// diaShowKeyb and then SFX_TRANSITION from the guiSwitchScreen right after it -- which stacked into
+// one distorted noise. Sharing a channel fixed that but broke worse: audsrv has no way to stop an
+// adpcm voice, so replaying a BUSY channel left it wedged and the NEXT press went silent (#504, and
+// #575's own follow-up).
 //
-// Replaying a channel replaces whatever it held, so routing these four through one channel makes
-// the newest press win and collapses both cases. Any channel in 1..SFX_COUNT-1 carries gSFXVolume
-// (audioSetVolume), so reusing one costs no new channel and needs no volume work; the channels the
-// other three used simply fall idle.
-//
-// SFX_CURSOR is deliberately NOT in this group -- it owns the rotation channels below precisely so
-// rapid scrolling can overlap, and cutting it would make fast movement sound broken. SFX_BOOT keeps
-// channel 0 (its own gBootSndVolume), and the BD connect/disconnect pair stay separate because they
-// are asynchronous device events rather than a response to a button press.
-#define UI_ONESHOT_SFX_CHANNEL SFX_CONFIRM
+// So never interrupt. Each sound keeps its own channel, and a one-shot arriving within a frame of
+// the previous one is simply dropped -- that is the double-raise, and one sound is what was asked
+// for either way. Deliberate presses are far more than a frame apart and all still play.
+#define SFX_ONESHOT_COALESCE_MS 50
 
 static int sfxIsUiOneShot(int id)
 {
@@ -417,8 +410,14 @@ void sfxPlay(int id)
             // rotation channel replaces its old sample in one SIF RPC.
             audsrv_ch_play_adpcm(channel, &sfx[id]);
         } else {
-            // Shared channel for the UI one-shots (see sfxIsUiOneShot), own channel for the rest.
-            audsrv_ch_play_adpcm(sfxIsUiOneShot(id) ? UI_ONESHOT_SFX_CHANNEL : id, &sfx[id]);
+            if (sfxIsUiOneShot(id)) { // see SFX_ONESHOT_COALESCE_MS
+                static u32 lastOneShotTicks = 0;
+                if (lastOneShotTicks != 0 &&
+                    (sfxStartTicks - lastOneShotTicks) / SFX_CLOCKS_PER_MS < SFX_ONESHOT_COALESCE_MS)
+                    return;
+                lastOneShotTicks = sfxStartTicks;
+            }
+            audsrv_ch_play_adpcm(id, &sfx[id]);
         }
 
         unsigned int costMs = (unsigned int)((cpu_ticks() - sfxStartTicks) / SFX_CLOCKS_PER_MS);
