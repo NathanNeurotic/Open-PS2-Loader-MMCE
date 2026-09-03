@@ -452,6 +452,12 @@ compiled into any published main ELF (`EXTRA_FEATURES ?= 0`); they ship in the
 DualSense / DualShock 5 (USB) support is available prebuilt in the `RIPTOPL-VARIANTS-*.zip`
 bundle, or build your own with `make DUALSENSE=1`.
 
+**RetroAchievements** ships as its own flavour in the same VARIANTS bundle
+(`RIPTOPL-ra-pademu*.ELF`, or `make RETROACHIEVEMENTS=1`). It is a **development build, not a
+finished feature** — the in-game half works but the menu side is not written yet — and the standard
+ELF is completely unaffected by it. See **[docs/RETROACHIEVEMENTS.md](docs/RETROACHIEVEMENTS.md)** for
+what it does, which launch paths can ever support it, and why.
+
 There are two release channels:
 
 | Channel | What it is |
