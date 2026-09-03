@@ -2451,7 +2451,30 @@ static void bdmShutdown(item_list_t *itemList)
     // As required by some (typically 2.5") HDDs, issue the SCSI STOP UNIT command to avoid causing an emergency park.
     // pDeviceData may be NULL here (shutdown without init, or a second deinit pass after priv was freed below),
     // so guard the dereference and fall back to the constructed mass%d: path.
-    fileXioDevctl((pDeviceData != NULL && pDeviceData->bdmDeviceRoot[0] != '\0') ? pDeviceData->bdmDeviceRoot : path, USBMASS_DEVCTL_STOP_ALL, NULL, 0, NULL, 0);
+    //
+    // TERMINAL TEARDOWN ONLY. Parking the heads is a POWEROFF courtesy; it is not something a game
+    // launch ever wanted. moduleCleanup sends every page that is NOT the selected one down this
+    // shutdown path, so on a launch this used to spin down every other BDM device on the way out --
+    // while the handoff that follows still has to read from them.
+    //
+    // That is not theoretical, and it is not new: hddShutdown carries the same gate for the same
+    // reason, added after powering DEV9 off here killed the ATA bus before a post-deinit
+    // POPSTARTER.ELF read (the 4236edf6-class black screen). Same shape, same page-by-page
+    // shutdown, one device layer down.
+    //
+    // It bites hardest where a stopped drive does not quietly come back: an external 1394/USB
+    // enclosure. Ember and POPSTARTER keep the IOP and read their ELF, BIOS and game folder through
+    // the mount they inherit, so a spun-down spindle under them reads as "nothing there" -- Ember's
+    // documented answer to which is to run the PS1 BIOS shell. "Drive shuts off" is the most
+    // repeated phrase in the iLink hardware reports.
+    //
+    // The poweroff case is unchanged: gDeinitTerminal is 1 for exit/poweroff, so the park still
+    // happens exactly where it was wanted.
+    if (gDeinitTerminal)
+        fileXioDevctl((pDeviceData != NULL && pDeviceData->bdmDeviceRoot[0] != '\0') ? pDeviceData->bdmDeviceRoot : path, USBMASS_DEVCTL_STOP_ALL, NULL, 0, NULL, 0);
+    else
+        LOG("BDMSUPPORT Shutdown: launch teardown -- NOT stopping %s\n",
+            (pDeviceData != NULL && pDeviceData->bdmDeviceRoot[0] != '\0') ? pDeviceData->bdmDeviceRoot : path);
 
     if (itemList->enabled && pDeviceData != NULL) {
         LOG("BDMSUPPORT Shutdown free data\n");
