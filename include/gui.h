@@ -132,16 +132,8 @@ void guiShowUIConfig();
 void guiShowSettings(void);
 // Settings-layout category pages (rebuild step 06)
 void guiShowDeviceConfig(void);
-void guiShowDisplayConfig(void);
-void guiShowLaunchConfig(void);
 int guiShowControllerConfig(void);
-void guiShowSecurityConfig(void);
-void guiShowAdvancedConfig(void);
-void guiShowPathPrefixConfig(void);
 int guiShowMmceConfig(void);
-void guiShowMmceCommConfig(void);
-void guiShowMmcePathConfig(void);
-void guiShowStorageConfig(void);
 void guiShowArtworkConfig(void);
 void guiShowCoverflowConfig(void);
 void guiShowColorsConfig(void);
@@ -167,14 +159,12 @@ int guiGetResidentNetProtocol(void);
 // at picker time would tear OPL down before the change was ever written to disk.
 int guiNetProtocolNeedsRestart(void);
 
-void guiShowVcdConfig(void); // POPStarter settings hub (device/path/RetroGEM; chains BDMA/List/Net sub-pages)
 // One-shot POPSTARTER USB driver pick (FAT32 vs exFAT), shown on EVERY USB VCD launch
 // (maintainer directive 2026-08-01: the user picks per launch, never a sticky default).
 int guiShowVcdUsbMode(void);
 void guiShowBdmaConfig(void);    // BDMA (exFAT driver stack) source/mode equip page
 void guiShowVcdListConfig(void); // VCD list options (hide game-id prefix, first-disc-only)
 void guiShowPopsNetConfig(void); // POPSTARTER's OWN IPCONFIG.DAT/SMBCONFIG.DAT editor
-void guiShowParentalLockConfig();
 
 void guiCheckNotifications(int checkTheme, int checkLang);
 
