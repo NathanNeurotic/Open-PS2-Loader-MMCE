@@ -36,7 +36,29 @@ jobs:
             exit 1
           fi
 
-          gh run watch "$run_id" --repo "$GITHUB_REPOSITORY" --exit-status
+          # A SUPERSEDED RUN IS NOT A FAILURE. rolling-release.yml uses
+          # `concurrency: cancel-in-progress`, deliberately, so the release always reflects the
+          # NEWEST push. Two merges inside one release cycle (~20 min) therefore cancel the first
+          # publish on purpose -- and `gh run watch --exit-status` reports a cancelled run exactly
+          # like a broken one, which turned that intended behaviour into a red CI run with nothing
+          # wrong. It is also self-correcting: the push that cancelled it started its own promote,
+          # which enforces the state for the build that actually shipped.
+          #
+          # So distinguish the two. Cancelled/skipped => this promote is obsolete, stand down
+          # quietly. Anything else that is not success stays loud, because that IS a broken publish.
+          if gh run watch "$run_id" --repo "$GITHUB_REPOSITORY" --exit-status; then
+            echo "Rolling Release $run_id succeeded."
+          else
+            concl="$(gh run view "$run_id" --repo "$GITHUB_REPOSITORY" --json conclusion --jq .conclusion 2>/dev/null || echo unknown)"
+            if [ "$concl" = "cancelled" ] || [ "$concl" = "skipped" ]; then
+              echo "Rolling Release $run_id was $concl -- superseded by a newer push to $GITHUB_REF_NAME."
+              echo "That push runs its own promote for the build that shipped; nothing to enforce here."
+              echo "SUPERSEDED=1" >> "$GITHUB_ENV"
+            else
+              echo "Rolling Release $run_id concluded '$concl' -- the publish is broken." >&2
+              exit 1
+            fi
+          fi
 
       # rolling-release.yml sets this state itself. Keep this post-publish normalization as an
       # idempotent guard against GitHub or a future workflow edit leaving the moving channel stale.
@@ -48,6 +70,10 @@ jobs:
       # is the natural second layer: asserting the published state here costs one idempotent call and
       # closes the only window in which users could find the rolling download page missing.
       - name: Enforce rolling as Latest, published and non-pre-release
+        # Skipped when the publish we were waiting on was superseded: the release on the tag right
+        # now belongs to a NEWER build whose own promote is enforcing it. Asserting here would race
+        # that run and could fail on a release mid-update through no fault of its own.
+        if: env.SUPERSEDED != '1'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
