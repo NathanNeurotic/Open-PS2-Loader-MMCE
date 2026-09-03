@@ -179,6 +179,32 @@ int HandleRxIntr(struct SmapDriverData *SmapDrivPrivData)
     return NumPacketsReceived;
 }
 
+#ifdef RETROACHIEVEMENTS
+/* RA: two IOP threads now call SMAPSendPacket: the stack thread for
+   game traffic and the raudp thread for RetroAchievements telemetry.
+   Without mutual exclusion one call could land in the middle of the
+   other's FIFO write. SMAPTxInit() creates the mutex when the driver
+   initializes. */
+static int smap_tx_sema = -1;
+
+int SMAPTxInit(void)
+{
+    iop_sema_t sema;
+
+    if (smap_tx_sema >= 0)
+        return 0;
+
+    sema.attr = 0;
+    sema.option = 0;
+    sema.initial = 1;
+    sema.max = 1;
+
+    smap_tx_sema = CreateSema(&sema);
+
+    return smap_tx_sema < 0 ? -1 : 0;
+}
+#endif
+
 int SMAPSendPacket(const void *data, unsigned int length)
 {
     int result;
@@ -190,6 +216,11 @@ int SMAPSendPacket(const void *data, unsigned int length)
     unsigned int SizeRounded;
 
     if (SmapDriverData.SmapIsInitialized) {
+#ifdef RETROACHIEVEMENTS
+        if (smap_tx_sema >= 0)
+            WaitSema(smap_tx_sema);
+#endif
+
         SizeRounded = (length + 3) & ~3;
         smap_regbase = SmapDriverData.smap_regbase;
         emac3_regbase = SmapDriverData.emac3_regbase;
@@ -250,6 +281,11 @@ int SMAPSendPacket(const void *data, unsigned int length)
         SMAP_EMAC3_SET(SMAP_R_EMAC3_TxMODE0, SMAP_E3_TX_GNP_0);
 
         result = 1;
+
+#ifdef RETROACHIEVEMENTS
+        if (smap_tx_sema >= 0)
+            SignalSema(smap_tx_sema);
+#endif
     } else
         result = -1;
 

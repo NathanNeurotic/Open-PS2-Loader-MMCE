@@ -16,6 +16,10 @@ IOP_LIBS =
 IOP_INCS += -Iinclude -I../../iopcore/common
 IOP_CFLAGS += -DLWIP_NOASSERT
 
+ifeq ($(INGAME_UDP),1)
+IOP_CFLAGS += -DINGAME_UDP
+endif
+
 ifeq ($(INGAME_DRIVER),1)
 IOP_CFLAGS += -DINGAME_DRIVER
 endif

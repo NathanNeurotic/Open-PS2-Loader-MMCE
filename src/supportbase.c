@@ -11,6 +11,9 @@
 #include "modules/iopcore/common/cdvd_config.h"
 #include "include/cheatman.h"
 #include "include/tar.h" // CHT/cht.tar cheat archives (#154)
+#ifdef RETROACHIEVEMENTS
+#include "include/rawatch.h" // RA watch lists, loaded next to the cheats
+#endif
 #include "include/pggsm.h"
 #include "include/cheatman.h"
 #include "include/ps2cnf.h"
@@ -1674,3 +1677,50 @@ void sbBuildVmcNeutrinoArgs(config_set_t *configSet, const char *vmcPrefix, neut
         }
     }
 }
+
+#ifdef RETROACHIEVEMENTS
+/*
+  RA: load this game's watch list from <path>RA/<file>.wl.
+
+  Mirrors sbLoadCheats' shape rather than upstream's single fixed path, so RA and
+  CHT behave the same way for the user:
+
+    * a 256-byte path, because the prefix here is a full device root plus an OPL
+      data folder and a shorter buffer truncates it silently -- the exact bug that
+      made cheats never load on longer BDM paths;
+    * both spellings of the extension, because PFS (HDD) is case-sensitive and the
+      BDM FAT drivers do not fold case on lookup either.
+
+  No tar variant: cht.tar exists because published cheat packs ship that way.
+  Watch lists are generated per game by the PC client, so there is nothing to pack
+  and inventing an ra.tar would be a format nobody writes.
+
+  A missing list is NOT an error -- the game simply is not tracked -- so this is
+  deliberately quiet and its result is advisory. Returns the entry count, or
+  negative when there is no usable list.
+*/
+int sbLoadWatchList(const char *path, const char *file)
+{
+    static const char *wlExt[] = {"wl", "WL"};
+    unsigned int ext;
+    int result = -1;
+
+    if (path == NULL || file == NULL)
+        return -1;
+
+    for (ext = 0; ext < sizeof(wlExt) / sizeof(wlExt[0]); ext++) {
+        char wlPath[256];
+
+        if (snprintf(wlPath, sizeof(wlPath), "%sRA/%s.%s", path, file, wlExt[ext]) >= (int)sizeof(wlPath))
+            continue;
+
+        if ((result = LoadWatchListFile(wlPath, file)) >= 0)
+            break;
+    }
+
+    if (result < 0)
+        LOG("RA: no watch list for %s under %sRA/\n", file, path);
+
+    return result;
+}
+#endif

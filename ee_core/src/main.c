@@ -14,6 +14,9 @@
 #include "gsm_api.h"
 #include "cheat_api.h"
 #include "coreconfig.h"
+#ifdef RETROACHIEVEMENTS
+#include "ra.h"
+#endif
 
 int isInit = 0;
 
@@ -96,6 +99,13 @@ static int eecoreInit(int argc, char **argv)
 
     if (config->gImage)
         LinkImage();
+
+#ifdef RETROACHIEVEMENTS
+    /* RetroAchievements: copy the watch list while loader memory is
+       still intact; the game overwrites it. Same trick as the cheats. */
+    RA_SetupWatchList();
+    DPRINTF("RA watchlist = %d entries, %d bytes\n", config->raWatchCount, config->raSnapBytes);
+#endif
 
     if (config->EnableGSMOp) {
         UpdateGSMParams(

@@ -55,6 +55,15 @@ EE_OBJS += $(IGSCORE_EE_OBJS)
 EE_CFLAGS += -DIGS
 endif
 
+# RetroAchievements, forwarded from the top Makefile's RETROACHIEVEMENTS=1. The
+# define also reaches coreconfig.h and modules.h, which grow a field and an enum
+# member under it -- so a stale obj/ here reads EECoreConfig_t through the wrong
+# offsets and loads the wrong module blob. Run make clean when switching it.
+ifeq ($(RETROACHIEVEMENTS),1)
+EE_OBJS += ra.o ra_overlay.o
+EE_CFLAGS += -DRETROACHIEVEMENTS
+endif
+
 EE_OBJS := $(EE_OBJS:%=$(EE_OBJS_DIR)%)
 
 EE_LDFLAGS = -nostartfiles -nostdlib -Tlinkfile -L$(PS2SDK)/ee/lib -s -Wl,-Map,$(MAPFILE)

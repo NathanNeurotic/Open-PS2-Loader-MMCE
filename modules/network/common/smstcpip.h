@@ -90,8 +90,14 @@ int lwip_listen(int s, int backlog);
 #define I_lwip_listen DECLARE_IMPORT(8, lwip_listen)
 int lwip_recv(int s, void *mem, int len, unsigned int flags);
 #define I_lwip_recv DECLARE_IMPORT(9, lwip_recv)
-int lwip_recvfrom(int s, void *mem, int len, unsigned int flags,
-                  struct sockaddr *from, socklen_t *fromlen);
+/* RA: SMSTCPIP reworked this function for SMB and it takes eight
+   arguments (sockets.c): the header and its length separate from the
+   payload. The old six-argument declaration compiled, but on the IOP
+   the arguments landed in the wrong registers. For a plain receive pass
+   header = NULL, index = 0 and everything in payload. The function
+   pointer in iopcore/cdvdman/device-smb.c is declared the same way. */
+int lwip_recvfrom(int s, void *header, int index, void *payload, int plen,
+                  unsigned int flags, struct sockaddr *from, socklen_t *fromlen);
 #define I_lwip_recvfrom DECLARE_IMPORT(10, lwip_recvfrom)
 int lwip_send(int s, void *dataptr, int size, unsigned int flags);
 #define I_lwip_send DECLARE_IMPORT(11, lwip_send)

@@ -252,7 +252,11 @@ ifeq ($(RETROACHIEVEMENTS),1)
   EE_CFLAGS += -DRETROACHIEVEMENTS
   EECORE_EXTRA_FLAGS += RETROACHIEVEMENTS=1
   # md5 (vendored, zlib licence): the game hash the PC client keys achievements on.
-  FRONTEND_OBJS += md5.o
+  # rawatch: the watch list the menu hands to ee_core, loaded from <device>RA/.
+  FRONTEND_OBJS += md5.o rawatch.o
+  # The in-game telemetry sender. Hand-builds Ethernet/UDP frames and calls
+  # SMAPSendPacket directly, so it deliberately bypasses the menu network stack.
+  IOP_OBJS += raudp.o
 endif
 
 # A DEBUG build implies the field diagnostics: it already has a TTY, so withholding the on-screen
@@ -313,6 +317,16 @@ ifeq ($(DEBUG),1)
 else
   EE_CFLAGS += -O2
   SMSTCPIP_INGAME_CFLAGS = INGAME_DRIVER=1
+endif
+
+# RetroAchievements: turn UDP on in the in-game lwIP build. Set here rather than
+# in the RA block above because SMSTCPIP_INGAME_CFLAGS is assigned (not appended)
+# by every branch of the debug block, so anything set earlier would be discarded.
+# The bumped heap and pool sizes in SMSTCPIP/include/lwipopts.h hang off the same
+# INGAME_UDP define -- MEM_SIZE 0x400 was a single 536-byte packet away from
+# starving the game's own SMB stream and rebooting the console.
+ifeq ($(RETROACHIEVEMENTS),1)
+  SMSTCPIP_INGAME_CFLAGS += INGAME_UDP=1
 endif
 
 EE_CFLAGS += -fsingle-precision-constant -DOPL_VERSION=\"$(OPL_VERSION)\"
@@ -448,6 +462,8 @@ clean:	download_lwNBD
 	echo " -pademu"
 	$(MAKE) -C modules/pademu USE_BT=1 clean
 	$(MAKE) -C modules/pademu USE_USB=1 clean
+	echo " -raudp"
+	$(MAKE) -C modules/network/raudp clean
 	echo "-pc tools"
 	$(MAKE) -C pc clean
 
@@ -538,8 +554,18 @@ $(EE_ASM_DIR)imgdrv.c: modules/iopcore/imgdrv/imgdrv.irx | $(EE_ASM_DIR)
 $(EE_ASM_DIR)eesync.c: $(PS2SDK)/iop/irx/eesync-nano.irx | $(EE_ASM_DIR)
 	$(BIN2C) $< $@ $(*F)_irx
 
+# RetroAchievements needs the network even when the game runs from USB, and the
+# in-game DEV9 driver lives inside cdvdman -- upstream enables it for the BDM
+# variant only under IOPCORE_DEBUG (modules/iopcore/cdvdman/Makefile). Without
+# DEV9 SMAP cannot start and raudp fails to load with -200 (E_IOP_DEPENDANCY).
+# Conditional so the default build's bdm_cdvdman.irx does not grow a driver it
+# has no use for.
+ifeq ($(RETROACHIEVEMENTS),1)
+CDVDMAN_RA_FLAGS = USE_DEV9=1
+endif
+
 modules/iopcore/cdvdman/bdm_cdvdman.irx: modules/iopcore/cdvdman
-	$(MAKE) $(CDVDMAN_PS2LOGO_FLAGS) $(CDVDMAN_DEBUG_FLAGS) USE_BDM=1 -C $< all
+	$(MAKE) $(CDVDMAN_PS2LOGO_FLAGS) $(CDVDMAN_DEBUG_FLAGS) $(CDVDMAN_RA_FLAGS) USE_BDM=1 -C $< all
 
 $(EE_ASM_DIR)bdm_cdvdman.c: modules/iopcore/cdvdman/bdm_cdvdman.irx | $(EE_ASM_DIR)
 	$(BIN2C) $< $@ $(*F)_irx
@@ -751,6 +777,21 @@ modules/network/smap_udpbd/smap_udpbd.irx: modules/network/smap_udpbd
 
 $(EE_ASM_DIR)smap_udpbd.c: modules/network/smap_udpbd/smap_udpbd.irx | $(EE_ASM_DIR)
 	$(BIN2C) $< $@ $(*F)_irx
+
+# RetroAchievements telemetry sender. Listed dependencies rather than a bare
+# directory prerequisite so editing raudp.c actually rebuilds the blob: the .irx
+# is embedded into the ELF, and a stale one is invisible until it misbehaves on
+# hardware. `rebuild` (clean+all) because this module's objects are shared with
+# nothing and a partial rebuild here is not worth the risk.
+RAUDP_DEPS := $(wildcard modules/network/raudp/*.c) $(wildcard modules/network/raudp/*.h) \
+              modules/network/raudp/imports.lst modules/network/raudp/exports.tab \
+              modules/network/raudp/Makefile
+
+modules/network/raudp/raudp.irx: $(RAUDP_DEPS) | modules/network/raudp
+	$(MAKE) -C modules/network/raudp rebuild
+
+$(EE_ASM_DIR)raudp.c: modules/network/raudp/raudp.irx | $(EE_ASM_DIR)
+	$(BIN2C) $< $@ raudp_irx
 
 modules/network/udpfs_smap/udpfs_smap.irx: modules/network/udpfs_smap
 	$(MAKE) -C $<
