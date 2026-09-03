@@ -86,6 +86,7 @@ enum CONFIG_INDEX {
 #define CONFIG_OPL_BGCOLOR                    "bg_color"
 #define CONFIG_OPL_TEXTCOLOR                  "text_color"
 #define CONFIG_OPL_UI_TEXTCOLOR               "ui_text_color"
+#define CONFIG_OPL_TITLECOLOR                 "title_color"
 #define CONFIG_OPL_SEL_TEXTCOLOR              "sel_text_color"
 #define CONFIG_OPL_PLAS_BLEND_COLOR           "plasma_blend_color" // plasma gradient LOW end (parity-audit #15); doubles as the theme-cfg key
 #define CONFIG_OPL_ENABLE_NOTIFICATIONS       "enable_notifications"

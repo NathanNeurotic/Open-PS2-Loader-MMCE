@@ -1967,7 +1967,7 @@ static theme_element_t *validateItemsList(const char *themePath, config_set_t *t
         }
     } else {
         LOG("THEMES No itemsList found, adding a default one\n");
-        list = initBasic(themePath, themeConfig, theme, "il", ELEM_TYPE_ITEMS_LIST, 42, 42, ALIGN_NONE, 373, 316, SCALING_RATIO, theme->textColor, theme->fonts[0]);
+        list = initBasic(themePath, themeConfig, theme, "il", ELEM_TYPE_ITEMS_LIST, 42, 42, ALIGN_NONE, 373, 316, SCALING_RATIO, theme->titleColor, theme->fonts[0]);
         initItemsList(themePath, themeConfig, theme, list, "il", NULL);
         list->next = mainElems->first->next; // Position the itemsList as second element (right after the Background)
         mainElems->first->next = list;
@@ -2355,26 +2355,26 @@ static int addGUIElem(const char *themePath, config_set_t *themeConfig, theme_t 
                 const char *devValue;
                 snprintf(devProp, sizeof(devProp), "%s_devices", name);
                 if (configGetStr(themeConfig, devProp, &devValue) && thmParseDeviceList(devValue, 1 /* initBasic re-parses and logs */) != 0) {
-                    elem = initBasic(themePath, themeConfig, theme, name, ELEM_TYPE_ITEMS_LIST, 42, 42, ALIGN_NONE, 400, 360, SCALING_RATIO, theme->textColor, theme->fonts[0]);
+                    elem = initBasic(themePath, themeConfig, theme, name, ELEM_TYPE_ITEMS_LIST, 42, 42, ALIGN_NONE, 400, 360, SCALING_RATIO, theme->titleColor, theme->fonts[0]);
                     initItemsList(themePath, themeConfig, theme, elem, name, NULL);
                     // Pre-existing quirk kept as-is: an UNFILTERED ItemsList parsed for an INFO
                     // family still claims the next nav slot below (thmLoad's info loops run after
                     // the main ones). Refusing info-family claims here would change behavior for
                     // themes that rely on it.
                 } else if (!theme->gamesItemsList) {
-                    elem = initBasic(themePath, themeConfig, theme, name, ELEM_TYPE_ITEMS_LIST, 0, 0, ALIGN_NONE, DIM_UNDEF, DIM_UNDEF, SCALING_RATIO, theme->textColor, theme->fonts[0]);
+                    elem = initBasic(themePath, themeConfig, theme, name, ELEM_TYPE_ITEMS_LIST, 0, 0, ALIGN_NONE, DIM_UNDEF, DIM_UNDEF, SCALING_RATIO, theme->titleColor, theme->fonts[0]);
                     initItemsList(themePath, themeConfig, theme, elem, name, NULL);
                     theme->gamesItemsList = elem;
                 } else if (!theme->appsItemsList) {
-                    elem = initBasic(themePath, themeConfig, theme, name, ELEM_TYPE_ITEMS_LIST, 42, 42, ALIGN_NONE, 400, 360, SCALING_RATIO, theme->textColor, theme->fonts[0]);
+                    elem = initBasic(themePath, themeConfig, theme, name, ELEM_TYPE_ITEMS_LIST, 42, 42, ALIGN_NONE, 400, 360, SCALING_RATIO, theme->titleColor, theme->fonts[0]);
                     initItemsList(themePath, themeConfig, theme, elem, name, NULL);
                     theme->appsItemsList = elem;
                 } else if (!theme->favsItemsList) {
-                    elem = initBasic(themePath, themeConfig, theme, name, ELEM_TYPE_ITEMS_LIST, 42, 42, ALIGN_NONE, 400, 360, SCALING_RATIO, theme->textColor, theme->fonts[0]);
+                    elem = initBasic(themePath, themeConfig, theme, name, ELEM_TYPE_ITEMS_LIST, 42, 42, ALIGN_NONE, 400, 360, SCALING_RATIO, theme->titleColor, theme->fonts[0]);
                     initItemsList(themePath, themeConfig, theme, elem, name, NULL);
                     theme->favsItemsList = elem;
                 } else if (!theme->vcdItemsList) {
-                    elem = initBasic(themePath, themeConfig, theme, name, ELEM_TYPE_ITEMS_LIST, 42, 42, ALIGN_NONE, 400, 360, SCALING_RATIO, theme->textColor, theme->fonts[0]);
+                    elem = initBasic(themePath, themeConfig, theme, name, ELEM_TYPE_ITEMS_LIST, 42, 42, ALIGN_NONE, 400, 360, SCALING_RATIO, theme->titleColor, theme->fonts[0]);
                     initItemsList(themePath, themeConfig, theme, elem, name, NULL);
                     theme->vcdItemsList = elem; // 4th slot: the L3 VCD view's own items list (own cover cache)
                 }
@@ -2386,7 +2386,7 @@ static int addGUIElem(const char *themePath, config_set_t *themeConfig, theme_t 
                 initGameImage(themePath, themeConfig, theme, elem, name, "COV", COVER_CACHE_SLOTS, NULL, NULL);
             } else if (!strcmp(elementsType[ELEM_TYPE_ITEM_TEXT], type)) {
                 elems->needsVcdDisplayId = 1;
-                elem = initBasic(themePath, themeConfig, theme, name, ELEM_TYPE_ITEM_TEXT, 0, 0, ALIGN_CENTER, DIM_UNDEF, DIM_UNDEF, SCALING_RATIO, theme->textColor, theme->fonts[0]);
+                elem = initBasic(themePath, themeConfig, theme, name, ELEM_TYPE_ITEM_TEXT, 0, 0, ALIGN_CENTER, DIM_UNDEF, DIM_UNDEF, SCALING_RATIO, theme->titleColor, theme->fonts[0]);
                 elem->drawElem = &drawItemText;
             } else if (!strcmp(elementsType[ELEM_TYPE_HINT_TEXT], type)) {
                 elem = initBasic(themePath, themeConfig, theme, name, ELEM_TYPE_HINT_TEXT, 16, -HINT_HEIGHT, ALIGN_NONE, 12, 20, SCALING_RATIO, theme->textColor, theme->fonts[0]);
@@ -2552,6 +2552,7 @@ static void thmSetColors(theme_t *theme)
     memcpy(theme->plasBlendColor, gDefaultPlasBlendColor, 3);
     theme->textColor = GS_SETREG_RGBA(gDefaultTextColor[0], gDefaultTextColor[1], gDefaultTextColor[2], 0x80);
     theme->uiTextColor = GS_SETREG_RGBA(gDefaultUITextColor[0], gDefaultUITextColor[1], gDefaultUITextColor[2], 0x80);
+    theme->titleColor = GS_SETREG_RGBA(gDefaultTitleColor[0], gDefaultTitleColor[1], gDefaultTitleColor[2], 0x80);
     theme->selTextColor = GS_SETREG_RGBA(gDefaultSelTextColor[0], gDefaultSelTextColor[1], gDefaultSelTextColor[2], 0x80);
 
     theme_element_t *elem = theme->mainElems.first;
@@ -2697,6 +2698,9 @@ static int thmLoad(const char *themePath)
 
     if (configGetColor(themeConfig, "ui_text_color", color))
         newT->uiTextColor = GS_SETREG_RGBA(color[0], color[1], color[2], 0x80);
+
+    if (configGetColor(themeConfig, "title_color", color))
+        newT->titleColor = GS_SETREG_RGBA(color[0], color[1], color[2], 0x80);
 
     if (configGetColor(themeConfig, "sel_text_color", color))
         newT->selTextColor = GS_SETREG_RGBA(color[0], color[1], color[2], 0x80);

@@ -14,7 +14,8 @@ enum UI_ITEMS {
     UICFG_UICOL,
     UICFG_TXTCOL,
     UICFG_SELCOL,
-    UICFG_PLASCOL, // plasma blend (gradient low end) color picker -- parity-audit #15
+    UICFG_PLASCOL,  // plasma blend (gradient low end) color picker -- parity-audit #15
+    UICFG_TITLECOL, // game-title text, separate from the general Text colour (#464)
     UICFG_RESETCOL,
     UICFG_AUTOSORT,
     UICFG_COVERART,

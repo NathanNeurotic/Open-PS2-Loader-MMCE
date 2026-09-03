@@ -1201,3 +1201,5 @@ gui_strings:
   string: VMC created, but it is fragmented. Memory card emulation needs one unbroken file, so this VMC will be skipped at launch and the real card used instead. Free up space and make it again, or copy one in from another device.
 - label: KEYB_MOVE_CURSOR
   string: Move cursor
+- label: TITLECOLOR
+  string: Game Title Color

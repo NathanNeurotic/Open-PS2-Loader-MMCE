@@ -133,6 +133,7 @@ typedef struct theme
     u64 textColor;
     u64 uiTextColor;
     u64 selTextColor;
+    u64 titleColor; // game-list titles, so they can differ from general text (#464)
 
     theme_elems_t mainElems;
     theme_elems_t infoElems;
