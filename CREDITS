@@ -94,6 +94,17 @@ Bundled third-party software, shipped in the release package and NOT part of Rip
     permission under the Ember Public Beta Testing Licence, shipped in the
     package as EMBER/LICENSE-BETA.txt.
 
+  - RetroAchievements support, by hacan359 (yoba)
+                                     https://github.com/hacan359/Open-PS2-Loader/pull/1
+    The design and the console implementation that RiptOPL's RETROACHIEVEMENTS
+    flavour follows: hashing an image the way rcheevos does, streaming the
+    watched memory addresses out of the running game over UDP, and the PC client
+    that runs rcheevos on the console's behalf. Adopted with the author's
+    permission (2026-08-27); he supplies and maintains the PC client. Re-authored
+    against this fork rather than merged, so any defect in the port is ours.
+    Includes md5.c/md5.h by L. Peter Deutsch, vendored unchanged under the zlib
+    licence.
+
   - POPStarter, by krHACKen          https://www.psx-place.com/resources/popstarter.683/
     A PS1 launcher built around Sony's native POPS emulator for the PS2, used as
     RiptOPL's primary PS1 core alongside Ember. POPStarter provides the
