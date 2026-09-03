@@ -253,7 +253,9 @@ ifeq ($(RETROACHIEVEMENTS),1)
   EECORE_EXTRA_FLAGS += RETROACHIEVEMENTS=1
   # md5 (vendored, zlib licence): the game hash the PC client keys achievements on.
   # rawatch: the watch list the menu hands to ee_core, loaded from <device>RA/.
-  FRONTEND_OBJS += md5.o rawatch.o
+  # rahash:  the image hash RetroAchievements keys a game on, taken by walking
+  #          ISO9660 directly -- mounting hangs on USB past the 2 GB mark.
+  FRONTEND_OBJS += md5.o rawatch.o rahash.o
   # The in-game telemetry sender. Hand-builds Ethernet/UDP frames and calls
   # SMAPSendPacket directly, so it deliberately bypasses the menu network stack.
   IOP_OBJS += raudp.o
