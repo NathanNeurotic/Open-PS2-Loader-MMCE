@@ -266,6 +266,7 @@ unsigned char gDefaultBgColor[3];
 unsigned char gDefaultTextColor[3];
 unsigned char gDefaultSelTextColor[3];
 unsigned char gDefaultUITextColor[3];
+unsigned char gDefaultTitleColor[3];
 hdl_game_info_t *gAutoLaunchGame;
 base_game_info_t *gAutoLaunchBDMGame;
 bdm_device_data_t *gAutoLaunchDeviceData;
@@ -2701,6 +2702,7 @@ static void _loadConfig()
             configGetColor(configOPL, CONFIG_OPL_BGCOLOR, gDefaultBgColor);
             configGetColor(configOPL, CONFIG_OPL_TEXTCOLOR, gDefaultTextColor);
             configGetColor(configOPL, CONFIG_OPL_UI_TEXTCOLOR, gDefaultUITextColor);
+            configGetColor(configOPL, CONFIG_OPL_TITLECOLOR, gDefaultTitleColor);
             configGetColor(configOPL, CONFIG_OPL_SEL_TEXTCOLOR, gDefaultSelTextColor);
             configGetInt(configOPL, CONFIG_OPL_ENABLE_NOTIFICATIONS, &gEnableNotifications);
             configGetInt(configOPL, CONFIG_OPL_ENABLE_COVERART, &gEnableArt);
@@ -3270,6 +3272,7 @@ static void _saveConfig()
         configSetColor(configOPL, CONFIG_OPL_BGCOLOR, gDefaultBgColor);
         configSetColor(configOPL, CONFIG_OPL_TEXTCOLOR, gDefaultTextColor);
         configSetColor(configOPL, CONFIG_OPL_UI_TEXTCOLOR, gDefaultUITextColor);
+        configSetColor(configOPL, CONFIG_OPL_TITLECOLOR, gDefaultTitleColor);
         configSetColor(configOPL, CONFIG_OPL_SEL_TEXTCOLOR, gDefaultSelTextColor);
         configSetInt(configOPL, CONFIG_OPL_ENABLE_NOTIFICATIONS, gEnableNotifications);
         configSetInt(configOPL, CONFIG_OPL_ENABLE_COVERART, gEnableArt);
@@ -4358,6 +4361,12 @@ void setDefaultColors(void)
     gDefaultUITextColor[0] = 0x58;
     gDefaultUITextColor[1] = 0x68;
     gDefaultUITextColor[2] = 0xB4;
+
+    // Seeded from the general text colour: out of the box titles look exactly as before, and
+    // only diverge once the user actually picks something in the new row.
+    gDefaultTitleColor[0] = gDefaultTextColor[0];
+    gDefaultTitleColor[1] = gDefaultTextColor[1];
+    gDefaultTitleColor[2] = gDefaultTextColor[2];
 }
 
 static void setDefaults(void)

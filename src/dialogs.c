@@ -746,6 +746,11 @@ struct UIItem diaColorsConfig[] = {
     {UI_COLOUR, UICFG_UICOL, 1, 1, -1, -10, 17, {.colourvalue = {0, 0}}},
     {UI_BREAK},
 
+    {UI_LABEL, 0, 1, 1, -1, -30, 0, {.label = {NULL, _STR_TITLECOLOR}}},
+    {UI_SPACER},
+    {UI_COLOUR, UICFG_TITLECOL, 1, 1, -1, -10, 17, {.colourvalue = {0, 0}}},
+    {UI_BREAK},
+
     {UI_LABEL, 0, 1, 1, -1, -30, 0, {.label = {NULL, _STR_BGCOLOR}}},
     {UI_SPACER},
     {UI_COLOUR, UICFG_BGCOL, 1, 1, -1, -10, 17, {.colourvalue = {0, 0}}},

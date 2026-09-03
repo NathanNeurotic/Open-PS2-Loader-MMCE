@@ -352,6 +352,7 @@ extern unsigned char gDefaultBgColor[3];
 extern unsigned char gDefaultTextColor[3];
 extern unsigned char gDefaultSelTextColor[3];
 extern unsigned char gDefaultUITextColor[3];
+extern unsigned char gDefaultTitleColor[3];
 
 // Launching games with args
 extern hdl_game_info_t *gAutoLaunchGame;

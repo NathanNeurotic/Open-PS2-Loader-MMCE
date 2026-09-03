@@ -2233,6 +2233,7 @@ void guiShowColorsConfig(void)
         // Display the default theme's colours.
         diaSetColor(diaColorsConfig, UICFG_BGCOL, gDefaultBgColor);
         diaSetColor(diaColorsConfig, UICFG_UICOL, gDefaultUITextColor);
+        diaSetColor(diaColorsConfig, UICFG_TITLECOL, gDefaultTitleColor);
         diaSetColor(diaColorsConfig, UICFG_TXTCOL, gDefaultTextColor);
         diaSetColor(diaColorsConfig, UICFG_SELCOL, gDefaultSelTextColor);
         diaSetColor(diaColorsConfig, UICFG_PLASCOL, gDefaultPlasBlendColor);
@@ -2241,11 +2242,13 @@ void guiShowColorsConfig(void)
         diaSetColor(diaColorsConfig, UICFG_BGCOL, gTheme->bgColor);
         diaSetColor(diaColorsConfig, UICFG_PLASCOL, gTheme->plasBlendColor); // raw uchar[3] like bgColor -- NOT the U64 form
         diaSetU64Color(diaColorsConfig, UICFG_UICOL, gTheme->uiTextColor);
+        diaSetU64Color(diaColorsConfig, UICFG_TITLECOL, gTheme->titleColor);
         diaSetU64Color(diaColorsConfig, UICFG_TXTCOL, gTheme->textColor);
         diaSetU64Color(diaColorsConfig, UICFG_SELCOL, gTheme->selTextColor);
     }
     diaSetEnabled(diaColorsConfig, UICFG_BGCOL, editable);
     diaSetEnabled(diaColorsConfig, UICFG_UICOL, editable);
+    diaSetEnabled(diaColorsConfig, UICFG_TITLECOL, editable);
     diaSetEnabled(diaColorsConfig, UICFG_TXTCOL, editable);
     diaSetEnabled(diaColorsConfig, UICFG_SELCOL, editable);
     diaSetEnabled(diaColorsConfig, UICFG_PLASCOL, editable);
@@ -2256,6 +2259,7 @@ void guiShowColorsConfig(void)
         if (editable) {
             diaGetColor(diaColorsConfig, UICFG_BGCOL, gDefaultBgColor);
             diaGetColor(diaColorsConfig, UICFG_UICOL, gDefaultUITextColor);
+            diaGetColor(diaColorsConfig, UICFG_TITLECOL, gDefaultTitleColor);
             diaGetColor(diaColorsConfig, UICFG_TXTCOL, gDefaultTextColor);
             diaGetColor(diaColorsConfig, UICFG_SELCOL, gDefaultSelTextColor);
             diaGetColor(diaColorsConfig, UICFG_PLASCOL, gDefaultPlasBlendColor);
