@@ -61,6 +61,13 @@ int diaShowKeyb(char *text, int maxLen, int hide_text, const char *title)
 {
     int i, j, len = strlen(text), selkeyb = 0, x, w;
     int selchar = 0, selcommand = -1;
+    // Insertion point, in characters from the start of the string. Starts at the END, so typing and
+    // backspace behave exactly as they always did until the user actually moves it (#466).
+    //
+    // L1/R1 rather than the d-pad: Left/Right already walk the on-screen key grid and hand off to
+    // the command column at its edges, which is the primary control on this screen. The request
+    // offers the shoulder buttons as its own alternative for that reason.
+    int caret = len;
     char c[2] = "\0\0", *mask_buffer;
     static const char keyb0[KEYB_ITEMS] = {
         '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '=',
@@ -113,7 +120,20 @@ int diaShowKeyb(char *text, int maxLen, int hide_text, const char *title)
         }
 
         // Text
-        fntRenderString(gTheme->fonts[0], 50, 120, ALIGN_NONE, 0, 0, hide_text ? mask_buffer : text, gTheme->textColor);
+        {
+            const char *shown = hide_text ? mask_buffer : text;
+            fntRenderString(gTheme->fonts[0], 50, 120, ALIGN_NONE, 0, 0, shown, gTheme->textColor);
+
+            // Caret. Drawn by measuring the substring to its LEFT rather than assuming a character
+            // width -- the theme font is proportional, so a fixed advance would drift along the
+            // line. Rendered as a thin filled rect so it reads as a caret and not as a typed '|'.
+            char pre[maxLen];
+            int n = (caret < len) ? caret : len;
+            memcpy(pre, shown, n);
+            pre[n] = '\0';
+            int caretX = 50 + rmUnScaleX(fntCalcDimensions(gTheme->fonts[0], pre));
+            rmDrawRect(caretX, 120, 2, UI_SPACING_H, gColWhite);
+        }
 
         // separating line for simpler orientation
         rmDrawLine(25, 138, 615, 138, gColWhite);
@@ -147,7 +167,17 @@ int diaShowKeyb(char *text, int maxLen, int hide_text, const char *title)
 
         rmEndFrame();
 
-        if (getKey(KEY_LEFT)) {
+        if (getKey(KEY_L1)) { // caret left
+            if (caret > 0) {
+                sfxPlay(SFX_CURSOR);
+                caret--;
+            }
+        } else if (getKey(KEY_R1)) { // caret right
+            if (caret < len) {
+                sfxPlay(SFX_CURSOR);
+                caret++;
+            }
+        } else if (getKey(KEY_LEFT)) {
             sfxPlay(SFX_CURSOR);
             if (selchar > -1) {
                 if (selchar % KEYB_WIDTH)
@@ -188,33 +218,38 @@ int diaShowKeyb(char *text, int maxLen, int hide_text, const char *title)
         } else if (getKeyOn(gSelectButton)) {
             if (len < (maxLen - 1) && selchar > -1) {
                 sfxPlay(SFX_CONFIRM);
+                // Insert AT the caret: shift the tail (and its NUL) right by one, drop the
+                // character in, and follow it. With the caret at the end this is the old append.
+                memmove(&text[caret + 1], &text[caret], len - caret + 1);
+                text[caret] = keyb[selchar];
                 if (mask_buffer != NULL) {
                     mask_buffer[len] = '*';
                     mask_buffer[len + 1] = '\0';
                 }
 
                 len++;
-                c[0] = keyb[selchar];
-                strcat(text, c);
+                caret++;
             } else if (selcommand == 0) {
                 sfxPlay(SFX_CANCEL);
-                if (len > 0) { // BACKSPACE
+                if (caret > 0) { // BACKSPACE -- removes the character LEFT of the caret
+                    memmove(&text[caret - 1], &text[caret], len - caret + 1);
                     len--;
-                    text[len] = 0;
+                    caret--;
                     if (mask_buffer != NULL)
                         mask_buffer[len] = '\0';
                 }
             } else if (selcommand == 1) {
                 sfxPlay(SFX_CONFIRM);
-                if (len < (maxLen - 1)) { // SPACE
+                if (len < (maxLen - 1)) { // SPACE -- inserted at the caret, like any other character
+                    memmove(&text[caret + 1], &text[caret], len - caret + 1);
+                    text[caret] = ' ';
                     if (mask_buffer != NULL) {
                         mask_buffer[len] = '*';
                         mask_buffer[len + 1] = '\0';
                     }
 
                     len++;
-                    c[0] = ' ';
-                    strcat(text, c);
+                    caret++;
                 }
             } else if (selcommand == 2) {
                 sfxPlay(SFX_CONFIRM);
@@ -230,24 +265,26 @@ int diaShowKeyb(char *text, int maxLen, int hide_text, const char *title)
                     keyb = keyb1;
             }
         } else if (getKey(KEY_SQUARE)) {
-            if (len > 0) { // BACKSPACE
+            if (caret > 0) { // BACKSPACE -- same caret-relative delete as the command column
                 sfxPlay(SFX_CANCEL);
+                memmove(&text[caret - 1], &text[caret], len - caret + 1);
                 len--;
-                text[len] = 0;
+                caret--;
                 if (mask_buffer != NULL)
                     mask_buffer[len] = '\0';
             }
         } else if (getKey(KEY_TRIANGLE)) {
             if (len < (maxLen - 1) && selchar > -1) { // SPACE
                 sfxPlay(SFX_CONFIRM);
+                memmove(&text[caret + 1], &text[caret], len - caret + 1);
+                text[caret] = ' ';
                 if (mask_buffer != NULL) {
                     mask_buffer[len] = '*';
                     mask_buffer[len + 1] = '\0';
                 }
 
                 len++;
-                c[0] = ' ';
-                strcat(text, c);
+                caret++;
             }
         } else if (getKeyOn(KEY_START)) {
             sfxPlay(SFX_CONFIRM);
