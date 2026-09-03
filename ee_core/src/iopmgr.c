@@ -16,8 +16,49 @@
 #include "util.h"
 #include "syshook.h"
 #include "coreconfig.h"
+#ifdef RETROACHIEVEMENTS
+#include "ra_overlay.h"
+#include "../../modules/network/common/ra_snap.h"
+#endif
 
 extern int _iop_reboot_count;
+
+#ifdef RETROACHIEVEMENTS
+/* Snapshot buffer in IOP RAM. The EE allocates it so it knows the address and
+   can DMA straight into it without touching the SIF command table, which the
+   game shares -- a command number is an index into a table the game owns, and
+   sceSifAddCmdHandler returns void, so overrunning it fails silently.
+   Zero means the allocation failed. Read by ra.c. */
+unsigned int ra_snap_iop = 0;
+
+/* Is there anything to send? The EE leaves raWatchList NULL when the user has
+   telemetry switched off or the game has no watch list (see src/system.c), so
+   this one test covers both.
+
+   DEVIATION from upstream, which brings the network up in every mode
+   unconditionally. That costs roughly 57 KB of the module storage region and
+   puts SMAP on the NIC in every game launched from the RA build, whether or not
+   a single achievement is being tracked. Gated, a RA build with nothing to
+   watch loads exactly what the default build loads. */
+static int RA_TelemetryWanted(struct EECoreConfig_t *config)
+{
+    return config->raWatchList != NULL && config->raWatchCount > 0 && config->raSnapBytes > 0;
+}
+
+/* Eight hex digits; there is no sprintf in ee_core. The buffer addresses travel
+   to raudp as a load-argument string. */
+static void RA_Hex32(unsigned int v, char *out)
+{
+    int i;
+
+    for (i = 7; i >= 0; i--) {
+        out[i] = "0123456789ABCDEF"[v & 0xF];
+        v >>= 4;
+    }
+    out[8] = '\0';
+}
+#endif
+
 static int imgdrv_offset_ioprpimg = 0;
 static int imgdrv_offset_ioprpsiz = 0;
 
@@ -123,6 +164,18 @@ static void ResetIopSpecial(const char *args, unsigned int arglen)
         LoadOPLModule(OPL_MODULE_ID_USBD, 0, 11, "thpri=2,3");
     }
 
+#if defined(RETROACHIEVEMENTS) && !defined(__LOAD_DEBUG_MODULES)
+    /* RetroAchievements telemetry needs the network in every mode, including
+       games running from USB: raudp imports SMAPSendPacket from the SMAP
+       driver, so without SMAP it fails to link and nothing is sent. ETH mode
+       loads both modules in its own branch below; every other mode loads them
+       here, and only when there is actually a watch list to stream. */
+    if (config->GameMode != ETH_MODE && RA_TelemetryWanted(config)) {
+        LoadOPLModule(OPL_MODULE_ID_SMSTCPIP, 0, 0, NULL);
+        LoadOPLModule(OPL_MODULE_ID_SMAP, 0, g_ipconfig_len, g_ipconfig);
+    }
+#endif
+
     switch (config->GameMode) {
         case BDM_USB_MODE:
             LoadOPLModule(OPL_MODULE_ID_USBMASSBD, 0, 0, NULL);
@@ -160,6 +213,43 @@ static void ResetIopSpecial(const char *args, unsigned int arglen)
             LoadOPLModule(OPL_MODULE_ID_MMCEDRV, 0, 0, NULL);
             break;
     };
+
+#ifdef RETROACHIEVEMENTS
+    /* RetroAchievements telemetry, loaded LAST because it imports
+       SMAPSendPacket from the SMAP driver above. The snapshot buffer is
+       allocated here, while the IOP heap is up and the game has not started,
+       and its address handed to the module as a load argument -- RA_SNAP_TOTAL
+       covers the header plus the values of the largest supported watch list. */
+    if (RA_TelemetryWanted(config)) {
+        void *snap = SifAllocIopHeap(RA_SNAP_TOTAL);
+
+        if (snap != NULL) {
+            /* argv[1]: the IOP snapshot, EE event and EE badge buffer
+               addresses, eight hex digits each, comma-separated.
+               argv[2]: SMAP's ipconfig strings -- raudp finds the PC itself. */
+            char args[27 + IPCONFIG_MAX_LEN];
+            int k;
+
+            ra_snap_iop = (unsigned int)snap;
+            RA_Hex32(ra_snap_iop, &args[0]);
+            args[8] = ',';
+            RA_Hex32((unsigned int)RA_OverlayEventBuffer(), &args[9]);
+            args[17] = ',';
+            RA_Hex32((unsigned int)RA_OverlayBadgeBuffer(), &args[18]);
+            args[26] = '\0';
+
+            for (k = 0; k < g_ipconfig_len && k < IPCONFIG_MAX_LEN; k++)
+                args[27 + k] = g_ipconfig[k];
+
+            LoadOPLModule(OPL_MODULE_ID_RAUDP, 0, 27 + k, args);
+        } else {
+            /* No buffer, so nothing can be sent. Leaving ra_snap_iop at zero
+               makes ra.c's per-frame path a no-op, and there is no reason to
+               start the module just to have it idle. */
+            ra_snap_iop = 0;
+        }
+    }
+#endif
 }
 
 /*----------------------------------------------------------------*/

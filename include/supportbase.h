@@ -109,4 +109,10 @@ void neutrinoArgsAssemble(const neutrino_args_t *na, char *out, int outSize);
 // BEFORE deinit frees it. vmcPrefix = the device prefix VMC/ lives under.
 void sbBuildVmcNeutrinoArgs(config_set_t *configSet, const char *vmcPrefix, neutrino_vmc_args_t *vmcArgs);
 
+#ifdef RETROACHIEVEMENTS
+// RA: load this game's watch list from <path>RA/<file>.wl. Mirrors sbLoadCheats'
+// shape (256-byte path, both extension cases). A missing list is not an error.
+int sbLoadWatchList(const char *path, const char *file);
+#endif
+
 #endif

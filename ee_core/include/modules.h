@@ -41,6 +41,15 @@ enum OPL_MODULE_ID {
     OPL_MODULE_ID_MMCEDRV,
     OPL_MODULE_ID_MMCEIGR,
 
+#ifdef RETROACHIEVEMENTS
+    // RetroAchievements: telemetry sender (UDP from inside the game).
+    // APPENDED rather than grouped with the other network modules on purpose:
+    // these IDs index the module table the EE hands over, so inserting one
+    // mid-enum makes every later ID mean a different blob to any object file
+    // that was not rebuilt. Delete obj/ whenever this enum changes.
+    OPL_MODULE_ID_RAUDP,
+#endif
+
     OPL_MODULE_ID_COUNT
 };
 

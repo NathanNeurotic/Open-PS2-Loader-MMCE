@@ -73,6 +73,23 @@ struct EECoreConfig_t
     struct GsmConfig_t GsmConfig;
 
     int MMCEIGRSettings;
+
+#ifdef RETROACHIEVEMENTS
+    /* RetroAchievements watch list: the memory addresses sampled once per
+       frame, packed one per word (see modules/network/common/ra_watch.h), and
+       the size of one snapshot. The pointer leads into loader memory, which
+       the game overwrites, so ee_core copies the list during init -- the same
+       trick SetupCheats() uses (see ra.c).
+
+       APPENDED, never inserted: an out-of-date .o that still holds the old
+       layout would otherwise read these through the wrong offsets. const for
+       the same reason gCheatList is -- the producer hands over a const buffer
+       and ee_core only ever reads it, and without the qualifier the
+       assignment in sysLaunchLoaderElf silently discards it. */
+    const u32 *raWatchList;
+    int raWatchCount;
+    int raSnapBytes;
+#endif
 };
 
 #define USE_LOCAL_EECORE_CONFIG struct EECoreConfig_t *config = &g_ee_core_config;
