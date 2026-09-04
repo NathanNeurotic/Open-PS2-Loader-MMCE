@@ -270,3 +270,8 @@ footer{max-width:var(--maxw);margin:0 auto;padding:26px 38px 60px;color:var(--in
   .hero h1{font-size:36px}
   .search{width:auto;flex:1}.brand small{display:none}
 }
+
+/* ---- mascot / identity banner on the landing page ---- */
+.hero-banner{display:block;width:100%;max-width:860px;height:auto;margin:0 0 26px;
+  border-radius:var(--radius);border:1px solid var(--line2);box-shadow:0 14px 40px rgba(0,0,0,.45)}
+@media (max-width:720px){.hero-banner{margin-bottom:18px}}
