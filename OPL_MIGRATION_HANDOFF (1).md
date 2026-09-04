@@ -231,11 +231,18 @@ Makefile with per-package flags.
 Build (fresh tree):
 
 ```sh
+bash download_lwNBD.sh         # modules/network/lwNBD is NOT committed
+python3 lang_compiler.py --make_source --base lng_tmpl/_base.yml src/lang_internal.c
+python3 lang_compiler.py --make_header --base lng_tmpl/_base.yml include/lang_autogen.h
 python3 tools/gen_assets.py    # pass 1 (ee_core/elfldr stubbed)
 ps2build build -c ps2.yaml
 python3 tools/gen_assets.py    # pass 2: real ee_core/elfldr blobs
 ps2build build -c ps2.yaml     # final: build/bin/opl.elf + opl-packed.elf
 ```
+
+Verified end-to-end from a pristine `origin/phaseDout` checkout
+(git worktree, nothing carried over): exactly these steps produce a
+green 722-step build.
 
 Conventions that still apply when adding or fixing targets:
 
