@@ -159,8 +159,10 @@ MODULES = [
         incs=["modules/network/lwNBD/include",
               "modules/network/lwNBD/ports/playstation2", "include"],
         defines=['APP_NAME=\\"lwnbdsvr\\"'],
-        cflags=["-include", ROOT.replace("\\", "/") +
-                "/modules/network/lwNBD/ports/playstation2/ps2sdk-compat.h"],
+        # Bare filename: ports/playstation2 is already on the include path,
+        # and -include searches -I dirs. An absolute path here would bake
+        # the generator-runner's checkout location into ps2.yaml.
+        cflags=["-include", "ps2sdk-compat.h"],
         libs=["gcc"]),
 ]
 
@@ -241,6 +243,9 @@ def render(m):
 def main():
     with open(YAML, "r", newline="") as f:
         text = f.read()
+    # Tolerate CRLF working copies (Windows checkouts) so MARKER still
+    # matches; output is always written back as LF.
+    text = text.replace("\r\n", "\n")
     if MARKER in text:
         text = text[:text.index(MARKER)]
     if not text.endswith("\n"):
