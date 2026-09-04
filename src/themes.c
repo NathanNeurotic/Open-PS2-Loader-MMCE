@@ -2555,9 +2555,21 @@ static void thmSetColors(theme_t *theme)
     theme->titleColor = GS_SETREG_RGBA(gDefaultTitleColor[0], gDefaultTitleColor[1], gDefaultTitleColor[2], 0x80);
     theme->selTextColor = GS_SETREG_RGBA(gDefaultSelTextColor[0], gDefaultSelTextColor[1], gDefaultSelTextColor[2], 0x80);
 
+    /* Re-colour the LIVE elements. This runs against a theme whose elements already exist, which
+       is what lets the Colours page apply without a reload -- and it is why the title picker has
+       to be honoured HERE as well as at element construction.
+
+       Game titles take titleColor, everything else textColor (#464). initBasic() already hands the
+       right colour to each element when a theme loads, but this loop forced textColor onto every
+       element, so the moment the user touched ANY colour the title choice was overwritten. The row
+       saved its value and the list went straight back to the general text colour -- which reads
+       exactly as "the option does nothing".
+
+       ITEMS_LIST is the game list in List mode; ITEM_TEXT is the title under the cover in
+       Coverflow. Both ARE the game title, so both follow the title picker. */
     theme_element_t *elem = theme->mainElems.first;
     while (elem) {
-        elem->color = theme->textColor;
+        elem->color = (elem->type == ELEM_TYPE_ITEMS_LIST || elem->type == ELEM_TYPE_ITEM_TEXT) ? theme->titleColor : theme->textColor;
         elem = elem->next;
     }
 }
