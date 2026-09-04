@@ -10,20 +10,33 @@ import os
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 YAML = os.path.join(ROOT, "ps2.yaml")
-PKG = "C:/Users/natha/AppData/Local/ps2dev/packages"
 MARKER = "  # ======================= IOP MODULES =======================\n"
 
-# Shared IOP include set: compat headers (irx.h/types.h/defs.h/atad.h/
-# aifdev9.h, all missing from the packages layout) + every IOP-relevant
-# core package include dir. common/ and startup/ are auto-added by ps2build.
-BASE_INCS = ["_ps2build_compat/include", "_ps2build_compat/include_iop"] + [
-    "%s/core/%s/include" % (PKG, p) for p in (
-        "loadcore", "sysclib", "stdio", "threadman", "intrman", "sysmem",
-        "ioman", "iomanx", "sifman", "sifcmd", "modload", "dmacman",
-        "timrman", "cdvd", "libsd", "bdm", "usbd", "mcman", "secrman",
-        "excepman", "heaplib", "mtapman", "padman", "sio2man", "rmman",
-        "vblank", "smap", "netman", "ps2ip", "ioprpgen", "ssbusc",
-    )
+# Every IOP-relevant core package, resolved via ps2build's own headers:
+# field (config.Target - see resolveTargetHeaders in internal/buildgraph/
+# build.go) instead of a vendored copy or a hand-expanded absolute
+# include_dirs:. Works for both kind: library (cdvd, netman, ps2ip,
+# ioprpgen) and kind: driver (everything else here - real IOP kernel
+# modules like loadcore/sysclib, never linked, only imported via SIF at
+# runtime) since ps2build's resolvePackageLibs now falls back to a
+# package's DriverArtifact when it has no library artifact, pulling its
+# include_dirs/headers only - see that function's own comment. common/
+# and startup/ are auto-added by ps2build.
+#
+# loadcore alone covers irx.h/types.h/defs.h/fcntl.h/sys/{fcntl,time,
+# types,unistd}.h - all real, already shipped there (confirmed: they're
+# ps2sdk's own iop/kernel/include/ files, just unreachable by package
+# name before ps2build's driver-artifact fallback existed). atad/dev9/
+# ps2ip-nm replace what used to be vendored under _ps2build_compat/ -
+# now real, declared package headers too (ps2ip-nm's package.yaml
+# didn't declare include_dirs at all until this was found).
+BASE_HEADERS = [
+    "loadcore", "sysclib", "stdio", "threadman", "intrman", "sysmem",
+    "ioman", "iomanx", "sifman", "sifcmd", "modload", "dmacman",
+    "timrman", "cdvd", "libsd", "bdm", "usbd", "mcman", "secrman",
+    "excepman", "heaplib", "mtapman", "padman", "sio2man", "rmman",
+    "vblank", "smap", "netman", "ps2ip", "ioprpgen", "ssbusc",
+    "atad", "dev9", "ps2ip-nm",
 ]
 
 D = "modules"  # shorthand
@@ -146,8 +159,8 @@ MODULES = [
         incs=["modules/network/lwNBD/include",
               "modules/network/lwNBD/ports/playstation2", "include"],
         defines=['APP_NAME=\\"lwnbdsvr\\"'],
-        cflags=["-include", "C:/Users/natha/Github/CPLUSPLUS/Open-PS2-Loader/"
-                "modules/network/lwNBD/ports/playstation2/ps2sdk-compat.h"],
+        cflags=["-include", ROOT.replace("\\", "/") +
+                "/modules/network/lwNBD/ports/playstation2/ps2sdk-compat.h"],
         libs=["gcc"]),
 ]
 
@@ -156,29 +169,26 @@ CDVDMAN_BASE = ["cdvdman.c", "ioops.c", "ncmd.c", "scmd.c", "searchfile.c",
                 "streaming.c", "ioplib_util.c", "smsutils.S",
                 "../../isofs/zso.c", "../../isofs/lz4.c"]
 # The classic build links -lbdm (ps2sdk's IOP libbdm.a: bd_defrag.o +
-# bd_cache.o) into the two BDM cdvdman variants. The new bdm package ships
-# only bdm.irx, so the vendored copy under _ps2build_compat/libbdm/ is
-# compiled in directly instead.
-LIBBDM_SRC = ["../../../_ps2build_compat/libbdm/src/bd_defrag.c",
-              "../../../_ps2build_compat/libbdm/src/bd_cache.c"]
-for name, extra, defines, incs in [
-    ("bdm_cdvdman", ["device-bdm.c"] + LIBBDM_SRC, ["BDM_DRIVER"],
-     ["_ps2build_compat/libbdm/include"]),
-    ("bdm_ata_cdvdman", ["device-bdm.c", "atad.c", "dev9.c"] + LIBBDM_SRC,
-     ["BDM_DRIVER", "USE_BDM_ATA", "__USE_DEV9"],
-     ["_ps2build_compat/libbdm/include"]),
-    ("mmce_cdvdman", ["device-mmce.c"], ["MMCE_DRIVER"], []),
+# bd_cache.o) into the two BDM cdvdman variants. The new bdm package now
+# ships that same archive for real (core/bdm/package.yaml's second
+# artifact, lib/libbdm.a) - libs: ["bdm"] pulls it in directly, no
+# vendored/recompiled copy needed.
+for name, extra, defines, incs, libs in [
+    ("bdm_cdvdman", ["device-bdm.c"], ["BDM_DRIVER"], [], ["bdm"]),
+    ("bdm_ata_cdvdman", ["device-bdm.c", "atad.c", "dev9.c"],
+     ["BDM_DRIVER", "USE_BDM_ATA", "__USE_DEV9"], [], ["bdm"]),
+    ("mmce_cdvdman", ["device-mmce.c"], ["MMCE_DRIVER"], [], []),
     ("smb_cdvdman", ["device-smb.c", "smb.c", "dev9.c"],
-     ["SMB_DRIVER", "__USE_DEV9"], ["modules/network/common"]),
+     ["SMB_DRIVER", "__USE_DEV9"], ["modules/network/common"], []),
     ("hdd_cdvdman", ["device-hdd.c", "atad.c", "dev9.c"],
-     ["HDD_DRIVER", "__USE_DEV9"], []),
+     ["HDD_DRIVER", "__USE_DEV9"], [], []),
     ("hdd_hdpro_cdvdman", ["device-hdd.c", "hdpro_atad.c"],
-     ["HDD_DRIVER", "HD_PRO"], []),
+     ["HDD_DRIVER", "HD_PRO"], [], []),
 ]:
     MODULES.append(mod(name, "modules/iopcore/cdvdman", CDVDMAN_BASE + extra,
                        exports="exports.tab",
                        incs=["modules/iopcore/common"] + incs,
-                       defines=defines))
+                       defines=defines, libs=libs))
 
 # mcemu variants.
 MCEMU_BASE = ["mcemu.c", "mcemu_io.c", "mcemu_sys.c", "mcemu_var.c",
@@ -202,8 +212,11 @@ def render(m):
         out.append("      - %s/%s" % (m["dir"], s))
     out.append("    include_dirs:")
     out.append("      - %s" % m["dir"])  # irx_imports.h lives here
-    for i in m["incs"] + BASE_INCS:
+    for i in m["incs"]:
         out.append("      - %s" % i)
+    out.append("    headers:")
+    for h in BASE_HEADERS:
+        out.append("      - %s" % h)
     if m["defines"]:
         out.append("    defines:")
         for d in m["defines"]:
