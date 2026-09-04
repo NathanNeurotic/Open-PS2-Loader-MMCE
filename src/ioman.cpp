@@ -198,10 +198,22 @@ static void ioWorkerThread(void *arg)
 
 static void ioSimpleActionHandler(void *data)
 {
-    io_simpleaction_t action = (io_simpleaction_t)data;
+    static_assert(sizeof(io_simpleaction_t) == sizeof(void *), "EE callback and request payload pointers must have the same representation size");
+
+    io_simpleaction_t action;
+    memcpy(&action, &data, sizeof(action));
 
     if (action)
         action();
+}
+
+int ioPutSimpleAction(io_simpleaction_t action)
+{
+    static_assert(sizeof(io_simpleaction_t) == sizeof(void *), "EE callback and request payload pointers must have the same representation size");
+
+    void *data;
+    memcpy(&data, &action, sizeof(data));
+    return ioPutRequest(IO_CUSTOM_SIMPLEACTION, data);
 }
 
 void ioInit(void)

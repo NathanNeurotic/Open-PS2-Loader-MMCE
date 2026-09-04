@@ -1,3 +1,7 @@
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define MAX_HISTORY_ENTRIES 21
 
 /*
@@ -101,3 +105,7 @@ int SaveHistoryFile(const char *path, const struct HistoryEntry *HistoryEntries)
 int AddOldHistoryFileRecord(const char *path, const struct HistoryEntry *OldHistoryEntry);
 int AddHistoryRecord(const char *name);
 int AddHistoryRecordUsingFullPath(const char *path);
+
+#ifdef __cplusplus
+}
+#endif

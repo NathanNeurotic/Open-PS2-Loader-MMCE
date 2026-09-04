@@ -13,8 +13,14 @@
 #include <delaythread.h> // DelayThread -- the bounded pad waits yield instead of spinning
 
 #ifdef PADEMU
+#ifdef __cplusplus
+extern "C" {
+#endif
 #include <libds34bt.h>
 #include <libds34usb.h>
+#ifdef __cplusplus
+}
+#endif
 #endif
 
 #define MAX_PADS 4

@@ -25,7 +25,10 @@
 
 #define OPL_HDD_MODE_PS2LOGO_OFFSET 0x17F8
 
+// Module header without C++ linkage guards: wrap at the use site (modules/ is not edited).
+extern "C" {
 #include "../modules/isofs/zso.h"
+}
 
 extern int probed_fd;
 extern u32 probed_lba;
@@ -180,7 +183,7 @@ static void hddClearRecoveredErrors(void)
     clearErrorMessageIf(_STR_HDD_PFS_UNAVAILABLE_ERROR);
 }
 
-static char *hddPrefix = "pfs0:";
+static const char *hddPrefix = "pfs0:";
 static hdl_games_list_t hddGames;
 
 // How long the HDD VCD launch waits for the art worker to let go before it remounts pfs0: under it.
@@ -196,8 +199,31 @@ static base_game_info_t *hddVcdGames = NULL;
 static int hddVcdGameCount = 0;
 static char (*hddVcdParts)[APA_IDMAX + 1] = NULL;
 
-// forward declaration
-static item_list_t hddGameList;
+// Forward declarations for the statics referenced by hddGameList's initialiser. C++ has no
+// tentative definitions, so keep the one initialised definition here instead of at file end.
+static int hddNeedsUpdate(item_list_t *itemList);
+static int hddUpdateGameList(item_list_t *itemList);
+static int hddGetGameCount(item_list_t *itemList);
+static void *hddGetGame(item_list_t *itemList, int id);
+static char *hddGetGameName(item_list_t *itemList, int id);
+static int hddGetGameNameLength(item_list_t *itemList, int id);
+static char *hddGetGameStartup(item_list_t *itemList, int id);
+static void hddDeleteGame(item_list_t *itemList, int id);
+static void hddRenameGame(item_list_t *itemList, int id, char *newName);
+static void hddLaunchVcd(item_list_t *itemList, const char *vcdName, config_set_t *configSet);
+static config_set_t *hddGetConfig(item_list_t *itemList, int id);
+static int hddGetImage(item_list_t *itemList, char *folder, int isRelative, char *value, char *suffix, GSTEXTURE *resultTex, short psm);
+static int hddGetTextId(item_list_t *itemList);
+static int hddGetIconId(item_list_t *itemList);
+static void hddCleanUp(item_list_t *itemList, int exception);
+static void hddShutdown(item_list_t *itemList);
+static int hddCheckVMC(item_list_t *itemList, char *name, int createSize);
+static char *hddGetPrefix(item_list_t *itemList);
+
+static item_list_t hddGameList = {
+    HDD_MODE, 0, 0, MODE_FLAG_COMPAT_DMA, MENU_MIN_INACTIVE_FRAMES, HDD_MODE_UPDATE_DELAY, NULL, NULL, &hddGetTextId, &hddGetPrefix, &hddInit, &hddNeedsUpdate, &hddUpdateGameList,
+    &hddGetGameCount, &hddGetGame, &hddGetGameName, &hddGetGameNameLength, &hddGetGameStartup, &hddDeleteGame, &hddRenameGame,
+    &hddLaunchGame, &hddGetConfig, &hddGetImage, &hddCleanUp, &hddShutdown, &hddCheckVMC, &hddGetIconId, &hddLaunchVcd, 0, &hddGetArtArchivePath};
 
 static int hddLoadGameListCache(hdl_games_list_t *cache);
 static int hddUpdateGameListCache(hdl_games_list_t *cache, hdl_games_list_t *game_list);
@@ -434,7 +460,7 @@ int hddLoadModules(void)
             hddDiagBootStageEnd("HDD:ATAD-HDPRO", retLoadModule);
             LOG("[XHDD]:\n");
             hddDiagBootStageBegin("HDD:XHDD-HDPRO");
-            retXhddModule = sysLoadModuleBuffer(&xhdd_irx, size_xhdd_irx, 6, "-hdpro");
+            retXhddModule = sysLoadModuleBuffer(&xhdd_irx, size_xhdd_irx, 6, (char *)"-hdpro");
             hddDiagBootStageEnd("HDD:XHDD-HDPRO", retXhddModule);
         } else {
             LOG("[BDM]:\n");
@@ -534,7 +560,7 @@ static int hddApaHeaderValid(const u8 *pSectorData)
 }
 
 // Returns 1 for MBR/GPT, 0 for APA, and -1 if an error occured
-int hddDetectNonSonyFileSystem()
+extern "C" int hddDetectNonSonyFileSystem()
 {
     int result = -1;
     // Allocate memory for storing data for the first two sectors.
@@ -774,9 +800,9 @@ void hddLoadSupportModules(void)
     hddClearRecoveredErrors();
     if (!strcmp(gOPLPart, "hdd0:__common")) {
         (void)hddCheckOPLFolder(hddPrefix);
-        gHDDPrefix = "pfs0:OPL/";
+        gHDDPrefix = (char *)"pfs0:OPL/";
     } else {
-        gHDDPrefix = "pfs0:";
+        gHDDPrefix = (char *)"pfs0:";
     }
 
     // A prior list pass may have parked relative HDD artwork as unavailable while no persistent
@@ -789,7 +815,7 @@ void hddInit(item_list_t *itemList)
     LOG("HDDSUPPORT Init\n");
     hddForceUpdate = 0; // Use cache at initial startup.
     hddGameList.delay = gArtDelay;
-    ioPutRequest(IO_CUSTOM_SIMPLEACTION, &hddInitModules);
+    ioPutSimpleAction(&hddInitModules);
     hddGameList.enabled = 1;
 }
 
@@ -910,13 +936,13 @@ static int hddBuildVcdGameList(void)
             if (!gVcdShowPpPops)
                 continue;
 
-            base_game_info_t *grownGames = realloc(newGames, (total + 1) * sizeof(base_game_info_t));
+            base_game_info_t *grownGames = (base_game_info_t *)realloc(newGames, (total + 1) * sizeof(base_game_info_t));
             if (grownGames == NULL) {
                 scanIncomplete = 1;
                 break;
             }
             newGames = grownGames;
-            char(*grownParts)[APA_IDMAX + 1] = realloc(newParts, (total + 1) * sizeof(*newParts));
+            char(*grownParts)[APA_IDMAX + 1] = (char(*)[APA_IDMAX + 1])realloc(newParts, (total + 1) * sizeof(*newParts));
             if (grownParts == NULL) {
                 scanIncomplete = 1;
                 break;
@@ -975,14 +1001,14 @@ static int hddBuildVcdGameList(void)
             continue;
         }
 
-        base_game_info_t *grownGames = realloc(newGames, (total + n) * sizeof(base_game_info_t));
+        base_game_info_t *grownGames = (base_game_info_t *)realloc(newGames, (total + n) * sizeof(base_game_info_t));
         if (grownGames == NULL) {
             free(vcds);
             scanIncomplete = 1;
             break;
         }
         newGames = grownGames;
-        char(*grownParts)[APA_IDMAX + 1] = realloc(newParts, (total + n) * sizeof(*newParts));
+        char(*grownParts)[APA_IDMAX + 1] = (char(*)[APA_IDMAX + 1])realloc(newParts, (total + n) * sizeof(*newParts));
         if (grownParts == NULL) {
             free(vcds);
             scanIncomplete = 1;
@@ -1049,7 +1075,7 @@ static int hddUpdateGameList(item_list_t *itemList)
     // consumed, so without this the stack would strand permanently.
     if (hddModulesLoadCount == 0) {
         if (!hddRetryQueued) {
-            if (ioPutRequest(IO_CUSTOM_SIMPLEACTION, &hddInitModules) == IO_OK)
+            if (ioPutSimpleAction(&hddInitModules) == IO_OK)
                 hddRetryQueued = 1;
         }
         return 0;
@@ -1756,7 +1782,7 @@ void hddLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
     int i, size_irx = 0;
     int EnablePS2Logo = 0;
     int result;
-    void *irx = NULL;
+    void **irx = NULL;
     char filename[32];
     hdl_game_info_t *game;
     struct cdvdman_settings_hdd *settings;
@@ -1903,10 +1929,10 @@ void hddLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
 
     if (hddHDProKitDetected) {
         size_irx = size_hdd_hdpro_cdvdman_irx;
-        irx = &hdd_hdpro_cdvdman_irx;
+        irx = hdd_hdpro_cdvdman_irx;
     } else {
         size_irx = size_hdd_cdvdman_irx;
-        irx = &hdd_cdvdman_irx;
+        irx = hdd_cdvdman_irx;
     }
 
     sbPrepare(NULL, configSet, size_irx, irx, &i);
@@ -2164,9 +2190,9 @@ static int hddLoadGameListCache(hdl_games_list_t *cache)
 
         count = size / sizeof(hdl_game_info_t);
         if (count > 0) {
-            games = memalign(64, count * sizeof(hdl_game_info_t));
+            games = (hdl_game_info_t *)memalign(64, count * sizeof(hdl_game_info_t));
             if (games != NULL) {
-                if (fread(games, sizeof(hdl_game_info_t), count, file) == count) {
+                if (fread(games, sizeof(hdl_game_info_t), count, file) == (size_t)count) {
                     cache->count = count;
                     cache->games = games;
                     LOG("hddLoadGameListCache: %d games loaded.\n", count);
@@ -2196,7 +2222,8 @@ static int hddUpdateGameListCache(hdl_games_list_t *cache, hdl_games_list_t *gam
 {
     char filename[256];
     FILE *file;
-    int result, i, j, modified;
+    int result, modified;
+    u32 i, j;
 
     if (!gHDDGameListCache || gHDDPrefix == NULL)
         return 1; // no persistent PFS home: keep the live list in RAM and skip games.bin writes
@@ -2268,8 +2295,3 @@ int hddGetArtArchivePath(item_list_t *itemList, char *out, int outSize)
     int n = snprintf(out, outSize, "%sART/art.tar", gHDDPrefix);
     return (n > 0 && n < outSize) ? 1 : -1;
 }
-
-static item_list_t hddGameList = {
-    HDD_MODE, 0, 0, MODE_FLAG_COMPAT_DMA, MENU_MIN_INACTIVE_FRAMES, HDD_MODE_UPDATE_DELAY, NULL, NULL, &hddGetTextId, &hddGetPrefix, &hddInit, &hddNeedsUpdate, &hddUpdateGameList,
-    &hddGetGameCount, &hddGetGame, &hddGetGameName, &hddGetGameNameLength, &hddGetGameStartup, &hddDeleteGame, &hddRenameGame,
-    &hddLaunchGame, &hddGetConfig, &hddGetImage, &hddCleanUp, &hddShutdown, &hddCheckVMC, &hddGetIconId, &hddLaunchVcd, 0, &hddGetArtArchivePath};

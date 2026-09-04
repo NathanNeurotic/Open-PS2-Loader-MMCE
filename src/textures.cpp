@@ -8,6 +8,7 @@
 #include <kernel.h>
 #include <png.h>
 
+extern "C" {
 extern void *load0_png;
 extern void *load1_png;
 extern void *load2_png;
@@ -109,6 +110,7 @@ extern void *case_png;
 extern void *PS1_png;
 extern void *PS2_png;
 extern void *case_overlay_png;
+}
 
 // Not related to screen size, just to limit at some point
 static int maxSize = 720 * 512 * 4;
@@ -131,7 +133,7 @@ static int maxSize = 720 * 512 * 4;
 typedef struct
 {
     int id;
-    char *name;
+    const char *name;
     void **texture;
 } texture_t;
 
@@ -292,7 +294,7 @@ static int texSizeValidate(int width, int height, u8 psm)
     if (width > 1024 || height > 1024)
         return -1;
 
-    if (gsKit_texture_size(width, height, (int)psm) > maxSize)
+    if (gsKit_texture_size(width, height, (int)psm) > (u32)maxSize)
         return -1;
 
     return 0;
@@ -362,7 +364,7 @@ void texSetLoadAbortFlag(volatile int *abortRequested)
 
 static void texReadMemFunction(png_structp pngPtr, png_bytep data, png_size_t length)
 {
-    void **PngBufferPtr = png_get_io_ptr(pngPtr);
+    void **PngBufferPtr = (void **)png_get_io_ptr(pngPtr);
 
     memcpy(data, *PngBufferPtr, length);
     *PngBufferPtr = (u8 *)(*PngBufferPtr) + length;
@@ -379,7 +381,7 @@ typedef struct
 
 static void texReadMemBoundedFunction(png_structp pngPtr, png_bytep data, png_size_t length)
 {
-    tex_mem_bounded_t *r = png_get_io_ptr(pngPtr);
+    tex_mem_bounded_t *r = (tex_mem_bounded_t *)png_get_io_ptr(pngPtr);
 
     if (length > r->remaining)
         png_error(pngPtr, "png read past buffer");
@@ -391,7 +393,7 @@ static void texReadMemBoundedFunction(png_structp pngPtr, png_bytep data, png_si
 
 static void texReadFileFunction(png_structp pngPtr, png_bytep data, png_size_t length)
 {
-    tex_file_reader_t *reader = png_get_io_ptr(pngPtr);
+    tex_file_reader_t *reader = (tex_file_reader_t *)png_get_io_ptr(pngPtr);
 
     while (length > 0) {
         int available;
@@ -592,7 +594,7 @@ static int texStageExternalFileIntoMemory(int fd, void **buffer, u32 *stagedSize
     // (the reason this path exists: MMCE streaming reads during decode are unreliable, and USB
     // streaming pays one read() RPC per chunk -- #296) -- only the size probe changes.
     capacity = TEX_MMCE_STAGE_READ_SIZE * 2; // 64 KB; doubles on demand for larger covers
-    fileBuffer = malloc(capacity);
+    fileBuffer = (unsigned char *)malloc(capacity);
     if (fileBuffer == NULL)
         return ERR_FILE_IO;
 
@@ -614,7 +616,7 @@ static int texStageExternalFileIntoMemory(int fd, void **buffer, u32 *stagedSize
                 return ERR_BAD_FILE;
             }
 
-            grown = realloc(fileBuffer, capacity * 2);
+            grown = (unsigned char *)realloc(fileBuffer, capacity * 2);
             if (grown == NULL) {
                 free(fileBuffer);
                 return ERR_FILE_IO;
@@ -706,7 +708,7 @@ static void texReadPixels24Row(GSTEXTURE *texture, png_bytep rowData, int row)
     };
     struct pixel3 *pixels = (struct pixel3 *)texture->Mem + (row * texture->Width);
 
-    for (int i = 0; i < texture->Width; i++)
+    for (int i = 0; (u32)i < texture->Width; i++)
         memcpy(&pixels[i], &rowData[4 * i], 3);
 }
 
@@ -718,7 +720,7 @@ static void texReadPixels32Row(GSTEXTURE *texture, png_bytep rowData, int row)
     };
     struct pixel *pixels = (struct pixel *)texture->Mem + (row * texture->Width);
 
-    for (int i = 0; i < texture->Width; i++) {
+    for (int i = 0; (u32)i < texture->Width; i++) {
         memcpy(&pixels[i], &rowData[4 * i], 3);
         pixels[i].a = rowData[4 * i + 3] >> 1;
     }
@@ -732,7 +734,7 @@ static int texReadData(GSTEXTURE *texture, png_structp pngPtr, png_infop infoPtr
     size_t size = gsKit_texture_size_ee(texture->Width, texture->Height, texture->PSM);
     png_bytep rowBuffer;
 
-    texture->Mem = memalign(128, size);
+    texture->Mem = (u32 *)memalign(128, size);
 
     if (!texture->Mem) {
         texFree(texture); // free the already-allocated paletted-PNG Clut before bailing (Gemini review);
@@ -748,7 +750,7 @@ static int texReadData(GSTEXTURE *texture, png_structp pngPtr, png_infop infoPtr
         // passes, so all rows must stay resident -- buffer the whole raw image, let libpng merge into
         // it, then convert row-by-row. Transient rowBytes*Height (~188 KB for a 184x256 cover), freed
         // before return; the common non-interlaced case keeps the single-row streaming loop below.
-        png_bytep raw = malloc((size_t)rowBytes * texture->Height);
+        png_bytep raw = (png_bytep)malloc((size_t)rowBytes * texture->Height);
         if (!raw) {
             texFree(texture);
             LOG("TEXTURES PngReadData: Failed to allocate interlaced buffer (%d x %d)\n", rowBytes, texture->Height);
@@ -756,7 +758,7 @@ static int texReadData(GSTEXTURE *texture, png_structp pngPtr, png_infop infoPtr
         }
         *bufSlot = raw;
         for (int pass = 0; pass < passes; pass++) {
-            for (int row = 0; row < texture->Height; row++) {
+            for (int row = 0; (u32)row < texture->Height; row++) {
                 if (texLoadAbortRequested()) {
                     *bufSlot = NULL;
                     free(raw);
@@ -766,7 +768,7 @@ static int texReadData(GSTEXTURE *texture, png_structp pngPtr, png_infop infoPtr
                 png_read_row(pngPtr, raw + (size_t)row * rowBytes, NULL);
             }
         }
-        for (int row = 0; row < texture->Height; row++)
+        for (int row = 0; (u32)row < texture->Height; row++)
             texPngReadRow(texture, raw + (size_t)row * rowBytes, row);
         *bufSlot = NULL;
         free(raw);
@@ -774,7 +776,7 @@ static int texReadData(GSTEXTURE *texture, png_structp pngPtr, png_infop infoPtr
         return 0;
     }
 
-    rowBuffer = malloc(rowBytes);
+    rowBuffer = (png_bytep)malloc(rowBytes);
     if (!rowBuffer) {
         texFree(texture);
         LOG("TEXTURES PngReadData: Failed to allocate memory for PNG row\n");
@@ -782,7 +784,7 @@ static int texReadData(GSTEXTURE *texture, png_structp pngPtr, png_infop infoPtr
     }
     *bufSlot = rowBuffer;
 
-    for (int row = 0; row < texture->Height; row++) {
+    for (int row = 0; (u32)row < texture->Height; row++) {
         if (texLoadAbortRequested()) {
             *bufSlot = NULL;
             free(rowBuffer);
@@ -1009,7 +1011,7 @@ static int texLoadAll(GSTEXTURE *texture, const char *filePath, int texId, const
 
             if (bitDepth == 4) {
                 texture->PSM = GS_PSM_T4;
-                texture->Clut = memalign(128, gsKit_texture_size_ee(8, 2, GS_PSM_CT32));
+                texture->Clut = (u32 *)memalign(128, gsKit_texture_size_ee(8, 2, GS_PSM_CT32));
                 if (texture->Clut == NULL)
                     return texEnd(pngPtr, infoPtr, pFileBuffer, fd, ERR_FILE_IO); // Clut OOM: file present -> transient, not absent
                 memset(texture->Clut, 0, gsKit_texture_size_ee(8, 2, GS_PSM_CT32));
@@ -1017,7 +1019,7 @@ static int texLoadAll(GSTEXTURE *texture, const char *filePath, int texId, const
                 texPngReadRow = &texReadPixels4Row;
             } else if (bitDepth == 8) {
                 texture->PSM = GS_PSM_T8;
-                texture->Clut = memalign(128, gsKit_texture_size_ee(16, 16, GS_PSM_CT32));
+                texture->Clut = (u32 *)memalign(128, gsKit_texture_size_ee(16, 16, GS_PSM_CT32));
                 if (texture->Clut == NULL)
                     return texEnd(pngPtr, infoPtr, pFileBuffer, fd, ERR_FILE_IO); // Clut OOM: file present -> transient, not absent
                 memset(texture->Clut, 0, gsKit_texture_size_ee(16, 16, GS_PSM_CT32));

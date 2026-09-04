@@ -16,7 +16,7 @@
 #include <kernel.h>
 #include <delaythread.h> // DelayThread -- must be included explicitly, it is not pulled in by kernel.h
 
-extern void *_gp;
+extern "C" void *_gp;
 
 // Tagged, not anonymous, because the record now carries its OWN queue links: art no longer rides an
 // ioman request node, it rides this one.
@@ -1068,7 +1068,7 @@ void cacheInit()
     gArtThread.option = 0;
     gArtThread.stack_size = ART_THREAD_STACK_SIZE;
     gArtThread.gp_reg = &_gp;
-    gArtThread.func = &cacheArtWorkerThread;
+    gArtThread.func = (void *)&cacheArtWorkerThread;
     gArtThread.stack = gArtStack;
     gArtThread.initial_priority = ART_THREAD_PRIORITY;
 
@@ -1518,7 +1518,7 @@ GSTEXTURE *cacheGetTextureEx(image_cache_t *cache, item_list_t *list, int *cache
             }
         }
 
-        load_image_request_t *req = malloc(sizeof(load_image_request_t) + valueLen + 1 + (archiveLen ? archiveLen + 1 : 0));
+        load_image_request_t *req = (load_image_request_t *)malloc(sizeof(load_image_request_t) + valueLen + 1 + (archiveLen ? archiveLen + 1 : 0));
         if (!req) {
             *cacheId = -1; // nothing cleared yet at this point, so the slot is untouched
             return NULL;

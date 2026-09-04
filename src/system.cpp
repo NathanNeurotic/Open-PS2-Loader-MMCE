@@ -32,8 +32,10 @@
 #include "include/xparam.h"
 
 #ifdef PADEMU
+extern "C" {
 #include <libds34bt.h>
 #include <libds34usb.h>
+}
 #endif
 
 #define NEWLIB_PORT_AWARE
@@ -610,8 +612,8 @@ int sysLaunchDisc(void)
 
 typedef struct
 {
-    char *game;
-    char *mode;
+    const char *game;
+    const char *mode;
     void *module;
     int *module_size;
 } patchlist_t;
@@ -648,7 +650,7 @@ static unsigned int addIopPatch(const char *mode_str, const char *startup, irxpt
 
 typedef struct
 {
-    char *game;
+    const char *game;
     void *addr;
 } modStorageSetting_t;
 
@@ -1379,7 +1381,7 @@ void sysLaunchNeutrino(const char *driver, const char *path, const char *startup
            silently reinstate the reset and reproduce the black screen with no way to tell why. */
         if (!strcmp(deviceName, "usb") && argc < argvMax &&
             !neutrinoArgHasActiveFlag(gNeutrinoArgs, "-qb") && !neutrinoArgHasActiveFlag(extraArgs, "-qb"))
-            argv[argc++] = "-qb";
+            argv[argc++] = (char *)"-qb";
     }
 
     // Everything up to and including -dvd/-qb is the boot-critical core: the pool-fit drop loop below
@@ -1402,11 +1404,11 @@ void sysLaunchNeutrino(const char *driver, const char *path, const char *startup
     // user's args already hold an active (non-$-disabled) copy -- one flag, emitted once.
     if (gEnableDebug && argc < argvMax &&
         !neutrinoArgHasActiveFlag(gNeutrinoArgs, "-dbc") && !neutrinoArgHasActiveFlag(extraArgs, "-dbc"))
-        argv[argc++] = "-dbc";
+        argv[argc++] = (char *)"-dbc";
 
     if (EnablePS2Logo && argc < argvMax &&
         !neutrinoArgHasActiveFlag(gNeutrinoArgs, "-logo") && !neutrinoArgHasActiveFlag(extraArgs, "-logo"))
-        argv[argc++] = "-logo";
+        argv[argc++] = (char *)"-logo";
 
     // Per-game Neutrino video mode (-gsm): 1=fp1 (240p), 2=fp2 (480p), 3=1080ix1 (1080i); 0/out-of-range
     // = no -gsm. Neutrino is LAST-wins on -gsm and ABORTS the boot on a malformed value, so emit exactly
@@ -1628,7 +1630,7 @@ void sysLaunchLoaderElf(const char *filename, const char *mode_str, int size_cdv
     struct EECoreConfig_t *config = NULL;
     u32 *core_ptr = (u32 *)&eecore_elf;
 
-    for (i = 0; i < size_eecore_elf / 4; i++) {
+    for (i = 0; (unsigned int)i < size_eecore_elf / 4; i++) {
         if (core_ptr[0] == EE_CORE_MAGIC_0 && core_ptr[1] == EE_CORE_MAGIC_1) {
             config = (struct EECoreConfig_t *)core_ptr;
             break;
@@ -1655,7 +1657,8 @@ void sysLaunchLoaderElf(const char *filename, const char *mode_str, int size_cdv
 
     if (GetCheatsEnabled()) {
         set_cheats_list();
-        config->gCheatList = GetCheatsList();
+        // The shared EE-core ABI predates const-correctness; its consumers only read this list.
+        config->gCheatList = (u32 *)GetCheatsList();
     } else
         config->gCheatList = NULL;
 
@@ -1735,7 +1738,7 @@ void sysLaunchLoaderElf(const char *filename, const char *mode_str, int size_cdv
 
         if (eph[i].memsz > eph[i].filesz) {
             LOG("EECORE PH CLEAR: %d 0x%08X 0x%08X\n", i, (u32)((u32)eph[i].vaddr + eph[i].filesz), eph[i].memsz - eph[i].filesz);
-            memset(eph[i].vaddr + eph[i].filesz, 0, eph[i].memsz - eph[i].filesz);
+            memset((u8 *)eph[i].vaddr + eph[i].filesz, 0, eph[i].memsz - eph[i].filesz);
         }
     }
 
@@ -1747,7 +1750,7 @@ void sysLaunchLoaderElf(const char *filename, const char *mode_str, int size_cdv
         int fd = 0;
         if ((fd = open("rom0:PS2LOGO", O_RDONLY)) >= 0) {
             close(fd);
-            argv[argc] = "rom0:PS2LOGO";
+            argv[argc] = (char *)"rom0:PS2LOGO";
             argc++;
         }
     }
@@ -1819,7 +1822,7 @@ int sysCheckVMC(const char *prefix, const char *sep, char *name, int createSize,
                 LOG("SYSTEM Block_size : 0x%X\n", vmc_superblock->pages_per_block);
                 LOG("SYSTEM Card_size  : 0x%X\n", vmc_superblock->pages_per_cluster * vmc_superblock->clusters_per_card);
 
-                if (!strncmp(vmc_superblock->magic, "Sony PS2 Memory Card Format", 27) && vmc_superblock->mc_type == 0x2 && size == vmc_superblock->pages_per_cluster * vmc_superblock->clusters_per_card * vmc_superblock->page_size) {
+                if (!strncmp(vmc_superblock->magic, "Sony PS2 Memory Card Format", 27) && vmc_superblock->mc_type == 0x2 && (u32)size == vmc_superblock->pages_per_cluster * vmc_superblock->clusters_per_card * vmc_superblock->page_size) {
                     LOG("SYSTEM VMC file structure valid: %s\n", path);
                 } else
                     size = 0;

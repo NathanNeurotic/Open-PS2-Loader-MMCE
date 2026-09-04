@@ -528,7 +528,7 @@ void vcdRequestDisplayId(const char *name)
         return;
 
     // If deferred due to art/BGM activity, throttle retry attempts
-    if (m->state == VCD_ID_DEFERRED && guiFrameId < m->retryFrame)
+    if (m->state == VCD_ID_DEFERRED && (unsigned int)guiFrameId < m->retryFrame)
         return;
 
     if (strlen(name) >= sizeof(gVcdIdReqName))
@@ -544,7 +544,7 @@ void vcdRequestDisplayId(const char *name)
     m->state = VCD_ID_QUEUED;
     EIntr();
 
-    if (ioPutRequest(IO_CUSTOM_SIMPLEACTION, &vcdResolveQueuedDisplayId) != IO_OK) {
+    if (ioPutSimpleAction(&vcdResolveQueuedDisplayId) != IO_OK) {
         // Enqueue failed: throttle retry so we don't spam
         DIntr();
         gVcdIdReqPending = 0;

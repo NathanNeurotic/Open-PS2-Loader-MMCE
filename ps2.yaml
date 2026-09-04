@@ -17,27 +17,27 @@ targets:
   - name: opl
     type: ee
     sources:
-      - src/pad.c
-      - src/fntsys.c
-      - src/renderman.c
+      - src/pad.cpp
+      - src/fntsys.cpp
+      - src/renderman.cpp
       - src/menusys.c
-      - src/OSDHistory.c
-      - src/system.c
-      - src/elfldr_noreset.c
+      - src/OSDHistory.cpp
+      - src/system.cpp
+      - src/elfldr_noreset.cpp
       - src/lang_internal.c
-      - src/dialogs.c
-      - src/dia.c
-      - src/texcache.c
-      - src/themes.c
-      - src/bdmsupport.c
-      - src/ethsupport.c
-      - src/udpfssupport.c
-      - src/hddsupport.c
-      - src/mmcesupport.c
-      - src/vcdsupport.c
+      - src/dialogs.cpp
+      - src/dia.cpp
+      - src/texcache.cpp
+      - src/themes.cpp
+      - src/bdmsupport.cpp
+      - src/ethsupport.cpp
+      - src/udpfssupport.cpp
+      - src/hddsupport.cpp
+      - src/mmcesupport.cpp
+      - src/vcdsupport.cpp
       - src/gui.c
-      - src/guigame.c
-      - src/textures.c
+      - src/guigame.cpp
+      - src/textures.cpp
       - src/opl.c
       - src/sound.c
       # embedded assets (tools/gen_assets.py; glob needs ps2build >= v2026.09.04.2)
@@ -64,6 +64,12 @@ targets:
       - -Wno-format-truncation
       - -Wno-stringop-truncation
       - -fdata-sections
+      # C++ (post-merge src/*.cpp): same freestanding set as the Makefile EE_CXXFLAGS
+      - -std=gnu++17
+      - -fno-exceptions
+      - -fno-rtti
+      - -fno-threadsafe-statics
+      - -fno-use-cxa-atexit
     ldflags:
       - -Wl,-Map,opl.map
     libs:

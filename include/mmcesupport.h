@@ -1,6 +1,10 @@
 #ifndef __MMCE_SUPPORT_H
 #define __MMCE_SUPPORT_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "include/iosupport.h"
 #include "include/mcemu.h"
 
@@ -32,5 +36,9 @@ int mmceSendGameID(const char *startup, const char *protectMcPath, int vmcSlotMa
 int mmceGameIdSettle(int timeoutMs);
 // Arm the GameID transport at menu/settings time (idempotent; no-op when the feature is off).
 void mmceArmGameIDTransport(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

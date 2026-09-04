@@ -376,7 +376,7 @@ void configEnd()
     }
 }
 
-config_set_t *configAlloc(int type, config_set_t *configSet, char *fileName)
+config_set_t *configAlloc(int type, config_set_t *configSet, const char *fileName)
 {
     int weAllocated = 0;
     if (!configSet) {

@@ -15,6 +15,7 @@
 */
 
 #include <kernel.h>
+#include "include/system.h" // public C-linkage declaration for sysLoadELFKeepIOP
 #include "include/ioman.h" // LOG (kernel argv-budget refusal trace)
 #include <sifrpc.h>
 #include <string.h>

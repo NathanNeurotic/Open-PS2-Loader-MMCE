@@ -1,6 +1,10 @@
 #ifndef __PAD_H
 #define __PAD_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // PAD handling
 
 #define KEY_LEFT     1
@@ -67,5 +71,9 @@ void padGetFaultCounters(u32 *maxNotReady, u32 *maxReadyEmpty);
 
 /** Debug HUD: reports detected actuators and alignment status for pad 0 and pad 1. */
 void padGetActuatorDiag(int *act0, int *aligned0, int *act1, int *aligned1);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
