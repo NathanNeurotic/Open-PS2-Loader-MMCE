@@ -7,7 +7,12 @@ banner = '''<p align="center">\n  <img width="400" height="92" alt="AI-Assisted-
 # docs site and every release page at once. It has to be an ABSOLUTE url: a release description
 # is rendered outside any repository context, so a relative path resolves to nothing.
 hero = '''<p align="center"><img alt="RiptOPL" src="https://raw.githubusercontent.com/NathanNeurotic/Open-PS2-Loader/rebuild/main/docs/assets/riptopl.png" /></p>'''
-hero_re = re.compile(r'<p align="center">(?:(?!</p>).)*riptopl\.png(?:(?!</p>).)*</p>\s*', re.DOTALL)
+# Anchored to the START of the body and to the asset PATH, not a bare filename, so this only ever
+# removes a hero this script itself put there. Matching a loose "riptopl.png" anywhere would delete
+# a centred image someone had placed in the notes on purpose. Deliberately NOT an exact-string match
+# against `hero`: if the markup is ever edited, an exact match would stop recognising the previous
+# hero and start stacking a second one on every pass -- the very failure this guard exists to stop.
+hero_re = re.compile(r'\A\s*<p align="center">(?:(?!</p>).)*docs/assets/riptopl\.png(?:(?!</p>).)*</p>\s*', re.DOTALL)
 resources = '''## External Tools & Services
 
 - **PS2-Servers** — all-in-one PC server launcher for **SMBv1, UDPFS and UDPBD**: https://github.com/NathanNeurotic/PS2-Servers
