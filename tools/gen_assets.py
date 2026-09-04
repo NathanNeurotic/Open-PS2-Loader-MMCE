@@ -1,24 +1,17 @@
 #!/usr/bin/env python3
-"""Generate embedded-asset .c files for the ps2build build of OPL.
+"""Generate embedded-asset .c files for the EE build.
 
-Replicates the root Makefile's bin2c rules (asm/*.c), which ps2build cannot
-express (no codegen steps). Every output goes to _ps2build_compat/gen/<sym>.c
-and exports exactly `unsigned char <sym>[]` / `unsigned int size_<sym>` like
-PS2SDK bin2c, so the EE sources link unchanged.
+Emits one bin2c-style .c per asset into tools/generated/<sym>.c, each
+exporting `unsigned char <sym>[]` / `unsigned int size_<sym>`. Assets
+without a real source on this machine are emitted as an empty stub so
+the build can still link; run twice after a fresh build so ee_core.elf/
+elfldr.elf pick up their real, just-built contents on the second pass.
 
-Real blobs are embedded where they exist (in-repo assets, prebuilt package
-IRXs under $PS2DEV/packages, and the ps2build-built ee_core/elfldr ELFs when
-present). Everything whose source is absent from the new SDK package layout
-(or that belongs to an omitted multi-variant module) is emitted as an EMPTY
-stub array so the EE compile/link can proceed; every stub is logged to
-_ps2build_compat/gen/STUBS.txt and mirrored into GAPS.md by hand.
-
-Usage (from the Open-PS2-Loader dir, with the build env on PATH):
-    python3 _ps2build_compat/gen_assets.py
-Re-run after `ps2build build` once ee_core.elf/elfldr.elf exist to swap the
-ELF stubs for the real binaries (two-pass bootstrap).
+Usage (from the repo root, with PS2DEV set):
+    python3 tools/gen_assets.py
 """
 
+import glob
 import gzip
 import os
 import shutil
@@ -26,8 +19,8 @@ import subprocess
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-GEN = os.path.join(ROOT, "_ps2build_compat", "gen")
-PS2DEV = os.environ.get("PS2DEV", "C:/Users/natha/AppData/Local/ps2dev")
+GEN = os.path.join(ROOT, "tools", "generated")
+PS2DEV = os.environ.get("PS2DEV", "")
 PACKAGES = os.path.join(PS2DEV, "packages")
 
 PNG_ASSETS = """load0 load1 load2 load3 load4 load5 load6 load7 usb usb_bd ilk_bd
@@ -41,45 +34,50 @@ Scan_1080i Scan_1080i2 Scan_1080p Vmode_multi Vmode_ntsc Vmode_pal logo
 logo0 logo1 logo2 logo3 case
 Index_0 Index_1 Index_2 Index_3 Index_4 fav fav_mark R3 L3 L1 R1 PS1 PS2 case_overlay""".split()
 
-ADP_ASSETS = "boot cancel confirm cursor message transition bd_connect bd_disconnect".split()
+# audio/*.adp is exhaustively embedded, so this is derived rather than
+# hand-listed.
+ADP_ASSETS = sorted(
+    os.path.splitext(os.path.basename(p))[0]
+    for p in glob.glob(os.path.join(ROOT, "audio", "*.adp"))
+)
 
-# Prebuilt IOP modules shipped as package .irx in the new SDK layout.
-# symbol -> path relative to $PS2DEV/packages. Paths verified against the
-# installed sdk-core v2026.09.03.1 / sdk-world v2026.09.03.2 / audsrv
-# v2026.09.03.1 trees on 2026-09-03; note the recurring dir-name !=
-# irx-name splits (dev9/ps2dev9, fs-osd/ps2fs-osd, hdpro_atad/hdproatad,
-# ps2ips-iop/ps2ips) and case-sensitive file names (iomanX, fileXio).
+# Prebuilt IOP modules, embedded straight from the installed package
+# tree. symbol -> path relative to $PS2DEV/packages. Several package
+# directory names differ from their real .irx filename (dev9/ps2dev9,
+# fs-osd/ps2fs-osd, hdpro_atad/hdproatad, ps2ips-iop/ps2ips), and a few
+# filenames are case-sensitive (iomanX, fileXio) - both are real, not
+# typos.
 PKG_IRX = {
-    "iomanx_irx": "core/iomanx/bin/iomanX.irx",       # Makefile: iomanX.irx
-    "filexio_irx": "core/filexio/bin/fileXio.irx",    # Makefile: fileXio.irx
-    "usbd_irx": "core/usbd_mini/bin/usbd_mini.irx",   # Makefile: usbd_mini.irx
+    "iomanx_irx": "core/iomanx/bin/iomanX.irx",
+    "filexio_irx": "core/filexio/bin/fileXio.irx",
+    "usbd_irx": "core/usbd_mini/bin/usbd_mini.irx",
     "bdm_irx": "core/bdm/bin/bdm.irx",
     "bdmfs_fatfs_irx": "core/bdmfs_fatfs/bin/bdmfs_fatfs.irx",
     "smap_irx": "core/smap/bin/smap.irx",
     "netman_irx": "core/netman/bin/netman.irx",
-    "sio2man_irx": "core/sio2man/bin/freesio2.irx",   # Makefile: freesio2.irx
-    "padman_irx": "core/padman/bin/freepad.irx",      # Makefile: freepad.irx
+    "sio2man_irx": "core/sio2man/bin/freesio2.irx",
+    "padman_irx": "core/padman/bin/freepad.irx",
     "mcman_irx": "core/mcman/bin/mcman.irx",
     "mcserv_irx": "core/mcserv/bin/mcserv.irx",
     "libsd_irx": "core/libsd/bin/libsd.irx",
     "audsrv_irx": "world/audsrv/bin/audsrv.irx",
-    "eesync_irx": "core/eesync-nano/bin/eesync-nano.irx",  # Makefile: eesync-nano.irx
-    "udnl_irx": "core/udnl/bin/udnl.irx",             # Makefile default; udnl-t300 is the PADEMU-less alt
-    "ps2fs_irx": "core/fs-osd/bin/ps2fs-osd.irx",     # Makefile: ps2fs-osd.irx
-    "ps2hdd_irx": "core/hdd-osd/bin/ps2hdd-osd.irx",  # Makefile: ps2hdd-osd.irx
-    "ps2dev9_irx": "core/dev9/bin/ps2dev9.irx",       # Makefile: ps2dev9.irx
-    "ps2ip_irx": "core/ps2ip-nm/bin/ps2ip-nm.irx",    # Makefile: ps2ip-nm.irx
-    "ps2ips_irx": "core/ps2ips-iop/bin/ps2ips.irx",   # Makefile: ps2ips.irx
+    "eesync_irx": "core/eesync-nano/bin/eesync-nano.irx",
+    "udnl_irx": "core/udnl/bin/udnl.irx",
+    "ps2fs_irx": "core/fs-osd/bin/ps2fs-osd.irx",
+    "ps2hdd_irx": "core/hdd-osd/bin/ps2hdd-osd.irx",
+    "ps2dev9_irx": "core/dev9/bin/ps2dev9.irx",
+    "ps2ip_irx": "core/ps2ip-nm/bin/ps2ip-nm.irx",
+    "ps2ips_irx": "core/ps2ips-iop/bin/ps2ips.irx",
     "poweroff_irx": "core/poweroff/bin/poweroff.irx",
-    "hdpro_atad_irx": "core/hdpro_atad/bin/hdproatad.irx",  # Makefile: hdproatad.irx
+    "hdpro_atad_irx": "core/hdpro_atad/bin/hdproatad.irx",
     "iLinkman_irx": "core/iLinkman/bin/iLinkman.irx",
-    # Release build embeds the _mini (printf-less) variants; the Makefile's
-    # DEBUG=1 branch uses the full versions (core/usbmass_bd etc.).
+    # Release build embeds the _mini (printf-less) variants; a debug
+    # build would want the full ones (core/usbmass_bd etc.) instead.
     "usbmass_bd_irx": "core/usbmass_bd_mini/bin/usbmass_bd_mini.irx",
     "IEEE1394_bd_irx": "core/IEEE1394_bd_mini/bin/IEEE1394_bd_mini.irx",
     "mx4sio_bd_irx": "core/mx4sio_bd_mini/bin/mx4sio_bd_mini.irx",
     "smbman_irx": "world/smbman/bin/smbman.irx",
-    "mmceman_irx": "world/mmceman/bin/mmceman.irx",   # Makefile: MMCE_ASSETS_DIR/mmceman.irx
+    "mmceman_irx": "world/mmceman/bin/mmceman.irx",
     "mmcedrv_irx": "world/mmcedrv/bin/mmcedrv.irx",
     "mmceigr_irx": "world/mmceigr/bin/mmceigr.irx",
 }
@@ -108,22 +106,18 @@ REPO_GZ = {
     "bdma_usbhdfsd_ata_gz": "modules/bdmassault/usbhdfsd.irx.ata",
 }
 
-# ps2build-built EE ELFs (second pass: present only after a successful build).
+# EE ELFs built by this same project. Present only on the second pass -
+# see the module docstring.
 BUILD_ELF = {
     "eecore_elf": "build/bin/ee_core.elf",
     "elfldr_elf": "build/bin/elfldr.elf",
 }
 
-# No source exists anywhere today -> empty stub array. Each entry is a gap;
-# keep in sync with GAPS.md. Empty since 2026-09-03: sdk-core v2026.09.03.1 +
-# sdk-world v2026.09.03.2 + the audsrv standalone release cover every
-# previously-stubbed IRX (see PKG_IRX). Keep the mechanism for future gaps.
+# Assets with no real source available at all - kept empty, populate an
+# entry here (symbol -> reason) if one is ever genuinely missing.
 STUBS = {}
 
-STUB_HEADER = """/* STUB: {sym} -- {reason}
- * Source blob is unavailable in the new SDK package layout; see
- * _ps2build_compat/GAPS.md. Empty array so the EE compile/link can proceed.
- */
+STUB_HEADER = """/* STUB: {sym} -- {reason} */
 #ifndef __{sym}__
 #define __{sym}__
 
@@ -141,11 +135,10 @@ def find_bin2c():
         p = shutil.which(name)
         if p:
             return p
-    for cand in ("/c/Users/natha/bin/bin2c.exe",
-                 os.path.join(PS2DEV, "bin", "bin2c.exe")):
-        if os.path.isfile(cand):
-            return cand
-    sys.exit("bin2c not found on PATH")
+    cand = os.path.join(PS2DEV, "bin", "tools", "bin2c.exe")
+    if os.path.isfile(cand):
+        return cand
+    sys.exit("bin2c not found on PATH or $PS2DEV/bin/tools")
 
 
 def emit(bin2c, sym, data_path, stubs, reason=None):

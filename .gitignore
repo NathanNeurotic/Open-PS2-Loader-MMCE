@@ -23,6 +23,8 @@
 *.a
 *.d
 DETAILED_CHANGELOG
+/build/
+/tools/generated/
 
 #
 # files that we don't want to ignore
