@@ -203,35 +203,39 @@ not a CMake wrapper (CMake-wrapping is for projects that already have a
 working upstream CMake build; OPL has none), and not a hand-written
 Makefile with per-package flags.
 
-**Status as of this rewrite: the port is started, in this repo.**
+**Status: the port is COMPLETE and GREEN (2026-09-04).**
 
-- `Open-PS2-Loader/ps2.yaml` — the real build definition (EE program +
-  IOP module targets, including the multi-variant cdvdman x6 / mcemu x4
-  / pademu x2 sets).
-- `Open-PS2-Loader/_ps2build_compat/GAPS.md` — **the live gap log**,
-  severity-tagged (BLOCKER/HIGH/MEDIUM/LOW). Read this first for
-  day-to-day work; it is more current than any handoff doc. Known-good
-  items closed there include: `libs:` pulling package include dirs,
-  exports-first IOP link ordering, and `.S` assembly on both ee and iop
-  targets.
-- `_ps2build_compat/gen_assets.py` — replicates the Makefile's ~150
-  bin2c/gzip asset rules into `gen/*.c` (needs a two-pass run for the
-  embedded `ee_core.elf`/`elfldr.elf`). `gen/STUBS.txt` lists
-  empty-stubbed symbols.
-- `_ps2build_compat/gen_iop_yaml.py` — emits the IOP-target section of
-  `ps2.yaml`.
-- `_ps2build_compat/include/` + `include_iop/` — workaround headers for
-  real SDK-package gaps (`irx.h`, `types.h`, `defs.h`, `atad.h`,
-  `aifdev9.h`, `iopcontrol_special.h`, and the IOP `sys/`+`fcntl.h`
-  set). These are still needed; treat their eventual upstreaming as part
-  of closing the port.
+- `Open-PS2-Loader/ps2.yaml` — the full build definition (910 lines
+  after the anchor/glob slim-down; EE program + 38 IOP module targets
+  including the multi-variant cdvdman x6 / mcemu x4 / pademu x2 sets;
+  IOP `headers:` via one YAML anchor, most IOP `sources:` via globs —
+  needs ps2build ≥ v2026.09.04.2).
+- `tools/gen_assets.py` — the one surviving compat piece: replicates
+  the Makefile's ~150 bin2c/gzip asset rules into `tools/generated/*.c`
+  (gitignored; ps2.yaml globs the directory, so run it before building;
+  needs the two-pass run for the embedded `ee_core.elf`/`elfldr.elf`).
+- Everything else was upstreamed 2026-09-04: ps2build v2026.09.04.1/.2
+  (driver-artifact header resolution, `pack: true`/ps2pack, `sources:`
+  globs), sdk-core v2026.09.04.2 (ps2ipee.h const fix, real `libbdm.a`
+  in the bdm package, `include_dirs:` on atad/dev9/ps2ip-nm/bdm),
+  srxfixup v2026.09.04 (release CRT), ogg/vorbis/jpeg v2026.09.03.2
+  (real EM_MIPS releases). The vendored headers, vendored libbdm, the
+  IOP yaml generator, and the report docs (GAPS.md, UPSTREAM-REPORT.md)
+  are all deleted — see PR #602 history (≤ `decb1193`) for the gap log
+  as it stood.
+- Still open upstream: literal `-l` flags don't pull their package's
+  `-L` (keep `pad` listed before `padx` in `libs:`), and generic file
+  embedding / pre-build codegen hooks / git-derived version defines
+  (until then, `tools/gen_assets.py` stays).
 
-What this sdk-world `.2` install changes vs. GAPS.md (worth editing
-there when someone next touches it): the #14 missing-EE-lib list shrinks
-to `audsrv`, `vorbisfile`, `vorbis`, `ogg` (`patches`, `png`, `z`,
-`freetype`, `padx`, `elf-loader-nocolour` are all real now); the #15
-stubbed-IRX list shrinks to `audsrv.irx` alone (`smbman` and the
-`mmceman` family are real now, which also closes #16).
+Build (fresh tree):
+
+```sh
+python3 tools/gen_assets.py    # pass 1 (ee_core/elfldr stubbed)
+ps2build build -c ps2.yaml
+python3 tools/gen_assets.py    # pass 2: real ee_core/elfldr blobs
+ps2build build -c ps2.yaml     # final: build/bin/opl.elf + opl-packed.elf
+```
 
 Conventions that still apply when adding or fixing targets:
 
@@ -263,14 +267,18 @@ Conventions that still apply when adding or fixing targets:
 - **`cdfs`** unmigrated; not referenced by OPL's Makefile directly.
 - **Debug-only OPL targets** (`modules/debug/udptty-ingame`, ps2link,
   drvtif/tifinet/deci2 blobs, `src/debug.cpp`) intentionally excluded
-  from the release port — see GAPS.md #17.
-- **ps2-packer/strip packaging** (`RIPTOPL.ELF`) not replicated;
-  `build/bin/opl.elf` is the deliverable for now — GAPS.md #19.
+  from the release port.
+- ~~**ps2-packer/strip packaging**~~ — superseded 2026-09-04: the `opl`
+  target sets `pack: true`, so the build emits
+  `build/bin/opl-packed.elf` (ps2pack, ~59% smaller) alongside
+  `opl.elf`. `build/bin/RIPTOPL.ELF` is a copy of the packed one.
 
 ## Where to look for more context
 
-- **`Open-PS2-Loader/_ps2build_compat/GAPS.md`** — the live, current gap
-  log for the OPL-side port. Start here.
+- **PR #602 history** — the gap log (`GAPS.md`) and upstream report
+  (`UPSTREAM-REPORT.md`) were removed by the 2026-09-04 cleanup once
+  their contents were fixed upstream; commits ≤ `decb1193` have the
+  final versions.
 - **`FEEDBACK.md`** — running log of every real finding from the SDK
   effort. **Local-only file**, not committed anywhere (workspace root,
   sibling to `sdk-core`/`sdk-world`); ask for a copy if it's not already

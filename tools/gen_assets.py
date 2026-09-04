@@ -7,7 +7,9 @@ without a real source on this machine are emitted as an empty stub so
 the build can still link; run twice after a fresh build so ee_core.elf/
 elfldr.elf pick up their real, just-built contents on the second pass.
 
-Usage (from the repo root, with PS2DEV set):
+Usage (from the repo root; PS2DEV comes from the environment or
+`ps2build config get ps2dev`, and the script exits loudly rather than
+silently stubbing if neither is set):
     python3 tools/gen_assets.py
 """
 
@@ -20,7 +22,27 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 GEN = os.path.join(ROOT, "tools", "generated")
-PS2DEV = os.environ.get("PS2DEV", "")
+
+
+def resolve_ps2dev():
+    # Same fallback chain as ps2build itself: env, then user config.
+    # Never default silently - an empty PS2DEV turns every package IRX
+    # into a stub and still links, producing a quietly broken opl.elf.
+    p = os.environ.get("PS2DEV", "")
+    if not p:
+        try:
+            out = subprocess.run(["ps2build", "config", "get", "ps2dev"],
+                                 capture_output=True, text=True, check=True)
+            p = out.stdout.strip()
+        except (OSError, subprocess.CalledProcessError):
+            p = ""
+    if not p or not os.path.isdir(os.path.join(p, "packages")):
+        sys.exit("PS2DEV not set and 'ps2build config get ps2dev' gave no "
+                 "valid path - set PS2DEV or run: ps2build config set ps2dev <path>")
+    return p
+
+
+PS2DEV = resolve_ps2dev()
 PACKAGES = os.path.join(PS2DEV, "packages")
 
 PNG_ASSETS = """load0 load1 load2 load3 load4 load5 load6 load7 usb usb_bd ilk_bd
