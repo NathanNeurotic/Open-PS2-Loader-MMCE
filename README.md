@@ -4,6 +4,7 @@
 
 
 <p align="center"><img alt="RiptOPL" src="https://raw.githubusercontent.com/NathanNeurotic/Open-PS2-Loader/rebuild/main/docs/assets/riptopl.png" /></p>
+
 ```HAS THIS EVER HAPPENED TO YOU?```
 ```You download another OPL fork. It has a new theme. A new menu. Maybe even a file browser, because apparently launching games was too direct and somebody needed a side quest.```
 ```Then the game still does not work.```
