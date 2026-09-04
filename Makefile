@@ -466,6 +466,8 @@ clean:	download_lwNBD
 	$(MAKE) -C modules/pademu USE_USB=1 clean
 	echo " -raudp"
 	$(MAKE) -C modules/network/raudp clean
+	echo " -ps2ips-ra"
+	$(MAKE) -C modules/network/ps2ips-ra clean
 	echo "-pc tools"
 	$(MAKE) -C pc clean
 
@@ -825,7 +827,32 @@ $(EE_ASM_DIR)smap.c: $(PS2SDK)/iop/irx/smap.irx | $(EE_ASM_DIR)
 $(EE_ASM_DIR)netman.c: $(PS2SDK)/iop/irx/netman.irx | $(EE_ASM_DIR)
 	$(BIN2C) $< $@ $(*F)_irx
 
-$(EE_ASM_DIR)ps2ips.c: $(PS2SDK)/iop/irx/ps2ips.irx | $(EE_ASM_DIR)
+# ps2ips: the EE<->IOP socket bridge. The RA flavour builds its own copy instead of taking the
+# ps2sdk prebuilt, because the stock module has four defects that the RetroAchievements menu path
+# trips over immediately -- the worst of which corrupts EE memory in ANY build that uses sockets:
+#
+#   * do_recvfrom DMAs the whole 144-byte rests_pkt into the EE's _intr_data[32], which is 128
+#     bytes. In the linked OPL the next object in .bss is __ps2ipc_fdman_ops_socket, the table of
+#     function pointers behind every EE socket call, and bytes 128..143 are its getfd/getfilename/
+#     close/read entries. Overwriting them makes close() skip the IOP call, so the lwIP socket
+#     leaks and the UDP PCB pool runs dry -- roughly one network operation per boot.
+#   * the reply sockaddr is written into the shared RPC buffer BEFORE the request's ee_addr and
+#     intr_data are read, so both transfers target EE address 0 and UDP receive never worked.
+#   * fromlen is passed uninitialised, so the sender address comes back as zeros.
+#   * lwip_buffer is BUFF_SIZE + 32 where a receive at offset 64 needs BUFF_SIZE + 64.
+#
+# Held to the RA flavour for now on purpose: swapping this module also affects nbns and httpclient,
+# so it wants its own hardware validation before it goes anywhere near the default build.
+ifeq ($(RETROACHIEVEMENTS),1)
+PS2IPS_IRX = modules/network/ps2ips-ra/ps2ips.irx
+
+modules/network/ps2ips-ra/ps2ips.irx: $(wildcard modules/network/ps2ips-ra/*.c) $(wildcard modules/network/ps2ips-ra/*.h) modules/network/ps2ips-ra/imports.lst modules/network/ps2ips-ra/Makefile
+	$(MAKE) -C modules/network/ps2ips-ra rebuild
+else
+PS2IPS_IRX = $(PS2SDK)/iop/irx/ps2ips.irx
+endif
+
+$(EE_ASM_DIR)ps2ips.c: $(PS2IPS_IRX) | $(EE_ASM_DIR)
 	$(BIN2C) $< $@ $(*F)_irx
 
 $(EE_ASM_DIR)smbman.c: $(PS2SDK)/iop/irx/smbman.irx | $(EE_ASM_DIR)
