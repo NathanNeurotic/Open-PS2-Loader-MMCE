@@ -21,6 +21,19 @@
 #define NEWLIB_PORT_AWARE
 #include <fileXio_rpc.h> // fileXioDevctl(ethBase, SMB_***)
 
+/* ps2ip_getconfig/ps2ip_setconfig + t_ip_info + DHCP_STATE_* live behind
+ * <ps2ip.h> in the new packages-layout SDK (via its <sys/socket.h> chain);
+ * struct ip4_addr/IP4_ADDR/ip4_addrN/ip_addr_* need the real lwip headers
+ * explicitly. <ps2ipee.h> is NOT usable: its own ps2ip_setconfig(const
+ * t_ip_info*) declaration macro-expands to libcglue_ps2ip_setconfig and
+ * conflicts with cglue's non-const one (SDK bug, see GAPS.md). Classic flat
+ * ps2sdk got all of this transitively, so only include in the new layout. */
+#if __has_include(<lwip/ip4_addr.h>)
+#include <ps2ip.h>
+#include <lwip/ip4_addr.h>
+#include <lwip/ip_addr.h>
+#endif
+
 #include "include/nbns.h"
 #include "httpclient.h"
 
