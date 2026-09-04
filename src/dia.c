@@ -70,6 +70,11 @@ int diaShowKeyb(char *text, int maxLen, int hide_text, const char *title)
     // the command column at its edges, which is the primary control on this screen. The request
     // offers the shoulder buttons as its own alternative for that reason.
     int caret = len;
+    // Blink phase. NOT guiFrameId: that only advances in guiStartFrame(), which this screen never
+    // calls -- it drives its own rmStartFrame/rmEndFrame loop -- so guiFrameId is frozen for as
+    // long as the keyboard is open and the caret held whatever state it was in (#466: "the cursor
+    // is now complete but lacks the flicking behaviour").
+    int caretFrame = 0;
     char c[2] = "\0\0", *mask_buffer;
     static const char keyb0[KEYB_ITEMS] = {
         '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '=',
@@ -108,6 +113,7 @@ int diaShowKeyb(char *text, int maxLen, int hide_text, const char *title)
 
     while (1) {
         readPads();
+        caretFrame++;
 
         rmStartFrame();
         if (guiDrawBGSettings() == 0)
@@ -133,7 +139,7 @@ int diaShowKeyb(char *text, int maxLen, int hide_text, const char *title)
             int n = (caret < len) ? caret : len;
             memcpy(pre, shown, n);
             pre[n] = '\0';
-            if ((guiFrameId >> 4) & 1)
+            if ((caretFrame >> 4) & 1)
                 rmDrawRect(50 + rmUnScaleX(fntCalcDimensions(gTheme->fonts[0], pre)), 120, 2, 20, gColWhite);
         }
 
