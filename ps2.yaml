@@ -1,0 +1,2306 @@
+# ps2build port of the OPL (RiptOPL fork) build. Stress-test port: the classic
+# Makefile build remains authoritative; this file builds everything the new
+# $PS2DEV/packages SDK layout can build today. See _ps2build_compat/GAPS.md
+# for every gap this file works around (missing packages, missing prebuilt
+# IRXs, no codegen/asset steps -> _ps2build_compat/gen_assets.py, etc).
+#
+# Generated assets in _ps2build_compat/gen/ come from gen_assets.py (run it
+# first). src/lang_internal.c + include/lang_autogen.h come from
+# lang_compiler.py (see GAPS.md "codegen").
+
+project: opl
+
+targets:
+  # ---------------------------------------------------------------------
+  # Main EE binary. C translation units + generated embedded-asset arrays;
+  # the 23 converted C++ TUs live in the oplxx ee_lib below so the strict
+  # C++ flag set doesn't land on plain C compiles (ps2build applies cflags
+  # to both ee_cc and ee_cxx edges of a target).
+  # ---------------------------------------------------------------------
+  - name: opl
+    type: ee
+    sources:
+      - src/pad.c
+      - src/fntsys.c
+      - src/renderman.c
+      - src/menusys.c
+      - src/OSDHistory.c
+      - src/system.c
+      - src/elfldr_noreset.c
+      - src/lang_internal.c
+      - src/dialogs.c
+      - src/dia.c
+      - src/texcache.c
+      - src/themes.c
+      - src/bdmsupport.c
+      - src/ethsupport.c
+      - src/udpfssupport.c
+      - src/hddsupport.c
+      - src/mmcesupport.c
+      - src/vcdsupport.c
+      - src/gui.c
+      - src/guigame.c
+      - src/textures.c
+      - src/opl.c
+      - src/sound.c
+      # embedded assets (gen_assets.py)
+      - _ps2build_compat/gen/APPS_png.c
+      - _ps2build_compat/gen/Aspect_s_png.c
+      - _ps2build_compat/gen/Aspect_w1_png.c
+      - _ps2build_compat/gen/Aspect_w2_png.c
+      - _ps2build_compat/gen/Aspect_w_png.c
+      - _ps2build_compat/gen/CD_png.c
+      - _ps2build_compat/gen/DVD_png.c
+      - _ps2build_compat/gen/ELF_png.c
+      - _ps2build_compat/gen/HDL_png.c
+      - _ps2build_compat/gen/ISO_png.c
+      - _ps2build_compat/gen/IOPRP_img.c
+      - _ps2build_compat/gen/Index_0_png.c
+      - _ps2build_compat/gen/Index_1_png.c
+      - _ps2build_compat/gen/Index_2_png.c
+      - _ps2build_compat/gen/Index_3_png.c
+      - _ps2build_compat/gen/Index_4_png.c
+      - _ps2build_compat/gen/L1_png.c
+      - _ps2build_compat/gen/L3_png.c
+      - _ps2build_compat/gen/PS1_png.c
+      - _ps2build_compat/gen/PS2_png.c
+      - _ps2build_compat/gen/R1_png.c
+      - _ps2build_compat/gen/R3_png.c
+      - _ps2build_compat/gen/Rating_0_png.c
+      - _ps2build_compat/gen/Rating_1_png.c
+      - _ps2build_compat/gen/Rating_2_png.c
+      - _ps2build_compat/gen/Rating_3_png.c
+      - _ps2build_compat/gen/Rating_4_png.c
+      - _ps2build_compat/gen/Rating_5_png.c
+      - _ps2build_compat/gen/Scan_1080i2_png.c
+      - _ps2build_compat/gen/Scan_1080i_png.c
+      - _ps2build_compat/gen/Scan_1080p_png.c
+      - _ps2build_compat/gen/Scan_240p1_png.c
+      - _ps2build_compat/gen/Scan_240p_png.c
+      - _ps2build_compat/gen/Scan_480i_png.c
+      - _ps2build_compat/gen/Scan_480p1_png.c
+      - _ps2build_compat/gen/Scan_480p2_png.c
+      - _ps2build_compat/gen/Scan_480p3_png.c
+      - _ps2build_compat/gen/Scan_480p4_png.c
+      - _ps2build_compat/gen/Scan_480p5_png.c
+      - _ps2build_compat/gen/Scan_480p_png.c
+      - _ps2build_compat/gen/Scan_576i_png.c
+      - _ps2build_compat/gen/Scan_576p_png.c
+      - _ps2build_compat/gen/Scan_720p_png.c
+      - _ps2build_compat/gen/UL_png.c
+      - _ps2build_compat/gen/VCD_png.c
+      - _ps2build_compat/gen/Vmode_multi_png.c
+      - _ps2build_compat/gen/Vmode_ntsc_png.c
+      - _ps2build_compat/gen/Vmode_pal_png.c
+      - _ps2build_compat/gen/ZSO_png.c
+      - _ps2build_compat/gen/app_png.c
+      - _ps2build_compat/gen/bd_connect_adp.c
+      - _ps2build_compat/gen/bd_disconnect_adp.c
+      - _ps2build_compat/gen/bdma_usbd_ata_gz.c
+      - _ps2build_compat/gen/bdma_usbd_mmce_gz.c
+      - _ps2build_compat/gen/bdma_usbd_usb_gz.c
+      - _ps2build_compat/gen/bdma_usbhdfsd_ata_gz.c
+      - _ps2build_compat/gen/bdma_usbhdfsd_mmce_gz.c
+      - _ps2build_compat/gen/bdma_usbhdfsd_mx4sio_gz.c
+      - _ps2build_compat/gen/bdma_usbhdfsd_usbexfat_gz.c
+      - _ps2build_compat/gen/bdm_irx.c
+      - _ps2build_compat/gen/bdmfs_fatfs_irx.c
+      - _ps2build_compat/gen/boot_adp.c
+      - _ps2build_compat/gen/cancel_adp.c
+      - _ps2build_compat/gen/case_overlay_png.c
+      - _ps2build_compat/gen/case_png.c
+      - _ps2build_compat/gen/circle_png.c
+      - _ps2build_compat/gen/conf_theme_OPL_cfg.c
+      - _ps2build_compat/gen/confirm_adp.c
+      - _ps2build_compat/gen/cover_png.c
+      - _ps2build_compat/gen/coverapp_png.c
+      - _ps2build_compat/gen/cross_png.c
+      - _ps2build_compat/gen/cursor_adp.c
+      - _ps2build_compat/gen/disc_png.c
+      - _ps2build_compat/gen/eecore_elf.c
+      - _ps2build_compat/gen/eesync_irx.c
+      - _ps2build_compat/gen/elfldr_elf.c
+      - _ps2build_compat/gen/eth_png.c
+      - _ps2build_compat/gen/fav_mark_png.c
+      - _ps2build_compat/gen/fav_png.c
+      - _ps2build_compat/gen/filexio_irx.c
+      - _ps2build_compat/gen/hdd_bd_png.c
+      - _ps2build_compat/gen/hdd_png.c
+      - _ps2build_compat/gen/hdpro_atad_irx.c
+      - _ps2build_compat/gen/iLinkman_irx.c
+      - _ps2build_compat/gen/icon_icn.c
+      - _ps2build_compat/gen/icon_sys.c
+      - _ps2build_compat/gen/icon_sys_A.c
+      - _ps2build_compat/gen/icon_sys_C.c
+      - _ps2build_compat/gen/icon_sys_J.c
+      - _ps2build_compat/gen/ilk_bd_png.c
+      - _ps2build_compat/gen/incebtion_png.c
+      - _ps2build_compat/gen/iomanx_irx.c
+      - _ps2build_compat/gen/ip_png.c
+      - _ps2build_compat/gen/left_png.c
+      - _ps2build_compat/gen/libsd_irx.c
+      - _ps2build_compat/gen/load0_png.c
+      - _ps2build_compat/gen/load1_png.c
+      - _ps2build_compat/gen/load2_png.c
+      - _ps2build_compat/gen/load3_png.c
+      - _ps2build_compat/gen/load4_png.c
+      - _ps2build_compat/gen/load5_png.c
+      - _ps2build_compat/gen/load6_png.c
+      - _ps2build_compat/gen/load7_png.c
+      - _ps2build_compat/gen/logo0_png.c
+      - _ps2build_compat/gen/logo1_png.c
+      - _ps2build_compat/gen/logo2_png.c
+      - _ps2build_compat/gen/logo3_png.c
+      - _ps2build_compat/gen/logo_png.c
+      - _ps2build_compat/gen/m4s_bd_png.c
+      - _ps2build_compat/gen/mcman_irx.c
+      - _ps2build_compat/gen/mcserv_irx.c
+      - _ps2build_compat/gen/message_adp.c
+      - _ps2build_compat/gen/missing_png.c
+      - _ps2build_compat/gen/mmce_png.c
+      - _ps2build_compat/gen/mmcedrv_irx.c
+      - _ps2build_compat/gen/mmceigr_irx.c
+      - _ps2build_compat/gen/mmceman_irx.c
+      - _ps2build_compat/gen/mx4sio_bd_irx.c
+      - _ps2build_compat/gen/netman_irx.c
+      - _ps2build_compat/gen/padman_irx.c
+      - _ps2build_compat/gen/poeveticanew_raw.c
+      - _ps2build_compat/gen/poweroff_irx.c
+      - _ps2build_compat/gen/ps2dev9_irx.c
+      - _ps2build_compat/gen/ps2fs_irx.c
+      - _ps2build_compat/gen/ps2hdd_irx.c
+      - _ps2build_compat/gen/ps2ip_irx.c
+      - _ps2build_compat/gen/ps2ips_irx.c
+      - _ps2build_compat/gen/right_png.c
+      - _ps2build_compat/gen/screen_png.c
+      - _ps2build_compat/gen/screens_png.c
+      - _ps2build_compat/gen/select_png.c
+      - _ps2build_compat/gen/sio2man_irx.c
+      - _ps2build_compat/gen/smap_irx.c
+      - _ps2build_compat/gen/smbman_irx.c
+      - _ps2build_compat/gen/square_png.c
+      - _ps2build_compat/gen/start_png.c
+      - _ps2build_compat/gen/theme_coverflow_cfg.c
+      - _ps2build_compat/gen/transition_adp.c
+      - _ps2build_compat/gen/triangle_png.c
+      - _ps2build_compat/gen/udnl_irx.c
+      - _ps2build_compat/gen/udp_bd_png.c
+      - _ps2build_compat/gen/udp_fs_png.c
+      - _ps2build_compat/gen/usb_bd_png.c
+      - _ps2build_compat/gen/usb_png.c
+      - _ps2build_compat/gen/usbd_irx.c
+      - _ps2build_compat/gen/usbmass_bd_irx.c
+      - _ps2build_compat/gen/IEEE1394_bd_irx.c
+      - _ps2build_compat/gen/audsrv_irx.c
+    include_dirs:
+      - .
+      - include
+      - modules/iopcore/common
+      - modules/network/common
+      - modules/hdd/common
+      - modules/ds34bt/ee
+      - modules/ds34usb/ee
+      - _ps2build_compat/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sbv/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/iomanx/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/cglue/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/debug/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/kernel/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/cdvd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/pad/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mc/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ps2ips/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/poweroff/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/world/freetype/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/world/png
+      - C:/Users/natha/AppData/Local/ps2dev/packages/world/z/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/world/audsrv/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/world/vorbis/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/world/ogg/include
+    defines:
+      - GSM_1080P
+      - PADEMU
+      - OPL_VERSION=\"v1.2.0-Beta-ps2build\"
+    cflags:
+      - -fsingle-precision-constant
+      - -Wno-format-truncation
+      - -Wno-stringop-truncation
+      - -fdata-sections
+    ldflags:
+      - -Wl,-Map,opl.map
+    libs:
+      - oplxx
+      - ds34usb_ee
+      - ds34bt_ee
+      - gskit
+      - dmakit
+      - poweroff
+      - filexio
+      - patches
+      - png
+      - z
+      - mc
+      - freetype
+      - vux
+      - cdvd
+      - netman
+      - ps2ips
+      - ps2ip
+      - audsrv
+      - vorbisfile
+      - vorbis
+      - ogg
+      - pad
+      - padx
+      - elf-loader-nocolour
+    embed_irx:
+      - imgdrv
+      - cdvdfsv
+      - resetspu
+      - iremsndpatch
+      - apemodpatch
+      - f2techioppatch
+      - cleareffects
+      - isofs
+      - bdmevent
+      - smsutils
+      - ingame_smstcpip
+      - smap_ingame
+      - smap_udpbd
+      - udpfs_smap
+      - udpfs_ministack
+      - udpfs_bd
+      - udpfs_ioman
+      - smbinit
+      - nbns
+      - httpclient
+      - ps2atad
+      - xhdd
+      - genvmc
+      - ds34usb
+      - ds34bt
+      - usb_pademu
+      - bt_pademu
+      - bdm_cdvdman
+      - bdm_ata_cdvdman
+      - mmce_cdvdman
+      - smb_cdvdman
+      - hdd_cdvdman
+      - hdd_hdpro_cdvdman
+      - bdm_mcemu
+      - mmce_mcemu
+      - hdd_mcemu
+      - smb_mcemu
+      - lwnbdsvr
+
+  # Converted C++ translation units (strict GNU++17 freestanding set from
+  # Makefile:315 EE_CXXFLAGS), archived and linked into opl.
+  - name: oplxx
+    type: ee_lib
+    sources:
+      - src/xparam.cpp
+      - src/config.cpp
+      - src/hdd.cpp
+      - src/favsupport.cpp
+      - src/ioman.cpp
+      - src/supportbase.cpp
+      - src/zso.cpp
+      - src/lz4.cpp
+      - src/appsupport.cpp
+      - src/artindex.cpp
+      - src/retrogem.cpp
+      - src/folderbrowse.cpp
+      - src/vmc_groups.cpp
+      - src/atlas.cpp
+      - src/nbns.cpp
+      - src/httpclient.cpp
+      - src/gsm.cpp
+      - src/cheatman.cpp
+      - src/ps2cnf.cpp
+      - src/tar.cpp
+      - src/ioprp.cpp
+      - src/util.cpp
+      - src/lang.cpp
+    include_dirs:
+      - .
+      - include
+      - modules/iopcore/common
+      - modules/network/common
+      - modules/hdd/common
+      - modules/ds34bt/ee
+      - modules/ds34usb/ee
+      - _ps2build_compat/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sbv/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/iomanx/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/cglue/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/debug/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/kernel/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/cdvd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/pad/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mc/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ps2ips/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/poweroff/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/gs/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/world/gskit/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/world/dmakit/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/draw/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/packet2/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/dma/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/graph/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/filexio/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/elf-loader-nocolour/include
+    defines:
+      - GSM_1080P
+      - PADEMU
+      - OPL_VERSION=\"v1.2.0-Beta-ps2build\"
+    cflags:
+      - -fsingle-precision-constant
+      - -Wno-format-truncation
+      - -Wno-stringop-truncation
+      - -fdata-sections
+      - -std=gnu++17
+      - -fno-exceptions
+      - -fno-rtti
+      - -fno-threadsafe-statics
+      - -fno-use-cxa-atexit
+
+  # PADEMU EE-side libraries (Makefile: modules/ds34usb/ee, ds34bt/ee).
+  # EE code: needs only kernel.h + sifrpc.h, both in the kernel package.
+  # Do NOT add IOP package include dirs here — loadcore/include/sys/types.h
+  # and sysclib/include/string.h shadow EE newlib headers on the compile
+  # path of anything linking these libs (their includes propagate).
+  - name: ds34usb_ee
+    type: ee_lib
+    sources:
+      - modules/ds34usb/ee/libds34usb.c
+    include_dirs:
+      - modules/ds34usb/ee
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/kernel/include
+
+  - name: ds34bt_ee
+    type: ee_lib
+    sources:
+      - modules/ds34bt/ee/libds34bt.c
+    include_dirs:
+      - modules/ds34bt/ee
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/kernel/include
+
+  # ee_core: the in-game EE core, embedded into opl as eecore_elf (bin2c of
+  # build/bin/ee_core.elf by gen_assets.py — two-pass: build once, re-run
+  # gen_assets.py to swap the stub for the real ELF, rebuild).
+  - name: ee_core
+    type: ee
+    sources:
+      - ee_core/src/main.c
+      - ee_core/src/syshook.c
+      - ee_core/src/iopmgr.c
+      - ee_core/src/modmgr.c
+      - ee_core/src/util.c
+      - ee_core/src/patches.c
+      - ee_core/src/padhook.c
+      - ee_core/src/cd_igr_rpc.c
+      - ee_core/src/tlb.c
+      - ee_core/src/gsm_api.c
+      - ee_core/src/cheat_api.c
+      - ee_core/src/asm.S
+      - ee_core/src/crt0.S
+      - ee_core/src/patches_asm.S
+      - ee_core/src/cheat_engine.S
+      - ee_core/src/dve_reg.S
+      - ee_core/src/gsm_engine.S
+    include_dirs:
+      - ee_core/include
+      - ee_core
+      - _ps2build_compat/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sbv/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/cdvd/include
+    defines:
+      - GSM_1080P
+      - PADEMU
+    opt: -Os
+    linkfile: ee_core/linkfile
+    ldflags:
+      - -nostartfiles
+      - -nostdlib
+      - -s
+      - -Wl,-Map,ee_core.map
+    libs:
+      - patches
+
+  # elfldr: no-IOP-reset child loader, embedded as elfldr_elf.
+  - name: elfldr
+    type: ee
+    sources:
+      - elfldr/loader.c
+    include_dirs:
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/filexio/include
+    defines:
+      - NEWLIB_PORT_AWARE
+    opt: -Os
+    linkfile: elfldr/linkfile
+    cflags:
+      - -fdata-sections
+    ldflags:
+      - -Wl,-zmax-page-size=128
+      - -s
+    libs:
+      - filexio
+
+
+
+
+
+  # ======================= IOP MODULES =======================
+  # Generated by _ps2build_compat/gen_iop_yaml.py -- edit the
+  # generator, not this section.
+
+  - name: imgdrv
+    type: iop
+    sources:
+      - modules/iopcore/imgdrv/imgdrv.c
+    include_dirs:
+      - modules/iopcore/imgdrv
+      - _ps2build_compat/include
+      - _ps2build_compat/include_iop
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/loadcore/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysclib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/stdio/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/threadman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/intrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysmem/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/iomanx/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifcmd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/modload/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/dmacman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/timrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/cdvd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/libsd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/bdm/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/usbd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mcman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/secrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/excepman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/heaplib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mtapman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/padman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sio2man/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/rmman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/vblank/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/smap/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/netman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ps2ip/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioprpgen/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ssbusc/include
+    imports_lst: modules/iopcore/imgdrv/imports.lst
+
+  - name: cdvdfsv
+    type: iop
+    sources:
+      - modules/iopcore/cdvdfsv/cdvdfsv.c
+      - modules/iopcore/cdvdfsv/searchfile.c
+      - modules/iopcore/cdvdfsv/ncmd.c
+      - modules/iopcore/cdvdfsv/scmd.c
+    include_dirs:
+      - modules/iopcore/cdvdfsv
+      - modules/iopcore/common
+      - _ps2build_compat/include
+      - _ps2build_compat/include_iop
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/loadcore/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysclib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/stdio/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/threadman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/intrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysmem/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/iomanx/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifcmd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/modload/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/dmacman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/timrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/cdvd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/libsd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/bdm/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/usbd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mcman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/secrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/excepman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/heaplib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mtapman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/padman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sio2man/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/rmman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/vblank/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/smap/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/netman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ps2ip/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioprpgen/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ssbusc/include
+    imports_lst: modules/iopcore/cdvdfsv/imports.lst
+    exports_tab: modules/iopcore/cdvdfsv/exports.tab
+
+  - name: resetspu
+    type: iop
+    sources:
+      - modules/iopcore/resetspu/resetspu.c
+    include_dirs:
+      - modules/iopcore/resetspu
+      - _ps2build_compat/include
+      - _ps2build_compat/include_iop
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/loadcore/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysclib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/stdio/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/threadman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/intrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysmem/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/iomanx/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifcmd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/modload/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/dmacman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/timrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/cdvd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/libsd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/bdm/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/usbd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mcman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/secrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/excepman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/heaplib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mtapman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/padman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sio2man/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/rmman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/vblank/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/smap/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/netman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ps2ip/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioprpgen/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ssbusc/include
+    imports_lst: modules/iopcore/resetspu/imports.lst
+
+  - name: iremsndpatch
+    type: iop
+    sources:
+      - modules/iopcore/patches/iremsndpatch/main.c
+      - modules/iopcore/patches/iremsndpatch/asm.S
+    include_dirs:
+      - modules/iopcore/patches/iremsndpatch
+      - _ps2build_compat/include
+      - _ps2build_compat/include_iop
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/loadcore/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysclib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/stdio/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/threadman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/intrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysmem/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/iomanx/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifcmd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/modload/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/dmacman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/timrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/cdvd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/libsd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/bdm/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/usbd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mcman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/secrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/excepman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/heaplib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mtapman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/padman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sio2man/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/rmman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/vblank/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/smap/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/netman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ps2ip/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioprpgen/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ssbusc/include
+    imports_lst: modules/iopcore/patches/iremsndpatch/imports.lst
+
+  - name: apemodpatch
+    type: iop
+    sources:
+      - modules/iopcore/patches/apemodpatch/main.c
+    include_dirs:
+      - modules/iopcore/patches/apemodpatch
+      - _ps2build_compat/include
+      - _ps2build_compat/include_iop
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/loadcore/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysclib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/stdio/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/threadman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/intrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysmem/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/iomanx/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifcmd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/modload/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/dmacman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/timrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/cdvd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/libsd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/bdm/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/usbd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mcman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/secrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/excepman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/heaplib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mtapman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/padman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sio2man/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/rmman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/vblank/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/smap/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/netman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ps2ip/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioprpgen/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ssbusc/include
+    imports_lst: modules/iopcore/patches/apemodpatch/imports.lst
+
+  - name: f2techioppatch
+    type: iop
+    sources:
+      - modules/iopcore/patches/f2techioppatch/main.c
+    include_dirs:
+      - modules/iopcore/patches/f2techioppatch
+      - _ps2build_compat/include
+      - _ps2build_compat/include_iop
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/loadcore/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysclib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/stdio/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/threadman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/intrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysmem/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/iomanx/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifcmd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/modload/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/dmacman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/timrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/cdvd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/libsd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/bdm/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/usbd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mcman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/secrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/excepman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/heaplib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mtapman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/padman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sio2man/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/rmman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/vblank/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/smap/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/netman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ps2ip/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioprpgen/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ssbusc/include
+    imports_lst: modules/iopcore/patches/f2techioppatch/imports.lst
+
+  - name: cleareffects
+    type: iop
+    sources:
+      - modules/iopcore/patches/cleareffects/main.c
+    include_dirs:
+      - modules/iopcore/patches/cleareffects
+      - _ps2build_compat/include
+      - _ps2build_compat/include_iop
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/loadcore/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysclib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/stdio/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/threadman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/intrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysmem/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/iomanx/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifcmd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/modload/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/dmacman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/timrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/cdvd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/libsd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/bdm/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/usbd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mcman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/secrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/excepman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/heaplib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mtapman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/padman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sio2man/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/rmman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/vblank/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/smap/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/netman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ps2ip/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioprpgen/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ssbusc/include
+    imports_lst: modules/iopcore/patches/cleareffects/imports.lst
+
+  - name: isofs
+    type: iop
+    sources:
+      - modules/isofs/isofs.c
+      - modules/isofs/zso.c
+      - modules/isofs/lz4.c
+    include_dirs:
+      - modules/isofs
+      - _ps2build_compat/include
+      - _ps2build_compat/include_iop
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/loadcore/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysclib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/stdio/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/threadman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/intrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysmem/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/iomanx/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifcmd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/modload/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/dmacman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/timrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/cdvd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/libsd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/bdm/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/usbd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mcman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/secrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/excepman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/heaplib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mtapman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/padman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sio2man/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/rmman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/vblank/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/smap/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/netman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ps2ip/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioprpgen/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ssbusc/include
+    imports_lst: modules/isofs/imports.lst
+
+  - name: bdmevent
+    type: iop
+    sources:
+      - modules/bdmevent/main.c
+    include_dirs:
+      - modules/bdmevent
+      - include
+      - _ps2build_compat/include
+      - _ps2build_compat/include_iop
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/loadcore/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysclib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/stdio/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/threadman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/intrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysmem/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/iomanx/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifcmd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/modload/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/dmacman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/timrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/cdvd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/libsd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/bdm/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/usbd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mcman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/secrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/excepman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/heaplib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mtapman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/padman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sio2man/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/rmman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/vblank/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/smap/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/netman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ps2ip/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioprpgen/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ssbusc/include
+    imports_lst: modules/bdmevent/imports.lst
+
+  - name: smsutils
+    type: iop
+    sources:
+      - modules/network/SMSUTILS/SMSUTILS.S
+    include_dirs:
+      - modules/network/SMSUTILS
+      - modules/iopcore/common
+      - _ps2build_compat/include
+      - _ps2build_compat/include_iop
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/loadcore/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysclib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/stdio/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/threadman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/intrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysmem/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/iomanx/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifcmd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/modload/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/dmacman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/timrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/cdvd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/libsd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/bdm/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/usbd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mcman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/secrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/excepman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/heaplib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mtapman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/padman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sio2man/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/rmman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/vblank/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/smap/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/netman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ps2ip/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioprpgen/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ssbusc/include
+
+  - name: ingame_smstcpip
+    type: iop
+    sources:
+      - modules/network/SMSTCPIP/ps2ip.c
+      - modules/network/SMSTCPIP/inet.S
+      - modules/network/SMSTCPIP/ip.c
+      - modules/network/SMSTCPIP/ip_addr.c
+      - modules/network/SMSTCPIP/ip_frag.c
+      - modules/network/SMSTCPIP/etharp.c
+      - modules/network/SMSTCPIP/tcp_in.c
+      - modules/network/SMSTCPIP/tcp_out.c
+      - modules/network/SMSTCPIP/tcp.c
+      - modules/network/SMSTCPIP/tcpip.c
+      - modules/network/SMSTCPIP/mem.c
+      - modules/network/SMSTCPIP/api_lib.c
+      - modules/network/SMSTCPIP/api_msg.c
+      - modules/network/SMSTCPIP/sockets.c
+      - modules/network/SMSTCPIP/netif.c
+      - modules/network/SMSTCPIP/udp.c
+      - modules/network/SMSTCPIP/memp.c
+      - modules/network/SMSTCPIP/icmp.c
+      - modules/network/SMSTCPIP/pbuf.c
+      - modules/network/SMSTCPIP/timers.c
+      - modules/network/SMSTCPIP/loopif.c
+    include_dirs:
+      - modules/network/SMSTCPIP
+      - modules/network/SMSTCPIP/include
+      - modules/iopcore/common
+      - _ps2build_compat/include
+      - _ps2build_compat/include_iop
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/loadcore/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysclib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/stdio/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/threadman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/intrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysmem/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/iomanx/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifcmd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/modload/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/dmacman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/timrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/cdvd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/libsd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/bdm/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/usbd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mcman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/secrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/excepman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/heaplib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mtapman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/padman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sio2man/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/rmman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/vblank/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/smap/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/netman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ps2ip/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioprpgen/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ssbusc/include
+    defines:
+      - LWIP_NOASSERT
+      - INGAME_DRIVER
+      - INTERRUPT_CTX_INPKT
+    cflags:
+      - -mno-memcpy
+      - -Wno-attributes
+      - -Wno-array-bounds
+      - -Wno-unused-but-set-variable
+    imports_lst: modules/network/SMSTCPIP/imports.lst
+    exports_tab: modules/network/SMSTCPIP/exports.tab
+
+  - name: smap_ingame
+    type: iop
+    sources:
+      - modules/network/smap-ingame/main.c
+      - modules/network/smap-ingame/smap.c
+      - modules/network/smap-ingame/xfer.c
+    include_dirs:
+      - modules/network/smap-ingame
+      - modules/iopcore/common
+      - modules/network/common
+      - _ps2build_compat/include
+      - _ps2build_compat/include_iop
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/loadcore/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysclib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/stdio/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/threadman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/intrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysmem/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/iomanx/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifcmd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/modload/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/dmacman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/timrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/cdvd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/libsd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/bdm/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/usbd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mcman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/secrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/excepman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/heaplib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mtapman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/padman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sio2man/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/rmman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/vblank/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/smap/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/netman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ps2ip/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioprpgen/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ssbusc/include
+    imports_lst: modules/network/smap-ingame/imports.lst
+
+  - name: smap_udpbd
+    type: iop
+    sources:
+      - modules/network/smap_udpbd/src/main.c
+      - modules/network/smap_udpbd/src/smap.c
+      - modules/network/smap_udpbd/src/xfer.c
+      - modules/network/smap_udpbd/src/ministack.c
+      - modules/network/smap_udpbd/src/udpbd.c
+      - modules/network/smap_udpbd/src/udptty.c
+    include_dirs:
+      - modules/network/smap_udpbd
+      - modules/network/smap_udpbd/src/include
+      - _ps2build_compat/include
+      - _ps2build_compat/include_iop
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/loadcore/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysclib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/stdio/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/threadman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/intrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysmem/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/iomanx/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifcmd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/modload/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/dmacman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/timrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/cdvd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/libsd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/bdm/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/usbd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mcman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/secrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/excepman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/heaplib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mtapman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/padman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sio2man/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/rmman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/vblank/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/smap/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/netman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ps2ip/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioprpgen/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ssbusc/include
+    cflags:
+      - -mno-check-zero-division
+    imports_lst: modules/network/smap_udpbd/src/imports.lst
+    exports_tab: modules/network/smap_udpbd/src/exports.tab
+
+  - name: udpfs_smap
+    type: iop
+    sources:
+      - modules/network/udpfs_smap/src/main.c
+      - modules/network/udpfs_smap/src/smap.c
+      - modules/network/udpfs_smap/src/xfer.c
+    include_dirs:
+      - modules/network/udpfs_smap
+      - modules/network/udpfs_smap/include
+      - modules/network/udpfs_smap/src
+      - _ps2build_compat/include
+      - _ps2build_compat/include_iop
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/loadcore/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysclib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/stdio/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/threadman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/intrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysmem/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/iomanx/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifcmd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/modload/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/dmacman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/timrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/cdvd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/libsd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/bdm/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/usbd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mcman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/secrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/excepman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/heaplib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mtapman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/padman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sio2man/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/rmman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/vblank/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/smap/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/netman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ps2ip/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioprpgen/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ssbusc/include
+    cflags:
+      - -mno-check-zero-division
+    imports_lst: modules/network/udpfs_smap/src/imports.lst
+    exports_tab: modules/network/udpfs_smap/src/exports.tab
+
+  - name: udpfs_ministack
+    type: iop
+    sources:
+      - modules/network/udpfs_ministack/src/main.c
+      - modules/network/udpfs_ministack/src/ministack_arp.c
+      - modules/network/udpfs_ministack/src/ministack_eth.c
+      - modules/network/udpfs_ministack/src/ministack_ip.c
+      - modules/network/udpfs_ministack/src/ministack_udp.c
+      - modules/network/udpfs_ministack/src/udptty.c
+    include_dirs:
+      - modules/network/udpfs_ministack
+      - modules/network/udpfs_ministack/include
+      - modules/network/udpfs_ministack/src
+      - modules/network/udpfs_smap/include
+      - _ps2build_compat/include
+      - _ps2build_compat/include_iop
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/loadcore/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysclib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/stdio/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/threadman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/intrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysmem/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/iomanx/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifcmd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/modload/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/dmacman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/timrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/cdvd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/libsd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/bdm/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/usbd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mcman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/secrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/excepman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/heaplib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mtapman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/padman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sio2man/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/rmman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/vblank/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/smap/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/netman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ps2ip/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioprpgen/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ssbusc/include
+    cflags:
+      - -mno-check-zero-division
+    imports_lst: modules/network/udpfs_ministack/src/imports.lst
+    exports_tab: modules/network/udpfs_ministack/src/exports.tab
+
+  - name: udpfs_bd
+    type: iop
+    sources:
+      - modules/network/udpfs_bd/src/main.c
+      - modules/network/udpfs_bd/src/udprdma.c
+      - modules/network/udpfs_bd/src/udpfs_core.c
+      - modules/network/udpfs_bd/src/udpfs_bd.c
+    include_dirs:
+      - modules/network/udpfs_bd
+      - modules/network/udpfs_bd/src
+      - modules/network/udpfs_smap/include
+      - modules/network/udpfs_ministack/include
+      - _ps2build_compat/include
+      - _ps2build_compat/include_iop
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/loadcore/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysclib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/stdio/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/threadman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/intrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysmem/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/iomanx/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifcmd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/modload/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/dmacman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/timrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/cdvd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/libsd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/bdm/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/usbd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mcman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/secrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/excepman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/heaplib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mtapman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/padman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sio2man/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/rmman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/vblank/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/smap/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/netman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ps2ip/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioprpgen/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ssbusc/include
+    defines:
+      - FEATURE_UDPFS_BD
+      - UDPRDMA_MAX_SOCKETS=1
+    cflags:
+      - -mno-check-zero-division
+    imports_lst: modules/network/udpfs_bd/src/imports.lst
+    exports_tab: modules/network/udpfs_bd/src/exports.tab
+
+  - name: udpfs_ioman
+    type: iop
+    sources:
+      - modules/network/udpfs_ioman/src/main.c
+      - modules/network/udpfs_ioman/src/udprdma.c
+      - modules/network/udpfs_ioman/src/udpfs_core.c
+      - modules/network/udpfs_ioman/src/udpfs_ioman.c
+    include_dirs:
+      - modules/network/udpfs_ioman
+      - modules/network/udpfs_ioman/src
+      - modules/network/udpfs_smap/include
+      - modules/network/udpfs_ministack/include
+      - _ps2build_compat/include
+      - _ps2build_compat/include_iop
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/loadcore/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysclib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/stdio/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/threadman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/intrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysmem/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/iomanx/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifcmd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/modload/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/dmacman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/timrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/cdvd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/libsd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/bdm/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/usbd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mcman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/secrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/excepman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/heaplib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mtapman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/padman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sio2man/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/rmman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/vblank/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/smap/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/netman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ps2ip/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioprpgen/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ssbusc/include
+    defines:
+      - FEATURE_UDPFS_IOMAN
+      - UDPRDMA_MAX_SOCKETS=1
+    cflags:
+      - -mno-check-zero-division
+    imports_lst: modules/network/udpfs_ioman/src/imports.lst
+    exports_tab: modules/network/udpfs_ioman/src/exports.tab
+
+  - name: smbinit
+    type: iop
+    sources:
+      - modules/network/smbinit/main.c
+      - modules/network/smbinit/smbauth.c
+      - modules/network/smbinit/des.c
+      - modules/network/smbinit/md4.c
+    include_dirs:
+      - modules/network/smbinit
+      - modules/iopcore/common
+      - _ps2build_compat/include
+      - _ps2build_compat/include_iop
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/loadcore/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysclib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/stdio/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/threadman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/intrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysmem/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/iomanx/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifcmd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/modload/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/dmacman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/timrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/cdvd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/libsd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/bdm/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/usbd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mcman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/secrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/excepman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/heaplib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mtapman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/padman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sio2man/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/rmman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/vblank/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/smap/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/netman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ps2ip/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioprpgen/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ssbusc/include
+    imports_lst: modules/network/smbinit/imports.lst
+
+  - name: nbns
+    type: iop
+    sources:
+      - modules/network/nbns/main.c
+      - modules/network/nbns/nbns.c
+    include_dirs:
+      - modules/network/nbns
+      - include
+      - _ps2build_compat/include
+      - _ps2build_compat/include_iop
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/loadcore/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysclib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/stdio/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/threadman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/intrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysmem/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/iomanx/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifcmd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/modload/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/dmacman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/timrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/cdvd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/libsd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/bdm/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/usbd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mcman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/secrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/excepman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/heaplib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mtapman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/padman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sio2man/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/rmman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/vblank/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/smap/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/netman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ps2ip/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioprpgen/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ssbusc/include
+    imports_lst: modules/network/nbns/imports.lst
+    exports_tab: modules/network/nbns/exports.tab
+
+  - name: httpclient
+    type: iop
+    sources:
+      - modules/network/httpclient/main.c
+      - modules/network/httpclient/httpclient.c
+    include_dirs:
+      - modules/network/httpclient
+      - modules/network/common
+      - _ps2build_compat/include
+      - _ps2build_compat/include_iop
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/loadcore/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysclib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/stdio/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/threadman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/intrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysmem/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/iomanx/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifcmd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/modload/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/dmacman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/timrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/cdvd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/libsd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/bdm/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/usbd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mcman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/secrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/excepman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/heaplib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mtapman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/padman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sio2man/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/rmman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/vblank/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/smap/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/netman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ps2ip/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioprpgen/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ssbusc/include
+    imports_lst: modules/network/httpclient/imports.lst
+    exports_tab: modules/network/httpclient/exports.tab
+
+  - name: ps2atad
+    type: iop
+    sources:
+      - modules/hdd/atad/src/ps2atad.c
+    include_dirs:
+      - modules/hdd/atad
+      - modules/hdd/atad/src
+      - _ps2build_compat/include
+      - _ps2build_compat/include_iop
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/loadcore/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysclib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/stdio/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/threadman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/intrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysmem/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/iomanx/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifcmd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/modload/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/dmacman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/timrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/cdvd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/libsd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/bdm/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/usbd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mcman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/secrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/excepman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/heaplib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mtapman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/padman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sio2man/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/rmman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/vblank/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/smap/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/netman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ps2ip/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioprpgen/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ssbusc/include
+    defines:
+      - ATA_USE_DEV9=1
+      - ATA_GAMESTAR_WORKAROUND=1
+      - ATA_ENABLE_BDM=1
+    imports_lst: modules/hdd/atad/src/imports.lst
+    exports_tab: modules/hdd/atad/src/exports.tab
+
+  - name: xhdd
+    type: iop
+    sources:
+      - modules/hdd/xhdd/xhdd.c
+      - modules/hdd/xhdd/xatad.c
+      - modules/hdd/xhdd/hdpro.c
+    include_dirs:
+      - modules/hdd/xhdd
+      - modules/hdd/common
+      - _ps2build_compat/include
+      - _ps2build_compat/include_iop
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/loadcore/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysclib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/stdio/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/threadman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/intrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysmem/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/iomanx/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifcmd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/modload/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/dmacman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/timrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/cdvd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/libsd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/bdm/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/usbd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mcman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/secrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/excepman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/heaplib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mtapman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/padman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sio2man/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/rmman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/vblank/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/smap/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/netman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ps2ip/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioprpgen/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ssbusc/include
+    imports_lst: modules/hdd/xhdd/imports.lst
+
+  - name: genvmc
+    type: iop
+    sources:
+      - modules/vmc/genvmc/genvmc.c
+    include_dirs:
+      - modules/vmc/genvmc
+      - _ps2build_compat/include
+      - _ps2build_compat/include_iop
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/loadcore/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysclib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/stdio/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/threadman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/intrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysmem/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/iomanx/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifcmd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/modload/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/dmacman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/timrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/cdvd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/libsd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/bdm/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/usbd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mcman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/secrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/excepman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/heaplib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mtapman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/padman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sio2man/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/rmman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/vblank/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/smap/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/netman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ps2ip/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioprpgen/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ssbusc/include
+    imports_lst: modules/vmc/genvmc/imports.lst
+
+  - name: ds34usb
+    type: iop
+    sources:
+      - modules/ds34usb/iop/ds34usb.c
+      - modules/ds34usb/iop/smsutils.S
+    include_dirs:
+      - modules/ds34usb/iop
+      - include
+      - _ps2build_compat/include
+      - _ps2build_compat/include_iop
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/loadcore/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysclib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/stdio/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/threadman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/intrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysmem/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/iomanx/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifcmd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/modload/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/dmacman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/timrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/cdvd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/libsd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/bdm/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/usbd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mcman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/secrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/excepman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/heaplib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mtapman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/padman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sio2man/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/rmman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/vblank/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/smap/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/netman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ps2ip/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioprpgen/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ssbusc/include
+    imports_lst: modules/ds34usb/iop/imports.lst
+
+  - name: ds34bt
+    type: iop
+    sources:
+      - modules/ds34bt/iop/ds34bt.c
+      - modules/ds34bt/iop/smsutils.S
+    include_dirs:
+      - modules/ds34bt/iop
+      - include
+      - _ps2build_compat/include
+      - _ps2build_compat/include_iop
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/loadcore/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysclib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/stdio/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/threadman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/intrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysmem/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/iomanx/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifcmd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/modload/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/dmacman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/timrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/cdvd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/libsd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/bdm/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/usbd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mcman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/secrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/excepman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/heaplib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mtapman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/padman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sio2man/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/rmman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/vblank/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/smap/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/netman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ps2ip/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioprpgen/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ssbusc/include
+    imports_lst: modules/ds34bt/iop/imports.lst
+
+  - name: usb_pademu
+    type: iop
+    sources:
+      - modules/pademu/pademu.c
+      - modules/pademu/sys_utils.c
+      - modules/pademu/padmacro.c
+      - modules/pademu/ds34common.c
+      - modules/pademu/ds34usb.c
+    include_dirs:
+      - modules/pademu
+      - include
+      - _ps2build_compat/include
+      - _ps2build_compat/include_iop
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/loadcore/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysclib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/stdio/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/threadman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/intrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysmem/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/iomanx/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifcmd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/modload/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/dmacman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/timrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/cdvd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/libsd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/bdm/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/usbd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mcman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/secrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/excepman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/heaplib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mtapman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/padman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sio2man/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/rmman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/vblank/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/smap/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/netman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ps2ip/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioprpgen/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ssbusc/include
+    defines:
+      - USE_SMSUTILS
+      - USB
+    imports_lst: modules/pademu/imports.lst
+    exports_tab: modules/pademu/exports.tab
+
+  - name: bt_pademu
+    type: iop
+    sources:
+      - modules/pademu/pademu.c
+      - modules/pademu/sys_utils.c
+      - modules/pademu/padmacro.c
+      - modules/pademu/ds34common.c
+      - modules/pademu/ds34bt.c
+    include_dirs:
+      - modules/pademu
+      - include
+      - _ps2build_compat/include
+      - _ps2build_compat/include_iop
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/loadcore/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysclib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/stdio/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/threadman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/intrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysmem/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/iomanx/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifcmd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/modload/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/dmacman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/timrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/cdvd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/libsd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/bdm/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/usbd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mcman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/secrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/excepman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/heaplib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mtapman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/padman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sio2man/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/rmman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/vblank/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/smap/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/netman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ps2ip/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioprpgen/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ssbusc/include
+    defines:
+      - USE_SMSUTILS
+      - BT
+    imports_lst: modules/pademu/imports.lst
+    exports_tab: modules/pademu/exports.tab
+
+  - name: lwnbdsvr
+    type: iop
+    sources:
+      - modules/network/lwNBD/ports/playstation2/lwnbd_irx.c
+      - modules/network/lwNBD/ports/playstation2/exports.c
+      - modules/network/lwNBD/ports/playstation2/imports.c
+      - modules/network/lwNBD/src/servers.c
+      - modules/network/lwNBD/src/plugins.c
+      - modules/network/lwNBD/src/contexts.c
+      - modules/network/lwNBD/servers/nbd/protocol-handshake.c
+      - modules/network/lwNBD/servers/nbd/protocol.c
+      - modules/network/lwNBD/servers/nbd/nbd.c
+      - modules/network/lwNBD/servers/nbd/tcp.c
+      - modules/network/lwNBD/plugins/atad/atad_d.c
+      - modules/network/lwNBD/plugins/memory/memory.c
+      - modules/network/lwNBD/plugins/mcman/mcman_d.c
+    include_dirs:
+      - modules/network/lwNBD
+      - modules/network/lwNBD/include
+      - modules/network/lwNBD/ports/playstation2
+      - include
+      - _ps2build_compat/include
+      - _ps2build_compat/include_iop
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/loadcore/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysclib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/stdio/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/threadman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/intrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysmem/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/iomanx/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifcmd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/modload/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/dmacman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/timrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/cdvd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/libsd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/bdm/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/usbd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mcman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/secrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/excepman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/heaplib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mtapman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/padman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sio2man/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/rmman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/vblank/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/smap/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/netman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ps2ip/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioprpgen/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ssbusc/include
+    defines:
+      - APP_NAME=\"lwnbdsvr\"
+    cflags:
+      - -include
+      - C:/Users/natha/Github/CPLUSPLUS/Open-PS2-Loader/modules/network/lwNBD/ports/playstation2/ps2sdk-compat.h
+    libs:
+      - gcc
+
+  - name: bdm_cdvdman
+    type: iop
+    sources:
+      - modules/iopcore/cdvdman/cdvdman.c
+      - modules/iopcore/cdvdman/ioops.c
+      - modules/iopcore/cdvdman/ncmd.c
+      - modules/iopcore/cdvdman/scmd.c
+      - modules/iopcore/cdvdman/searchfile.c
+      - modules/iopcore/cdvdman/streaming.c
+      - modules/iopcore/cdvdman/ioplib_util.c
+      - modules/iopcore/cdvdman/smsutils.S
+      - modules/iopcore/cdvdman/../../isofs/zso.c
+      - modules/iopcore/cdvdman/../../isofs/lz4.c
+      - modules/iopcore/cdvdman/device-bdm.c
+      - modules/iopcore/cdvdman/../../../_ps2build_compat/libbdm/src/bd_defrag.c
+      - modules/iopcore/cdvdman/../../../_ps2build_compat/libbdm/src/bd_cache.c
+    include_dirs:
+      - modules/iopcore/cdvdman
+      - modules/iopcore/common
+      - _ps2build_compat/libbdm/include
+      - _ps2build_compat/include
+      - _ps2build_compat/include_iop
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/loadcore/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysclib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/stdio/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/threadman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/intrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysmem/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/iomanx/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifcmd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/modload/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/dmacman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/timrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/cdvd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/libsd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/bdm/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/usbd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mcman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/secrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/excepman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/heaplib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mtapman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/padman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sio2man/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/rmman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/vblank/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/smap/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/netman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ps2ip/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioprpgen/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ssbusc/include
+    defines:
+      - BDM_DRIVER
+    imports_lst: modules/iopcore/cdvdman/imports.lst
+    exports_tab: modules/iopcore/cdvdman/exports.tab
+
+  - name: bdm_ata_cdvdman
+    type: iop
+    sources:
+      - modules/iopcore/cdvdman/cdvdman.c
+      - modules/iopcore/cdvdman/ioops.c
+      - modules/iopcore/cdvdman/ncmd.c
+      - modules/iopcore/cdvdman/scmd.c
+      - modules/iopcore/cdvdman/searchfile.c
+      - modules/iopcore/cdvdman/streaming.c
+      - modules/iopcore/cdvdman/ioplib_util.c
+      - modules/iopcore/cdvdman/smsutils.S
+      - modules/iopcore/cdvdman/../../isofs/zso.c
+      - modules/iopcore/cdvdman/../../isofs/lz4.c
+      - modules/iopcore/cdvdman/device-bdm.c
+      - modules/iopcore/cdvdman/atad.c
+      - modules/iopcore/cdvdman/dev9.c
+      - modules/iopcore/cdvdman/../../../_ps2build_compat/libbdm/src/bd_defrag.c
+      - modules/iopcore/cdvdman/../../../_ps2build_compat/libbdm/src/bd_cache.c
+    include_dirs:
+      - modules/iopcore/cdvdman
+      - modules/iopcore/common
+      - _ps2build_compat/libbdm/include
+      - _ps2build_compat/include
+      - _ps2build_compat/include_iop
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/loadcore/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysclib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/stdio/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/threadman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/intrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysmem/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/iomanx/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifcmd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/modload/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/dmacman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/timrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/cdvd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/libsd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/bdm/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/usbd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mcman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/secrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/excepman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/heaplib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mtapman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/padman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sio2man/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/rmman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/vblank/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/smap/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/netman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ps2ip/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioprpgen/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ssbusc/include
+    defines:
+      - BDM_DRIVER
+      - USE_BDM_ATA
+      - __USE_DEV9
+    imports_lst: modules/iopcore/cdvdman/imports.lst
+    exports_tab: modules/iopcore/cdvdman/exports.tab
+
+  - name: mmce_cdvdman
+    type: iop
+    sources:
+      - modules/iopcore/cdvdman/cdvdman.c
+      - modules/iopcore/cdvdman/ioops.c
+      - modules/iopcore/cdvdman/ncmd.c
+      - modules/iopcore/cdvdman/scmd.c
+      - modules/iopcore/cdvdman/searchfile.c
+      - modules/iopcore/cdvdman/streaming.c
+      - modules/iopcore/cdvdman/ioplib_util.c
+      - modules/iopcore/cdvdman/smsutils.S
+      - modules/iopcore/cdvdman/../../isofs/zso.c
+      - modules/iopcore/cdvdman/../../isofs/lz4.c
+      - modules/iopcore/cdvdman/device-mmce.c
+    include_dirs:
+      - modules/iopcore/cdvdman
+      - modules/iopcore/common
+      - _ps2build_compat/include
+      - _ps2build_compat/include_iop
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/loadcore/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysclib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/stdio/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/threadman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/intrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysmem/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/iomanx/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifcmd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/modload/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/dmacman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/timrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/cdvd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/libsd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/bdm/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/usbd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mcman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/secrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/excepman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/heaplib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mtapman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/padman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sio2man/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/rmman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/vblank/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/smap/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/netman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ps2ip/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioprpgen/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ssbusc/include
+    defines:
+      - MMCE_DRIVER
+    imports_lst: modules/iopcore/cdvdman/imports.lst
+    exports_tab: modules/iopcore/cdvdman/exports.tab
+
+  - name: smb_cdvdman
+    type: iop
+    sources:
+      - modules/iopcore/cdvdman/cdvdman.c
+      - modules/iopcore/cdvdman/ioops.c
+      - modules/iopcore/cdvdman/ncmd.c
+      - modules/iopcore/cdvdman/scmd.c
+      - modules/iopcore/cdvdman/searchfile.c
+      - modules/iopcore/cdvdman/streaming.c
+      - modules/iopcore/cdvdman/ioplib_util.c
+      - modules/iopcore/cdvdman/smsutils.S
+      - modules/iopcore/cdvdman/../../isofs/zso.c
+      - modules/iopcore/cdvdman/../../isofs/lz4.c
+      - modules/iopcore/cdvdman/device-smb.c
+      - modules/iopcore/cdvdman/smb.c
+      - modules/iopcore/cdvdman/dev9.c
+    include_dirs:
+      - modules/iopcore/cdvdman
+      - modules/iopcore/common
+      - modules/network/common
+      - _ps2build_compat/include
+      - _ps2build_compat/include_iop
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/loadcore/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysclib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/stdio/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/threadman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/intrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysmem/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/iomanx/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifcmd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/modload/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/dmacman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/timrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/cdvd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/libsd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/bdm/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/usbd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mcman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/secrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/excepman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/heaplib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mtapman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/padman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sio2man/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/rmman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/vblank/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/smap/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/netman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ps2ip/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioprpgen/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ssbusc/include
+    defines:
+      - SMB_DRIVER
+      - __USE_DEV9
+    imports_lst: modules/iopcore/cdvdman/imports.lst
+    exports_tab: modules/iopcore/cdvdman/exports.tab
+
+  - name: hdd_cdvdman
+    type: iop
+    sources:
+      - modules/iopcore/cdvdman/cdvdman.c
+      - modules/iopcore/cdvdman/ioops.c
+      - modules/iopcore/cdvdman/ncmd.c
+      - modules/iopcore/cdvdman/scmd.c
+      - modules/iopcore/cdvdman/searchfile.c
+      - modules/iopcore/cdvdman/streaming.c
+      - modules/iopcore/cdvdman/ioplib_util.c
+      - modules/iopcore/cdvdman/smsutils.S
+      - modules/iopcore/cdvdman/../../isofs/zso.c
+      - modules/iopcore/cdvdman/../../isofs/lz4.c
+      - modules/iopcore/cdvdman/device-hdd.c
+      - modules/iopcore/cdvdman/atad.c
+      - modules/iopcore/cdvdman/dev9.c
+    include_dirs:
+      - modules/iopcore/cdvdman
+      - modules/iopcore/common
+      - _ps2build_compat/include
+      - _ps2build_compat/include_iop
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/loadcore/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysclib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/stdio/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/threadman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/intrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysmem/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/iomanx/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifcmd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/modload/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/dmacman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/timrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/cdvd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/libsd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/bdm/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/usbd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mcman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/secrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/excepman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/heaplib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mtapman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/padman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sio2man/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/rmman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/vblank/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/smap/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/netman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ps2ip/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioprpgen/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ssbusc/include
+    defines:
+      - HDD_DRIVER
+      - __USE_DEV9
+    imports_lst: modules/iopcore/cdvdman/imports.lst
+    exports_tab: modules/iopcore/cdvdman/exports.tab
+
+  - name: hdd_hdpro_cdvdman
+    type: iop
+    sources:
+      - modules/iopcore/cdvdman/cdvdman.c
+      - modules/iopcore/cdvdman/ioops.c
+      - modules/iopcore/cdvdman/ncmd.c
+      - modules/iopcore/cdvdman/scmd.c
+      - modules/iopcore/cdvdman/searchfile.c
+      - modules/iopcore/cdvdman/streaming.c
+      - modules/iopcore/cdvdman/ioplib_util.c
+      - modules/iopcore/cdvdman/smsutils.S
+      - modules/iopcore/cdvdman/../../isofs/zso.c
+      - modules/iopcore/cdvdman/../../isofs/lz4.c
+      - modules/iopcore/cdvdman/device-hdd.c
+      - modules/iopcore/cdvdman/hdpro_atad.c
+    include_dirs:
+      - modules/iopcore/cdvdman
+      - modules/iopcore/common
+      - _ps2build_compat/include
+      - _ps2build_compat/include_iop
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/loadcore/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysclib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/stdio/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/threadman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/intrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysmem/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/iomanx/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifcmd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/modload/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/dmacman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/timrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/cdvd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/libsd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/bdm/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/usbd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mcman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/secrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/excepman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/heaplib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mtapman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/padman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sio2man/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/rmman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/vblank/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/smap/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/netman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ps2ip/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioprpgen/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ssbusc/include
+    defines:
+      - HDD_DRIVER
+      - HD_PRO
+    imports_lst: modules/iopcore/cdvdman/imports.lst
+    exports_tab: modules/iopcore/cdvdman/exports.tab
+
+  - name: bdm_mcemu
+    type: iop
+    sources:
+      - modules/mcemu/mcemu.c
+      - modules/mcemu/mcemu_io.c
+      - modules/mcemu/mcemu_sys.c
+      - modules/mcemu/mcemu_var.c
+      - modules/mcemu/mcemu_rpc.c
+      - modules/mcemu/device-bdm.c
+    include_dirs:
+      - modules/mcemu
+      - _ps2build_compat/include
+      - _ps2build_compat/include_iop
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/loadcore/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysclib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/stdio/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/threadman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/intrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysmem/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/iomanx/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifcmd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/modload/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/dmacman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/timrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/cdvd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/libsd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/bdm/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/usbd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mcman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/secrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/excepman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/heaplib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mtapman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/padman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sio2man/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/rmman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/vblank/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/smap/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/netman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ps2ip/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioprpgen/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ssbusc/include
+    defines:
+      - PADEMU
+      - BDM_DRIVER
+    imports_lst: modules/mcemu/imports.lst
+
+  - name: mmce_mcemu
+    type: iop
+    sources:
+      - modules/mcemu/mcemu.c
+      - modules/mcemu/mcemu_io.c
+      - modules/mcemu/mcemu_sys.c
+      - modules/mcemu/mcemu_var.c
+      - modules/mcemu/mcemu_rpc.c
+      - modules/mcemu/device-mmce.c
+    include_dirs:
+      - modules/mcemu
+      - _ps2build_compat/include
+      - _ps2build_compat/include_iop
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/loadcore/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysclib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/stdio/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/threadman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/intrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysmem/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/iomanx/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifcmd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/modload/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/dmacman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/timrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/cdvd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/libsd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/bdm/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/usbd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mcman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/secrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/excepman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/heaplib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mtapman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/padman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sio2man/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/rmman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/vblank/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/smap/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/netman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ps2ip/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioprpgen/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ssbusc/include
+    defines:
+      - PADEMU
+      - MMCE_DRIVER
+    imports_lst: modules/mcemu/imports.lst
+
+  - name: hdd_mcemu
+    type: iop
+    sources:
+      - modules/mcemu/mcemu.c
+      - modules/mcemu/mcemu_io.c
+      - modules/mcemu/mcemu_sys.c
+      - modules/mcemu/mcemu_var.c
+      - modules/mcemu/mcemu_rpc.c
+      - modules/mcemu/device-hdd.c
+    include_dirs:
+      - modules/mcemu
+      - _ps2build_compat/include
+      - _ps2build_compat/include_iop
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/loadcore/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysclib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/stdio/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/threadman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/intrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysmem/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/iomanx/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifcmd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/modload/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/dmacman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/timrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/cdvd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/libsd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/bdm/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/usbd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mcman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/secrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/excepman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/heaplib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mtapman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/padman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sio2man/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/rmman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/vblank/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/smap/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/netman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ps2ip/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioprpgen/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ssbusc/include
+    defines:
+      - PADEMU
+      - HDD_DRIVER
+    imports_lst: modules/mcemu/imports.lst
+
+  - name: smb_mcemu
+    type: iop
+    sources:
+      - modules/mcemu/mcemu.c
+      - modules/mcemu/mcemu_io.c
+      - modules/mcemu/mcemu_sys.c
+      - modules/mcemu/mcemu_var.c
+      - modules/mcemu/mcemu_rpc.c
+      - modules/mcemu/device-smb.c
+    include_dirs:
+      - modules/mcemu
+      - _ps2build_compat/include
+      - _ps2build_compat/include_iop
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/loadcore/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysclib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/stdio/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/threadman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/intrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sysmem/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/iomanx/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sifcmd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/modload/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/dmacman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/timrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/cdvd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/libsd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/bdm/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/usbd/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mcman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/secrman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/excepman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/heaplib/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/mtapman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/padman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/sio2man/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/rmman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/vblank/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/smap/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/netman/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ps2ip/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ioprpgen/include
+      - C:/Users/natha/AppData/Local/ps2dev/packages/core/ssbusc/include
+    defines:
+      - PADEMU
+      - SMB_DRIVER
+    imports_lst: modules/mcemu/imports.lst
