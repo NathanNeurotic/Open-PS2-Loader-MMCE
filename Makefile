@@ -91,7 +91,7 @@ TTY_APPROACH ?= UDP
 #   ran" is a checkout of this hash. The exclusion list errs toward caution: anything
 #   NOT named still moves the hash, so a missed code path can never silently collide
 #   two different binaries under one string.
-CODE_ANCHOR = $(shell git log -1 --format=%H -- . ':(exclude).github' ':(exclude)HANDOFF.md' ':(exclude)agent-file-drop' ':(exclude)frame_builds' ':(exclude)notes' ':(exclude)obj' ':(exclude).claude' ':(exclude).agents' ':(exclude).codex' ':(exclude).codex-tmp-nhddl' ':(exclude).codex-tmp-wle-r3z' 2>/dev/null)
+CODE_ANCHOR = $(shell git log -1 --format=%H -- . ':(exclude).github' ':(exclude)agent-file-drop' ':(exclude)frame_builds' ':(exclude)notes' ':(exclude)obj' ':(exclude).claude' ':(exclude).agents' ':(exclude).codex' ':(exclude).codex-tmp-nhddl' ':(exclude).codex-tmp-wle-r3z' 2>/dev/null)
 REVISION = $(shell expr $(shell git rev-list --count HEAD) + 2)
 
 GIT_HASH = $(shell git rev-parse --short=7 $(if $(CODE_ANCHOR),$(CODE_ANCHOR),HEAD) 2>/dev/null)
