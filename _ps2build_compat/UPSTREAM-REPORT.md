@@ -1,5 +1,14 @@
 # UPSTREAM REPORT — what it took to build OPL under ps2build
 
+> **UPDATE 2026-09-04 (same day):** tech resolved asks A–E upstream
+> (ps2build v2026.09.04.1, sdk-core v2026.09.04.2, srxfixup v2026.09.04,
+> ogg/vorbis/jpeg v2026.09.03.2) plus `pack: true`/ps2pack (G.3), and
+> sent a cleanup patch deleting every vendored header and hardcoded path
+> (`8a555090`). This document is kept as the historical record of what
+> the port needed; per-item resolution status lives in `GAPS.md`.
+> Remaining open asks: F.1 (literal `-l`/`-L` nit), G.1/G.2/G.4
+> (embedding, codegen hooks, git version).
+
 Audience: tech (ps2dev/ps2build upstream). Date: 2026-09-04.
 Companion: `GAPS.md` (full gap log with severities and error shapes).
 
