@@ -868,40 +868,6 @@ int guiShowMmceConfig(void)
     return ret;
 }
 
-// MMCE -> Communication Settings (SIO2 ack-wait pacing, alarm usage).
-void guiShowMmceCommConfig(void)
-{
-    const char *deviceAckWaitCycles[] = {"0", "1", "2", "3", "4", "5", NULL};
-    const char *deviceOnOff[] = {"OFF", "ON", NULL};
-
-    diaSetEnum(diaMmceCommConfig, CFG_MMCE_WAIT_CYCLES, deviceAckWaitCycles);
-    diaSetInt(diaMmceCommConfig, CFG_MMCE_WAIT_CYCLES, gMMCEAckWaitCycles);
-    diaSetEnum(diaMmceCommConfig, CFG_MMCE_USE_ALARMS, deviceOnOff);
-    diaSetInt(diaMmceCommConfig, CFG_MMCE_USE_ALARMS, gMMCEUseAlarms);
-
-    int ret = diaExecuteDialog(diaMmceCommConfig, -1, 1, NULL);
-    if (ret) {
-        diaGetInt(diaMmceCommConfig, CFG_MMCE_WAIT_CYCLES, &gMMCEAckWaitCycles);
-        diaGetInt(diaMmceCommConfig, CFG_MMCE_USE_ALARMS, &gMMCEUseAlarms);
-        applyConfig(-1, -1, 0);
-        menuReinitMainMenu();
-    }
-}
-
-// MMCE -> Path Settings (MMCE library prefix).
-void guiShowMmcePathConfig(void)
-{
-    diaSetString(diaMmcePathConfig, CFG_MMCEPREFIX, gMMCEPrefix);
-
-    int ret = diaExecuteDialog(diaMmcePathConfig, -1, 1, NULL);
-    if (ret) {
-        diaGetString(diaMmcePathConfig, CFG_MMCEPREFIX, gMMCEPrefix, sizeof(gMMCEPrefix));
-        applyConfig(-1, -1, 0);
-        menuReinitMainMenu();
-    }
-}
-
-
 // Deep-copy a NULL-terminated name list for handing to diaSetEnum. The CALLER must hold guiLock
 // across BOTH the getter fetch (thmGetGuiList/lngGetGuiList) and this copy: the source lists live
 // on the heap and are freed+rebuilt under guiLock on the IO worker (thmRebuildGuiNames/
@@ -1427,77 +1393,6 @@ int guiShowVcdUsbMode(void)
     return diaExecuteDialog(diaVcdUsbMode, -1, 1, NULL);
 }
 
-// POPStarter page (settings-layout restructure, was VCD Settings): PS1-via-POPSTARTER launch
-// config (POPSTARTER.ELF device/path). The BDMA equip, VCD list display options and POPStarter
-// network settings are chained sub-dialogs (guiShowBdmaConfig / guiShowVcdListConfig /
-// guiShowPopsNetConfig). CFG ids are shared with the old rows, so saved config values map through
-// unchanged.
-// SUPERSEDED AND UNREFERENCED. The live PS Emulation Settings page is guiSettingsShowPopstarter(),
-// which COMPOSES a copy of diaVcdConfig + diaBdmaConfig and drives that copy. Nothing calls this
-// function any more; it is kept only because its declaration is still published in gui.h.
-//
-// Wiring a new row here does NOTHING. That mistake was made once already, with CFG_EMBER_DISPLAY:
-// the row rendered on the composed page with no enum list and never saved, because its diaSetEnum
-// ran against the template in here instead of against the composed `ui`. Add new rows to
-// guiSettingsShowPopstarter().
-void guiShowVcdConfig(void)
-{
-    // POPSTARTER.ELF device TYPE (POPS_DEV_*). MUST stay in sync with vcdResolvePopstarter() (vcdsupport.c).
-    const char *popsDevStrs[] = {_l(_STR_DEFAULT), "Memory Card", "USB", "MX4SIO", "MMCE", "HDD (exFAT)", "HDD (APA)", "Custom", _l(_STR_GAMES_DEVICE), "iLink", NULL}; // iLink is appended after Game's Device to preserve every saved POPS_DEV_* value
-    // diaSetEnum stores the ARRAY POINTER rather than copying, so this must outlive every render of
-    // the dialog -- static, like the BDMA option arrays on the peer page.
-    static const char *emberDisplayStrs[] = {NULL, "240p", "480p", NULL};
-    emberDisplayStrs[0] = _l(_STR_DEFAULT);
-    diaSetEnum(diaVcdConfig, CFG_EMBER_DISPLAY, emberDisplayStrs);
-    diaSetInt(diaVcdConfig, CFG_EMBER_DISPLAY, gEmberDisplay);
-    guiSetGameViewPicker(diaVcdConfig);
-
-    diaSetEnum(diaVcdConfig, CFG_POPSTARTER_DEVICE, popsDevStrs);
-    diaSetInt(diaVcdConfig, CFG_POPSTARTER_DEVICE, gPopstarterDevice);
-    diaSetString(diaVcdConfig, CFG_POPSTARTER_PATH, gPopstarterPath);
-    diaSetShowDefaultWhenEmpty(diaVcdConfig, CFG_POPSTARTER_PATH, 1);
-    diaSetInt(diaVcdConfig, CFG_POPSTARTER_RETROGEM_GAMEID, gPopstarterRetroGemGameID);
-
-    // POPSTARTER Path is the Custom-only escape hatch (guiVcdUpdater re-reveals it live).
-    diaSetVisible(diaVcdConfig, CFG_LBL_POPSTARTER_PATH, gPopstarterDevice == POPS_DEV_CUSTOM);
-    diaSetVisible(diaVcdConfig, CFG_POPSTARTER_PATH, gPopstarterDevice == POPS_DEV_CUSTOM);
-
-    int ret;
-reshow_vcd:
-    ret = diaExecuteDialog(diaVcdConfig, -1, 1, &guiVcdUpdater);
-    if (ret == VCD_BDMA_BUTTON) {
-        guiShowBdmaConfig();
-        goto reshow_vcd;
-    }
-    if (ret == VCD_LIST_BUTTON) {
-        guiShowVcdListConfig();
-        goto reshow_vcd;
-    }
-    if (ret == VCD_NET_BUTTON) {
-        guiShowPopsNetConfig();
-        goto reshow_vcd;
-    }
-    if (ret) {
-        int gameViewChanged = guiReadGameViewPicker(diaVcdConfig);
-        diaGetInt(diaVcdConfig, CFG_POPSTARTER_DEVICE, &gPopstarterDevice);
-        diaGetInt(diaVcdConfig, CFG_POPSTARTER_RETROGEM_GAMEID, &gPopstarterRetroGemGameID);
-        diaGetInt(diaVcdConfig, CFG_EMBER_DISPLAY, &gEmberDisplay);
-
-        {
-            // The dialog field is char[32]; only adopt the typed value if it actually changed, so
-            // opening+saving this page never truncates a longer path stored via the cfg.
-            char tmpPop[sizeof(gPopstarterPath)];
-            diaGetString(diaVcdConfig, CFG_POPSTARTER_PATH, tmpPop, sizeof(tmpPop));
-            if (strncmp(tmpPop, gPopstarterPath, 31) != 0)
-                snprintf(gPopstarterPath, sizeof(gPopstarterPath), "%s", tmpPop);
-        }
-        applyConfig(-1, -1, 0);
-        if (gameViewChanged)
-            guiRefreshGameViews();
-        menuReinitMainMenu();
-    }
-}
-
 static void guiSetBdmaSettings(struct UIItem *ui)
 {
     static const char *bdmaSourceStrs[] = {NULL, NULL, NULL, NULL, NULL, NULL};
@@ -1944,15 +1839,6 @@ static void guiSaveAdvancedSettings(struct UIItem *ui)
     diaGetInt(ui, CFG_SMBCACHE, &smbCacheSize);
 }
 
-void guiShowParentalLockConfig(void)
-{
-    guiSetParentalLockValue(diaParentalLockConfig);
-
-    int result = diaExecuteDialog(diaParentalLockConfig, -1, 1, NULL);
-    if (result) {
-        guiSaveParentalLockValue(diaParentalLockConfig);
-    }
-}
 // Neutrino Defaults live-updater: the ":c" comp half is only ever emitted alongside a video mode
 // (-gsm=v:c grammar) -- grey it while the global Neutrino Video default is Off (same rule as the
 // per-game rows).
@@ -2077,100 +1963,6 @@ void guiShowNeutrinoArgsConfig(char *argsBuf, int bufSize)
     }
 }
 
-
-void guiShowLaunchConfig(void)
-{
-    // Global default Loader Core: the core a game uses when its per-game selector is "Default".
-    // <OPL> = OPL's native ee-core; Neutrino = the external neutrino.elf. Indices 0/1 match the
-    // stored value (0=<OPL>, 1=Neutrino) and the first two per-game COMPAT_LOADER options.
-    const char *defaultCoreStrs[] = {"<OPL>", "Neutrino", NULL};
-    diaSetEnum(diaLaunchConfig, CFG_DEFAULT_CORE, defaultCoreStrs);
-    diaSetInt(diaLaunchConfig, CFG_DEFAULT_CORE, gDefaultCoreLoader);
-    diaSetInt(diaLaunchConfig, CFG_PS2LOGO, gPS2Logo);
-
-    int ret;
-reshow_launch:
-    ret = diaExecuteDialog(diaLaunchConfig, -1, 1, NULL);
-    if (ret == LAUNCH_NEUTRINO_DEFAULTS_BUTTON) {
-        guiShowNeutrinoDefaults();
-        goto reshow_launch;
-    }
-    if (ret == LAUNCH_OSD_DEFAULTS_BUTTON) {
-        guiGameShowOSDLanguageConfig(1);
-        goto reshow_launch;
-    }
-    if (ret) {
-        diaGetInt(diaLaunchConfig, CFG_DEFAULT_CORE, &gDefaultCoreLoader);
-        diaGetInt(diaLaunchConfig, CFG_PS2LOGO, &gPS2Logo);
-
-        applyConfig(-1, -1, 0);
-        menuReinitMainMenu();
-    }
-}
-
-void guiShowSecurityConfig(void)
-{
-    diaSetInt(diaSecurityConfig, CFG_ENWRITEOP, gEnableWrite);
-    guiSetParentalLockValue(diaSecurityConfig);
-
-    int ret = diaExecuteDialog(diaSecurityConfig, -1, 1, NULL);
-    if (ret) {
-        diaGetInt(diaSecurityConfig, CFG_ENWRITEOP, &gEnableWrite);
-        guiSaveParentalLockValue(diaSecurityConfig);
-
-        applyConfig(-1, -1, 0);
-        menuReinitMainMenu();
-    }
-}
-
-void guiShowAdvancedConfig(void)
-{
-    diaSetInt(diaAdvancedConfig, CFG_DEBUG, gEnableDebug);
-    guiSetAdvancedSettings(diaAdvancedConfig);
-
-    int ret = diaExecuteDialog(diaAdvancedConfig, -1, 1, NULL);
-    if (ret) {
-        diaGetInt(diaAdvancedConfig, CFG_DEBUG, &gEnableDebug);
-        guiSaveAdvancedSettings(diaAdvancedConfig);
-
-        applyConfig(-1, -1, 0);
-        menuReinitMainMenu();
-    }
-}
-
-void guiShowPathPrefixConfig(void)
-{
-    diaSetString(diaPathPrefixConfig, CFG_BDMPREFIX, gBDMPrefix);
-    diaSetString(diaPathPrefixConfig, CFG_ETHPREFIX, gETHPrefix);
-
-    int ret = diaExecuteDialog(diaPathPrefixConfig, -1, 1, NULL);
-    if (ret) {
-        diaGetString(diaPathPrefixConfig, CFG_BDMPREFIX, gBDMPrefix, sizeof(gBDMPrefix));
-        diaGetString(diaPathPrefixConfig, CFG_ETHPREFIX, gETHPrefix, sizeof(gETHPrefix));
-
-        applyConfig(-1, -1, 0);
-    }
-}
-
-void guiShowStorageConfig(void)
-{
-    diaSetInt(diaStorageConfig, CFG_HDDSPINDOWN, gHDDSpindown);
-    diaSetInt(diaStorageConfig, CFG_HDDGAMELISTCACHE, gHDDGameListCache);
-    diaSetInt(diaStorageConfig, CFG_BDMCACHE, bdmCacheSize);
-    diaSetInt(diaStorageConfig, CFG_HDDCACHE, hddCacheSize);
-    diaSetInt(diaStorageConfig, CFG_SMBCACHE, smbCacheSize);
-
-    int ret = diaExecuteDialog(diaStorageConfig, -1, 1, NULL);
-    if (ret) {
-        diaGetInt(diaStorageConfig, CFG_HDDSPINDOWN, &gHDDSpindown);
-        diaGetInt(diaStorageConfig, CFG_HDDGAMELISTCACHE, &gHDDGameListCache);
-        diaGetInt(diaStorageConfig, CFG_BDMCACHE, &bdmCacheSize);
-        diaGetInt(diaStorageConfig, CFG_HDDCACHE, &hddCacheSize);
-        diaGetInt(diaStorageConfig, CFG_SMBCACHE, &smbCacheSize);
-
-        applyConfig(-1, -1, 0);
-    }
-}
 
 static const char *artDelayNames[] = {"0 (Instant)", "2 (Fast)", "5 (Medium)", "8 (Standard)", NULL};
 static const int artDelayValues[] = {0, 2, 5, 8};
@@ -2311,78 +2103,6 @@ static void guiApplyGameIdMode(int mode)
 {
     gApplyGameID = mode == 0 || mode == 2;
     gPopstarterRetroGemGameID = mode == 0 || mode == 1;
-}
-
-void guiShowDisplayConfig(void)
-{
-    // clang-format off
-    const char *vmodeNames[] = {_l(_STR_AUTO)
-        , "PAL 640x512i @50Hz 24bit"
-        , "NTSC 640x448i @60Hz 24bit"
-        , "EDTV 640x448p @60Hz 24bit"
-        , "EDTV 640x512p @50Hz 24bit"
-        , "VGA 640x480p @60Hz 24bit"
-        , "PAL 704x576i @50Hz 24bit (HIRES)"
-        , "NTSC 704x480i @60Hz 24bit (HIRES)"
-        , "EDTV 704x480p @60Hz 24bit (HIRES)"
-        , "EDTV 704x576p @50Hz 24bit (HIRES)"
-        , "HDTV 1280x720p @60Hz 16bit (HIRES)"
-        , "HDTV 1920x1080i @60Hz 16bit (HIRES)"
-        , "PAL 640x256p @50Hz 24bit"
-        , "NTSC 640x224p @60Hz 24bit"
-        , NULL};
-    // clang-format on
-    const char *gameIDModes[] = {_l(_STR_GAMEID_MODE_ALL), _l(_STR_GAMEID_MODE_POPSTARTER),
-                                 _l(_STR_GAMEID_MODE_PS2), _l(_STR_GAMEID_MODE_OFF), NULL};
-    int previousVMode;
-    int ret;
-
-reselect_video_mode:
-    previousVMode = gVMode;
-    diaSetEnum(diaDisplayConfig, UICFG_VMODE, vmodeNames);
-    diaSetEnum(diaDisplayConfig, CFG_APPLYGAMEID, gameIDModes);
-    diaSetInt(diaDisplayConfig, UICFG_VMODE, gVMode);
-    diaSetInt(diaDisplayConfig, UICFG_WIDESCREEN, gWideScreen);
-    diaSetInt(diaDisplayConfig, UICFG_XOFF, gXOff);
-    diaSetInt(diaDisplayConfig, UICFG_YOFF, gYOff);
-    diaSetInt(diaDisplayConfig, UICFG_OVERSCAN, gOverscan);
-    diaSetInt(diaDisplayConfig, CFG_APPLYGAMEID, guiGameIdModeFromGlobals());
-
-reshow_display:
-    ret = diaExecuteDialog(diaDisplayConfig, -1, 1, guiDisplayUpdater);
-
-    // The GSM defaults sub-page writes straight into the global config set, so re-enter WITHOUT
-    // going back through the diaSetInt block above -- otherwise the rows the user already changed
-    // on this page would be reset from the (not yet committed) globals.
-    if (ret == DISPLAY_GSM_DEFAULTS_BUTTON) {
-        guiGameShowGSConfig(1);
-        goto reshow_display;
-    }
-
-    if (ret) {
-        diaGetInt(diaDisplayConfig, UICFG_VMODE, &gVMode);
-        diaGetInt(diaDisplayConfig, UICFG_WIDESCREEN, &gWideScreen);
-        diaGetInt(diaDisplayConfig, UICFG_XOFF, &gXOff);
-        diaGetInt(diaDisplayConfig, UICFG_YOFF, &gYOff);
-        diaGetInt(diaDisplayConfig, UICFG_OVERSCAN, &gOverscan);
-        int gameIDMode;
-        diaGetInt(diaDisplayConfig, CFG_APPLYGAMEID, &gameIDMode);
-        guiApplyGameIdMode(gameIDMode);
-
-        // Same #172 contract as _guiShowUIConfig above: play out the confirm bump before the GS
-        // teardown/rebuild below, on the GUI thread -- never inside applyConfig itself.
-        padRumbleFlush();
-        applyConfig(-1, -1, 1);
-    }
-
-    if (previousVMode != gVMode) {
-        if (guiConfirmVideoMode() == 0) {
-            // Restore previous video mode.
-            gVMode = previousVMode;
-            applyConfig(-1, -1, 1);
-            goto reselect_video_mode;
-        }
-    }
 }
 
 void guiShowCoverflowConfig(void)
@@ -3096,6 +2816,16 @@ static int guiSettingsPopstarterUpdater(int modified)
     return 0;
 }
 
+// PS Emulation Settings: PS1-via-POPSTARTER launch config (POPSTARTER.ELF device/path).
+//
+// This page COMPOSES a copy of diaVcdConfig + diaBdmaConfig and drives that copy, so a new row
+// belongs HERE, against the composed `ui` -- never against either template. A row wired into a
+// template renders on the composed page with no enum list and never saves; that happened once
+// with CFG_EMBER_DISPLAY.
+//
+// The BDMA equip, VCD list display options and POPStarter network settings are chained
+// sub-dialogs (guiShowBdmaConfig / guiShowVcdListConfig / guiShowPopsNetConfig). CFG ids are
+// shared with the pre-shell rows, so saved config values map through unchanged.
 static int guiSettingsShowPopstarter(void)
 {
     const struct UIItem *parts[] = {diaVcdConfig, diaBdmaConfig};

@@ -976,66 +976,6 @@ struct UIItem diaAdvancedConfig[] = {
     // end of dialog
     {UI_TERMINATOR}};
 
-// Advanced -> Path Prefixes. Rows moved out of the old General Settings (diaConfig).
-struct UIItem diaPathPrefixConfig[] = {
-    {UI_HEADER, 0, 1, 1, -1, 0, 0, {.label = {NULL, _STR_PATH_PREFIXES}}},
-    {UI_SPLITTER},
-
-    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {NULL, _STR_BDM_PREFIX}}},
-    {UI_SPACER},
-    {UI_STRING, CFG_BDMPREFIX, 1, 1, -1, 0, 0, {.stringvalue = {"", "", NULL}}},
-    {UI_BREAK},
-
-    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {NULL, _STR_ETH_PREFIX}}},
-    {UI_SPACER},
-    {UI_STRING, CFG_ETHPREFIX, 1, 1, -1, 0, 0, {.stringvalue = {"", "", NULL}}},
-    {UI_BREAK},
-
-    // buttons
-    {UI_OK, 0, 1, 1, -1, 0, 0, {.label = {NULL, _STR_OK}}},
-    {UI_BREAK},
-
-    // end of dialog
-    {UI_TERMINATOR}};
-
-// Advanced -> Storage and Cache. Rows moved out of the old General Settings (diaConfig).
-struct UIItem diaStorageConfig[] = {
-    {UI_HEADER, 0, 1, 1, -1, 0, 0, {.label = {NULL, _STR_STORAGE_CACHE}}},
-    {UI_SPLITTER},
-
-    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {NULL, _STR_HDD_SPINDOWN}}},
-    {UI_SPACER},
-    {UI_INT, CFG_HDDSPINDOWN, 1, 1, _STR_HINT_SPINDOWN, 0, 0, {.intvalue = {20, 20, 0, 20}}},
-    {UI_BREAK},
-
-    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {NULL, _STR_CACHE_HDD_GAME_LIST}}},
-    {UI_SPACER},
-    {UI_BOOL, CFG_HDDGAMELISTCACHE, 1, 1, -1, 0, 0, {.intvalue = {0, 0}}},
-    {UI_BREAK},
-
-    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {"BDM Cache", -1}}},
-    {UI_SPACER},
-    {UI_INT, CFG_BDMCACHE, 1, 1, -1, 0, 0, {.intvalue = {16, 8, 0, 32, NULL}}},
-    {UI_BREAK},
-
-    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {"HDD Cache", -1}}},
-    {UI_SPACER},
-    {UI_INT, CFG_HDDCACHE, 1, 1, -1, 0, 0, {.intvalue = {8, 0, 0, 32, NULL}}},
-    {UI_BREAK},
-
-    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {"SMB Cache", -1}}},
-    {UI_SPACER},
-    {UI_INT, CFG_SMBCACHE, 1, 1, -1, 0, 0, {.intvalue = {16, 4, 0, 32, NULL}}},
-    {UI_BREAK},
-
-    // buttons
-    {UI_OK, 0, 1, 1, -1, 0, 0, {.label = {NULL, _STR_OK}}},
-    {UI_BREAK},
-
-    // end of dialog
-    {UI_TERMINATOR}};
-
-
 // Per-Game Modes Menu (row order per the settings-layout restructure tree: Loader Core, DMA,
 // Game ID, Alternate Startup, Modes 1-7, then the Neutrino overrides)
 struct UIItem diaCompatConfig[] = {
@@ -1682,23 +1622,6 @@ struct UIItem diaNetCompatUpdate[] = {
     {UI_BUTTON, NETUPD_BTN_START, 1, 1, -1, 0, 0, {.label = {NULL, _STR_START}}},
     {UI_SPACER},
     {UI_BUTTON, NETUPD_BTN_CANCEL, 1, 1, -1, 0, 0, {.label = {NULL, _STR_CANCEL}}},
-    {UI_BREAK},
-
-    // end of dialog
-    {UI_TERMINATOR}};
-
-// Parental Lock Config Menu
-struct UIItem diaParentalLockConfig[] = {
-    {UI_HEADER, 0, 1, 1, -1, 0, 0, {.label = {NULL, _STR_PARENLOCKCONFIG}}},
-    {UI_SPLITTER},
-
-    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {NULL, _STR_PARENLOCK_PASSWORD}}},
-    {UI_SPACER},
-    {UI_PASSWORD, CFG_PARENLOCK_PASSWORD, 1, 1, _STR_PARENLOCK_PASSWORD_HINT, 0, 0, {.stringvalue = {"", "", NULL}}},
-    {UI_BREAK},
-
-    // buttons
-    {UI_OK, 0, 1, 1, -1, 0, 0, {.label = {NULL, _STR_OK}}},
     {UI_BREAK},
 
     // end of dialog

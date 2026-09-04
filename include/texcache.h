@@ -143,11 +143,6 @@ unsigned int cacheDebugTransientFail(void);
  */
 void cacheDebugLastLoad(int *lastMs, int *lastOkMs, int *width, int *height);
 
-/** May speculative art (viewport warming, far-row thumbnails, the Coverflow lookahead) be issued
- * now? Looser than cacheHasPendingArt(): it allows prefetch while a few loads are already in
- * flight, so the device stays busy instead of prefetch running one image at a time.
- */
-int cacheMayPrefetchArt(void);
 void cacheInvalidateFailMemo(void);
 
 /** Nonzero while any cover art is queued for, or currently being, read+decoded by the IO worker.
