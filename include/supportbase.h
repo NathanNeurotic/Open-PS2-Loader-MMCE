@@ -76,7 +76,6 @@ void sbCreateFolders(const char *path, int createDiscImgFolders);
 // ISO9660 filesystem management functions.
 u32 sbGetISO9660MaxLBA(const char *path);
 int sbProbeISO9660(const char *path, base_game_info_t *game, u32 layer1_offset);
-int sbProbeISO9660_64(const char *path, base_game_info_t *game, u32 layer1_offset);
 
 int sbLoadCheats(const char *path, const char *file);
 

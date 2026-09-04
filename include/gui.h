@@ -108,8 +108,6 @@ void guiExecDeferredOps(void);
 /** Allocates a new deffered operation */
 struct gui_update_t *guiOpCreate(gui_op_type_t type);
 
-/** For completeness, the deffered operations are destroyed automatically */
-void guiDestroyOp(struct gui_update_t *op);
 
 int guiShowKeyboard(char *value, int maxLength);
 int guiMsgBox(const char *text, int addAccept, struct UIItem *ui);

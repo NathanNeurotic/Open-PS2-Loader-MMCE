@@ -26,7 +26,7 @@
 #include "include/gui.h"         // guiWarning (passing toast on a failed launch-path BDMA equip)
 #include "include/texcache.h"    // cosmetic ID resolver yields while artwork is pending
 #include "include/sound.h"       // cosmetic ID resolver yields to BGM low-water protection
-#include "include/util.h"        // checkMCSaveIconsDir -- browser icon pair for the POPSTARTER folder
+#include "include/util.h"        // kept for its transitive declarations; the checkMCSaveIconsDir this once named never existed
 #include "include/lang.h"        // _l + _STR_BDMA_ERR_* (same texts the Settings-screen equip shows)
 #include "include/textures.h"    // texDiscoverLoad + ERR_BAD_FILE (VCD POPS cover fallback)
 #include "include/vcdsupport.h"
