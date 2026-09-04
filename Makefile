@@ -424,6 +424,8 @@ clean:	download_lwNBD
 	echo " -pademu"
 	$(MAKE) -C modules/pademu USE_BT=1 clean
 	$(MAKE) -C modules/pademu USE_USB=1 clean
+	echo " -ps2ips"
+	$(MAKE) -C modules/network/ps2ips clean
 	echo "-pc tools"
 	$(MAKE) -C pc clean
 
@@ -758,7 +760,31 @@ $(EE_ASM_DIR)smap.c: $(PS2SDK)/iop/irx/smap.irx | $(EE_ASM_DIR)
 $(EE_ASM_DIR)netman.c: $(PS2SDK)/iop/irx/netman.irx | $(EE_ASM_DIR)
 	$(BIN2C) $< $@ $(*F)_irx
 
-$(EE_ASM_DIR)ps2ips.c: $(PS2SDK)/iop/irx/ps2ips.irx | $(EE_ASM_DIR)
+# FORK-VENDORED ps2ips (modules/network/ps2ips): the ps2sdk prebuilt has four defects in the
+# EE<->IOP socket bridge, and the first one corrupts EE memory in any build that opens a socket.
+#
+#   * do_recvfrom DMAs the whole 144-byte rests_pkt into the EE's _intr_data[32], which is 128
+#     bytes. In the LINKED OPL the next object in .bss is __ps2ipc_fdman_ops_socket -- the table of
+#     function pointers behind every EE socket call -- and bytes 128..143 are exactly its getfd /
+#     getfilename / close / read entries. Overwriting them makes close() stop calling the IOP, so
+#     the lwIP socket leaks and the UDP PCB pool runs dry: roughly ONE network operation per boot.
+#   * the reply sockaddr is written into the shared RPC buffer BEFORE the request's ee_addr and
+#     intr_data are read, so both DMA transfers target EE address 0 -- EE-side UDP receive has
+#     never worked.
+#   * fromlen is passed uninitialised, so the sender address comes back zeroed.
+#   * lwip_buffer is BUFF_SIZE + 32 where a receive at offset 64 needs BUFF_SIZE + 64.
+#
+# The source is current ps2sdk master with the four spots marked "RA fix" -- verified by diffing
+# against ps2dev/ps2sdk master: 6 hunks, and every removed line is one of the defects above, so
+# vendoring drops no upstream behaviour. It keeps the ps2ips.irx name and the same export table, so
+# nbns, httpclient and everything else on the EE socket API bind exactly as before.
+#
+# Kept out of .clang-format-ignore's reach by that same reasoning: do NOT reformat it, or the diff
+# against ps2sdk (and the chance of upstreaming this) is lost.
+modules/network/ps2ips/ps2ips.irx: $(wildcard modules/network/ps2ips/*.c) $(wildcard modules/network/ps2ips/*.h) modules/network/ps2ips/imports.lst modules/network/ps2ips/Makefile
+	$(MAKE) -C modules/network/ps2ips rebuild
+
+$(EE_ASM_DIR)ps2ips.c: modules/network/ps2ips/ps2ips.irx | $(EE_ASM_DIR)
 	$(BIN2C) $< $@ $(*F)_irx
 
 $(EE_ASM_DIR)smbman.c: $(PS2SDK)/iop/irx/smbman.irx | $(EE_ASM_DIR)
