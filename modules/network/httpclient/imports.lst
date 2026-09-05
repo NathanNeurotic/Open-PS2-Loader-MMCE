@@ -38,6 +38,7 @@ I_look_ctype_table
 I_memcpy
 I_memmove
 I_memset
+I_memchr
 I_strcmp
 I_strncmp
 I_strlen
