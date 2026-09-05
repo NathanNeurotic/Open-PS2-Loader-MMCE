@@ -1,9 +1,13 @@
+
+<p align="center"><img alt="RiptOPL" src="https://raw.githubusercontent.com/NathanNeurotic/Open-PS2-Loader/rebuild/main/docs/assets/riptopl.png" /></p>
+
+
+
 <p align="center">
   <img width="400" height="92" alt="AI-Assisted-Software-Lovers-Only" src="https://github.com/user-attachments/assets/71335775-9fe3-4507-ac2c-caa851abb24c" />
 </p>
 
 
-<p align="center"><img alt="RiptOPL" src="https://raw.githubusercontent.com/NathanNeurotic/Open-PS2-Loader/rebuild/main/docs/assets/riptopl.png" /></p>
 
 ```HAS THIS EVER HAPPENED TO YOU?```
 ```You download another OPL fork. It has a new theme. A new menu. Maybe even a file browser, because apparently launching games was too direct and somebody needed a side quest.```
@@ -16,9 +20,6 @@
 ```Fast. Simple. Compatible.```
 ```Stop chasing the same thing with a new name.```
 ```Stop mistaking decoration for development.```
-```A turd in glitter is still a turd.```
-```Get one and done.```
-```Get RiptOPL.```
 # RiptOPL
 **An opinionated [Open PS2 Loader](https://github.com/ps2homebrew/Open-PS2-Loader) fork — aiming to be the "definitive build."**
 <br>
