@@ -772,6 +772,77 @@ jobs:
           echo "Built rolling/${ZIP}:"
           unzip -l "rolling/${ZIP}"
 
+      - name: Pack the RIPTOPL RA package zip
+        run: |
+          set -eu
+          # RetroAchievements ships as its OWN installable archive, shaped like the main package
+          # zip above -- same POPS/, EMBER/, neutrino/ and PC-tool shortcuts, just a different
+          # loader. Two reasons it is not simply an entry in VARIANTS:
+          #   * VARIANTS is ~120 MB of every build permutation. "Download 120 MB and know which of
+          #     sixteen ELFs to pick" is not a way to offer somebody a feature.
+          #   * the MEGA step below excludes VARIANTS and DEBUG as diagnostic bundles, so anything
+          #     shipped there is never permanently archived.
+          # Best-effort throughout: RA is an opt-in flavour and a missing RA build must never sink
+          # the publish of everything else.
+          PKG=riptopl_pkg
+          REL="${OPL_VERSION:-rolling}"
+          # xeRAbora, hacan359's PC client. The RA loader does nothing on its own -- the console
+          # streams memory to this and it does the talking to RetroAchievements -- so the package
+          # that ships the loader has to say where to get it. Shortcut only, like every other
+          # PC-side tool: link the maintained thing, never vendor a copy. Asserted rather than
+          # best-effort for the same reason as the Ember licence: a package that omits it hands
+          # somebody a loader with no way to use it.
+          test -f pc/xeRAbora.url
+          cp -f pc/xeRAbora.url "$PKG/xeRAbora.url"
+          if [ ! -d rolling/ra ] || [ -z "$(ls -A rolling/ra 2>/dev/null)" ]; then
+            echo "No RA builds present; skipping the RIPTOPL RA zip."
+          else
+            # PADEMU ?= 1 is the Makefile default, so the pademu1 build is the one that matches the
+            # main package's loader and takes the plain flavour folder name. The pademu0 build sits
+            # beside it as -nopademu, mirroring how the main zip labels its flavours by folder.
+            RA_STAGED=no
+            for sdk in PS2DEVROLLING PS2DEVPINNED; do
+              for pad in 1 0; do
+                SRC="rolling/ra/RIPTOPL-ra-pademu${pad}-${sdk}.ELF"
+                [ -f "$SRC" ] || continue
+                if [ "$pad" = "1" ]; then DEST="$PKG/APP_RIPTOPL-RA-${sdk}"; else DEST="$PKG/APP_RIPTOPL-RA-${sdk}-nopademu"; fi
+                mkdir -p "$DEST"
+                cp -f "$SRC" "$DEST/RIPTOPL.ELF"
+                RA_STAGED=yes
+              done
+            done
+            if [ "$RA_STAGED" = "no" ]; then
+              echo "WARN: rolling/ra held no recognisable ELF names; skipping the RIPTOPL RA zip." >&2
+            else
+              # Tag from the PS2DEVROLLING loader when it exists, exactly as the main zip does:
+              # that flavour is required-to-build, while PS2DEVPINNED is best-effort, so sourcing
+              # the tag from whatever sorts first would silently change which build names the file.
+              if [ -f "$PKG/APP_RIPTOPL-RA-PS2DEVROLLING/RIPTOPL.ELF" ]; then
+                RA_REF="$PKG/APP_RIPTOPL-RA-PS2DEVROLLING"
+              else
+                RA_REF="$(ls -d "$PKG"/APP_RIPTOPL-RA-* 2>/dev/null | head -n1)"
+              fi
+              RA_SHA="$(sha256sum "$RA_REF/RIPTOPL.ELF" | cut -c1-16)"
+              RA_ZIP="RIPTOPL-RA-${REL}-${RA_SHA}.zip"
+              (
+                cd "$PKG"
+                # Same payload as the main package, RA loader in place of the standard one. POPS,
+                # EMBER and the shortcuts are already staged and asserted by the step above, so a
+                # broken bundle has failed the build long before here.
+                zip -r -X "../rolling/${RA_ZIP}" POPS EMBER xeRAbora.url PS2-Servers.url udpfs-server.url OrbitPS2-Manager.url OPL-PS1-AIO-Converter-GUI.url PS2RD-CHT-Manager.url >/dev/null
+                for d in APP_RIPTOPL-RA-*; do
+                  [ -d "$d" ] && zip -r -X "../rolling/${RA_ZIP}" "$d" >/dev/null
+                done
+                if [ -d neutrino ]; then zip -r -X "../rolling/${RA_ZIP}" neutrino >/dev/null; fi
+              )
+              echo "Built rolling/${RA_ZIP}:"
+              unzip -l "rolling/${RA_ZIP}"
+            fi
+          fi
+          # Remove the loose dir either way so the final 'gh release upload rolling/*' stays
+          # file-only -- the same contract the VARIANTS/DEBUG step keeps.
+          rm -rf rolling/ra 2>/dev/null || true
+
       - name: Pack RIPTOPL VARIANTS + DEBUG zips
         run: |
           set -eu
@@ -915,6 +986,9 @@ jobs:
             printf -- '- PC network servers: use the linked PS2 Servers AIO, match the settings shown by its launcher,\n'
             printf -- '  and confirm the game list populates and an ISO boots over your chosen protocol on real hardware.\n'
             printf '\n## Other downloads\n'
+            if ls rolling/RIPTOPL-RA-*.zip >/dev/null 2>&1; then
+              printf -- '- RIPTOPL-RA-*.zip: the RetroAchievements loader as a complete package (POPS, EMBER, neutrino, shortcuts) -- **development build, not hardware-tested**\n'
+            fi
             if [ -f "rolling/RIPTOPL-VARIANTS-${OPL_VERSION:-rolling}.zip" ]; then
               printf -- '- RIPTOPL-VARIANTS-*.zip: EXTRA_FEATURES x PADEMU x DUALSENSE configs for the two ps2dev flavours\n'
             fi
@@ -1115,6 +1189,8 @@ jobs:
           # deliberately EXCLUDED from the permanent MEGA copy:
           #   RIPTOPL-VARIANTS-*.zip  (~120 MB -- every PADEMU x EXTRA_FEATURES x DUALSENSE combo, two ps2dev flavours)
           #   RIPTOPL-DEBUG-*.zip     (~91 MB  -- iopcore/ingame/eesio/ppctty/DTL debug builds, two ps2dev flavours)
+          # RIPTOPL-RA-*.zip is NOT in that exclusion: it is an installable package (loader + POPS +
+          # EMBER + neutrino + shortcuts), the same shape as the main zip, so it is archived like one.
           # They dominate the size (~10x: ~233 MB -> ~22 MB), they still ship on the GitHub rolling
           # release for the CURRENT build, and a *permanent* per-build archive is for restoring or
           # rebuilding an installable build -- not for old diagnostic permutations (when you debug,

@@ -115,8 +115,15 @@ make clean && make RETROACHIEVEMENTS=1 release
 enumeration shared between the menu and the loader core, and make cannot see that a stale object file
 is now wrong.
 
-The rolling release publishes the flavour as `RIPTOPL-ra-pademu0*.ELF` and `RIPTOPL-ra-pademu1*.ELF`
-inside the variants archive. The default build is unaffected by all of this — every RA source file and
+The rolling release publishes the flavour as its own archive, **`RIPTOPL-RA-*.zip`**, built to the
+same shape as the main package: `POPS/`, `EMBER/`, `neutrino/` and the PC-tool shortcuts, with
+`APP_RIPTOPL-RA-<flavour>/RIPTOPL.ELF` in place of the standard loader (`-nopademu` folders carry the
+`PADEMU=0` builds). It also carries **`xeRAbora.url`**, because the loader does nothing without the
+PC client.
+
+It is deliberately *not* an entry in `RIPTOPL-VARIANTS-*.zip`: that archive is a ~120 MB bag of every
+build permutation, and the release workflow excludes it from the permanent MEGA archive as a
+diagnostic bundle rather than installable payload. The default build is unaffected by all of this — every RA source file and
 every call site is behind `#ifdef RETROACHIEVEMENTS`, and that is checked by comparing the two builds'
 symbol tables, loader core and embedded IOP modules.
 

@@ -2,6 +2,7 @@
 # Build the "extra" RIPTOPL release builds for the rolling release:
 #   * the EXTRA_FEATURES x PADEMU x DUALSENSE variant matrix -> rolling/variants/
 #   * the debug configs                          -> rolling/debug/
+#   * the RetroAchievements flavour              -> rolling/ra/
 #
 # Called by each ps2dev build job in rolling-release.yml. $1 is the SDK suffix appended to each
 # filename: "-PS2DEVPINNED" for the digest-pinned ps2dev snapshot
@@ -42,15 +43,22 @@ done
 # double the rolling job for a feature most users will not run. Two builds -- PADEMU is the only
 # axis a RA user still cares about; EXTRA_FEATURES=1 is fixed on because the RA build is opt-in
 # already and there is no reason to ship a cut-down one.
-echo "== Building RIPTOPL RetroAchievements variant (suffix='${SDK_SUFFIX}') =="
+# Staged in rolling/ra/, NOT rolling/variants/. VARIANTS is a ~120 MB diagnostic grab-bag that
+# rolling-release.yml deliberately excludes from the permanent MEGA archive as "not installable
+# payload" -- so anything living there is classified as a debug artifact and is not archived. RA is
+# meant to be a thing a user chooses and installs, so it gets its own installable package zip
+# instead (see "Pack the RIPTOPL RA package zip" in rolling-release.yml).
+echo "== Building RIPTOPL RetroAchievements flavour (suffix='${SDK_SUFFIX}') =="
+mkdir -p rolling/ra
 for ra_pad in PADEMU=0 PADEMU=1; do
   make clean >/dev/null 2>&1 || true
   if make --trace RETROACHIEVEMENTS=1 $ra_pad EXTRA_FEATURES=1 NOT_PACKED=1 $BRAND_ARG && [ -f opl.elf ]; then
-    mv opl.elf "rolling/variants/RIPTOPL-ra-pademu${ra_pad#PADEMU=}${SDK_SUFFIX}.ELF"
+    mv opl.elf "rolling/ra/RIPTOPL-ra-pademu${ra_pad#PADEMU=}${SDK_SUFFIX}.ELF"
   else
-    echo "WARN: RA variant '$ra_pad'${SDK_SUFFIX} failed to build; skipping it"
+    echo "WARN: RA build '$ra_pad'${SDK_SUFFIX} failed to build; skipping it"
   fi
 done
+echo "RA builds present:"; ls -la rolling/ra || true
 
 echo "Variants present:"; ls -la rolling/variants || true
 

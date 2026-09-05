@@ -454,10 +454,12 @@ compiled into any published main ELF (`EXTRA_FEATURES ?= 0`); they ship in the
 DualSense / DualShock 5 (USB) support is available prebuilt in the `RIPTOPL-VARIANTS-*.zip`
 bundle, or build your own with `make DUALSENSE=1`.
 
-**RetroAchievements** ships as its own flavour in the same VARIANTS bundle
-(`RIPTOPL-ra-pademu*.ELF`, or `make RETROACHIEVEMENTS=1`). It is a **development build, not a
-finished feature** — both halves are now written, the menu side included, but none of it has run on a
-real console yet — and the standard ELF is completely unaffected by it. See
+**RetroAchievements** ships as its own complete package, `RIPTOPL-RA-*.zip` (or build it with
+`make RETROACHIEVEMENTS=1`). It is laid out like the main archive — same `POPS/`, `EMBER/`,
+`neutrino/` and shortcuts — with the RA loader in place of the standard one, plus a shortcut to
+**xeRAbora**, the PC client the feature talks to. It is a **development build, not a finished
+feature** — both halves are now written, the menu side included, but none of it has run on a real
+console yet — and the standard ELF is completely unaffected by it. See
 **[docs/RETROACHIEVEMENTS.md](docs/RETROACHIEVEMENTS.md)** for what it does, which launch paths can
 ever support it, and why.
 
