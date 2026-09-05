@@ -492,4 +492,18 @@ observed outcome. Keep a non-HTTP control on the same game where practical.
 
 ## Credits
 
-* **Docmine17** — the HTTP design, the byte-range reader this port follows, and the PC server.
+**Docmine17** — https://github.com/Docmine17/Open-PS2-Loader-HTTP
+
+The design and the console implementation RiptOPL's HTTP support follows: serving a library from a
+plain static HTTP server, and streaming an ISO into the loader core with ordinary HTTP byte ranges.
+Adopted with the author's permission, given directly to Ripto (NathanNeurotic); he wants the
+approach to become a shared convention and offered it here first. He also supplies and maintains the
+PC server, which RiptOPL does not ship and will not grow a replacement for.
+
+Re-authored against this fork rather than merged, so any defect in the port is ours — his server and
+his existing catalogs stay the compatibility baseline they always were.
+
+Behind him, as behind all of it: the **ps2homebrew** team's Open PS2 Loader and the PS2SDK, which
+both trees descend from. `Docmine17/Open-PS2-Loader-HTTP` is listed with the rest of the OPL family
+in [`CREDITS`](../CREDITS); the PC server gets its External Tools entry at Phase 6, in the
+`.github/workflows/docs-sync.yml` template rather than in `README.md` directly.

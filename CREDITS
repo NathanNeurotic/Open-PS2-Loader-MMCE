@@ -77,6 +77,7 @@ features, code, and ideas from:
   - nhddl (pcm720)                  https://github.com/pcm720/nhddl
   - Modulo-R1 (AdityaKumar7209)     https://github.com/AdityaKumar7209/Modulo-R1-Beta-Preview---PS2
   - PS2-Launcher (Irfanlesnar)      https://github.com/Irfanlesnar/PS2-Launcher
+  - OPL HTTP (Docmine17)            https://github.com/Docmine17/Open-PS2-Loader-HTTP
   - official OPL                    https://github.com/ps2homebrew/Open-PS2-Loader
 
 Bundled third-party software, shipped in the release package and NOT part of RiptOPL:
