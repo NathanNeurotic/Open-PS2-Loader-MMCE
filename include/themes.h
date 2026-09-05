@@ -49,6 +49,9 @@ typedef struct
     // pass over the "plastic" frame, so a box needs no off-centre window shift (graphics-team FR).
     image_texture_t *overlayTexture2;
     int overlayTexture2Linked;
+#ifdef RETROACHIEVEMENTS
+    int raIsCover; // RA: this element shows the cover, so it gets the RA mark (set in initGameImage)
+#endif
 } mutable_image_t;
 
 typedef struct

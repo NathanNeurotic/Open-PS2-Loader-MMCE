@@ -13,6 +13,9 @@
 #include "include/favsupport.h"
 #include "include/vcdsupport.h" // vcdDisplayName -- display-only VCD game-ID prefix hide
 #include "include/libview.h"    // libViewActive / libListViewActive -- which list this page shows
+#ifdef RETROACHIEVEMENTS
+#include "include/rabadge.h" // RA: mark over the cover
+#endif
 
 #include <time.h>
 #include <math.h>
@@ -713,6 +716,9 @@ static mutable_image_t *initMutableImage(const char *themePath, config_set_t *th
     mutableImage->overlayTextureLinked = 0;
     mutableImage->overlayTexture2 = NULL;
     mutableImage->overlayTexture2Linked = 0;
+#ifdef RETROACHIEVEMENTS
+    mutableImage->raIsCover = 0; // set in initGameImage, which knows the pattern
+#endif
 
     char elemProp[64];
 
@@ -993,6 +999,10 @@ static void initGameImage(const char *themePath, config_set_t *themeConfig, them
     mutable_image_t *mutableImage = initMutableImage(themePath, themeConfig, theme, name, elem->type, pattern, count, texture, overlay);
     elem->extended = mutableImage;
     elem->endElem = &endMutableImage;
+
+#ifdef RETROACHIEVEMENTS
+    mutableImage->raIsCover = (pattern != NULL && !strcmp(pattern, "COV"));
+#endif
 
     if (mutableImage->cache)
         elem->drawElem = &drawGameImage;

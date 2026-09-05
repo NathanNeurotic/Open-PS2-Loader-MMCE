@@ -39,6 +39,9 @@
 #include "include/vcdsupport.h"
 #include "include/cuesupport.h" // cueIsCueEntry -- a PS1 row names its own core   // VCD display naming + POPSTARTER launch helpers
 #include "include/libview.h"    // libViewActive / libListViewActive -- which list this page shows
+#ifdef RETROACHIEVEMENTS
+#include "include/rabadge.h" // RA: "tracked game" badge in the list
+#endif
 
 #include "include/cheatman.h"
 #include "include/sound.h"
@@ -1182,6 +1185,12 @@ static void updateMenuFromGameList(opl_io_module_t *mdl)
     struct gui_update_t *gup = NULL;
     int count = mdl->support->itemUpdate(mdl->support);
 
+#ifdef RETROACHIEVEMENTS
+    // RA badges: recompute on every list rebuild. This runs on the I/O thread (itemUpdate
+    // above is the device scan), where the <device>RA/ stat() calls are safe.
+    raBadgeRefresh(mdl->support, count);
+#endif
+
     // Folder browsing: while inside a subfolder, show the breadcrumb ("Device: RPGs/SNES") as the page
     // title. folderGetSub() points at persistent static state, so the char* stays valid. At the device
     // root the device name set above stands. Only one device is ever inside a folder at a time (the
@@ -1225,7 +1234,15 @@ static void updateMenuFromGameList(opl_io_module_t *mdl)
 
                 gup->submenu.icon_id = -1;
                 gup->submenu.id = i;
+#ifdef RETROACHIEVEMENTS
+                {
+                    // The RA badge prefix, when this game has a watch list. NULL means plain name.
+                    const char *badge = raBadgeText(mdl->support, i);
+                    gup->submenu.text = (char *)(badge != NULL ? badge : mdl->support->itemGetName(mdl->support, i));
+                }
+#else
                 gup->submenu.text = mdl->support->itemGetName(mdl->support, i);
+#endif
                 gup->submenu.text_id = -1;
                 gup->submenu.selected = 0;
                 gup->submenu.isFolder = isFolderRow;

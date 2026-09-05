@@ -102,6 +102,13 @@ void rmDrawPixmap(GSTEXTURE *txt, int x, int y, short aligned, int w, int h, sho
 void rmDrawOverlayPixmap(GSTEXTURE *overlay, int x, int y, short aligned, int w, int h, short scaled, u64 color,
                          GSTEXTURE *inlay, int ulx, int uly, int urx, int ury, int blx, int bly, int brx, int bry, int reflection);
 
+#ifdef RETROACHIEVEMENTS
+/** RA cover mark: the same inlay-quad mapping as rmDrawOverlayPixmap, for a badge drawn
+    inside the cover's own (possibly slanted) coordinate system. No reflection. */
+void rmDrawInlayPixmap(GSTEXTURE *txt, int x, int y, short aligned, int w, int h, short scaled, u64 color,
+                       int ulx, int uly, int urx, int ury, int blx, int bly, int brx, int bry);
+#endif
+
 /** Vertical pixel offset applied to the coverflow reflection (0 = flush under the cover, - = up, + = down). */
 void rmSetReflectionYOffset(int yoff);
 

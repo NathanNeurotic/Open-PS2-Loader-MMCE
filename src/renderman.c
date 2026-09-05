@@ -512,6 +512,49 @@ void rmDrawOverlayPixmap(GSTEXTURE *overlay, int x, int y, short aligned, int w,
     }
 }
 
+#ifdef RETROACHIEVEMENTS
+/* RA: the cover mark, drawn as a quadrilateral INSIDE the cover's own (possibly slanted)
+   coordinate system. Same mapping as the overlay/inlay pair above, minus the reflection:
+   the mark is a badge, not art. */
+void rmDrawInlayPixmap(GSTEXTURE *txt, int x, int y, short aligned, int w, int h, short scaled, u64 color,
+                       int ulx, int uly, int urx, int ury, int blx, int bly, int brx, int bry)
+{
+    rm_quad_t quad;
+    rmSetupQuad(txt, x, y, aligned, w, h, scaled, color, &quad);
+
+    ulx = X_SCALE(ulx * iAspectWidth) >> 2;
+    urx = X_SCALE(urx * iAspectWidth) >> 2;
+    blx = X_SCALE(blx * iAspectWidth) >> 2;
+    brx = X_SCALE(brx * iAspectWidth) >> 2;
+    uly = Y_SCALE(uly);
+    ury = Y_SCALE(ury);
+    bly = Y_SCALE(bly);
+    bry = Y_SCALE(bry);
+
+    /* Alpha test as in rmDrawQuad: without it the transparent background
+       of the image is painted and the mark becomes a solid square. */
+    if ((txt->PSM == GS_PSM_CT32) || (txt->Clut && txt->ClutPSM == GS_PSM_CT32)) {
+        gsGlobal->PrimAlphaEnable = GS_SETTING_ON;
+        gsKit_set_test(gsGlobal, GS_ATEST_ON);
+    } else {
+        gsGlobal->PrimAlphaEnable = GS_SETTING_OFF;
+        gsKit_set_test(gsGlobal, GS_ATEST_OFF);
+    }
+
+    gsKit_TexManager_bind(gsGlobal, txt);
+    gsKit_prim_quad_texture(gsGlobal, txt,
+                            quad.ul.x + ulx + fRenderXOff, quad.ul.y + uly + fRenderYOff,
+                            0.0f, 0.0f,
+                            quad.ul.x + urx + fRenderXOff, quad.ul.y + ury + fRenderYOff,
+                            txt->Width, 0.0f,
+                            quad.ul.x + blx + fRenderXOff, quad.ul.y + bly + fRenderYOff,
+                            0.0f, txt->Height,
+                            quad.ul.x + brx + fRenderXOff, quad.ul.y + bry + fRenderYOff,
+                            txt->Width, txt->Height, order, color);
+    order++;
+}
+#endif
+
 void rmDrawRect(int x, int y, int w, int h, u64 color)
 {
     float fx = X_SCALE(x) + fRenderXOff;
