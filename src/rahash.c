@@ -119,7 +119,19 @@ static int find_entry(int fd, unsigned int dir_lba, unsigned int dir_size,
             if (len == 0)
                 break; /* entries never cross a sector boundary */
 
+            /* ...which the format promises and a damaged image does not. Without this the
+               walk trusts len blindly: rec[32] and the name bytes at rec[33 + i] read up to
+               ~287 bytes past p, and since only the first ISO_SECTOR of g_chunk was filled
+               that is leftover data from an earlier 64 KB read -- so a truncated image can
+               match a name that is not there and hand back a bogus LBA. */
+            if (len < 33 || p + len > ISO_SECTOR)
+                break;
+
             namelen = rec[32];
+
+            /* The name must also fit inside the record it claims to belong to. */
+            if (33 + namelen > len)
+                break;
 
             /* The name in the image carries a version: "SLUS_210.65;1".
                Compare up to the semicolon so the version does not matter. */

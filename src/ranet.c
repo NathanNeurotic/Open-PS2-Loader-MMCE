@@ -398,6 +398,9 @@ int raAskPC(const char *hash, const char *serial, const char *savepath,
                 return -4;
             }
             idx = -1;
+            len = -1; /* a reply that parsed only idx must not leave len holding stack junk:
+                         if idx happens to equal i the guard below passes, and the length
+                         check that follows evaluates `len < 0` BEFORE it reaches `hdr == 0`. */
             hdr = 0;
             if (sscanf(g_rx, "RAC1 %d %d %n", &idx, &len, &hdr) >= 2 && idx == i)
                 break;
