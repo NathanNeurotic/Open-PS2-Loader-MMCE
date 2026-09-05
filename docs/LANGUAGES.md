@@ -1,6 +1,6 @@
 # Languages / translations — how they work and how to maintain them
 
-RiptOPL's on-screen text is built from three sources that `lang_compiler.py` merges at
+RiptOPL's on-screen text is built from three sources that `tools/languages/lang_compiler.py` merges at
 build time. This doc explains the pipeline and the exact steps to add or update strings.
 
 ## The pieces
@@ -9,8 +9,8 @@ build time. This doc explains the pipeline and the exact steps to add or update 
 |---|---|---|
 | `lng_tmpl/_base.yml` | The fork's **master list** of every string + its **English** text. Source of truth. | **Yes** — add strings here. |
 | `lng_fork/<Language>.yml` | The fork's **own translations** of fork strings (and overrides). | **Yes** — add translations here. |
-| `lng_src/` (git-ignored) | The **upstream** community translations, cloned from [`ps2homebrew/Open-PS2-Loader-lang`](https://github.com/ps2homebrew/Open-PS2-Loader-lang) by `download_lng.sh`. | **No** — upstream owns these. |
-| `lang_compiler.py` | The tool that assembles everything into the binary `.lng` files + the C sources. | No (it's the machinery). |
+| `lng_src/` (git-ignored) | The **upstream** community translations, cloned from [`ps2homebrew/Open-PS2-Loader-lang`](https://github.com/ps2homebrew/Open-PS2-Loader-lang) by `tools/dependencies/download_lng.sh`. | **No** — upstream owns these. |
+| `tools/languages/lang_compiler.py` | The tool that assembles everything into the binary `.lng` files + the C sources. | No (it's the machinery). |
 
 ### `_base.yml` entry format
 ```yaml
@@ -24,7 +24,7 @@ translations:
   MMCE_PREFIX: Chemin du préfixe MMCE
 ```
 
-## The build flow (`make languages`, all via `lang_compiler.py`)
+## The build flow (`make languages`, all via `tools/languages/lang_compiler.py`)
 
 1. **`--make_header` / `--make_source`** → generate `include/lang_autogen.h` (the `_STR_*`
    enum every `.c` file uses) and `src/lang_internal.c` (the built-in **English fallback**)
@@ -65,7 +65,7 @@ Repeat per language you want to cover. Untranslated languages fall back to Engli
 
 ## Important: there is **no auto-translator** in the build
 
-`lang_compiler.py` only *merges* translations that already exist in `lng_fork/*.yml`. The
+`tools/languages/lang_compiler.py` only *merges* translations that already exist in `lng_fork/*.yml`. The
 initial bulk fill of the 32 fork languages was a **one-off external step** (a machine
 translation pass), not part of this repo's build. So to keep translations current you must
 supply the translated text for `lng_fork/*.yml` yourself (by hand, an external MT tool, or
@@ -76,7 +76,7 @@ an assistant) — the build will not invent it.
 ```sh
 make languages
 ```
-Requires `python3` + `PyYAML` (`py3-yaml`) and network access for `download_lng.sh` (first
+Requires `python3` + `PyYAML` (`py3-yaml`) and network access for `tools/dependencies/download_lng.sh` (first
 run clones the upstream lang repo into `lng_src/`). CI does this automatically.
 
 ## Where the fork strings live

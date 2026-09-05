@@ -16,6 +16,8 @@ from the repository root unless a tool explicitly documents another directory.
 | `labs/` | Standalone experiments and test programs |
 | `misc/` | Sample configurations and icon resources |
 | `docs/` | User and developer documentation |
+| `docs/history/` | Dated reports and the legacy changelog |
+| `tools/` | Repository dependency, language, and release helpers; see [commands](../tools/README.md) |
 | `notes/`, `reference/` | Research notes and reference material |
 | `.github/` | GitHub workflows, workflow helpers, and issue templates |
 

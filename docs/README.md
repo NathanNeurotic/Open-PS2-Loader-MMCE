@@ -3,6 +3,7 @@
 ## Guides
 
 - [Repository layout and maintenance](REPOSITORY.md)
+- [Repository helper commands](../tools/README.md)
 - [Languages and translations](LANGUAGES.md)
 - [MX4SIO](MX4SIO.md)
 - [Neutrino integration](NEUTRINO.md)
@@ -22,6 +23,7 @@ historical context and must be checked against current code before reuse.
 - [Recovery investigation, 2026-07-03](history/RECOVERY-2026-07-03.md)
 - [Neutrino parity audit, 2026-07-05](history/NEUTRINO-PARITY-2026-07-05.md)
 - [Parity audit, 2026-07-06](history/PARITY-AUDIT-2026-07-06.md)
+- [Legacy detailed changelog](history/OLD_DETAILED_CHANGELOG)
 
 Obsolete root handoffs were removed in PR #596. For their original contents, use
 the parent of commit `b603dadd` in Git history; they are not current instructions.

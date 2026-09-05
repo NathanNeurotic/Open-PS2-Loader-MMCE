@@ -38,7 +38,7 @@ fi
 printf '\n' >> /tmp/commit_summary
 
 # Store number of commits
-old_number_commits=$(($(grep "rev" < OLD_DETAILED_CHANGELOG | head -1 | cut -d " " -f 1 | cut -c 4-)))
+old_number_commits=$(($(grep "rev" < docs/history/OLD_DETAILED_CHANGELOG | head -1 | cut -d " " -f 1 | cut -c 4-)))
 number_commits=$(wc -l < /tmp/commit_summary)
 new_number_commits=$((number_commits - old_number_commits + 2))
 
