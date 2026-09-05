@@ -115,7 +115,7 @@ RiptOPL is a **strict superset** of wOPL — coverflow+reflection+anim, DS3/DS4 
 2. **Theme `aligned=2` (right-justify) not parsed (low, S).** `ALIGN_RIGHT` exists at the renderer level (`renderman.h`, `1<<2`) but the theme parser maps `_aligned` only to 0=NONE / non-zero=CENTER (`themes.c`). A wOPL/uOPL theme using `aligned=2` silently centers. One-line parser extension: value 2 → `ALIGN_RIGHT`.
 3. **`plasma_blend_color` theme key absent (low, M).** wOPL exposes a secondary plasma-blend color; RiptOPL has bg/text/ui-text/sel-text pickers but not this. Purely cosmetic; skip unless plasma-theme fidelity is a goal.
 
-**Corrected false gap:** the raw audit listed "Neutrino unsupported-format (ZSO) hard-aborts instead of falling back to native." **This already ships** — on local devices `bdmTryNeutrinoLaunch` returns 0 on a ZSO/missing-elf reject, so `bdmLaunchGame` falls through to the native OPL core (the hard-abort is retained only for UDP, where native is genuinely unbootable). Corroborated by `docs/NEUTRINO-PARITY-2026-07-05.md`. **Drop this item.**
+**Corrected false gap:** the raw audit listed "Neutrino unsupported-format (ZSO) hard-aborts instead of falling back to native." **This already ships** — on local devices `bdmTryNeutrinoLaunch` returns 0 on a ZSO/missing-elf reject, so `bdmLaunchGame` falls through to the native OPL core (the hard-abort is retained only for UDP, where native is genuinely unbootable). Corroborated by `docs/history/NEUTRINO-PARITY-2026-07-05.md`. **Drop this item.**
 
 ---
 
@@ -159,7 +159,7 @@ Ranked by user-visible payoff ÷ effort, black-screen / data-loss risks first.
 > Δ-series and the core-aware-settings/DS5/bsdfs work; item 4 (gCheats lazy alloc) shipped in the
 > cht.tar PR (`ensureCheatTable`, f7546100) plus a free-on-disable hook; item 6 (480p recovery)
 > shipped as ef91674d; item 7 (RTC last-played) is **retracted** — `CONFIG_LAST` is a single
-> global store, so last-write-wins already IS newest-wins (do not resurrect this row again). **Corrected** against the fork's own `docs/NEUTRINO-PARITY-2026-07-05.md` and the two hand-verifications above.
+> global store, so last-write-wins already IS newest-wins (do not resurrect this row again). **Corrected** against the fork's own `docs/history/NEUTRINO-PARITY-2026-07-05.md` and the two hand-verifications above.
 
 | # | Item | Why | Sev | Effort | Where |
 |---|------|-----|-----|--------|-------|
@@ -225,4 +225,4 @@ For traceability when acting on this report:
 - **DS5 code exists** in `modules/ds34usb/iop/ds34usb.c` (the critic searched the wrong directory); recommendation is a build artifact, not "add the code" (§3).
 - **`argc<32` guard confirmed present**; the byte-length guard (#3) is a *distinct* limit, not a duplicate.
 - **Δ1–Δ9 reconciled**: the audit re-derived several already-shipped items (Δ2/Δ3 VMC hardening, Δ6 preflight, Δ8 lean path) without crediting the plan; those are marked "ahead/parity," not gaps. Δ9 and Δ10 are the two genuinely-unstarted tracked items and lead the queue.
-- **Not audited this pass (follow-up candidates):** the POPSTARTER/PS1-VCD launch axis for parity, and the config/save-path robustness saga (exFAT-HDD corruption, cwd-config) tracked in `docs/RECOVERY-2026-07-03.md`.
+- **Not audited this pass (follow-up candidates):** the POPSTARTER/PS1-VCD launch axis for parity, and the config/save-path robustness saga (exFAT-HDD corruption, cwd-config) tracked in `docs/history/RECOVERY-2026-07-03.md`.

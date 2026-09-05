@@ -27,8 +27,9 @@ directories, with the source SHA, toolchain, and file hashes. Do not treat an EL
 as disposable merely because Git ignores it.
 
 Linked worktrees must be managed with `git worktree` commands. Inspect their
-status, untracked files, and ownership before removing one. The tracked Git links
-under `forensic/` require a separate audit; they are not ordinary source folders.
+status, untracked files, and ownership before removing one. PR #596 removed the
+broken tracked Git links under `forensic/`; local directories and worktree
+registrations can still exist and must be inspected separately.
 
 ## Cleanup sequence and recovery
 
@@ -37,11 +38,17 @@ This cleanup starts at `9e7cc9c4089bd8cb849223437fcfbe1932d7914b` on
 commit so it can be reviewed or reverted independently:
 
 1. Record the layout and maintenance rules.
-2. Archive historical root handoffs and provide a documentation index.
+2. Group dated historical reports and provide a documentation index. PR #596
+   already removed the obsolete root handoffs; they remain available in Git history.
 3. Group repository helper scripts and update Makefile, workflow, and documentation
    references together. Preserve their repository-root working-directory contract.
 4. Validate the changed paths and generated language outputs; run the existing
    build-flavours workflow on the PR.
+
+Before moving files, the branch incorporated `rebuild/main` at
+`2e25cf3b181ca2ccaa751e532960e962043c8bdf`, including the already merged hygiene PR
+#596. That merge is a separate breadcrumb; it is not part of the cleanup diff
+against the updated base.
 
 Source cleanup does not authorize bulk branch or tag deletion. A cleanup branch
 isolates file edits, but refs and worktree registrations belong to the repository.
