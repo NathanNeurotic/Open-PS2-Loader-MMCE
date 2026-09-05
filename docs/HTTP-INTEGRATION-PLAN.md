@@ -1,7 +1,30 @@
 # HTTP integration plan (RiptOPL)
 
-**Status:** approved in principle, nothing implemented. This document is the brief for the
-implementing agent.
+**Status:** phases 1-4 written and building; **nothing has run on a PlayStation 2.** See the ledger
+immediately below before picking anything up.
+
+## Where this actually is
+
+| Phase | State |
+| --- | --- |
+| 1 — contract and fixtures | **done.** `pc/http/`: reference parser, fixtures, `expected.json`, server conformance harness. Docmine17's unmodified server passes it 14/0/1. |
+| 2 — shared TCP/IP stack | **done.** `src/netsupport.c` owns the stack; `ethsupport.c` keeps the SMB session. Every moved body diffs identical to its original. |
+| 3 — menu RPC, settings, source | **done.** Streaming GET (`STREAM_BEGIN`/`STREAM_READ`), `NET_PROTO_HTTP`, `HTTP_MODE`, the Network page rows and Test action, `src/httpsupport.c` as an `item_list_t`, `src/httpcatalog.c` as the parser. |
+| 4 — in-game driver | **written, unproven.** `device-http.c`, the `USE_HTTP` cdvdman target, `cdvdman_settings_http`, `HTTP_MODE` through ee_core, and the EE launch that fills all of it. |
+| 5 — library integration | **partial.** The OPL-only core pin covers HTTP including Favourites. Last-played and local per-game CFG/art work. Not yet exercised: Favourites round-trip, artwork, cheats, the unavailable-VMC route. |
+| 6 — release validation and docs | **not started.** No `docs/HTTP.md`, no External Tools entry for the PC server, no release-note text. |
+
+What is deliberately absent rather than missing: no VMC over HTTP, no Neutrino leg, no PS1/Ember,
+no ZSO (listed but refused by name), no HTTPS or authentication. `EnablePS2Logo` is always 0,
+because `CheckPS2Logo` needs a file descriptor and HTTP has none.
+
+The next thing that matters is hardware, not more code. Section 9's console matrix is the gate, and
+test 3 — a CD or DVD5 booting from his unmodified server — is the one that decides whether any of
+this works at all.
+
+---
+
+This document is the brief for the implementing agent.
 **Branch:** `codex/http-protocol`, cut from `origin/rebuild/main`.
 **Base audited:** `rebuild/main` @ `24f72490` (the source citations below were re-verified against it).
 **Donor audited:** `Docmine17/Open-PS2-Loader-HTTP`, `master` @
