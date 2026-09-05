@@ -241,6 +241,21 @@ struct UIItem diaPopsNetConfig[] = {
     {UI_PASSWORD, NETCFG_POPS_SMB_PASS, 1, 1, _STR_HINT_GUEST, 0, 0, {.stringvalue = {"", "", NULL}}},
     {UI_BREAK},
 
+#ifdef RETROACHIEVEMENTS
+    // RetroAchievements. Always visible: telemetry rides whatever SMAP the LAUNCH loaded, so
+    // unlike the SMB block above it is not conditioned on the selected network protocol. Only
+    // the menu-side check is refused under UDPBD/UDPFS, and it says so when asked.
+    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {NULL, _STR_RA_TELEMETRY}}},
+    {UI_SPACER},
+    {UI_BOOL, NETCFG_RA_TELEMETRY, 1, 1, -1, 0, 0, {.intvalue = {0, 0}}},
+    {UI_BREAK},
+
+    {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {NULL, _STR_RA_BADGES}}},
+    {UI_SPACER},
+    {UI_BOOL, NETCFG_RA_BADGES, 1, 1, -1, 0, 0, {.intvalue = {1, 0}}},
+    {UI_BREAK},
+#endif
+
     // buttons
     {UI_OK, 0, 1, 1, -1, 0, 0, {.label = {NULL, _STR_OK}}},
 

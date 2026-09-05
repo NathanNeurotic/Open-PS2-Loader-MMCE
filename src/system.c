@@ -778,7 +778,7 @@ static unsigned int sendIrxKernelRAM(const char *startup, const char *mode_str, 
       GetWatchCount() is authoritative here because the launch legs have already
       run sbLoadWatchList() by this point; no list means nothing to send.
     */
-    if (GetWatchCount() > 0)
+    if (gRATelemetry && GetWatchCount() > 0)
         modules |= CORE_IRX_ETH;
 #endif
 

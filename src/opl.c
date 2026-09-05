@@ -221,6 +221,10 @@ int gNetStartMode;    // START_MODE_* -- the Off/Manual/Auto network start row (
 int gAutosort;
 int gAutoRefresh;
 int gEnableNotifications;
+#ifdef RETROACHIEVEMENTS
+int gRATelemetry;
+int gRABadges;
+#endif
 int gEnableArt;
 int gWideScreen;
 int gVMode; // 0 - Auto, 1 - PAL, 2 - NTSC
@@ -2737,6 +2741,10 @@ static void _loadConfig()
             configGetColor(configOPL, CONFIG_OPL_TITLECOLOR, gDefaultTitleColor);
             configGetColor(configOPL, CONFIG_OPL_SEL_TEXTCOLOR, gDefaultSelTextColor);
             configGetInt(configOPL, CONFIG_OPL_ENABLE_NOTIFICATIONS, &gEnableNotifications);
+#ifdef RETROACHIEVEMENTS
+            configGetInt(configOPL, CONFIG_OPL_RA_TELEMETRY, &gRATelemetry);
+            configGetInt(configOPL, CONFIG_OPL_RA_BADGES, &gRABadges);
+#endif
             configGetInt(configOPL, CONFIG_OPL_ENABLE_COVERART, &gEnableArt);
             configGetInt(configOPL, CONFIG_OPL_WIDESCREEN, &gWideScreen);
 
@@ -3307,6 +3315,10 @@ static void _saveConfig()
         configSetColor(configOPL, CONFIG_OPL_TITLECOLOR, gDefaultTitleColor);
         configSetColor(configOPL, CONFIG_OPL_SEL_TEXTCOLOR, gDefaultSelTextColor);
         configSetInt(configOPL, CONFIG_OPL_ENABLE_NOTIFICATIONS, gEnableNotifications);
+#ifdef RETROACHIEVEMENTS
+        configSetInt(configOPL, CONFIG_OPL_RA_TELEMETRY, gRATelemetry);
+        configSetInt(configOPL, CONFIG_OPL_RA_BADGES, gRABadges);
+#endif
         configSetInt(configOPL, CONFIG_OPL_ENABLE_COVERART, gEnableArt);
         configSetInt(configOPL, CONFIG_OPL_WIDESCREEN, gWideScreen);
         configSetInt(configOPL, CONFIG_OPL_VMODE, gVMode);
@@ -4477,6 +4489,10 @@ static void setDefaults(void)
     gBDMPrefix[0] = '\0';
     gETHPrefix[0] = '\0';
     gEnableNotifications = 1;
+#ifdef RETROACHIEVEMENTS
+    gRATelemetry = 0; // opt in: telemetry puts SMAP on the NIC in every launch that has a .wl
+    gRABadges = 1;    // free once telemetry is on -- raBadgeRefresh runs on the I/O thread
+#endif
     gEnableArt = 1;
     gWideScreen = 1;
     gEnableSFX = 1; // safe now: sfxPlay dispatches asynchronously (#340)

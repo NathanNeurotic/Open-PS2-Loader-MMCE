@@ -182,6 +182,13 @@ enum CONFIG_INDEX {
 #define CONFIG_OPL_COVERFLOW_ANIM       "coverflow_anim"
 #define CONFIG_OPL_COVERFLOW_DIM        "coverflow_dim"
 
+// RetroAchievements keys. Placed AFTER the block above, not inside it: an #ifdef in the middle
+// of a run of #defines splits clang-format's alignment group and reflows every line above it.
+#ifdef RETROACHIEVEMENTS
+#define CONFIG_OPL_RA_TELEMETRY "ra_telemetry"
+#define CONFIG_OPL_RA_BADGES    "ra_badges"
+#endif
+
 // Network config keys
 #define CONFIG_NET_ETH_LINKM          "eth_linkmode"
 #define CONFIG_NET_PS2_DHCP           "ps2_ip_use_dhcp"

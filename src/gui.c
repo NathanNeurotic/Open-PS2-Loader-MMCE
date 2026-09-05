@@ -1273,6 +1273,10 @@ int guiShowNetConfig(void)
     diaSetString(diaNetConfig, NETCFG_SHARE_USERNAME, gPCUserName);
     diaSetString(diaNetConfig, NETCFG_SHARE_PASSWORD, gPCPassword);
     diaSetInt(diaNetConfig, NETCFG_ETHOPMODE, gETHOpMode);
+#ifdef RETROACHIEVEMENTS
+    diaSetInt(diaNetConfig, NETCFG_RA_TELEMETRY, gRATelemetry);
+    diaSetInt(diaNetConfig, NETCFG_RA_BADGES, gRABadges);
+#endif
 
     // Protocol rows, seeded from the authoritative gNetworkProtocol.
     //   Protocol: SMB(0)/UDPFS(1)/UDPBD(2)  -- OFF and UDPFSBD both collapse to their protocol
@@ -1329,6 +1333,10 @@ reshow_network:
             diaGetInt(diaNetConfig, NETCFG_SHARE_IP_ADDR_0 + i, &pc_ip[i]);
         }
         diaGetInt(diaNetConfig, NETCFG_ETHOPMODE, &gETHOpMode);
+#ifdef RETROACHIEVEMENTS
+        diaGetInt(diaNetConfig, NETCFG_RA_TELEMETRY, &gRATelemetry);
+        diaGetInt(diaNetConfig, NETCFG_RA_BADGES, &gRABadges);
+#endif
 
         diaGetInt(diaNetConfig, NETCFG_SHARE_PORT, &gPCPort);
         diaGetString(diaNetConfig, NETCFG_SHARE_NAME, gPCShareName, sizeof(gPCShareName));

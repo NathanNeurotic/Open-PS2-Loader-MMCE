@@ -108,6 +108,12 @@ void raBadgeRefresh(item_list_t *support, int count)
     }
     slot->count = 0;
 
+    /* Switched off: return AFTER the clear above, never before it, so turning badges off
+       drops the cache on the next list rebuild instead of freezing the last one on screen.
+       raBadgeText and raBadgeHas both read this slot, so the cover mark goes with them. */
+    if (!gRATelemetry || !gRABadges)
+        return;
+
     if (count <= 0)
         return;
 
