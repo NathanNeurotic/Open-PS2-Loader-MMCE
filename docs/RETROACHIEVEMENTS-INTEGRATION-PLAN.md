@@ -1,9 +1,15 @@
 # RetroAchievements integration plan (RiptOPL)
 
-**Status:** approved, not started. This document is the brief for the implementing agent.
-**Branch:** `feature/retroachievements`, cut from `origin/rebuild/main` (commit `9e7cc9c4`).
+**Status:** approved, phases 0-2 implemented. This document is the brief for the implementing agent.
+**Branch:** `claude/retroachievements-port-bb1959` (PR #600), rebased onto `origin/rebuild/main`.
 **Shipping shape:** its own build flavour in the variants archive — `make RETROACHIEVEMENTS=1`. The
 default RiptOPL ELF must be **byte-for-byte unaffected**.
+
+> **2026-09-04 status note.** Phase 4 (the `modules/network/ps2ips-ra/` copy) is **obsolete and was
+> dropped**: `rebuild/main` commit `561d91d3` promoted the same fixed ps2ips to the default build,
+> byte-identical, at `modules/network/ps2ips/`. Every mention of `ps2ips-ra` below describes the
+> plan as written, not the tree as built; the RA flavour now uses the same ps2ips as every other
+> flavour. Open question #4 ("land RA-only first, then propose promotion") is answered by events.
 
 ---
 

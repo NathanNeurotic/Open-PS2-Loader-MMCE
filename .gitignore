@@ -86,3 +86,8 @@ tmp/
 /agent-file-drop/
 /frame_builds/
 /_mmcebuild/
+#
+# pc/RA/ is where the xeRAbora PC client lives locally: ~1.6 MB of somebody else's binaries,
+# reference-only, and it must never be committed. It got swept into a commit once by a bare
+# `git add -A`; ignoring it stops that happening again.
+/pc/RA/
