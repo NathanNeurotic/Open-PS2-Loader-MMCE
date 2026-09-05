@@ -446,18 +446,28 @@ static void udpfsLaunchGame(item_list_t *itemList, int id, config_set_t *configS
     // -dvd target (the udpfs: filesystem game file); a follow-up stage finalizes the exact -dvd/-bsd argv.
     sbCreatePath(game, partname, udpfsPrefix, "/", 0);
 
-    // MMCE cross-device game-id (#261): push the disc id to a present MMCE card before teardown frees
-    // `game`. Neutrino path forwarded so a Neutrino launch protects the MMCE hand-off timing.
-    mmceSendGameID(game->startup, neutrinoPath,
-                   (neutrinoVmc.arg[0][0] ? 1 : 0) | (neutrinoVmc.arg[1][0] ? 2 : 0)); // Δ3: -mc-covered slots keep their card
-
     // Neutrino keep-IOP handoff (sysLoadELFKeepIOP): Neutrino reads the game through OUR udpfs
     // filesystem and its config/modules from the neutrino.elf device (-cwd) before its own IOP
     // reset -- keep BOTH mounted across the teardown. Mirrors bdmsupport's Neutrino deinit contract.
     // D6: pre-teardown validation -- for UDPFS this is where the bsd toml ip= sync now happens
     // (was post-deinit inside sysLaunchNeutrino); a failure toasts and stays in the menu.
+    //
+    // ORDER (matches bdmsupport/hddsupport): the preflight runs BEFORE the GameID push, never after.
+    // The 0x8 devctl below physically re-mounts the MMCE card, and on Gen2 the busy bit it waits on
+    // can clear before the FILESYSTEM surface is back (see mmceSettleAfterSwitch). On a
+    // "Neutrino Device = MMCE" install the preflight's config/bsd-udpfs.toml open lands on mmceN:,
+    // so running it after the push aimed that open straight into the re-mount window and failed the
+    // launch with _STR_NEUTRINO_TOML_SYNC_FAILED on a toml that reads fine a moment earlier or
+    // later. Preflighting first also means an abort leaves the card UNSWITCHED instead of dropping
+    // the user back into the menu sitting on the per-game card.
     if (sysNeutrinoPreflight("udpfs", neutrinoPath) < 0)
         return;
+
+    // MMCE cross-device game-id (#261): push the disc id to a present MMCE card before teardown frees
+    // `game`. Neutrino path forwarded so a Neutrino launch protects the MMCE hand-off timing.
+    mmceSendGameID(game->startup, neutrinoPath,
+                   (neutrinoVmc.arg[0][0] ? 1 : 0) | (neutrinoVmc.arg[1][0] ? 2 : 0)); // Δ3: -mc-covered slots keep their card
+
     int neutrinoDevMode = oplPath2Mode(neutrinoPath);
     char gameStartup[GAME_STARTUP_MAX + 1];
     snprintf(gameStartup, sizeof(gameStartup), "%s", game->startup);
