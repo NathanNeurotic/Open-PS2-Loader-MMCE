@@ -50,8 +50,6 @@ int ioHasPendingRequests(void);
 int ioGetPending(int type);
 unsigned int ioGetTotal(int type);
 
-/** returns nonzero if the io thread is running */
-int ioIsRunning(void);
 
 /** Helper thread safe printf */
 int ioPrintf(const char *format, ...);

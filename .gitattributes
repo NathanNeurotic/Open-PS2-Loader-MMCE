@@ -34,6 +34,19 @@ EMBER/** binary
 *.url text eol=crlf
 *.bat text eol=crlf
 
+# Shell scripts check out with LF even on Windows.
+#
+# `* text=auto` above already STORES them as LF, so this changes nothing in history -- only what
+# lands on disk. Without it a Windows checkout writes CRLF, and every containerised build then has
+# to run dos2unix over the tree (a CRLF shebang reads as `#!/bin/bash\r` and dies with a bare
+# "No such file or directory" / Error 127). That rewrite dirties ten tracked scripts on every
+# build, so `git status` is never clean, real edits hide among the noise, and the line-ending
+# churn keeps getting committed by accident.
+#
+# Nothing on Windows needs a CRLF .sh: these run under Git Bash, WSL or the ps2dev container, all
+# of which want LF.
+*.sh text eol=lf
+
 # Custom for Visual Studio
 *.cs   diff=csharp
 

@@ -69,3 +69,20 @@ lng/lang_*.lng
 src/lang_internal.c
 include/lang_autogen.h
 tmp/
+
+#
+# Local-only working areas
+#
+# forensic/ holds side-by-side checkouts used to compare this tree against master and against other
+# projects. It got committed once by accident: `git add` on a directory that CONTAINS a git checkout
+# records a GITLINK, so the repo carried four submodule entries with no .gitmodules to resolve them
+# -- and two of them (neutrino, nhddl) named commits from OTHER repositories, which no clone of this
+# one can ever fetch. Ignoring it stops that happening again.
+/forensic/
+#
+# Scratch areas agent runs write into. The Makefile's CODE_ANCHOR already excludes these by name so
+# a dropped file does not read as a code change in the version string; ignoring them keeps them out
+# of `git status` as well.
+/agent-file-drop/
+/frame_builds/
+/_mmcebuild/

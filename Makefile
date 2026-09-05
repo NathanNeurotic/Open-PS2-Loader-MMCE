@@ -86,12 +86,14 @@ TTY_APPROACH ?= UDP
 #   code prints a new NUMBER, which is mildly confusing at worst, never misleading.
 #   GIT_HASH carries the reproducibility contract instead: it anchors to CODE_ANCHOR,
 #   the last commit touching anything the build can consume (tree minus the exclusion
-#   list below). Bookkeeping commits (docs, CI, handoff/process files) do not move it,
-#   so the hash always names the exact code a tester ran -- "check out what the tester
-#   ran" is a checkout of this hash. The exclusion list errs toward caution: anything
-#   NOT named still moves the hash, so a missed code path can never silently collide
-#   two different binaries under one string.
-CODE_ANCHOR = $(shell git log -1 --format=%H -- . ':(exclude).github' ':(exclude)HANDOFF.md' ':(exclude)agent-file-drop' ':(exclude)frame_builds' ':(exclude)notes' ':(exclude)obj' ':(exclude).claude' ':(exclude).agents' ':(exclude).codex' ':(exclude).codex-tmp-nhddl' ':(exclude).codex-tmp-wle-r3z' 2>/dev/null)
+#   list below). A commit confined to those NAMED paths -- CI, the agent scratch
+#   areas, notes/, obj/ -- does not move it, so the hash names the exact code a
+#   tester ran and "check out what the tester ran" is a checkout of this hash.
+#   Note that docs/ is deliberately NOT on the list, so a docs-only commit does
+#   move the hash: the list errs toward caution, and anything not named still
+#   moves it, so a missed code path can never silently collide two different
+#   binaries under one string.
+CODE_ANCHOR = $(shell git log -1 --format=%H -- . ':(exclude).github' ':(exclude)agent-file-drop' ':(exclude)frame_builds' ':(exclude)notes' ':(exclude)obj' ':(exclude).claude' ':(exclude).agents' ':(exclude).codex' ':(exclude).codex-tmp-nhddl' ':(exclude).codex-tmp-wle-r3z' 2>/dev/null)
 REVISION = $(shell expr $(shell git rev-list --count HEAD) + 2)
 
 GIT_HASH = $(shell git rev-parse --short=7 $(if $(CODE_ANCHOR),$(CODE_ANCHOR),HEAD) 2>/dev/null)
@@ -422,6 +424,8 @@ clean:	download_lwNBD
 	echo " -pademu"
 	$(MAKE) -C modules/pademu USE_BT=1 clean
 	$(MAKE) -C modules/pademu USE_USB=1 clean
+	echo " -ps2ips"
+	$(MAKE) -C modules/network/ps2ips clean
 	echo "-pc tools"
 	$(MAKE) -C pc clean
 
@@ -756,7 +760,31 @@ $(EE_ASM_DIR)smap.c: $(PS2SDK)/iop/irx/smap.irx | $(EE_ASM_DIR)
 $(EE_ASM_DIR)netman.c: $(PS2SDK)/iop/irx/netman.irx | $(EE_ASM_DIR)
 	$(BIN2C) $< $@ $(*F)_irx
 
-$(EE_ASM_DIR)ps2ips.c: $(PS2SDK)/iop/irx/ps2ips.irx | $(EE_ASM_DIR)
+# FORK-VENDORED ps2ips (modules/network/ps2ips): the ps2sdk prebuilt has four defects in the
+# EE<->IOP socket bridge, and the first one corrupts EE memory in any build that opens a socket.
+#
+#   * do_recvfrom DMAs the whole 144-byte rests_pkt into the EE's _intr_data[32], which is 128
+#     bytes. In the LINKED OPL the next object in .bss is __ps2ipc_fdman_ops_socket -- the table of
+#     function pointers behind every EE socket call -- and bytes 128..143 are exactly its getfd /
+#     getfilename / close / read entries. Overwriting them makes close() stop calling the IOP, so
+#     the lwIP socket leaks and the UDP PCB pool runs dry: roughly ONE network operation per boot.
+#   * the reply sockaddr is written into the shared RPC buffer BEFORE the request's ee_addr and
+#     intr_data are read, so both DMA transfers target EE address 0 -- EE-side UDP receive has
+#     never worked.
+#   * fromlen is passed uninitialised, so the sender address comes back zeroed.
+#   * lwip_buffer is BUFF_SIZE + 32 where a receive at offset 64 needs BUFF_SIZE + 64.
+#
+# The source is current ps2sdk master with the four spots marked "RA fix" -- verified by diffing
+# against ps2dev/ps2sdk master: 6 hunks, and every removed line is one of the defects above, so
+# vendoring drops no upstream behaviour. It keeps the ps2ips.irx name and the same export table, so
+# nbns, httpclient and everything else on the EE socket API bind exactly as before.
+#
+# Kept out of .clang-format-ignore's reach by that same reasoning: do NOT reformat it, or the diff
+# against ps2sdk (and the chance of upstreaming this) is lost.
+modules/network/ps2ips/ps2ips.irx: $(wildcard modules/network/ps2ips/*.c) $(wildcard modules/network/ps2ips/*.h) modules/network/ps2ips/imports.lst modules/network/ps2ips/Makefile
+	$(MAKE) -C modules/network/ps2ips rebuild
+
+$(EE_ASM_DIR)ps2ips.c: modules/network/ps2ips/ps2ips.irx | $(EE_ASM_DIR)
 	$(BIN2C) $< $@ $(*F)_irx
 
 $(EE_ASM_DIR)smbman.c: $(PS2SDK)/iop/irx/smbman.irx | $(EE_ASM_DIR)
