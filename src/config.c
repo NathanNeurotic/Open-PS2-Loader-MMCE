@@ -268,6 +268,11 @@ static struct config_value_t *getConfigItemForName(config_set_t *configSet, cons
 
 static char cfgDevice[8];
 static char cfgLoadDevice[8];
+// The directory configInit()/configSetMove() homed the settings on, kept whole rather than
+// truncated to the device the way cfgDevice is. HTTP needs it: it has no filesystem of its own, so
+// its per-game CFG and art have to live wherever the settings already do (see
+// docs/HTTP-INTEGRATION-PLAN.md section 2.2).
+static char cfgHomePath[256];
 
 static void configPrepareDevice(char *device, size_t deviceSize, const char *prefix)
 {
@@ -342,7 +347,19 @@ void configInit(char *prefix)
         configAlloc(1 << i, &configFiles[i], path);
     }
 
+    snprintf(cfgHomePath, sizeof(cfgHomePath), "%s", prefix);
     configPrepareNotifications(prefix);
+}
+
+const char *configGetHomePath(void)
+{
+    // Same wildcard substitution configGetDir() performs, and for the same reason: a legacy
+    // "mc?:OPL" home must resolve to the card that was actually found before anything opens a
+    // file through it.
+    if (!strncmp(cfgHomePath, "mc", 2) && cfgHomePath[2] == '?' && getmcID() >= 0)
+        cfgHomePath[2] = getmcID();
+
+    return cfgHomePath;
 }
 
 void configSetMove(char *prefix)
@@ -359,6 +376,10 @@ void configSetMove(char *prefix)
         configBuildPath(path, sizeof(path), prefix, configFilenames[i]);
         configMove(&configFiles[i], path);
     }
+
+    // A move re-homes the settings, so the recorded home has to follow it or HTTP's per-game data
+    // keeps resolving against the place the config used to live.
+    snprintf(cfgHomePath, sizeof(cfgHomePath), "%s", prefix);
 
     configPrepareNotifications(prefix);
 }

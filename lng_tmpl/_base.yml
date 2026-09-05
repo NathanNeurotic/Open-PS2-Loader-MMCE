@@ -1279,3 +1279,29 @@ gui_strings:
   string: RetroAchievements telemetry
 - label: RA_BADGES
   string: RetroAchievements badges
+- label: HTTP_GAMES
+  string: HTTP Games
+- label: HTTP_SERVER
+  string: HTTP server
+- label: HTTP_PORT
+  string: HTTP port
+- label: HTTP_BASE_PATH
+  string: HTTP base path
+- label: HTTP_TEST
+  string: Test HTTP server
+- label: HTTP_TEST_OK
+  string: Server OK -- games listed
+- label: HTTP_TEST_EMPTY
+  string: Catalog is empty -- valid, but it proves nothing about byte ranges
+- label: HTTP_TEST_NO_ISO
+  string: Catalog has no supported image to test a byte range against
+- label: HTTP_ERR_CONNECT
+  string: Cannot reach the HTTP server
+- label: HTTP_ERR_CATALOG
+  string: games.csv is missing, unreadable or too large
+- label: HTTP_ERR_RANGE
+  string: The server did not return the exact bytes that were asked for
+- label: HTTP_LAUNCH_UNAVAILABLE
+  string: HTTP launch is not implemented yet -- the catalog is browsable only
+- label: HTTP_ERR_COMPRESSED
+  string: Compressed images (.zso) are not supported over HTTP yet

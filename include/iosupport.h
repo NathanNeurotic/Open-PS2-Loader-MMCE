@@ -21,6 +21,7 @@ enum IO_MODES {
     MMCE_MODE,  // reserved: MMCE support returns with checklist item 1
     FAV_MODE,   // reserved: Favourites returns with checklist item 33
     UDPFS_MODE, // reserved (item 6); appended last so existing mode values don't shift
+    HTTP_MODE,  // games.csv catalog + byte-range ISO reads; appended for the same reason
 
     MODE_COUNT
 };

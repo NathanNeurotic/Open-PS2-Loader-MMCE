@@ -1209,7 +1209,7 @@ void guiGameShowCompatConfig(int id, item_list_t *support, config_set_t *configS
     // VCD games launch through POPSTARTER only, so the Loader Core is inert for them -- keep every
     // Neutrino-only row greyed even under a Neutrino global default (guiGameSetCoreAwareState reads
     // this). SMB likewise: ethsupport has no Neutrino launch leg, the effective core is always <OPL>.
-    coreNeverNeutrino = (support != NULL && ((libViewActive(support->mode) == LIB_VIEW_PS1) || support->mode == ETH_MODE));
+    coreNeverNeutrino = (support != NULL && ((libViewActive(support->mode) == LIB_VIEW_PS1) || support->mode == ETH_MODE || support->mode == HTTP_MODE));
 
     // UDPBD games have no OPL core backend -- they always launch via Neutrino
     // (bdmsupport.c forces it). Lock the selector to Neutrino so the screen matches;
@@ -1221,7 +1221,7 @@ void guiGameShowCompatConfig(int id, item_list_t *support, config_set_t *configS
         // could run under a different core.
         diaSetInt(diaCompatConfig, COMPAT_LOADER, 2);
         diaSetEnabled(diaCompatConfig, COMPAT_LOADER, 0);
-    } else if (support != NULL && support->mode == ETH_MODE) {
+    } else if (support != NULL && (support->mode == ETH_MODE || support->mode == HTTP_MODE)) {
         // SMB has no Neutrino launch leg (ethsupport never builds Neutrino args) -- the effective
         // core is ALWAYS <OPL>. Pin the row to the inert "Default" (index 2: saving removes any
         // stale $CoreLoader key, self-healing old Neutrino selections) and lock it. Launch-time

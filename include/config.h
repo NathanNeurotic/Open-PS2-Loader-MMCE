@@ -203,6 +203,9 @@ enum CONFIG_INDEX {
 #define CONFIG_NET_SMB_USER           "smb_user"
 #define CONFIG_NET_SMB_PASSW          "smb_pass"
 #define CONFIG_NET_SMB_PORT           "smb_port"
+#define CONFIG_NET_HTTP_IP_ADDR       "http_ip"
+#define CONFIG_NET_HTTP_PORT          "http_port"
+#define CONFIG_NET_HTTP_BASE_PATH     "http_base_path"
 #define CONFIG_NET_NBD_DEFAULT_EXPORT "nbd_default_export"
 
 #define CONFIG_KEY_NAME_LEN  32
@@ -273,6 +276,8 @@ void configSetVMCDisable(config_set_t *configSet, int slot, int disabled);
 void configRemoveVMCDisable(config_set_t *configSet, int slot);
 
 char *configGetDir(void);
+// Full settings-home directory, not just its device. See src/config.c.
+const char *configGetHomePath(void);
 char *configGetLoadDir(void);
 void configPrepareNotifications(char *prefix);
 

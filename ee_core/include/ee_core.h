@@ -73,6 +73,7 @@ enum GAME_MODE {
     ETH_MODE,
     HDD_MODE,
     MMCE_MODE,
+    HTTP_MODE,
 };
 
 extern int EnableDebug;

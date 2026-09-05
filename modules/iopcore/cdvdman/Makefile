@@ -28,6 +28,15 @@ USE_DEV9 = 1
 IOP_INCS += -I../../network/common
 endif
 
+ifeq ($(USE_HTTP),1)
+IOP_BIN = http_cdvdman.irx
+IOP_OBJS_DIR = obj.http/
+IOP_OBJS += device-http.o
+IOP_CFLAGS += -DHTTP_DRIVER
+USE_DEV9 = 1
+IOP_INCS += -I../../network/common
+endif
+
 ifeq ($(USE_BDM),1)
 IOP_BIN  = bdm_cdvdman.irx
 IOP_OBJS_DIR = obj.bdm/

@@ -21,7 +21,8 @@
 #include "include/system.h"
 #include "include/mmcesupport.h"
 #include "include/ethsupport.h"
-#include "include/udpfssupport.h" // udpfsGetModulesLoaded() -- network-protocol restart-notice check
+#include "include/udpfssupport.h"
+#include "include/httpsupport.h" // httpTestServer() -- the Network page Test button
 #include "include/artindex.h"
 #include "include/bdmsupport.h" // bdmIsUDPBDLoaded() + bdmForceDeviceRefresh()
 #include "include/hddsupport.h" // staged normal APA OPL-home selector
@@ -1151,9 +1152,19 @@ reshow_ui:
     guiFreeNameList(langNamesSnap);
 }
 
+static int httpTestBusy;
+static int httpTestIp[4], httpTestPort;
+static char httpTestBase[HTTP_BASE_PATH_MAX], httpTestMessage[128];
+
+static void httpTestWorker(void)
+{
+    httpTestServer(httpTestIp, httpTestPort, httpTestBase, httpTestMessage, sizeof(httpTestMessage));
+    httpTestBusy = 0;
+}
+
 static int netConfigUpdater(int modified)
 {
-    int showAdvancedOptions, isNetBIOS, isDHCPEnabled, netProto, isSMB, i;
+    int showAdvancedOptions, isNetBIOS, isDHCPEnabled, netProto, isSMB, isHTTP, i;
 
     if (modified) {
         diaGetInt(diaNetConfig, NETCFG_SHOW_ADVANCED_OPTS, &showAdvancedOptions);
@@ -1162,6 +1173,7 @@ static int netConfigUpdater(int modified)
         diaGetInt(diaNetConfig, NETCFG_SHARE_ADDR_TYPE, &isNetBIOS);
         diaGetInt(diaNetConfig, CFG_NETPROTOCOL, &netProto);
         isSMB = netProto == 0;
+        isHTTP = netProto == 3;
         diaSetVisible(diaNetConfig, NETCFG_SHARE_NB_ADDR, isNetBIOS);
 
         // SMB server fields belong to OPL's SMB consumer. UDPFS/UDPBD are the Neutrino-facing
@@ -1196,6 +1208,20 @@ static int netConfigUpdater(int modified)
         diaSetVisible(diaNetConfig, NETCFG_SHARE_USERNAME, isSMB);
         diaSetVisible(diaNetConfig, NETCFG_SHARE_PASSWORD, isSMB);
 
+        // HTTP endpoint, shown only for HTTP. Its fields are separate from the SMB ones, so a
+        // protocol switch hides them rather than repurposing another protocol's settings.
+        diaSetVisible(diaNetConfig, NETCFG_LBL_HTTP_SERVER, isHTTP);
+        diaSetVisible(diaNetConfig, NETCFG_LBL_HTTP_PORT, isHTTP);
+        diaSetVisible(diaNetConfig, NETCFG_LBL_HTTP_BASE, isHTTP);
+        diaSetVisible(diaNetConfig, NETCFG_HTTP_PORT, isHTTP);
+        diaSetVisible(diaNetConfig, NETCFG_HTTP_BASE, isHTTP);
+        diaSetVisible(diaNetConfig, NETCFG_HTTP_TEST, isHTTP);
+        diaSetVisible(diaNetConfig, NETCFG_LBL_HTTP_TEST, isHTTP);
+        for (i = 0; i < 3; i++)
+            diaSetVisible(diaNetConfig, NETCFG_HTTP_DOT_0 + i, isHTTP);
+        for (i = 0; i < 4; i++)
+            diaSetVisible(diaNetConfig, NETCFG_HTTP_IP_0 + i, isHTTP);
+
         // Protocol: lock Access to Files for SMB and to IMG for UDPBD (only UDPFS offers the free
         // toggle) -- snap the value so a stale IMG left over from UDPFS can never mis-derive to
         // UDPFSBD under SMB, AND grey the control so the lock is visible.
@@ -1203,7 +1229,7 @@ static int netConfigUpdater(int modified)
         // enables it while SMB is the selected protocol).
         diaSetEnabled(diaNetConfig, CFG_SMBDIALECT, 0);
         diaSetVisible(diaNetConfig, CFG_SMBDIALECT, isSMB);
-        if (netProto == 0) { // SMB -> Files, locked
+        if (netProto == 0 || netProto == 3) { // SMB and HTTP -> Files, locked
             diaSetInt(diaNetConfig, CFG_UDPFSMODE, 0);
             diaSetEnabled(diaNetConfig, CFG_UDPFSMODE, 0);
         } else if (netProto == 2) { // UDPBD -> IMG, locked
@@ -1223,8 +1249,8 @@ int guiShowNetConfig(void)
     const char *ethOpModes[] = {_l(_STR_AUTO), _l(_STR_ETH_100MFDX), _l(_STR_ETH_100MHDX), _l(_STR_ETH_10MFDX), _l(_STR_ETH_10MHDX), NULL};
     const char *addrConfModes[] = {_l(_STR_ADDR_TYPE_IP), _l(_STR_ADDR_TYPE_NETBIOS), NULL};
     const char *ipAddrConfModes[] = {_l(_STR_IP_ADDRESS_TYPE_STATIC), _l(_STR_IP_ADDRESS_TYPE_DHCP), NULL};
-    const char *netProtocols[] = {"SMB", "UDPFS", "UDPBD", NULL}; // UDPBD = SUDPBDv2 server -- protocol names, not translated
-    const char *udpfsModes[] = {"Files", "IMG", NULL};            // Access: Files=udpfs_ioman filesystem, IMG=udpfs_bd block
+    const char *netProtocols[] = {"SMB", "UDPFS", "UDPBD", "HTTP", NULL}; // UDPBD = SUDPBDv2 server -- protocol names, not translated
+    const char *udpfsModes[] = {"Files", "IMG", NULL};                    // Access: Files=udpfs_ioman filesystem, IMG=udpfs_bd block
     // NOTE(rebuild): SMBv1 only until item 4 re-adds the SMB2 dialect; the row shows the active
     // dialect and stays greyed (netConfigUpdater keeps it disabled).
     const char *smbDialects[] = {"SMBv1", NULL};
@@ -1283,11 +1309,16 @@ int guiShowNetConfig(void)
     //   Access:   Files(0)/IMG(1); IMG only distinct for UDPFS (-> UDPFSBD backend)
     // A NET_PROTO_OFF backend has no protocol memory, so seed the protocol row to SMB -- the common
     // default a user reaches when they switch the Game Sources Start row from Off to Manual/Auto.
-    int netProtoVal = (gNetworkProtocol == NET_PROTO_UDPBD)                                          ? 2 :
+    int netProtoVal = (gNetworkProtocol == NET_PROTO_HTTP)                                           ? 3 :
+                      (gNetworkProtocol == NET_PROTO_UDPBD)                                          ? 2 :
                       (gNetworkProtocol == NET_PROTO_UDPFS || gNetworkProtocol == NET_PROTO_UDPFSBD) ? 1 :
                                                                                                        0; // SMB / OFF
     // IMG for the udpfs block backend AND UDPBD (IMG-locked), so the seed already matches the lock.
     int netAccessVal = (gNetworkProtocol == NET_PROTO_UDPFSBD || gNetworkProtocol == NET_PROTO_UDPBD) ? 1 : 0;
+    for (i = 0; i < 4; ++i)
+        diaSetInt(diaNetConfig, NETCFG_HTTP_IP_0 + i, gHttpServerIp[i]);
+    diaSetInt(diaNetConfig, NETCFG_HTTP_PORT, gHttpPort);
+    diaSetString(diaNetConfig, NETCFG_HTTP_BASE, gHttpBasePath);
     diaSetInt(diaNetConfig, CFG_NETPROTOCOL, netProtoVal);
     diaSetInt(diaNetConfig, CFG_UDPFSMODE, netAccessVal);
     diaSetInt(diaNetConfig, CFG_SMBDIALECT, 0); // SMBv1 -- the only dialect until item 4
@@ -1313,6 +1344,18 @@ int guiShowNetConfig(void)
     int result;
 reshow_network:
     result = diaExecuteDialog(diaNetConfig, -1, 1, &netConfigUpdater);
+    if (result == NETCFG_HTTP_TEST) {
+        for (i = 0; i < 4; ++i)
+            diaGetInt(diaNetConfig, NETCFG_HTTP_IP_0 + i, &httpTestIp[i]);
+        diaGetInt(diaNetConfig, NETCFG_HTTP_PORT, &httpTestPort);
+        diaGetString(diaNetConfig, NETCFG_HTTP_BASE, httpTestBase, sizeof(httpTestBase));
+        httpNormalizeBasePath(httpTestBase, sizeof(httpTestBase));
+        snprintf(httpTestMessage, sizeof(httpTestMessage), "%s", _l(_STR_HTTP_ERR_CONNECT));
+        httpTestBusy = 1;
+        guiHandleDeferedIO(&httpTestBusy, _l(_STR_HTTP_TEST), IO_CUSTOM_SIMPLEACTION, &httpTestWorker, 0);
+        guiMsgBox(httpTestMessage, 0, NULL);
+        goto reshow_network;
+    }
     if (result == NETCFG_POPSTARTER_BUTTON) {
         // This is the shared POPSTARTER network editor. It owns IPCONFIG.DAT / SMBCONFIG.DAT;
         // the Network page only provides a second entry point and never mirrors that state.
@@ -1339,6 +1382,11 @@ reshow_network:
 #endif
 
         diaGetInt(diaNetConfig, NETCFG_SHARE_PORT, &gPCPort);
+        for (i = 0; i < 4; ++i)
+            diaGetInt(diaNetConfig, NETCFG_HTTP_IP_0 + i, &gHttpServerIp[i]);
+        diaGetInt(diaNetConfig, NETCFG_HTTP_PORT, &gHttpPort);
+        diaGetString(diaNetConfig, NETCFG_HTTP_BASE, gHttpBasePath, sizeof(gHttpBasePath));
+        httpNormalizeBasePath(gHttpBasePath, sizeof(gHttpBasePath));
         diaGetString(diaNetConfig, NETCFG_SHARE_NAME, gPCShareName, sizeof(gPCShareName));
         diaGetString(diaNetConfig, NETCFG_SHARE_USERNAME, gPCUserName, sizeof(gPCUserName));
         diaGetString(diaNetConfig, NETCFG_SHARE_PASSWORD, gPCPassword, sizeof(gPCPassword));
@@ -1357,6 +1405,7 @@ reshow_network:
             gNetworkProtocol = NET_PROTO_OFF;
         else
             gNetworkProtocol = (netProtoVal2 == 0)  ? NET_PROTO_SMB :
+                               (netProtoVal2 == 3)  ? NET_PROTO_HTTP :
                                (netProtoVal2 == 2)  ? NET_PROTO_UDPBD :
                                (netAccessVal2 == 1) ? NET_PROTO_UDPFSBD :
                                                       NET_PROTO_UDPFS; // UDPFS + Files

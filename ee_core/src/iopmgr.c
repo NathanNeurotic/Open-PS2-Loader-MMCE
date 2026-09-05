@@ -170,7 +170,7 @@ static void ResetIopSpecial(const char *args, unsigned int arglen)
        driver, so without SMAP it fails to link and nothing is sent. ETH mode
        loads both modules in its own branch below; every other mode loads them
        here, and only when there is actually a watch list to stream. */
-    if (config->GameMode != ETH_MODE && RA_TelemetryWanted(config)) {
+    if (config->GameMode != ETH_MODE && config->GameMode != HTTP_MODE && RA_TelemetryWanted(config)) {
         LoadOPLModule(OPL_MODULE_ID_SMSTCPIP, 0, 0, NULL);
         LoadOPLModule(OPL_MODULE_ID_SMAP, 0, g_ipconfig_len, g_ipconfig);
     }
@@ -186,6 +186,12 @@ static void ResetIopSpecial(const char *args, unsigned int arglen)
             LoadOPLModule(OPL_MODULE_ID_SMAP, 0, g_ipconfig_len, g_ipconfig);
 #endif
             LoadOPLModule(OPL_MODULE_ID_SMBINIT, 0, 0, NULL);
+            break;
+        case HTTP_MODE:
+#ifndef __LOAD_DEBUG_MODULES
+            LoadOPLModule(OPL_MODULE_ID_SMSTCPIP, 0, 0, NULL);
+            LoadOPLModule(OPL_MODULE_ID_SMAP, 0, g_ipconfig_len, g_ipconfig);
+#endif
             break;
         case HDD_MODE:
             break;

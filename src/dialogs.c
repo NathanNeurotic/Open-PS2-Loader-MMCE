@@ -138,6 +138,37 @@ struct UIItem diaNetConfig[] = {
     {UI_PASSWORD, NETCFG_SHARE_PASSWORD, 1, 1, _STR_HINT_GUEST, 0, 0, {.stringvalue = {"", "", NULL}}},
     {UI_BREAK},
 
+    //  ---- HTTP endpoint. Its own fields, never SMB's: pointing HTTP at another box must not
+    //  silently repoint SMB, and opening this section must not touch SMB's share the way the
+    //  donor's fork does. Hidden whole unless the protocol row is HTTP.
+    {UI_LABEL, NETCFG_LBL_HTTP_SERVER, 1, 1, -1, -40, 0, {.label = {NULL, _STR_HTTP_SERVER}}},
+    {UI_SPACER},
+    {UI_INT, NETCFG_HTTP_IP_0, 1, 1, -1, 0, 0, {.intvalue = {192, 192, 0, 255}}},
+    {UI_LABEL, NETCFG_HTTP_DOT_0, 1, 1, -1, 0, 0, {.label = {".", -1}}},
+    {UI_INT, NETCFG_HTTP_IP_1, 1, 1, -1, 0, 0, {.intvalue = {168, 168, 0, 255}}},
+    {UI_LABEL, NETCFG_HTTP_DOT_1, 1, 1, -1, 0, 0, {.label = {".", -1}}},
+    {UI_INT, NETCFG_HTTP_IP_2, 1, 1, -1, 0, 0, {.intvalue = {0, 0, 0, 255}}},
+    {UI_LABEL, NETCFG_HTTP_DOT_2, 1, 1, -1, 0, 0, {.label = {".", -1}}},
+    {UI_INT, NETCFG_HTTP_IP_3, 1, 1, -1, 0, 0, {.intvalue = {10, 10, 0, 255}}},
+    {UI_BREAK},
+
+    // 1100 is Docmine17's PC server default and therefore what an unconfigured install should try
+    // first. Any port is accepted, 80 and 8080 included.
+    {UI_LABEL, NETCFG_LBL_HTTP_PORT, 1, 1, -1, -40, 0, {.label = {NULL, _STR_HTTP_PORT}}},
+    {UI_SPACER},
+    {UI_INT, NETCFG_HTTP_PORT, 1, 1, -1, 0, 0, {.intvalue = {1100, 1100, 1, 65535}}},
+    {UI_BREAK},
+
+    {UI_LABEL, NETCFG_LBL_HTTP_BASE, 1, 1, -1, -40, 0, {.label = {NULL, _STR_HTTP_BASE_PATH}}},
+    {UI_SPACER},
+    {UI_STRING, NETCFG_HTTP_BASE, 1, 1, -1, 0, 0, {.stringvalue = {"/", "/", NULL}}},
+    {UI_BREAK},
+
+    {UI_LABEL, NETCFG_LBL_HTTP_TEST, 1, 1, -1, -40, 0, {.label = {NULL, _STR_HTTP_TEST}}},
+    {UI_SPACER},
+    {UI_BUTTON, NETCFG_HTTP_TEST, 1, 1, -1, 0, 0, {.label = {NULL, _STR_TEST}}},
+    {UI_BREAK},
+
     // POPSTARTER owns its own IPCONFIG.DAT / SMBCONFIG.DAT editor. Keep its entry beside the
     // SMB server data it relates to, without duplicating any of that state in this page.
     {UI_LABEL, 0, 1, 1, -1, -40, 0, {.label = {NULL, _STR_POPSTARTER_NETWORK_SETTINGS}}},

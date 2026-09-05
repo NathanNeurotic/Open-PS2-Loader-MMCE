@@ -124,16 +124,20 @@ int HttpStreamRead(void *buffer, int wanted)
         return 0;
 
     args->wanted = wanted;
-    args->output = buffer;
+    static unsigned char streamBuffer[HTTP_CLIENT_STREAM_CHUNK] __attribute__((aligned(64)));
+    args->output = streamBuffer;
 
     // The IOP DMAs straight into this buffer, so anything the EE still holds in cache for it would
     // survive the transfer and be read back as stale bytes.
-    if (!IS_UNCACHED_SEG(buffer))
-        SifWriteBackDCache(buffer, wanted);
+    SifWriteBackDCache(streamBuffer, sizeof(streamBuffer));
 
     if ((result = SifCallRpc(&SifRpcClient, HTTP_CLIENT_CMD_STREAM_READ, 0, RpcTxBuffer, sizeof(*args), RpcRxBuffer, sizeof(*res), NULL, NULL)) < 0)
         return result;
 
+    if (res->result > 0 && res->result <= wanted)
+        memcpy(buffer, UNCACHED_SEG(streamBuffer), res->result);
+    else if (res->result > wanted)
+        return HTTP_STREAM_ERR_TRUNC;
     return res->result;
 }
 
