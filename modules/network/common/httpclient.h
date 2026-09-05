@@ -145,7 +145,7 @@ struct HttpClientSendGetResult
 // Ordinals must match modules/network/httpclient/exports.tab position for position. Nothing on the
 // IOP imports httpc today -- the menu reaches it over RPC -- but keeping these in step means the
 // next module that does will not silently bind the wrong function.
-#define I_HttpStreamBegin DECLARE_IMPORT(7, HttpStreamBegin)
-#define I_HttpStreamRead  DECLARE_IMPORT(8, HttpStreamRead)
-#define I_HttpStreamEnd   DECLARE_IMPORT(9, HttpStreamEnd)
+#define I_HttpStreamBegin     DECLARE_IMPORT(7, HttpStreamBegin)
+#define I_HttpStreamRead      DECLARE_IMPORT(8, HttpStreamRead)
+#define I_HttpStreamEnd       DECLARE_IMPORT(9, HttpStreamEnd)
 #endif
