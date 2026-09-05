@@ -173,6 +173,13 @@ Hand testers a **run-pinned nightly.link build**, never a bare artifact link.
 * **Deleting `obj/` is mandatory** after any change to `EECoreConfig_t`, `OPL_MODULE_ID` or the
   submenu structs. This Makefile does not track header dependencies, so an incremental build can
   pass locally while CI's `make clean` fails.
+* **`ee_core` has about 3 KB of headroom, and RA spends it.** ram84 is 77312 bytes
+  (`ee_core/linkfile`). Without RA, an `EXTRA_FEATURES=1` ee_core comes to 74215; with RA and
+  without extras, 74067. Either fits; both together overflow by roughly 6.5 KB and `ld` refuses
+  with `.bss is not within region ram84`. That is why the release builds RA at the default
+  `EXTRA_FEATURES=0`, which is also what the main loader ships as — so the RA archive is the
+  shipping loader plus achievements, not a variant. `ra_snap_buf` and `ra_watch` are most of RA's
+  share; shrink them before trying to add anything else to that build.
 * **Do not build a PC client.** hacan359 provides and maintains xeRAbora. Do not commit `pc/RA/`.
 * **Disc mode is deferred**, deliberately, as a separate game source. It is not a missing piece of
   this work.
