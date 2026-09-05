@@ -13,7 +13,7 @@ translations:
   COVERFLOW_SETTINGS: Paramètres Coverflow
 ```
 
-At build time (`make languages`), `tools/languages/lang_compiler.py --overlay_translation_yml` merges each
+At build time (`make languages`), `tools/lang_compiler.py --overlay_translation_yml` merges each
 file into its language **only to fill gaps** — it never overwrites a real upstream/human
 translation, and a missing file just means English fallback. `<Language>` must match a name
 in the Makefile's `TRANSLATIONS` list (e.g. `French`, `Portuguese_BR`, `SChinese`).

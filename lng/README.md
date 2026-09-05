@@ -65,7 +65,7 @@ translations:
 ```
 
 During `make languages`, after each upstream `lng_src/<Language>.yml` is merged against
-`lng_tmpl/_base.yml`, `tools/languages/lang_compiler.py --overlay_translation_yml` applies the matching
+`lng_tmpl/_base.yml`, `tools/lang_compiler.py --overlay_translation_yml` applies the matching
 `lng_fork/<Language>.yml`:
 
 - It only **fills gaps.** A label that already carries a real (human) translation in the

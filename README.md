@@ -794,12 +794,10 @@ Currently, supported only [PS3 Backward Compatible](https://www.psdevwiki.com/ps
 
 To run OPL, you need an entry point for running PS2 titles. You can use everything (Swapmagic PS2, for example), but custom firmware with the latest Cobra is preferred. Note: only CFW supports HDD mode.
 
-## Documentation
-
-See the [documentation index](docs/README.md) for guides, historical reports, and
-the [repository layout and maintenance guide](docs/REPOSITORY.md).
-
 ## Some notes for DEVS
+
+Repository scripts live in `tools/`; run them from the repository root. Existing
+Makefile targets retain their names and output locations.
 
 Open PS2 Loader needs the [**latest PS2SDK**](https://github.com/ps2dev/ps2sdk)
 
