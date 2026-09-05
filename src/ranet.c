@@ -75,12 +75,12 @@
 #include "include/ioman.h"
 #include "include/ranet.h"
 #include "include/lang.h"
-#include "include/supportbase.h" /* raHashStep: crumbs to the log on the share;
+#include "include/supportbase.h"  /* raHashStep: crumbs to the log on the share;
                                     LOG output is invisible in the menu on hardware */
-#include "include/ethsupport.h"  /* ethGetNetConfig: own IP for the request */
-#include "include/bdmsupport.h"  /* bdmIsUDPBDLoaded: the NIC interlock */
+#include "include/ethsupport.h"   /* ethGetNetConfig: own IP for the request */
+#include "include/bdmsupport.h"   /* bdmIsUDPBDLoaded: the NIC interlock */
 #include "include/udpfssupport.h" /* udpfsGetModulesLoaded: the NIC interlock */
-#include "include/rawatch.h"     /* SetWatchList: list straight into memory */
+#include "include/rawatch.h"      /* SetWatchList: list straight into memory */
 
 #include <ps2ips.h>
 #include <errno.h>

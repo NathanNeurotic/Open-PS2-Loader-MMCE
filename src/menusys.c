@@ -1893,7 +1893,7 @@ void menuHandleInputGameMenu()
             guiShowRANotice(_l(_STR_RA_LOOKING_FOR_PC), NULL);
         } else
 #endif
-        if (menuID == GAME_COMPAT_SETTINGS) {
+            if (menuID == GAME_COMPAT_SETTINGS) {
             guiGameShowCompatConfig(selected_item->item->current->item.id, selected_item->item->userdata, itemConfig);
         } else if (menuID == GAME_CHEAT_SETTINGS) {
             if (gameMenuCoreIsNeutrino())
