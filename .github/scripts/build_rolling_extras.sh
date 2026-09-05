@@ -41,8 +41,17 @@ done
 # RetroAchievements flavour. Deliberately its OWN short loop rather than a fourth dimension of the
 # matrix above: folding it in would take 8 builds per SDK flavour to 16 (32 in total) and roughly
 # double the rolling job for a feature most users will not run. Two builds -- PADEMU is the only
-# axis a RA user still cares about; EXTRA_FEATURES=1 is fixed on because the RA build is opt-in
-# already and there is no reason to ship a cut-down one.
+# axis a RA user still cares about.
+#
+# EXTRA_FEATURES is deliberately NOT passed. The flag defaults to 0 and the MAIN release loader is
+# built with that default, so leaving it alone is what makes this the shipping loader plus
+# achievements -- which is what somebody taking RIPTOPL-RA-*.zip instead of the main archive should
+# get. An earlier version pinned EXTRA_FEATURES=1, borrowed from the matrix above on the reasoning
+# that an opt-in build may as well carry everything. The linker settled it: GSM_1080P + IGS cost
+# ee_core ~6.2 KB of text, RA costs ~6.0 KB of bss, and ram84 (77312 bytes, ee_core/linkfile) fits
+# one or the other -- ld refuses with ".bss is not within region ram84" and this loop then logs a
+# WARN, skips, and the release publishes with no RA zip while every job stays green. Do not restore
+# the flag without first shrinking RA's ee_core footprint by ~6.5 KB.
 # Staged in rolling/ra/, NOT rolling/variants/. VARIANTS is a ~120 MB diagnostic grab-bag that
 # rolling-release.yml deliberately excludes from the permanent MEGA archive as "not installable
 # payload" -- so anything living there is classified as a debug artifact and is not archived. RA is
@@ -52,7 +61,7 @@ echo "== Building RIPTOPL RetroAchievements flavour (suffix='${SDK_SUFFIX}') =="
 mkdir -p rolling/ra
 for ra_pad in PADEMU=0 PADEMU=1; do
   make clean >/dev/null 2>&1 || true
-  if make --trace RETROACHIEVEMENTS=1 $ra_pad EXTRA_FEATURES=1 NOT_PACKED=1 $BRAND_ARG && [ -f opl.elf ]; then
+  if make --trace RETROACHIEVEMENTS=1 $ra_pad NOT_PACKED=1 $BRAND_ARG && [ -f opl.elf ]; then
     mv opl.elf "rolling/ra/RIPTOPL-ra-pademu${ra_pad#PADEMU=}${SDK_SUFFIX}.ELF"
   else
     echo "WARN: RA build '$ra_pad'${SDK_SUFFIX} failed to build; skipping it"
