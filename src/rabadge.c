@@ -110,7 +110,7 @@ void raBadgeRefresh(item_list_t *support, int count)
 
     /* Switched off: return AFTER the clear above, never before it, so turning badges off
        drops the cache on the next list rebuild instead of freezing the last one on screen.
-       raBadgeText and raBadgeHas both read this slot, so the cover mark goes with them. */
+       raBadgeText reads this slot, and the cover mark rides on the same answer. */
     if (!gRATelemetry || !gRABadges)
         return;
 
@@ -137,11 +137,6 @@ void raBadgeRefresh(item_list_t *support, int count)
         else
             dst[0] = '\0'; /* empty means show the plain name */
     }
-}
-
-int raBadgeHas(item_list_t *support, int idx)
-{
-    return raBadgeText(support, idx) != NULL;
 }
 
 const char *raBadgeText(item_list_t *support, int idx)

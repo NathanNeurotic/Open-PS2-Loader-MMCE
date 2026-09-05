@@ -39,6 +39,9 @@ struct gui_update_t
             int text_id;
             int selected;
             int isFolder; // folder-browse row marker (checklist item 34)
+#ifdef RETROACHIEVEMENTS
+            int raBadged; // RA watch list present -- resolved on the I/O thread, see submenu_item_t
+#endif
         } submenu;
 
         struct

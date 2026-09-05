@@ -14,7 +14,4 @@ void raBadgeRefresh(item_list_t *support, int count);
    until the next raBadgeRefresh of the same device. */
 const char *raBadgeText(item_list_t *support, int idx);
 
-/* Whether the game is tracked. Used for the mark over the cover. */
-int raBadgeHas(item_list_t *support, int idx);
-
 #endif

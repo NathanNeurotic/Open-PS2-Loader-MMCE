@@ -1243,6 +1243,9 @@ static void updateMenuFromGameList(opl_io_module_t *mdl)
                     // The RA badge prefix, when this game has a watch list. NULL means plain name.
                     const char *badge = raBadgeText(mdl->support, i);
                     gup->submenu.text = (char *)(badge != NULL ? badge : mdl->support->itemGetName(mdl->support, i));
+                    /* Resolve the cover mark HERE, on the I/O thread that owns the badge cache,
+                       and carry the answer to the renderer as a plain int. */
+                    gup->submenu.raBadged = (badge != NULL);
                 }
 #else
                 gup->submenu.text = mdl->support->itemGetName(mdl->support, i);

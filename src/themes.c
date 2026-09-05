@@ -927,18 +927,19 @@ static int raQuadUsable(const image_texture_t *ovl, const GSTEXTURE *geom)
            ovl->lowerRight_y > ovl->upperRight_y && ovl->lowerRight_y <= geom->Height;
 }
 
-static void drawRAMark(struct menu_list *menu, struct submenu_list *item,
-                       struct theme_element *elem, mutable_image_t *img,
-                       GSTEXTURE *cover)
+static void drawRAMark(struct submenu_list *item, struct theme_element *elem,
+                       mutable_image_t *img, GSTEXTURE *cover)
 {
     GSTEXTURE *mark, *geom;
     image_texture_t *ovl;
     int w, h, x0, y0, side, margin, right, topy, refw, x, y;
 
-    if (item == NULL || menu == NULL || menu->item->userdata == NULL || cover == NULL)
+    if (item == NULL || cover == NULL)
         return;
 
-    if (!raBadgeHas((item_list_t *)menu->item->userdata, item->item.id))
+    /* The row already knows. Asking the badge cache from here would mean the render thread
+       dereferencing a pointer the I/O thread frees on every list rebuild (raBadgeRefresh). */
+    if (!item->item.raBadged)
         return;
 
     mark = thmGetTexture(RA_MARK);
@@ -1170,7 +1171,7 @@ static void drawGameImage(struct menu_list *menu, struct submenu_list *item, con
         /* The RA mark over the cover of a tracked game. Only elements whose pattern is
            COV (raIsCover); drawn after the cover so it lands on top. */
         if (gameImage->raIsCover)
-            drawRAMark(menu, item, drawElem, gameImage, texture);
+            drawRAMark(item, drawElem, gameImage, texture);
 #endif
 
     } else if (elem->type == ELEM_TYPE_BACKGROUND) {
