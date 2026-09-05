@@ -196,7 +196,7 @@ EE_OBJS_DIR = obj/
 EE_ASM_DIR = asm/
 LNG_SRC_DIR = lng_src/
 # Fork-maintained translation overlay (item 57). Fills gaps in the upstream language files for
-# labels this fork added, without ever touching lng_src/ (which download_lng.sh rewrites).
+# labels this fork added, without ever touching lng_src/ (which tools/download_lng.sh rewrites).
 LNG_FORK_DIR = lng_fork/
 LNG_TMPL_DIR = lng_tmpl/
 LNG_DIR = lng/
@@ -518,7 +518,7 @@ $(EE_OBJS_DIR):
 
 .PHONY: DETAILED_CHANGELOG
 DETAILED_CHANGELOG:
-	sh make_changelog.sh
+	sh tools/make_changelog.sh
 
 $(EE_BIN_STRIPPED): $(EE_BIN)
 	echo "Stripping..."
@@ -1050,18 +1050,18 @@ ENGLISH_LNG = $(LNG_SRC_DIR)lang_English.lng
 BASE_LANGUAGE = $(LNG_TMPL_DIR)_base.yml
 INTERNAL_LANGUAGE_C = src/lang_internal.c
 INTERNAL_LANGUAGE_H = include/lang_autogen.h
-LANG_COMPILER = lang_compiler.py
+LANG_COMPILER = tools/lang_compiler.py
 
 languages: $(ENGLISH_TEMPLATE_YML) $(TRANSLATIONS_YML) $(ENGLISH_LNG) $(TRANSLATIONS_LNG) $(INTERNAL_LANGUAGE_C) $(INTERNAL_LANGUAGE_H)
 
 download_lng:
-	./download_lng.sh
+	./tools/download_lng.sh
 
 download_lwNBD:
-	./download_lwNBD.sh
+	./tools/download_lwNBD.sh
 
 download_cfla:
-	./download_cfla.sh
+	./tools/download_cfla.sh
 
 $(TRANSLATIONS_LNG): $(LNG_DIR)lang_%.lng: $(LNG_SRC_DIR)%.yml $(BASE_LANGUAGE) $(LANG_COMPILER)
 	@if [ -f $(LNG_FORK_DIR)$*.yml ]; then python3 $(LANG_COMPILER) --overlay_translation_yml --base $(BASE_LANGUAGE) --translation $< --overlay $(LNG_FORK_DIR)$*.yml; fi

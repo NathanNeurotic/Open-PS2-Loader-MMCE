@@ -232,7 +232,7 @@ jobs:
         run: make --trace clean && make --trace LOCALVERSION=PS2DEVROLLING release
 
       - name: Detailed changelog
-        run: sh ./make_changelog.sh
+        run: sh ./tools/make_changelog.sh
 
       - name: Stage rolling assets (ps2dev-latest = required version authority)
         run: |
@@ -251,7 +251,7 @@ jobs:
           # Standalone language pack (lang_*.lng + their non-Latin fonts, which are NOT embedded in the
           # ELF) -- build it off the just-built lng/ and stage it so 'rolling' carries it too. Soft-fail
           # so a LANGS hiccup can't break rolling.
-          if ./lng_pack.sh && ls RIPTOPL-LANGS-*.zip >/dev/null 2>&1; then
+          if ./tools/lng_pack.sh && ls RIPTOPL-LANGS-*.zip >/dev/null 2>&1; then
             cp -f RIPTOPL-LANGS-*.zip rolling/
           else
             echo "WARN: language pack not produced this run"

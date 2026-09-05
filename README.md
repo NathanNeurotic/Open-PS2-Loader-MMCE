@@ -804,6 +804,9 @@ To run OPL, you need an entry point for running PS2 titles. You can use everythi
 
 ## Some notes for DEVS
 
+Repository scripts live in `tools/`; run them from the repository root. Existing
+Makefile targets retain their names and output locations.
+
 Open PS2 Loader needs the [**latest PS2SDK**](https://github.com/ps2dev/ps2sdk)
 
 ## OPL Archive
