@@ -1,0 +1,5 @@
+# The same startup twice, pointing at different images. First record wins so that a refresh
+# is stable; the second is reported rather than silently dropped or silently preferred.
+SLUS_123.45,First Record,DVD,DVD/first.iso
+SLUS_200.09,Unrelated,DVD,DVD/unrelated.iso
+SLUS_123.45,Second Record,CD,CD/second.iso

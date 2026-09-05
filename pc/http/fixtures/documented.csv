@@ -1,0 +1,8 @@
+# The four-field form the donor's README documents: STARTUP,TITLE,MEDIA,RELATIVE_ISO_PATH
+# The fourth field is authoritative. Title and filename need not resemble each other.
+SLUS_123.45,Example Game,DVD,DVD/Example Game.iso
+SLUS_200.01,"Example, The",DVD,DVD/example-the.iso
+SLES_512.34,Short One,CD,CD/Short One.iso
+SLUS_210.65,"He said ""hi""",DVD,DVD/quoted title.iso
+SLUS_999.99,Nested Deep,DVD,DVD/sub dir/Deep # Game %20.iso
+SLUS_111.11,CD In The Title,DVD,DVD/CD Collection.iso

@@ -91,3 +91,8 @@ tmp/
 # reference-only, and it must never be committed. It got swept into a commit once by a bare
 # `git add -A`; ignoring it stops that happening again.
 /pc/RA/
+#
+# pc/http/http_conformance.py imports catalog_reference as a module, so running either tool
+# leaves a __pycache__ behind next to them. Nothing generated belongs in the tree.
+__pycache__/
+*.pyc

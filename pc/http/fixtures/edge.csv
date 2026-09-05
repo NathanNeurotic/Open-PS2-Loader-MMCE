@@ -1,0 +1,15 @@
+# Shape of the file itself: comments, blank lines, indented rows, a trailing comma.
+
+	SLUS_123.45,Indented With Tab,DVD,DVD/tab.iso
+   SLUS_200.05,Indented With Spaces,DVD,DVD/spaces.iso
+
+# A row whose title is padded -- the padding is not part of the title.
+SLUS_300.06,   Padded Title   ,DVD,   DVD/padded.iso
+# Trailing comma: the fourth field is present but empty, so the path is derived.
+SLUS_400.07,Trailing Comma,DVD,
+# A quoted field containing a comment marker and a comma.
+SLUS_500.08,"# not, a comment",DVD,DVD/hash.iso
+# A quote only opens a quoted field at the START of that field. Mid-field it is an ordinary
+# character, so this row is accepted with the quote in the title -- matching the donor, which
+# does no quote handling at all. Only a quote that opens a field can be unterminated.
+SLUS_600.09,Ready 2 Rumble "Round 2",DVD,DVD/rumble.iso
