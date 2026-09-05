@@ -107,11 +107,22 @@ static int find_entry(int fd, unsigned int dir_lba, unsigned int dir_size,
     while (done < dir_size) {
         int got = read_at(fd, (long long)(dir_lba)*ISO_SECTOR + done, g_chunk, ISO_SECTOR);
         int p = 0;
+        /* Parse only as far as the DIRECTORY runs, which is not always as far as the sector we
+           just read. A well-formed ISO9660 sizes every directory extent in whole 2048-byte
+           blocks, so on a good image this is always ISO_SECTOR -- but a damaged or hand-built
+           image can end its extent mid-sector, and the bytes after it belong to whatever file
+           follows. Parsing those would let adjacent image data pose as a directory record,
+           match the name we are looking for, and hand back its LBA: raHashIsoDirect then hashes
+           the wrong file and reports a confident, wrong game id. The read stays a full sector
+           on purpose -- clamping it too would turn a truncated image into a hard failure that
+           did not happen before, and bounding the PARSE is what actually fixes this. */
+        unsigned int left = dir_size - done;
+        int limit = (left < (unsigned int)ISO_SECTOR) ? (int)left : ISO_SECTOR;
 
         if (got != ISO_SECTOR)
             return -1;
 
-        while (p < ISO_SECTOR) {
+        while (p < limit) {
             unsigned char *rec = (unsigned char *)&g_chunk[p];
             int len = rec[0];
             int namelen;
@@ -123,8 +134,10 @@ static int find_entry(int fd, unsigned int dir_lba, unsigned int dir_size,
                walk trusts len blindly: rec[32] and the name bytes at rec[33 + i] read up to
                ~287 bytes past p, and since only the first ISO_SECTOR of g_chunk was filled
                that is leftover data from an earlier 64 KB read -- so a truncated image can
-               match a name that is not there and hand back a bogus LBA. */
-            if (len < 33 || p + len > ISO_SECTOR)
+               match a name that is not there and hand back a bogus LBA. Bounded by `limit`,
+               not ISO_SECTOR: a record must fit inside the directory, not merely inside the
+               buffer the directory was read into. */
+            if (len < 33 || p + len > limit)
                 break;
 
             namelen = rec[32];
