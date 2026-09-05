@@ -127,6 +127,58 @@ diagnostic bundle rather than installable payload. The default build is unaffect
 every call site is behind `#ifdef RETROACHIEVEMENTS`, and that is checked by comparing the two builds'
 symbol tables, loader core and embedded IOP modules.
 
+## Before this is called finished
+
+Nothing below has been done. The feature is written end to end and builds clean; it has not run on a
+PlayStation 2. Emulator testing gets you as far as: the menu boots, the RA entries render and
+navigate, the flag-off build is unchanged, and a game with no `.wl` does not crash. That is the
+ceiling — GS raster timing and real SMAP behaviour are not testable there.
+
+Hand testers a **run-pinned nightly.link build**, never a bare artifact link.
+
+| # | Test | Expected |
+| --- | --- | --- |
+| 1 | Default build (`RETROACHIEVEMENTS=0`) | no regression on any existing path |
+| 2 | RA build, telemetry Off | behaves as the default build |
+| 3 | USB launch, valid `.wl`, telemetry On | ~60 snapshots/s for ≥5 min, skip/fail counters flat |
+| 4 | Same, watching frame rate | no perceptible impact |
+| 5 | SMB launch with telemetry | the game's own SMB stream unaffected |
+| 6 | Menu check, protocol = SMB | title + counts, `.wl` written |
+| 7 | Menu check, protocol = Off | RA raises the stack, same result |
+| 8 | Menu check, protocol = UDPBD / UDPFS | clean refusal + hash written to `RA/hashes.txt`, no wedge |
+| 9 | Neutrino-core game | clean refusal, no hash attempt |
+| 10 | PS1/VCD entry | clean refusal |
+| 11 | HDD/APA entry | the check refuses; a watch list still loads |
+| 12 | Badge + cover mark | appear after refresh, correct game, correct device |
+| 13 | Unlock overlay | gold pulse on `RAU1`, game keeps running |
+| 14 | IGR combo during an RA launch | still resets |
+| 15 | MX4SIO launch with telemetry | no navigation or art regression (that device has history) |
+
+---
+
+## Notes for anyone changing this code
+
+* **Only four launch legs can ever carry telemetry** — BDM, ETH/SMB, HDD/APA, MMCE. The rest exec an
+  external ELF, so `ee_core` never loads and there is nothing to run the snapshot from. The menu
+  refuses each of the others by name; do not "fix" that by hashing anyway.
+* **The badge cache belongs to the I/O thread.** `raBadgeRefresh` frees and reallocates it. Nothing
+  on the render path may read it — that is why a row carries `raBadged` as a plain int, resolved
+  when the row is built. Re-introducing a `raBadgeHas`-style call from a draw routine re-introduces
+  a use-after-free that only shows up as a rare hang.
+* **`MSG_DONTWAIT` is `0x08` on the menu path**, from ps2sdk's `tcpip.h`. The `0x40` in SMSTCPIP
+  belongs to the in-game stack that serves `raudp`. They are different stacks; do not unify them.
+* **The texture table is positional.** `RA_MARK` in `enum INTERNAL_TEXTURE` and its row in
+  `internalDefault[]` are guarded by the same `#ifdef` for that reason. Guard one without the other
+  and the array silently goes one short.
+* **Deleting `obj/` is mandatory** after any change to `EECoreConfig_t`, `OPL_MODULE_ID` or the
+  submenu structs. This Makefile does not track header dependencies, so an incremental build can
+  pass locally while CI's `make clean` fails.
+* **Do not build a PC client.** hacan359 provides and maintains xeRAbora. Do not commit `pc/RA/`.
+* **Disc mode is deferred**, deliberately, as a separate game source. It is not a missing piece of
+  this work.
+
+---
+
 ## Credits
 
 * **hacan359 (yoba)** — the RetroAchievements design, the console implementation this port follows,
