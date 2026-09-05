@@ -1,9 +1,9 @@
-#include <delaythread.h> // DelayThread -- bounded lock acquire in ethDeinitModules
 #include "include/opl.h"
 #include "include/lang.h"
 #include "include/gui.h"
 #include "include/supportbase.h"
 #include "include/ethsupport.h"
+#include "include/netsupport.h" // the shared TCP/IP stack; this file owns only the SMB session on top of it
 #include "include/vcdsupport.h"
 #include "include/cuesupport.h" // ps1FillGameList + the Ember launch helpers
 #include "include/libview.h"    // libViewActive / libListViewActive -- which list this page shows
@@ -32,38 +32,15 @@ static int ethULSizePrev = -2;
 static time_t ethModifiedCDPrev;
 static time_t ethModifiedDVDPrev;
 static int ethGameCount = 0;
-static unsigned char ethModulesLoaded = 0;
 static unsigned char ethSmbModuleLoaded = 0;
 static base_game_info_t *ethGames = NULL;
 static int ethPs1GameCount = 0;
 static base_game_info_t *ethPs1Games = NULL;
 
-static struct ip4_addr lastIP;
-static struct ip4_addr lastNM;
-static struct ip4_addr lastGW;
-
 // forward declaration
 static item_list_t ethGameList;
-static int ethWaitValidNetIFLinkState(void);
-static int ethWaitValidDHCPState(void);
-static int ethGetNetIFLinkStatus(void);
-static int ethApplyNetIFConfig(void);
-static int ethApplyIPConfig(void);
-static int ethReadNetConfig(void);
 
-static int ethInitSemaID = -1;
 static unsigned char ethReconnectQueued = 0;
-
-// Initializes locking semaphore for network support (not for just SMB support, but for the network subsystem).
-static int ethInitSema(void)
-{
-    if (ethInitSemaID < 0) {
-        if ((ethInitSemaID = sbCreateSemaphore()) < 0)
-            return ethInitSemaID;
-    }
-
-    return 0;
-}
 
 static void ethSMBConnect(void)
 {
@@ -169,94 +146,16 @@ static int ethSMBDisconnect(void)
     return 0;
 }
 
-static void EthStatusCheckCb(s32 alarm_id, u16 time, void *common)
-{
-    iSignalSema(*(int *)common);
-}
-
-static int WaitValidNetState(int (*checkingFunction)(void))
-{
-    int SemaID, retry_cycles;
-    ee_sema_t SemaData;
-
-    // Wait for a valid network status;
-    SemaData.option = SemaData.attr = 0;
-    SemaData.init_count = 0;
-    SemaData.max_count = 1;
-    if ((SemaID = CreateSema(&SemaData)) < 0)
-        return SemaID;
-
-    for (retry_cycles = 0; checkingFunction() == 0; retry_cycles++) {
-        SetAlarm(1000 * rmGetHsync(), &EthStatusCheckCb, &SemaID);
-        WaitSema(SemaID);
-
-        if (retry_cycles >= 30) // 30s = 30*1000ms
-        {
-            DeleteSema(SemaID);
-            return -1;
-        }
-    }
-
-    DeleteSema(SemaID);
-    return 0;
-}
-
-static int ethWaitValidNetIFLinkState(void)
-{
-    return WaitValidNetState(&ethGetNetIFLinkStatus);
-}
-
-static int ethWaitValidDHCPState(void)
-{
-    return WaitValidNetState(&ethGetDHCPStatus);
-}
-
-static int ethInitApplyConfig(void)
-{
-    LOG("ETHSUPPORT ApplyConfig\n");
-
-    do {
-        if (ethWaitValidNetIFLinkState() != 0) {
-            gNetworkStartup = ERROR_ETH_LINK_FAIL;
-            return ERROR_ETH_LINK_FAIL;
-        }
-    } while (ethApplyNetIFConfig() != 0);
-
-    // Wait for the link to re-establish after applying the NIF link-mode setting.
-    if (ethWaitValidNetIFLinkState() != 0) {
-        gNetworkStartup = ERROR_ETH_LINK_FAIL;
-        return ERROR_ETH_LINK_FAIL;
-    }
-
-    ethApplyIPConfig();
-
-    // Wait for DHCP to initialize, if DHCP is enabled.
-    if (ps2_ip_use_dhcp && (ethWaitValidDHCPState() != 0)) {
-        gNetworkStartup = ERROR_ETH_DHCP_FAIL;
-        return ERROR_ETH_DHCP_FAIL;
-    }
-
-    return 0;
-}
-
 int ethApplyConfig(void)
 {
-    int ret;
-
-    WaitSema(ethInitSemaID);
-    ret = ethInitApplyConfig();
-    SignalSema(ethInitSemaID);
-
-    return ret;
+    return netApplyConfig();
 }
 
 static void ethInitSMB(void)
 {
     int ret;
 
-    WaitSema(ethInitSemaID);
-    ret = ethInitApplyConfig();
-    SignalSema(ethInitSemaID);
+    ret = netApplyConfig();
 
     if (ret != 0) {
         ethDisplayErrorStatus();
@@ -285,138 +184,32 @@ static void ethInitSMB(void)
 
 int ethGetModulesLoaded(void)
 {
-    return ethModulesLoaded;
+    return netGetModulesLoaded();
 }
 
 int ethIsSMBShareConnected(void)
 {
-    return ethModulesLoaded && gNetworkStartup == 0 && ethPrefix[0] != '\0';
+    return netGetModulesLoaded() && gNetworkStartup == 0 && ethPrefix[0] != '\0';
 }
 
-static int ethLoadModules(void)
+// SMB's own teardown. netDeinitModules runs this inside the init lock, at the point in the
+// sequence nbnsDeinit() has always occupied: after the HTTP RPC client is released, before
+// NetManDeinit.
+static void ethProtocolTeardown(void)
 {
-    LOG("ETHSUPPORT LoadModules\n");
-
-    // UDPBD owns the single SMAP NIC ("SMAP_driver" modname); refuse to bring up the SMB stack on top
-    // of it. The Device-hub UI already interlocks the two; this is the runtime backstop.
-    if (bdmIsUDPBDLoaded()) {
-        LOG("ETHSUPPORT: UDPBD active -- not loading the SMB NIC stack\n");
-        return -1;
-    }
-    // Same NIC exclusivity vs the udpfs FILESYSTEM chain (udpfs_smap + ministack). The other two
-    // directions already guard symmetrically (udpfssupport checks eth+bdm, bdmsupport checks
-    // eth+udpfs); without this one an in-session UDPFS->SMB protocol switch could double-drive the
-    // SMAP EMAC with two drivers -- at best SMB fails to start, at worst the IOP wedges.
-    if (udpfsGetModulesLoaded()) {
-        LOG("ETHSUPPORT: UDPFS filesystem NIC active -- not loading the SMB NIC stack\n");
-        return -1;
-    }
-
-    if (!ethModulesLoaded) {
-        ethModulesLoaded = 1;
-
-        sysInitDev9();
-
-        LOG("[NETMAN]:\n");
-        if (sysLoadModuleBuffer(&netman_irx, size_netman_irx, 0, NULL) >= 0) {
-            NetManInit();
-            LOG("[SMSUTILS]:\n");
-            sysLoadModuleBuffer(&smsutils_irx, size_smsutils_irx, 0, NULL);
-            LOG("[SMAP]:\n");
-            if (sysLoadModuleBuffer(&smap_irx, size_smap_irx, 0, NULL) >= 0) {
-                // Before the network stack is loaded, attempt to set the link settings in order to avoid needing double-initialization of the IF.
-                // But do not fail here because there is currently no way to re-start initialization.
-                ethApplyNetIFConfig();
-                LOG("[PS2IP]:\n");
-                if (sysLoadModuleBuffer(&ps2ip_irx, size_ps2ip_irx, 0, NULL) >= 0) {
-                    LOG("[PS2IPS]:\n");
-                    sysLoadModuleBuffer(&ps2ips_irx, size_ps2ips_irx, 0, NULL);
-                    LOG("[HTTPCLIENT]:\n");
-                    if (sysLoadModuleBuffer(&httpclient_irx, size_httpclient_irx, 0, NULL) >= 0) {
-                        if (HttpInit() < 0)
-                            LOG("ETHSUPPORT: httpclient RPC bind failed; compat update unavailable\n");
-                    }
-                    ps2ip_init();
-                    LOG("ETHSUPPORT Modules loaded\n");
-                    return 0;
-                }
-            }
-        }
-
-        gNetworkStartup = ERROR_ETH_MODULE_NETIF_FAILURE;
-        return -1;
-    }
-
-    return 0;
+    nbnsDeinit();
+    ethSmbModuleLoaded = 0;
+    gNetworkStartup = ERROR_ETH_NOT_STARTED;
 }
-
-// Slices ethDeinitModules will wait for the init lock before giving up. One slice is 100 ms, so ~3 s
-// -- far past any healthy hand-off, and the ONLY unbounded blocker that was left on the teardown
-// path (found by the rebuild-154 exit-hang audit and parked then because it is not ATA-specific;
-// issue #382 is the not-ATA case).
-#define ETH_DEINIT_LOCK_SLICES 30
 
 void ethDeinitModules(void)
 {
-    if (ethModulesLoaded) {
-        // BOUNDED ACQUIRE, was an unbounded WaitSema. deinit runs this while a game launch is in
-        // flight, and anything still holding this lock -- an in-progress SMB reconnect, a network
-        // read that will not return because the link is already going away -- used to stop the exit
-        // dead with the screen already torn down. That is the exact shape of rebuild-154's ATA hang,
-        // one transport over.
-        //
-        // Giving up is safe and is the whole point: every caller is on its way to an IOP reset that
-        // reclaims the network stack wholesale. A teardown that gives up beats one that hangs.
-        int lockHeld = 0;
-        if (ethInitSemaID >= 0) {
-            int slices = ETH_DEINIT_LOCK_SLICES;
-            while (slices-- > 0) {
-                if (PollSema(ethInitSemaID) == ethInitSemaID) {
-                    lockHeld = 1;
-                    break;
-                }
-                DelayThread(100000); // 100 ms
-            }
-            if (!lockHeld)
-                LOG("ETH: deinit could not take the init lock -- tearing down anyway\n");
-        }
-
-        HttpDeinit();
-        nbnsDeinit();
-        NetManDeinit();
-        ethModulesLoaded = 0;
-        ethSmbModuleLoaded = 0;
-        gNetworkStartup = ERROR_ETH_NOT_STARTED;
-
-        if (ethInitSemaID >= 0) {
-            if (lockHeld)
-                SignalSema(ethInitSemaID);
-            DeleteSema(ethInitSemaID);
-            ethInitSemaID = -1;
-        }
-
-        // To allow the configuration to be read later on, read the latest version now.
-        ethReadNetConfig();
-        ps2ip_deinit();
-    }
+    netDeinitModules(&ethProtocolTeardown);
 }
 
 int ethLoadInitModules(void)
 {
-    int ret;
-
-    if ((ret = ethInitSema()) < 0)
-        return ret;
-
-    WaitSema(ethInitSemaID);
-
-    if ((ret = ethLoadModules()) == 0) {
-        ret = ethInitApplyConfig();
-    }
-
-    SignalSema(ethInitSemaID);
-
-    return ret;
+    return netLoadInitModules();
 }
 
 void ethDisplayErrorStatus(void)
@@ -461,9 +254,7 @@ static void smbLoadModules(void)
 
     LOG("SMBSUPPORT LoadModules\n");
 
-    WaitSema(ethInitSemaID);
-    ret = ethLoadModules();
-    SignalSema(ethInitSemaID);
+    ret = netEnsureModules();
 
     if (ret == 0) {
         gNetworkStartup = ERROR_ETH_MODULE_SMBMAN_FAILURE;
@@ -515,7 +306,7 @@ static void ethReconnectSMB(void)
     ethPs1GameCount = 0;
     gNetworkStartup = ERROR_ETH_NOT_STARTED;
 
-    if (!ethModulesLoaded || !ethSmbModuleLoaded)
+    if (!netGetModulesLoaded() || !ethSmbModuleLoaded)
         smbLoadModules();
     else
         ethInitSMB(); // applies link/IP settings before logging on and reopening the share
@@ -533,7 +324,7 @@ void ethRequestReconnect(void)
         return;
     if (ethReconnectQueued)
         return;
-    if (ethInitSema() < 0)
+    if (netInitSema() < 0)
         return;
 
     ethGameList.enabled = 1;
@@ -545,7 +336,7 @@ void ethRequestReconnect(void)
 
 void ethInit(item_list_t *itemList)
 {
-    if (ethInitSema() < 0)
+    if (netInitSema() < 0)
         return;
 
     if (gNetworkStartup >= ERROR_ETH_SMB_CONN) {
@@ -1163,7 +954,7 @@ static void ethShutdown(item_list_t *itemList)
     }
 
     // UI may have initialized modules outside of ETH mode, so deinitialize regardless of the enabled status.
-    int ethWasLoaded = ethModulesLoaded; // capture BEFORE ethDeinitModules() clears ethModulesLoaded
+    int ethWasLoaded = netGetModulesLoaded(); // capture BEFORE ethDeinitModules() tears the stack down
     ethDeinitModules();
 
     // Only shut down dev9 from here, if it was initialized from here before.
@@ -1192,146 +983,12 @@ static item_list_t ethGameList = {
     &ethLaunchGame, &ethGetConfig, &ethGetImage, &ethCleanUp, &ethShutdown, &ethCheckVMC, &ethGetIconId, &ethLaunchVcd,
     ITEM_VIEW_NATIVE, NULL, &ethLaunchCue, &ethGetItemView, &ethGetSourceId};
 
-static int ethReadNetConfig(void)
-{
-    t_ip_info ip_info;
-    int result;
-
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wstrict-aliasing"
-    if ((result = ps2ip_getconfig("sm0", &ip_info)) >= 0) {
-        lastIP = *(struct ip4_addr *)&ip_info.ipaddr;
-        lastNM = *(struct ip4_addr *)&ip_info.netmask;
-        lastGW = *(struct ip4_addr *)&ip_info.gw;
-    } else {
-        ip4_addr_set_zero(&lastIP);
-        ip4_addr_set_zero(&lastNM);
-        ip4_addr_set_zero(&lastGW);
-    }
-#pragma GCC diagnostic pop
-
-    return result;
-}
-
 int ethGetNetConfig(u8 *ip_address, u8 *netmask, u8 *gateway)
 {
-    int result;
-
-    // Read a cached copy of the settings, if this is read after deinitialization.
-    result = ethModulesLoaded ? ethReadNetConfig() : -1;
-    ip_address[0] = ip4_addr1(&lastIP);
-    ip_address[1] = ip4_addr2(&lastIP);
-    ip_address[2] = ip4_addr3(&lastIP);
-    ip_address[3] = ip4_addr4(&lastIP);
-
-    netmask[0] = ip4_addr1(&lastNM);
-    netmask[1] = ip4_addr2(&lastNM);
-    netmask[2] = ip4_addr3(&lastNM);
-    netmask[3] = ip4_addr4(&lastNM);
-
-    gateway[0] = ip4_addr1(&lastGW);
-    gateway[1] = ip4_addr2(&lastGW);
-    gateway[2] = ip4_addr3(&lastGW);
-    gateway[3] = ip4_addr4(&lastGW);
-
-    return result;
-}
-
-static int ethApplyNetIFConfig(void)
-{
-    int mode, result;
-    static int CurrentMode = NETMAN_NETIF_ETH_LINK_MODE_AUTO;
-
-    switch (gETHOpMode) {
-        case ETH_OP_MODE_100M_FDX:
-            mode = NETMAN_NETIF_ETH_LINK_MODE_100M_FDX;
-            break;
-        case ETH_OP_MODE_100M_HDX:
-            mode = NETMAN_NETIF_ETH_LINK_MODE_100M_HDX;
-            break;
-        case ETH_OP_MODE_10M_FDX:
-            mode = NETMAN_NETIF_ETH_LINK_MODE_10M_FDX;
-            break;
-        case ETH_OP_MODE_10M_HDX:
-            mode = NETMAN_NETIF_ETH_LINK_MODE_10M_HDX;
-            break;
-        default:
-            mode = NETMAN_NETIF_ETH_LINK_MODE_AUTO;
-    }
-
-    if (CurrentMode != mode) {
-        if ((result = NetManSetLinkMode(mode)) == 0)
-            CurrentMode = mode;
-    } else
-        result = 0;
-
-    return result;
-}
-
-static int ethGetNetIFLinkStatus(void)
-{
-    return (NetManIoctl(NETMAN_NETIF_IOCTL_GET_LINK_STATUS, NULL, 0, NULL, 0) == NETMAN_NETIF_ETH_LINK_STATE_UP);
-}
-
-static int ethApplyIPConfig(void)
-{
-    t_ip_info ip_info;
-    struct ip4_addr ipaddr, netmask, gw, dns;
-    const struct ip4_addr *dns_curr;
-    int result;
-
-    if ((result = ps2ip_getconfig("sm0", &ip_info)) >= 0) {
-        IP4_ADDR(&ipaddr, ps2_ip[0], ps2_ip[1], ps2_ip[2], ps2_ip[3]);
-        IP4_ADDR(&netmask, ps2_netmask[0], ps2_netmask[1], ps2_netmask[2], ps2_netmask[3]);
-        IP4_ADDR(&gw, ps2_gateway[0], ps2_gateway[1], ps2_gateway[2], ps2_gateway[3]);
-        IP4_ADDR(&dns, ps2_dns[0], ps2_dns[1], ps2_dns[2], ps2_dns[3]);
-        dns_curr = dns_getserver(0);
-
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wstrict-aliasing"
-        // Check if it's the same. Otherwise, apply the new configuration.
-        if ((ps2_ip_use_dhcp != ip_info.dhcp_enabled) || (!ps2_ip_use_dhcp &&
-                                                          (!ip_addr_cmp(&ipaddr, (struct ip4_addr *)&ip_info.ipaddr) ||
-                                                           !ip_addr_cmp(&netmask, (struct ip4_addr *)&ip_info.netmask) ||
-                                                           !ip_addr_cmp(&gw, (struct ip4_addr *)&ip_info.gw) ||
-                                                           !ip_addr_cmp(&dns, dns_curr)))) {
-            if (ps2_ip_use_dhcp) {
-                ip4_addr_set_zero((struct ip4_addr *)&ip_info.ipaddr);
-                ip4_addr_set_zero((struct ip4_addr *)&ip_info.netmask);
-                ip4_addr_set_zero((struct ip4_addr *)&ip_info.gw);
-                ip4_addr_set_zero(&dns);
-
-                ip_info.dhcp_enabled = 1;
-            } else {
-                ip_addr_set((struct ip4_addr *)&ip_info.ipaddr, &ipaddr);
-                ip_addr_set((struct ip4_addr *)&ip_info.netmask, &netmask);
-                ip_addr_set((struct ip4_addr *)&ip_info.gw, &gw);
-
-                ip_info.dhcp_enabled = 0;
-            }
-
-            result = ps2ip_setconfig(&ip_info);
-            if (!ps2_ip_use_dhcp)
-                dns_setserver(0, &dns);
-        } else
-            result = 0;
-#pragma GCC diagnostic pop
-    }
-
-    return result;
+    return netGetConfig(ip_address, netmask, gateway);
 }
 
 int ethGetDHCPStatus(void)
 {
-    t_ip_info ip_info;
-    int result;
-
-    if ((result = ps2ip_getconfig("sm0", &ip_info)) >= 0) {
-        if (ip_info.dhcp_enabled) {
-            result = (ip_info.dhcp_status == DHCP_STATE_BOUND || (ip_info.dhcp_status == DHCP_STATE_OFF));
-        } else
-            result = -1;
-    }
-
-    return result;
+    return netGetDHCPStatus();
 }
