@@ -39,6 +39,9 @@ struct gui_update_t
             int text_id;
             int selected;
             int isFolder; // folder-browse row marker (checklist item 34)
+#ifdef RETROACHIEVEMENTS
+            int raBadged; // RA watch list present -- resolved on the I/O thread, see submenu_item_t
+#endif
         } submenu;
 
         struct
@@ -211,5 +214,13 @@ int guiConfirmVideoMode(void);
 int guiGameShowRemoveSettings(config_set_t *configSet, config_set_t *configGame);
 
 void guiManageCheats(void);
+
+#ifdef RETROACHIEVEMENTS
+/* RA: two-line notice popup, set from the I/O thread (the check/test actions run
+   there) and drawn by the render loop. guiShowRANotices() is called once per
+   frame from the main loop. */
+void guiShowRANotice(const char *line1, const char *line2);
+void guiShowRANotices(void);
+#endif
 
 #endif

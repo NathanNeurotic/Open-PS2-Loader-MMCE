@@ -1050,6 +1050,12 @@ void mmceLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
     }
     settings->common.layer1_start = layer1_start;
 
+#ifdef RETROACHIEVEMENTS
+    // RA: this game's watch list, settled before sysLaunchLoaderElf reads
+    // GetWatchCount() to decide whether the network modules travel with the
+    // launch. Absent is normal -- the game is simply not tracked.
+    sbLoadWatchList(mmcePrefix, game->startup);
+#endif
     if ((result = sbLoadCheats(mmcePrefix, game->startup)) < 0) {
         // #265: let the user back out instead of sitting through the whole load. The helper does
         // the sbUnprepare itself -- see include/supportbase.h; skipping it breaks the NEXT launch.

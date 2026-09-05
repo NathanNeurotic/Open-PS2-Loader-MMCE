@@ -448,6 +448,55 @@ static void guiShowNotifications(void)
     }
 }
 
+#ifdef RETROACHIEVEMENTS
+/* RA notices: two-line feedback from the check/test actions, which run on the
+   I/O thread and so cannot open a dialog. They set the text; the render loop
+   draws it. Deliberately NOT gated on gEnableNotifications -- they are the
+   answer to an action the user just took, not a courtesy popup. */
+static char raNotice[2][96];
+static int raNoticeLines = 0;
+static clock_t raNoticeTimer = 0;
+
+void guiShowRANotice(const char *line1, const char *line2)
+{
+    raNoticeLines = 0; /* renderer stops drawing before the new text lands */
+    snprintf(raNotice[0], sizeof(raNotice[0]), "%s", line1 ? line1 : "");
+    snprintf(raNotice[1], sizeof(raNotice[1]), "%s", line2 ? line2 : "");
+    raNoticeTimer = 0;
+    raNoticeLines = (line2 != NULL && line2[0] != '\0') ? 2 : 1;
+}
+
+static int guiRenderRANotices(int y, int yadd)
+{
+    int i;
+
+    if (raNoticeLines <= 0)
+        return y;
+
+    if (!raNoticeTimer) {
+        raNoticeTimer = clock() + 8000 * (CLOCKS_PER_SEC / 1000);
+        sfxPlay(SFX_MESSAGE);
+    }
+
+    for (i = 0; i < raNoticeLines; i++) {
+        guiRenderNotifications(raNotice[i], y);
+        y += yadd;
+    }
+
+    if (clock() >= raNoticeTimer) {
+        raNoticeLines = 0;
+        raNoticeTimer = 0;
+    }
+
+    return y;
+}
+
+void guiShowRANotices(void)
+{
+    guiRenderRANotices(10, 35);
+}
+#endif
+
 static int guiNetCompatUpdRefresh(int modified)
 {
     int result;
@@ -1224,6 +1273,10 @@ int guiShowNetConfig(void)
     diaSetString(diaNetConfig, NETCFG_SHARE_USERNAME, gPCUserName);
     diaSetString(diaNetConfig, NETCFG_SHARE_PASSWORD, gPCPassword);
     diaSetInt(diaNetConfig, NETCFG_ETHOPMODE, gETHOpMode);
+#ifdef RETROACHIEVEMENTS
+    diaSetInt(diaNetConfig, NETCFG_RA_TELEMETRY, gRATelemetry);
+    diaSetInt(diaNetConfig, NETCFG_RA_BADGES, gRABadges);
+#endif
 
     // Protocol rows, seeded from the authoritative gNetworkProtocol.
     //   Protocol: SMB(0)/UDPFS(1)/UDPBD(2)  -- OFF and UDPFSBD both collapse to their protocol
@@ -1280,6 +1333,10 @@ reshow_network:
             diaGetInt(diaNetConfig, NETCFG_SHARE_IP_ADDR_0 + i, &pc_ip[i]);
         }
         diaGetInt(diaNetConfig, NETCFG_ETHOPMODE, &gETHOpMode);
+#ifdef RETROACHIEVEMENTS
+        diaGetInt(diaNetConfig, NETCFG_RA_TELEMETRY, &gRATelemetry);
+        diaGetInt(diaNetConfig, NETCFG_RA_BADGES, &gRABadges);
+#endif
 
         diaGetInt(diaNetConfig, NETCFG_SHARE_PORT, &gPCPort);
         diaGetString(diaNetConfig, NETCFG_SHARE_NAME, gPCShareName, sizeof(gPCShareName));
@@ -3177,8 +3234,12 @@ static void guiHandleOp(struct gui_update_t *item)
 
         case GUI_OP_APPEND_MENU:
             result = submenuAppendItem(item->menu.subMenu, item->submenu.icon_id, item->submenu.text, item->submenu.id, item->submenu.text_id);
-            if (result != NULL)
+            if (result != NULL) {
                 result->item.isFolder = item->submenu.isFolder; // folder-browse row marker
+#ifdef RETROACHIEVEMENTS
+                result->item.raBadged = item->submenu.raBadged; // RA cover mark, resolved on the I/O thread
+#endif
+            }
             // coverflow wrap tail: submenuAppendItem always returns the new tail
             item->menu.menu->last = result;
             if (!item->menu.menu->submenu) { // first subitem in list
@@ -4017,6 +4078,12 @@ void guiMainLoop(void)
         // when the user has notifications off (it explains an otherwise-silent empty games page).
         if (gEnableNotifications || showNetDhcpPopup)
             guiShowNotifications();
+
+#ifdef RETROACHIEVEMENTS
+        // RA action feedback: always drawn while a notice is set (it is the answer to
+        // something the user just asked for), independent of gEnableNotifications.
+        guiShowRANotices();
+#endif
 
         // handle deferred operations
         guiHandleDeferredOps();

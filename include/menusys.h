@@ -33,6 +33,13 @@ typedef struct submenu_item
     int favourited;
     /// 1 when this row is a browsable folder, not a launchable game -- checklist item 34
     int isFolder;
+#ifdef RETROACHIEVEMENTS
+    /// 1 when this game has a RetroAchievements watch list. Resolved once on the I/O thread when
+    /// the row is built, exactly like text and isFolder, so the RENDER path never calls back into
+    /// the badge cache -- that cache is freed and reallocated by raBadgeRefresh on the I/O thread,
+    /// and dereferencing it from a frame draw is a use-after-free waiting for the wrong interleave.
+    int raBadged;
+#endif
 } submenu_item_t;
 
 typedef struct submenu_list

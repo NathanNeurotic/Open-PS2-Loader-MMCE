@@ -56,6 +56,21 @@ DUALSENSE ?= 0
 #The mode itself stays gated behind the triple-confirm in the GUI.
 GSM1080P ?= 1
 
+#Enables/disables RetroAchievements support: the menu-side "is this game tracked?" check and the
+#in-game memory telemetry that feeds a PC client running rcheevos. Builds its OWN release flavour
+#(see .github/scripts/build_rolling_extras.sh); the default ELF must stay byte-for-byte unaffected,
+#so every RA source file is wrapped in #ifdef RETROACHIEVEMENTS and every call site in a shared
+#file sits inside one too.
+#
+#A FLAG IS NOT A DEPENDENCY: make cannot see that flipping this changes the meaning of an object
+#file, so run "make clean" when switching it. This bites hardest on EECoreConfig_t and
+#OPL_MODULE_ID, where a stale .o silently loads the wrong module blob.
+#
+#Only the four launch legs that go through sysLaunchLoaderElf (BDM/ETH/HDD/MMCE) can ever carry
+#telemetry -- Neutrino-core games, UDPFS and PS1/VCD hand off to an external ELF and never load
+#ee_core at all. See docs/RETROACHIEVEMENTS-INTEGRATION-PLAN.md.
+RETROACHIEVEMENTS ?= 0
+
 #Enables/disables building of an edition of OPL that will support the DTL-T10000 (SDK v2.3+)
 DTL_T10000 ?= 0
 
@@ -148,6 +163,14 @@ PNG_ASSETS = load0 load1 load2 load3 load4 load5 load6 load7 usb usb_bd ilk_bd \
 	Index_0 Index_1 Index_2 Index_3 Index_4 fav fav_mark R3 L3 L1 R1 PS1 PS2 case_overlay
 	# unused icons - up down l2 r2
 
+# The RA cover mark is embedded ONLY in the RA flavour: the default build has no
+# RA_MARK enum member and no table row for it, so embedding the bitmap there would
+# be dead weight and would break the "default ELF is unaffected" acceptance gate.
+# Must stay ahead of GFX_OBJS, which expands PNG_ASSETS.
+ifeq ($(RETROACHIEVEMENTS),1)
+PNG_ASSETS += ra_mark
+endif
+
 GFX_OBJS = $(PNG_ASSETS:%=%_png.o) poeveticanew.o icon_sys.o icon_icn.o
 
 # NOTE: audio/bgm.ogg is intentionally NOT compiled into the ELF (saves ~324 KB).
@@ -231,6 +254,25 @@ else
   PADEMU_FLAGS = PADEMU=0
 endif
 
+# RetroAchievements flavour. Everything the feature adds hangs off this one switch, on BOTH sides
+# of the EE/ee_core split -- the define reaches the menu build directly and ee_core through
+# EECORE_EXTRA_FLAGS, because ee_core is a separate $(MAKE) invocation that inherits nothing.
+# Grows one entry at a time as each phase lands its files, so the flavour always builds.
+ifeq ($(RETROACHIEVEMENTS),1)
+  EE_CFLAGS += -DRETROACHIEVEMENTS
+  EECORE_EXTRA_FLAGS += RETROACHIEVEMENTS=1
+  # md5 (vendored, zlib licence): the game hash the PC client keys achievements on.
+  # rawatch: the watch list the menu hands to ee_core, loaded from <device>RA/.
+  # rahash:  the image hash RetroAchievements keys a game on, taken by walking
+  #          ISO9660 directly -- mounting hangs on USB past the 2 GB mark.
+  # ranet:   the menu-side PC client exchange (hash -> watch list over UDP).
+  # rabadge: the "tracked game" badge cache behind the list mark and cover mark.
+  FRONTEND_OBJS += md5.o rawatch.o rahash.o ranet.o rabadge.o
+  # The in-game telemetry sender. Hand-builds Ethernet/UDP frames and calls
+  # SMAPSendPacket directly, so it deliberately bypasses the menu network stack.
+  IOP_OBJS += raudp.o
+endif
+
 # A DEBUG build implies the field diagnostics: it already has a TTY, so withholding the on-screen
 # labels from it would only make the two build types disagree about what they report.
 ifeq ($(DEBUG),1)
@@ -289,6 +331,16 @@ ifeq ($(DEBUG),1)
 else
   EE_CFLAGS += -O2
   SMSTCPIP_INGAME_CFLAGS = INGAME_DRIVER=1
+endif
+
+# RetroAchievements: turn UDP on in the in-game lwIP build. Set here rather than
+# in the RA block above because SMSTCPIP_INGAME_CFLAGS is assigned (not appended)
+# by every branch of the debug block, so anything set earlier would be discarded.
+# The bumped heap and pool sizes in SMSTCPIP/include/lwipopts.h hang off the same
+# INGAME_UDP define -- MEM_SIZE 0x400 was a single 536-byte packet away from
+# starving the game's own SMB stream and rebooting the console.
+ifeq ($(RETROACHIEVEMENTS),1)
+  SMSTCPIP_INGAME_CFLAGS += INGAME_UDP=1
 endif
 
 EE_CFLAGS += -fsingle-precision-constant -DOPL_VERSION=\"$(OPL_VERSION)\"
@@ -426,6 +478,8 @@ clean:	download_lwNBD
 	$(MAKE) -C modules/pademu USE_USB=1 clean
 	echo " -ps2ips"
 	$(MAKE) -C modules/network/ps2ips clean
+	echo " -raudp"
+	$(MAKE) -C modules/network/raudp clean
 	echo "-pc tools"
 	$(MAKE) -C pc clean
 
@@ -516,8 +570,18 @@ $(EE_ASM_DIR)imgdrv.c: modules/iopcore/imgdrv/imgdrv.irx | $(EE_ASM_DIR)
 $(EE_ASM_DIR)eesync.c: $(PS2SDK)/iop/irx/eesync-nano.irx | $(EE_ASM_DIR)
 	$(BIN2C) $< $@ $(*F)_irx
 
+# RetroAchievements needs the network even when the game runs from USB, and the
+# in-game DEV9 driver lives inside cdvdman -- upstream enables it for the BDM
+# variant only under IOPCORE_DEBUG (modules/iopcore/cdvdman/Makefile). Without
+# DEV9 SMAP cannot start and raudp fails to load with -200 (E_IOP_DEPENDANCY).
+# Conditional so the default build's bdm_cdvdman.irx does not grow a driver it
+# has no use for.
+ifeq ($(RETROACHIEVEMENTS),1)
+CDVDMAN_RA_FLAGS = USE_DEV9=1
+endif
+
 modules/iopcore/cdvdman/bdm_cdvdman.irx: modules/iopcore/cdvdman
-	$(MAKE) $(CDVDMAN_PS2LOGO_FLAGS) $(CDVDMAN_DEBUG_FLAGS) USE_BDM=1 -C $< all
+	$(MAKE) $(CDVDMAN_PS2LOGO_FLAGS) $(CDVDMAN_DEBUG_FLAGS) $(CDVDMAN_RA_FLAGS) USE_BDM=1 -C $< all
 
 $(EE_ASM_DIR)bdm_cdvdman.c: modules/iopcore/cdvdman/bdm_cdvdman.irx | $(EE_ASM_DIR)
 	$(BIN2C) $< $@ $(*F)_irx
@@ -729,6 +793,21 @@ modules/network/smap_udpbd/smap_udpbd.irx: modules/network/smap_udpbd
 
 $(EE_ASM_DIR)smap_udpbd.c: modules/network/smap_udpbd/smap_udpbd.irx | $(EE_ASM_DIR)
 	$(BIN2C) $< $@ $(*F)_irx
+
+# RetroAchievements telemetry sender. Listed dependencies rather than a bare
+# directory prerequisite so editing raudp.c actually rebuilds the blob: the .irx
+# is embedded into the ELF, and a stale one is invisible until it misbehaves on
+# hardware. `rebuild` (clean+all) because this module's objects are shared with
+# nothing and a partial rebuild here is not worth the risk.
+RAUDP_DEPS := $(wildcard modules/network/raudp/*.c) $(wildcard modules/network/raudp/*.h) \
+              modules/network/raudp/imports.lst modules/network/raudp/exports.tab \
+              modules/network/raudp/Makefile
+
+modules/network/raudp/raudp.irx: $(RAUDP_DEPS) | modules/network/raudp
+	$(MAKE) -C modules/network/raudp rebuild
+
+$(EE_ASM_DIR)raudp.c: modules/network/raudp/raudp.irx | $(EE_ASM_DIR)
+	$(BIN2C) $< $@ raudp_irx
 
 modules/network/udpfs_smap/udpfs_smap.irx: modules/network/udpfs_smap
 	$(MAKE) -C $<

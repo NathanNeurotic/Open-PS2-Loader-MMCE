@@ -11,6 +11,11 @@
 #include "modules/iopcore/common/cdvd_config.h"
 #include "include/cheatman.h"
 #include "include/tar.h" // CHT/cht.tar cheat archives (#154)
+#ifdef RETROACHIEVEMENTS
+#include "include/rawatch.h" // RA watch lists, loaded next to the cheats
+#include "include/ranet.h"   // raAskPC/raNetTestLink -- the menu-side PC client exchange
+#include "include/rahash.h"  // raHashIsoDirect -- the image hash, no mounting
+#endif
 #include "include/pggsm.h"
 #include "include/cheatman.h"
 #include "include/ps2cnf.h"
@@ -1103,7 +1108,15 @@ static void sbCreateFoldersFromList(const char *path, const char **folders)
 
 void sbCreateFolders(const char *path, int createDiscImgFolders)
 {
-    const char *basicFolders[] = {"CFG", "THM", "LNG", "ART", "VMC", "CHT", "APPS", "POPS", NULL};
+    const char *basicFolders[] = {"CFG", "THM", "LNG", "ART", "VMC", "CHT", "APPS", "POPS",
+#ifdef RETROACHIEVEMENTS
+                                  // RA watch lists, one <startup>.wl per tracked game. Sits at the
+                                  // root of each activated device exactly like CHT/, per the
+                                  // folders-vs-settings rule: library folders go to the device
+                                  // root, never to the memory card and never to the CWD.
+                                  "RA",
+#endif
+                                  NULL};
     const char *discImgFolders[] = {"CD", "DVD", NULL};
 
     sbCreateFoldersFromList(path, basicFolders);
@@ -1674,3 +1687,267 @@ void sbBuildVmcNeutrinoArgs(config_set_t *configSet, const char *vmcPrefix, neut
         }
     }
 }
+
+#ifdef RETROACHIEVEMENTS
+/*
+  RA: load this game's watch list from <path>RA/<file>.wl.
+
+  Mirrors sbLoadCheats' shape rather than upstream's single fixed path, so RA and
+  CHT behave the same way for the user:
+
+    * a 256-byte path, because the prefix here is a full device root plus an OPL
+      data folder and a shorter buffer truncates it silently -- the exact bug that
+      made cheats never load on longer BDM paths;
+    * both spellings of the extension, because PFS (HDD) is case-sensitive and the
+      BDM FAT drivers do not fold case on lookup either.
+
+  No tar variant: cht.tar exists because published cheat packs ship that way.
+  Watch lists are generated per game by the PC client, so there is nothing to pack
+  and inventing an ra.tar would be a format nobody writes.
+
+  A missing list is NOT an error -- the game simply is not tracked -- so this is
+  deliberately quiet and its result is advisory. Returns the entry count, or
+  negative when there is no usable list.
+*/
+int sbLoadWatchList(const char *path, const char *file)
+{
+    static const char *wlExt[] = {"wl", "WL"};
+    unsigned int ext;
+    int result = -1;
+
+    if (path == NULL || file == NULL)
+        return -1;
+
+    for (ext = 0; ext < sizeof(wlExt) / sizeof(wlExt[0]); ext++) {
+        char wlPath[256];
+
+        if (snprintf(wlPath, sizeof(wlPath), "%sRA/%s.%s", path, file, wlExt[ext]) >= (int)sizeof(wlPath))
+            continue;
+
+        if ((result = LoadWatchListFile(wlPath, file)) >= 0)
+            break;
+    }
+
+    if (result < 0)
+        LOG("RA: no watch list for %s under %sRA/\n", file, path);
+
+    return result;
+}
+
+/* ------------------------------------------------------------------ */
+/* RA: the hash log. One file, <path>RA/hashes.txt, opened around a    */
+/* check; the crumb trail shows how far a check got even when the      */
+/* console hangs partway through (LOG output is invisible in the menu  */
+/* on hardware). ranet.c drops its network crumbs here too.            */
+
+static FILE *ra_hashlog = NULL;
+
+void raHashLogOpen(const char *path)
+{
+    char dir[128], file[192];
+
+    raHashLogClose();
+
+    snprintf(dir, sizeof(dir), "%sRA", path);
+    mkdir(dir, 0777);
+    snprintf(file, sizeof(file), "%sRA/hashes.txt", path);
+
+    ra_hashlog = fopen(file, "a");
+    if (ra_hashlog == NULL)
+        LOG("RA: could not open %s for writing\n", file);
+    else
+        LOG("RA: writing hashes to %s\n", file);
+}
+
+/* A crumb into the same file: shows how far things got even after a
+   hang. Not static: ranet.c reports what arrives on the network port
+   here, otherwise a network failure is known only by its outcome. */
+void raHashStep(const char *what)
+{
+    if (ra_hashlog == NULL)
+        return;
+
+    fprintf(ra_hashlog, "  step: %s\n", what);
+    fflush(ra_hashlog);
+}
+
+void raHashLogAdd(const char *name, const char *startup, const char *hash)
+{
+    if (ra_hashlog == NULL)
+        return;
+
+    fprintf(ra_hashlog, "%-60s %-12s %s\n", name, startup, hash);
+    fflush(ra_hashlog);
+}
+
+void raHashLogClose(void)
+{
+    if (ra_hashlog != NULL) {
+        fclose(ra_hashlog);
+        ra_hashlog = NULL;
+    }
+}
+
+/* ------------------------------------------------------------------ */
+/* RA: hash of ONE image, the one selected in the menu. Computed on    */
+/* demand; hashing every image during the scan would hold the console  */
+/* on the splash screen. The image's folder is not known in advance,   */
+/* so DVD is tried first, then CD, the way OPL itself lays them out.   */
+
+void sbHashGame(const char *path, const char *name, const char *ext, const char *startup, int format)
+{
+    static const char *dirs[] = {"DVD", "CD", NULL};
+    char iso[256], hash[33], info[96], info2[96];
+    char last_err[64] = "NOT HASHED";
+    int i;
+
+    info[0] = '\0';
+    info2[0] = '\0';
+    raHashLogOpen(path);
+    raHashSetStepLog(&raHashStep);
+
+    /* Split UL games are not image files; nothing to open. Say so
+       instead of reporting a missing file. */
+    if (format == GAME_FORMAT_USBLD) {
+        raHashStep("1-ul-format-not-supported");
+        raHashLogAdd(name, startup, "UL: not an image, not supported yet");
+        guiShowRANotice(_l(_STR_RA_UL_UNSUPPORTED), _l(_STR_RA_UL_UNSUPPORTED2));
+        raHashSetStepLog(NULL);
+        raHashLogClose();
+        return;
+    }
+
+    for (i = 0; dirs[i] != NULL; i++) {
+        int ret;
+
+        /* The file name follows the game's format, the way the scan
+           builds it. In the old naming scheme (OPL Manager's default:
+           "SLPM_656.88.Berserk.iso") the scan strips the ID off the
+           displayed name, so it has to go back in front of it here. */
+        if (format == GAME_FORMAT_OLD_ISO)
+            snprintf(iso, sizeof(iso), "%s%s/%s.%s%s", path, dirs[i], startup, name, ext);
+        else
+            snprintf(iso, sizeof(iso), "%s%s/%s%s", path, dirs[i], name, ext);
+        LOG("RA: trying %s\n", iso);
+
+        /* Direct read only. Mounting is not a fallback: on USB it hangs
+           on files beyond the 2 GB mark, so falling back to it after a
+           failure would hang the console instead of reporting the
+           error. */
+        ret = raHashIsoDirect(iso, startup, hash);
+
+        if (ret == 0) {
+            int q;
+
+            raHashLogAdd(name, startup, hash);
+            LOG("RA: hash %s = %s\n", startup, hash);
+
+            /* Broadcast to the PC: does it know this image, and what
+               should be read every frame. The list is stored next to
+               the game, where the loader picks it up at launch. */
+            raHashStep("6-asking-pc");
+            q = raAskPC(hash, startup, path, info, sizeof(info), info2, sizeof(info2));
+
+            if (q == 0) {
+                raHashStep("7-list-received");
+                guiShowRANotice(info[0] ? info : _l(_STR_RA_SUPPORTED),
+                                info2[0] ? info2 : _l(_STR_RA_START_TO_TRACK));
+            } else if (q == 1) {
+                raHashStep("7-pc-does-not-know-image");
+                guiShowRANotice(_l(_STR_RA_UNKNOWN_IMAGE), hash);
+            } else if (q == -7) {
+                raHashStep("7-pc-still-identifying");
+                guiShowRANotice(_l(_STR_RA_STILL_IDENTIFYING), _l(_STR_RA_TRY_AGAIN));
+            } else if (q == -8) {
+                /* NIC owned by a UDP transport (the settlement): the ask was
+                   refused without touching the network. The hash is already in
+                   the log, so the PC-side path to a .wl stays open. */
+                raHashStep("7-nic-busy-udp-transport");
+                guiShowRANotice(_l(_STR_RA_NET_BUSY), _l(_STR_RA_NET_BUSY_HASH));
+            } else if (q == -1) {
+                /* The console could not open a UDP socket, so nothing was
+                   ever sent -- report that, not a PC that never heard us. */
+                raHashStep("7-no-socket-on-console");
+                guiShowRANotice(_l(_STR_RA_NO_SOCKET), _l(_STR_RA_NO_SOCKET2));
+            } else {
+                raHashStep("7-pc-did-not-answer");
+                guiShowRANotice(_l(_STR_RA_PC_NO_ANSWER), _l(_STR_RA_PC_NO_ANSWER2));
+            }
+
+            raHashSetStepLog(NULL);
+            raHashLogClose();
+            return;
+        }
+
+        /* Record which step failed: a bare "not hashed" says nothing. */
+        LOG("RA: %s -> code %d\n", iso, ret);
+        snprintf(last_err, sizeof(last_err), "%s: %s", dirs[i],
+                 ret == -1 ? "image did not open" :
+                 ret == -2 ? "not ISO9660" :
+                 ret == -3 ? "ELF not found in directory" :
+                 ret == -4 ? "odd ELF size" :
+                 ret == -5 ? "read broke off" :
+                             "?");
+    }
+
+    raHashLogAdd(name, startup, last_err);
+    raHashSetStepLog(NULL);
+    raHashLogClose();
+    guiShowRANotice(_l(_STR_RA_HASH_FAILED), _l(_STR_RA_HASH_FAILED2));
+}
+
+/* ------------------------------------------------------------------ */
+/* RA: the deferred entry points. OPL talks to devices from a          */
+/* dedicated I/O thread (ioPutRequest); calling file I/O from the menu */
+/* handler hangs the console on USB. One check at a time: the          */
+/* parameters are shared with the I/O thread, so a second request      */
+/* while the worker runs would change them under it.                   */
+
+static char ra_hash_path[256]; /* the same length discipline as sbLoadWatchList: shorter truncates silently on long BDM paths */
+static char ra_hash_name[128];
+static char ra_hash_ext[16];
+static char ra_hash_startup[16];
+static int ra_hash_format = -1; /* GAME_FORMAT_USBLD is 0: never default to it */
+
+static void sbHashGameDeferredWorker(void);
+
+/* The parameters are shared with the I/O thread, so a second request
+   while the worker runs would change them under it. One check at a
+   time; the caller tells the user. */
+static volatile int ra_hash_busy = 0;
+
+int sbHashGameDeferred(const char *path, const char *name, const char *ext, const char *startup, int format)
+{
+    if (ra_hash_busy)
+        return 0;
+    ra_hash_busy = 1;
+
+    snprintf(ra_hash_path, sizeof(ra_hash_path), "%s", path ? path : "");
+    snprintf(ra_hash_name, sizeof(ra_hash_name), "%s", name ? name : "");
+    snprintf(ra_hash_ext, sizeof(ra_hash_ext), "%s", ext ? ext : "");
+    snprintf(ra_hash_startup, sizeof(ra_hash_startup), "%s", startup ? startup : "");
+    ra_hash_format = format;
+
+    ioPutRequest(IO_CUSTOM_SIMPLEACTION, &sbHashGameDeferredWorker);
+    return 1;
+}
+
+static void sbHashGameDeferredWorker(void)
+{
+    sbHashGame(ra_hash_path, ra_hash_name, ra_hash_ext, ra_hash_startup, ra_hash_format);
+    ra_hash_busy = 0;
+}
+
+static void sbTestPCLinkWorker(void)
+{
+    char line1[96], line2[96];
+
+    raNetTestLink(line1, sizeof(line1), line2, sizeof(line2));
+    guiShowRANotice(line1, line2);
+}
+
+void sbTestPCLinkDeferred(void)
+{
+    ioPutRequest(IO_CUSTOM_SIMPLEACTION, &sbTestPCLinkWorker);
+}
+#endif

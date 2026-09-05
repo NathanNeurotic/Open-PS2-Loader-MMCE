@@ -2253,6 +2253,12 @@ void bdmLaunchGame(item_list_t *itemList, int id, config_set_t *configSet)
     // adjust ZSO cache
     settings->common.zso_cache = bdmCacheSize;
 
+#ifdef RETROACHIEVEMENTS
+    // RA: this game's watch list, settled before sysLaunchLoaderElf reads
+    // GetWatchCount() to decide whether the network modules travel with the
+    // launch. Absent is normal -- the game is simply not tracked.
+    sbLoadWatchList(pDeviceData->bdmPrefix, game->startup);
+#endif
     if ((result = sbLoadCheats(pDeviceData->bdmPrefix, game->startup)) < 0) {
         // #265: let the user back out instead of sitting through the whole load. The helper does
         // the sbUnprepare itself -- see include/supportbase.h; skipping it breaks the NEXT launch.

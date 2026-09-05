@@ -20,6 +20,7 @@ up to five archives (DEBUG and language packs are listed when produced):
 | `RIPTOPL-<version>-src.zip` | Source snapshot to rebuild this exact commit. |
 | `RIPTOPL-LANGS-*.zip` | Extra UI language files (`.lng` + non-Latin fonts) — copy into your OPL folder. |
 | `RIPTOPL-VARIANTS-*.zip` | Alternate build configs across the moving and pinned ps2dev flavours; the normalizer also adds one ready-made DualSense (`DUALSENSE=1`) loader for each available official flavour. |
+| `RIPTOPL-RA-*.zip` | The **RetroAchievements** loader as a complete, installable package — same shape as the main archive (`POPS/`, `EMBER/`, `neutrino/`, the PC-tool shortcuts), with `APP_RIPTOPL-RA-*` loader folders in place of the standard ones, plus `xeRAbora.url` for the PC client the feature needs. Its own archive rather than an entry in VARIANTS so it can be picked deliberately, and because VARIANTS is excluded from the permanent MEGA archive as a diagnostic bundle. **A development build, not a finished feature**: both halves are written, none of it has been tested on hardware. See [docs/RETROACHIEVEMENTS.md](docs/RETROACHIEVEMENTS.md). |
 | `RIPTOPL-DEBUG-*.zip` | Diagnostic builds across the moving and pinned ps2dev flavours, when produced. |
 
 The final GitHub release intentionally has no floating `.ELF`, `SHA256SUMS.txt`, detailed changelog,

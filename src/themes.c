@@ -13,6 +13,9 @@
 #include "include/favsupport.h"
 #include "include/vcdsupport.h" // vcdDisplayName -- display-only VCD game-ID prefix hide
 #include "include/libview.h"    // libViewActive / libListViewActive -- which list this page shows
+#ifdef RETROACHIEVEMENTS
+#include "include/rabadge.h" // RA: mark over the cover
+#endif
 
 #include <time.h>
 #include <math.h>
@@ -713,6 +716,9 @@ static mutable_image_t *initMutableImage(const char *themePath, config_set_t *th
     mutableImage->overlayTextureLinked = 0;
     mutableImage->overlayTexture2 = NULL;
     mutableImage->overlayTexture2Linked = 0;
+#ifdef RETROACHIEVEMENTS
+    mutableImage->raIsCover = 0; // set in initGameImage, which knows the pattern
+#endif
 
     char elemProp[64];
 
@@ -877,6 +883,188 @@ static GSTEXTURE *getGameImageCached(image_cache_t *cache, struct submenu_item *
 // paths so an APP favourite renders with the apps element, not the game cover element).
 static theme_element_t *thmGetElemForItem(struct menu_list *menu, struct submenu_list *item, theme_element_t *elem);
 
+#ifdef RETROACHIEVEMENTS
+/* RA: the mark over the cover of a checked, tracked game. What
+   we know about the game does not depend on the picture. The mark image
+   carries a dark backing so it stays visible on light covers.
+
+   The rectangle follows the same arithmetic as rmSetupQuad: the element
+   may use any alignment, and we need the upper-right corner of what
+   was drawn. Sizes come from the texture when the theme leaves them
+   undefined, since covers vary in size. */
+/* RA: positions along the cover's sides are fractions of RA_MARK_ONE;
+   a power of two keeps the division cheap. */
+#define RA_MARK_ONE 1024
+
+/* A point inside the cover quadrilateral: s is the fraction along the
+   top edge, t along the left edge, both out of RA_MARK_ONE. Bilinear
+   interpolation over the four corners, the same mapping the renderer
+   uses to fit the cover itself (gsKit_prim_quad_texture in
+   rmDrawOverlayPixmap). Corner values never exceed the texture size, so
+   the products fit an int with room to spare. */
+static void raQuadPoint(const image_texture_t *ovl, int s, int t, int *px, int *py)
+{
+    int topx = ovl->upperLeft_x + ((ovl->upperRight_x - ovl->upperLeft_x) * s) / RA_MARK_ONE;
+    int topy = ovl->upperLeft_y + ((ovl->upperRight_y - ovl->upperLeft_y) * s) / RA_MARK_ONE;
+    int botx = ovl->lowerLeft_x + ((ovl->lowerRight_x - ovl->lowerLeft_x) * s) / RA_MARK_ONE;
+    int boty = ovl->lowerLeft_y + ((ovl->lowerRight_y - ovl->lowerLeft_y) * s) / RA_MARK_ONE;
+
+    *px = topx + ((botx - topx) * t) / RA_MARK_ONE;
+    *py = topy + ((boty - topy) * t) / RA_MARK_ONE;
+}
+
+/* Whether the overlay corners are sane enough to compute from. All four
+   are checked because the lower ones take part in the interpolation. */
+static int raQuadUsable(const image_texture_t *ovl, const GSTEXTURE *geom)
+{
+    return ovl->upperRight_x > 8 && ovl->upperRight_x <= geom->Width &&
+           ovl->upperLeft_x >= 0 && ovl->upperLeft_x < ovl->upperRight_x &&
+           ovl->upperLeft_y >= 0 && ovl->upperLeft_y < geom->Height &&
+           ovl->upperRight_y >= 0 && ovl->upperRight_y < geom->Height &&
+           ovl->lowerLeft_x >= 0 && ovl->lowerLeft_x <= geom->Width &&
+           ovl->lowerRight_x >= 0 && ovl->lowerRight_x <= geom->Width &&
+           ovl->lowerLeft_y > ovl->upperLeft_y && ovl->lowerLeft_y <= geom->Height &&
+           ovl->lowerRight_y > ovl->upperRight_y && ovl->lowerRight_y <= geom->Height;
+}
+
+static void drawRAMark(struct submenu_list *item, struct theme_element *elem,
+                       mutable_image_t *img, GSTEXTURE *cover)
+{
+    GSTEXTURE *mark, *geom;
+    image_texture_t *ovl;
+    int w, h, x0, y0, side, margin, right, topy, refw, x, y;
+
+    if (item == NULL || cover == NULL)
+        return;
+
+    /* The row already knows. Asking the badge cache from here would mean the render thread
+       dereferencing a pointer the I/O thread frees on every list rebuild (raBadgeRefresh). */
+    if (!item->item.raBadged)
+        return;
+
+    mark = thmGetTexture(RA_MARK);
+    if (mark == NULL || mark->Mem == NULL)
+        return;
+
+    /* The case overlay, when present, defines the quad size: the
+       renderer fits the cover inside it. */
+    ovl = img->overlayTexture;
+    geom = (ovl != NULL) ? &ovl->source : cover;
+
+    w = (elem->width == DIM_UNDEF) ? geom->Width : elem->width;
+    h = (elem->height == DIM_UNDEF) ? geom->Height : elem->height;
+    if (w <= 0 || h <= 0)
+        return;
+
+    if (elem->scaled & SCALING_RATIO)
+        w = rmWideScale(w);
+
+    if (elem->aligned & ALIGN_HCENTER)
+        x0 = elem->posX - (w >> 1);
+    else if (elem->aligned & ALIGN_RIGHT)
+        x0 = elem->posX - w;
+    else
+        x0 = elem->posX;
+
+    if (elem->aligned & ALIGN_VCENTER)
+        y0 = elem->posY - (h >> 1);
+    else if (elem->aligned & ALIGN_BOTTOM)
+        y0 = elem->posY - h;
+    else
+        y0 = elem->posY;
+
+    /* Skew. The renderer fits the cover into the quadrilateral given by
+       the overlay corners, which is where its slant comes from. The
+       mark lives in the cover's own coordinate system: its corners are
+       bilinearly interpolated and handed to the renderer as a
+       quadrilateral, so it shares the slant instead of looking like a
+       sticker.
+
+       Size and margin are FRACTIONS OF THE COVER'S SIDES rather than
+       screen pixels: the sides are slanted and their length differs
+       from the case width, so pixel arithmetic would be wrong. */
+    if (ovl != NULL && raQuadUsable(ovl, geom)) {
+        int coverW = ovl->upperRight_x - ovl->upperLeft_x;
+        int coverH = ovl->lowerLeft_y - ovl->upperLeft_y;
+        int s0, s1, t0, t1;
+        int ax, ay, bx, by, cx, cy, dx, dy;
+
+        side = coverW / 3;
+        if (side < 22)
+            side = 22;
+        if (side > 48)
+            side = 48;
+        if (side > coverH / 2)
+            side = coverH / 2;
+        if (side < 4)
+            return;
+
+        margin = side / 8;
+        if (margin < 2)
+            margin = 2;
+
+        s1 = RA_MARK_ONE - (margin * RA_MARK_ONE) / coverW;
+        s0 = s1 - (side * RA_MARK_ONE) / coverW;
+        t0 = (margin * RA_MARK_ONE) / coverH;
+        t1 = t0 + (side * RA_MARK_ONE) / coverH;
+
+        /* A broken theme with a tiny case: draw nothing rather than an
+           inside-out quadrilateral. */
+        if (s0 < 0 || t1 > RA_MARK_ONE)
+            return;
+
+        raQuadPoint(ovl, s0, t0, &ax, &ay);
+        raQuadPoint(ovl, s1, t0, &bx, &by);
+        raQuadPoint(ovl, s0, t1, &cx, &cy);
+        raQuadPoint(ovl, s1, t1, &dx, &dy);
+
+        /* The origin is computed HERE, as in the flat path below: x0/y0
+           are already derived from the COVER's size. Passing
+           elem->width/height would not do: rmSetupQuad resolves
+           DIM_UNDEF from the texture it is given, and that texture is
+           the mark, so the box would take the mark's size. With centre
+           alignment the whole quadrilateral then lands off screen and
+           the mark disappears. */
+        rmDrawInlayPixmap(mark, x0, y0, ALIGN_NONE, w, h, SCALING_NONE,
+                          gDefaultCol, ax, ay, bx, by, cx, cy, dx, dy);
+        return;
+    }
+
+    /* No overlay: the cover is not slanted, so draw a flat square at its
+       upper-right corner. */
+    right = w;
+    topy = 0;
+    refw = w;
+
+    /* A third of the cover width, within limits: on a small cover the
+       mark would swallow it, on a large one it would get lost. */
+    side = refw / 3;
+    if (side < 22)
+        side = 22;
+    if (side > 48)
+        side = 48;
+    if (side > h / 2)
+        side = h / 2;
+
+    margin = side / 8;
+    if (margin < 2)
+        margin = 2;
+
+    x = x0 + right - side - margin;
+    y = y0 + topy + margin;
+
+    /* Guard against a broken theme: stay on screen. */
+    if (x + side > screenWidth)
+        x = screenWidth - side;
+    if (x < 0)
+        x = 0;
+    if (y < 0)
+        y = 0;
+
+    rmDrawPixmap(mark, x, y, ALIGN_NONE, side, side, SCALING_NONE, gDefaultCol, 0);
+}
+#endif /* RETROACHIEVEMENTS */
+
 static void drawGameImage(struct menu_list *menu, struct submenu_list *item, config_set_t *config, struct theme_element *elem)
 {
     if (item) {
@@ -979,6 +1167,13 @@ static void drawGameImage(struct menu_list *menu, struct submenu_list *item, con
         } else
             rmDrawPixmap(texture, drawElem->posX, drawElem->posY, drawElem->aligned, drawElem->width, drawElem->height, drawElem->scaled, gDefaultCol, 0);
 
+#ifdef RETROACHIEVEMENTS
+        /* The RA mark over the cover of a tracked game. Only elements whose pattern is
+           COV (raIsCover); drawn after the cover so it lands on top. */
+        if (gameImage->raIsCover)
+            drawRAMark(item, drawElem, gameImage, texture);
+#endif
+
     } else if (elem->type == ELEM_TYPE_BACKGROUND) {
         mutable_image_t *gameImage = (mutable_image_t *)elem->extended;
         if (gameImage->defaultTexture)
@@ -993,6 +1188,10 @@ static void initGameImage(const char *themePath, config_set_t *themeConfig, them
     mutable_image_t *mutableImage = initMutableImage(themePath, themeConfig, theme, name, elem->type, pattern, count, texture, overlay);
     elem->extended = mutableImage;
     elem->endElem = &endMutableImage;
+
+#ifdef RETROACHIEVEMENTS
+    mutableImage->raIsCover = (pattern != NULL && !strcmp(pattern, "COV"));
+#endif
 
     if (mutableImage->cache)
         elem->drawElem = &drawGameImage;

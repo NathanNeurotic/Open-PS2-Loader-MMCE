@@ -28,6 +28,9 @@
 #include "padpatterns.h"
 #include "syshook.h"
 #include "tlb.h"
+#ifdef RETROACHIEVEMENTS
+#include "ra.h"
+#endif
 #include "gsm_api.h"
 #ifdef IGS
 #include "igs_api.h"
@@ -284,6 +287,10 @@ static int IGR_Intc_Handler(int cause)
     USE_LOCAL_EECORE_CONFIG;
     int i;
     u8 pad_pos_state, pad_pos_frame, pad_pos_combo1, pad_pos_combo2;
+
+#ifdef RETROACHIEVEMENTS
+    RA_OnVblank(); /* RetroAchievements: per-frame memory snapshot */
+#endif
 
     if (Pad_Data.pad_buf != NULL) {
         // Copy values via the uncached segment, to bypass the cache.

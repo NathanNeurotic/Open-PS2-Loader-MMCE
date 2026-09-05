@@ -370,6 +370,7 @@ and ideas from [rickgaiser's OPL](https://github.com/rickgaiser/Open-PS2-Loader)
 [POPSLoader](https://github.com/NathanNeurotic/POPSLoader),
 [OPL RetroGEM ID by CosmicScale](https://github.com/CosmicScale/Open-PS2-Loader-Retro-GEM),
 [nhddl](https://github.com/pcm720/nhddl),
+[hacan359's RetroAchievements OPL](https://github.com/hacan359/Open-PS2-Loader/pull/1),
 [Modulo-R1](https://github.com/AdityaKumar7209/Modulo-R1-Beta-Preview---PS2),
 [PS2-Launcher](https://github.com/Irfanlesnar/PS2-Launcher), and
 [official OPL](https://github.com/ps2homebrew/Open-PS2-Loader).
@@ -388,6 +389,14 @@ With special and sincere thanks to:
   unique features and unmerged work alive. Thank you.
 - **bbsan2k** — for the **MMCE (Memory Card Mass Storage) protocol** that makes SD-via-memory-card
   loading through the PS2's memory-card slot possible. OPL's MMCE support builds directly on it.
+- **hacan359 (yoba)** — for **RetroAchievements on real PS2 hardware**, and for offering it to
+  this fork rather than keeping it to his own. The design is his: the console works out which game
+  an image is and streams the handful of memory addresses that game's achievements watch, while
+  everything else — rcheevos, the RetroAchievements servers, your login — happens on the PC. He
+  writes and maintains that PC client, **[xeRAbora](https://github.com/hacan359/xerabora)** (MIT),
+  and RiptOPL neither ships one nor intends to. RiptOPL's RA support is a reimplementation of his
+  work against his published wire protocol, shipped as its own `RIPTOPL-RA-*.zip` build with a
+  shortcut to his client inside. Please report *RiptOPL* problems to us, not to him.
 - **saildot4k** — for **BDMA-ATA** (exFAT internal-HDD block-device support), and the fixes,
   feedback, and oversight that shaped this fork's block-device work. A big piece of getting it right.
 - **eliminator1403** — for dedicated **testing, bug reports, and real-hardware feedback** that
@@ -453,6 +462,15 @@ compiled into any published main ELF (`EXTRA_FEATURES ?= 0`); they ship in the
 `EXTRA_FEATURES=1` builds inside the VARIANTS zip.
 DualSense / DualShock 5 (USB) support is available prebuilt in the `RIPTOPL-VARIANTS-*.zip`
 bundle, or build your own with `make DUALSENSE=1`.
+
+**RetroAchievements** ships as its own complete package, `RIPTOPL-RA-*.zip` (or build it with
+`make RETROACHIEVEMENTS=1`). It is laid out like the main archive — same `POPS/`, `EMBER/`,
+`neutrino/` and shortcuts — with the RA loader in place of the standard one, plus a shortcut to
+**xeRAbora**, the PC client the feature talks to. It is a **development build, not a finished
+feature** — both halves are now written, the menu side included, but none of it has run on a real
+console yet — and the standard ELF is completely unaffected by it. See
+**[docs/RETROACHIEVEMENTS.md](docs/RETROACHIEVEMENTS.md)** for what it does, which launch paths can
+ever support it, and why.
 
 There are two release channels:
 

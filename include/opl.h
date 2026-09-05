@@ -269,6 +269,14 @@ extern int gNetStartMode;    // START_MODE_* -- network start row (Off/Manual/Au
 extern int gAutosort;
 extern int gAutoRefresh;
 extern int gEnableNotifications;
+#ifdef RETROACHIEVEMENTS
+// RA master switch. Off (the default) means the in-game network stack is never forced into a
+// launch, so an RA build with telemetry off costs a launch exactly what the default build does.
+extern int gRATelemetry;
+// List badges and the cover mark. Cosmetic, and subordinate to gRATelemetry: badges advertise a
+// feature, so they stay dark while the feature is switched off.
+extern int gRABadges;
+#endif
 extern int gEnableArt;
 extern int gWideScreen;
 extern int gVMode; // 0 - Auto, 1 - PAL, 2 - NTSC

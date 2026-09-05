@@ -42,6 +42,9 @@
 #include "include/pggsm.h"
 #include "include/cheatman.h"
 #include "include/xparam.h"
+#ifdef RETROACHIEVEMENTS
+#include "include/rawatch.h"
+#endif
 
 #ifdef PADEMU
 #include <libds34bt.h>
@@ -760,6 +763,25 @@ static unsigned int sendIrxKernelRAM(const char *startup, const char *mode_str, 
     else
         modules |= CORE_IRX_HDD;
 
+#ifdef RETROACHIEVEMENTS
+    /*
+      RetroAchievements telemetry leaves the console over the network whatever the
+      game was booted from, so the in-game SMAP + SMSTCPIP pair has to travel in
+      the module table even for a USB launch.
+
+      DEVIATION from upstream, which sets this unconditionally. It is not free:
+      the two modules cost roughly 57 KB of the module storage area
+      (OPL_MOD_STORAGE, include/iosupport.h) and put SMAP on the NIC in every
+      game. Gated on the watch list, a RA build launching an untracked game
+      reserves and loads exactly what the default build does.
+
+      GetWatchCount() is authoritative here because the launch legs have already
+      run sbLoadWatchList() by this point; no list means nothing to send.
+    */
+    if (gRATelemetry && GetWatchCount() > 0)
+        modules |= CORE_IRX_ETH;
+#endif
+
     irxtable = (irxtab_t *)ModuleStorage;
     irxptr_tab = (irxptr_t *)((unsigned char *)irxtable + sizeof(irxtab_t));
     size_ioprp_image = size_IOPRP_img + size_cdvdman_irx + size_cdvdfsv_irx + size_eesync_irx + 256;
@@ -824,6 +846,16 @@ static unsigned int sendIrxKernelRAM(const char *startup, const char *mode_str, 
         irxptr_tab[modcount].info = size_smbinit_irx | SET_OPL_MOD_ID(OPL_MODULE_ID_SMBINIT);
         irxptr_tab[modcount++].ptr = (void *)&smbinit_irx;
     }
+
+#ifdef RETROACHIEVEMENTS
+    // RetroAchievements telemetry sender. Registered only alongside the network
+    // modules it imports from -- raudp links against SMAP's SMAPSendPacket, so
+    // shipping it without CORE_IRX_ETH would just fail to load with -200.
+    if (modules & CORE_IRX_ETH) {
+        irxptr_tab[modcount].info = size_raudp_irx | SET_OPL_MOD_ID(OPL_MODULE_ID_RAUDP);
+        irxptr_tab[modcount++].ptr = (void *)&raudp_irx;
+    }
+#endif
 
     //Load MMCEIGR module (~1.4KB) on reset if bootcard switch is enabled for either slot
     if (gMMCEIGRSlot != 0) {
@@ -1768,6 +1800,20 @@ void sysLaunchLoaderElf(const char *filename, const char *mode_str, int size_cdv
     // PS2RD .img cheats (item 26). Without this the EE loads the .img into RAM and then never hands
     // the pointer to the core, so LinkImage() had nothing to link and the whole feature was dead.
     config->gImage = GetImageEnabled() ? (u32 *)GetImage() : NULL;
+
+#ifdef RETROACHIEVEMENTS
+    // RetroAchievements: the watch list for this game, already loaded by the launch
+    // leg. It may legitimately be absent -- the game simply is not tracked -- in
+    // which case ee_core sees NULL and never starts the telemetry path.
+    config->raWatchList = GetWatchList();
+    config->raWatchCount = GetWatchCount();
+    config->raSnapBytes = GetWatchBytes();
+
+    // The last point where the list is still ours: from here it goes into ee_core
+    // with no feedback. A zero shows up in the launch log directly, rather than as
+    // empty packets on the PC.
+    raLaunchNote("to-ee-core", config->raWatchCount, config->raSnapBytes);
+#endif
 
     sprintf(config->g_ps2_ip, "%u.%u.%u.%u", local_ip_address[0], local_ip_address[1], local_ip_address[2], local_ip_address[3]);
     sprintf(config->g_ps2_netmask, "%u.%u.%u.%u", local_netmask[0], local_netmask[1], local_netmask[2], local_netmask[3]);

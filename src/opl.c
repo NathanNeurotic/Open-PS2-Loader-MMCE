@@ -39,6 +39,9 @@
 #include "include/vcdsupport.h"
 #include "include/cuesupport.h" // cueIsCueEntry -- a PS1 row names its own core   // VCD display naming + POPSTARTER launch helpers
 #include "include/libview.h"    // libViewActive / libListViewActive -- which list this page shows
+#ifdef RETROACHIEVEMENTS
+#include "include/rabadge.h" // RA: "tracked game" badge in the list
+#endif
 
 #include "include/cheatman.h"
 #include "include/sound.h"
@@ -218,6 +221,10 @@ int gNetStartMode;    // START_MODE_* -- the Off/Manual/Auto network start row (
 int gAutosort;
 int gAutoRefresh;
 int gEnableNotifications;
+#ifdef RETROACHIEVEMENTS
+int gRATelemetry;
+int gRABadges;
+#endif
 int gEnableArt;
 int gWideScreen;
 int gVMode; // 0 - Auto, 1 - PAL, 2 - NTSC
@@ -1182,6 +1189,12 @@ static void updateMenuFromGameList(opl_io_module_t *mdl)
     struct gui_update_t *gup = NULL;
     int count = mdl->support->itemUpdate(mdl->support);
 
+#ifdef RETROACHIEVEMENTS
+    // RA badges: recompute on every list rebuild. This runs on the I/O thread (itemUpdate
+    // above is the device scan), where the <device>RA/ stat() calls are safe.
+    raBadgeRefresh(mdl->support, count);
+#endif
+
     // Folder browsing: while inside a subfolder, show the breadcrumb ("Device: RPGs/SNES") as the page
     // title. folderGetSub() points at persistent static state, so the char* stays valid. At the device
     // root the device name set above stands. Only one device is ever inside a folder at a time (the
@@ -1225,7 +1238,18 @@ static void updateMenuFromGameList(opl_io_module_t *mdl)
 
                 gup->submenu.icon_id = -1;
                 gup->submenu.id = i;
+#ifdef RETROACHIEVEMENTS
+                {
+                    // The RA badge prefix, when this game has a watch list. NULL means plain name.
+                    const char *badge = raBadgeText(mdl->support, i);
+                    gup->submenu.text = (char *)(badge != NULL ? badge : mdl->support->itemGetName(mdl->support, i));
+                    /* Resolve the cover mark HERE, on the I/O thread that owns the badge cache,
+                       and carry the answer to the renderer as a plain int. */
+                    gup->submenu.raBadged = (badge != NULL);
+                }
+#else
                 gup->submenu.text = mdl->support->itemGetName(mdl->support, i);
+#endif
                 gup->submenu.text_id = -1;
                 gup->submenu.selected = 0;
                 gup->submenu.isFolder = isFolderRow;
@@ -2720,6 +2744,10 @@ static void _loadConfig()
             configGetColor(configOPL, CONFIG_OPL_TITLECOLOR, gDefaultTitleColor);
             configGetColor(configOPL, CONFIG_OPL_SEL_TEXTCOLOR, gDefaultSelTextColor);
             configGetInt(configOPL, CONFIG_OPL_ENABLE_NOTIFICATIONS, &gEnableNotifications);
+#ifdef RETROACHIEVEMENTS
+            configGetInt(configOPL, CONFIG_OPL_RA_TELEMETRY, &gRATelemetry);
+            configGetInt(configOPL, CONFIG_OPL_RA_BADGES, &gRABadges);
+#endif
             configGetInt(configOPL, CONFIG_OPL_ENABLE_COVERART, &gEnableArt);
             configGetInt(configOPL, CONFIG_OPL_WIDESCREEN, &gWideScreen);
 
@@ -3290,6 +3318,10 @@ static void _saveConfig()
         configSetColor(configOPL, CONFIG_OPL_TITLECOLOR, gDefaultTitleColor);
         configSetColor(configOPL, CONFIG_OPL_SEL_TEXTCOLOR, gDefaultSelTextColor);
         configSetInt(configOPL, CONFIG_OPL_ENABLE_NOTIFICATIONS, gEnableNotifications);
+#ifdef RETROACHIEVEMENTS
+        configSetInt(configOPL, CONFIG_OPL_RA_TELEMETRY, gRATelemetry);
+        configSetInt(configOPL, CONFIG_OPL_RA_BADGES, gRABadges);
+#endif
         configSetInt(configOPL, CONFIG_OPL_ENABLE_COVERART, gEnableArt);
         configSetInt(configOPL, CONFIG_OPL_WIDESCREEN, gWideScreen);
         configSetInt(configOPL, CONFIG_OPL_VMODE, gVMode);
@@ -4460,6 +4492,10 @@ static void setDefaults(void)
     gBDMPrefix[0] = '\0';
     gETHPrefix[0] = '\0';
     gEnableNotifications = 1;
+#ifdef RETROACHIEVEMENTS
+    gRATelemetry = 0; // opt in: telemetry puts SMAP on the NIC in every launch that has a .wl
+    gRABadges = 1;    // free once telemetry is on -- raBadgeRefresh runs on the I/O thread
+#endif
     gEnableArt = 1;
     gWideScreen = 1;
     gEnableSFX = 1; // safe now: sfxPlay dispatches asynchronously (#340)

@@ -3,6 +3,11 @@
 
 #include <irx.h>
 
+#ifdef RETROACHIEVEMENTS
+#include <loadcore.h>
+#include <thsemap.h>
+#endif
+
 /* Please keep these in alphabetical order!  */
 #include <dmacman.h>
 #include <dev9.h>

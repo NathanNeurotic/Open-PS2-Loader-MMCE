@@ -54,6 +54,12 @@ enum GAME_MENU_IDs {
     GAME_REMOVE_CHANGES,
     GAME_RENAME_GAME,
     GAME_DELETE_GAME,
+#ifdef RETROACHIEVEMENTS
+    // Appended last, and only in the RA flavour: menuRenderGameMenu's extra-spacing arithmetic keys
+    // on these enum positions, so RA entries must not shift the existing ones.
+    GAME_RA_CHECK,
+    GAME_RA_TEST,
+#endif
 };
 
 // global menu variables
@@ -652,6 +658,10 @@ void menuInitGameMenu(void)
         submenuAppendItem(&gameMenu, -1, NULL, GAME_RENAME_GAME, _STR_RENAME);
         submenuAppendItem(&gameMenu, -1, NULL, GAME_DELETE_GAME, _STR_DELETE);
     }
+#ifdef RETROACHIEVEMENTS
+    submenuAppendItem(&gameMenu, -1, NULL, GAME_RA_CHECK, _STR_RA_CHECK_GAME);
+    submenuAppendItem(&gameMenu, -1, NULL, GAME_RA_TEST, _STR_RA_TEST_LINK);
+#endif
 
     gameMenuCurrent = gameMenu;
 }
@@ -1842,7 +1852,48 @@ void menuHandleInputGameMenu()
 
         sfxPlay(SFX_CONFIRM);
 
-        if (menuID == GAME_COMPAT_SETTINGS) {
+#ifdef RETROACHIEVEMENTS
+        if (menuID == GAME_RA_CHECK) {
+            /* RA: hash the selected image, on demand. Hashing every image during the scan would
+               hold the console on the splash screen: the scan runs before the menu appears and
+               each image has to be opened and read.
+               Every refusal SAYS why -- a silent no-op reads as broken, and hashing an image
+               nothing will ever watch is worse. Only the four legs that reach sysLaunchLoaderElf
+               (BDM, ETH/SMB, HDD/APA, MMCE) can ever carry telemetry; the rest exec an external
+               ELF and ee_core never loads. */
+            item_list_t *support = selected_item->item->userdata;
+            int gid = selected_item->item->current->item.id;
+
+            if (menuSelectedRowView(support) == LIB_VIEW_PS1) {
+                // PS1/VCD rows launch through POPSTARTER or Ember, never ee_core.
+                guiShowRANotice(_l(_STR_RA_NA_PS1), NULL);
+            } else if (support->mode == UDPFS_MODE) {
+                // UDPFS is Neutrino-only in this fork.
+                guiShowRANotice(_l(_STR_RA_NA_UDPFS), NULL);
+            } else if (gameMenuCoreIsNeutrino()) {
+                guiShowRANotice(_l(_STR_RA_NA_NEUTRINO), NULL);
+            } else if (support->mode == HDD_MODE) {
+                /* HDLoader entries (hdl_game_info_t) have no filename and no extension, so there
+                   is nothing to hash. Watch lists still LOAD from RA/ at launch; the .wl has to
+                   be built on the PC. */
+                guiShowRANotice(_l(_STR_RA_NA_HDD), _l(_STR_RA_NA_HDD2));
+            } else if (support->itemGet != NULL && support->itemGetPrefix != NULL) {
+                base_game_info_t *g = (base_game_info_t *)support->itemGet(support, gid);
+                const char *prefix = support->itemGetPrefix(support);
+
+                if (g != NULL && prefix != NULL && g->format != GAME_FORMAT_FOLDER) {
+                    if (sbHashGameDeferred(prefix, g->name, g->extension, g->startup, g->format))
+                        guiShowRANotice(_l(_STR_RA_CHECKING_IMAGE), NULL);
+                    else
+                        guiShowRANotice(_l(_STR_RA_CHECK_RUNNING), NULL);
+                }
+            }
+        } else if (menuID == GAME_RA_TEST) {
+            sbTestPCLinkDeferred();
+            guiShowRANotice(_l(_STR_RA_LOOKING_FOR_PC), NULL);
+        } else
+#endif
+            if (menuID == GAME_COMPAT_SETTINGS) {
             guiGameShowCompatConfig(selected_item->item->current->item.id, selected_item->item->userdata, itemConfig);
         } else if (menuID == GAME_CHEAT_SETTINGS) {
             if (gameMenuCoreIsNeutrino())
