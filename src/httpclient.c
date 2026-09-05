@@ -6,7 +6,8 @@
 #include "ioman.h"
 
 static SifRpcClientData_t SifRpcClient;
-static unsigned char RpcTxBuffer[256] ALIGNED(64);
+// Must hold the largest argument struct; HttpClientStreamBeginArgs is the one that sets the size.
+static unsigned char RpcTxBuffer[1024] ALIGNED(64);
 static unsigned char RpcRxBuffer[64] ALIGNED(64);
 
 int HttpInit(void)
@@ -76,4 +77,68 @@ int HttpSendGetRequest(s32 HttpSocket, const char *UserAgent, const char *host, 
     }
 
     return result;
+}
+
+int HttpStreamBegin(s32 HttpSocket, const char *host, const char *uri,
+                    int useRange, u64 rangeStart, u64 rangeEnd, int keepAlive,
+                    int *contentLen, u64 *total, int *hasTotal)
+{
+    struct HttpClientStreamBeginArgs *args = (struct HttpClientStreamBeginArgs *)RpcTxBuffer;
+    struct HttpClientStreamBeginResult *res = (struct HttpClientStreamBeginResult *)RpcRxBuffer;
+    int result;
+
+    memset(args, 0, sizeof(*args));
+    args->socket = HttpSocket;
+    args->rangeStartLo = (u32)(rangeStart & 0xFFFFFFFF);
+    args->rangeStartHi = (u32)(rangeStart >> 32);
+    args->rangeEndLo = (u32)(rangeEnd & 0xFFFFFFFF);
+    args->rangeEndHi = (u32)(rangeEnd >> 32);
+    args->useRange = useRange ? 1 : 0;
+    args->keepAlive = keepAlive ? 1 : 0;
+    strncpy(args->host, host, sizeof(args->host) - 1);
+    strncpy(args->uri, uri, sizeof(args->uri) - 1);
+
+    *contentLen = -1;
+    *total = 0;
+    *hasTotal = 0;
+
+    if ((result = SifCallRpc(&SifRpcClient, HTTP_CLIENT_CMD_STREAM_BEGIN, 0, RpcTxBuffer, sizeof(*args), RpcRxBuffer, sizeof(*res), NULL, NULL)) < 0)
+        return result;
+
+    *contentLen = res->contentLen;
+    *total = ((u64)res->totalHi << 32) | res->totalLo;
+    *hasTotal = res->hasTotal;
+
+    return res->result;
+}
+
+int HttpStreamRead(void *buffer, int wanted)
+{
+    struct HttpClientStreamReadArgs *args = (struct HttpClientStreamReadArgs *)RpcTxBuffer;
+    struct HttpClientStreamReadResult *res = (struct HttpClientStreamReadResult *)RpcRxBuffer;
+    int result;
+
+    if (wanted > HTTP_CLIENT_STREAM_CHUNK)
+        wanted = HTTP_CLIENT_STREAM_CHUNK;
+    if (wanted <= 0)
+        return 0;
+
+    args->wanted = wanted;
+    args->output = buffer;
+
+    // The IOP DMAs straight into this buffer, so anything the EE still holds in cache for it would
+    // survive the transfer and be read back as stale bytes.
+    if (!IS_UNCACHED_SEG(buffer))
+        SifWriteBackDCache(buffer, wanted);
+
+    if ((result = SifCallRpc(&SifRpcClient, HTTP_CLIENT_CMD_STREAM_READ, 0, RpcTxBuffer, sizeof(*args), RpcRxBuffer, sizeof(*res), NULL, NULL)) < 0)
+        return result;
+
+    return res->result;
+}
+
+void HttpStreamEnd(void)
+{
+    // Nothing to say to the IOP: the stream is torn down by HttpCloseConnection, and a BEGIN
+    // always resets it. This exists so callers can pair Begin/End symmetrically.
 }

@@ -42,6 +42,7 @@ I_strcmp
 I_strncmp
 I_strlen
 I_strcat
+I_strcpy
 I_sprintf
 I_strtoul
 I_strchr
