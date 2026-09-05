@@ -212,4 +212,12 @@ int guiGameShowRemoveSettings(config_set_t *configSet, config_set_t *configGame)
 
 void guiManageCheats(void);
 
+#ifdef RETROACHIEVEMENTS
+/* RA: two-line notice popup, set from the I/O thread (the check/test actions run
+   there) and drawn by the render loop. guiShowRANotices() is called once per
+   frame from the main loop. */
+void guiShowRANotice(const char *line1, const char *line2);
+void guiShowRANotices(void);
+#endif
+
 #endif

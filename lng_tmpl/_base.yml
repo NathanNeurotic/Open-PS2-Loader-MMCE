@@ -1203,3 +1203,79 @@ gui_strings:
   string: Move cursor
 - label: TITLECOLOR
   string: Game Title Color
+# RetroAchievements (RETROACHIEVEMENTS=1 build flavour) -- appended at the very end on
+# purpose: .lng is consumed by line position, so new labels may ONLY ever be added here.
+- label: RA_CHECK_GAME
+  string: Check RetroAchievements support
+- label: RA_TEST_LINK
+  string: Test RetroAchievements PC link
+- label: RA_CHECKING_IMAGE
+  string: Checking the image, this takes a few seconds...
+- label: RA_CHECK_RUNNING
+  string: An image check is already running
+- label: RA_LOOKING_FOR_PC
+  string: Looking for the PC client...
+- label: RA_UL_UNSUPPORTED
+  string: UL/USBExtreme games cannot be checked yet
+- label: RA_UL_UNSUPPORTED2
+  string: Only plain .iso images in DVD/ or CD/ are supported
+- label: RA_UNKNOWN_IMAGE
+  string: RetroAchievements does not know this image
+- label: RA_STILL_IDENTIFYING
+  string: The PC is still identifying the image
+- label: RA_TRY_AGAIN
+  string: Try again in a few seconds
+- label: RA_NO_SOCKET
+  string: The console could not open a network socket
+- label: RA_NO_SOCKET2
+  string: Restart the console, or check the ETH device in settings
+- label: RA_TEST_NO_SOCKET2
+  string: Check the cable and ETH in settings; if the network is up, reboot the console
+- label: RA_PC_NO_ANSWER
+  string: The PC client did not answer
+- label: RA_PC_NO_ANSWER2
+  string: Check that xeRAbora runs, or try the PC link test
+- label: RA_SUPPORTED
+  string: Supported by RetroAchievements
+- label: RA_START_TO_TRACK
+  string: Start the game to track achievements
+- label: RA_ACHIEVEMENTS
+  string: "%d achievements"
+- label: RA_ACHIEVEMENTS_FULL
+  string: "%d achievements -- %d unlocked, %d unsupported"
+- label: RA_HASH_FAILED
+  string: The image could not be hashed
+- label: RA_HASH_FAILED2
+  string: See RA/hashes.txt next to the games for the reason
+- label: RA_NET_BUSY
+  string: The network is in use by a UDP transport
+- label: RA_NET_BUSY2
+  string: RA needs the SMB stack -- switch the protocol, or build the .wl on the PC
+- label: RA_NET_BUSY_HASH
+  string: The hash is in RA/hashes.txt -- xeRAbora can build the .wl from it
+- label: RA_NO_IP
+  string: The console has no IP address
+- label: RA_NO_IP2
+  string: Check DHCP or the static address in Network settings
+- label: RA_TEST_NO_ANSWER
+  string: No PC client answered within 3 seconds
+- label: RA_TEST_NO_ANSWER2
+  string: "Console%s. Check that xeRAbora runs and UDP 18194 is open"
+- label: RA_TEST_FOUND
+  string: "PC client found%s%s %s"
+- label: RA_TEST_FOUND2
+  string: "Reply in %u ms, console%s"
+- label: RA_NA_NEUTRINO
+  string: "RA tracking needs the <OPL> core -- Neutrino launches never load ee_core"
+- label: RA_NA_UDPFS
+  string: RA tracking is not available on UDPFS -- games launch through Neutrino
+- label: RA_NA_PS1
+  string: RA tracking is not available for PS1 games
+- label: RA_NA_HDD
+  string: HDLoader games have no image file to hash
+- label: RA_NA_HDD2
+  string: Build the .wl in xeRAbora and place it in RA/ on the share
+- label: RA_TELEMETRY
+  string: RetroAchievements telemetry
+- label: RA_BADGES
+  string: RetroAchievements badges

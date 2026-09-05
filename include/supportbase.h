@@ -113,6 +113,24 @@ void sbBuildVmcNeutrinoArgs(config_set_t *configSet, const char *vmcPrefix, neut
 // RA: load this game's watch list from <path>RA/<file>.wl. Mirrors sbLoadCheats'
 // shape (256-byte path, both extension cases). A missing list is not an error.
 int sbLoadWatchList(const char *path, const char *file);
+
+// RA: the hash log, <path>RA/hashes.txt. Open before hashing, close after:
+// raHashStep and ranet.c drop their crumbs into whatever log is open.
+void raHashLogOpen(const char *path);
+void raHashStep(const char *what);
+void raHashLogAdd(const char *name, const char *startup, const char *hash);
+void raHashLogClose(void);
+
+// RA: hash one image and ask the PC client for its watch list. From the menu
+// call ONLY the deferred variant -- it runs on the I/O thread, where device
+// access is safe. sbHashGameDeferred returns 1 when queued, 0 when a check is
+// already running.
+void sbHashGame(const char *path, const char *name, const char *ext, const char *startup, int format);
+int sbHashGameDeferred(const char *path, const char *name, const char *ext, const char *startup, int format);
+
+// RA: ask the PC client to answer, from the I/O thread; the result is shown
+// as a notice.
+void sbTestPCLinkDeferred(void);
 #endif
 
 #endif
