@@ -1544,7 +1544,15 @@ struct UIItem diaAbout[] = {
     {UI_BREAK},
 
     {UI_SPACER},
+#ifdef RETROACHIEVEMENTS
+    // hacan359 authored the RetroAchievements work this flavour ships. diaAbout never scrolls and
+    // has about one row of headroom, so the credit goes ON an existing line rather than adding a
+    // row. Guarded because the acceptance gate for this feature is that the standard ELF is
+    // unchanged, and a longer string literal changes it. CREDITS carries the full entry for both.
+    {UI_LABEL, 0, 1, 1, -1, 0, 15, {.label = {"hacan359 - hominem.te.esse - ifcaro - izdubar - jimmikaelkael - KrahJohlito", -1}}},
+#else
     {UI_LABEL, 0, 1, 1, -1, 0, 15, {.label = {"hominem.te.esse - ifcaro - izdubar - jimmikaelkael - KrahJohlito", -1}}},
+#endif
     {UI_BREAK},
 
     {UI_SPACER},

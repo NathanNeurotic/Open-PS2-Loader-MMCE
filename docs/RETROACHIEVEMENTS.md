@@ -17,7 +17,8 @@ grow one.
 
 ## Status
 
-**Incomplete.** The build flavour and the in-game half exist; the menu half does not yet.
+**Written end to end, verified on nothing.** Every part below exists in the build; not one of them
+has run on a PlayStation 2. Treat the RA variant as a development build until that changes.
 
 | Part | State |
 | --- | --- |
@@ -25,11 +26,31 @@ grow one.
 | In-game telemetry (`raudp`, ee_core snapshots) | written, **not hardware-tested** |
 | Watch-list loading from `<device>/RA/<serial>.wl` | done |
 | Image hashing (ISO9660 walk + MD5) | done |
-| Menu "check this game" action, badges, unlock overlay UI | **not implemented** |
+| Menu actions: check game support, test PC link | written, **not hardware-tested** |
+| List badges and the cover mark | written, **not hardware-tested** |
+| Unlock overlay | written, **not hardware-tested** |
+| Settings: RA telemetry, RA badges | done |
 | Disc-in-the-tray as a game source | deliberately deferred |
 
-Until the menu half lands there is no way to *ask* the PC about a game from the console, so a watch
-list has to be placed by hand. Treat the RA variant as a development build.
+---
+
+## Using it
+
+Two settings, on the **Network** settings page:
+
+| Setting | Default | Effect |
+| --- | --- | --- |
+| RetroAchievements telemetry | **Off** | The master switch. While it is off an RA build launches a game for exactly what the standard build costs — no in-game network stack, no `raudp`, no snapshots. |
+| RetroAchievements badges | On | The `RA ` prefix in the game list and the mark over the cover. Cosmetic, and it follows the master switch: badges stay dark while telemetry is off. |
+
+Two actions on a game's own menu:
+
+* **check game support** — hashes the image, asks the PC client about it, and writes
+  `<device>/RA/<serial>.wl` if the game is tracked.
+* **test PC link** — confirms the console can find the client at all, without touching a game.
+
+A game the console has a watch list for shows the badge and the cover mark after the next list
+refresh. Switch telemetry on and launch it.
 
 ---
 

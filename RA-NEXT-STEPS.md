@@ -2,9 +2,24 @@
 
 **Working handover document for the next agent on `claude/retroachievements-port-bb1959` (PR #600).**
 
-Verified 2026-09-04 against branch head `2db46cc6` and `origin/rebuild/main` `7daadaa2`. Every claim
-below was checked against the tree on that date; where a claim is inherited from
-`docs/RETROACHIEVEMENTS-INTEGRATION-PLAN.md` rather than re-verified, it says so.
+Written 2026-09-04 against branch head `2db46cc6`. **Updated 2026-09-05: all three blockers are
+cleared and phase 3 is written.** Every claim below was checked against the tree; where a claim is
+inherited from `docs/RETROACHIEVEMENTS-INTEGRATION-PLAN.md` rather than re-verified, it says so.
+
+## Where it stands now
+
+| | |
+|---|---|
+| **B1 rebase** | done — the branch sits on `rebuild/main` |
+| **B2 `ps2ips-ra`** | done — dropped during the rebase (`89a4eee0`) |
+| **B3 settings screens** | done — the RA rows went on the live Network page |
+| **Phase 3** | **written**, in `81755006` (3a), `e0861619` (3b), `340c6e4f` (3c), `e62f6880` (3d) |
+| **Phase 6 docs** | status text refreshed; docs-sync template entry + changelog still open |
+| **Hardware** | **nothing has run on a PS2.** This is the entire remaining risk. |
+
+So the next agent's job is no longer to write phase 3. It is: get a build in front of a tester,
+work the acceptance matrix in §5, and close out the two remaining doc items. Sections 0 and 1 below
+are kept for the record — they explain *why* the tree looks the way it does.
 
 > **This file must not survive the merge.** `rebuild/main` commit `b603dadd` (2026-09-03) deleted the
 > repo-root handover notes (`HANDOFF.md`, `PICKUP-PROMPT.md`, `MMCE_PHASE_A_PARITY.md`,
@@ -18,9 +33,9 @@ authority on what is built; that one is the authority on why.
 
 ---
 
-## 0. Three blockers. Handle all three before writing a line of feature code.
+## 0. Three blockers — ALL CLEARED. Kept for the reasoning.
 
-### B1 — The branch is 22 commits behind `rebuild/main`. Rebase first.
+### B1 — ~~The branch is 22 commits behind `rebuild/main`~~ — DONE
 
 ```
 git fetch origin
@@ -39,7 +54,7 @@ The conflict surface is exactly four files. Resolutions:
 Do not merge instead of rebasing: the PR is a phase-per-commit stack and bisectability is the whole
 point of that shape.
 
-### B2 — Phase 4 is obsolete. Delete `modules/network/ps2ips-ra/` entirely.
+### B2 — ~~Phase 4 is obsolete~~ — DONE (`89a4eee0`; the phase-4 commit was dropped in the rebase)
 
 `rebuild/main` commit `561d91d3` ("Replace the ps2sdk ps2ips prebuilt with a fixed copy", 2026-09-03)
 landed the same module for the **default** build, unconditionally, at `modules/network/ps2ips/`.
@@ -73,7 +88,7 @@ defect shape this fork keeps getting bitten by.
 Open question #4 in the design doc ("land ps2ips RA-only first, then propose promotion") is
 **answered and superseded by events**: promotion already happened. Do not re-ask it.
 
-### B3 — Ten settings screens were deleted on 2026-09-03. Do not add RA rows to a dead one.
+### B3 — ~~Ten settings screens were deleted~~ — DONE (the RA rows are on the Network page)
 
 `rebuild/main` commit `35180354` removed `guiShowAdvancedConfig`, `guiShowStorageConfig`,
 `guiShowDisplayConfig`, `guiShowLaunchConfig`, `guiShowSecurityConfig`, `guiShowVcdConfig`,
@@ -110,30 +125,37 @@ Checked by listing the branch tree and grepping for wiring, not by reading the p
 | 0 — build flavour | **done** | `RETROACHIEVEMENTS` in `Makefile`, `ee_core/Makefile`, `.github/scripts/build_rolling_extras.sh`; `src/md5.c`, `include/md5.h` vendored |
 | 1 — in-game telemetry | **done** | `modules/network/raudp/*` (5 files), `modules/network/common/{ra_snap,ra_watch}.h`, `ee_core/{include,src}/ra*.{h,c}`, `smap-ingame` TX export, `system.c` module-table + `EECoreConfig_t` plumbing |
 | 2 — hashing + `RA/` folder | **done** | `src/rahash.c`, `src/rawatch.c`, `include/rahash.h`, `include/rawatch.h`, `"RA"` in `sbCreateFolders` (`src/supportbase.c:1115`), `sbLoadWatchList` at `src/supportbase.c:1710` and called from all four legs |
-| 3 — **menu integration** | **NOT STARTED** | `include/ranet.h`, `src/ranet.c`, `include/rabadge.h`, `src/rabadge.c`, `gfx/ra_mark.png` all absent; `src/gui.c`, `src/menusys.c`, `src/opl.c`, `src/textures.c`, `src/themes.c`, `src/renderman.c`, `src/dialogs.c`, `lng_tmpl/_base.yml` **untouched vs the merge-base** (verified with `git diff --stat`) |
-| 4 — ps2ips | **obsolete** | see B2 |
+| 3 — menu integration | **written, untested** | `ranet.c` (PC exchange), `rabadge.c` (badge cache on `MODE_COUNT` slots), `menusys.c` (the two game-menu actions + the four refusals), `opl.c` (badge refresh + badged name), `renderman.c` (`rmDrawInlayPixmap`), `themes.c` (`raIsCover`, `drawRAMark`), `textures.c` + `gfx/ra_mark.png` (`RA_MARK`), `gui.c` (notices + the settings rows), `dialogs.c` (rows + the About credit) |
+| 4 — ps2ips | **dropped** | promoted to the default build on `rebuild/main`; see B2 |
 | 5 — disc mode | **deferred** | maintainer decision, do not start |
-| 6 — docs | **partial** | `docs/RETROACHIEVEMENTS.md` exists (106 lines), `CREDITS`/`README.md`/`ROLLING_RELEASE.md` touched; docs-sync template entry and changelog outstanding |
+| 6 — docs | **partial** | `docs/RETROACHIEVEMENTS.md`, `README.md` and `ROLLING_RELEASE.md` now describe the feature as written-but-untested rather than half-built; `CREDITS` and the About dialog carry hacan359. **Still open: the xeRAbora link in the docs-sync template, and the changelog / rolling notes.** |
 
 Watch-list call sites, for reference (branch line numbers, pre-rebase):
 `src/bdmsupport.c:2260`, `src/ethsupport.c:1000`, `src/hddsupport.c:2141`, `src/mmcesupport.c:1057`.
 
 **Nothing has been hardware-tested.** That is still the whole open risk.
 
-### One gap inside "done" phase 1
+### ~~One gap inside "done" phase 1~~ — closed in `e62f6880`
 
-`src/system.c:781` gates the in-game network stack on the watch list only:
+`src/system.c` gated the in-game network stack on the watch list alone; the design doc (§4) calls for
+the `#ifdef`, a runtime master switch, **and** a non-empty list. `gRATelemetry` now supplies the
+middle term:
 
 ```c
-if (GetWatchCount() > 0)
+if (gRATelemetry && GetWatchCount() > 0)
     modules |= CORE_IRX_ETH;
 ```
 
-The design doc (§4) calls for `#ifdef RETROACHIEVEMENTS` **and** a runtime "RA telemetry" master
-switch **and** a non-empty watch list. The runtime switch does not exist yet — there is no `gRA*`
-global and no `$RA*` config key anywhere in the tree. It arrives with the phase-3 settings work
-(§3.5 below); add the `&& gRATelemetry` term to this condition at the same time, or the master switch
-will not actually be a master switch.
+### Two traps this work turned up, worth keeping
+
+1. **`internalDefault[TEXTURES_COUNT]` in `src/textures.c` is POSITIONAL.** Adding `RA_MARK` to
+   `enum INTERNAL_TEXTURE` without adding its row grew the array bound past the initialiser, leaving
+   the last slot `{0, NULL, NULL}` — so `texLookupInternalTexId()` ran `strcmp()` against a NULL
+   name on every unmatched theme lookup, and the mark could never draw. It compiles silently either
+   way. Guard the enum member and the table row with the same `#ifdef`, always.
+2. **An `#ifdef` inside a run of `#define`s reflows the whole run.** clang-format aligns consecutive
+   `#define`s as one group; a preprocessor conditional splits the group and re-aligns everything
+   above it. The RA config keys therefore sit *after* the `CONFIG_OPL_*` block, not inside it.
 
 ---
 
