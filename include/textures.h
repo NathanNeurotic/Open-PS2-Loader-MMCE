@@ -120,6 +120,11 @@ enum INTERNAL_TEXTURE {
     UDPFS_ICON,
     L1_ICON, // Settings peer-page navigation hint
     R1_ICON, // Settings peer-page navigation hint
+#ifdef RETROACHIEVEMENTS
+    // RA mark over a tracked game's cover (theme override "ra_mark"). Appended last:
+    // texId is positional.
+    RA_MARK,
+#endif
 
     TEXTURES_COUNT
 };

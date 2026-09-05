@@ -163,6 +163,14 @@ PNG_ASSETS = load0 load1 load2 load3 load4 load5 load6 load7 usb usb_bd ilk_bd \
 	Index_0 Index_1 Index_2 Index_3 Index_4 fav fav_mark R3 L3 L1 R1 PS1 PS2 case_overlay
 	# unused icons - up down l2 r2
 
+# The RA cover mark is embedded ONLY in the RA flavour: the default build has no
+# RA_MARK enum member and no table row for it, so embedding the bitmap there would
+# be dead weight and would break the "default ELF is unaffected" acceptance gate.
+# Must stay ahead of GFX_OBJS, which expands PNG_ASSETS.
+ifeq ($(RETROACHIEVEMENTS),1)
+PNG_ASSETS += ra_mark
+endif
+
 GFX_OBJS = $(PNG_ASSETS:%=%_png.o) poeveticanew.o icon_sys.o icon_icn.o
 
 # NOTE: audio/bgm.ogg is intentionally NOT compiled into the ELF (saves ~324 KB).

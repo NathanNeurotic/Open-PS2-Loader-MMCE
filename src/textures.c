@@ -109,6 +109,9 @@ extern void *case_png;
 extern void *PS1_png;
 extern void *PS2_png;
 extern void *case_overlay_png;
+#ifdef RETROACHIEVEMENTS
+extern void *ra_mark_png;
+#endif
 
 // Not related to screen size, just to limit at some point
 static int maxSize = 720 * 512 * 4;
@@ -270,6 +273,13 @@ static texture_t internalDefault[TEXTURES_COUNT] = {
     {UDPFS_ICON, "udp_fs", &udp_fs_png},
     {L1_ICON, "L1", &L1_png},
     {R1_ICON, "R1", &R1_png},
+#ifdef RETROACHIEVEMENTS
+    // Positional: guarded by the same #ifdef as RA_MARK in enum INTERNAL_TEXTURE. Without
+    // this row TEXTURES_COUNT grows but the initialiser does not, leaving the last slot
+    // {0, NULL, NULL} -- texLookupInternalTexId() then strcmp()s against a NULL name on
+    // every unmatched theme lookup, and thmGetTexture(RA_MARK) never returns the bitmap.
+    {RA_MARK, "ra_mark", &ra_mark_png},
+#endif
 };
 
 int texLookupInternalTexId(const char *name)
