@@ -126,7 +126,15 @@ def check_range(res, conn, path, start, end, total, label):
     if cl is None:
         res.bad(label, "no Content-Length")
         return None
-    if int(cl) != want:
+    # A server that sends a non-numeric Content-Length is exactly the kind this harness exists to
+    # catch, so it has to be reported rather than raised -- an unhandled ValueError here would kill
+    # the run and tell you nothing about the remaining checks.
+    try:
+        cl_value = int(cl)
+    except ValueError:
+        res.bad(label, "Content-Length is not a number: {!r}".format(cl))
+        return None
+    if cl_value != want:
         res.bad(label, "Content-Length {} != requested {}".format(cl, want))
         return None
     if len(body) != want:
@@ -215,12 +223,29 @@ def main():
         res.bad("size probe", "expected 206 for bytes=0-0, got {}".format(status))
         print("\n{} passed, {} failed, {} skipped".format(res.passed, res.failed, res.skipped))
         return 1
+    # Everything downstream is measured against this number, so the probe has to be held to the
+    # same standard as a real read. Accepting any 206 that merely carried a total would let a
+    # server answer a different interval and still set the size the rest of the run trusts.
     cr = parse_content_range(hdrs.get("content-range"))
+    probe_fault = None
     if cr is None or cr[2] is None:
-        res.bad("size probe", "no usable total in Content-Range: {!r}".format(
-            hdrs.get("content-range")))
+        probe_fault = "no usable total in Content-Range: {!r}".format(hdrs.get("content-range"))
+    elif (cr[0], cr[1]) != (0, 0):
+        probe_fault = "Content-Range says {}-{}, asked for 0-0".format(cr[0], cr[1])
+    elif "transfer-encoding" in hdrs:
+        probe_fault = "Transfer-Encoding: {}".format(hdrs["transfer-encoding"])
+    elif hdrs.get("content-encoding", "identity").strip().lower() != "identity":
+        probe_fault = "Content-Encoding: {}".format(hdrs["content-encoding"])
+    elif hdrs.get("content-length") != "1":
+        probe_fault = "Content-Length is {!r}, expected 1".format(hdrs.get("content-length"))
+    elif len(body) != 1:
+        probe_fault = "body is {} bytes, expected 1".format(len(body))
+
+    if probe_fault is not None:
+        res.bad("size probe", probe_fault)
         print("\n{} passed, {} failed, {} skipped".format(res.passed, res.failed, res.skipped))
         return 1
+
     total = cr[2]
     res.ok("size probe", "{} bytes ({:.2f} GiB)".format(total, total / (1024 ** 3)))
 

@@ -32,6 +32,23 @@ ISO_GAME_NAME_MAX = 160
 # side must define the same number in one place and assert against it.
 CATALOG_PATH_MAX = 255
 
+# Whole-catalog bounds. These mirror HTTP_CATALOG_BYTES_MAX and HTTP_CATALOG_ROWS_MAX in
+# include/httpsupport.h and must stay equal to them.
+#
+# Exceeding either fails the WHOLE catalog rather than truncating it, on both sides. A library
+# that is quietly missing its last hundred games looks like games that were deleted, and someone
+# will go looking for them on the server. The console reports it; so does this.
+#
+# On the C side the byte cap lives in httpFetchCatalog (it can refuse on Content-Length before
+# reading a thing) and the row cap in httpParseCatalog. Here both are in parse_catalog, because
+# there is no fetch step to put one in.
+CATALOG_BYTES_MAX = 262144
+CATALOG_ROWS_MAX = 2048
+
+
+class CatalogTooLarge(Exception):
+    """The catalog exceeded a whole-catalog bound. Not a per-row rejection."""
+
 MEDIA_CD = 0x12
 MEDIA_DVD = 0x14
 
@@ -226,8 +243,18 @@ def parse_line(raw, line_no):
     return Row(startup, title, media, path, supported, note), None
 
 
-def parse_catalog(data):
-    """Parse a whole catalog. `data` is bytes or str. Returns (rows, rejects)."""
+def parse_catalog(data, bytes_max=CATALOG_BYTES_MAX, rows_max=CATALOG_ROWS_MAX):
+    """Parse a whole catalog. `data` is bytes or str. Returns (rows, rejects).
+
+    Raises CatalogTooLarge if either whole-catalog bound is exceeded. The bounds are parameters
+    only so the self-test can exercise them without committing a 2049-row fixture.
+    """
+    # Measured before decoding: the cap is on what came off the wire, and a UTF-8 decode can only
+    # make the string shorter than the bytes, never longer.
+    raw_len = len(data) if isinstance(data, bytes) else len(data.encode("utf-8"))
+    if raw_len > bytes_max:
+        raise CatalogTooLarge("catalog is {} bytes, limit is {}".format(raw_len, bytes_max))
+
     if isinstance(data, bytes):
         # Invalid UTF-8 is replaced rather than fatal: one bad byte in one title must not cost
         # the user their whole library. The C side does the same by copying bytes through.
@@ -250,6 +277,8 @@ def parse_catalog(data):
             # First record wins, so a refresh is stable rather than order-dependent.
             rejects.append(Reject(idx, "duplicate_startup"))
             continue
+        if len(rows) >= rows_max:
+            raise CatalogTooLarge("catalog has more than {} records".format(rows_max))
         seen[row.startup] = idx
         rows.append(row)
 
@@ -310,6 +339,39 @@ def selftest(fixtures_dir):
                 print("  want: " + json.dumps(want, sort_keys=True))
                 print("  got:  " + json.dumps(got, sort_keys=True))
 
+    # Whole-catalog bounds. Generated rather than committed: a fixture at the real 2048-row limit
+    # would be a large file that proves nothing a small override cannot.
+    def limit_case(name, text, kwargs, should_raise):
+        try:
+            parse_catalog(text, **kwargs)
+        except CatalogTooLarge:
+            if should_raise:
+                return 0
+            print("FAIL {}: rejected a catalog that is within bounds".format(name))
+            return 1
+        if should_raise:
+            print("FAIL {}: accepted a catalog that is over the limit".format(name))
+            return 1
+        return 0
+
+    rows_text = "".join("SLUS_{:03d}.45,Game {},DVD,g{}.iso\n".format(i % 1000, i, i)
+                        for i in range(12))
+    big_text = "# " + ("x" * 4096) + "\n"
+
+    checked += 6
+    failures += limit_case("rows at limit", rows_text, {"rows_max": 12}, False)
+    failures += limit_case("rows over limit", rows_text, {"rows_max": 11}, True)
+    failures += limit_case("bytes at limit", big_text,
+                           {"bytes_max": len(big_text.encode("utf-8"))}, False)
+    failures += limit_case("bytes over limit", big_text,
+                           {"bytes_max": len(big_text.encode("utf-8")) - 1}, True)
+    # A duplicate does not consume a record slot, so it must not push a catalog over the row cap.
+    dup_text = rows_text + "SLUS_000.45,Duplicate,DVD,dup.iso\n"
+    failures += limit_case("duplicate does not count toward the row cap", dup_text,
+                           {"rows_max": 12}, False)
+    # The real defaults must admit every fixture, or the bounds are set wrong.
+    failures += limit_case("defaults admit a normal catalog", rows_text, {}, False)
+
     print("{} checks over {} fixtures, {} failures".format(checked, len(names), failures))
     return 1 if failures else 0
 
@@ -349,7 +411,14 @@ def main():
         ap.error("give a catalog path, or --selftest")
 
     with open(args.catalog, "rb") as fh:
-        rows, rejects = parse_catalog(fh.read())
+        # One byte past the cap is enough to detect an over-limit file without reading a
+        # multi-gigabyte one into memory to find that out.
+        raw = fh.read(CATALOG_BYTES_MAX + 1)
+    try:
+        rows, rejects = parse_catalog(raw)
+    except CatalogTooLarge as exc:
+        print("{}: {}".format(args.catalog, exc), file=sys.stderr)
+        return 1
     for r in rows:
         flag = "" if r.supported else "  [unsupported: {}]".format(r.note)
         print("{:<12}  {:<3}  {:<40}  {}{}".format(

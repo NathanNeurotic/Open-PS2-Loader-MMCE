@@ -279,9 +279,21 @@ SLUS_123.45,"Example, The",DVD,DVD/Example Game.iso
 * Keep the original unescaped path in the record; encode path segments once at request time.
   Preserve `/` separators; handle spaces, `%`, `#`, `?`, commas and non-ASCII consistently. Reject
   control characters, absolute URLs and paths escaping the base.
-* Deliver incrementally with bounded buffers; bound total memory and game count and *report* an
-  over-limit catalog. A successful empty response clears the list. A failed or truncated one must
-  not replace the last good list with an apparently-successful partial.
+* Deliver incrementally with bounded buffers. The bounds are **262144 bytes** and **2048 records** —
+  `HTTP_CATALOG_BYTES_MAX` / `HTTP_CATALOG_ROWS_MAX` in `include/httpsupport.h`, mirrored as
+  `CATALOG_BYTES_MAX` / `CATALOG_ROWS_MAX` in `pc/http/catalog_reference.py`; the two must stay
+  equal. Exceeding either fails the **whole** catalog rather than truncating it: a library quietly
+  missing its last hundred games looks like games that were deleted, and someone will go hunting
+  for them on the server. On the console the byte cap lives in `httpFetchCatalog` — it can refuse
+  on `Content-Length` before reading anything — and the row cap in `httpParseCatalog`; the
+  reference has no fetch step, so it enforces both in `parse_catalog`.
+* A successful empty response clears the list. A failed or truncated one must not replace the last
+  good list with an apparently-successful partial.
+* **A four-field row whose fourth field is empty derives the filename from the title**, exactly as
+  a two- or three-field row does. A trailing comma is a stray keystroke far more often than a
+  deliberate "this row has no image", and the donor's parser never reads that field at all — it
+  always derives — so deriving is the donor-compatible answer. The rule that an explicit path is
+  authoritative and is never retried under a derived name governs a path that is *present*.
 * Existing `.zso` rows stay subject to the deferred ZSO capability — never stream compressed bytes
   as raw sectors.
 
