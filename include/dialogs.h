@@ -181,6 +181,22 @@ enum UI_ITEMS {
     NETCFG_LBL_SHARE_USER,
     NETCFG_LBL_SHARE_PASSWORD,
     NETCFG_LBL_SMBDIALECT,
+    // HTTP endpoint rows. Appended, like the SMB section labels above, so every NETCFG_*_0..N
+    // consecutive run stays intact -- gui.c indexes those by NETCFG_x_0 + i.
+    NETCFG_LBL_HTTP_SERVER,
+    NETCFG_HTTP_IP_0,
+    NETCFG_HTTP_IP_1,
+    NETCFG_HTTP_IP_2,
+    NETCFG_HTTP_IP_3,
+    NETCFG_LBL_HTTP_PORT,
+    NETCFG_HTTP_PORT,
+    NETCFG_LBL_HTTP_BASE,
+    NETCFG_HTTP_BASE,
+    NETCFG_HTTP_TEST,
+    NETCFG_HTTP_DOT_0,
+    NETCFG_HTTP_DOT_1,
+    NETCFG_HTTP_DOT_2,
+    NETCFG_LBL_HTTP_TEST,
 #ifdef RETROACHIEVEMENTS
     // RA rows on the Network page. Guarded in lockstep with their rows in diaNetConfig --
     // guard one and not the other and the array carries an id the enum does not define.

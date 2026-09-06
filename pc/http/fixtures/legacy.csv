@@ -1,0 +1,10 @@
+# The forms the donor's client actually parses today. These must keep working unchanged.
+# Two fields: filename derived from the title, media defaults to DVD.
+SLUS_123.45,Example Game
+# Three fields: explicit media.
+SLUS_200.02,Another Game,DVD
+SLES_512.35,Disc Only,CD
+# Title already carries the extension: it is moved to the extension, not doubled.
+SLUS_300.03,Already Has Ext.iso,CD
+# Startup-only row: the startup doubles as title and filename stem.
+SLUS_400.04

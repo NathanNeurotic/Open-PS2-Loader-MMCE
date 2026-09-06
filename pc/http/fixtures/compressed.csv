@@ -1,0 +1,5 @@
+# .zso parses -- an existing catalog still lists -- but the row is marked unsupported. The
+# donor accepts the extension and streams the bytes as raw sectors, which corrupts silently.
+SLUS_123.45,Compressed Explicit,DVD,DVD/game.zso
+SLUS_200.10,Compressed Legacy.zso,DVD
+SLUS_300.11,Plain Alongside,DVD,DVD/plain.iso

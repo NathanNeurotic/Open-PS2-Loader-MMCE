@@ -1,0 +1,2 @@
+# A catalog with no records is valid. It clears the library; it is not an error, and it
+# proves nothing about whether the server supports ranges.

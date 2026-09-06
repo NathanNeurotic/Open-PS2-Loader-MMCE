@@ -758,6 +758,8 @@ static unsigned int sendIrxKernelRAM(const char *startup, const char *mode_str, 
         modules |= CORE_IRX_HDD;
     else if (!strcmp(mode_str, "ETH_MODE"))
         modules |= CORE_IRX_ETH | CORE_IRX_SMB;
+    else if (!strcmp(mode_str, "HTTP_MODE"))
+        modules |= CORE_IRX_ETH;
     else if (!strcmp(mode_str, "MMCE_MODE"))
         modules |= CORE_IRX_MMCE;
     else

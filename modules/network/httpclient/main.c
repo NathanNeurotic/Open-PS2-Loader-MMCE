@@ -16,9 +16,13 @@ IRX_ID("HTTP_Client", 1, 1);
 static SifRpcDataQueue_t SifQueueData;
 static SifRpcServerData_t SifServerData;
 static int RpcThreadID;
-static unsigned char SifServerRxBuffer[256];
-static unsigned char SifServerTxBuffer[16];
+// Sized for the largest argument struct, which is HttpClientStreamBeginArgs and is dominated by its
+// URI. Was 256, which is under that -- adding the streaming opcodes without growing this would have
+// let the RPC layer write past the end of the buffer.
+static unsigned char SifServerRxBuffer[1024];
+static unsigned char SifServerTxBuffer[64];
 static unsigned char DmaBuffer[512];
+static unsigned char StreamDmaBuffer[HTTP_CLIENT_STREAM_CHUNK] __attribute__((aligned(64)));
 
 extern struct irx_export_table _exp_httpc;
 
@@ -32,6 +36,9 @@ static void *SifRpc_handler(int fno, void *buffer, int nbytes)
             *(int *)SifServerTxBuffer = HttpEstabConnection(((struct HttpClientConnEstabArgs *)buffer)->server, ((struct HttpClientConnEstabArgs *)buffer)->port);
             break;
         case HTTP_CLIENT_CMD_CONN_CLOSE:
+            // Drop any live stream first: it holds this socket, and a STREAM_READ afterwards would
+            // otherwise recv() on a closed descriptor.
+            HttpStreamEnd();
             HttpCloseConnection(((struct HttpClientConnCloseArgs *)buffer)->socket);
             break;
         case HTTP_CLIENT_CMD_SEND_GET_REQ:
@@ -54,6 +61,52 @@ static void *SifRpc_handler(int fno, void *buffer, int nbytes)
                 ;
             CpuResumeIntr(OldState);
             break;
+        case HTTP_CLIENT_CMD_STREAM_BEGIN: {
+            struct HttpClientStreamBeginArgs *a = (struct HttpClientStreamBeginArgs *)buffer;
+            struct HttpClientStreamBeginResult *r = (struct HttpClientStreamBeginResult *)SifServerTxBuffer;
+            u64 start = ((u64)a->rangeStartHi << 32) | a->rangeStartLo;
+            u64 end = ((u64)a->rangeEndHi << 32) | a->rangeEndLo;
+            u64 total = 0;
+            int contentLen = -1, hasTotal = 0;
+
+            // The EE fills these from bounded copies, but this is the trust boundary for a struct
+            // that arrived over RPC -- terminate both strings before anything walks them.
+            a->host[sizeof(a->host) - 1] = '\0';
+            a->uri[sizeof(a->uri) - 1] = '\0';
+
+            r->result = HttpStreamBegin(a->socket, a->host, a->uri, a->useRange, start, end,
+                                        a->keepAlive, &contentLen, &total, &hasTotal);
+            r->contentLen = contentLen;
+            r->totalLo = (u32)(total & 0xFFFFFFFF);
+            r->totalHi = (u32)(total >> 32);
+            r->hasTotal = (u8)hasTotal;
+            break;
+        }
+        case HTTP_CLIENT_CMD_STREAM_READ: {
+            struct HttpClientStreamReadArgs *a = (struct HttpClientStreamReadArgs *)buffer;
+            struct HttpClientStreamReadResult *r = (struct HttpClientStreamReadResult *)SifServerTxBuffer;
+            int wanted = a->wanted;
+
+            if (wanted > (int)sizeof(StreamDmaBuffer))
+                wanted = (int)sizeof(StreamDmaBuffer);
+            if (wanted < 0)
+                wanted = 0;
+
+            r->result = HttpStreamRead(StreamDmaBuffer, wanted);
+
+            if (r->result > 0) {
+                dmat.src = StreamDmaBuffer;
+                dmat.dest = a->output;
+                dmat.size = (r->result + 0xF) & ~0xF;
+                dmat.attr = 0;
+
+                CpuSuspendIntr(&OldState);
+                while (sceSifSetDma(&dmat, 1) == 0)
+                    ;
+                CpuResumeIntr(OldState);
+            }
+            break;
+        }
         default:
             *(int *)SifServerTxBuffer = -ENXIO;
     }

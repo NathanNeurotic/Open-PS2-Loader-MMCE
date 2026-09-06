@@ -28,6 +28,15 @@ USE_DEV9 = 1
 IOP_INCS += -I../../network/common
 endif
 
+ifeq ($(USE_HTTP),1)
+IOP_BIN = http_cdvdman.irx
+IOP_OBJS_DIR = obj.http/
+IOP_OBJS += device-http.o
+IOP_CFLAGS += -DHTTP_DRIVER
+USE_DEV9 = 1
+IOP_INCS += -I../../network/common
+endif
+
 ifeq ($(USE_BDM),1)
 IOP_BIN  = bdm_cdvdman.irx
 IOP_OBJS_DIR = obj.bdm/
@@ -75,3 +84,7 @@ endif
 include $(PS2SDK)/Defs.make
 include ../../Rules.bin.make
 include $(PS2SDK)/samples/Makefile.iopglobal
+
+ifeq ($(USE_HTTP),1)
+$(IOP_OBJS): $(wildcard *.h ../common/*.h ../../isofs/*.h ../../network/common/*.h ../../network/common/*.inc) Makefile ../../Rules.bin.make
+endif

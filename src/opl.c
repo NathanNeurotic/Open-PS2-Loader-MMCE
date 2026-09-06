@@ -30,6 +30,7 @@
 #include "include/bdmsupport.h"
 #include "include/ethsupport.h"
 #include "include/udpfssupport.h"
+#include "include/httpsupport.h"
 #include "include/hddsupport.h"
 #include "include/appsupport.h"
 #include "include/favsupport.h"
@@ -160,6 +161,9 @@ int gETHOpMode; // See ETH_OP_MODES.
 int gPCShareAddressIsNetBIOS;
 int pc_ip[4];
 int gPCPort;
+int gHttpServerIp[4];
+int gHttpPort;
+char gHttpBasePath[HTTP_BASE_PATH_MAX];
 char gPCShareNBAddress[17];
 char gPCShareName[32];
 char gPCUserName[32];
@@ -779,6 +783,8 @@ void initSupport(item_list_t *itemList, int mode, int force_reinit)
         // boot, Manual defers it to tab-entry. Live only while its protocol is the selected one, so
         // exactly one network tab is ever enabled.
         startMode = (gNetworkProtocol == NET_PROTO_UDPFS) ? gNetStartMode : START_MODE_DISABLED;
+    else if (mode == HTTP_MODE)
+        startMode = (gNetworkProtocol == NET_PROTO_HTTP) ? gNetStartMode : START_MODE_DISABLED;
     else if (mode == MMCE_MODE)
         startMode = gMMCEStartMode;
 
@@ -849,6 +855,9 @@ static void initAllSupport(int force_reinit)
     // UDPFS filesystem shares the single NIC with SMB/UDPBD; its start-mode gate (initSupport) is live
     // only when gNetworkProtocol == NET_PROTO_UDPFS, so exactly one network tab is ever enabled.
     initSupport(udpfsGetObject(0), UDPFS_MODE, force_reinit);
+    // HTTP shares that same NIC and the same one-tab-at-a-time rule: its start-mode gate is live
+    // only when gNetworkProtocol == NET_PROTO_HTTP.
+    initSupport(httpGetObject(0), HTTP_MODE, force_reinit);
     guiSetBootStatus(_l(_STR_BOOT_SCANNING_HDD));
     if (gBootInProgress)
         guiRenderGreetingScreen();
@@ -3046,6 +3055,12 @@ static void _loadConfig()
 
             configGetInt(configNet, CONFIG_NET_SMB_PORT, &gPCPort);
 
+            if (configGetStr(configNet, CONFIG_NET_HTTP_IP_ADDR, &temp))
+                sscanf(temp, "%d.%d.%d.%d", &gHttpServerIp[0], &gHttpServerIp[1], &gHttpServerIp[2], &gHttpServerIp[3]);
+            configGetInt(configNet, CONFIG_NET_HTTP_PORT, &gHttpPort);
+            configGetStrCopy(configNet, CONFIG_NET_HTTP_BASE_PATH, gHttpBasePath, sizeof(gHttpBasePath));
+            httpNormalizeBasePath(gHttpBasePath, sizeof(gHttpBasePath));
+
             configGetStrCopy(configNet, CONFIG_NET_SMB_SHARE, gPCShareName, sizeof(gPCShareName));
             configGetStrCopy(configNet, CONFIG_NET_SMB_USER, gPCUserName, sizeof(gPCUserName));
             configGetStrCopy(configNet, CONFIG_NET_SMB_PASSW, gPCPassword, sizeof(gPCPassword));
@@ -3431,6 +3446,10 @@ static void _saveConfig()
         snprintf(temp, sizeof(temp), "%d.%d.%d.%d", pc_ip[0], pc_ip[1], pc_ip[2], pc_ip[3]);
         configSetStr(configNet, CONFIG_NET_SMB_IP_ADDR, temp);
         configSetInt(configNet, CONFIG_NET_SMB_PORT, gPCPort);
+        snprintf(temp, sizeof(temp), "%d.%d.%d.%d", gHttpServerIp[0], gHttpServerIp[1], gHttpServerIp[2], gHttpServerIp[3]);
+        configSetStr(configNet, CONFIG_NET_HTTP_IP_ADDR, temp);
+        configSetInt(configNet, CONFIG_NET_HTTP_PORT, gHttpPort);
+        configSetStr(configNet, CONFIG_NET_HTTP_BASE_PATH, gHttpBasePath);
         configSetStr(configNet, CONFIG_NET_SMB_SHARE, gPCShareName);
         configSetStr(configNet, CONFIG_NET_SMB_USER, gPCUserName);
         configSetStr(configNet, CONFIG_NET_SMB_PASSW, gPCPassword);
@@ -4467,6 +4486,14 @@ static void setDefaults(void)
     ps2_dns[2] = 1;
     ps2_dns[3] = 1;
     gPCPort = 1111; // RiptOPL default SMB port (was 445): matches the bundled PC server tooling
+    // 1100 is Docmine17's PC server default, and his unmodified server is the compatibility
+    // baseline. Any other port works; this is only what an unconfigured install tries first.
+    gHttpServerIp[0] = 192;
+    gHttpServerIp[1] = 168;
+    gHttpServerIp[2] = 0;
+    gHttpServerIp[3] = 10;
+    gHttpPort = 1100;
+    strcpy(gHttpBasePath, "/");
     // Fork's opinionated first-boot defaults: the overwhelmingly common SMB setup is a share named
     // "games" with guest access, so a fresh install can connect after typing only the host IP.
     // A loaded config still overwrites both.

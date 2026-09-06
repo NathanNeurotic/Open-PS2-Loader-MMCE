@@ -132,7 +132,7 @@ endif
 endif
 
 FRONTEND_OBJS = pad.o xparam.o fntsys.o renderman.o menusys.o OSDHistory.o system.o elfldr_noreset.o elfldr.o lang.o lang_internal.o config.o hdd.o dialogs.o favsupport.o \
-		dia.o ioman.o texcache.o themes.o supportbase.o bdmsupport.o ethsupport.o udpfssupport.o hddsupport.o zso.o lz4.o \
+		dia.o ioman.o texcache.o themes.o supportbase.o bdmsupport.o netsupport.o ethsupport.o httpcatalog.o httpsupport.o udpfssupport.o hddsupport.o zso.o lz4.o \
 		appsupport.o mmcesupport.o artindex.o vcdsupport.o cuesupport.o libview.o retrogem.o folderbrowse.o gui.o guigame.o vmc_groups.o textures.o opl.o atlas.o nbns.o httpclient.o gsm.o cheatman.o sound.o ps2cnf.o tar.o
 
 IOP_OBJS =	iomanx.o filexio.o ps2fs.o usbd.o bdmevent.o \
@@ -147,7 +147,7 @@ IOP_OBJS =	iomanx.o filexio.o ps2fs.o usbd.o bdmevent.o \
 
 EECORE_OBJS = ee_core.o ioprp.o util.o \
 		udnl.o imgdrv.o eesync.o \
-		bdm_cdvdman.o bdm_ata_cdvdman.o IOPRP_img.o smb_cdvdman.o \
+		bdm_cdvdman.o bdm_ata_cdvdman.o IOPRP_img.o smb_cdvdman.o http_cdvdman.o \
 		hdd_cdvdman.o mmce_cdvdman.o hdd_hdpro_cdvdman.o cdvdfsv.o \
 		ingame_smstcpip.o smap_ingame.o smbman.o smbinit.o
 
@@ -414,6 +414,7 @@ clean:	download_lwNBD
 	$(MAKE) -C modules/iopcore/cdvdman USE_BDM_ATA=1 clean
 	$(MAKE) -C modules/iopcore/cdvdman USE_MMCE=1 clean
 	$(MAKE) -C modules/iopcore/cdvdman USE_SMB=1 clean
+	$(MAKE) -C modules/iopcore/cdvdman USE_HTTP=1 clean
 	$(MAKE) -C modules/iopcore/cdvdman USE_HDD=1 clean
 	$(MAKE) -C modules/iopcore/cdvdman USE_HDPRO=1 clean
 	echo " -cdvdfsv"
@@ -602,6 +603,17 @@ modules/iopcore/cdvdman/smb_cdvdman.irx: modules/iopcore/cdvdman
 	$(MAKE) $(CDVDMAN_PS2LOGO_FLAGS) $(CDVDMAN_DEBUG_FLAGS) USE_SMB=1 -C $< all
 
 $(EE_ASM_DIR)smb_cdvdman.c: modules/iopcore/cdvdman/smb_cdvdman.irx | $(EE_ASM_DIR)
+	$(BIN2C) $< $@ $(*F)_irx
+
+# Always enter the nested builds so their own dependency checks run. Track shared includes
+# there too; top-level directory timestamps cannot detect an edited source or header.
+.PHONY: http-submake
+http-submake:
+
+modules/iopcore/cdvdman/http_cdvdman.irx: modules/iopcore/cdvdman http-submake
+	$(MAKE) $(CDVDMAN_PS2LOGO_FLAGS) $(CDVDMAN_DEBUG_FLAGS) USE_HTTP=1 -C $< all
+
+$(EE_ASM_DIR)http_cdvdman.c: modules/iopcore/cdvdman/http_cdvdman.irx | $(EE_ASM_DIR)
 	$(BIN2C) $< $@ $(*F)_irx
 
 modules/iopcore/cdvdman/hdd_cdvdman.irx: modules/iopcore/cdvdman
@@ -942,7 +954,7 @@ modules/network/nbns/nbns.irx: modules/network/nbns
 $(EE_ASM_DIR)nbns-iop.c: modules/network/nbns/nbns.irx | $(EE_ASM_DIR)
 	$(BIN2C) $< $@ nbns_irx
 
-modules/network/httpclient/httpclient.irx: modules/network/httpclient
+modules/network/httpclient/httpclient.irx: modules/network/httpclient http-submake
 	$(MAKE) -C $<
 
 $(EE_ASM_DIR)httpclient-iop.c: modules/network/httpclient/httpclient.irx | $(EE_ASM_DIR)

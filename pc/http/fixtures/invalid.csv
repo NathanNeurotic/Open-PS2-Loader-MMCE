@@ -1,0 +1,13 @@
+# Every row here must be rejected, individually and by name. One bad row must not cost the
+# user the rest of the library, and no row here may be silently guessed at.
+,No Startup,DVD,DVD/a.iso
+SLUS_123456.78,Startup Too Long,DVD,DVD/b.iso
+SLUS_100.01,Bad Media,BLURAY,DVD/c.iso
+SLUS_100.02,Escapes Root,DVD,../../etc/passwd.iso
+SLUS_100.03,Absolute Path,DVD,/srv/games/d.iso
+SLUS_100.04,Absolute URL,DVD,http://elsewhere/e.iso
+SLUS_100.05,Backslash Path,DVD,DVD\f.iso
+SLUS_100.07,"Closed" then text,DVD,DVD/h.iso
+SLUS_100.08,Five Fields,DVD,DVD/i.iso,extra
+SLUS_100.09,No Extension,DVD,DVD/j.bin
+SLUS_100.10,Empty Segment,DVD,DVD//k.iso

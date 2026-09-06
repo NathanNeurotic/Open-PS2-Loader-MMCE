@@ -1,0 +1,242 @@
+{
+  "compressed.csv": {
+    "accept": [
+      {
+        "media": "DVD",
+        "note": "compressed_image_unsupported",
+        "path": "DVD/game.zso",
+        "startup": "SLUS_123.45",
+        "supported": false,
+        "title": "Compressed Explicit"
+      },
+      {
+        "media": "DVD",
+        "note": "compressed_image_unsupported",
+        "path": "Compressed Legacy.zso",
+        "startup": "SLUS_200.10",
+        "supported": false,
+        "title": "Compressed Legacy"
+      },
+      {
+        "media": "DVD",
+        "path": "DVD/plain.iso",
+        "startup": "SLUS_300.11",
+        "supported": true,
+        "title": "Plain Alongside"
+      }
+    ],
+    "reject": []
+  },
+  "documented.csv": {
+    "accept": [
+      {
+        "media": "DVD",
+        "path": "DVD/Example Game.iso",
+        "startup": "SLUS_123.45",
+        "supported": true,
+        "title": "Example Game"
+      },
+      {
+        "media": "DVD",
+        "path": "DVD/example-the.iso",
+        "startup": "SLUS_200.01",
+        "supported": true,
+        "title": "Example, The"
+      },
+      {
+        "media": "CD",
+        "path": "CD/Short One.iso",
+        "startup": "SLES_512.34",
+        "supported": true,
+        "title": "Short One"
+      },
+      {
+        "media": "DVD",
+        "path": "DVD/quoted title.iso",
+        "startup": "SLUS_210.65",
+        "supported": true,
+        "title": "He said \"hi\""
+      },
+      {
+        "media": "DVD",
+        "path": "DVD/sub dir/Deep # Game %20.iso",
+        "startup": "SLUS_999.99",
+        "supported": true,
+        "title": "Nested Deep"
+      },
+      {
+        "media": "DVD",
+        "path": "DVD/CD Collection.iso",
+        "startup": "SLUS_111.11",
+        "supported": true,
+        "title": "CD In The Title"
+      }
+    ],
+    "reject": []
+  },
+  "duplicates.csv": {
+    "accept": [
+      {
+        "media": "DVD",
+        "path": "DVD/first.iso",
+        "startup": "SLUS_123.45",
+        "supported": true,
+        "title": "First Record"
+      },
+      {
+        "media": "DVD",
+        "path": "DVD/unrelated.iso",
+        "startup": "SLUS_200.09",
+        "supported": true,
+        "title": "Unrelated"
+      }
+    ],
+    "reject": [
+      {
+        "line": 5,
+        "reason": "duplicate_startup"
+      }
+    ]
+  },
+  "edge.csv": {
+    "accept": [
+      {
+        "media": "DVD",
+        "path": "DVD/tab.iso",
+        "startup": "SLUS_123.45",
+        "supported": true,
+        "title": "Indented With Tab"
+      },
+      {
+        "media": "DVD",
+        "path": "DVD/spaces.iso",
+        "startup": "SLUS_200.05",
+        "supported": true,
+        "title": "Indented With Spaces"
+      },
+      {
+        "media": "DVD",
+        "path": "DVD/padded.iso",
+        "startup": "SLUS_300.06",
+        "supported": true,
+        "title": "Padded Title"
+      },
+      {
+        "media": "DVD",
+        "path": "Trailing Comma.iso",
+        "startup": "SLUS_400.07",
+        "supported": true,
+        "title": "Trailing Comma"
+      },
+      {
+        "media": "DVD",
+        "path": "DVD/hash.iso",
+        "startup": "SLUS_500.08",
+        "supported": true,
+        "title": "# not, a comment"
+      },
+      {
+        "media": "DVD",
+        "path": "DVD/rumble.iso",
+        "startup": "SLUS_600.09",
+        "supported": true,
+        "title": "Ready 2 Rumble \"Round 2\""
+      }
+    ],
+    "reject": []
+  },
+  "empty.csv": {
+    "accept": [],
+    "reject": []
+  },
+  "invalid.csv": {
+    "accept": [],
+    "reject": [
+      {
+        "line": 3,
+        "reason": "empty_startup"
+      },
+      {
+        "line": 4,
+        "reason": "startup_too_long"
+      },
+      {
+        "line": 5,
+        "reason": "bad_media"
+      },
+      {
+        "line": 6,
+        "reason": "parent_segment"
+      },
+      {
+        "line": 7,
+        "reason": "absolute_path"
+      },
+      {
+        "line": 8,
+        "reason": "absolute_url"
+      },
+      {
+        "line": 9,
+        "reason": "backslash_in_path"
+      },
+      {
+        "line": 10,
+        "reason": "text_after_quoted_field"
+      },
+      {
+        "line": 11,
+        "reason": "too_many_fields"
+      },
+      {
+        "line": 12,
+        "reason": "unknown_extension"
+      },
+      {
+        "line": 13,
+        "reason": "empty_segment"
+      }
+    ]
+  },
+  "legacy.csv": {
+    "accept": [
+      {
+        "media": "DVD",
+        "path": "Example Game.iso",
+        "startup": "SLUS_123.45",
+        "supported": true,
+        "title": "Example Game"
+      },
+      {
+        "media": "DVD",
+        "path": "Another Game.iso",
+        "startup": "SLUS_200.02",
+        "supported": true,
+        "title": "Another Game"
+      },
+      {
+        "media": "CD",
+        "path": "Disc Only.iso",
+        "startup": "SLES_512.35",
+        "supported": true,
+        "title": "Disc Only"
+      },
+      {
+        "media": "CD",
+        "path": "Already Has Ext.iso",
+        "startup": "SLUS_300.03",
+        "supported": true,
+        "title": "Already Has Ext"
+      },
+      {
+        "media": "DVD",
+        "note": "startup_only_row",
+        "path": "SLUS_400.04.iso",
+        "startup": "SLUS_400.04",
+        "supported": true,
+        "title": "SLUS_400.04"
+      }
+    ],
+    "reject": []
+  }
+}

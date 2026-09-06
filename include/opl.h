@@ -130,6 +130,15 @@ extern char gPCShareName[32];
 extern char gPCUserName[32];
 extern char gPCPassword[32];
 
+// HTTP endpoint. Deliberately NOT sharing pc_ip/gPCPort with SMB: those are the SMB server's
+// address, nothing else uses them, and coupling them would mean pointing HTTP at a different box
+// silently repointed SMB too. The donor's fork went further and cleared the SMB share field when
+// its HTTP settings opened; opening one protocol's settings must never touch another's.
+#define HTTP_BASE_PATH_MAX 64
+extern int gHttpServerIp[4];
+extern int gHttpPort;
+extern char gHttpBasePath[HTTP_BASE_PATH_MAX]; // leading '/', trailing '/' normalised away
+
 //// Settings
 
 // describes what is happening in the network startup thread (>0 means loading, <0 means error)...
@@ -262,6 +271,9 @@ enum NETWORK_PROTOCOL {
     NET_PROTO_UDPFS = 2,   // udpfs FILESYSTEM (udpfs_ioman "udpfs:"); loose ISOs -- picker "UDPFS", access=Files
     NET_PROTO_UDPFSBD = 3, // udpfs BLOCK device (udpfs_bd -> massN:, UDPRDMA) -- picker "UDPFS", access=Image
     NET_PROTO_UDPBD = 4,   // smap_udpbd / SUDPBDv2 monolith -- picker "UDPBD"; server = udpbd-server (0xBDBD)
+    // Plain LAN HTTP: a games.csv catalog plus byte-range reads of the ISO, over the same menu
+    // TCP/IP stack SMB uses. Appended, so every value above keeps the number it was persisted with.
+    NET_PROTO_HTTP = 5,
 };
 extern int gNetworkProtocol; // enum NETWORK_PROTOCOL -- authoritative backend; the three above are derived shadows
 extern int gNetStartMode;    // START_MODE_* -- network start row (Off/Manual/Auto); DISABLED <=> protocol OFF

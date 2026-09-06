@@ -61,6 +61,19 @@ struct cdvdman_settings_smb
     };
 } __attribute__((packed));
 
+// HTTP stores the launch-owned request target and expected image size across every IOP reset.
+// No menu pointer or live socket crosses this boundary. Existing device layouts stay unchanged.
+#define CDVDMAN_HTTP_URI_MAX 768
+struct cdvdman_settings_http
+{
+    struct cdvdman_settings_common common;
+    char server[16];
+    u16 port;
+    char uri[CDVDMAN_HTTP_URI_MAX];
+    u32 size_lo;
+    u32 size_hi;
+} __attribute__((packed));
+
 #define BDM_MAX_FILES 1  // ISO
 #define BDM_MAX_FRAGS 64 // 64 * 8bytes = 512bytes
 
