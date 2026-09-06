@@ -11,8 +11,8 @@ immediately below before picking anything up.
 | 2 — shared TCP/IP stack | **done.** `src/netsupport.c` owns the stack; `ethsupport.c` keeps the SMB session. Every moved body diffs identical to its original. |
 | 3 — menu RPC, settings, source | **done.** Streaming GET (`STREAM_BEGIN`/`STREAM_READ`), `NET_PROTO_HTTP`, `HTTP_MODE`, the Network page rows and Test action, `src/httpsupport.c` as an `item_list_t`, `src/httpcatalog.c` as the parser. |
 | 4 — in-game driver | **written, unproven.** `device-http.c`, the `USE_HTTP` cdvdman target, `cdvdman_settings_http`, `HTTP_MODE` through ee_core, and the EE launch that fills all of it. |
-| 5 — library integration | **partial.** The OPL-only core pin covers HTTP including Favourites. Last-played and local per-game CFG/art work. Not yet exercised: Favourites round-trip, artwork, cheats, the unavailable-VMC route. |
-| 6 — release validation and docs | **not started.** No `docs/HTTP.md`, no External Tools entry for the PC server, no release-note text. |
+| 5 — library integration | **done.** OPL-only core pin (Favourites included), last-played, local per-game CFG/art/cheats, VMC refused at the menu door rather than shown inert, and the protocol-switch hint the other transports get. Favourites resolves generically through `list_support[HTTP_MODE]`. |
+| 6 — release validation and docs | **written.** `docs/HTTP.md`, the README entry, and Docmine17's server in the docs-sync External Tools template. Four-flavour CI passes. What remains is the console matrix in section 9 — hardware, not code. |
 
 What is deliberately absent rather than missing: no VMC over HTTP, no Neutrino leg, no PS1/Ember,
 no ZSO (listed but refused by name), no HTTPS or authentication. `EnablePS2Logo` is always 0,

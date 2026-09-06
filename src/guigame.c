@@ -319,6 +319,15 @@ void guiGameShowVMCMenu(int id, item_list_t *support)
 {
     int result = -1;
 
+    // HTTP has no writable side. The server is read-only by profile and there is no http: ioman
+    // device to put a card image on, so every button in here would be inert. Refuse at the door
+    // rather than showing a dialog whose Create silently does nothing -- and do it HERE, because
+    // this menu is reachable from Favourites too, where the per-device compat lock cannot see it.
+    if (support != NULL && support->mode == HTTP_MODE) {
+        guiMsgBox(_l(_STR_HTTP_NO_VMC), 0, NULL);
+        return;
+    }
+
     // show dialog
     do {
         diaSetLabel(diaVMCConfig, COMPAT_VMC1_DEFINE, vmc1);

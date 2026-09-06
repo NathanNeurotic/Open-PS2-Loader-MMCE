@@ -203,6 +203,14 @@ This build layers several features on top of upstream OPL:
   fails, press **Select / Refresh** on the failed network page to retry it. Run it from the
   **[PS2 Servers](https://github.com/NathanNeurotic/PS2-Servers)** all-in-one PC launcher. See the
   network-boot section of **[docs/NEUTRINO.md](docs/NEUTRINO.md#4-network-boot--the-network-protocol-selector)**.
+- **HTTP library (new):** a fifth network protocol — point RiptOPL at any static HTTP server
+  that supports byte ranges, and it reads a `games.csv` catalog and streams the ISOs straight off it
+  through OPL’s own core. The PC side is **[Docmine17](https://github.com/Docmine17)’s**
+  **[HTTP server](https://github.com/Docmine17/Open-PS2-Loader-HTTP)**, adopted with permission and
+  used **unmodified** — existing catalogs and folder layouts need no conversion. Pick **HTTP** under
+  **Network → Protocol**, set the address, port (default **1100**) and base path, then use **Test HTTP
+  server**. No VMC, no Neutrino and no PS1 over HTTP, and it has **not been hardware-tested yet**.
+  See **[docs/HTTP.md](docs/HTTP.md)**.
 - **UDPFS network boot (Neutrino):** a newer network transport (Neutrino's UDPRDMA) offered
   alongside UDPBD. The network controls are split across two pages: **Game Sources** holds the
   **Network Start Mode** row (Off / Manual / Auto), and **Network** holds **Protocol**

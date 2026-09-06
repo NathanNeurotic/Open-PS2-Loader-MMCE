@@ -840,7 +840,9 @@ reshow_device:
         // joins the ring silently (Manual start waits for a Confirm-press inside it), and the block
         // transports show a tab only once the PC server answers.
         if (gNetworkProtocol != netProtocolWas) {
-            if (gNetworkProtocol == NET_PROTO_UDPFS)
+            if (gNetworkProtocol == NET_PROTO_HTTP)
+                guiMsgBox(_l(_STR_HTTP_TAB_HINT), 0, NULL);
+            else if (gNetworkProtocol == NET_PROTO_UDPFS)
                 guiMsgBox(_l(_STR_NET_UDPFS_TAB_HINT), 0, NULL);
             else if (gNetworkProtocol == NET_PROTO_UDPFSBD || gNetworkProtocol == NET_PROTO_UDPBD)
                 guiMsgBox(_l(_STR_NET_UDPBD_TAB_HINT), 0, NULL);
@@ -1430,7 +1432,9 @@ reshow_network:
         // restart notice below: when a restart is pending, the restart message must be the LAST
         // word so the guidance reads as "after that".
         if (gNetworkProtocol != netProtocolWas) {
-            if (gNetworkProtocol == NET_PROTO_UDPFS)
+            if (gNetworkProtocol == NET_PROTO_HTTP)
+                guiMsgBox(_l(_STR_HTTP_TAB_HINT), 0, NULL);
+            else if (gNetworkProtocol == NET_PROTO_UDPFS)
                 guiMsgBox(_l(_STR_NET_UDPFS_TAB_HINT), 0, NULL);
             else if (gNetworkProtocol == NET_PROTO_UDPFSBD || gNetworkProtocol == NET_PROTO_UDPBD)
                 guiMsgBox(_l(_STR_NET_UDPBD_TAB_HINT), 0, NULL);
@@ -2675,7 +2679,9 @@ reshow_sources:
         gETHStartMode = (gNetworkProtocol == NET_PROTO_SMB) ? gNetStartMode : START_MODE_DISABLED;
 
         if (gNetworkProtocol != netProtocolWas) {
-            if (gNetworkProtocol == NET_PROTO_UDPFS)
+            if (gNetworkProtocol == NET_PROTO_HTTP)
+                guiMsgBox(_l(_STR_HTTP_TAB_HINT), 0, NULL);
+            else if (gNetworkProtocol == NET_PROTO_UDPFS)
                 guiMsgBox(_l(_STR_NET_UDPFS_TAB_HINT), 0, NULL);
             else if (gNetworkProtocol == NET_PROTO_UDPFSBD || gNetworkProtocol == NET_PROTO_UDPBD)
                 guiMsgBox(_l(_STR_NET_UDPBD_TAB_HINT), 0, NULL);

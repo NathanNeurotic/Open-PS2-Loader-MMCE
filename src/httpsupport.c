@@ -831,7 +831,12 @@ static int httpCheckVMC(item_list_t *itemList, char *name, int createSize)
 
     // No VMC over HTTP: this profile never writes to the server, and the donor passes no VMC
     // module either. Physical cards are the save path.
-    return 0;
+    //
+    // -1 means "no such file", which is the honest answer and the one the callers are written
+    // for. Returning 0 read as "a card exists and is 0 MiB", which guigame renders as
+    // VMC_FILE_ERROR. guiGameShowVMCMenu refuses HTTP outright, so this is the backstop for any
+    // other caller.
+    return -1;
 }
 
 item_list_t *httpGetObject(int initOnly)
