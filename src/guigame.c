@@ -323,7 +323,10 @@ void guiGameShowVMCMenu(int id, item_list_t *support)
     // device to put a card image on, so every button in here would be inert. Refuse at the door
     // rather than showing a dialog whose Create silently does nothing -- and do it HERE, because
     // this menu is reachable from Favourites too, where the per-device compat lock cannot see it.
-    if (support != NULL && support->mode == HTTP_MODE) {
+    int sourceMode = support == NULL           ? -1 :
+                     support->mode == FAV_MODE ? favGetItemSourceMode(id) :
+                                                 support->mode;
+    if (sourceMode == HTTP_MODE) {
         guiMsgBox(_l(_STR_HTTP_NO_VMC), 0, NULL);
         return;
     }
@@ -1173,6 +1176,9 @@ static int guiGameCompatUpdater(int modified)
 void guiGameShowCompatConfig(int id, item_list_t *support, config_set_t *configSet)
 {
     int i;
+    int sourceMode = support == NULL           ? -1 :
+                     support->mode == FAV_MODE ? favGetItemSourceMode(id) :
+                                                 support->mode;
 
     // static, NOT block-scoped: diaSetEnum stores the raw pointer and diaCompatConfig keeps
     // re-rendering it (reshow_compat loop below). Block-locals dangled at the closing brace and
@@ -1218,7 +1224,7 @@ void guiGameShowCompatConfig(int id, item_list_t *support, config_set_t *configS
     // VCD games launch through POPSTARTER only, so the Loader Core is inert for them -- keep every
     // Neutrino-only row greyed even under a Neutrino global default (guiGameSetCoreAwareState reads
     // this). SMB likewise: ethsupport has no Neutrino launch leg, the effective core is always <OPL>.
-    coreNeverNeutrino = (support != NULL && ((libViewActive(support->mode) == LIB_VIEW_PS1) || support->mode == ETH_MODE || support->mode == HTTP_MODE));
+    coreNeverNeutrino = (support != NULL && ((libViewActive(support->mode) == LIB_VIEW_PS1) || support->mode == ETH_MODE || sourceMode == HTTP_MODE));
 
     // UDPBD games have no OPL core backend -- they always launch via Neutrino
     // (bdmsupport.c forces it). Lock the selector to Neutrino so the screen matches;
@@ -1230,7 +1236,7 @@ void guiGameShowCompatConfig(int id, item_list_t *support, config_set_t *configS
         // could run under a different core.
         diaSetInt(diaCompatConfig, COMPAT_LOADER, 2);
         diaSetEnabled(diaCompatConfig, COMPAT_LOADER, 0);
-    } else if (support != NULL && (support->mode == ETH_MODE || support->mode == HTTP_MODE)) {
+    } else if (support != NULL && (support->mode == ETH_MODE || sourceMode == HTTP_MODE)) {
         // SMB has no Neutrino launch leg (ethsupport never builds Neutrino args) -- the effective
         // core is ALWAYS <OPL>. Pin the row to the inert "Default" (index 2: saving removes any
         // stale $CoreLoader key, self-healing old Neutrino selections) and lock it. Launch-time

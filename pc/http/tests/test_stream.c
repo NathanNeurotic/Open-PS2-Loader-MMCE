@@ -3,11 +3,52 @@
    land wherever the test wants them. */
 #include <stdio.h>
 #include <string.h>
+#include <errno.h>
 #include "stub/ps2ip.h"
 #include "httpclient.h"
+#include "stub/thbase.h"
 
 const unsigned char *tstData;
 int tstLen, tstPos, tstChunk, tstSelectFail;
+static u64 tstTicks;
+static unsigned int tstStepUs;
+static int tstConnecting, tstConnectResult, tstConnectError, tstSocketResult = 3;
+static int tstConnectReady = 1, tstClosed, tstNonblocking, tstConnectWaits;
+
+int stub_socket(int domain, int type, int protocol)
+{
+    return tstSocketResult;
+}
+int stub_connect(int socket, const struct sockaddr *addr, socklen_t len)
+{
+    errno = tstConnectResult < 0 ? EINPROGRESS : 0;
+    return tstConnectResult;
+}
+int stub_ioctl(int socket, long command, void *arg)
+{
+    tstNonblocking = *(unsigned long *)arg;
+    return 0;
+}
+int stub_getsockopt(int socket, int level, int name, void *value, socklen_t *len)
+{
+    *(int *)value = tstConnectError;
+    return 0;
+}
+
+
+void GetSystemTime(iop_sys_clock_t *clock)
+{
+    clock->lo = (u32)tstTicks;
+    clock->hi = (u32)(tstTicks >> 32);
+}
+void SysClock2USec(iop_sys_clock_t *clock, u32 *seconds, u32 *useconds)
+{
+    u64 ticks = ((u64)clock->hi << 32) | clock->lo;
+    u64 us = ticks * 1000 / 36864;
+    *seconds = us / 1000000;
+    *useconds = us % 1000000;
+}
+
 
 int stub_select(int n, fd_set *r, fd_set *w, fd_set *e, struct timeval *t)
 {
@@ -15,7 +56,18 @@ int stub_select(int n, fd_set *r, fd_set *w, fd_set *e, struct timeval *t)
     (void)r;
     (void)w;
     (void)e;
-    (void)t;
+    if (w) {
+        if (tstConnecting) {
+            tstConnectWaits++;
+            if (t->tv_sec != 10 || t->tv_usec != 0)
+                return 0;
+            return tstConnectReady;
+        }
+        return 1;
+    }
+    if (tstStepUs > (unsigned long)t->tv_sec * 1000000 + t->tv_usec)
+        return 0;
+    tstTicks += (u64)tstStepUs * 36864 / 1000;
     if (tstSelectFail)
         return 0;
     return tstPos < tstLen ? 1 : 0;
@@ -46,6 +98,7 @@ int stub_send(int s, const void *b, int l, int f)
 int stub_closesocket(int s)
 {
     (void)s;
+    tstClosed++;
     return 0;
 }
 int stub_shutdown(int s, int how)
@@ -79,6 +132,7 @@ static void feed(const char *hdr, int bodylen, int chunk)
     tstPos = 0;
     tstChunk = chunk;
     tstSelectFail = 0;
+    tstStepUs = 0;
 }
 
 int main(void)
@@ -211,6 +265,51 @@ int main(void)
     printf("16 read without begin\n");
     HttpStreamEnd();
     ck(HttpStreamRead(out, 16) == HTTP_STREAM_ERR_NOSTREAM, "read without begin refused");
+
+    printf("17 slow headers share one deadline\n");
+    feed("HTTP/1.1 200 OK\r\nContent-Length: 64\r\n\r\n", 64, 1);
+    tstStepUs = 1000000;
+    st = HttpStreamBegin(3, "h", "/x", 0, 0, 0, 1, &cl, &total, &has);
+    ck(st == HTTP_STREAM_ERR_HEADERS, "dribbled headers time out");
+    ck(tstPos <= 10, "deadline not reset per receive");
+
+    printf("18 deadline survives separate body reads and clock wrap\n");
+    feed("HTTP/1.1 200 OK\r\nContent-Length: 8192\r\n\r\n", 8192, 1);
+    tstTicks = 0xffffffffULL - 36864;
+    st = HttpStreamBegin(3, "h", "/x", 0, 0, 0, 1, &cl, &total, &has);
+    ck(st == 200, "headers before deadline");
+    tstChunk = HTTP_CLIENT_STREAM_CHUNK;
+    tstStepUs = 4000000;
+    ck(HttpStreamRead(out, HTTP_CLIENT_STREAM_CHUNK) == HTTP_CLIENT_STREAM_CHUNK, "first chunk at four seconds");
+    ck(HttpStreamRead(out, HTTP_CLIENT_STREAM_CHUNK) == HTTP_CLIENT_STREAM_CHUNK, "second chunk at eight seconds across wrap");
+    ck(HttpStreamRead(out, HTTP_CLIENT_STREAM_CHUNK) == HTTP_STREAM_ERR_TRUNC, "third chunk exceeds shared deadline");
+
+    printf("19 new response gets a fresh deadline\n");
+    feed("HTTP/1.1 200 OK\r\nContent-Length: 64\r\n\r\n", 64, 1);
+    tstTicks += 120ULL * 36864000;
+    st = HttpStreamBegin(3, "h", "/x", 0, 0, 0, 1, &cl, &total, &has);
+    ck(st == 200, "new begin resets old deadline");
+    tstTicks += 120ULL * 36864000;
+    ck(HttpStreamRead(out, 64) == HTTP_STREAM_ERR_TRUNC, "long pause cannot wrap deadline back to live");
+
+    printf("20 connection completion and timeout cleanup\n");
+    tstConnecting = 1;
+    tstConnectResult = 0;
+    ck(HttpEstabConnection("127.0.0.1", 1100) == 3, "immediate connection succeeds");
+    ck(tstNonblocking == 0, "legacy blocking mode restored");
+    tstConnectResult = -1;
+    ck(HttpEstabConnection("127.0.0.1", 1100) == 3, "pending connection succeeds after select");
+    tstConnectReady = 0;
+    tstClosed = tstConnectWaits = 0;
+    ck(HttpEstabConnection("127.0.0.1", 1100) < 0, "connection timeout fails");
+    ck(tstClosed == 1 && tstConnectWaits == 1, "timeout closes socket after one bounded wait");
+    tstConnectReady = 1;
+    tstConnectError = ECONNREFUSED;
+    ck(HttpEstabConnection("127.0.0.1", 1100) < 0, "writable failed connection is rejected via SO_ERROR");
+    ck(tstClosed == 2, "failed connection closed");
+    tstSocketResult = -1;
+    ck(HttpEstabConnection("127.0.0.1", 1100) < 0, "socket allocation failure returned");
+    ck(tstClosed == 2, "invalid socket is not closed");
 
     printf("\n%s: %d checks, %d failures\n", fails ? "FAILED" : "PASSED", checks, fails);
     return fails != 0;

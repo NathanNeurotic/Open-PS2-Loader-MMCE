@@ -1,6 +1,7 @@
 #include <string.h>
 #include <kernel.h>
 #include <sifrpc.h>
+#include <delaythread.h>
 
 #include "httpclient.h"
 #include "ioman.h"
@@ -12,12 +13,21 @@ static unsigned char RpcRxBuffer[64] ALIGNED(64);
 
 int HttpInit(void)
 {
-    while (SifBindRpc(&SifRpcClient, 0x00001B14, 0) < 0 || SifRpcClient.server == NULL) {
-        LOG("libhttpclient: bind failed\n");
-        nopdelay();
+    if (SifRpcClient.server != NULL)
+        return 0;
+    for (int attempt = 0; attempt < 300; attempt++) {
+        if (SifBindRpc(&SifRpcClient, 0x00001B14, 0) >= 0 && SifRpcClient.server != NULL)
+            return 0;
+        DelayThread(10000);
     }
+    LOG("libhttpclient: bind timed out\n");
+    HttpDeinit();
+    return -1;
+}
 
-    return 0;
+int HttpIsInitialized(void)
+{
+    return SifRpcClient.server != NULL;
 }
 
 void HttpDeinit(void)
@@ -28,6 +38,9 @@ void HttpDeinit(void)
 int HttpEstabConnection(char *server, u16 port)
 {
     int result;
+
+    if (!HttpIsInitialized())
+        return -1;
 
     strncpy(((struct HttpClientConnEstabArgs *)RpcTxBuffer)->server, server, HTTP_CLIENT_SERVER_NAME_MAX - 1);
     ((struct HttpClientConnEstabArgs *)RpcTxBuffer)->server[HTTP_CLIENT_SERVER_NAME_MAX - 1] = '\0';

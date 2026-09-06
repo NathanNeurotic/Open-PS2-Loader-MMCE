@@ -6,6 +6,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+#include <sys/ioctl.h>
 typedef signed char s8;
 typedef unsigned char u8;
 typedef unsigned short u16;
@@ -22,6 +23,14 @@ int stub_recv(int s, void *b, int l, int f);
 int stub_send(int s, const void *b, int l, int f);
 int stub_closesocket(int s);
 int stub_shutdown(int s, int how);
+int stub_socket(int domain, int type, int protocol);
+int stub_connect(int socket, const struct sockaddr *addr, socklen_t len);
+int stub_ioctl(int socket, long command, void *arg);
+int stub_getsockopt(int socket, int level, int name, void *value, socklen_t *len);
+#define socket      stub_socket
+#define connect     stub_connect
+#define ioctlsocket stub_ioctl
+#define getsockopt  stub_getsockopt
 #define select      stub_select
 #define recv        stub_recv
 #define send        stub_send

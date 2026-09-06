@@ -209,7 +209,7 @@ void ethDeinitModules(void)
 
 int ethLoadInitModules(void)
 {
-    return netLoadInitModules();
+    return netLoadInitModules(NET_PROTO_SMB);
 }
 
 void ethDisplayErrorStatus(void)

@@ -2,8 +2,13 @@
 
 RiptOPL can read a game library straight off an ordinary HTTP server: a small `games.csv` catalog
 says what exists, and the console streams the ISO itself with plain HTTP byte ranges as the game
-asks for sectors. Nothing on the PC side is special — any static server that honours `Range`
-requests will do.
+asks for sectors. The server must satisfy the client profile: no transfer encoding, no content
+encoding other than identity, no multipart responses, exact `Content-Range` and `Content-Length`
+for range reads, and complete response bodies. Check it with the
+[conformance tool](../pc/http/README.md).
+
+Use HTTP only on a trusted, isolated local network. It provides no encryption or server/content
+authentication; range and length validation detect malformed responses, not substituted game data.
 
 The design, the byte-range reader RiptOPL follows, and the PC server are
 **[Docmine17](https://github.com/Docmine17)**'s
@@ -17,8 +22,9 @@ regeneration step, nothing to upgrade.
 
 ## Status
 
-**Written end to end, verified on nothing.** Every part below exists in the build and none of it
-has run on a PlayStation 2. Treat HTTP as a development feature until that changes.
+**Implemented and host-tested, not yet verified on PlayStation 2 hardware.** Every part below
+exists in the build, but none of it has run on a PlayStation 2. Treat HTTP as a development feature
+until that changes.
 
 | Part | State |
 | --- | --- |
@@ -36,7 +42,7 @@ has run on a PlayStation 2. Treat HTTP as a development feature until that chang
 
 ## Setting it up
 
-On the PC, run any HTTP server that supports byte ranges, with your ISOs under its document root,
+On the PC, run an HTTP server meeting the profile above, with your ISOs under its document root,
 and put a `games.csv` beside them. Docmine17's `http_server.py` does exactly this and defaults to
 port **1100**.
 
@@ -78,10 +84,14 @@ other.
 **Older catalogs keep working untouched.** These are all still accepted:
 
 ```csv
-SLUS_123.45,Example Game            <- filename derived from the title, media defaults to DVD
-SLUS_200.02,Another Game,CD         <- explicit media
-SLUS_300.03,Already Has Ext.iso,CD  <- extension already on the title, not doubled
-SLUS_400.04                         <- startup only; it doubles as title and filename
+# Filename derived from the title; media defaults to DVD
+SLUS_123.45,Example Game
+# Explicit media
+SLUS_200.02,Another Game,CD
+# Extension already on the title, not doubled
+SLUS_300.03,Already Has Ext.iso,CD
+# Startup only; it doubles as title and filename
+SLUS_400.04
 ```
 
 Blank lines and lines starting with `#` are ignored. Both LF and CRLF work, and a missing final

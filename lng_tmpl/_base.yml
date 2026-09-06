@@ -1308,4 +1308,4 @@ gui_strings:
 - label: HTTP_NO_VMC
   string: Virtual memory cards are not available over HTTP -- use a physical card
 - label: HTTP_TAB_HINT
-  string: HTTP reads games.csv from your server. Set the address, port and base path below, then use Test.
+  string: HTTP reads games.csv from your server. Set the address, port and base path in Network settings, then use Test.

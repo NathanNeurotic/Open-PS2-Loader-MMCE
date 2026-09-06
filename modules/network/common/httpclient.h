@@ -3,6 +3,7 @@
 
 // EE-side only
 int HttpInit(void);
+int HttpIsInitialized(void);
 void HttpDeinit(void);
 
 int HttpEstabConnection(char *server, u16 port);

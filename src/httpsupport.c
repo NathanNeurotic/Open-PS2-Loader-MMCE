@@ -371,7 +371,7 @@ void httpTestServer(const int *ip, int port, const char *base, char *msg, size_t
     int contentLen, hasTotal, sock, r;
     u64 total;
 
-    if (netLoadInitModules() != 0) {
+    if (netLoadInitModules(NET_PROTO_HTTP) != 0) {
         snprintf(msg, msgSize, "%s", _l(_STR_HTTP_ERR_CONNECT));
         return;
     }
@@ -519,7 +519,7 @@ static int httpUpdateGameList(item_list_t *itemList)
     if (gNetworkProtocol != NET_PROTO_HTTP)
         return 0;
 
-    if (netLoadInitModules() != 0) {
+    if (netLoadInitModules(NET_PROTO_HTTP) != 0) {
         LOG("HTTPSUPPORT: network stack unavailable\n");
         return 0;
     }
@@ -648,7 +648,7 @@ static int httpProbeImage(const http_endpoint_t *endpoint, const char *relative,
     // Primary volume descriptor, sector 16. Byte 80 is the volume space size in sectors.
     if (!httpProbeRead(endpoint, relative, 16 * 2048, sizeof(sector), sector, &total))
         return 0;
-    if (total == 0)
+    if (total == 0 || sector[0] != 1 || memcmp(&sector[1], "CD001", 5) != 0 || sector[6] != 1)
         return 0;
     *sizeOut = total;
 

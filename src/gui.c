@@ -21,6 +21,7 @@
 #include "include/system.h"
 #include "include/mmcesupport.h"
 #include "include/ethsupport.h"
+#include "include/netsupport.h"
 #include "include/udpfssupport.h"
 #include "include/httpsupport.h" // httpTestServer() -- the Network page Test button
 #include "include/artindex.h"
@@ -727,7 +728,7 @@ reshow_config:
 int guiGetResidentNetProtocol(void)
 {
     if (ethGetModulesLoaded())
-        return NET_PROTO_SMB;
+        return netGetResidentProtocol();
     if (udpfsGetModulesLoaded())
         return NET_PROTO_UDPFS;
     if (bdmIsUDPBDLoaded())

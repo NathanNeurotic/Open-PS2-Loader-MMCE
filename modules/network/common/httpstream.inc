@@ -1,6 +1,9 @@
 // Included by the menu RPC client and the HTTP cdvdman driver. Callers serialize access
 // and supply SendData and RecvBounded using their own stack ABI.
 #define HTTP_HDR_MAX 1024
+#ifndef HTTP_STREAM_START
+#define HTTP_STREAM_START() ((void)0)
+#endif
 
 static struct
 {
@@ -122,6 +125,7 @@ int HttpStreamBegin(s32 HttpSocket, const char *host, const char *uri,
     int sawLength = 0;
 
     HttpStreamEnd();
+    HTTP_STREAM_START();
 
     *contentLen = -1;
     *total = 0;

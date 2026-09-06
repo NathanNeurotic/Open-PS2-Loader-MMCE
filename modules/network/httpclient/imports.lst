@@ -15,6 +15,8 @@ I_lwip_close
 I_lwip_select
 I_lwip_socket
 I_lwip_shutdown
+I_lwip_ioctl
+I_lwip_getsockopt
 I_lwip_connect
 I_lwip_gethostbyname
 ps2ip_IMPORTS_end
@@ -57,4 +59,6 @@ I_CreateThread
 I_DeleteThread
 I_StartThread
 I_TerminateThread
+I_GetSystemTime
+I_SysClock2USec
 thbase_IMPORTS_end

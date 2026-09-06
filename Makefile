@@ -605,10 +605,12 @@ modules/iopcore/cdvdman/smb_cdvdman.irx: modules/iopcore/cdvdman
 $(EE_ASM_DIR)smb_cdvdman.c: modules/iopcore/cdvdman/smb_cdvdman.irx | $(EE_ASM_DIR)
 	$(BIN2C) $< $@ $(*F)_irx
 
-# httpstream.inc is #included by BOTH of these, and make does not see inside a sub-make, so a
-# change to the shared engine would otherwise relink neither. It has already bitten once: a stale
-# httpclient.irx built clean locally while CI's make clean failed on a missing import.
-modules/iopcore/cdvdman/http_cdvdman.irx: modules/iopcore/cdvdman modules/network/common/httpstream.inc
+# Always enter the nested builds so their own dependency checks run. Track shared includes
+# there too; top-level directory timestamps cannot detect an edited source or header.
+.PHONY: http-submake
+http-submake:
+
+modules/iopcore/cdvdman/http_cdvdman.irx: modules/iopcore/cdvdman http-submake
 	$(MAKE) $(CDVDMAN_PS2LOGO_FLAGS) $(CDVDMAN_DEBUG_FLAGS) USE_HTTP=1 -C $< all
 
 $(EE_ASM_DIR)http_cdvdman.c: modules/iopcore/cdvdman/http_cdvdman.irx | $(EE_ASM_DIR)
@@ -952,7 +954,7 @@ modules/network/nbns/nbns.irx: modules/network/nbns
 $(EE_ASM_DIR)nbns-iop.c: modules/network/nbns/nbns.irx | $(EE_ASM_DIR)
 	$(BIN2C) $< $@ nbns_irx
 
-modules/network/httpclient/httpclient.irx: modules/network/httpclient modules/network/common/httpstream.inc
+modules/network/httpclient/httpclient.irx: modules/network/httpclient http-submake
 	$(MAKE) -C $<
 
 $(EE_ASM_DIR)httpclient-iop.c: modules/network/httpclient/httpclient.irx | $(EE_ASM_DIR)

@@ -21,6 +21,7 @@
 #include "httpclient.h"
 
 static unsigned char netModulesLoaded = 0;
+static int netResidentProtocol = NET_PROTO_OFF;
 
 static struct ip4_addr lastIP;
 static struct ip4_addr lastNM;
@@ -147,7 +148,7 @@ int netGetModulesLoaded(void)
 }
 
 // Caller must hold the init lock.
-static int netLoadModules(void)
+static int netLoadModules(int protocol)
 {
     LOG("NETSUPPORT LoadModules\n");
 
@@ -168,6 +169,7 @@ static int netLoadModules(void)
 
     if (!netModulesLoaded) {
         netModulesLoaded = 1;
+        netResidentProtocol = protocol;
 
         sysInitDev9();
 
@@ -192,6 +194,10 @@ static int netLoadModules(void)
                     }
                     ps2ip_init();
                     LOG("NETSUPPORT Modules loaded\n");
+                    if (protocol == NET_PROTO_HTTP && !HttpIsInitialized()) {
+                        gNetworkStartup = ERROR_ETH_MODULE_NETIF_FAILURE;
+                        return -1;
+                    }
                     return 0;
                 }
             }
@@ -201,7 +207,19 @@ static int netLoadModules(void)
         return -1;
     }
 
+    // Keep the residency latch: teardown does not unload IRXs, so pretending the NIC is free
+    // after an HTTP bind failure would allow another driver to load on top of it. SMB can still
+    // use the shared stack when only its optional compatibility HTTP client failed.
+    if (protocol == NET_PROTO_HTTP && !HttpIsInitialized()) {
+        gNetworkStartup = ERROR_ETH_MODULE_NETIF_FAILURE;
+        return -1;
+    }
     return 0;
+}
+
+int netGetResidentProtocol(void)
+{
+    return netResidentProtocol;
 }
 
 // Slices netDeinitModules will wait for the init lock before giving up. One slice is 100 ms, so ~3 s
@@ -243,6 +261,7 @@ void netDeinitModules(void (*protocolTeardown)(void))
         nbnsDeinit();
         NetManDeinit();
         netModulesLoaded = 0;
+        netResidentProtocol = NET_PROTO_OFF;
         // The protocol's own state is cleared HERE, immediately after netModulesLoaded and before
         // the semaphore goes, because that is precisely where SMB cleared its two flags.
         if (protocolTeardown != NULL)
@@ -261,7 +280,7 @@ void netDeinitModules(void (*protocolTeardown)(void))
     }
 }
 
-int netLoadInitModules(void)
+int netLoadInitModules(int protocol)
 {
     int ret;
 
@@ -270,7 +289,7 @@ int netLoadInitModules(void)
 
     WaitSema(netInitSemaID);
 
-    if ((ret = netLoadModules()) == 0) {
+    if ((ret = netLoadModules(protocol)) == 0) {
         ret = netInitApplyConfig();
     }
 
@@ -287,7 +306,7 @@ int netEnsureModules(void)
         return ret;
 
     WaitSema(netInitSemaID);
-    ret = netLoadModules();
+    ret = netLoadModules(NET_PROTO_SMB);
     SignalSema(netInitSemaID);
 
     return ret;

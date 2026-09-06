@@ -23,7 +23,10 @@
 
 // Bring the stack up and apply the current network configuration (link mode, IP/DHCP).
 // 0 on success. Sets gNetworkStartup on failure.
-int netLoadInitModules(void);
+int netLoadInitModules(int protocol);
+
+// Protocol that first made the shared stack resident; independent of mutable settings.
+int netGetResidentProtocol(void);
 
 // Bring the stack up WITHOUT applying the network configuration. Only for a protocol that applies
 // it later as part of its own connect sequence, which is what SMB does. Everything else wants

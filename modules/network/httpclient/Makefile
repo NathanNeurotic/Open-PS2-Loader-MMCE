@@ -6,3 +6,5 @@ IOP_INCS += -I../common
 include $(PS2SDK)/Defs.make
 include ../../Rules.bin.make
 include $(PS2SDK)/samples/Makefile.iopglobal
+
+$(IOP_OBJS): $(wildcard *.h ../common/*.h ../common/*.inc) Makefile ../../Rules.bin.make

@@ -84,3 +84,7 @@ endif
 include $(PS2SDK)/Defs.make
 include ../../Rules.bin.make
 include $(PS2SDK)/samples/Makefile.iopglobal
+
+ifeq ($(USE_HTTP),1)
+$(IOP_OBJS): $(wildcard *.h ../common/*.h ../../isofs/*.h ../../network/common/*.h ../../network/common/*.inc) Makefile ../../Rules.bin.make
+endif
