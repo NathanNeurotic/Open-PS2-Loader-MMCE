@@ -292,7 +292,24 @@ int main(void)
     tstTicks += 120ULL * 36864000;
     ck(HttpStreamRead(out, 64) == HTTP_STREAM_ERR_TRUNC, "long pause cannot wrap deadline back to live");
 
-    printf("20 connection completion and timeout cleanup\n");
+    printf("20 legacy request shares its deadline across header reads\n");
+    {
+        s8 mode = HTTP_CMODE_PERSISTENT;
+        u16 length = sizeof(out);
+        // Two-byte fragments force repeated GetData calls while parsing the headers.
+        feed("HTTP/1.1 200 OK\r\nContent-Length: 64\r\n\r\n", 64, 2);
+        tstStepUs = 1000000;
+        st = HttpSendGetRequest(3, "test", "h", &mode, NULL, "/x", (char *)out, &length);
+        ck(tstPos <= 20, "legacy reads stop at the original ten-second deadline");
+        ck(length < 64, "legacy timeout stops before the full payload arrives");
+        feed("HTTP/1.1 200 OK\r\nContent-Length: 64\r\n\r\n", 64, 0);
+        length = sizeof(out);
+        st = HttpSendGetRequest(3, "test", "h", &mode, NULL, "/x", (char *)out, &length);
+        ck(st == 200, "fresh legacy request can receive healthy headers");
+        ck(length > 0 && memcmp(out, body, length) == 0, "legacy payload remains correct");
+    }
+
+    printf("21 connection completion and timeout cleanup\n");
     tstConnecting = 1;
     tstConnectResult = 0;
     ck(HttpEstabConnection("127.0.0.1", 1100) == 3, "immediate connection succeeds");

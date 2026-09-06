@@ -193,14 +193,21 @@ def main():
     if status != 200:
         res.bad("GET " + args.catalog, "expected 200, got {}".format(status))
     else:
-        rows, rejects = catalog_reference.parse_catalog(body)
-        res.ok("GET " + args.catalog, "{} bytes, {} rows, {} rejected".format(
-            len(body), len(rows), len(rejects)))
-        for j in rejects:
-            print("        catalog line {}: {}".format(j.line_no, j.reason))
-        if len(body) > 512:
-            res.ok("catalog exceeds the 512-byte menu RPC buffer",
-                   "{} bytes -- the client must stream, not truncate".format(len(body)))
+        try:
+            rows, rejects = catalog_reference.parse_catalog(body)
+        except catalog_reference.CatalogTooLarge as exc:
+            res.bad("GET " + args.catalog, str(exc))
+            conn.close()
+            print("\n{} passed, {} failed, {} skipped".format(res.passed, res.failed, res.skipped))
+            return 1
+        else:
+            res.ok("GET " + args.catalog, "{} bytes, {} rows, {} rejected".format(
+                len(body), len(rows), len(rejects)))
+            for j in rejects:
+                print("        catalog line {}: {}".format(j.line_no, j.reason))
+            if len(body) > 512:
+                res.ok("catalog exceeds the 512-byte menu RPC buffer",
+                       "{} bytes -- the client must stream, not truncate".format(len(body)))
 
     # 2. Pick an image.
     rel = args.iso

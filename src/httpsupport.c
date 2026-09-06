@@ -189,6 +189,18 @@ static int httpParseCatalog(char *buf, int len, base_game_info_t **outGames, htt
             http_catalog_row_t parsed;
 
             if (httpCatalogParseLine(trimmed, &parsed) == HTTP_CAT_OK) {
+                // First record wins. A duplicate consumes no capacity, even at the limit.
+                for (i = 0; i < rows; i++) {
+                    if (!strcmp(httpGames[i].startup, parsed.startup)) {
+                        duplicate = 1;
+                        break;
+                    }
+                }
+                if (duplicate) {
+                    rejected++;
+                    line = nl + 1;
+                    continue;
+                }
                 if (rows == HTTP_CATALOG_ROWS_MAX) {
                     free(httpGames);
                     free(httpExtras);
@@ -205,17 +217,7 @@ static int httpParseCatalog(char *buf, int len, base_game_info_t **outGames, htt
                 snprintf(httpExtras[rows].path, sizeof(httpExtras[rows].path), "%s", parsed.path);
                 httpExtras[rows].supported = parsed.supported;
 
-                // First record wins, so a refresh is stable rather than order-dependent.
-                for (i = 0; i < rows; i++) {
-                    if (!strcmp(httpGames[i].startup, httpGames[rows].startup)) {
-                        duplicate = 1;
-                        break;
-                    }
-                }
-                if (duplicate)
-                    rejected++;
-                else
-                    rows++;
+                rows++;
             } else {
                 rejected++;
             }

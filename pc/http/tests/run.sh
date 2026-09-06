@@ -39,3 +39,6 @@ echo "== catalog parser vs the Python reference =="
     "$root/pc/http/tests/test_catalog.c" \
     "$root/src/httpcatalog.c"
 python3 "$root/pc/http/tests/compare_catalog.py" --bin "$out-catalog"
+
+python3 "$root/pc/http/tests/test_catalog_limits.py"
+python3 "$root/pc/http/tests/test_conformance.py"

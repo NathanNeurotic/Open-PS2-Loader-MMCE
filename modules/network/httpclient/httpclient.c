@@ -103,24 +103,18 @@ static int SendData(int socket, char *buffer, int length)
 
 static int GetData(int socket, char *buffer, int length)
 {
-    struct timeval timeout;
-    fd_set readfds;
     char *pointer;
     int remaining, ToRead, result;
 
     for (remaining = length, pointer = buffer; remaining > 0;) {
         ToRead = remaining;
 
-        // This safeguards against a deadlock, if the TCP connection gets broken for long enough. Long enough for the RST packet from the other side gets lost.
-        timeout.tv_sec = 10;
-        timeout.tv_usec = 0;
-        FD_ZERO(&readfds);
-        FD_SET(socket, &readfds);
-        if (select(socket + 1, &readfds, NULL, NULL, &timeout) <= 0) {
+        // Keep the deadline set by HttpSendGetRequest across short header and body reads.
+        if (!WaitSocket(socket, 0)) {
             break;
         }
 
-        if ((result = recv(socket, pointer, ToRead, 0)) < 1)
+        if ((result = recv(socket, pointer, ToRead, MSG_DONTWAIT)) < 1)
             break;
         remaining -= result;
         pointer += result;
