@@ -7,8 +7,7 @@ requests will do.
 
 The design, the byte-range reader RiptOPL follows, and the PC server are
 **[Docmine17](https://github.com/Docmine17)**'s
-([Open-PS2-Loader-HTTP](https://github.com/Docmine17/Open-PS2-Loader-HTTP)), adopted with his
-permission. He wants the approach to become a shared convention and offered it here first.
+([Open-PS2-Loader-HTTP](https://github.com/Docmine17/Open-PS2-Loader-HTTP)).
 
 **His unmodified server is the compatibility baseline.** If you already run it, RiptOPL points at
 it as-is: same port, same `games.csv`, same folder layout. No new API, no catalog conversion, no
@@ -162,8 +161,6 @@ then reports a disc error. It will not sit there reconnecting forever.
 * **The two lwIP stacks are not interchangeable.** `MSG_DONTWAIT` is `0x08` on the menu path and
   `0x40` in SMSTCPIP, and SMSTCPIP exports no `select`, so the in-game reader polls against a
   deadline instead.
-* **Do not write a PC server.** Docmine17 maintains one, and RiptOPL working with it unmodified is
-  the point.
 * `docs/HTTP-INTEGRATION-PLAN.md` carries the phase ledger, the evidence table and the console test
   matrix. Read it before picking this up.
 
