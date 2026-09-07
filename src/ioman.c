@@ -10,7 +10,30 @@
 #include <sio.h>
 #endif
 
-#define MAX_IO_REQUESTS 64
+/*
+  There is deliberately NO cap on the number of queued requests.
+
+  A MAX_IO_REQUESTS 64 constant used to sit here, enforced nowhere -- the dead half of the pair whose
+  live half (MAX_IO_HANDLERS, below) IS enforced in ioRegisterHandler. Removed rather than wired up,
+  because enforcing it would be wrong in both directions:
+
+  Nothing to protect. A request node is a type plus two pointers. Sixty-four of them is about a
+  kilobyte on a 32 MB console, and the worker drains the queue to empty before it sleeps
+  (ioWorkerThread), so depth is set by the event rate, not by any cap.
+
+  Backpressure already exists, at the PRODUCERS, which is the only place it can be lossless. The
+  background rescans refuse to enqueue at all while anything is pending (menuUpdateHook's
+  `if (ioHasPendingRequests()) return;`), and art has its own gArtQueuedCount gate -- lock-free
+  precisely because the obvious queue-side counter, ioGetPendingRequestCount(), takes gProcSemaId,
+  which the worker holds across the WHOLE drain, so calling it from the GUI thread froze the menu for
+  as long as any art was in flight (see texcache.c). Those gates also close the one case a cap might
+  seem to answer: a wedged handler stops the drain, but it stops the enqueues with it.
+
+  And rejecting here would LOSE work rather than defer it. Most call sites ignore the return value, so
+  a refused IO_MENU_UPDATE_DEFFERED is a list that never refreshes and a refused art load is a cover
+  that parks forever -- the exact failure classes this fork keeps having to fix. IO_ERR_TOO_MANY_REQUESTS
+  stays: ioPutRequest still returns it when the node allocation itself fails.
+*/
 #define MAX_IO_HANDLERS 64
 
 extern void *_gp;
