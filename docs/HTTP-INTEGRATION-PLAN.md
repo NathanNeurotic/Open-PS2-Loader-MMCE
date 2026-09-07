@@ -37,18 +37,16 @@ a normal feature of the default ELF.
 
 ## 0. Read this first
 
-### 0.1 Permission and provenance
+### 0.1 Upstream source
 
-The upstream work is **Docmine17**. Permission to adopt was granted by the author, who wants the
-approach to become a shared convention and offered it here first. He also supplies the PC side:
-`pc/http_server.py` in his tree, a ~90-line `ThreadingHTTPServer` subclass that serves the process
+The upstream implementation is by **Docmine17**. The PC server is
+`pc/http_server.py` in the upstream tree, a ~90-line `ThreadingHTTPServer` subclass that serves the process
 working directory with byte-range support and defaults to **port 1100**
 (`pc/http_server.py:66-75` in the donor tree).
 
-Preserve his attribution, the AFL-3.0 notices, the donor SHA above, and a record of what we changed
-and why. He is not writing our client and we are not rewriting his server.
+Preserve upstream attribution, the AFL-3.0 notices, the donor SHA above, and a record of changes.
 
-**His unmodified server is a release gate, not a fixture.** Anyone already running it, with their
+**Compatibility with the unmodified upstream server is a release gate.** Anyone already running it, with their
 existing `games.csv` and their existing folder layout, must be able to point RiptOPL at it and have
 it work. No replacement server, no new API, no mandatory catalog header, no regeneration step, no
 capability handshake.
@@ -531,12 +529,7 @@ observed outcome. Keep a non-HTTP control on the same game where practical.
 
 The design and the console implementation RiptOPL's HTTP support follows: serving a library from a
 plain static HTTP server, and streaming an ISO into the loader core with ordinary HTTP byte ranges.
-Adopted with the author's permission, given directly to Ripto (NathanNeurotic); he wants the
-approach to become a shared convention and offered it here first. He also supplies and maintains the
-PC server, which RiptOPL does not ship and will not grow a replacement for.
-
-Re-authored against this fork rather than merged, so any defect in the port is ours — his server and
-his existing catalogs stay the compatibility baseline they always were.
+The upstream PC server and its existing catalogs are the compatibility baseline for this port.
 
 Behind him, as behind all of it: the **ps2homebrew** team's Open PS2 Loader and the PS2SDK, which
 both trees descend from. `Docmine17/Open-PS2-Loader-HTTP` is listed with the rest of the OPL family

@@ -4,7 +4,6 @@
 Ember-only PS1 list because POPSTARTER cannot restore either network transport. Ember handoffs
 remain hardware-unproven unless a later test report says otherwise.
 **Base commit:** `291716d3` on `rebuild/main` (2026-08-27).
-**Permission:** Gage (author of Ember) has approved and encouraged this integration.
 
 ---
 

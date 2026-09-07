@@ -151,8 +151,7 @@ the connection directly; reopening settings or saving the whole configuration is
 
 **Ember is created by Gageformer.** Release page: <https://github.com/Gageformer/Ember/releases>
 
-Ember is an independent PS1 emulator written from scratch for the PS2. It is **not** part of
-RiptOPL and is not our work. It is bundled here unmodified, with the author's blessing, under the
+Ember is an independent PS1 emulator written from scratch for the PS2, bundled unmodified under the
 **Ember Public Beta Testing Licence** — shipped as **`EMBER/LICENSE-BETA.txt`**, which governs the
 build it accompanies. In short: free to use and to bundle non-commercially; no selling, no modifying
 or repackaging the build; and no BIOS or game content is included, ever.
@@ -174,8 +173,8 @@ core. That is the whole point of having two — if a title dislikes one, switch 
 
 **Neutrino is created by rickgaiser.** Home: <https://github.com/rickgaiser/neutrino>
 
-Neutrino is an independent *"Small, Fast and Modular PS2 Device Emulator"*. It is **not** part of
-RiptOPL and is not our work. It is bundled here under its **AFL-3.0** licence.
+Neutrino is an independent *"Small, Fast and Modular PS2 Device Emulator"*, bundled under its
+**AFL-3.0** licence.
 
 One honest note on "unmodified": we add exactly **one** file to the folder,
 `config/bsd-udpfsbd.toml`. Neutrino ships `udpfs_bd.irx` but no matching `-bsd` token for it, and
