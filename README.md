@@ -234,7 +234,7 @@ This build layers several features on top of upstream OPL:
   changes.
 > **Credit and licence — Neutrino is created by [rickgaiser](https://github.com/rickgaiser), and its
 > official home is <https://github.com/rickgaiser/neutrino>.** Neutrino is an independent PS2 device
-> emulator, **not** part of RiptOPL and not our work. Release packaging normally bundles the official
+> emulator. Release packaging normally bundles the official
 > latest build, re-fetched at publish time (download/extraction failures can omit it; check the release notes), under its **AFL-3.0** licence. We add exactly one file to
 > that folder — `config/bsd-udpfsbd.toml`, because Neutrino ships `udpfs_bd.irx` without a matching
 > `-bsd` token and RiptOPL launches UDPFS as `-bsd=udpfsbd`. Nothing of rickgaiser's is altered or
@@ -257,8 +257,7 @@ This build layers several features on top of upstream OPL:
   network-boot section of **[docs/NEUTRINO.md](docs/NEUTRINO.md#4-network-boot--the-network-protocol-selector)**.
 - **HTTP library (new):** point RiptOPL at a server meeting the [HTTP client response profile](docs/HTTP.md), and it reads a `games.csv` catalog and streams the ISOs straight off it
   through OPL’s own core. The PC side is **[Docmine17](https://github.com/Docmine17)’s**
-  **[HTTP server](https://github.com/Docmine17/Open-PS2-Loader-HTTP)**, adopted with permission and
-  used **unmodified** — existing catalogs and folder layouts need no conversion. Pick **HTTP** under
+  **[HTTP server](https://github.com/Docmine17/Open-PS2-Loader-HTTP)**, used **unmodified** — existing catalogs and folder layouts need no conversion. Pick **HTTP** under
   **Network → Protocol**, set the address, port (default **1100**) and base path, then use **Test HTTP
   server**. No VMC, no Neutrino and no PS1 over HTTP, and it has **not been hardware-tested yet**.
   See **[docs/HTTP.md](docs/HTTP.md)**.
@@ -337,8 +336,7 @@ This build layers several features on top of upstream OPL:
 
   **Credit and licence — Ember is created by [Gageformer](https://github.com/Gageformer), and its
   official release page is <https://github.com/Gageformer/Ember/releases>.** Ember is an
-  independent PS1 emulator written from scratch for the PS2; it is **not** part of RiptOPL and is
-  not our work. We bundle it unmodified and with the author's blessing, under the **Ember Public
+  independent PS1 emulator written from scratch for the PS2. It is bundled unmodified under the **Ember Public
   Beta Testing Licence**, which ships in the release package as `EMBER/LICENSE-BETA.txt` and governs
   the build it accompanies. That licence permits non-commercial bundling but prohibits selling,
   modifying or repackaging the build. Ember contains no PlayStation BIOS and no game data — you
@@ -708,9 +706,9 @@ RiptOPL is intended to work with these maintained companion tools:
 - **[OrbitPS2 Manager](https://github.com/Luden02/OrbitPS2-Manager)** by **[Luden](https://github.com/Luden02)** — cross-platform PC library manager for importing discs, artwork/screenshots, ZSO compression, per-game settings and VMC management.
 - **[OPL PS1 AIO Converter GUI](https://github.com/shaanhomebrew-cloud/OPL-PS1-AIO-Converter-GUI)** by **[shaan](https://github.com/shaanhomebrew-cloud)** — Windows all-in-one PS1/POPStarter preparation tool for converting BIN/CUE backups to VCDs and installing them to USB, MX4SIO, MMCE, iLink, exFAT HDD, SMB and APA internal HDD.
 - **[xeRAbora](https://github.com/hacan359/xerabora)** by **[hacan359](https://github.com/hacan359)** — the PC client for **RetroAchievements** on real PS2 hardware. RiptOPL's RA build streams the running game's memory to it; xeRAbora runs rcheevos, talks to the RetroAchievements servers and unlocks the achievements. It also builds the per-game watch list the console needs. Shipped as a shortcut inside `RIPTOPL-RA-*.zip`; MIT licensed. RiptOPL’s RA integration is not yet hardware-tested.
-- **[OPL HTTP PC server](https://github.com/Docmine17/Open-PS2-Loader-HTTP)** by **[Docmine17](https://github.com/Docmine17)** — the PC side of RiptOPL’s **HTTP** protocol: a small static HTTP server with byte-range support that serves your `games.csv` catalog and streams the ISOs themselves. RiptOPL works with it **unmodified** — no new API, no catalog conversion, no changed folder layout — with host conformance checks against his server. PS2 hardware validation is still pending. The HTTP design and the byte-range reader RiptOPL follows are his, adopted with permission.
+- **[OPL HTTP PC server](https://github.com/Docmine17/Open-PS2-Loader-HTTP)** by **[Docmine17](https://github.com/Docmine17)** — the PC side of RiptOPL’s **HTTP** protocol: a small static HTTP server with byte-range support that serves your `games.csv` catalog and streams the ISOs themselves. RiptOPL works with it **unmodified** — no new API, no catalog conversion, no changed folder layout — with host conformance checks against the upstream server. PS2 hardware validation is still pending.
 - **[PS2RD CHT Manager](https://github.com/TheRealNextria/PS2RD-CHT-Manager)** by **[TheRealNextria](https://github.com/TheRealNextria)** — PC manager for the PS2RD `.cht` cheat files RiptOPL reads from your device's `CHT` folder. A `PS2RD-CHT-Manager.url` shortcut ships in installable packages.
-- **[Ember](https://github.com/Gageformer/Ember)** by **[Gageformer](https://github.com/Gageformer)** — a PS1 emulator that runs natively on the PS2, used as RiptOPL's **second PS1 core** alongside POPSTARTER. Unlike the others this one is not just a shortcut: an `EMBER/` folder ships **inside** the release package, ready to drop onto a device. It is bundled unmodified with the author's permission under the Ember Public Beta Testing Licence (`EMBER/LICENSE-BETA.txt` in the package); releases: <https://github.com/Gageformer/Ember/releases>.
+- **[Ember](https://github.com/Gageformer/Ember)** by **[Gageformer](https://github.com/Gageformer)** — a PS1 emulator that runs natively on the PS2, used as RiptOPL's **second PS1 core** alongside POPSTARTER. Unlike the others this one is not just a shortcut: an `EMBER/` folder ships **inside** the release package, ready to drop onto a device. It is bundled unmodified under the Ember Public Beta Testing Licence (`EMBER/LICENSE-BETA.txt` in the package); releases: <https://github.com/Gageformer/Ember/releases>.
 - **[POPStarter](https://www.psx-place.com/resources/popstarter.683/)** by **krHACKen** — a PS1 launcher built around Sony's native **POPS** emulator for the PS2, used as RiptOPL's **primary PS1 core** alongside Ember. POPStarter provides the compatibility and launch layer for running PS1 VCDs from USB, MX4SIO, MMCE, iLink, internal HDD, and SMB; RiptOPL's iLink handoff is wired but still awaiting a passing hardware retest. The official POPStarter r13 package contains **no Sony emulator binaries, libraries, or BIOS files**; those components must be supplied separately by the user. Official download, documentation, compatibility information, and releases are maintained on **[PSX-Place](https://www.psx-place.com/resources/popstarter.683/)**.
 - **[Neutrino](https://github.com/rickgaiser/neutrino)** by **[rickgaiser](https://github.com/rickgaiser)** — a *"Small, Fast and Modular PS2 Device Emulator"*, and RiptOPL's **second PS2 loader core** alongside OPL's own. Like Ember it is not a shortcut: a ready-to-use `neutrino/` folder normally ships **inside** the installable package (check release notes for download/extraction omissions), drag-and-drop to `mc?:/neutrino/`. Neutrino is deliberately **UI-agnostic** — it has no interface of its own, which is exactly what lets a front-end like RiptOPL drive it per game. Licensed **AFL-3.0**; releases: <https://github.com/rickgaiser/neutrino/releases>.
 ## Acknowledgements
@@ -749,14 +747,11 @@ With special and sincere thanks to:
   unique features and unmerged work alive. Thank you.
 - **bbsan2k** — for the **MMCE (Memory Card Mass Storage) protocol** that makes SD-via-memory-card
   loading through the PS2's memory-card slot possible. OPL's MMCE support builds directly on it.
-- **hacan359 (yoba)** — for **RetroAchievements on real PS2 hardware**, and for offering it to
-  this fork rather than keeping it to his own. The design is his: the console works out which game
-  an image is and streams the handful of memory addresses that game's achievements watch, while
-  everything else — rcheevos, the RetroAchievements servers, your login — happens on the PC. He
-  writes and maintains that PC client, **[xeRAbora](https://github.com/hacan359/xerabora)** (MIT),
-  and RiptOPL neither ships one nor intends to. RiptOPL's RA support is a reimplementation of his
-  work against his published wire protocol, shipped as its own `RIPTOPL-RA-*.zip` build with a
-  shortcut to his client inside. Please report *RiptOPL* problems to us, not to him.
+- **hacan359 (yoba)** — for **RetroAchievements on real PS2 hardware** and the
+  **[xeRAbora PC client](https://github.com/hacan359/xerabora)** (MIT). The console identifies the
+  game and streams the memory addresses its achievements watch; xeRAbora handles rcheevos, the
+  RetroAchievements service, and login. RiptOPL implements the published wire protocol in its
+  `RIPTOPL-RA-*.zip` build, which includes a shortcut to xeRAbora.
 - **saildot4k** — for **BDMA-ATA** (exFAT internal-HDD block-device support), and the fixes,
   feedback, and oversight that shaped this fork's block-device work. A big piece of getting it right.
 - **eliminator1403** — for dedicated **testing, bug reports, and real-hardware feedback** that

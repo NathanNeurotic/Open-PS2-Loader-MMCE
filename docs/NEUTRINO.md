@@ -11,7 +11,7 @@ boot better under Neutrino, or for users who prefer Neutrino's loader and its la
 **Neutrino is created by [rickgaiser](https://github.com/rickgaiser)** — a *"Small, Fast and Modular
 PS2 Device Emulator"*. Home: <https://github.com/rickgaiser/neutrino>.
 
-It is an independent project, **not** part of RiptOPL and not our work. The RiptOPL release package
+The RiptOPL release package
 normally bundles the official latest build, re-fetched from upstream at publish time (a failed download/extraction can omit it; check the release notes), under Neutrino's
 **AFL-3.0** licence. We add exactly one file to that folder — `config/bsd-udpfsbd.toml`, because
 Neutrino ships `udpfs_bd.irx` without a matching `-bsd` token and RiptOPL launches UDPFS as

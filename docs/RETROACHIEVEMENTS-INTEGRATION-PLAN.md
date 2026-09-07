@@ -15,17 +15,12 @@ default RiptOPL ELF must be **byte-for-byte unaffected**.
 
 ## 0. Read this first
 
-### 0.1 Permission and provenance
+### 0.1 Upstream source
 
 The upstream work is **yoba / `hacan359`**, in
 [hacan359/Open-PS2-Loader#1](https://github.com/hacan359/Open-PS2-Loader/pull/1) (branch `ra`).
-Permission to adopt was granted by the author directly over Discord on **2026-08-27**. He also
-supplies and maintains the **PC client**.
-
-> **Do not write a PC client.** Not a prototype, not a "minimal test harness", not a Python stub.
-> Ask the author for the current client and the protocol spec. If you need something to test
-> against before he delivers, say so and stop — do not invent a second implementation of a protocol
-> somebody else owns.
+Use the upstream **[xeRAbora PC client](https://github.com/hacan359/xerabora)** and its published
+protocol as the compatibility baseline.
 
 The upstream code is AFL-3.0, same licence as OPL. Two files are vendored under their own terms and
 must keep their original formatting via `.clang-format-ignore`:

@@ -9,9 +9,8 @@ running it streams the handful of memory addresses that game's achievements depe
 else — talking to the RetroAchievements servers, deciding what unlocked, your login — happens on the
 PC.
 
-Upstream design and implementation are by **hacan359 (yoba)**, adopted here with his permission
-(2026-08-27). He also supplies and maintains the PC client; RiptOPL does not ship one and will not
-grow one.
+Based on the RetroAchievements implementation by **[hacan359 (yoba)](https://github.com/hacan359/Open-PS2-Loader/pull/1)**.
+Use the upstream **[xeRAbora PC client](https://github.com/hacan359/xerabora)** with RiptOPL's RA build.
 
 ---
 
