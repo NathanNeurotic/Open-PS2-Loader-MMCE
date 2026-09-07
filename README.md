@@ -787,6 +787,9 @@ work it is built on:
 
 ### Real-hardware testing (this fork)
 
+- **Aerosol** — isolated a UDPFS connection setup issue and confirmed that CRLF config output
+  could leave a carriage return in a VMC filename; converting the config to LF restored VMC loading.
+
 Enormous thanks to the testers who run rolling builds on real consoles and file the
 reports that shape the fixes — **eliminator1403, lucaslmgv, AndrewBento, AcidReach, bodvenomz,
 nuno6573, zackcage6 and Blade1984**.

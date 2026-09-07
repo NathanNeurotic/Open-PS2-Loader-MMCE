@@ -88,7 +88,7 @@ int isWS(char c)
 // wrong -- app title.cfg uses bare lowercase `title`/`boot`/`argv1` (appsupport.h), exactly like wOPL,
 // and conf_apps.cfg uses the user's own app title as the key. Instead, note that the two WRITERS are
 // fully characterised and cannot overlap:
-//   ours (configWrite below): "%s=%s\r\n"  -- NEVER a space before '=', NEVER a trailing ';'
+//   ours (configWrite below): "%s=%s\n"  -- NEVER a space before '=', NEVER a trailing ';'
 //   theirs (libconfig):       "key = val;" -- ALWAYS " = ", ALWAYS a trailing ';'
 // Requiring BOTH, plus a legal libconfig identifier, makes misclassification impossible for anything
 // either writer can emit.
@@ -1341,14 +1341,15 @@ int configWrite(config_set_t *configSet)
             // FORMAT INHERITANCE: emit whatever syntax this file arrived in. A file that was libconfig
             // when we read it is written back as libconfig; a legacy file stays legacy. We never
             // convert a user's file in either direction -- that is the whole point. Before this, a
-            // libconfig file hit the "%s=%s\r\n" loop below and was DESTROYED on the first save.
+            // libconfig file hit the legacy key=value loop below and was DESTROYED on the first save.
             if (configSet->format == CFG_FMT_LIBCONFIG) {
                 cfgWriteLibconfig(fileBuffer, configSet);
             } else {
                 struct config_value_t *cur = configSet->head;
                 while (cur) {
                     if ((cur->key[0] != '\0') && (cur->key[0] != '#')) {
-                        snprintf(line, sizeof(line), "%s=%s\r\n", cur->key, cur->val); // add windows CR+LF (0x0D 0x0A)
+                        // Shared configs also have readers that split on LF without stripping CR.
+                        snprintf(line, sizeof(line), "%s=%s\n", cur->key, cur->val);
                         writeFileBuffer(fileBuffer, line, strlen(line));
                     }
 
