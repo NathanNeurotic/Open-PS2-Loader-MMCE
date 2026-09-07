@@ -61,16 +61,30 @@ Telemetry lives inside OPL's own loader core, which only exists for launches OPL
 | Launch path | Supported |
 | --- | --- |
 | BDM — USB, iLink, MX4SIO, ATA/exFAT | yes |
-| ETH / SMB | yes |
+| ETH / SMB | wired, but **known bad upstream** — see below |
 | HDD (APA) | yes — but see the note below |
 | MMCE | yes |
-| HTTP | local watch-list loading is wired into OPL-core launch; combined HTTP/RA operation is not hardware-validated |
+| HTTP | local watch-list loading is wired into OPL-core launch; combined HTTP/RA operation is not hardware-validated, and it shares the ETH/SMB risk below |
 | Neutrino core (`$CoreLoader`) | **no** |
 | UDPFS | **no** |
 | PS1 / VCD (POPSTARTER, Ember) | **no** |
 
 Neutrino, UDPFS and PS1 hand the console over to an external ELF and never load OPL's core, so there is
 nothing to take a snapshot from. This is structural, not an oversight.
+
+### Do not expect a game with achievements to run from a network share
+
+A game that streams its own disc over the NIC is competing with telemetry for that NIC. This build no
+longer *reads* from the network in play on such a launch — `raudp` stops walking the SMAP receive ring
+and stops polling the stack, because the game's disc stream arrives through both — but **hacan359
+reports on hardware (2026-09-05) that this is not enough: a game with an achievement set still stops
+loading about a minute in from a share, so the send path disturbs the stream on its own.** xeRAbora's
+own documentation says the same, and names the USB stick and the original disc as the only tested ways
+to play.
+
+That defect is upstream's and ours alike; we have not reproduced or ruled it out on our own hardware,
+because none of this has been hardware-tested here yet. Until it is, **keep the images you play with
+achievements on a local device.** The same reasoning applies to HTTP, which streams down the same path.
 
 HDD (APA) games are stored in HDLoader format and have no image file to hash, so while a watch list
 placed by hand still loads and streams, the console cannot work out the hash for them itself.

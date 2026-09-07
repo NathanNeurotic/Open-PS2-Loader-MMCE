@@ -231,10 +231,11 @@ static void ResetIopSpecial(const char *args, unsigned int arglen)
 
         if (snap != NULL) {
             /* argv[1]: the IOP snapshot, EE event and EE badge buffer
-               addresses, eight hex digits each, comma-separated.
+               addresses, eight hex digits each; then whether raudp may read
+               from the network in play, then the game's serial.
                argv[2]: SMAP's ipconfig strings -- raudp finds the PC itself. */
-            char args[27 + IPCONFIG_MAX_LEN];
-            int k;
+            char args[45 + IPCONFIG_MAX_LEN];
+            int k, n;
 
             ra_snap_iop = (unsigned int)snap;
             RA_Hex32(ra_snap_iop, &args[0]);
@@ -242,12 +243,30 @@ static void ResetIopSpecial(const char *args, unsigned int arglen)
             RA_Hex32((unsigned int)RA_OverlayEventBuffer(), &args[9]);
             args[17] = ',';
             RA_Hex32((unsigned int)RA_OverlayBadgeBuffer(), &args[18]);
-            args[26] = '\0';
+
+            /* Both roads raudp takes to the PC cost the game something when it
+               streams its own disc over this NIC: the raw one frees the SMAP
+               receive descriptors that stream arrives in, the lwIP one queues
+               on the mailbox the SMB or HTTP client waits on. A game from a
+               share loads for ever with either, so tell raudp to stop looking.
+               Sending is unaffected and stays on. HTTP_MODE is ours -- upstream
+               has no HTTP protocol -- but it streams down the same path and
+               carries the same defect. */
+            args[26] = ',';
+            args[27] = (config->GameMode == ETH_MODE || config->GameMode == HTTP_MODE) ? '0' : '1';
+
+            /* The serial seeds the packet header, so the PC has it before the
+               first snapshot is written. */
+            args[28] = ',';
+            for (n = 0; n < 15 && config->GameID[n] != '\0'; n++)
+                args[29 + n] = config->GameID[n];
+            args[29 + n] = '\0';
+            n += 30;
 
             for (k = 0; k < g_ipconfig_len && k < IPCONFIG_MAX_LEN; k++)
-                args[27 + k] = g_ipconfig[k];
+                args[n + k] = g_ipconfig[k];
 
-            LoadOPLModule(OPL_MODULE_ID_RAUDP, 0, 27 + k, args);
+            LoadOPLModule(OPL_MODULE_ID_RAUDP, 0, n + k, args);
         } else {
             /* No buffer, so nothing can be sent. Leaving ra_snap_iop at zero
                makes ra.c's per-frame path a no-op, and there is no reason to
