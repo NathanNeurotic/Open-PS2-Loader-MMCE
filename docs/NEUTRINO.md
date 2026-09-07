@@ -12,7 +12,7 @@ boot better under Neutrino, or for users who prefer Neutrino's loader and its la
 PS2 Device Emulator"*. Home: <https://github.com/rickgaiser/neutrino>.
 
 It is an independent project, **not** part of RiptOPL and not our work. The RiptOPL release package
-bundles the official latest build, re-fetched from upstream at publish time, under Neutrino's
+normally bundles the official latest build, re-fetched from upstream at publish time (a failed download/extraction can omit it; check the release notes), under Neutrino's
 **AFL-3.0** licence. We add exactly one file to that folder — `config/bsd-udpfsbd.toml`, because
 Neutrino ships `udpfs_bd.irx` without a matching `-bsd` token and RiptOPL launches UDPFS as
 `-bsd=udpfsbd`. Nothing of rickgaiser's is altered or removed.
@@ -178,10 +178,10 @@ For the full list of flags Neutrino accepts, see the
 
 RiptOPL streams games from a PC over the LAN, chosen with the **Game Sources → Network Start
 Mode** row (**Off** / Manual / Auto) plus the **Network → Protocol** selector — **SMB / UDPFS /
-UDPBD**. **UDPFS** is the modern
+UDPBD / HTTP**. HTTP uses OPL’s core and has its own [guide](HTTP.md). **UDPFS** is the modern
 network-boot protocol (Rick Gaiser's **UDPRDMA** transport); **UDPBD** is the older SUDPBDv2 protocol,
 kept for users still running the `udpbd-server`. Both appear in OPL as their own games list — with
-covers and per-game settings — and boot via the external Neutrino core. **SMB** is the exception: it's
+covers and per-game settings — and boot via the external Neutrino core. **SMB** uses
 a mounted SMB file share served by OPL's **own** core (no Neutrino), and it keeps its own address /
 port / share / credentials fields plus an **SMB Version** row (**SMBv1** default, or **SMB2**).
 Changing the version only takes effect on the next boot — OPL shows the usual restart notice when a
@@ -190,10 +190,11 @@ reading, so an SMBv1-only server (including the bundled PS2-Servers tool) will l
 
 | Choice | Wire protocol | On the PS2 | Core | PC server |
 |---|---|---|---|---|
-| **Off** | — | no network device (default) | — | — |
+| **Network Start Mode: Off** | — | no network device (default) | — | — |
 | **SMB** | SMBv1 (default) or SMB2 — **Network → SMB Version** | a mounted file share | OPL's *own* core (not Neutrino) | [PS2 Servers](https://github.com/NathanNeurotic/PS2-Servers) (recommended) / Samba |
 | **UDPFS** | UDPRDMA | a games source served over UDP (see **UDPFS Access** below) | Neutrino only | [PS2 Servers](https://github.com/NathanNeurotic/PS2-Servers) (recommended, PC) / [udpfs-server](https://github.com/YouKnow-sys/udpfs-server) (Android) / [`udpfsd`](https://github.com/pcm720/udpfsd) |
 | **UDPBD** | SUDPBDv2 | a served disk image mounted as `massN:` | Neutrino only | [PS2 Servers](https://github.com/NathanNeurotic/PS2-Servers) (recommended) / [`udpbd-server`](https://github.com/israpps/udpbd-server) |
+| **HTTP** | HTTP byte ranges | a `games.csv` catalog and ISO streams | OPL's own core | [Docmine17's server](https://github.com/Docmine17/Open-PS2-Loader-HTTP) or a server meeting the [HTTP profile](HTTP.md) |
 
 > **SMB3 is reserved, not offered.** The dialect enum has a slot for it, but packet signing isn't
 > implemented, so the picker deliberately stops at SMB2. The bundled PS2-Servers SMB server speaks
