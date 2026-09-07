@@ -34,6 +34,7 @@
     <a href="smb.html"><span class="em">🌐</span>SMB (network share)</a>
     <a href="hdd.html"><span class="em">💽</span>Internal HDD (APA &amp; exFAT)</a>
     <a href="network-boot.html"><span class="em">📡</span>Network Boot (UDPBD/UDPFS)</a>
+    <a href="http.html"><span class="em">🌐</span>HTTP</a>
     <h4>Features</h4>
     <a href="ps1-vcd.html"><span class="em">💿</span>PS1 Games</a>
     <a href="neutrino.html"><span class="em">⚛️</span>Neutrino Core</a>
@@ -42,6 +43,7 @@
     <a href="per-game-settings.html"><span class="em">🎚️</span>Per-game Settings</a>
     <a href="vmc.html"><span class="em">💾</span>VMC</a>
     <a href="cheats.html"><span class="em">🎮</span>Cheats</a>
+    <a href="retroachievements.html"><span class="em">🏆</span>RetroAchievements</a>
     <h4>Theme Engine</h4>
     <a href="themes.html"><span class="em">🎨</span>Theme Engine</a>
     <h4>Reference</h4>
@@ -59,16 +61,16 @@
 <p class="lead">Step-by-step fixes for the most common RiptOPL problems — boot hangs, blank screens, video mode locks, white-screen game failures, BDMA driver errors, and PS1/VCD list issues.</p>
 
 <div class="callout info"><div class="h">i Still stuck after reading this page?</div>
-Report game-specific compatibility problems at the
-<a href="https://www.psx-place.com/threads/open-ps2-loader-game-bug-reports.19401/">OPL game bug report thread</a>
-on PSX-Place. For PS1 internals (IGR, cheats, multi-disc, config table), see the sister
+Report RiptOPL regressions in <a href="https://github.com/NathanNeurotic/Open-PS2-Loader/issues">our issue tracker</a>.
+Include version/SHA, SDK flavour, console model, game ID, source/protocol, core, steps, settings and any
+known-good build comparison. The <a href="https://www.psx-place.com/threads/open-ps2-loader-game-bug-reports.19401/">upstream OPL forum</a> remains a community resource. For PS1 internals (IGR, cheats, multi-disc, config table), see the sister
 <a href="https://nathanneurotic.github.io/POPSLoader/">POPStarter docs</a>.
 </div>
 
 <h2 id="freeze-logo">OPL freezes on the logo or grey screen</h2>
 
 <p><b>Symptom:</b> RiptOPL hangs at the animated logo or a grey screen on every boot — the game list never appears.</p>
-<p><b>Likely cause:</b> A corrupted or incompatible config file (from an older build, a partial write, or a settings collision) is being loaded during initialization.</p>
+<p><b>First isolation check:</b> Try skipping saved configuration. A bad config is one possible cause; a startup screen alone does not identify the failing subsystem.</p>
 
 <div class="steps">
   <div class="step">
@@ -81,57 +83,40 @@ on PSX-Place. For PS1 internals (IGR, cheats, multi-disc, config table), see the
   </div>
   <div class="step">
     <h3>Verify the fix</h3>
-    <p>Reboot OPL normally (without holding any buttons). If it reaches the game list or settings screen without freezing, the bad config has been replaced. If it still freezes, the file may need to be deleted manually from your memory card's <code>OPL/</code> folder via uLaunchELF or a similar file manager.</p>
+    <p>Reboot OPL normally (without holding any buttons). If it reaches the game list or settings screen without freezing, the bad config has been replaced. If it still freezes, record the exact build and active settings location and report the result; do not assume the file lives on the memory card.</p>
   </div>
 </div>
 
 <details class="deep"><summary>Why does RiptOPL have its own config file?</summary>
-<p>RiptOPL saves its master config as <code>settings_riptopl.cfg</code> (auto-migrated from the older <code>conf_riptopl.cfg</code>). This is intentionally separate from stock OPL's <code>conf_opl.cfg</code> so both builds can coexist on the same memory card without clobbering each other's settings. Everything else — artwork, themes, VMCs, per-game configs, and favorites — lives in the shared <code>OPL/</code> folder and is readable by all OPL-family builds.</p>
+<p>RiptOPL's master settings use <code>settings_riptopl.cfg</code> (with migration from
+<code>conf_riptopl.cfg</code>). That filename is separate from stock OPL's master config, but
+<code>conf_network.cfg</code>, app lists, per-game configuration and support files can still be shared.
+Favorites import from uOPL/wOPL is <b>one-way</b>: the next write saves RiptOPL's own <code>OFAV</code>
+format to <code>favourites.bin</code>, which those loaders cannot read back. Keep an original copy if
+you use them too. The settings home follows boot-directory discovery or <b>Custom Settings Path</b>;
+do not assume it is always <code>mc0:/OPL/</code>.</p>
 </details>
 
 <h2 id="white-screen">Game stops on a white screen</h2>
-
-<p><b>Symptom:</b> A game starts to load but freezes on a white (or black) screen and never reaches the title screen or menu.</p>
-<p><b>Likely cause:</b> The game image is fragmented across the storage device, so OPL cannot read it in one continuous pass. A corrupt or incomplete dump produces the same symptom.</p>
-
-<div class="steps">
-  <div class="step">
-    <h3>Check image integrity</h3>
-    <p>If you have a known-good checksum (MD5/SHA) for the dump, verify the file against it. An incomplete copy or a rip error produces a file of the right size that fails at load time.</p>
-  </div>
-  <div class="step">
-    <h3>Defragment by re-copying</h3>
-    <p>Copy <b>all</b> game files off the device to a PC. Reformat the device (FAT32 or exFAT, as appropriate). Copy the files back one at a time, in order, so each game lands contiguous on disk. OPL supports up to 64 fragments per file (since v1.2.0 beta), but a fully contiguous copy is the most reliable state.</p>
-  </div>
-  <div class="step">
-    <h3>Relaunch and verify</h3>
-    <p>Boot the same title again. If it passes the white screen and reaches the game's intro or menu, fragmentation was the cause. If it still fails after a clean recopy, the dump itself is likely corrupt — source a fresh rip.</p>
-  </div>
-</div>
-
-<div class="callout info"><div class="h">i Defrag programs are not recommended</div>
-Do not use a third-party defragmenter on your game drive. They may rearrange clusters in ways OPL does not expect and can introduce new fragmentation patterns. The only reliable method is the copy-off / format / copy-back procedure described above.
-</div>
+<p>A white or black launch screen alone does not diagnose fragmentation or a corrupt dump. Record
+the build/SDK, console, game ID, source and core before changing anything.</p>
+<ol><li>Check the image against a known-good dump and verify that the copy completed.</li>
+<li>Try the title with game overrides disabled, checking inherited global defaults as well.</li>
+<li>If the loader reports a fragment-limit error, try a fresh sequential copy with sufficient free
+space. OPL's BDM table is shared across game image parts; Neutrino counts ISO and VMC fragments
+together against its 64-entry block-device budget.</li>
+<li>Compare a known-good build on the same setup and report where the launch stops.</li></ol>
+<p>Back up all data before considering a reformat. Do not reformat solely because of a screen colour.
+A successful retry after several changes does not establish which change fixed it.</p>
 
 <h2 id="no-display">No display on boot (blank or black screen)</h2>
-
-<p><b>Symptom:</b> The PS2 is running but the TV shows nothing — no OPL interface appears at all.</p>
-<p><b>Likely cause:</b> A video mode (or GSM override) was saved that your display does not support. This is the most common trigger after experimenting with GSM video-mode or scaling settings.</p>
-
-<div class="steps">
-  <div class="step">
-    <h3>Hold Triangle + Cross at boot</h3>
-    <p>Power on your PS2 and immediately hold <kbd>Triangle</kbd> + <kbd>Cross</kbd> while OPL initializes. Keep both buttons held until the interface appears (or until you have waited a few seconds). This forces the video mode to <b>480p progressive</b> — a mode virtually every display syncs — without touching any other settings. (Older builds reset to <b>Auto</b>, which resolves to interlaced 480i/576i: exactly what some modern displays and upscalers can't lock onto.)</p>
-  </div>
-  <div class="step">
-    <h3>Verify the display returns</h3>
-    <p>Start OPL normally (without holding buttons). If the interface is now visible, you're running in the safe 480p recovery mode. Open <b>Settings → Video</b> and pick your preferred mode (or <b>Auto</b>).</p>
-  </div>
-</div>
-
-<div class="callout info"><div class="h">i Same fix for GSM video mode mistakes</div>
-If you saved an incompatible GSM (Graphics Synthesizer Mode) override and your screen went dark, the same recovery applies: hold <kbd>Triangle</kbd> + <kbd>Cross</kbd> while OPL boots to force safe <b>480p</b> for OPL's own UI. (Per-game GSM overrides only apply at game launch — they never affect the OPL menu itself.)
-</div>
+<p>Hold <kbd>Triangle</kbd> + <kbd>Cross</kbd> while RiptOPL initializes to force <b>480p for the menu</b>.
+The display and connection must accept that signal. Once visible, select a suitable mode under
+<b>Interface</b>, save, and retry. Holding <kbd>START</kbd> skips saved configuration and uses defaults.</p>
+<h3 id="game-video">Menu works, but launching a game loses the picture</h3>
+<p>The menu recovery combo does not clear per-game GSM settings. Open the affected game's settings
+and disable/change its GSM override, or its Neutrino video options for that core. Check global video
+defaults too. Retry with the game's normal output before adding overrides again.</p>
 
 <h2 id="vcd-list-empty">PS1/VCD — "my VCDs don't show up" (works elsewhere)</h2>
 
@@ -267,13 +252,9 @@ pinned or disabled by PS2/PS1 Game Display.
     <tr>
       <td>Blank / black screen (unsupported video mode)</td>
       <td><code>Triangle + Cross</code></td>
-      <td>Forces the safe 480p video mode</td>
+      <td>Forces 480p for the menu only; requires a compatible display/connection</td>
     </tr>
-    <tr>
-      <td>GSM override locked display</td>
-      <td><code>Triangle + Cross</code></td>
-      <td>Forces the safe 480p video mode</td>
-    </tr>
+    <tr><td>Menu works; game video fails</td><td>No boot combo clears game overrides</td><td>Disable/change GSM or Neutrino video settings and check global defaults</td></tr>
   </tbody>
 </table>
 
@@ -295,8 +276,8 @@ pinned or disabled by PS2/PS1 Game Display.
   <a href="https://github.com/ps2homebrew">ps2homebrew</a> team and the wider OPL family — see
   <a href="credits.html">Credits &amp; Sources</a>. For the canonical project, see
   <a href="https://github.com/ps2homebrew/Open-PS2-Loader">ps2homebrew/Open-PS2-Loader</a>.</p>
-  <p class="prov-inline">RiptOPL is a downstream fork, not the canonical project. PS1 emulation is Sony's POPS,
-  which is <b>not</b> distributed here. PS1/POPSTARTER deep reference: the sister
+  <p class="prov-inline">RiptOPL is a downstream fork, not the canonical project. POPSTARTER uses Sony's POPS; Ember is a separate emulator. Sony's POPS is
+  <b>not</b> distributed here. PS1/POPSTARTER deep reference: the sister
   <a href="https://nathanneurotic.github.io/POPSLoader/">POPStarter docs</a>.</p>
 </footer>
 <script src="assets/app.js"></script>

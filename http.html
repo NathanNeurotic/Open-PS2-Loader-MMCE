@@ -1,0 +1,328 @@
+<!doctype html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HTTP · RiptOPL Docs</title>
+<meta name="description" content="RiptOPL HTTP: setup, limitations and validation status.">
+<link rel="icon" type="image/png" href="assets/favicon.png">
+<meta property="og:site_name" content="RiptOPL Docs">
+<meta property="og:type" content="website">
+<meta property="og:image" content="https://nathanneurotic.github.io/Open-PS2-Loader/assets/riptopl.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://nathanneurotic.github.io/Open-PS2-Loader/assets/riptopl.png">
+<link rel="stylesheet" href="assets/style.css">
+</head><body data-base="">
+<header class="topbar">
+  <button class="menu-btn" aria-label="Menu">☰</button>
+  <a class="brand" href="index.html">
+    <span class="psbtns"><i class="tri">&#9651;</i><i class="cir">&#9711;</i><i class="cro">&#10005;</i><i class="squ">&#9633;</i></span>
+    RiptOPL <small>DOCS</small></a>
+  <div class="search">
+    <span class="ico">🔎</span>
+    <input id="q" type="search" placeholder="Search devices, themes, Neutrino, settings…  ( / )" autocomplete="off">
+    <kbd>/</kbd>
+    <div id="results"></div>
+  </div>
+</header>
+<div class="layout">
+  <nav class="sidebar">
+    <a href="index.html"><span class="em">🏠</span>Home</a>
+    <h4>Start</h4>
+    <a href="getting-started.html"><span class="em">🚀</span>Getting Started</a>
+    <a href="install.html"><span class="em">📥</span>Install &amp; First Boot</a>
+    <h4>Game sources</h4>
+    <a href="usb.html"><span class="em">🔌</span>USB / MX4SIO / iLink</a>
+    <a href="mmce.html"><span class="em">🧩</span>MMCE</a>
+    <a href="smb.html"><span class="em">🌐</span>SMB (network share)</a>
+    <a href="hdd.html"><span class="em">💽</span>Internal HDD (APA &amp; exFAT)</a>
+    <a href="network-boot.html"><span class="em">📡</span>Network Boot (UDPBD/UDPFS)</a>
+    <a href="http.html" class="active"><span class="em">🌐</span>HTTP</a>
+    <h4>Features</h4>
+    <a href="ps1-vcd.html"><span class="em">💿</span>PS1 Games</a>
+    <a href="neutrino.html"><span class="em">⚛️</span>Neutrino Core</a>
+    <a href="coverflow.html"><span class="em">🎴</span>Coverflow</a>
+    <a href="favourites.html"><span class="em">⭐</span>Favorites</a>
+    <a href="per-game-settings.html"><span class="em">🎚️</span>Per-game Settings</a>
+    <a href="vmc.html"><span class="em">💾</span>VMC</a>
+    <a href="cheats.html"><span class="em">🎮</span>Cheats</a>
+    <a href="retroachievements.html"><span class="em">🏆</span>RetroAchievements</a>
+    <h4>Theme Engine</h4>
+    <a href="themes.html"><span class="em">🎨</span>Theme Engine</a>
+    <h4>Reference</h4>
+    <a href="settings.html"><span class="em">🔧</span>Settings Reference</a>
+    <a href="nbd.html"><span class="em">🖧</span>NBD Server</a>
+    <a href="zso.html"><span class="em">🗜️</span>ZSO Format</a>
+    <a href="ps3-bc.html"><span class="em">🎯</span>PS3 BC</a>
+    <a href="releases.html"><span class="em">📦</span>Releases</a>
+    <a href="troubleshooting.html"><span class="em">🛠️</span>Troubleshooting</a>
+    <a href="credits.html"><span class="em">🙏</span>Credits &amp; Sources</a>
+    <a href="https://nathanneurotic.github.io/POPSLoader/"><span class="em">📚</span>POPStarter docs ↗</a>
+  </nav>
+  <main class="content">
+<h1 id="http">HTTP</h1>
+<p>RiptOPL can read a game library straight off an ordinary HTTP server: a small <code>games.csv</code> catalog
+says what exists, and the console streams the ISO itself with plain HTTP byte ranges as the game
+asks for sectors. The server must satisfy the client profile: no transfer encoding, no content
+encoding other than identity, no multipart responses, exact <code>Content-Range</code> and <code>Content-Length</code>
+for range reads, and complete response bodies. Check it with the
+<a href="https://github.com/NathanNeurotic/Open-PS2-Loader/blob/rebuild/main/pc/http/README.md">conformance tool</a>.</p>
+<p>Use HTTP only on a trusted, isolated local network. It provides no encryption or server/content
+authentication; range and length validation detect malformed responses, not substituted game data.</p>
+<p>The design, the byte-range reader RiptOPL follows, and the PC server are
+<strong><a href="https://github.com/Docmine17">Docmine17</a></strong>'s
+(<a href="https://github.com/Docmine17/Open-PS2-Loader-HTTP">Open-PS2-Loader-HTTP</a>).</p>
+<p><strong>His unmodified server is the compatibility baseline.</strong> If you already run it, RiptOPL points at
+it as-is: same port, same <code>games.csv</code>, same folder layout. No new API, no catalog conversion, no
+regeneration step, nothing to upgrade.</p>
+<hr/>
+<h2 id="status">Status</h2>
+<p><strong>Implemented and host-tested, not yet verified on PlayStation 2 hardware.</strong> Every part below
+exists in the build, but none of it has run on a PlayStation 2. Treat HTTP as a development feature
+until that changes.</p>
+<table>
+<thead>
+<tr>
+<th>Part</th>
+<th>State</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Catalog fetch and parse</td>
+<td>done, and cross-checked against a reference parser</td>
+</tr>
+<tr>
+<td>Byte-range validation</td>
+<td>done, and covered by host tests</td>
+</tr>
+<tr>
+<td>Network settings, Test action</td>
+<td>written, <strong>not hardware-tested</strong></td>
+</tr>
+<tr>
+<td>Game list, artwork, per-game settings</td>
+<td>written, <strong>not hardware-tested</strong></td>
+</tr>
+<tr>
+<td>Launching a game</td>
+<td>written, <strong>not hardware-tested</strong> — this is the least proven part</td>
+</tr>
+<tr>
+<td>DVD9 (dual layer)</td>
+<td>probe implemented, <strong>never seen a real dual-layer read</strong></td>
+</tr>
+<tr>
+<td>Virtual memory cards</td>
+<td>deliberately unavailable</td>
+</tr>
+<tr>
+<td>Neutrino, PS1/VCD, Ember</td>
+<td>deliberately unavailable</td>
+</tr>
+<tr>
+<td>ZSO / compressed images</td>
+<td>listed, refused by name</td>
+</tr>
+</tbody>
+</table>
+<hr/>
+<h2 id="setting-it-up">Setting it up</h2>
+<p>On the PC, run an HTTP server meeting the profile above, with your ISOs under its document root,
+and put a <code>games.csv</code> beside them. Docmine17's <code>http_server.py</code> does exactly this and defaults to
+port <strong>1100</strong>.</p>
+<p>On the console, enable <strong>Network Start Mode → Manual</strong> or <strong>Auto</strong> in <strong>Game Sources</strong>, then open <strong>Settings → Network</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Row</th>
+<th>What it is</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Protocol</td>
+<td>choose <strong>HTTP</strong></td>
+</tr>
+<tr>
+<td>HTTP server</td>
+<td>the PC's IPv4 address</td>
+</tr>
+<tr>
+<td>HTTP port</td>
+<td><strong>1100</strong> by default; anything valid works, 80 and 8080 included</td>
+</tr>
+<tr>
+<td>HTTP base path</td>
+<td><code>/</code> unless your catalog and images live in a subfolder</td>
+</tr>
+<tr>
+<td>Test HTTP server</td>
+<td>fetches the catalog, parses it, and reads one real byte range</td>
+</tr>
+</tbody>
+</table>
+<p>Use <strong>Test</strong> before saving. It tells you which part failed — unreachable, catalog missing, catalog
+unreadable, or the server not returning the exact bytes asked for — rather than one generic error.</p>
+<p>An empty catalog is a valid answer, and Test says so plainly: it proves the server is there, and
+proves nothing at all about whether byte ranges work.</p>
+<p>The first protocol selected while the adapter is unused can start immediately. Switching away from an already loaded protocol requires restarting RiptOPL; the UI reports that requirement. Only one protocol can own the adapter in a session.</p>
+<hr/>
+<h2 id="the-catalog">The catalog</h2>
+<p><code>games.csv</code> at the root of your base path, one game per line:</p>
+<pre><code class="language-csv">SLUS_123.45,Example Game,DVD,DVD/Example Game.iso
+SLUS_200.01,"Example, The",DVD,DVD/example-the.iso
+SLES_512.34,Short One,CD,CD/Short One.iso
+</code></pre>
+<p><code>STARTUP,TITLE,MEDIA,PATH</code> — the boot identifier, the name shown on screen, <code>CD</code> or <code>DVD</code>, and the
+path to the image relative to your base path. The title and the filename need not resemble each
+other.</p>
+<p><strong>Older catalogs keep working untouched.</strong> These are all still accepted:</p>
+<pre><code class="language-csv"># Filename derived from the title; media defaults to DVD
+SLUS_123.45,Example Game
+# Explicit media
+SLUS_200.02,Another Game,CD
+# Extension already on the title, not doubled
+SLUS_300.03,Already Has Ext.iso,CD
+# Startup only; it doubles as title and filename
+SLUS_400.04
+</code></pre>
+<p>Blank lines and lines starting with <code>#</code> are ignored. Both LF and CRLF work, and a missing final
+newline is fine. A field containing a comma or a quote can be double-quoted, <code>""</code> being a literal
+quote.</p>
+<p>A row RiptOPL cannot use is skipped and the rest of the library still loads — one typo does not
+cost you every game. What gets a row skipped: no startup ID, a startup longer than 12 characters, a
+media field that is not exactly <code>CD</code> or <code>DVD</code>, a path that escapes your base directory, an absolute
+URL, or a filename that is not an image.</p>
+<p>If a row names a path explicitly, that path is what gets requested. It is never quietly retried
+under a name derived from the title — that is how you end up launching a different disc than the
+one you picked.</p>
+<hr/>
+<h2 id="what-works-and-what-does-not">What works, and what does not</h2>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Over HTTP</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>PS2 ISO, CD and DVD5</td>
+<td>the supported target</td>
+</tr>
+<tr>
+<td>DVD9</td>
+<td>implemented, unproven — see Status</td>
+</tr>
+<tr>
+<td>Per-game settings, artwork, cheats</td>
+<td>yes, stored locally (see below)</td>
+</tr>
+<tr>
+<td>Favourites, last played</td>
+<td>yes</td>
+</tr>
+<tr>
+<td>Saving to a physical memory card</td>
+<td>yes</td>
+</tr>
+<tr>
+<td>Virtual memory cards</td>
+<td><strong>no</strong> — nothing writes to the server, so there is nowhere to keep one</td>
+</tr>
+<tr>
+<td>Neutrino core</td>
+<td><strong>no</strong> — it would need its own HTTP backend</td>
+</tr>
+<tr>
+<td>PS1 / VCD / Ember</td>
+<td><strong>no</strong></td>
+</tr>
+<tr>
+<td>ZSO and other compressed images</td>
+<td><strong>no</strong> — they are listed but refuse to launch</td>
+</tr>
+<tr>
+<td>HTTPS, passwords, redirects</td>
+<td><strong>no</strong> — this is plain LAN HTTP</td>
+</tr>
+</tbody>
+</table>
+<p>The PS2 logo animation is skipped on HTTP launches. Checking it means reading the logo out of the
+image through a file handle, and HTTP has no filesystem to open one on.</p>
+<h3 id="where-per-game-data-lives">Where per-game data lives</h3>
+<p>Folder-based sources keep <code>CFG/</code>, <code>ART/</code> and <code>CHT/</code> under the configured library prefix; APA uses its selected PFS data home.
+HTTP cannot: the server is read-only and there is no drive to write to. So HTTP keeps them <strong>with
+your settings</strong> instead — under RiptOPL’s active local settings home (boot-directory/discovery or Custom Settings Path).</p>
+<p>That is the one deliberate exception to the usual rule, and it is why covers and per-game options
+for HTTP games go next to <code>settings_riptopl.cfg</code> rather than on the server.</p>
+<hr/>
+<h2 id="when-something-goes-wrong">When something goes wrong</h2>
+<p>RiptOPL refuses rather than guesses. A read is only accepted when the server returns exactly the
+bytes that were asked for: the right status, the right byte interval, and the right length. A
+server that ignores the range, answers a different interval, or stops early gets a disc read error
+instead of quietly feeding the game whatever arrived.</p>
+<table>
+<thead>
+<tr>
+<th>What you see</th>
+<th>What it means</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Cannot reach the HTTP server</td>
+<td>wrong address or port, or the server is not running</td>
+</tr>
+<tr>
+<td>games.csv is missing, unreadable or too large</td>
+<td>the catalog did not arrive intact</td>
+</tr>
+<tr>
+<td>The server did not return the exact bytes</td>
+<td>the server does not support byte ranges properly</td>
+</tr>
+<tr>
+<td>Compressed images are not supported</td>
+<td>the row points at a <code>.zso</code></td>
+</tr>
+</tbody>
+</table>
+<p>If the server disappears mid-game, the console retries the same read once on a fresh connection and
+then reports a disc error. It will not sit there reconnecting forever.</p>
+<hr/>
+<h2 id="notes-for-anyone-changing-this-code">Notes for anyone changing this code</h2>
+<ul>
+<li><strong><code>src/httpcatalog.c</code> and <code>pc/http/catalog_reference.py</code> are one contract.</strong> The fixtures in
+  <code>pc/http/fixtures/</code> hold them to it and <code>pc/http/tests/compare_catalog.py</code> proves it. Change one,
+  change all three, in the same commit.</li>
+<li><strong>Run the host tests.</strong> <code>sh pc/http/tests/run.sh</code> compiles the real sources and exercises the
+  parsers directly — header framing, range validation, truncation, and every catalog fixture in
+  three line-ending forms.</li>
+<li><strong><code>modules/network/common/httpstream.inc</code> is shared</strong> by the menu RPC module and the in-game
+  cdvdman driver. Both IRX rules depend on it in the top-level Makefile, because make cannot see
+  inside a sub-make and a stale IRX otherwise builds clean locally and fails CI.</li>
+<li><strong>The two lwIP stacks are not interchangeable.</strong> <code>MSG_DONTWAIT</code> is <code>0x08</code> on the menu path and
+  <code>0x40</code> in SMSTCPIP, and SMSTCPIP exports no <code>select</code>, so the in-game reader polls against a
+  deadline instead.</li>
+<li><code>docs/HTTP-INTEGRATION-PLAN.md</code> carries the phase ledger, the evidence table and the console test
+  matrix. Read it before picking this up.</li>
+</ul>
+<hr/>
+<h2 id="credits">Credits</h2>
+<ul>
+<li><strong><a href="https://github.com/Docmine17">Docmine17</a></strong> — the HTTP design, the byte-range reader this port
+  follows, and the PC server.</li>
+</ul>
+</main>
+  <aside class="toc"><div class="toc-h">On this page</div><nav id="toc-nav"></nav></aside>
+</div>
+<footer>
+  <p><b>RiptOPL Documentation</b> — for the opinionated Open PS2 Loader fork. Built on, and grateful to, the
+  <a href="https://github.com/ps2homebrew">ps2homebrew</a> team and the wider OPL family — see
+  <a href="credits.html">Credits &amp; Sources</a>. For the canonical project, see
+  <a href="https://github.com/ps2homebrew/Open-PS2-Loader">ps2homebrew/Open-PS2-Loader</a>.</p>
+  <p class="prov-inline">RiptOPL is a downstream fork, not the canonical project. POPSTARTER uses Sony's POPS; Ember is a separate emulator. Sony's POPS is
+  <b>not</b> distributed here. PS1/POPSTARTER deep reference: the sister
+  <a href="https://nathanneurotic.github.io/POPSLoader/">POPStarter docs</a>.</p>
+</footer>
+<script src="assets/app.js"></script>
+</body></html>

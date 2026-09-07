@@ -34,6 +34,7 @@
     <a href="smb.html"><span class="em">🌐</span>SMB (network share)</a>
     <a href="hdd.html"><span class="em">💽</span>Internal HDD (APA &amp; exFAT)</a>
     <a href="network-boot.html"><span class="em">📡</span>Network Boot (UDPBD/UDPFS)</a>
+    <a href="http.html"><span class="em">🌐</span>HTTP</a>
     <h4>Features</h4>
     <a href="ps1-vcd.html"><span class="em">💿</span>PS1 Games</a>
     <a href="neutrino.html"><span class="em">⚛️</span>Neutrino Core</a>
@@ -42,6 +43,7 @@
     <a href="per-game-settings.html"><span class="em">🎚️</span>Per-game Settings</a>
     <a href="vmc.html"><span class="em">💾</span>VMC</a>
     <a href="cheats.html"><span class="em">🎮</span>Cheats</a>
+    <a href="retroachievements.html"><span class="em">🏆</span>RetroAchievements</a>
     <h4>Theme Engine</h4>
     <a href="themes.html"><span class="em">🎨</span>Theme Engine</a>
     <h4>Reference</h4>
@@ -61,10 +63,13 @@ appears in the UI, with its values and a brief description. Options that open a 
 <b>[sub-screen]</b>. Options that exist only in per-game context are on the
 <a href="per-game-settings.html">Per-game Settings</a> page.</p>
 
-<div class="callout info"><div class="h">i Where settings live</div>All global settings are saved to
-<code>settings_riptopl.cfg</code> in the OPL folder on the memory card (or the device the config was
-loaded from). RiptOPL uses its own file so it never collides with stock OPL or wOPL on the same card.
-Artwork, themes, VMC files and <code>favourites.bin</code> remain shared.</div>
+<div class="callout info"><div class="h">Where settings live</div>RiptOPL's master settings use <code>settings_riptopl.cfg</code> (with migration from
+<code>conf_riptopl.cfg</code>). That filename is separate from stock OPL's master config, but
+<code>conf_network.cfg</code>, app lists, per-game configuration and support files can still be shared.
+Favorites import from uOPL/wOPL is <b>one-way</b>: the next write saves RiptOPL's own <code>OFAV</code>
+format to <code>favourites.bin</code>, which those loaders cannot read back. Keep an original copy if
+you use them too. The settings home follows boot-directory discovery or <b>Custom Settings Path</b>;
+do not assume it is always <code>mc0:/OPL/</code>.</div>
 
 <div class="callout info"><div class="h">i Page return retention</div>
 Opening Start or Settings remembers the game/source page you paused on. Returning keeps that page
@@ -91,7 +96,7 @@ The PS1/BDMA plumbing now lives on its own <a href="#vcd-settings">PS Emulation 
 <tr><td>Remember Last Played Game</td><td>Off / On</td><td>Remembers and pre-selects the last launched game on the next boot.</td></tr>
 <tr><td>Auto Start <em>(seconds)</em></td><td>0&ndash;9</td><td>Auto-launches the last played game after the specified number of seconds. Visible only when <em>Remember Last Played Game</em> is on. 0 disables the countdown.</td></tr>
 <tr><td>Browse Folders in Game List</td><td>Off / On</td><td>Shows subfolders of <code>CD/</code> and <code>DVD/</code> as browsable entries — select to open, cancel to go back. Off by default.</td></tr>
-<tr><td>Controller Vibration in Menus</td><td>Off / On</td><td>Short vibration when moving the cursor, confirming, or going back. Needs a DualShock in analog mode. Off by default.</td></tr>
+<tr><td>Controller Vibration in Menus</td><td>Off / On</td><td>Short vibration when moving the cursor, confirming, or going back. Needs a DualShock in analog mode. On by default; disable it here if preferred.</td></tr>
 </tbody>
 </table>
 
@@ -146,10 +151,10 @@ enabled, their start modes, and the network transport rows. Prefix paths and cac
 <tr><td>MX4SIO</td><td>Off / On</td><td>Enables the MX4SIO SPI adapter driver.</td></tr>
 <tr><td>HDD (GPT/MBR)</td><td>Off / On</td><td>Enables the BDM path for exFAT / GPT / MBR hard-drive access (shows as an HDD Games tab per slot). Coexists with the APA HDD Start Mode below — both rows stay enabled. One shared <code>ata_bd</code> stack serves APA and BDM, and per-drive arbitration happens at mount time (APA is refused on an MBR/GPT/exFAT disk).</td></tr>
 <tr><td>HDD (APA) Start Mode</td><td>Off / Manual / Auto</td><td>OPL's native APA/PFS HDD mode. Coexists with HDD (GPT/MBR) above — enabling one no longer greys the other. See <a href="hdd.html">Internal HDD</a>.</td></tr>
-<tr><td>Network Protocol</td><td>Off / Manual / Auto</td><td>Start mode for the network stack, and the gate for the three rows below. <em>Off</em> (the default) leaves the NIC alone and greys them; <em>Manual</em> waits for you to press Start; <em>Auto</em> starts immediately. See <a href="network-boot.html">Network Boot</a>.</td></tr>
-<tr><td>Protocol</td><td>SMB / UDPFS / UDPBD</td><td>Which transport the single NIC carries — only one per session. Greyed while <em>Network Protocol</em> is Off. <em>SMB</em> is the classic network-share mode; <em>UDPFS</em> and <em>UDPBD</em> stream games over the LAN and require a static PS2 IP (DHCP is not resolved). <em>UDPBD</em> uses the SUDPBDv2 monolithic driver. See <a href="network-boot.html">Network Boot</a>.</td></tr>
+<tr><td>Network Start Mode (Game Sources)</td><td>Off / Manual / Auto</td><td>Start mode for the network stack, and the gate for the three rows below. <em>Off</em> (the default) leaves the NIC alone and greys them; <em>Manual</em> waits for you to press Start; <em>Auto</em> starts immediately. See <a href="network-boot.html">Network Boot</a>.</td></tr>
+<tr><td>Protocol (Network)</td><td>SMB / UDPFS / UDPBD / HTTP</td><td>Only one protocol can own the NIC in a session. First activation can start live; changing an already loaded protocol requires restarting RiptOPL. UDPFS/UDPBD need a static PS2 IP. HTTP has separate endpoint fields; see <a href="http.html">HTTP setup and limitations</a>.</td></tr>
 <tr><td>SMB Version</td><td>SMBv1 / SMB2</td><td>Which SMB dialect to speak. <em>SMBv1</em> is the default. Live only while <em>Protocol</em> is SMB and greyed otherwise, but the chosen value is preserved rather than reset. It applies to both browsing and in-game reading, and takes effect on the next boot. See <a href="smb.html">SMB (network share)</a>.</td></tr>
-<tr><td>Access</td><td>Files / IMG</td><td><em>Files</em> uses the <code>udpfs_ioman</code> filesystem to serve loose ISOs from a folder (<code>-bsd=udpfs</code>); <em>IMG</em> uses the <code>udpfs_bd</code> block device to serve a served disk image (<code>-bsd=udpfsbd</code>). Only UDPFS lets you choose: SMB locks the row to <em>Files</em> and UDPBD locks it to <em>IMG</em> — greyed, not hidden. See <a href="network-boot.html">Network Boot</a>.</td></tr>
+<tr><td>Access</td><td>Files / IMG</td><td><em>Files</em> uses the <code>udpfs_ioman</code> filesystem to serve loose ISOs from a folder (<code>-bsd=udpfs</code>); <em>IMG</em> uses the <code>udpfs_bd</code> block device to serve a served disk image (<code>-bsd=udpfsbd</code>). Only UDPFS lets you choose: SMB and HTTP lock the row to <em>Files</em> and UDPBD locks it to <em>IMG</em> — greyed, not hidden. See <a href="network-boot.html">Network Boot</a>.</td></tr>
 <tr><td>Applications Start Mode</td><td>Off / Manual / Auto</td><td>Startup mode for the Apps tab.</td></tr>
 <tr><td>Favorites Start Mode</td><td>Off / Manual / Auto</td><td>Startup mode for the Favorites tab. Set to <em>Off</em> to hide the Favorites tab entirely. See <a href="favourites.html">Favorites</a>.</td></tr>
 <tr><td>MMCE Start Mode</td><td>Off / Manual / Auto</td><td>Startup mode for MMCE (SD2PSX / MemCard PRO2) game loading. See <a href="mmce.html">MMCE</a>.</td></tr>
@@ -319,7 +324,7 @@ An <em>Advanced Options</em> toggle reveals Ethernet link-mode controls.</p>
 <tbody>
 <tr><td>Address Type</td><td>IP / NetBIOS</td><td>Whether the server is addressed by IP or by NetBIOS name.</td></tr>
 <tr><td>Address</td><td>text or four octets</td><td>Server IP or NetBIOS hostname.</td></tr>
-<tr><td>Port</td><td>0&ndash;65535 (default 1111)</td><td>SMB port. RiptOPL defaults to <code>1111</code> (was 445), but the server and client must match. <a href="https://github.com/NathanNeurotic/PS2-Servers">PS2 Servers</a> currently defaults to <code>1445</code>; enter the protocol-specific value its launcher displays. Standard Samba/native shares commonly use <code>445</code>.</td></tr>
+<tr><td>Port</td><td>0&ndash;65535 (default 1111)</td><td>SMB port. RiptOPL defaults to <code>1111</code> (was 445), but the server and client must match. <a href="https://github.com/NathanNeurotic/PS2-Servers">PS2 Servers</a> currently defaults to <code>1111</code>; enter the protocol-specific value its launcher displays. Standard Samba/native shares commonly use <code>445</code>.</td></tr>
 <tr><td>Share</td><td>text (default <code>PS2SMB</code>)</td><td>Share name on the server. Leave blank to list available shares.</td></tr>
 <tr><td>User</td><td>text (default <code>GUEST</code>)</td><td>SMB username.</td></tr>
 <tr><td>Password</td><td>text</td><td>SMB password. Leave blank for guest authentication.</td></tr>
@@ -356,7 +361,7 @@ available (passes <code>-gc=7</code> to Neutrino). DMA Mode, Game ID, Custom ELF
 remain active regardless of core. See <a href="per-game-settings.html">Per-game Settings</a>.</p>
 </details>
 
-</main>
+<h2 id="http-settings">HTTP and RetroAchievements</h2><p>See <a href="http.html">HTTP</a> for the separate server, port, base path and Test fields, and <a href="retroachievements.html">RetroAchievements</a> for RA-build telemetry and badge settings.</p></main>
   <aside class="toc"><div class="toc-h">On this page</div><nav id="toc-nav"></nav></aside>
 </div>
 <footer>
@@ -364,8 +369,8 @@ remain active regardless of core. See <a href="per-game-settings.html">Per-game 
   <a href="https://github.com/ps2homebrew">ps2homebrew</a> team and the wider OPL family — see
   <a href="credits.html">Credits &amp; Sources</a>. For the canonical project, see
   <a href="https://github.com/ps2homebrew/Open-PS2-Loader">ps2homebrew/Open-PS2-Loader</a>.</p>
-  <p class="prov-inline">RiptOPL is a downstream fork, not the canonical project. PS1 emulation is Sony's POPS,
-  which is <b>not</b> distributed here. PS1/POPSTARTER deep reference: the sister
+  <p class="prov-inline">RiptOPL is a downstream fork, not the canonical project. POPSTARTER uses Sony's POPS; Ember is a separate emulator. Sony's POPS is
+  <b>not</b> distributed here. PS1/POPSTARTER deep reference: the sister
   <a href="https://nathanneurotic.github.io/POPSLoader/">POPStarter docs</a>.</p>
 </footer>
 <script src="assets/app.js"></script>

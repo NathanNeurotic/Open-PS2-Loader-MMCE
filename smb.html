@@ -34,6 +34,7 @@
     <a href="smb.html" class="active"><span class="em">🌐</span>SMB (network share)</a>
     <a href="hdd.html"><span class="em">💽</span>Internal HDD (APA &amp; exFAT)</a>
     <a href="network-boot.html"><span class="em">📡</span>Network Boot (UDPBD/UDPFS)</a>
+    <a href="http.html"><span class="em">🌐</span>HTTP</a>
     <h4>Features</h4>
     <a href="ps1-vcd.html"><span class="em">💿</span>PS1 Games</a>
     <a href="neutrino.html"><span class="em">⚛️</span>Neutrino Core</a>
@@ -42,6 +43,7 @@
     <a href="per-game-settings.html"><span class="em">🎚️</span>Per-game Settings</a>
     <a href="vmc.html"><span class="em">💾</span>VMC</a>
     <a href="cheats.html"><span class="em">🎮</span>Cheats</a>
+    <a href="retroachievements.html"><span class="em">🏆</span>RetroAchievements</a>
     <h4>Theme Engine</h4>
     <a href="themes.html"><span class="em">🎨</span>Theme Engine</a>
     <h4>Reference</h4>
@@ -102,8 +104,8 @@ another already-configured SMB server.</p>
   APPS\     ← homebrew ELFs</pre>
   </div>
   <div class="step">
-    <h3>Share the folder with full read/write access</h3>
-    <p>OPL needs <b>full read and write permissions</b> on the share so it can create the sub-folders above and write per-game config files during gameplay.</p>
+    <h3>Grant the access your features need</h3>
+    <p>Read access is required for game loading. Write access is also needed to create support folders, save configuration changes or save to VMCs on the share. Copy the endpoint and credentials shown by your server.</p>
     <p><b>Linux / Samba:</b> add a share block to <code>/etc/samba/smb.conf</code> — for example:</p>
     <pre>[PS2SMB]
    path = /srv/ps2smb
@@ -145,7 +147,7 @@ another already-configured SMB server.</p>
   <tbody>
     <tr><td><b>Address Type</b></td><td><b>IP Address</b> or <b>NetBIOS</b>. For most setups use IP address — it connects directly without name resolution. NetBIOS lets you type a Windows machine name (e.g. <code>MYPC</code>) but requires the PS2 to resolve the name first; if the name lookup fails, OPL cannot connect at all.</td></tr>
     <tr><td><b>Address</b></td><td>Either the server's IPv4 address (e.g. <code>192.168.0.5</code>) or its NetBIOS name (up to 15 characters, e.g. <code>MYPC</code>), depending on Address Type.</td></tr>
-    <tr><td><b>Port</b></td><td>RiptOPL defaults to <b>1111</b>, but the client and server must match. <a href="https://github.com/NathanNeurotic/PS2-Servers">PS2 Servers</a> currently defaults to <b>1445</b>; enter the value its launcher displays. Standard Samba/native SMB commonly uses port 445. Network Settings opens with advanced options on, so the Port field is always visible and editable.</td></tr>
+    <tr><td><b>Port</b></td><td>RiptOPL defaults to <b>1111</b>, but the client and server must match. <a href="https://github.com/NathanNeurotic/PS2-Servers">PS2 Servers</a> currently defaults to <b>1111</b>; enter the value its launcher displays. Standard Samba/native SMB commonly uses port 445. Network Settings opens with advanced options on, so the Port field is always visible and editable.</td></tr>
     <tr><td><b>Share</b></td><td>The share name, e.g. <code>PS2SMB</code>. This is the name you gave the share on the server — not a path. Default is <code>PS2SMB</code>.</td></tr>
     <tr><td><b>User</b></td><td>The username to log on with. Default is <code>GUEST</code>. For a guest/public share leave this as-is. For a password-protected share enter the correct account name.</td></tr>
     <tr><td><b>Password</b></td><td>Leave empty for no-password shares. For password-protected shares OPL first asks the loaded SMB driver to pre-hash the password. The SMBv1 driver does that and sends the hash; the SMB2 driver declines, because its own NTLMSSP exchange wants the password verbatim — so OPL hands it over as-is and the driver still turns it into an NTLM response rather than putting it on the wire in the clear.</td></tr>
@@ -166,8 +168,8 @@ If your share contains more than one OPL layout — for example you have multipl
 <table data-sortable>
   <thead><tr><th>Row</th><th>Values</th><th>What it does</th></tr></thead>
   <tbody>
-    <tr><td><b>Network Protocol</b></td><td>Off / Manual / Auto</td><td>The network <em>start mode</em>, using the same three options as every other device. <b>Off</b> loads no network transport at all and greys out the three rows below it. <b>Manual</b> registers the <b>ETH Games</b> tab and connects when you navigate into it — boot stays fast and you only pay the connection cost on entry. <b>Auto</b> brings the stack up during startup instead.</td></tr>
-    <tr><td><b>Protocol</b></td><td>SMB / UDPFS / UDPBD</td><td>Which transport owns the single Ethernet adapter. <b>SMB</b> is the network-share client documented on this page; UDPFS and UDPBD select Network Boot instead — see <a href="network-boot.html">Network Boot</a>.</td></tr>
+    <tr><td><b>Network Start Mode</b></td><td>Off / Manual / Auto</td><td>The network <em>start mode</em>, using the same three options as every other device. <b>Off</b> loads no network transport at all and greys out the three rows below it. <b>Manual</b> registers the <b>ETH Games</b> tab and connects when you navigate into it — boot stays fast and you only pay the connection cost on entry. <b>Auto</b> brings the stack up during startup instead.</td></tr>
+    <tr><td><b>Protocol</b></td><td>SMB / UDPFS / UDPBD / HTTP</td><td>Which transport owns the single Ethernet adapter. <b>SMB</b> is the network-share client documented on this page; UDPFS and UDPBD select Network Boot instead — see <a href="network-boot.html">Network Boot</a>.</td></tr>
     <tr><td><b>SMB Version</b></td><td>SMBv1 / SMB2</td><td>Which SMB dialect to speak. <b>SMBv1</b> is the default. Live only while <b>Protocol</b> is SMB, and greyed out otherwise — but the value is kept, so detouring through UDPFS and back does not silently reset you to SMBv1. See <a href="#smb-version">SMB Version</a> below.</td></tr>
     <tr><td><b>Access</b></td><td>Files / IMG</td><td>Only meaningful for UDPFS. Under <b>SMB</b> it is locked to <b>Files</b> and greyed out; under UDPBD it is locked to <b>IMG</b>. You never need to touch it for an SMB setup.</td></tr>
   </tbody>
@@ -364,8 +366,8 @@ The <b>SMB Version</b> setting governs OPL's own browsing and its in-game reader
   <a href="https://github.com/ps2homebrew">ps2homebrew</a> team and the wider OPL family — see
   <a href="credits.html">Credits &amp; Sources</a>. For the canonical project, see
   <a href="https://github.com/ps2homebrew/Open-PS2-Loader">ps2homebrew/Open-PS2-Loader</a>.</p>
-  <p class="prov-inline">RiptOPL is a downstream fork, not the canonical project. PS1 emulation is Sony's POPS,
-  which is <b>not</b> distributed here. PS1/POPSTARTER deep reference: the sister
+  <p class="prov-inline">RiptOPL is a downstream fork, not the canonical project. POPSTARTER uses Sony's POPS; Ember is a separate emulator. Sony's POPS is
+  <b>not</b> distributed here. PS1/POPSTARTER deep reference: the sister
   <a href="https://nathanneurotic.github.io/POPSLoader/">POPStarter docs</a>.</p>
 </footer>
 <script src="assets/app.js"></script>

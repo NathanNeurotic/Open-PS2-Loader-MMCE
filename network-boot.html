@@ -1,7 +1,7 @@
 <!doctype html><html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Network Boot (SMB/UDP) · RiptOPL Docs</title>
-<meta name="description" content="Stream games from a PC over the LAN with four Game Sources rows — Network Protocol (Off / Manual / Auto), Protocol (SMB / UDPFS / UDPBD), SMB Version, and Access (Files / IMG).">
+<meta name="description" content="Stream games from a PC over the LAN with four Game Sources rows — Network Start Mode (Off / Manual / Auto), Protocol (SMB / UDPFS / UDPBD / HTTP), SMB Version, and Access (Files / IMG).">
 <link rel="icon" type="image/png" href="assets/favicon.png">
 <meta property="og:site_name" content="RiptOPL Docs">
 <meta property="og:type" content="website">
@@ -34,6 +34,7 @@
     <a href="smb.html"><span class="em">🌐</span>SMB (network share)</a>
     <a href="hdd.html"><span class="em">💽</span>Internal HDD (APA &amp; exFAT)</a>
     <a href="network-boot.html" class="active"><span class="em">📡</span>Network Boot (SMB/UDP)</a>
+    <a href="http.html"><span class="em">🌐</span>HTTP</a>
     <h4>Features</h4>
     <a href="ps1-vcd.html"><span class="em">💿</span>PS1 Games</a>
     <a href="neutrino.html"><span class="em">⚛️</span>Neutrino Core</a>
@@ -42,6 +43,7 @@
     <a href="per-game-settings.html"><span class="em">🎚️</span>Per-game Settings</a>
     <a href="vmc.html"><span class="em">💾</span>VMC</a>
     <a href="cheats.html"><span class="em">🎮</span>Cheats</a>
+    <a href="retroachievements.html"><span class="em">🏆</span>RetroAchievements</a>
     <h4>Theme Engine</h4>
     <a href="themes.html"><span class="em">🎨</span>Theme Engine</a>
     <h4>Reference</h4>
@@ -56,22 +58,13 @@
   </nav>
   <main class="content">
 <h1>Network Boot (SMB / UDP)</h1>
-<p class="lead">Stream your PS2 game library from a PC over the LAN. RiptOPL configures the network with
-<b>four rows</b> in <b>Game Sources</b>: <b>Network Protocol</b> (the start mode — <b>Off / Manual /
-Auto</b>), <b>Protocol</b> (<b>SMB / UDPFS / UDPBD</b>), <b>SMB Version</b> (<b>SMBv1</b> or <b>SMB2</b>)
-and <b>Access</b> (<b>Files</b> or <b>IMG</b>). Because the PS2 has one Ethernet adapter, exactly one
-transport is ever active, so the Protocol row is exclusive <i>by construction</i>. <b>UDPFS</b> is the modern
-network-boot protocol (Rick Gaiser's <b>UDPRDMA</b> transport); <b>UDPBD</b> is the older SUDPBDv2
-protocol, kept for users still running the <code>udpbd-server</code>. Both appear in RiptOPL as their own
-games list — with covers, Favorites, and per-game settings, just like a local drive — and always
-launch through <a href="neutrino.html">Neutrino</a> (there is no OPL built-in core fallback for them).
-SMB is the exception: it is a mounted file share served by OPL's own core, and needs no Neutrino.</p>
+<p class="lead">UDPFS and UDPBD stream PS2 games from a PC and require Neutrino. Set <b>Network Start Mode</b> (Off / Manual / Auto) in <b>Game Sources</b>, then choose <b>Protocol</b> in <b>Network</b>. The picker contains SMB / UDPFS / UDPBD / HTTP. SMB and <a href="http.html">HTTP</a> use OPL's own core; HTTP has separate setup and limits.</p>
 
 <div class="callout info"><div class="h">ℹ Four rows, Off by default</div>
 The old <b>Network Boot</b> ON/OFF toggle and the separate <b>Net Boot Protocol</b> picker are retired
-placeholders. The network is now four rows: row 1 <b>Network Protocol</b> is an <b>Off / Manual / Auto</b>
+placeholders. The network is now four rows: row 1 <b>Network Start Mode</b> is an <b>Off / Manual / Auto</b>
 start mode and defaults to <b>Off</b> (no network device); row 2 <b>Protocol</b> chooses
-<b>SMB / UDPFS / UDPBD</b> and greys while row 1 is Off; rows 3 and 4 (<b>SMB Version</b> and
+<b>SMB / UDPFS / UDPBD / HTTP</b> and greys while row 1 is Off; rows 3 and 4 (<b>SMB Version</b> and
 <b>Access</b>) qualify the chosen protocol. UDPFS needs a static PS2 IP and a matching
 PC-side server. Pick a protocol only when you have those pieces in place. Local devices
 (USB / internal HDD / MMCE) are independent and browse alongside whichever network protocol you choose.
@@ -79,13 +72,7 @@ PC-side server. Pick a protocol only when you have those pieces in place. Local 
 
 <h2 id="protocols">The Network rows</h2>
 
-<p><b>Settings &rarr; Game Sources</b> carries four network rows. Row 1 <b>Network Protocol</b> is the
-start mode (<b>Off / Manual / Auto</b>); while it is <b>Off</b>, the other three grey out. Row 2
-<b>Protocol</b> picks the transport — because the PS2 has a single NIC, choosing one automatically
-excludes the others. Row 3 <b>SMB Version</b> is live only while Protocol = SMB, and keeps its value
-(rather than snapping back) while greyed. Row 4 <b>Access</b> is free to change only under UDPFS: it is
-value-locked to <b>Files</b> under SMB and to <b>IMG</b> under UDPBD, and greyed in both cases. In the
-table below, <b>Off</b> is row 1's value; the other three are row 2's.</p>
+<p><b>Game Sources</b> holds <b>Network Start Mode</b>. <b>Network</b> holds <b>Protocol</b>, <b>SMB Version</b> and <b>Access</b>. The SMB version is editable for SMB. Access is Files/IMG for UDPFS, locked to Files for SMB/HTTP and IMG for UDPBD. The first protocol can start while the NIC is unused; switching an already loaded protocol requires restarting RiptOPL.</p>
 
 <table data-sortable>
 <thead><tr><th>Choice</th><th>Wire protocol</th><th>On the PS2</th><th>PC server</th><th>Core</th></tr></thead>
@@ -99,7 +86,7 @@ table below, <b>Off</b> is row 1's value; the other three are row 2's.</p>
 </tr>
 <tr>
   <td><b>SMB</b></td>
-  <td>SMBv1 or SMB2 (Game Sources &rarr; SMB Version; default SMBv1)</td>
+  <td>SMBv1 or SMB2 (Network &rarr; SMB Version; default SMBv1)</td>
   <td>a mounted file share</td>
   <td><a href="https://github.com/NathanNeurotic/PS2-Servers">PS2 Servers</a> (recommended) / Samba</td>
   <td>OPL's <b>own</b> core (not Neutrino)</td>
@@ -120,6 +107,7 @@ table below, <b>Off</b> is row 1's value; the other three are row 2's.</p>
   <td><a href="https://github.com/NathanNeurotic/PS2-Servers">PS2 Servers</a> (recommended) / <code>udpbd-server</code></td>
   <td>Neutrino only</td>
 </tr>
+<tr><td><b>HTTP</b></td><td>HTTP byte ranges</td><td>games.csv catalog and ISO streams</td><td>Server meeting the <a href="http.html">client profile</a></td><td>OPL core; hardware validation pending</td></tr>
 </tbody>
 </table>
 
@@ -310,7 +298,7 @@ module-load time and have no way to acquire a lease later. (SMB can stay on DHCP
 </div>
 <div class="step">
 <h3>Pick your Network Protocol (and Access)</h3>
-<p>In <b>Settings &rarr; Game Sources</b>, set <b>Network Protocol</b> (row 1) to <b>Manual</b> or
+<p>In <b>Settings &rarr; Game Sources</b>, set <b>Network Start Mode</b> (row 1) to <b>Manual</b> or
 <b>Auto</b>, then set <b>Protocol</b> (row 2) to <b>SMB</b>, <b>UDPFS</b>, or <b>UDPBD</b>; set row 1 back
 to <b>Off</b> to disable networking. When Protocol = <b>SMB</b>, pick the <b>SMB Version</b> — <b>SMBv1</b>
 (default) or <b>SMB2</b>. The <b>Access</b> row (<b>Files</b> / <b>IMG</b>) is always present, but it is
@@ -380,7 +368,7 @@ and <a href="neutrino.html">Neutrino Core</a> for details.
 loads a SMAP driver on it. Only one can own the adapter at a time, so RiptOPL exposes them as
 mutually exclusive <b>values of one Protocol row</b> rather than independent toggles. That replaces the
 old model, where a separate <b>Network Boot</b> toggle and an <b>Ethernet (SMB)</b> mode had to be greyed
-against each other. The four rows still interlock live, but only downward: <b>Network Protocol</b>
+against each other. The four rows still interlock live, but only downward: <b>Network Start Mode</b>
 (row 1) gates the rest — while it is <b>Off</b>, <b>Protocol</b>, <b>SMB Version</b> and <b>Access</b>
 are all greyed — and the chosen protocol then qualifies its own sub-rows (SMB Version is live only under
 SMB; Access is free only under UDPFS, and is value-locked to <b>Files</b> under SMB and to <b>IMG</b>
@@ -399,7 +387,7 @@ independent of these rows and browse alongside whichever network protocol you pi
 <thead><tr><th>Key</th><th>Type</th><th>Default</th><th>Meaning</th></tr></thead>
 <tbody>
 <tr><td><code>network_protocol</code></td><td>int (0–4)</td><td><code>0</code></td><td><b>Authoritative selector.</b> User-facing: <code>0</code>=Off, <code>1</code>=SMB, <code>2</code>=UDPFS (Access = Files). <code>3</code>=UDPFSBD is the internal value for Access = IMG — the picker maps both <code>2</code> and <code>3</code> onto the single "UDPFS" menu entry, and the <b>Access</b> row picks between them. <code>4</code>=UDPBD is a <b>first-class value</b> for the retained UDPBD (SUDPBDv2) choice: it is <b>preserved as-is on load</b>, never migrated, so users still on the old <code>udpbd-server</code> keep it.</td></tr>
-<tr><td><code>net_start_mode</code></td><td>int (0–2)</td><td><code>0</code></td><td>Row 1 <b>Network Protocol</b>: <code>0</code>=Off, <code>1</code>=Manual, <code>2</code>=Auto. Reconciled with <code>network_protocol</code> on load — a protocol of Off forces this to Off, and a live protocol with an Off (or out-of-range) start mode is floored to Manual.</td></tr>
+<tr><td><code>net_start_mode</code></td><td>int (0–2)</td><td><code>0</code></td><td>Row 1 <b>Network Start Mode</b>: <code>0</code>=Off, <code>1</code>=Manual, <code>2</code>=Auto. Reconciled with <code>network_protocol</code> on load — a protocol of Off forces this to Off, and a live protocol with an Off (or out-of-range) start mode is floored to Manual.</td></tr>
 <tr><td><code>smb_dialect</code></td><td>int (0/1)</td><td><code>0</code></td><td>Row 3 <b>SMB Version</b>: <code>0</code>=SMBv1 (default), <code>1</code>=SMB2. Only meaningful while the protocol is SMB; the value is kept (not reset) when the row is greyed. SMB3 is reserved internally and is not a selectable value.</td></tr>
 <tr><td><code>enable_udpbd</code></td><td>bool (0/1)</td><td><code>0</code></td><td><b>Legacy back-compat shadow</b> (superseded by <code>network_protocol</code>). Still dual-written: <code>1</code> whenever the protocol resolves to UDPFSBD (IMG) <em>or</em> UDPBD — both block-device transports set it.</td></tr>
 <tr><td><code>net_boot_protocol</code></td><td>int (0/1)</td><td><code>0</code></td><td><b>Legacy back-compat shadow</b> (superseded). Derived from the selector; only meaningful when the legacy <code>enable_udpbd=1</code>. Selecting <b>UDPBD</b> sets <code>enable_udpbd=1</code> with the classic UDPBD encoding, so a fresh UDPBD config still produces the legacy UDPBD shadow values.</td></tr>
@@ -494,7 +482,7 @@ in IMG mode, only standard ISO images work.</p>
   <td>Existing UDPBD setup stopped working after updating</td>
   <td>The <b>Protocol</b> row is set to something other than <b>UDPBD</b> (UDPBD is
   wire-incompatible with UDPFS, so a UDPFS pick won't talk to <code>udpbd-server</code>).</td>
-  <td>Set <b>Game Sources &rarr; Protocol</b> back to <b>UDPBD</b> (with <b>Network Protocol</b> on
+  <td>Set <b>Game Sources &rarr; Protocol</b> back to <b>UDPBD</b> (with <b>Network Start Mode</b> on
   <b>Manual</b> or <b>Auto</b>) and keep running the same
   <code>udpbd-server</code> on the PC — a config saved as UDPBD is preserved as-is, never migrated.
   (Alternatively, switch to <b>UDPFS</b> and run <code>udpfsd</code> instead — but that is a different
@@ -514,8 +502,8 @@ the OPL built-in core and does not require Neutrino).</p>
   <a href="https://github.com/ps2homebrew">ps2homebrew</a> team and the wider OPL family — see
   <a href="credits.html">Credits &amp; Sources</a>. For the canonical project, see
   <a href="https://github.com/ps2homebrew/Open-PS2-Loader">ps2homebrew/Open-PS2-Loader</a>.</p>
-  <p class="prov-inline">RiptOPL is a downstream fork, not the canonical project. PS1 emulation is Sony's POPS,
-  which is <b>not</b> distributed here. PS1/POPSTARTER deep reference: the sister
+  <p class="prov-inline">RiptOPL is a downstream fork, not the canonical project. POPSTARTER uses Sony's POPS; Ember is a separate emulator. Sony's POPS is
+  <b>not</b> distributed here. PS1/POPSTARTER deep reference: the sister
   <a href="https://nathanneurotic.github.io/POPSLoader/">POPStarter docs</a>.</p>
 </footer>
 <script src="assets/app.js"></script>

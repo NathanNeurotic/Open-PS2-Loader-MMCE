@@ -1,0 +1,379 @@
+<!doctype html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>RetroAchievements · RiptOPL Docs</title>
+<meta name="description" content="RiptOPL RetroAchievements: setup, limitations and validation status.">
+<link rel="icon" type="image/png" href="assets/favicon.png">
+<meta property="og:site_name" content="RiptOPL Docs">
+<meta property="og:type" content="website">
+<meta property="og:image" content="https://nathanneurotic.github.io/Open-PS2-Loader/assets/riptopl.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://nathanneurotic.github.io/Open-PS2-Loader/assets/riptopl.png">
+<link rel="stylesheet" href="assets/style.css">
+</head><body data-base="">
+<header class="topbar">
+  <button class="menu-btn" aria-label="Menu">☰</button>
+  <a class="brand" href="index.html">
+    <span class="psbtns"><i class="tri">&#9651;</i><i class="cir">&#9711;</i><i class="cro">&#10005;</i><i class="squ">&#9633;</i></span>
+    RiptOPL <small>DOCS</small></a>
+  <div class="search">
+    <span class="ico">🔎</span>
+    <input id="q" type="search" placeholder="Search devices, themes, Neutrino, settings…  ( / )" autocomplete="off">
+    <kbd>/</kbd>
+    <div id="results"></div>
+  </div>
+</header>
+<div class="layout">
+  <nav class="sidebar">
+    <a href="index.html"><span class="em">🏠</span>Home</a>
+    <h4>Start</h4>
+    <a href="getting-started.html"><span class="em">🚀</span>Getting Started</a>
+    <a href="install.html"><span class="em">📥</span>Install &amp; First Boot</a>
+    <h4>Game sources</h4>
+    <a href="usb.html"><span class="em">🔌</span>USB / MX4SIO / iLink</a>
+    <a href="mmce.html"><span class="em">🧩</span>MMCE</a>
+    <a href="smb.html"><span class="em">🌐</span>SMB (network share)</a>
+    <a href="hdd.html"><span class="em">💽</span>Internal HDD (APA &amp; exFAT)</a>
+    <a href="network-boot.html"><span class="em">📡</span>Network Boot (UDPBD/UDPFS)</a>
+    <a href="http.html"><span class="em">🌐</span>HTTP</a>
+    <h4>Features</h4>
+    <a href="ps1-vcd.html"><span class="em">💿</span>PS1 Games</a>
+    <a href="neutrino.html"><span class="em">⚛️</span>Neutrino Core</a>
+    <a href="coverflow.html"><span class="em">🎴</span>Coverflow</a>
+    <a href="favourites.html"><span class="em">⭐</span>Favorites</a>
+    <a href="per-game-settings.html"><span class="em">🎚️</span>Per-game Settings</a>
+    <a href="vmc.html"><span class="em">💾</span>VMC</a>
+    <a href="cheats.html"><span class="em">🎮</span>Cheats</a>
+    <a href="retroachievements.html" class="active"><span class="em">🏆</span>RetroAchievements</a>
+    <h4>Theme Engine</h4>
+    <a href="themes.html"><span class="em">🎨</span>Theme Engine</a>
+    <h4>Reference</h4>
+    <a href="settings.html"><span class="em">🔧</span>Settings Reference</a>
+    <a href="nbd.html"><span class="em">🖧</span>NBD Server</a>
+    <a href="zso.html"><span class="em">🗜️</span>ZSO Format</a>
+    <a href="ps3-bc.html"><span class="em">🎯</span>PS3 BC</a>
+    <a href="releases.html"><span class="em">📦</span>Releases</a>
+    <a href="troubleshooting.html"><span class="em">🛠️</span>Troubleshooting</a>
+    <a href="credits.html"><span class="em">🙏</span>Credits &amp; Sources</a>
+    <a href="https://nathanneurotic.github.io/POPSLoader/"><span class="em">📚</span>POPStarter docs ↗</a>
+  </nav>
+  <main class="content">
+<h1 id="retroachievements">RetroAchievements</h1>
+<p>RiptOPL can report a running game's memory to a PC client that runs
+<a href="https://github.com/RetroAchievements/rcheevos">rcheevos</a> on the console's behalf, so achievements
+unlock on real PlayStation 2 hardware.</p>
+<p>The console does two things: it works out <strong>which</strong> game an image is (a hash), and once the game is
+running it streams the handful of memory addresses that game's achievements depend on. Everything
+else — talking to the RetroAchievements servers, deciding what unlocked, your login — happens on the
+PC.</p>
+<p>Upstream design and implementation are by <strong>hacan359 (yoba)</strong>, adopted here with his permission
+(2026-08-27). He also supplies and maintains the PC client; RiptOPL does not ship one and will not
+grow one.</p>
+<hr/>
+<h2 id="status">Status</h2>
+<p><strong>Implemented, not yet validated on PS2 hardware.</strong> Every part below exists in the build; not one of them
+has run on a PlayStation 2. Treat the RA variant as a development build until that changes.</p>
+<table>
+<thead>
+<tr>
+<th>Part</th>
+<th>State</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>RETROACHIEVEMENTS=1</code> build flavour</td>
+<td>done</td>
+</tr>
+<tr>
+<td>In-game telemetry (<code>raudp</code>, ee_core snapshots)</td>
+<td>written, <strong>not hardware-tested</strong></td>
+</tr>
+<tr>
+<td>Watch-list loading from <code>&lt;device&gt;/RA/&lt;serial&gt;.wl</code></td>
+<td>done</td>
+</tr>
+<tr>
+<td>Image hashing (ISO9660 walk + MD5)</td>
+<td>done</td>
+</tr>
+<tr>
+<td>Menu actions: check game support, test PC link</td>
+<td>written, <strong>not hardware-tested</strong></td>
+</tr>
+<tr>
+<td>List badges and the cover mark</td>
+<td>written, <strong>not hardware-tested</strong></td>
+</tr>
+<tr>
+<td>Unlock overlay</td>
+<td>written, <strong>not hardware-tested</strong></td>
+</tr>
+<tr>
+<td>Settings: RA telemetry, RA badges</td>
+<td>done</td>
+</tr>
+<tr>
+<td>Disc-in-the-tray as a game source</td>
+<td>deliberately deferred</td>
+</tr>
+</tbody>
+</table>
+<hr/>
+<h2 id="using-it">Using it</h2>
+<p>Two settings, on the <strong>Network</strong> settings page:</p>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Default</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>RetroAchievements telemetry</td>
+<td><strong>Off</strong></td>
+<td>The master switch. While it is off an RA build launches a game for exactly what the standard build costs — no in-game network stack, no <code>raudp</code>, no snapshots.</td>
+</tr>
+<tr>
+<td>RetroAchievements badges</td>
+<td>On</td>
+<td>The <code>RA</code> prefix in the game list and the mark over the cover. Cosmetic, and it follows the master switch: badges stay dark while telemetry is off.</td>
+</tr>
+</tbody>
+</table>
+<p>Two actions on a game's own menu:</p>
+<ul>
+<li><strong>check game support</strong> — hashes the image, asks the PC client about it, and writes
+  <code>&lt;device&gt;/RA/&lt;serial&gt;.wl</code> if the game is tracked.</li>
+<li><strong>test PC link</strong> — confirms the console can find the client at all, without touching a game.</li>
+</ul>
+<p>A game the console has a watch list for shows the badge and the cover mark after the next list
+refresh. Switch telemetry on and launch it.</p>
+<hr/>
+<h2 id="which-launch-paths-can-work">Which launch paths can work</h2>
+<p>Telemetry lives inside OPL's own loader core, which only exists for launches OPL performs itself.</p>
+<table>
+<thead>
+<tr>
+<th>Launch path</th>
+<th>Supported</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>BDM — USB, iLink, MX4SIO, ATA/exFAT</td>
+<td>yes</td>
+</tr>
+<tr>
+<td>ETH / SMB</td>
+<td>yes</td>
+</tr>
+<tr>
+<td>HDD (APA)</td>
+<td>yes — but see the note below</td>
+</tr>
+<tr>
+<td>MMCE</td>
+<td>yes</td>
+</tr>
+<tr>
+<td>HTTP</td>
+<td>local watch-list loading is wired into OPL-core launch; combined HTTP/RA operation is not hardware-validated</td>
+</tr>
+<tr>
+<td>Neutrino core (<code>$CoreLoader</code>)</td>
+<td><strong>no</strong></td>
+</tr>
+<tr>
+<td>UDPFS</td>
+<td><strong>no</strong></td>
+</tr>
+<tr>
+<td>PS1 / VCD (POPSTARTER, Ember)</td>
+<td><strong>no</strong></td>
+</tr>
+</tbody>
+</table>
+<p>Neutrino, UDPFS and PS1 hand the console over to an external ELF and never load OPL's core, so there is
+nothing to take a snapshot from. This is structural, not an oversight.</p>
+<p>HDD (APA) games are stored in HDLoader format and have no image file to hash, so while a watch list
+placed by hand still loads and streams, the console cannot work out the hash for them itself.</p>
+<h2 id="networking">Networking</h2>
+<p>Telemetry is UDP, sent by an IOP module that builds Ethernet frames by hand rather than going through
+the network stack — the stack's mailbox is shared with the game's own traffic, and 60 sends a second
+pushed the game out of it.</p>
+<p>Because of that, <strong>the console needs a valid IP even when the game was not launched over the
+network.</strong> OPL's own network settings supply it: whatever address, netmask and gateway are configured
+there are handed to the in-game Ethernet driver on every RA launch. If those are wrong or unset, the
+game runs normally but nothing reaches the PC.</p>
+<p>The PC client is found automatically: the console broadcasts a query on UDP port 18194 and the client
+answers. Nothing is stored between runs.</p>
+<hr/>
+<h2 id="files-on-the-card">Files on the card</h2>
+<pre><code>&lt;device root&gt;/RA/&lt;serial&gt;.wl        e.g. mass0:/RA/SLUS_210.65.wl
+</code></pre>
+<p>One watch list per tracked game, generated by the PC client from that game's achievement set. <code>RA/</code> follows the source’s support-file prefix, like <code>CHT/</code>. HTTP loads an existing watch list from the local settings home because the server is read-only; do not assume automatic image hashing/support detection works for a remote HTTP ISO. RiptOPL creates it along with the other library folders.</p>
+<p>A missing list is not an error. It means the game is simply not tracked, and it launches normally with
+no telemetry and no extra modules loaded.</p>
+<hr/>
+<h2 id="building">Building</h2>
+<pre><code class="language-bash">make clean &amp;&amp; make RETROACHIEVEMENTS=1 release
+</code></pre>
+<p><code>make clean</code> is not optional when switching the flag: it changes the layout of a structure and an
+enumeration shared between the menu and the loader core, and make cannot see that a stale object file
+is now wrong.</p>
+<p>The rolling release publishes the flavour as its own archive, <strong><code>RIPTOPL-RA-*.zip</code></strong>, built to the
+same shape as the main package: <code>POPS/</code>, <code>EMBER/</code>, <code>neutrino/</code> and the PC-tool shortcuts, with
+<code>APP_RIPTOPL-RA-&lt;flavour&gt;/RIPTOPL.ELF</code> in place of the standard loader (<code>-nopademu</code> folders carry the
+<code>PADEMU=0</code> builds). It also carries <strong><code>xeRAbora.url</code></strong>, because the loader does nothing without the
+PC client.</p>
+<p>It is deliberately <em>not</em> an entry in <code>RIPTOPL-VARIANTS-*.zip</code>: that archive is a ~120 MB bag of every
+build permutation, and the release workflow excludes it from the permanent MEGA archive as a
+diagnostic bundle rather than installable payload. The default build is unaffected by all of this — every RA source file and
+every call site is behind <code>#ifdef RETROACHIEVEMENTS</code>, and that is checked by comparing the two builds'
+symbol tables, loader core and embedded IOP modules.</p>
+<h2 id="before-this-is-called-finished">Before this is called finished</h2>
+<p>Nothing below has been done. The feature is written end to end and builds clean; it has not run on a
+PlayStation 2. Emulator testing gets you as far as: the menu boots, the RA entries render and
+navigate, the flag-off build is unchanged, and a game with no <code>.wl</code> does not crash. That is the
+ceiling — GS raster timing and real SMAP behaviour are not testable there.</p>
+<p>Hand testers a <strong>run-pinned nightly.link build</strong>, never a bare artifact link.</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Test</th>
+<th>Expected</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Default build (<code>RETROACHIEVEMENTS=0</code>)</td>
+<td>no regression on any existing path</td>
+</tr>
+<tr>
+<td>2</td>
+<td>RA build, telemetry Off</td>
+<td>behaves as the default build</td>
+</tr>
+<tr>
+<td>3</td>
+<td>USB launch, valid <code>.wl</code>, telemetry On</td>
+<td>~60 snapshots/s for ≥5 min, skip/fail counters flat</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Same, watching frame rate</td>
+<td>no perceptible impact</td>
+</tr>
+<tr>
+<td>5</td>
+<td>SMB launch with telemetry</td>
+<td>the game's own SMB stream unaffected</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Menu check, protocol = SMB</td>
+<td>title + counts, <code>.wl</code> written</td>
+</tr>
+<tr>
+<td>7</td>
+<td>Menu check, protocol = Off</td>
+<td>RA raises the stack, same result</td>
+</tr>
+<tr>
+<td>8</td>
+<td>Menu check, protocol = UDPBD / UDPFS</td>
+<td>clean refusal + hash written to <code>RA/hashes.txt</code>, no wedge</td>
+</tr>
+<tr>
+<td>9</td>
+<td>Neutrino-core game</td>
+<td>clean refusal, no hash attempt</td>
+</tr>
+<tr>
+<td>10</td>
+<td>PS1/VCD entry</td>
+<td>clean refusal</td>
+</tr>
+<tr>
+<td>11</td>
+<td>HDD/APA entry</td>
+<td>the check refuses; a watch list still loads</td>
+</tr>
+<tr>
+<td>12</td>
+<td>Badge + cover mark</td>
+<td>appear after refresh, correct game, correct device</td>
+</tr>
+<tr>
+<td>13</td>
+<td>Unlock overlay</td>
+<td>gold pulse on <code>RAU1</code>, game keeps running</td>
+</tr>
+<tr>
+<td>14</td>
+<td>IGR combo during an RA launch</td>
+<td>still resets</td>
+</tr>
+<tr>
+<td>15</td>
+<td>MX4SIO launch with telemetry</td>
+<td>no navigation or art regression (that device has history)</td>
+</tr>
+</tbody>
+</table>
+<hr/>
+<h2 id="notes-for-anyone-changing-this-code">Notes for anyone changing this code</h2>
+<ul>
+<li>
+<p><strong>Telemetry requires an OPL-core launch.</strong> BDM, ETH/SMB, HDD/APA and MMCE have this path; HTTP also loads an existing watch list from its local settings prefix. Neutrino and the PS1 cores run external ELFs, so OPL's telemetry core does not run there. Treat HTTP/RA interoperability as unvalidated until tested.</p>
+</li>
+<li>
+<p><strong>The badge cache belongs to the I/O thread.</strong> <code>raBadgeRefresh</code> frees and reallocates it. Nothing
+  on the render path may read it — that is why a row carries <code>raBadged</code> as a plain int, resolved
+  when the row is built. Re-introducing a <code>raBadgeHas</code>-style call from a draw routine re-introduces
+  a use-after-free that only shows up as a rare hang.</p>
+</li>
+<li><strong><code>MSG_DONTWAIT</code> is <code>0x08</code> on the menu path</strong>, from ps2sdk's <code>tcpip.h</code>. The <code>0x40</code> in SMSTCPIP
+  belongs to the in-game stack that serves <code>raudp</code>. They are different stacks; do not unify them.</li>
+<li><strong>The texture table is positional.</strong> <code>RA_MARK</code> in <code>enum INTERNAL_TEXTURE</code> and its row in
+  <code>internalDefault[]</code> are guarded by the same <code>#ifdef</code> for that reason. Guard one without the other
+  and the array silently goes one short.</li>
+<li><strong>Deleting <code>obj/</code> is mandatory</strong> after any change to <code>EECoreConfig_t</code>, <code>OPL_MODULE_ID</code> or the
+  submenu structs. This Makefile does not track header dependencies, so an incremental build can
+  pass locally while CI's <code>make clean</code> fails.</li>
+<li><strong><code>ee_core</code> has about 3 KB of headroom, and RA spends it.</strong> ram84 is 77312 bytes
+  (<code>ee_core/linkfile</code>). Without RA, an <code>EXTRA_FEATURES=1</code> ee_core comes to 74215; with RA and
+  without extras, 74067. Either fits; both together overflow by roughly 6.5 KB and <code>ld</code> refuses
+  with <code>.bss is not within region ram84</code>. That is why the release builds RA at the default
+  <code>EXTRA_FEATURES=0</code>, which is also what the main loader ships as — so the RA archive is the
+  shipping loader plus achievements, not a variant. <code>ra_snap_buf</code> and <code>ra_watch</code> are most of RA's
+  share; shrink them before trying to add anything else to that build.</li>
+<li><strong>Do not build a PC client.</strong> hacan359 provides and maintains xeRAbora. Do not commit <code>pc/RA/</code>.</li>
+<li><strong>Disc mode is deferred</strong>, deliberately, as a separate game source. It is not a missing piece of
+  this work.</li>
+</ul>
+<hr/>
+<h2 id="credits">Credits</h2>
+<ul>
+<li><strong>hacan359 (yoba)</strong> — the RetroAchievements design, the console implementation this port follows,
+  and the PC client.</li>
+<li><code>src/md5.c</code>, <code>include/md5.h</code> — L. Peter Deutsch, zlib licence, vendored unchanged.</li>
+</ul>
+</main>
+  <aside class="toc"><div class="toc-h">On this page</div><nav id="toc-nav"></nav></aside>
+</div>
+<footer>
+  <p><b>RiptOPL Documentation</b> — for the opinionated Open PS2 Loader fork. Built on, and grateful to, the
+  <a href="https://github.com/ps2homebrew">ps2homebrew</a> team and the wider OPL family — see
+  <a href="credits.html">Credits &amp; Sources</a>. For the canonical project, see
+  <a href="https://github.com/ps2homebrew/Open-PS2-Loader">ps2homebrew/Open-PS2-Loader</a>.</p>
+  <p class="prov-inline">RiptOPL is a downstream fork, not the canonical project. POPSTARTER uses Sony's POPS; Ember is a separate emulator. Sony's POPS is
+  <b>not</b> distributed here. PS1/POPSTARTER deep reference: the sister
+  <a href="https://nathanneurotic.github.io/POPSLoader/">POPStarter docs</a>.</p>
+</footer>
+<script src="assets/app.js"></script>
+</body></html>
