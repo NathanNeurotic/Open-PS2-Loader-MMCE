@@ -2,7 +2,7 @@
 
 This fork publishes a continuously-updated **`rolling`** development release so the current
 publishing-branch build can be pulled straight from GitHub as development progresses, without
-touching the curated `v*` tagged releases. `rolling` is a full (non-pre-release) release and
+changing a preserved snapshot such as `current-fan-favorite`. No stable `v*` release is currently published here. `rolling` is a full (non-pre-release) release and
 intentionally owns GitHub's **Latest** marker. The publishing branch is `rebuild/main` during the
 rebuild. `master` is the OLD LINEAGE and is no longer wired to the release workflow at all: a
 push to it builds nothing and publishes nothing.
@@ -12,11 +12,11 @@ push to it builds nothing and publishes nothing.
 Every push to the publishing branch rebuilds and republishes the `rolling` release. The headline
 asset is a **full installable package** (built across four toolchain flavours, with best-effort
 flavours called out if omitted). A post-publish normalizer consolidates the public download set into
-up to five archives (DEBUG and language packs are listed when produced):
+archives by purpose (RA, DEBUG and language packs are listed when produced):
 
 | Asset | What it is |
 |---|---|
-| `RIPTOPL-<rel>-<sha>.zip` | **The installable package.** Normally contains four loader folders that differ ONLY by the SDK toolchain they were built with (the RiptOPL code in each is identical), each explicitly labeled: `APP_RIPTOPL-PS2DEVPINNED/RIPTOPL.ELF` (#1, recommended pinned ps2dev), `APP_RIPTOPL-OFFICIALPINNED/RIPTOPL.ELF` (#2, recommended pinned ps2homebrew), `APP_RIPTOPL-PS2DEVROLLING/RIPTOPL.ELF` (#3, rolling canary), and `APP_RIPTOPL-OFFICIALROLLING/RIPTOPL.ELF` (#4, rolling canary). A best-effort flavour can be absent when its build fails, and the release notes identify it. Also includes a `POPS/` folder for PS1 support via POPSTARTER (including all loose BDMA pairs—none are embedded in the loader—the new `usbd.irx.ilink` + `usbhdfsd.irx.ilink` pair for iLink VCD launches, and `POPS/POPSTARTER VERSIONS/`, the alternate POPSTARTER builds) and an `EMBER/` folder for PS1 support via **[Ember](https://github.com/Gageformer/Ember)** by **[Gageformer](https://github.com/Gageformer)**, the second PS1 core; the bundled **[Neutrino](https://github.com/rickgaiser/neutrino)** core by **[rickgaiser](https://github.com/rickgaiser)** as a ready-to-use `neutrino/` folder (drag-and-drop to `mc?:/`), plus `PS2-Servers.url`, `udpfs-server.url`, `OrbitPS2-Manager.url`, `OPL-PS1-AIO-Converter-GUI.url`, and `PS2RD-CHT-Manager.url`. Extract it, pick a folder and copy its `RIPTOPL.ELF` — see [Which build should I use?](#which-build-should-i-use) below. |
+| `RIPTOPL-<rel>-<sha>.zip` | **The installable package.** Normally contains four loader folders that differ ONLY by the SDK toolchain they were built with (the RiptOPL code in each is identical), each explicitly labeled: `APP_RIPTOPL-PS2DEVPINNED/RIPTOPL.ELF` (#1, recommended pinned ps2dev), `APP_RIPTOPL-OFFICIALPINNED/RIPTOPL.ELF` (#2, recommended pinned ps2homebrew), `APP_RIPTOPL-PS2DEVROLLING/RIPTOPL.ELF` (#3, rolling canary), and `APP_RIPTOPL-OFFICIALROLLING/RIPTOPL.ELF` (#4, rolling canary). A best-effort flavour can be absent when its build fails, and the release notes identify it. Also includes a `POPS/` folder for PS1 support via POPSTARTER (including all loose BDMA pairs—none are embedded in the loader—the new `usbd.irx.ilink` + `usbhdfsd.irx.ilink` pair for iLink VCD launches, and `POPS/POPSTARTER VERSIONS/`, the alternate POPSTARTER builds) and an `EMBER/` folder for PS1 support via **[Ember](https://github.com/Gageformer/Ember)** by **[Gageformer](https://github.com/Gageformer)**, the second PS1 core; the normally bundled **[Neutrino](https://github.com/rickgaiser/neutrino)** core by **[rickgaiser](https://github.com/rickgaiser)** as a ready-to-use `neutrino/` folder (drag-and-drop to `mc?:/`), plus `PS2-Servers.url`, `udpfs-server.url`, `OrbitPS2-Manager.url`, `OPL-PS1-AIO-Converter-GUI.url`, and `PS2RD-CHT-Manager.url`. Extract it, pick a folder and copy its `RIPTOPL.ELF` — see [Which build should I use?](#which-build-should-i-use) below. |
 | `RIPTOPL-<version>-src.zip` | Source snapshot to rebuild this exact commit. |
 | `RIPTOPL-LANGS-*.zip` | Extra UI language files (`.lng` + non-Latin fonts) — copy into your OPL folder. |
 | `RIPTOPL-VARIANTS-*.zip` | Alternate build configs across the moving and pinned ps2dev flavours; the normalizer also adds one ready-made DualSense (`DUALSENSE=1`) loader for each available official flavour. |
@@ -43,11 +43,10 @@ flavour carries the same version with its flavour suffix (`-PS2DEVPINNED`, `-OFF
 ## Which build should I use?
 
 All loaders contain **the same RiptOPL code** — they differ only by the SDK toolchain that built them.
-Recommended in this order, by reliability:
+Start with a pinned SDK for reproducible comparisons:
 
 1. **`APP_RIPTOPL-PS2DEVPINNED/` (`-PS2DEVPINNED`) — recommended primary download.** Built on the
-   `ps2dev/ps2dev` SDK pinned by image digest to a known-good configuration so it provides reproducible,
-   stable behavior.
+   `ps2dev/ps2dev` SDK pinned by image digest for reproducible toolchain selection. Pinning does not itself prove hardware compatibility.
 2. **`APP_RIPTOPL-OFFICIALPINNED/` (`-OFFICIALPINNED`) — recommended official pin.** Built on the
    `ps2homebrew/ps2homebrew` official SDK, pinned by image digest.
 3. **`APP_RIPTOPL-PS2DEVROLLING/` (`-PS2DEVROLLING`) — bleeding-edge canary.** Tracks `ps2dev/ps2dev:latest`.
@@ -65,9 +64,10 @@ filename — the `gh` CLI grabs whatever is currently published:
 # Everything in the current rolling release
 gh release download rolling --repo NathanNeurotic/Open-PS2-Loader --clobber
 
-# Just the installable package zip
+# For just the normal installable package, copy its exact filename from the release page.
+# Broad RIPTOPL-* globs also match RA, VARIANTS, DEBUG, LANGS and source archives.
 gh release download rolling --repo NathanNeurotic/Open-PS2-Loader \
-  --pattern 'RIPTOPL-*-*-*.zip' --clobber
+  --pattern "<exact-normal-package-filename>.zip" --clobber
 ```
 
 Or download from the release page:
@@ -119,5 +119,6 @@ cancelling each other.
 
 ## Not a stable release
 
-`rolling` is a development build and may be unstable. Use the tagged releases for
-known-good versions.
+`rolling` is a development build and may be unstable. The [Current Fan Favorite Build](https://github.com/NathanNeurotic/Open-PS2-Loader/releases/tag/current-fan-favorite) is a preserved development snapshot selected after positive user feedback, not a universal compatibility guarantee.
+
+Neutrino download/extraction is best-effort: a failed fetch can omit `neutrino/`; read the release notes before installing that core. MEGA uploads depend on successful publishing and configured credentials. Superseded or failed runs may have no archived package.

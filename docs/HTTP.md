@@ -46,7 +46,7 @@ On the PC, run an HTTP server meeting the profile above, with your ISOs under it
 and put a `games.csv` beside them. Docmine17's `http_server.py` does exactly this and defaults to
 port **1100**.
 
-On the console, **Settings → Network**:
+On the console, enable **Network Start Mode → Manual** or **Auto** in **Game Sources**, then open **Settings → Network**:
 
 | Row | What it is |
 | --- | --- |
@@ -62,8 +62,7 @@ unreadable, or the server not returning the exact bytes asked for — rather tha
 An empty catalog is a valid answer, and Test says so plainly: it proves the server is there, and
 proves nothing at all about whether byte ranges work.
 
-Switching protocol takes effect after a restart, the same as SMB and the UDP transports. Only one
-of them can drive the console's single network adapter.
+The first protocol selected while the adapter is unused can start immediately. Switching away from an already loaded protocol requires restarting RiptOPL; the UI reports that requirement. Only one protocol can own the adapter in a session.
 
 ---
 
@@ -129,12 +128,12 @@ image through a file handle, and HTTP has no filesystem to open one on.
 
 ### Where per-game data lives
 
-Every other device keeps `CFG/`, `ART/` and `CHT/` at the root of the device the game came from.
+Folder-based sources keep `CFG/`, `ART/` and `CHT/` under the configured library prefix; APA uses its selected PFS data home.
 HTTP cannot: the server is read-only and there is no drive to write to. So HTTP keeps them **with
-your settings** instead — wherever RiptOPL saves its configuration, normally the memory card.
+your settings** instead — under RiptOPL’s active local settings home (boot-directory/discovery or Custom Settings Path).
 
 That is the one deliberate exception to the usual rule, and it is why covers and per-game options
-for HTTP games go next to `conf_opl.cfg` rather than on the server.
+for HTTP games go next to `settings_riptopl.cfg` rather than on the server.
 
 ---
 

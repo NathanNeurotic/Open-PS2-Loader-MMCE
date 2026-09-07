@@ -9,17 +9,6 @@
 
 
 
-```HAS THIS EVER HAPPENED TO YOU?```
-```You download another OPL fork. It has a new theme. A new menu. Maybe even a file browser, because apparently launching games was too direct and somebody needed a side quest.```
-```Then the game still does not work.```
-```Introducing RiptOPL, for people who wanted OPL to get better instead of just getting redecorated.```
-```Thanks to serious testing from @PixeliGer, @zackcage6, and others, RiptOPL has reached a stable, reliable state overall. Bug reports, suggestions, feature requests, and questions are still welcome, because unlike a paintjob, actual progress requires feedback.```
-```RiptOPL is not just a frontend. It is not just a theme pack with confidence. It is not OPL wearing a fake mustache and introducing itself as innovation.```
-```RiptOPL keeps compatibility work moving in both places that matter: the OPL core and Neutrino. That means two real launch systems in one setup. If a game does not like one mode, change the game setting and try the other. No app swapping. No fork roulette. No pretending five copies of the same idea equals five solutions.```
-```You get the options that can actually change results. You get fewer pointless blockers. You get less feature clutter pretending to be engineering.```
-```Fast. Simple. Compatible.```
-```Stop chasing the same thing with a new name.```
-```Stop mistaking decoration for development.```
 # RiptOPL
 **An opinionated [Open PS2 Loader](https://github.com/ps2homebrew/Open-PS2-Loader) fork — aiming to be the "definitive build."**
 <br>
@@ -34,57 +23,115 @@ Review the LICENSE file for further details.<br><br>
 [![Documentation](https://img.shields.io/badge/Documentation-RiptOPL-skyblue?style=flat&logo=githubpages&logoColor=white&labelColor=navy)](https://nathanneurotic.github.io/Open-PS2-Loader/)
 [![MEGA Archive](https://img.shields.io/badge/MEGA-Rolling%20Archive-%23D90007?style=flat&logo=mega&logoColor=white)](https://mega.nz/folder/74pRHKRB#9SLDkrkvZAbeKO4Qvxg9LQ)
 
-> **What is RiptOPL?** A downstream fork of Open PS2 Loader with a built-in cover-art **Coverflow** theme (default), a **Favorites** tab, per-game **Neutrino** external-core launching, a reorganized category **settings layout**, DualSense support, and ready-to-use opinionated defaults. Its settings live in their own **`settings_riptopl.cfg`** so they never collide with official OPL or wOPL installed on the same memory card — while artwork, themes, VMCs and **favorites stay shared**. See **[This Fork's Additions](#this-forks-additions)**. For the canonical project, use [ps2homebrew/Open-PS2-Loader](https://github.com/ps2homebrew/Open-PS2-Loader).
+> **What is RiptOPL?** A downstream fork of Open PS2 Loader with a built-in cover-art **Coverflow** theme (default), a **Favorites** tab, per-game **Neutrino** external-core launching, a reorganized category **settings layout**, DualSense support, and ready-to-use opinionated defaults. Its settings live in their own **`settings_riptopl.cfg`** to keep its master settings separate from official OPL and wOPL. Other files, including network and per-game settings, can still be shared. Favorites import from uOPL/wOPL is **one-way**: the next save writes RiptOPL’s own format to `favourites.bin`. See [Where your files live](#where-your-files-live). See **[This Fork's Additions](#this-forks-additions)**. For the canonical project, use [ps2homebrew/Open-PS2-Loader](https://github.com/ps2homebrew/Open-PS2-Loader).
 
-> 📖 **Full documentation & guides:** **<https://nathanneurotic.github.io/Open-PS2-Loader/>** — a complete, searchable docs site covering every storage backend, the Neutrino core, PS1/VCD, the Theme Engine (with worked examples and an annotated sample theme), a full settings reference, and troubleshooting.
+> 📖 **Full documentation & guides:** **<https://nathanneurotic.github.io/Open-PS2-Loader/>** — searchable setup and reference guides covering storage backends, the Neutrino core, PS1/VCD, the Theme Engine (with worked examples and an annotated sample theme), a full settings reference, and troubleshooting.
 
-## External Tools & Services
-
-RiptOPL is intended to work with these maintained companion tools:
-
-- **[PS2-Servers](https://github.com/NathanNeurotic/PS2-Servers)** by **[Ripto](https://github.com/NathanNeurotic)** — all-in-one PC server launcher for **SMBv1, UDPFS and UDPBD**.
-- **[udpfs-server](https://github.com/YouKnow-sys/udpfs-server)** by **[YouKnow-sys](https://github.com/YouKnow-sys)** — the same idea **from a phone**: an Android app that shares folders and disk images to the PS2 over **UDPFS**, found by broadcast so there is no server address to type in on the console. Works over a router or a direct cable. Built on **[udpfsd](https://github.com/pcm720/udpfsd)** by **[pcm720](https://github.com/pcm720)**; MIT licensed. A `udpfs-server.url` shortcut ships in every release package.
-- **[OrbitPS2 Manager](https://github.com/Luden02/OrbitPS2-Manager)** by **[Luden](https://github.com/Luden02)** — cross-platform PC library manager for importing discs, artwork/screenshots, ZSO compression, per-game settings and VMC management.
-- **[OPL PS1 AIO Converter GUI](https://github.com/shaanhomebrew-cloud/OPL-PS1-AIO-Converter-GUI)** by **[shaan](https://github.com/shaanhomebrew-cloud)** — Windows all-in-one PS1/POPStarter preparation tool for converting BIN/CUE backups to VCDs and installing them to USB, MX4SIO, MMCE, iLink, exFAT HDD, SMB and APA internal HDD.
-- **[xeRAbora](https://github.com/hacan359/xerabora)** by **[hacan359](https://github.com/hacan359)** — the PC client for **RetroAchievements** on real PS2 hardware. RiptOPL's RA build streams the running game's memory to it; xeRAbora runs rcheevos, talks to the RetroAchievements servers and unlocks the achievements. It also builds the per-game watch list the console needs. Shipped as a shortcut inside `RIPTOPL-RA-*.zip`; MIT licensed.
-- **[OPL HTTP PC server](https://github.com/Docmine17/Open-PS2-Loader-HTTP)** by **[Docmine17](https://github.com/Docmine17)** — the PC side of RiptOPL’s **HTTP** protocol: a small static HTTP server with byte-range support that serves your `games.csv` catalog and streams the ISOs themselves. RiptOPL works with it **unmodified** — no new API, no catalog conversion, no changed folder layout — and passing against his server is a release gate for the feature, not merely a nice-to-have. The HTTP design and the byte-range reader RiptOPL follows are his, adopted with permission.
-- **[PS2RD CHT Manager](https://github.com/TheRealNextria/PS2RD-CHT-Manager)** by **[TheRealNextria](https://github.com/TheRealNextria)** — PC manager for the PS2RD `.cht` cheat files RiptOPL reads from your device's `CHT` folder. A `PS2RD-CHT-Manager.url` shortcut ships in every release package.
-- **[Ember](https://github.com/Gageformer/Ember)** by **[Gageformer](https://github.com/Gageformer)** — a PS1 emulator that runs natively on the PS2, used as RiptOPL's **second PS1 core** alongside POPSTARTER. Unlike the others this one is not just a shortcut: an `EMBER/` folder ships **inside** the release package, ready to drop onto a device. It is bundled unmodified with the author's permission under the Ember Public Beta Testing Licence (`EMBER/LICENSE-BETA.txt` in the package); releases: <https://github.com/Gageformer/Ember/releases>.
-- **[POPStarter](https://www.psx-place.com/resources/popstarter.683/)** by **krHACKen** — a PS1 launcher built around Sony's native **POPS** emulator for the PS2, used as RiptOPL's **primary PS1 core** alongside Ember. POPStarter provides the compatibility and launch layer for running PS1 VCDs from USB, MX4SIO, MMCE, iLink, internal HDD, and SMB; RiptOPL's iLink handoff is wired but still awaiting a passing hardware retest. The official POPStarter r13 package contains **no Sony emulator binaries, libraries, or BIOS files**; those components must be supplied separately by the user. Official download, documentation, compatibility information, and releases are maintained on **[PSX-Place](https://www.psx-place.com/resources/popstarter.683/)**.
-- **[Neutrino](https://github.com/rickgaiser/neutrino)** by **[rickgaiser](https://github.com/rickgaiser)** — a *"Small, Fast and Modular PS2 Device Emulator"*, and RiptOPL's **second PS2 loader core** alongside OPL's own. Like Ember it is not a shortcut: a ready-to-use `neutrino/` folder ships **inside** the release package, drag-and-drop to `mc?:/neutrino/`. Neutrino is deliberately **UI-agnostic** — it has no interface of its own, which is exactly what lets a front-end like RiptOPL drive it per game. Licensed **AFL-3.0**; releases: <https://github.com/rickgaiser/neutrino/releases>.
 ## Contents
 
-- [Introduction](#introduction) · [Quick Start](#quick-start) · [Major Features Overview](#major-features-overview) · [Releases](#releases) · [How to Use](#how-to-use) · [USB/MMCE/MX4SIO/iLink](#usbmmcemx4sioilink) · [SMB](#smb) · [HDD](#hdd) · [APPS](#apps) · [Cheats](#cheats) · [NBD Server](#nbd-server) · [ZSO Format](#zso-format) · [PS3 BC](#ps3-bc) · [Frequent Issues](#frequent-issues)
+[Releases](#releases) · [Quick Start](#quick-start) · [Sources and cores](#introduction) ·
+[Features](#major-features-overview) · [Fork additions](#this-forks-additions) ·
+[PS1](#ps1-games-two-cores-one-list) · [HTTP](docs/HTTP.md) · [RetroAchievements](docs/RETROACHIEVEMENTS.md) ·
+[Files and folders](#how-to-use) · [USB/MMCE/MX4SIO/iLink](#usbmmcemx4sioilink) ·
+[SMB](#smb) · [HDD](#hdd) · [APPS](#apps) · [Cheats](#cheats) · [NBD](#nbd-server) ·
+[ZSO](#zso-format) · [PS3 BC](#ps3-bc) · [Troubleshooting](#frequent-issues) ·
+[Companion tools](#external-tools--services) · [Credits](#acknowledgements)
+
+## Releases
+
+RiptOPL ships **one full-feature build** — GSM video-mode handling (including 1080p), DS3/DS4 pad
+emulation (PADEMU), VMC, PS2RD cheats and parental controls are all included in the
+standard ELF (no upstream-style per-feature variants). The two upstream `EXTRA_FEATURES`
+extras — in-game screenshots (IGS) and right-to-left (RTL) language support — are **not**
+compiled into any published main ELF (`EXTRA_FEATURES ?= 0`); they ship in the
+`EXTRA_FEATURES=1` builds inside the VARIANTS zip.
+DualSense / DualShock 5 (USB) support is available prebuilt in the `RIPTOPL-VARIANTS-*.zip`
+bundle, or build your own with `make DUALSENSE=1`.
+
+**RetroAchievements** ships as its own complete package, `RIPTOPL-RA-*.zip` (or build it with
+`make RETROACHIEVEMENTS=1`). It is laid out like the main archive — same `POPS/`, `EMBER/`,
+`neutrino/` and shortcuts — with the RA loader in place of the standard one, plus a shortcut to
+**xeRAbora**, the PC client the feature talks to. It is a **development build, not a finished
+feature** — both halves are now written, the menu side included, but none of it has run on a real
+console yet — and the standard ELF is completely unaffected by it. See
+**[docs/RETROACHIEVEMENTS.md](docs/RETROACHIEVEMENTS.md)** for what it does, which launch paths can
+ever support it, and why.
+
+Choose the current development build or a preserved snapshot:
+
+| Channel | What it is |
+| --- | --- |
+| **[Rolling (Latest)](https://github.com/NathanNeurotic/Open-PS2-Loader/releases/tag/rolling)** | Updated from `rebuild/main` by successful publishing runs. A full, non-pre-release GitHub release that remains a **development build**, with compatibility depending on the game and hardware. |
+| **[Current Fan Favorite Build](https://github.com/NathanNeurotic/Open-PS2-Loader/releases/tag/current-fan-favorite)** | A preserved development snapshot selected after positive user feedback. Use it as a fixed comparison point; it is not a universal compatibility guarantee. |
+
+Download the **normal installable package**, `RIPTOPL-<rel>-<sha>.zip`. Separate archives serve
+different purposes: `RA` for the experimental RetroAchievements loader, `VARIANTS` for alternate
+configurations including DualSense, `DEBUG` for diagnostics, `LANGS` for translations, and `src`
+for the exact source snapshot. Optional archives or SDK flavours can be omitted; read the release notes.
+GitHub does not publish bare loader ELFs or separate checksum/SDK manifests in the normalized asset set.
+The workflow can also publish `v*` tags, but no such stable release is currently offered here.
+
+
+See **[ROLLING_RELEASE.md](ROLLING_RELEASE.md)** for exactly what the rolling release
+contains and how to pull it.
+
+> **Which rolling build?** The rolling zip ships four loader ELFs that differ only by build
+> toolchain — the RiptOPL code in each is identical. Start with a pinned SDK for reproducible comparisons:
+> 1. **`APP_RIPTOPL-PS2DEVPINNED/`** (`-PS2DEVPINNED`) — **recommended primary download.** Built on the
+>    `ps2dev/ps2dev` SDK pinned by image digest for reproducible toolchain selection; pinning alone does not prove hardware compatibility.
+> 2. **`APP_RIPTOPL-OFFICIALPINNED/`** (`-OFFICIALPINNED`) — **recommended official pin.** Built on the
+>    `ps2homebrew/ps2homebrew` official SDK, pinned by image digest.
+> 3. **`APP_RIPTOPL-PS2DEVROLLING/`** (`-PS2DEVROLLING`) — **bleeding-edge canary.** Tracks `ps2dev/ps2dev:latest`.
+> 4. **`APP_RIPTOPL-OFFICIALROLLING/`** (`-OFFICIALROLLING`) — **bleeding-edge official canary.** Tracks `ps2homebrew:main`.
+> See [Which build should I use?](ROLLING_RELEASE.md#which-build-should-i-use).
+
+> Older published builds may be available in the [MEGA archive](#opl-archive).
+
+## Quick Start
+
+### What you need
+
+- A PS2 with a homebrew ELF launcher, or a supported [backward-compatible PS3](#ps3-bc).
+- One prepared storage source from the table below. Ethernet and a reachable server are required for network sources.
+- The normal installable `RIPTOPL-<rel>-<sha>.zip` from [Releases](#releases).
+
+### Minimal startup path
+
+1. Extract the normal installable archive. Start with `APP_RIPTOPL-PS2DEVPINNED/RIPTOPL.ELF` when present; see [build choices](ROLLING_RELEASE.md#which-build-should-i-use) for alternatives.
+2. Copy that ELF to a location your homebrew launcher can boot. For Neutrino, also copy the complete `neutrino/` folder to `mc0:/neutrino/` or `mc1:/neutrino/`. PS1 needs the companion files described in [PS1 games](#ps1-games-two-cores-one-list); copying the loader ELF alone does not install those cores.
+3. Prepare your game's source: `CD/` or `DVD/` for folder-based PS2 libraries, HDLoader partitions for APA, or `games.csv` for HTTP. See [How to use](#how-to-use).
+4. In **Settings → Game Sources**, enable the device and its start mode. For a network source, set **Network Start Mode** to **Manual** or **Auto**, then choose the protocol in **Network** and enter your server's settings.
+5. Use the server's Test action where available, then choose **Save Changes** before launching a game. A successful menu test is not proof that gameplay works.
+6. Launch one test game. If it fails, record the exact build, SDK flavour, source and core before changing settings; see [Frequent Issues](#frequent-issues).
+
+### Known limitations
+
+- **HTTP:** implemented and host-tested, but not yet tested on PS2 hardware. ISO only; no VMC, Neutrino or PS1. DVD9 probing is implemented but unproven. [HTTP guide](docs/HTTP.md).
+- **RetroAchievements:** a separate development package; the console integration has not been hardware-tested. It requires xeRAbora on a PC and OPL-core launching. [RA guide](docs/RETROACHIEVEMENTS.md).
+- **iLink:** revision 2692 passed Ember on the tested SCPH-39001 but failed native OPL, Neutrino and POPSTARTER handoffs. The Neutrino `-qb` correction is implemented; a passing retest is still needed.
+- **Core switching is source-dependent:** SMB and HTTP use OPL; UDPFS/UDPBD use Neutrino. See the [source table](#introduction).
 
 ## Introduction
 
 Open PS2 Loader (OPL) is a 100% Open source game and application loader for
-the PS2 and PS3 units.
+the PS2 and supported backward-compatible PS3 units (see [PS3 BC](#ps3-bc)). RiptOPL source is AFL-3.0; bundled third-party components retain their own licences.
 Major capabilities include GSM video mode fixes, Virtual Memory Cards (VMC), PS2RD cheats, DS3/DS4 pad emulation, themes, and homebrew app launching.
 
-It supports six categories of devices:
+RiptOPL supports local USB, MMCE, MX4SIO, iLink and internal ATA storage, plus
+SMB, UDPFS, UDPBD and HTTP over Ethernet. Capabilities depend on both the source and loader core:
 
-1. USB mass storage devices;
-2. MMCE (Memory Card Mass Storage protocol devices);
-3. MX4SIO (SD card connected to memory card port via adapter);
-4. iLink (SBP2 compliant storage devices via IEEE 1394);
-5. SMB shares (SMBv1 or SMB2, selectable under **Network**);
-6. ATA/IDE HDDs, including internal exFAT configurations (MBR/GPT).
+| PS2 game source | Loader core | Image/layout | VMC notes |
+| --- | --- | --- | --- |
+| USB / MX4SIO / MMCE / ATA exFAT | OPL or Neutrino for ISO | ISO; OPL also handles ZSO and UL split images | Supported; Neutrino cards must be on the game's device |
+| iLink | OPL or Neutrino paths implemented | Local files | Launch remains pending hardware retest; see [iLink status](#usbmmcemx4sioilink) |
+| Internal HDD, APA | OPL or Neutrino | HDLoader partitions | OPL supports VMC; Neutrino drops APA/PFS VMC with a warning |
+| SMB | OPL | ISO, ZSO, UL | Server must permit writes for VMC saves |
+| UDPFS Files / IMG and UDPBD | Neutrino | Files under `CD/` / `DVD/`, or a served FAT/exFAT disk image | Depends on backend and write access; see [Neutrino](docs/NEUTRINO.md) |
+| HTTP | OPL | ISO listed in `games.csv`; compressed images refuse to launch | No VMC; use physical memory cards |
 
-Plus an optional **network-block-device boot** (UDPBD / UDPFS, via Neutrino) that streams games
-from a PC over the LAN as their own game list — the network protocol defaults to **Off**; the
-first protocol you pick in **Network** comes up live. (Network stacks share the one adapter
-and stay loaded for the whole boot, so *switching away* from a loaded protocol still needs a
-restart — OPL says so when it applies.)
-See [This Fork's Additions](#this-forks-additions).
-
-All of the devices mentioned above support multiple file formats, including:
-
-- ISO;
-- ZSO (Compressed ISO);
-- USB Extreme (ul);
-- Homebrews (Apps) in ELF format;
-- HDDs support the HDLoader format.
+Neutrino does not read local ZSO or UL split images. A compatible UDPFS server can instead
+decompress an image on the PC and expose it to the console as an ISO; that is server-side support.
+ELF apps and PS1 games have their own launch paths, described below.
 
 >[!NOTE]
 OPL is developed continuously - anyone can contribute improvements to the project due to its open-source nature.
@@ -95,27 +142,8 @@ You can visit the Open PS2 Loader forum at:\
 You can report compatibility game problems at:\
 <https://www.psx-place.com/threads/open-ps2-loader-game-bug-reports.19401/>
 
-For an updated compatibility list, you can visit the OPL-CL site at:\
+For historical upstream OPL compatibility reports (not a current RiptOPL compatibility guarantee), visit:\
 <http://sx.sytes.net/oplcl/games.aspx>
-
-## Quick Start
-
-### What you need
-
-- [ ] A PlayStation 2 or backward-compatible PlayStation 3.
-- [ ] One storage option: USB drive, MMCE or MX4SIO SD setup, iLink storage, SMB network share, or internal HDD (APA/PFS or exFAT).
-- [ ] A RiptOPL build (`RIPTOPL.ELF`) — a tagged `v*` release for stability, or the `rolling` Latest development release for the newest features.
-- [ ] Optional: network access (recommended for SMB and remote file management).
-
-### Minimal startup path
-
-1. Download a RiptOPL build (tagged `v*` or `rolling`) from the [Releases](https://github.com/NathanNeurotic/Open-PS2-Loader/releases) page.
-2. Copy the `RIPTOPL.ELF` file to your launch method (FMCB, FHDB, or equivalent).
-3. Prepare your storage with the expected OPL folders: `DVD`, `CD`, `CFG`, `ART`, `VMC`, and other mode-specific directories as needed.
-4. Open OPL settings and enable the device mode you plan to use.
-5. Launch one test game, then save settings so OPL reuses your configuration.
-
-For detailed setup steps, jump to the README sections for **USB/MMCE/MX4SIO/iLink**, **SMB**, **HDD**, **APPS**, and **Frequent Issues**.
 
 ### Major Features Overview
 
@@ -159,7 +187,7 @@ This build layers several features on top of upstream OPL:
   (alongside the device tabs, switched on in **Game Sources**) gathers your starred games
   from every device into one list, and a star marks favorited titles everywhere. Favorites
   are stored in a shared `favourites.bin`, and RiptOPL will **import an existing uOPL / wOPL
-  `favourites.bin` file** if it finds one — so your favorites carry over from those builds.
+  `favourites.bin` file** if it finds one. This is a **one-way import**: the next favorites write replaces that file with RiptOPL’s `OFAV` format, which those loaders cannot read back. Keep a copy of the original if you also use them.
   Favorites always has its own independent **L3** ring: **All in One → PS2 → PS1 → ELF**.
   The selected row's real type controls its actions and launcher even in All in One; the global
   device-game display setting does not pin or disable this page.
@@ -175,7 +203,7 @@ This build layers several features on top of upstream OPL:
   list, so covers, favorites, coverflow and per-game settings all work inside folders. Works on
   USB / MX4SIO / iLink / internal-BDM, MMCE and UDPFS-Files. Left off, a flat library looks and
   behaves exactly as before.
-- **Controller vibration in the menus (opt-in):** turn on **Controller Vibration in Menus** in
+- **Controller vibration in the menus (on by default):** toggle **Controller Vibration in Menus** in
   **Settings** for a little haptic tap as you move around — a light tick when the cursor moves,
   a slightly firmer bump on confirm / cancel / notifications, and one when OPL finishes booting
   and the menu is ready. Needs a **DualShock in analog mode** (a digital-only or clone pad simply
@@ -183,8 +211,8 @@ This build layers several features on top of upstream OPL:
   changes.
 > **Credit and licence — Neutrino is created by [rickgaiser](https://github.com/rickgaiser), and its
 > official home is <https://github.com/rickgaiser/neutrino>.** Neutrino is an independent PS2 device
-> emulator, **not** part of RiptOPL and not our work. Every release package bundles the official
-> latest build, re-fetched at publish time, under its **AFL-3.0** licence. We add exactly one file to
+> emulator, **not** part of RiptOPL and not our work. Release packaging normally bundles the official
+> latest build, re-fetched at publish time (download/extraction failures can omit it; check the release notes), under its **AFL-3.0** licence. We add exactly one file to
 > that folder — `config/bsd-udpfsbd.toml`, because Neutrino ships `udpfs_bd.irx` without a matching
 > `-bsd` token and RiptOPL launches UDPFS as `-bsd=udpfsbd`. Nothing of rickgaiser's is altered or
 > removed. RiptOPL is one of several front-ends built on Neutrino, alongside **NHDDL**, **XEB+
@@ -204,8 +232,7 @@ This build layers several features on top of upstream OPL:
   fails, press **Select / Refresh** on the failed network page to retry it. Run it from the
   **[PS2 Servers](https://github.com/NathanNeurotic/PS2-Servers)** all-in-one PC launcher. See the
   network-boot section of **[docs/NEUTRINO.md](docs/NEUTRINO.md#4-network-boot--the-network-protocol-selector)**.
-- **HTTP library (new):** a fifth network protocol — point RiptOPL at any static HTTP server
-  that supports byte ranges, and it reads a `games.csv` catalog and streams the ISOs straight off it
+- **HTTP library (new):** point RiptOPL at a server meeting the [HTTP client response profile](docs/HTTP.md), and it reads a `games.csv` catalog and streams the ISOs straight off it
   through OPL’s own core. The PC side is **[Docmine17](https://github.com/Docmine17)’s**
   **[HTTP server](https://github.com/Docmine17/Open-PS2-Loader-HTTP)**, adopted with permission and
   used **unmodified** — existing catalogs and folder layouts need no conversion. Pick **HTTP** under
@@ -215,9 +242,9 @@ This build layers several features on top of upstream OPL:
 - **UDPFS network boot (Neutrino):** a newer network transport (Neutrino's UDPRDMA) offered
   alongside UDPBD. The network controls are split across two pages: **Game Sources** holds the
   **Network Start Mode** row (Off / Manual / Auto), and **Network** holds **Protocol**
-  (**SMB / UDPFS / UDPBD**), **SMB Version** (SMBv1 / SMB2, live only while Protocol is SMB),
+  (**SMB / UDPFS / UDPBD / HTTP**), **SMB Version** (SMBv1 / SMB2, live only while Protocol is SMB),
   and **Access** (Files / IMG — locked to Files
-  for SMB and to IMG for UDPBD, free only for UDPFS). UDPFS launches via `-bsd=udpfsbd` with a
+  for SMB/HTTP and to IMG for UDPBD, free only for UDPFS). UDPFS launches via `-bsd=udpfsbd` with a
   bundled `bsd-udpfsbd.toml`. Use the
   **[PS2 Servers](https://github.com/NathanNeurotic/PS2-Servers)** all-in-one PC launcher for UDPFS,
   SMB and UDPBD; advanced users can run **[pcm720/udpfsd](https://github.com/pcm720/udpfsd)** directly.
@@ -352,17 +379,317 @@ This build layers several features on top of upstream OPL:
   it no longer falls back to the first USB page.
 - **DualSense / DualShock 5 (USB):** optional controller support — available in the prebuilt
   `RIPTOPL-VARIANTS-*.zip` release bundle (one ELF per SDK flavour), or build with `make DUALSENSE=1`.
-- **1080p GSM video mode:** forced progressive 1080p (1920×1080) GSM mode is built directly into all standard builds (`make GSM1080P=1`). Selecting 1080p in the per-game GSM picker is guarded by a **three-step confirmation**; if your display cannot sync it, holding **Triangle + Cross** on console boot forces safe 480p progressive mode.
+- **1080p GSM video mode:** forced progressive 1080p (1920×1080) GSM mode is built directly into all standard builds (`make GSM1080P=1`). Selecting 1080p in the per-game GSM picker is guarded by a **three-step confirmation**; if a game loses the picture, disable/change its GSM override before relaunching. **Triangle + Cross** at boot affects only the OPL menu and requires a 480p-capable display/connection.
 - **Ready-to-use defaults:** a fresh install boots with sensible options already enabled —
   widescreen, cover art, notifications, sound effects + boot sound, delete/rename, and
   the PS2 logo. Video mode stays **Auto**. Every storage device ships **off**, so the first boot
   lands on the start menu with no tabs — enable exactly the devices your console has under
   **Game Sources**. Change any of it under Settings.
-- **Private settings, shared data:** RiptOPL saves its master config as **`settings_riptopl.cfg`**
-  (auto-migrated from the older `conf_riptopl.cfg`; not `conf_opl.cfg`), so it can sit on the same memory card as official OPL or wOPL without
-  either build clobbering the other's settings. Everything else under the `OPL/` folder —
-  artwork, themes, VMCs, per-game configs, and **favorites** — stays **shared** between builds.
+- **Private master settings, shared support files:** `settings_riptopl.cfg` is separate from stock OPL's master file. Other configuration and data can still be shared; favorites migration from uOPL/wOPL is one-way. See [Where your files live](#where-your-files-live).
 
+## How to use
+
+Folder-based PS2 libraries use the following support folders under their configured library prefix.
+APA uses its selected PFS data partition. HTTP uses local support folders beside the active settings
+home; it does not open these folders on the server. Availability also depends on the core:
+
+| Folder | Description                                          | Modes       |
+| ------ | ---------------------------------------------------- | ----------- |
+| `CD`   | for games on CD media - i.e. blue-bottom discs       | All folder devices¹ |
+| `DVD`  | for DVD5 and DVD9 images (if filesystem supports +4gb files) | All folder devices¹ |
+| `VMC`  | Virtual Memory Card images (headline save feature): stored in `VMC/`, typically 8MB to 64MB, then assigned per game via **Game Settings** | See source/core table |
+| `CFG`  | for saving per-game configuration files              | See source/core table |
+| `ART`  | for game art images                                  | See source/core table |
+| `THM`  | for themes support                                   | See source/core table |
+| `LNG`  | for translation support                              | See source/core table |
+| `CHT`  | for cheats files                                     | See source/core table |
+| `APPS`  | for ELF files                                       | See source/core table |
+
+¹ **Folder-based devices** — USB, MMCE, MX4SIO, iLink, SMB, and the **exFAT** (BDM) HDD — keep games as files in the `CD`/`DVD` folders. The **APA/PFS** HDD instead stores games as HDLoader partitions (no `CD`/`DVD` folders), while still using `CFG`/`ART`/`VMC`/`THM`/`CHT`/`LNG`/`APPS` on the configured OPL data partition (`+OPL` root by default, or `__common/OPL/` for the legacy layout).
+
+Per-game settings are stored per title in the `CFG` context. Typical use cases include compatibility toggles, video options (GSM), cheat toggles, and assigning a VMC file from the `VMC` folder to that game.
+
+RiptOPL attempts to create support folders when you enable a writable source. Read-only sources need preparation on the server or PC; enabling a device does not format a disk or create APA partitions.
+
+For APA, RiptOPL uses existing partitions only: a usable `hdd_partition` selection in
+`hdd0:__common/OPL/conf_hdd.cfg`, then an existing `+OPL`, then `__common/OPL/`.
+If no suitable data partition exists it fails without creating one. See [HDD](#hdd).
+
+HDDs are also able to be formatted as exFAT to avoid the 2TB limitation.  Please see below in the `HDD` section for more details on this configuration.
+
+### Where your files live
+
+`settings_riptopl.cfg` holds RiptOPL's master settings; an older `conf_riptopl.cfg` is imported on
+read and migrated on save. The normal settings home starts with the loader's boot directory and
+uses discovery/fallbacks when that location cannot be used. **Custom Settings Path** can select a
+different home. Check the active location instead of assuming all settings are on `mc0:/OPL/`.
+
+Network configuration (`conf_network.cfg`), app lists, per-game settings, artwork, themes and VMCs
+can still be shared with other OPL installations. Separate master filenames do not isolate these
+files. Favorites import from uOPL/wOPL is one-way: saving writes RiptOPL's own `OFAV` format.
+
+PS2 folders follow the source's configured library prefix. Local PS1 `POPS/` and `EMBER/` live at
+the **device root**, even if PS2 games use a subfolder. APA has its own partition layouts, covered
+in [PS1/VCD](docs/VCD.md). HTTP's `CFG/`, `ART/` and `CHT/` are local folders under the active settings
+home; placing them on the HTTP server does not make the console load them from there.
+
+## USB/MMCE/MX4SIO/iLink
+
+Supported file systems:
+FAT32 and exFAT are the usual folder-based layouts. MBR is the conventional setup for USB and SD media; partition-table support also depends on the device/driver. For large internal disks, see [HDD](#hdd) for GPT/exFAT. This section applies to MMCE and MX4SIO SD setups, USB storage, and iLink SBP2 storage.
+
+> [!WARNING]
+> **Revision 2692 iLink status is not a blanket pass.** On an SCPH-39001, Ember passed from the same
+> IEEE 1394 disk in all four SDK flavours, while the native OPL core, Neutrino, and POPSTARTER failed
+> at their reset/handoff boundaries. The current code corrects a confirmed RiptOPL-side Neutrino
+> handoff mismatch (`-qb` was not auto-emitted for iLink); only hardware retesting can establish
+> whether that was the complete cause. POPSTARTER's
+> external `.ilink` BDMA equip and `mass:/POPS/XX.<name>.ELF` handoff are present, but remain
+> unconfirmed, and the native OPL iLink reset path is still under investigation. See
+> [Neutrino](docs/NEUTRINO.md) and [PS1/VCD](docs/VCD.md) for the exact status and isolation checks.
+
+> [!NOTE]
+> MX4SIO game launch requires the matching PS2SDK `freesio2` module to load before
+> `mx4sio_bd` after OPL resets the game IOP. See [MX4SIO game-launch notes](docs/MX4SIO.md)
+> for the dependency, regression history, and hardware test checklist.
+
+Game files should be *ideally* defragmented either file by file or by whole drive.
+
+> Fragmentation has a bounded budget. OPL’s BDM reader shares a 64-entry fragment table across the game image parts; Neutrino’s block-device budget includes the ISO and VMCs together. Contiguous copies leave the most headroom.
+
+If you choose to use the FAT32 file system, games larger than 4gb must use USBExtreme format (see OPLUtil or USBUtil programs).
+
+If a fragment-limit error is reported, first try a fresh sequential copy with enough free space.
+Back up all data before considering a reformat; a screen colour alone does not diagnose fragmentation.
+
+## SMB
+
+For loading games by SMB protocol, you need to share a folder (ex: PS2SMB)
+on the host machine or NAS device and grant read access for game loading. Write access is also needed for VMC saves and changes to files stored on the share. USB Advance/Extreme format is optional - \*.ISO images
+are supported using the folder structure above.
+
+> **SMB version:** the **Network** page has an **SMB Version** row (SMBv1 / SMB2) directly under
+> **Protocol**, live only while **Protocol** is **SMB** (greyed out otherwise). It defaults to
+> **SMBv1**; setting it to **SMB2** switches *both* sides — browsing loads the SMB2 driver instead
+> of the SMBv1 one, and so does the in-game reader — so the server must speak SMB2 for the whole
+> session.
+>
+> **RiptOPL network defaults:** the network protocol selector defaults to **Off** — under
+> **Game Sources** set **Network Start Mode** to **Manual** or **Auto**, then in **Network** set
+> **Protocol** to **SMB**, before the **NET Games** tab appears. Network Config
+> ships static defaults (PS2 `192.168.1.10`, PC `192.168.1.100`, share `games`, user `guest`);
+> adjust them to your LAN. The default **SMB Port is `1111`** — a non-privileged port (>1024), so a server
+> binds it without admin/root. **Network Config** now opens with **advanced options on**, so
+> the **Port** field (and ETH link mode) are editable immediately. If Windows 10/11 has
+> disabled SMB1/NTLMv1, set **SMB Version** to **SMB2**; the
+> **[PS2 Servers](https://github.com/NathanNeurotic/PS2-Servers)** all-in-one launcher remains the
+> fallback for SMBv1-only setups. Choose its SMBv1 server, then set RiptOPL's
+> IP, port, share and credentials to the values the launcher displays. Its documented custom SMBv1
+> port is **1111**, matching RiptOPL’s default. Windows’ built-in server or a NAS may use a different
+> port; enter the value that server actually listens on. Release packages
+> include **`PS2-Servers.url`** as a direct shortcut to the repository.
+
+## HDD
+	
+Both PS2 HDD types are **off by default** in RiptOPL — enable the one you use under **Game
+Sources**. For PS2, 48-bit LBA internal HDDs are supported. The HDD can be formatted as:
+
+- APA partitioning with PFS filesystem (up to 2TB)
+	- RiptOPL mounts an existing data partition. A usable `hdd_partition` selection in `__common/OPL/conf_hdd.cfg` takes priority, followed by existing `+OPL`, then `__common/OPL/`. No partition is created, resized or formatted. `+OPL` uses its root for support folders; `__common` uses `OPL/`.
+- MBR partitioning (up to 2TB) or GPT partitioning (capacities above the MBR limit, subject to the driver and tested hardware) with the exFAT filesystem
+	- Enable **BDM HDD** in **Game Sources**. The exFAT HDD then mounts through the Block Device Manager (BDMAssault / "BDMA") into the shared `massN:` namespace — the same path as USB/MX4SIO — and appears as an **HDD (exFAT)** games list with the HDD icon.
+	- Files should be added contiguously or synchronously to avoid fragmentation. For example, drag and drop files one at a time, or ensure that files are added sequentially.
+	- When formatting drives for the exFAT filesystem, please make sure the `Allocation unit size` is set to `Default`.
+	- **PS1 games:** PS1 `*.VCD` titles in the HDD's `POPS/` folder list under the **L3** PS1 view like any other device. To boot them, open **PS Emulation Settings → BDMA Settings** from the main menu. **VCD BDMA Apply on Launch** is on by default and equips the matching exFAT driver automatically; turn it off to reveal the manual **BDMA Source** / **BDMA Mode** pickers and set **BDMA Mode → HDD (exFAT)** by hand so POPSTARTER can read the exFAT volume. See **[docs/VCD.md](docs/VCD.md)**.
+
+## APPS
+
+There are two supported methods for adding apps to OPL. Keep both available and choose the one that fits your setup:
+
+- Use legacy `conf_apps.cfg` when you want one central list and/or apps stored anywhere on supported devices.
+- Prefer folder-based `title.cfg` when you want each app self-contained inside `APPS/<APP_FOLDER>/`.
+
+### conf_apps.cfg method (Legacy)
+
+Each entry uses `Display Name=DevicePathToELF`:
+- Left side: the name shown in the OPL app list.
+- Right side: full device/path to the ELF.
+
+To begin:
+
+1. Create a text file called `conf_apps.cfg`.
+2. In this file, put the name you want to appear in the list of apps, followed by the "=" sign.
+3. Add the device prefix and ELF path (for example `mass:` for USB/MX4SIO/iLink/exFAT-HDD, `mmce0:` for MMCE, `mc0:` for the Memory Card, or `hdd0:`/`pfs0:` for the APA HDD), then the file path to the ELF.
+
+> NOTE: Enter the exact path and exact letter case. OPL is case-sensitive.
+
+The structure should look like this:
+
+```
+My App Name=mass:APPS/MYAPP.ELF
+```
+
+let's use OPL itself as an example:
+
+```
+OPL=mass:APPS/RIPTOPL.ELF
+```
+
+With this method, ELFs do not need to be in `APPS`, but keeping them there can make your setup easier to manage.
+
+RiptOPL checks `mc?:OPL/conf_apps.cfg` first, then `conf_apps.cfg` under each enabled source’s configured prefix; the first file found wins. With a default mass-device prefix, use `mass0:/conf_apps.cfg`. `mass0:/OPL/conf_apps.cfg` is only found through this route when `OPL/` is that source’s configured prefix. Files are not merged into one legacy list.
+
+### title.cfg method
+
+This method uses one `title.cfg` per app folder, with two required lines:
+- `title=` for the app name shown in OPL.
+- `boot=` for the ELF filename to launch.
+
+To begin:
+
+1. In `APPS`, create a folder for the app.
+2. Put the ELF in that folder, and create a text file named `title.cfg` in the same folder.
+3. In that file, add the following instructions:
+
+```
+title=My App Name
+boot=MYAPP.ELF
+```
+
+Using OPL again as an example:
+
+```
+title=Open PS2 Loader
+boot=RIPTOPL.ELF
+```
+
+In this method, both the ELF and `title.cfg` must be in the same folder under `APPS`.
+
+> NOTE: In both methods, pay close attention to file names because, as already mentioned, OPL is case-sensitive.
+
+## Cheats
+
+OPL accepts `.cht` files in PS2RD format. Name them after the game’s startup ID, for example `CHT/SLUS_123.45.cht`. An uncompressed `CHT/cht.tar` containing `<startup>.cht` members is also supported, with loose files used as a fallback. Each cheat file corresponds to a specific game and must be stored in the `CHT` directory on your device.
+Cheats are structured as hexadecimal codes, with proper headers as descriptions to identify their function.
+You can activate cheats via OPL's graphical interface. Navigate to a games settings, enable cheats and select the desired mode.
+
+### Cheat Modes
+
+  * Auto Select Cheats:  
+This mode will enable and apply all cheat codes in your `.cht` file to your game automatically.
+
+  * Select Game Cheats:  
+When enabled a cheat selection menu will appear when you launch a game. You can navigate the menu and disable undesired cheats for this launch session. Master Codes cannot be disabled as they are required for any other cheats to be applied.
+
+## NBD Server
+
+The built-in NBD server **exports the PS2's internal drive to a PC** for tools such as `hdl-dump`
+or `pfs-shell`. This is different from UDPBD/UDPFS, which serve game data from a PC to the PS2.
+Configure the console's IP (static or DHCP), choose **Start NBD server**, and connect only after
+the console reports that it is running. Disconnect the PC client before leaving the server screen.
+
+See the [NBD client setup guide](https://nathanneurotic.github.io/Open-PS2-Loader/nbd.html) for
+Linux, WSL and Windows examples. The implementation uses [lwNBD](https://github.com/bignaux/lwNBD)
+and the [NBD protocol](https://github.com/NetworkBlockDevice/nbd/blob/master/doc/proto.md).
+
+## ZSO Format
+
+As of version 1.2.0, compressed ISO files in ZSO format is supported by OPL.
+
+To handle ZSO files, a python script (ziso.py) is included in the pc folder of this repository.
+It requires Python 3 and the LZ4 library:
+
+  ```sh
+pip install lz4
+```
+
+To compress an ISO file to ZSO:
+
+  ```sh
+python pc/ziso.py -c 2 "input.iso" "output.zso"
+```
+
+To decompress a ZSO back to the original ISO:
+
+```sh
+python pc/ziso.py -c 0 "input.zso" "output.iso"
+```
+
+For OPL-core folder-based sources, copy ZSO files beside your ISOs. Local ZSO is not a Neutrino format, and HTTP refuses compressed-image launches; see the [source table](#introduction).
+To install onto internal HDD, you can use the latest version of HDL-Dump.
+
+## PS3 BC
+
+Currently, supported only [PS3 Backward Compatible](https://www.psdevwiki.com/ps3/PS2_Compatibility#PS2-Compatibility) (BC) versions. So only [COK-001](https://www.psdevwiki.com/ps3/COK-00x#COK-001) and [COK-002/COK-002W](https://www.psdevwiki.com/ps3/COK-00x#COK-002) boards are supported. USB, SMB, HDD modes are supported.
+
+To run OPL, you need an entry point for running PS2 titles. You can use everything (Swapmagic PS2, for example), but custom firmware with the latest Cobra is preferred. Note: only CFW supports HDD mode.
+
+## Some notes for DEVS
+
+Repository scripts live in `tools/`; run them from the repository root. Existing
+Makefile targets retain their names and output locations.
+
+Use one of the toolchain images in [the CI matrix](.github/workflows/flavours.yml). Both pinned
+and rolling SDK images are supported; the latest SDK is not required. For a reproducible baseline,
+use the `PS2DEVPINNED` image digest from that matrix. From the repository root with Docker available:
+
+```sh
+docker run --rm -v "${PWD}:/src" -w /src ps2dev/ps2dev@sha256:8fba50ecc2229acd7f8da63d34302f12939b7d4fa6848dda1e6a0ce083321a11 make -j4
+```
+
+Use a clean checkout/build directory when changing SDK images. See the Makefile for flags such as
+`DUALSENSE=1` and `EXTRA_FEATURES=1`; build success does not establish console compatibility.
+
+## OPL Archive
+
+Successful archive uploads preserve rolling builds on MEGA under run-specific folders (`RiptOPL/Rolling/<version>/run_<number>/`). Uploads depend on publishing success and configured credentials; superseded or failed runs may have no archive. The archive includes installable packages, source and build metadata; VARIANTS and DEBUG bundles are excluded. You can access it by clicking the MEGA badge at the top of this readme or visiting the [MEGA Rolling Archive](https://mega.nz/folder/74pRHKRB#9SLDkrkvZAbeKO4Qvxg9LQ).
+
+## Frequent Issues
+
+### OPL freezes on logo or grey screen
+
+Hold **START** while RiptOPL initializes to skip saved configuration. If that restores the menu,
+review the active settings location, configure the required source, save, and retry a normal boot.
+This isolates configuration as a possibility; it does not diagnose every startup freeze.
+
+### Game freezes on white screen
+
+A white or black launch screen alone does not identify the cause. Record the exact build/SDK,
+console, game ID, source and core. Check the image against a known-good dump and test with game
+overrides disabled. If the loader reports a fragment-limit error, try a fresh sequential copy.
+Back up the device before any reformat; do not reformat solely because of the screen colour.
+
+### OPL does not display anything on boot
+
+Hold **Triangle + Cross** while RiptOPL initializes to force **480p for the OPL menu**. Your display
+and connection must accept 480p. Once visible, choose a suitable menu mode under **Interface** and
+save. **START** skips saved configuration and uses defaults if you need to undo a saved menu setup.
+
+### The menu works, but launching a game loses the picture
+
+Menu recovery does not clear game video settings. Open that game’s settings and disable/change its
+GSM override, or its Neutrino video options if that is the selected core. Check inherited global
+video defaults too. Retry with the game's normal video mode before adding overrides again.
+
+Report RiptOPL regressions in [this repository’s issue tracker](https://github.com/NathanNeurotic/Open-PS2-Loader/issues).
+Include the version/SHA, SDK flavour, console model, game ID, storage/protocol, loader core,
+reproduction steps, relevant settings and any known-good build comparison. For upstream/community
+discussion, the [OPL forum](https://www.psx-place.com/forums/open-ps2-loader-opl.77/) remains available.
+
+## External Tools & Services
+
+RiptOPL is intended to work with these maintained companion tools:
+
+- **[PS2-Servers](https://github.com/NathanNeurotic/PS2-Servers)** by **[Ripto](https://github.com/NathanNeurotic)** — all-in-one PC server launcher for **SMB, UDPFS, UDPBD and HTTP**.
+- **[udpfs-server](https://github.com/YouKnow-sys/udpfs-server)** by **[YouKnow-sys](https://github.com/YouKnow-sys)** — the same idea **from a phone**: an Android app that shares folders and disk images to the PS2 over **UDPFS**, found by broadcast so there is no server address to type in on the console. Works over a router or a direct cable. Built on **[udpfsd](https://github.com/pcm720/udpfsd)** by **[pcm720](https://github.com/pcm720)**; MIT licensed. A `udpfs-server.url` shortcut ships in installable packages.
+- **[OrbitPS2 Manager](https://github.com/Luden02/OrbitPS2-Manager)** by **[Luden](https://github.com/Luden02)** — cross-platform PC library manager for importing discs, artwork/screenshots, ZSO compression, per-game settings and VMC management.
+- **[OPL PS1 AIO Converter GUI](https://github.com/shaanhomebrew-cloud/OPL-PS1-AIO-Converter-GUI)** by **[shaan](https://github.com/shaanhomebrew-cloud)** — Windows all-in-one PS1/POPStarter preparation tool for converting BIN/CUE backups to VCDs and installing them to USB, MX4SIO, MMCE, iLink, exFAT HDD, SMB and APA internal HDD.
+- **[xeRAbora](https://github.com/hacan359/xerabora)** by **[hacan359](https://github.com/hacan359)** — the PC client for **RetroAchievements** on real PS2 hardware. RiptOPL's RA build streams the running game's memory to it; xeRAbora runs rcheevos, talks to the RetroAchievements servers and unlocks the achievements. It also builds the per-game watch list the console needs. Shipped as a shortcut inside `RIPTOPL-RA-*.zip`; MIT licensed. RiptOPL’s RA integration is not yet hardware-tested.
+- **[OPL HTTP PC server](https://github.com/Docmine17/Open-PS2-Loader-HTTP)** by **[Docmine17](https://github.com/Docmine17)** — the PC side of RiptOPL’s **HTTP** protocol: a small static HTTP server with byte-range support that serves your `games.csv` catalog and streams the ISOs themselves. RiptOPL works with it **unmodified** — no new API, no catalog conversion, no changed folder layout — with host conformance checks against his server. PS2 hardware validation is still pending. The HTTP design and the byte-range reader RiptOPL follows are his, adopted with permission.
+- **[PS2RD CHT Manager](https://github.com/TheRealNextria/PS2RD-CHT-Manager)** by **[TheRealNextria](https://github.com/TheRealNextria)** — PC manager for the PS2RD `.cht` cheat files RiptOPL reads from your device's `CHT` folder. A `PS2RD-CHT-Manager.url` shortcut ships in installable packages.
+- **[Ember](https://github.com/Gageformer/Ember)** by **[Gageformer](https://github.com/Gageformer)** — a PS1 emulator that runs natively on the PS2, used as RiptOPL's **second PS1 core** alongside POPSTARTER. Unlike the others this one is not just a shortcut: an `EMBER/` folder ships **inside** the release package, ready to drop onto a device. It is bundled unmodified with the author's permission under the Ember Public Beta Testing Licence (`EMBER/LICENSE-BETA.txt` in the package); releases: <https://github.com/Gageformer/Ember/releases>.
+- **[POPStarter](https://www.psx-place.com/resources/popstarter.683/)** by **krHACKen** — a PS1 launcher built around Sony's native **POPS** emulator for the PS2, used as RiptOPL's **primary PS1 core** alongside Ember. POPStarter provides the compatibility and launch layer for running PS1 VCDs from USB, MX4SIO, MMCE, iLink, internal HDD, and SMB; RiptOPL's iLink handoff is wired but still awaiting a passing hardware retest. The official POPStarter r13 package contains **no Sony emulator binaries, libraries, or BIOS files**; those components must be supplied separately by the user. Official download, documentation, compatibility information, and releases are maintained on **[PSX-Place](https://www.psx-place.com/resources/popstarter.683/)**.
+- **[Neutrino](https://github.com/rickgaiser/neutrino)** by **[rickgaiser](https://github.com/rickgaiser)** — a *"Small, Fast and Modular PS2 Device Emulator"*, and RiptOPL's **second PS2 loader core** alongside OPL's own. Like Ember it is not a shortcut: a ready-to-use `neutrino/` folder normally ships **inside** the installable package (check release notes for download/extraction omissions), drag-and-drop to `mc?:/neutrino/`. Neutrino is deliberately **UI-agnostic** — it has no interface of its own, which is exactly what lets a front-end like RiptOPL drive it per game. Licensed **AFL-3.0**; releases: <https://github.com/rickgaiser/neutrino/releases>.
 ## Acknowledgements
 
 This fork stands entirely on the shoulders of the PS2 homebrew community. **None of this
@@ -375,7 +702,7 @@ shared openly; it is the only reason a fork like this is even possible.
 RiptOPL is a **direct agglomeration** of the wider OPL family, bringing together features, code,
 and ideas from [rickgaiser's OPL](https://github.com/rickgaiser/Open-PS2-Loader),
 [neutrino](https://github.com/rickgaiser/neutrino),
-[sOPL](https://github.com/mystyq/Stable-Open-PS2-Loader), [uOPL](https://github.com/Wolf3s/uOPL),
+[sOPL](https://github.com/mystyq/Stable-Open-PS2-Loader), uOPL,
 [wOPL](https://github.com/KrahJohlito/wOPL), [OPL DB](https://github.com/Jay-Jay-OPL/OPL-Daily-Builds),
 [POPSLoader](https://github.com/NathanNeurotic/POPSLoader),
 [OPL RetroGEM ID by CosmicScale](https://github.com/CosmicScale/Open-PS2-Loader-Retro-GEM),
@@ -395,7 +722,7 @@ With special and sincere thanks to:
   this fork does with them is a reimplementation of his work. We learned more reading his
   code than anywhere else, and RiptOPL is, above all, a tribute to it. Thank you.
 - **Wolf3s** — for contributions across the wOPL effort and the wider OPL scene, and for
-  maintaining an independent **[uOPL](https://github.com/Wolf3s/uOPL)** fork that keeps
+  past work on an independent **uOPL** fork that kept
   unique features and unmerged work alive. Thank you.
 - **bbsan2k** — for the **MMCE (Memory Card Mass Storage) protocol** that makes SD-via-memory-card
   loading through the PS2's memory-card slot possible. OPL's MMCE support builds directly on it.
@@ -442,7 +769,7 @@ work it is built on:
 
 ### Real-hardware testing (this fork)
 
-Enormous thanks to the testers who run every rolling build on real consoles and file the
+Enormous thanks to the testers who run rolling builds on real consoles and file the
 reports that shape the fixes — **eliminator1403, lucaslmgv, AndrewBento, AcidReach, bodvenomz,
 nuno6573, zackcage6 and Blade1984**.
 
@@ -461,403 +788,3 @@ If you want the canonical, actively-maintained project, it lives at
 **[ps2homebrew/Open-PS2-Loader](https://github.com/ps2homebrew/Open-PS2-Loader)** — please
 support it. This fork is a downstream labor of love, not a replacement, and it exists only
 because that upstream work is open for everyone to learn from.
-
-## Releases
-
-RiptOPL ships **one full-feature build** — GSM video-mode handling (including 1080p), DS3/DS4 pad
-emulation (PADEMU), VMC, PS2RD cheats and parental controls are all included in the
-standard ELF (no upstream-style per-feature variants). The two upstream `EXTRA_FEATURES`
-extras — in-game screenshots (IGS) and right-to-left (RTL) language support — are **not**
-compiled into any published main ELF (`EXTRA_FEATURES ?= 0`); they ship in the
-`EXTRA_FEATURES=1` builds inside the VARIANTS zip.
-DualSense / DualShock 5 (USB) support is available prebuilt in the `RIPTOPL-VARIANTS-*.zip`
-bundle, or build your own with `make DUALSENSE=1`.
-
-**RetroAchievements** ships as its own complete package, `RIPTOPL-RA-*.zip` (or build it with
-`make RETROACHIEVEMENTS=1`). It is laid out like the main archive — same `POPS/`, `EMBER/`,
-`neutrino/` and shortcuts — with the RA loader in place of the standard one, plus a shortcut to
-**xeRAbora**, the PC client the feature talks to. It is a **development build, not a finished
-feature** — both halves are now written, the menu side included, but none of it has run on a real
-console yet — and the standard ELF is completely unaffected by it. See
-**[docs/RETROACHIEVEMENTS.md](docs/RETROACHIEVEMENTS.md)** for what it does, which launch paths can
-ever support it, and why.
-
-There are two release channels:
-
-| Channel | What it is |
-| --- | --- |
-| **Rolling (Latest)** (the `rolling` tag) | Continuously rebuilt from the publishing branch on every push — currently `rebuild/main` — and intentionally published as GitHub's **Latest**, full (non-pre-release) development release. Its final download set has up to five archives: the full installable package (`RIPTOPL-<rel>-<sha>.zip`, normally containing all four labelled SDK loader folders + the bundled Neutrino and Ember cores + the canonical POPS folder + five companion-tool shortcuts), plus VARIANTS, exact source, and the DEBUG/language archives when those optional jobs produce them. Best-effort flavours and optional packs are called out if omitted. Floating ELFs, checksums, and SDK/IRX manifests are deliberately removed from GitHub release assets by the normalizer. It is the bleeding edge and may be unstable. |
-| **Tagged releases** (`v*` tags) | Curated, known-good versions cut from a tag. Use these for stability. |
-
-See **[ROLLING_RELEASE.md](ROLLING_RELEASE.md)** for exactly what the rolling release
-contains and how to pull it.
-
-> **Which rolling build?** The rolling zip ships four loader ELFs that differ only by build
-> toolchain — the RiptOPL code in each is identical. Recommended in order of reliability:
-> 1. **`APP_RIPTOPL-PS2DEVPINNED/`** (`-PS2DEVPINNED`) — **recommended primary download.** Built on the
->    `ps2dev/ps2dev` SDK pinned by image digest for reproducible, stable behavior.
-> 2. **`APP_RIPTOPL-OFFICIALPINNED/`** (`-OFFICIALPINNED`) — **recommended official pin.** Built on the
->    `ps2homebrew/ps2homebrew` official SDK, pinned by image digest.
-> 3. **`APP_RIPTOPL-PS2DEVROLLING/`** (`-PS2DEVROLLING`) — **bleeding-edge canary.** Tracks `ps2dev/ps2dev:latest`.
-> 4. **`APP_RIPTOPL-OFFICIALROLLING/`** (`-OFFICIALROLLING`) — **bleeding-edge official canary.** Tracks `ps2homebrew:main`.
-> See [Which build should I use?](ROLLING_RELEASE.md#which-build-should-i-use).
-
-> 🗄️ **Permanent archive (MEGA):** the GitHub `rolling` release only ever holds the *latest*
-> build — every push overwrites it. So **every** rolling build is also archived permanently to MEGA
-> as one self-contained zip of the installable payload (all four loader ELFs, the installable
-> package zip, the source snapshot, `SHA256SUMS.txt`, and the IRX manifests — the large VARIANTS
-> and DEBUG diagnostic bundles stay on the GitHub release only). Click the **MEGA**
-> badge at the top of this README — or [browse the archive here](https://mega.nz/folder/74pRHKRB#9SLDkrkvZAbeKO4Qvxg9LQ) —
-> to fetch any past build. Each is stored immutably under `RiptOPL/Rolling/<version>/run_<number>/`,
-> so nothing is ever overwritten.
-
-## How to use
-
-OPL uses the following directory tree structure across all supported devices —
-USB, MMCE, MX4SIO, iLink, SMB, and the internal HDD:
-
-| Folder | Description                                          | Modes       |
-| ------ | ---------------------------------------------------- | ----------- |
-| `CD`   | for games on CD media - i.e. blue-bottom discs       | All folder devices¹ |
-| `DVD`  | for DVD5 and DVD9 images (if filesystem supports +4gb files) | All folder devices¹ |
-| `VMC`  | Virtual Memory Card images (headline save feature): stored in `VMC/`, typically 8MB to 64MB, then assigned per game via **Game Settings** | all         |
-| `CFG`  | for saving per-game configuration files              | all         |
-| `ART`  | for game art images                                  | all         |
-| `THM`  | for themes support                                   | all         |
-| `LNG`  | for translation support                              | all         |
-| `CHT`  | for cheats files                                     | all         |
-| `APPS`  | for ELF files                                       | all         |
-
-¹ **Folder-based devices** — USB, MMCE, MX4SIO, iLink, SMB, and the **exFAT** (BDM) HDD — keep games as files in the `CD`/`DVD` folders. The **APA/PFS** HDD instead stores games as HDLoader partitions (no `CD`/`DVD` folders), while still using `CFG`/`ART`/`VMC`/`THM`/`CHT`/`LNG`/`APPS` on the configured OPL data partition (`+OPL` root by default, or `__common/OPL/` for the legacy layout).
-
-Per-game settings are stored per title in the `CFG` context. Typical use cases include compatibility toggles, video options (GSM), cheat toggles, and assigning a VMC file from the `VMC` folder to that game.
-
-OPL will automatically create the above directory structure the first time you launch it and enable your favorite device.
-
-For HDDs formatted with the APA partition scheme, OPL will read `hdd0:__common/OPL/conf_hdd.cfg` for the config entry `hdd_partition` to use as your OPL partition.
-If not found a config file, a 128Mb `+OPL` partition will be created. You can edit the config if you wish to use/create a different partition.
-All partitions created by OPL will be 128Mb (it is not recommended to enlarge partitions as it will break LBAs, instead remove and recreate manually with uLaunchELF at a larger size if needed).
-	
-HDDs are also able to be formatted as exFAT to avoid the 2TB limitation.  Please see below in the `HDD` section for more details on this configuration.
-
-## USB/MMCE/MX4SIO/iLink
-
-Supported file systems:
-exFAT (since OPL v1.2.0 beta - rev1880) and FAT32, both use the MBR partition table. This section applies to MMCE and MX4SIO SD setups, USB storage, and iLink SBP2 storage.
-
-> [!WARNING]
-> **Revision 2692 iLink status is not a blanket pass.** On an SCPH-39001, Ember passed from the same
-> IEEE 1394 disk in all four SDK flavours, while the native OPL core, Neutrino, and POPSTARTER failed
-> at their reset/handoff boundaries. The next build corrects a confirmed RiptOPL-side Neutrino
-> handoff mismatch (`-qb` was not auto-emitted for iLink); only hardware retesting can establish
-> whether that was the complete cause. POPSTARTER's
-> external `.ilink` BDMA equip and `mass:/POPS/XX.<name>.ELF` handoff are present, but remain
-> unconfirmed, and the native OPL iLink reset path is still under investigation. See
-> [Neutrino](docs/NEUTRINO.md) and [PS1/VCD](docs/VCD.md) for the exact status and isolation checks.
-
-> [!NOTE]
-> MX4SIO game launch requires the matching PS2SDK `freesio2` module to load before
-> `mx4sio_bd` after OPL resets the game IOP. See [MX4SIO game-launch notes](docs/MX4SIO.md)
-> for the dependency, regression history, and hardware test checklist.
-
-Game files should be *ideally* defragmented either file by file or by whole drive.
-
-> NOTE: Partial file fragmentation is supported (up to 64 fragments!) since OPL v1.2.0 beta - rev1893
-
-If you choose to use the FAT32 file system, games larger than 4gb must use USBExtreme format (see OPLUtil or USBUtil programs).
-
-We do **not** recommend using any defrag programs. The best way for defragmenting - copy all files to pc, format USB, copy all files back.
-Repeat it once you faced defragmenting problem again.
-
-## SMB
-
-For loading games by SMB protocol, you need to share a folder (ex: PS2SMB)
-on the host machine or NAS device and make sure that it has full read and
-write permissions. USB Advance/Extreme format is optional - \*.ISO images
-are supported using the folder structure above.
-
-> **SMB version:** the **Network** page has an **SMB Version** row (SMBv1 / SMB2) directly under
-> **Protocol**, live only while **Protocol** is **SMB** (greyed out otherwise). It defaults to
-> **SMBv1**; setting it to **SMB2** switches *both* sides — browsing loads the SMB2 driver instead
-> of the SMBv1 one, and so does the in-game reader — so the server must speak SMB2 for the whole
-> session.
->
-> **RiptOPL network defaults:** the network protocol selector defaults to **Off** — under
-> **Game Sources** set **Network Start Mode** to **Manual** or **Auto**, then in **Network** set
-> **Protocol** to **SMB**, before the **NET Games** tab appears. Network Config
-> ships static defaults (PS2 `192.168.1.10`, PC `192.168.1.100`, share `games`, user `guest`);
-> adjust them to your LAN. The default **SMB Port is `1111`** — a non-privileged port (>1024), so a server
-> binds it without admin/root. **Network Config** now opens with **advanced options on**, so
-> the **Port** field (and ETH link mode) are editable immediately. If Windows 10/11 has
-> disabled SMB1/NTLMv1, set **SMB Version** to **SMB2**; the
-> **[PS2 Servers](https://github.com/NathanNeurotic/PS2-Servers)** all-in-one launcher remains the
-> fallback for SMBv1-only setups. Choose its SMBv1 server, then set RiptOPL's
-> IP, port, share and credentials to the values the launcher displays (PS2 Servers currently uses
-> port **1445** by default, so change RiptOPL's saved **1111** when prompted). Release packages
-> include **`PS2-Servers.url`** as a direct shortcut to the repository.
-
-## HDD
-	
-Both PS2 HDD types are **off by default** in RiptOPL — enable the one you use under **Game
-Sources**. For PS2, 48-bit LBA internal HDDs are supported. The HDD can be formatted as:
-
-- APA partitioning with PFS filesystem (up to 2TB)
-	- OPL will create the `+OPL` partition on the HDD.  To avoid this, create `hdd0:__common/OPL/conf_hdd.cfg` containing the entry `hdd_partition=__common` (or whichever partition you prefer) — the same file and key described above.
-- MBR partitioning (up to 2TB) or GPT partitioning (unlimited) with the exFAT filesystem
-	- Enable **BDM HDD** in **Game Sources**. The exFAT HDD then mounts through the Block Device Manager (BDMAssault / "BDMA") into the shared `massN:` namespace — the same path as USB/MX4SIO — and appears as an **HDD (exFAT)** games list with the HDD icon.
-	- Files should be added contiguously or synchronously to avoid fragmentation. For example, drag and drop files one at a time, or ensure that files are added sequentially.
-	- When formatting drives for the exFAT filesystem, please make sure the `Allocation unit size` is set to `Default`.
-	- **PS1 games:** PS1 `*.VCD` titles in the HDD's `POPS/` folder list under the **L3** PS1 view like any other device. To boot them, open **PS Emulation Settings → BDMA Settings** from the main menu. **VCD BDMA Apply on Launch** is on by default and equips the matching exFAT driver automatically; turn it off to reveal the manual **BDMA Source** / **BDMA Mode** pickers and set **BDMA Mode → HDD (exFAT)** by hand so POPSTARTER can read the exFAT volume. See **[docs/VCD.md](docs/VCD.md)**.
-
-## APPS
-
-There are two supported methods for adding apps to OPL. Keep both available and choose the one that fits your setup:
-
-- Use legacy `conf_apps.cfg` when you want one central list and/or apps stored anywhere on supported devices.
-- Prefer folder-based `title.cfg` when you want each app self-contained inside `APPS/<APP_FOLDER>/`.
-
-### conf_apps.cfg method (Legacy)
-
-Each entry uses `Display Name=DevicePathToELF`:
-- Left side: the name shown in the OPL app list.
-- Right side: full device/path to the ELF.
-
-To begin:
-
-1. Create a text file called `conf_apps.cfg`.
-2. In this file, put the name you want to appear in the list of apps, followed by the "=" sign.
-3. Add the device prefix and ELF path (for example `mass:` for USB/MX4SIO/iLink/exFAT-HDD, `mmce:` for MMCE, `mc:` for the Memory Card, or `hdd0:`/`pfs0:` for the APA HDD), then the file path to the ELF.
-
-> NOTE: Enter the exact path and exact letter case. OPL is case-sensitive.
-
-The structure should look like this:
-
-```
-My App Name=mass:APPS/MYAPP.ELF
-```
-
-let's use OPL itself as an example:
-
-```
-OPL=mass:APPS/RIPTOPL.ELF
-```
-
-With this method, ELFs do not need to be in `APPS`, but keeping them there can make your setup easier to manage.
-
-The `conf_apps.cfg` file can be placed in the `OPL/` folder on your Memory Card or storage device (e.g., `mc0:OPL/conf_apps.cfg`, `mass0:OPL/conf_apps.cfg`), or at the root of the storage device.
-
-### title.cfg method
-
-This method uses one `title.cfg` per app folder, with two required lines:
-- `title=` for the app name shown in OPL.
-- `boot=` for the ELF filename to launch.
-
-To begin:
-
-1. In `APPS`, create a folder for the app.
-2. Put the ELF in that folder, and create a text file named `title.cfg` in the same folder.
-3. In that file, add the following instructions:
-
-```
-title=My App Name
-boot=MYAPP.ELF
-```
-
-Using OPL again as an example:
-
-```
-title=Open PS2 Loader
-boot=RIPTOPL.ELF
-```
-
-In this method, both the ELF and `title.cfg` must be in the same folder under `APPS`.
-
-> NOTE: In both methods, pay close attention to file names because, as already mentioned, OPL is case-sensitive.
-
-## Cheats
-
-OPL accepts `.cht` files in PS2RD format. Each cheat file corresponds to a specific game and must be stored in the `CHT` directory on your device.
-Cheats are structured as hexadecimal codes, with proper headers as descriptions to identify their function.
-You can activate cheats via OPL's graphical interface. Navigate to a games settings, enable cheats and select the desired mode.
-
-### Cheat Modes
-
-  * Auto Select Cheats:  
-This mode will enable and apply all cheat codes in your `.cht` file to your game automatically.
-
-  * Select Game Cheats:  
-When enabled a cheat selection menu will appear when you launch a game. You can navigate the menu and disable undesired cheats for this launch session. Master Codes cannot be disabled as they are required for any other cheats to be applied.
-
-## NBD Server
-
-OPL now uses an [NBD](https://en.wikipedia.org/wiki/Network_block_device) server to share the internal hard drive, instead of HDL server.
-NBD is [formally documented](https://github.com/NetworkBlockDevice/nbd/blob/master/doc/proto.md) and developed as a collaborative open standard.
-
-The current implementation of the server is based on [lwNBD](https://github.com/bignaux/lwNBD), go there to contribute on the NBD code itself.
-
-The main advantage of using NBD is that the client will expose the drive to your operating system in a similar way as a directly attached drive.
-This means that any utility that worked with the drive when it was directly attached should work the same way with NBD.
-
-OPL currently only supports exporting (sharing out) the PS2's drive.
-
-Version note: feature availability and behavior may differ by build date/tag.
-
-You can use `hdl-dump`, `pfs-shell`, or even directly edit the disk in a hex editor.
-
-For example, to use `hdl_dump` to install a game to the HDD:
-
-  * Connect with your chosen client (OS specific)
-  * Run `hdl_dump inject_dvd ps2/nbd "Test Game" ./TEST.ISO`
-  * Disconnect the client.
-
-To use the NBD server in OPL:
-
-  * Use the latest release or pre-release from the [Releases](https://github.com/NathanNeurotic/Open-PS2-Loader/releases) page if you need newer NBD fixes.
-  * Ensure OPL is configured with an IP address (either static or DHCP).
-  * Open the menu and select "Start NBD server". Once it's ready, it should update the screen to say "NBD Server running..."
-  * Now you can connect with any of the following NBD clients.
-
-### nbd-client
-
-Supported: Linux, [Windows with WSL and custom kernel](https://github.com/microsoft/WSL/issues/5968)
-
-nbd-client requires nbd kernel support. If it isn't loaded,
-`sudo modprobe nbd` will do.
-
-list available export:
-
-```sh
-nbd-client -l 192.168.1.45
-```
-
-connect:
-
-```sh
-nbd-client 192.168.1.45 /dev/nbd1
-```
-
-disconnect:
-
-```sh
-nbd-client -d /dev/nbd1
-```
-
-You'll generally need sudo to run these commands in root or
-add your user to the right group usually "disk".
-
-### nbdfuse
-
-Supported: Linux, Windows with WSL2
-
-list available export:
-
-```sh
-nbdinfo --list nbd://192.168.1.45
-```
-
-connect:
-
-```sh
-mkdir ps2
-nbdfuse ps2/ nbd://192.168.1.45 &
-```
-
-disconnect:
-
-```sh
-umount ps2
-```
-
-### wnbd
-
-Supported: Windows
-
-[WNBD client](https://cloudbase.it/ceph-for-windows/).
-Install, reboot, open elevated (with Administrator rights) [PowerShell](https://docs.microsoft.com/en-us/powershell/scripting/windows-powershell/starting-windows-powershell?view=powershell-7.1#how-to-start-windows-powershell-on-earlier-versions-of-windows)
-
-connect:
-
-```sh
-wnbd-client.exe map hdd0 192.168.1.22
-```
-
-disconnect:
-
-```sh
-wnbd-client.exe unmap hdd0
-```
-
-### Mac OS
-
-Not supported.
-
-## ZSO Format
-
-As of version 1.2.0, compressed ISO files in ZSO format is supported by OPL.
-
-To handle ZSO files, a python script (ziso.py) is included in the pc folder of this repository.
-It requires Python 3 and the LZ4 library:
-
-  ```sh
-pip install lz4
-```
-
-To compress an ISO file to ZSO:
-
-  ```sh
-python ziso.py -c 2 "input.iso" "output.zso"
-```
-
-To decompress a ZSO back to the original ISO:
-
-```sh
-python ziso.py -c 0 "input.zso" "output.iso"
-```
-
-You can copy ZSO files to the same folder as your ISOs and they will be detected by OPL.
-To install onto internal HDD, you can use the latest version of HDL-Dump.
-
-## PS3 BC
-
-Currently, supported only [PS3 Backward Compatible](https://www.psdevwiki.com/ps3/PS2_Compatibility#PS2-Compatibility) (BC) versions. So only [COK-001](https://www.psdevwiki.com/ps3/COK-00x#COK-001) and [COK-002/COK-002W](https://www.psdevwiki.com/ps3/COK-00x#COK-002) boards are supported. USB, SMB, HDD modes are supported.
-
-To run OPL, you need an entry point for running PS2 titles. You can use everything (Swapmagic PS2, for example), but custom firmware with the latest Cobra is preferred. Note: only CFW supports HDD mode.
-
-## Some notes for DEVS
-
-Repository scripts live in `tools/`; run them from the repository root. Existing
-Makefile targets retain their names and output locations.
-
-Open PS2 Loader needs the [**latest PS2SDK**](https://github.com/ps2dev/ps2sdk)
-
-## OPL Archive
-
-Every RiptOPL rolling build is permanently archived to MEGA under immutable folders (`RiptOPL/Rolling/<version>/run_<number>/`). You can access the archive by clicking the MEGA badge at the top of this readme or visiting the [MEGA Rolling Archive](https://mega.nz/folder/74pRHKRB#9SLDkrkvZAbeKO4Qvxg9LQ).
-
-## Frequent Issues
-
-### OPL Freezes on logo or grey screen
-
-1. **Symptom:** OPL hangs on the logo or a grey screen during startup.
-2. **Likely cause:** OPL is trying to load an incompatible or corrupted config file from an older build.
-3. **Recovery steps:** Hold __`START`__ while OPL initializes to skip config loading, open settings, then save a fresh configuration.
-4. **Verification:** Reboot OPL normally (without holding buttons) and confirm it reaches the game list/settings screen without freezing.
-
-### Game freezes on white screen
-
-1. **Symptom:** Game boot stops on a white screen or fails to continue loading.
-2. **Likely cause:** The game image is fragmented so OPL cannot read it reliably, or the ISO/ZSO/UL image is corrupted/incomplete.
-3. **Recovery steps:** Check the game file integrity (size/hash against known-good dump if available), recopy the game image, and ensure files are contiguous (copy all files off the device, reformat, then copy files back in order).
-4. **Verification:** Relaunch the same title and confirm it passes the white screen and reaches the game's intro/menu.
-
-### OPL does not display anything on boot
-
-1. **Symptom:** No image is shown after launching OPL (black/blank screen on TV).
-2. **Likely cause:** A forced video mode was saved that your display does not support (commonly from GSM video mode/scaling compatibility settings).
-3. **Recovery steps:** Hold __`Triangle + Cross`__ while OPL initializes to force the video mode to __`480p progressive`__ — a mode virtually every display syncs (Auto resolves to interlaced 480i/576i, which is exactly what some modern displays/upscalers can't lock onto). Once you can see the UI, pick your preferred mode under **Settings**.
-4. **Verification:** Start OPL again normally and confirm the interface appears and remains visible.
-
-For GSM/video-mode mistakes, use the same recovery combo above: hold __`Triangle + Cross`__ at boot to force __`480p`__ for OPL's own UI (per-game GSM overrides only apply at game launch and don't affect the OPL menu).
-
-If your issue is still unresolved, report it here: <https://www.psx-place.com/threads/open-ps2-loader-game-bug-reports.19401/>.
-
