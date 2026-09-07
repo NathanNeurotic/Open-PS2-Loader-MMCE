@@ -752,6 +752,21 @@ static int ra_discover(void)
 
         tries++;
         if (tries >= RA_DISC_FAST) {
+            /* The endless slow re-query exists so the PC client may start
+               after the game. On a share it must not: every poll posts to the
+               stack mailbox the SMB or HTTP client is waiting on, and there
+               that is the road the game's own disc arrives by -- the same
+               reason ra_rx_in_game shuts the in-play reads down. Discovery
+               runs before that gate is reached, so bound it here instead:
+               the fast phase gets ten seconds, inside the start-up hold-off,
+               and then the stack is left alone for the rest of the session.
+               Nothing that worked is lost -- with no PC there is no address
+               to send telemetry to either. */
+            if (!ra_rx_in_game) {
+                lwip_close(s);
+                return 0;
+            }
+
             DelayThread(RA_DISC_SLOW_US);
             if (ra_disc_us < 0xF0000000)
                 ra_disc_us += RA_DISC_SLOW_US;
