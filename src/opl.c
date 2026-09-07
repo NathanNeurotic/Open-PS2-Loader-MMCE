@@ -1309,8 +1309,33 @@ void menuDeferredUpdate(void *data)
         // If other modes have been updated, then the apps list should be updated too.
         // Exclude FAV: a FAV rebuild marking apps dirty would re-trigger the FAV resync below
         // (an apps refresh calls loadFavourites), looping forever once favNeedsUpdate fires.
-        if (mod->support->mode != APP_MODE && mod->support->mode != FAV_MODE)
+        if (mod->support->mode != APP_MODE && mod->support->mode != FAV_MODE) {
             shouldAppsUpdate = 1;
+
+            // ...and SCHEDULE the pass that consumes that flag. Raising it is not enough: APPS has
+            // updateDelay > 0, so the only thing that ever queued an APP_MODE deferred update in the
+            // background was menuUpdateHook's `gAutoRefresh && longIdle` branch -- and automatic
+            // refresh is OFF by default. With it off the flag simply sat set until the user pressed
+            // SELECT.
+            //
+            // That is the reported bug (eliminator1403): USB and APPS both on Auto, and the APPS tab
+            // comes up EMPTY every boot. bdmEnumerateDevices() is asynchronous -- it only queues
+            // bdmLoadBlockDeviceModules -- so the per-slot bdmPrefix is still empty when the boot's
+            // one APP_MODE update runs, and oplScanApps skips every device-less prefix (#253). The
+            // stick then attaches, BDM publishes its list, this line raises shouldAppsUpdate... and
+            // nothing ever asked APPS to look at it. Pressing SELECT was the only consumer.
+            //
+            // Queue it here instead, exactly the way loadFavourites() below schedules FAV's rebuild.
+            // Bounded, not a storm: itemNeedsUpdate returns 1 only on a REAL source change (a
+            // never-connected BDM slot returns 0 early), and duplicates self-coalesce because
+            // oplShouldAppsUpdate() clears the flag on the first pass, so any extra queued pass
+            // rebuilds nothing. Enqueueing from this IO worker is the established pattern here
+            // (bdmNeedsUpdate and loadFavourites both do it): ioPutRequest takes only gEndSemaId,
+            // which the worker does not hold while a handler runs.
+            opl_io_module_t *appMod = &list_support[APP_MODE];
+            if (appMod->support != NULL && appMod->support->enabled)
+                ioPutRequest(IO_MENU_UPDATE_DEFFERED, &appMod->support->mode);
+        }
 
         // A source-list refresh may expose newly-loaded items to validate favourites
         // against. Re-sync the FAV tab (cheap/idempotent; skipped when FAV is disabled).
