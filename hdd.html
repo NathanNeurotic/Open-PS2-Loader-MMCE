@@ -34,6 +34,7 @@
     <a href="smb.html"><span class="em">🌐</span>SMB (network share)</a>
     <a href="hdd.html" class="active"><span class="em">💽</span>Internal HDD (APA &amp; exFAT)</a>
     <a href="network-boot.html"><span class="em">📡</span>Network Boot (UDPBD/UDPFS)</a>
+    <a href="http.html"><span class="em">🌐</span>HTTP</a>
     <h4>Features</h4>
     <a href="ps1-vcd.html"><span class="em">💿</span>PS1 Games</a>
     <a href="neutrino.html"><span class="em">⚛️</span>Neutrino Core</a>
@@ -42,6 +43,7 @@
     <a href="per-game-settings.html"><span class="em">🎚️</span>Per-game Settings</a>
     <a href="vmc.html"><span class="em">💾</span>VMC</a>
     <a href="cheats.html"><span class="em">🎮</span>Cheats</a>
+    <a href="retroachievements.html"><span class="em">🏆</span>RetroAchievements</a>
     <h4>Theme Engine</h4>
     <a href="themes.html"><span class="em">🎨</span>Theme Engine</a>
     <h4>Reference</h4>
@@ -61,13 +63,13 @@
 <b>exFAT filesystem</b> routed through the Block Device Manager (BDMAssault). Both formats are supported and both can be enabled at the same time — one shared
 <code>ata_bd</code> stack serves APA and BDM, and neither toggle greys the other. Arbitration happens per
 <i>drive</i> at mount time rather than in the dialog: APA is kept off an MBR/GPT/exFAT disk, and BDM only
-publishes a <code>massN:</code> slot where a FAT/exFAT partition exists. Only 48-bit LBA drives are supported; that covers every IDE drive manufactured after ~2003 and all CF-to-IDE adapters.</p>
+publishes a <code>massN:</code> slot where a FAT/exFAT partition exists. Only 48-bit LBA drives are supported; check the drive and adapter specifications before use.</p>
 
 <div class="callout info"><div class="h">ℹ Which format should I use?</div>
 <b>APA/PFS</b> is the classic choice: maximum compatibility with every existing tool (HDL-Dump, uLaunchELF, ps2-packer,
 etc.) and the format your existing HDLoader library already lives on. <b>exFAT</b> is the modern choice: copy ISOs
 from any PC with no special software, GPT for drives larger than 2 TB, and PS1 VCD support on the same drive — but
-files <em>must</em> be written contiguously (see the fragmentation warning below). Most users with an existing HDD
+contiguous files leave the most fragment-budget headroom (see the fragmentation warning below). Most users with an existing HDD
 library should stay on APA/PFS. New builds or large (>2 TB) drives are where exFAT shines.
 </div>
 
@@ -81,24 +83,15 @@ the older HDL server). This path is mature, well-tested, and requires no configu
 exFAT with a GPT partition table instead (see below).</p>
 
 <h3 id="apa-opl-partition">The OPL data partition</h3>
-<p>OPL stores its data files (artwork, themes, VMCs, configs, cheats, etc.) in a dedicated PFS partition. On first
-launch, if no partition is found, OPL creates a <b>128 MB <code>+OPL</code></b> partition automatically. The partition
-name can be overridden by placing a config file on the drive before OPL first runs:</p>
-<pre>hdd0:__common:pfs:OPL/conf_hdd.cfg</pre>
-<p>That file is an OPL config with a single key:</p>
-<pre>hdd_partition=__common</pre>
-<p>The value is the APA partition name (without the <code>hdd0:</code> prefix). If the file is absent OPL writes <code>conf_hdd.cfg</code> into
-<code>hdd0:__common</code> (at <code>pfs0:OPL/conf_hdd.cfg</code>) recording <code>hdd_partition=+OPL</code>, then creates and mounts <code>hdd0:+OPL</code> as the data partition. With that
-default partition the OPL folder tree (<code>CFG/</code>, <code>ART/</code>, <code>VMC/</code>, <code>THM/</code>, etc.)
-sits at the partition <b>root</b> — <code>pfs0:CFG/</code>, <code>pfs0:ART/</code>, and so on. The extra
-<code>OPL/</code> tier applies only when <code>hdd_partition</code> names a partition whose name does not start with
-<code>+</code> (for example <code>__common</code>).</p>
-
-<div class="callout info"><div class="h">ℹ Don't enlarge OPL partitions with a hex editor</div>
-Resizing an APA partition in place breaks LBA offsets for partitions that follow it on disk, which can corrupt your
-entire game library. If you need a larger OPL partition, delete the existing one and recreate it at the desired size
-with uLaunchELF, then copy your data back.
-</div>
+<p>RiptOPL only mounts <b>existing</b> PFS partitions. It does not create, resize or format an APA
+partition. The selection order is:</p>
+<ol><li>A usable <code>hdd_partition</code> selection in <code>__common/OPL/conf_hdd.cfg</code>.</li>
+<li>An existing <code>+OPL</code> partition.</li><li>Existing <code>__common/OPL/</code>.</li></ol>
+<p>If none is available, the data home stays unavailable instead of creating a partition. To select
+an existing partition explicitly, place this in <code>OPL/conf_hdd.cfg</code> on the mounted
+<code>__common</code> partition:</p><pre>hdd_partition=__common</pre>
+<p><code>+OPL</code> keeps support folders at its root. The <code>__common</code> fallback keeps them
+inside <code>OPL/</code>. A configuration entry names a partition to mount; it does not create one.</p>
 
 <h3 id="apa-folder-layout">Folder layout</h3>
 <p>Unlike folder-based devices (USB, MMCE, SMB…), APA/PFS stores games as HDLoader partitions — there are no
@@ -175,7 +168,7 @@ namespace alongside any USB/MX4SIO devices.</p>
 <ul class="checklist">
 <li><b>No special install tools needed</b> — copy ISOs directly from any PC (Windows, macOS, Linux) to the
 <code>DVD/</code> or <code>CD/</code> folder, just like a USB drive.</li>
-<li><b>MBR up to 2 TB, GPT unlimited</b> — if your drive is larger than 2 TB, GPT breaks the APA ceiling.</li>
+<li><b>MBR up to 2 TB; GPT can address larger disks</b> — if your drive is larger than 2 TB, GPT breaks the APA ceiling.</li>
 <li><b>PS1 VCDs on the same drive</b> — put <code>*.VCD</code> files in the <code>POPS/</code> folder and they list
 under L3 PS1 view exactly like a USB drive (with the BDMA equip for POPSTARTER — see below).</li>
 </ul>
@@ -256,7 +249,7 @@ including the BDMA Source setting.</p>
 <table data-sortable>
 <thead><tr><th>Feature</th><th>APA / PFS</th><th>exFAT (BDMA)</th></tr></thead>
 <tbody>
-<tr><td>Max capacity</td><td>2 TB (48-bit LBA)</td><td>2 TB (MBR) / unlimited (GPT)</td></tr>
+<tr><td>Max capacity</td><td>2 TB (48-bit LBA)</td><td>2 TB (MBR); larger GPT disks depend on driver and hardware support</td></tr>
 <tr><td>Install method</td><td>HDL-Dump via NBD server</td><td>Copy files from PC (no tools)</td></tr>
 <tr><td>PS2 game format</td><td>HDLoader partitions</td><td>ISO / ZSO in <code>DVD/</code> or <code>CD/</code></td></tr>
 <tr><td>OPL data location</td><td>Standard folders at the OPL partition root (<code>pfs0:</code>)</td><td>Standard folders at drive root</td></tr>
@@ -287,8 +280,8 @@ HDD and network boot at the same time.</li>
   <a href="https://github.com/ps2homebrew">ps2homebrew</a> team and the wider OPL family — see
   <a href="credits.html">Credits &amp; Sources</a>. For the canonical project, see
   <a href="https://github.com/ps2homebrew/Open-PS2-Loader">ps2homebrew/Open-PS2-Loader</a>.</p>
-  <p class="prov-inline">RiptOPL is a downstream fork, not the canonical project. PS1 emulation is Sony's POPS,
-  which is <b>not</b> distributed here. PS1/POPSTARTER deep reference: the sister
+  <p class="prov-inline">RiptOPL is a downstream fork, not the canonical project. POPSTARTER uses Sony's POPS; Ember is a separate emulator. Sony's POPS is
+  <b>not</b> distributed here. PS1/POPSTARTER deep reference: the sister
   <a href="https://nathanneurotic.github.io/POPSLoader/">POPStarter docs</a>.</p>
 </footer>
 <script src="assets/app.js"></script>

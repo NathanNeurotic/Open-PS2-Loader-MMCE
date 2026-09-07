@@ -34,6 +34,7 @@
     <a href="smb.html"><span class="em">🌐</span>SMB (network share)</a>
     <a href="hdd.html"><span class="em">💽</span>Internal HDD (APA &amp; exFAT)</a>
     <a href="network-boot.html"><span class="em">📡</span>Network Boot (UDPBD/UDPFS)</a>
+    <a href="http.html"><span class="em">🌐</span>HTTP</a>
     <h4>Features</h4>
     <a href="ps1-vcd.html"><span class="em">💿</span>PS1 Games</a>
     <a href="neutrino.html"><span class="em">⚛️</span>Neutrino Core</a>
@@ -42,6 +43,7 @@
     <a href="per-game-settings.html"><span class="em">🎚️</span>Per-game Settings</a>
     <a href="vmc.html"><span class="em">💾</span>VMC</a>
     <a href="cheats.html"><span class="em">🎮</span>Cheats</a>
+    <a href="retroachievements.html"><span class="em">🏆</span>RetroAchievements</a>
     <h4>Theme Engine</h4>
     <a href="themes.html"><span class="em">🎨</span>Theme Engine</a>
     <h4>Reference</h4>
@@ -69,12 +71,12 @@ If <code>RIPTOPL.ELF</code> is already on your PS2 and booting, skip ahead to
   <li>A PlayStation 2 (any model) or a backward-compatible PlayStation 3.</li>
   <li>A way to launch homebrew ELFs — Free McBoot (FMCB), Free HD Boot (FHDB), a modchip, or equivalent.</li>
   <li>At least one storage option: USB drive, MMCE / MX4SIO SD card, iLink storage, SMB network share, or an internal HDD.</li>
-  <li>A RiptOPL build — download <code>RIPTOPL.ELF</code> from the <a href="releases.html">Releases</a> page. Use a tagged <code>v*</code> release for stability, or the <code>rolling</code> Latest development release for the newest features.</li>
+  <li>A RiptOPL build — download <code>RIPTOPL.ELF</code> from the <a href="releases.html">Releases</a> page. Choose the preserved <code>current-fan-favorite</code> development snapshot or <code>rolling</code> for the newest development build.</li>
   <li>At least one PS2 game image in ISO or ZSO format.</li>
 </ul>
 
 <details class="deep"><summary>Which release should I download?</summary>
-<p>The <b>rolling</b> channel is rebuilt from <code>rebuild/main</code> on every push during the rebuild and is intentionally published as GitHub's full, non-pre-release <b>Latest</b> release. It may occasionally be unstable. Tagged <b>v*</b> releases are manually cut, known-good snapshots. Either way, the full installable package zip (<code>RIPTOPL-&lt;rel&gt;-&lt;sha&gt;.zip</code>) normally contains four labelled loader folders (the notes identify any omitted best-effort flavour), one canonical <code>POPS/</code> folder (including every loose BDMA pair and the iLink <code>.ilink</code> pair), <code>EMBER/</code>, and the already-extracted <code>neutrino/</code> folder. No duplicate release-root <code>POPSTARTER/</code> folder or embedded BDMA pair is used. The language pack is a separate optional <code>RIPTOPL-LANGS-*.zip</code> release asset. See <a href="releases.html">Releases</a> for details.</p>
+<p>The <b>rolling</b> channel is rebuilt from <code>rebuild/main</code> on every push during the rebuild and is intentionally published as GitHub's full, non-pre-release <b>Latest</b> release. It may occasionally be unstable. The <b>Current Fan Favorite Build</b> is a preserved development snapshot selected after positive feedback; compatibility still varies by setup. Either way, the full installable package zip (<code>RIPTOPL-&lt;rel&gt;-&lt;sha&gt;.zip</code>) normally contains four labelled loader folders (the notes identify any omitted best-effort flavour), one canonical <code>POPS/</code> folder (including every loose BDMA pair and the iLink <code>.ilink</code> pair), <code>EMBER/</code>, and normally an extracted <code>neutrino/</code> folder (check release notes for download/extraction omissions). No duplicate release-root <code>POPSTARTER/</code> folder or embedded BDMA pair is used. The language pack is a separate optional <code>RIPTOPL-LANGS-*.zip</code> release asset. See <a href="releases.html">Releases</a> for details.</p>
 </details>
 
 <h2 id="pick-a-device">Pick a device</h2>
@@ -134,7 +136,7 @@ An APA-formatted internal HDD stores games as HDLoader partitions, <b>not</b> as
 
 <div class="step">
 <h3>1. Prepare the drive</h3>
-<p>Format your USB drive as <b>FAT32</b> (for drives up to 32 GB) or <b>exFAT</b> (larger drives or games over 4 GB). Use the default allocation unit size when formatting exFAT. Create a <code>DVD</code> folder at the root of the drive (or let RiptOPL create it when you turn USB on in step 3), then copy your game ISO into it:</p>
+<p>Format your USB drive as <b>FAT32</b> (single files below 4 GiB; larger games need splitting) or <b>exFAT</b> (large single ISO files). Use the default allocation unit size when formatting exFAT. Create a <code>DVD</code> folder at the root of the drive (or let RiptOPL create it when you turn USB on in step 3), then copy your game ISO into it:</p>
 <pre>
 USB root
 └── DVD/
@@ -170,7 +172,13 @@ USB root
 <h3>5. Save your settings</h3>
 <p>After a successful launch, go back to the main menu (press <b>Start</b>) and choose <b>Save Changes</b>. This writes <code>settings_riptopl.cfg</code> to your storage device so RiptOPL remembers your configuration on every subsequent boot.</p>
 <div class="callout info"><div class="h">ℹ Where the config file lives</div>
-RiptOPL saves its master config as <code>settings_riptopl.cfg</code> — distinct from upstream OPL's <code>conf_opl.cfg</code>. Both builds can share the same memory card or storage device without overwriting each other's settings. Art, themes, VMCs, per-game configs, and favorites in the shared <code>OPL/</code> folders are visible to all OPL builds.</div>
+RiptOPL's master settings use <code>settings_riptopl.cfg</code> (with migration from
+<code>conf_riptopl.cfg</code>). That filename is separate from stock OPL's master config, but
+<code>conf_network.cfg</code>, app lists, per-game configuration and support files can still be shared.
+Favorites import from uOPL/wOPL is <b>one-way</b>: the next write saves RiptOPL's own <code>OFAV</code>
+format to <code>favourites.bin</code>, which those loaders cannot read back. Keep an original copy if
+you use them too. The settings home follows boot-directory discovery or <b>Custom Settings Path</b>;
+do not assume it is always <code>mc0:/OPL/</code>.</div>
 </div>
 
 </div>
@@ -191,11 +199,17 @@ RiptOPL saves its master config as <code>settings_riptopl.cfg</code> — distinc
 </div>
 
 <details class="deep"><summary>Can I use RiptOPL alongside stock OPL or wOPL on the same memory card?</summary>
-<p>Yes. RiptOPL saves its master config as <b><code>settings_riptopl.cfg</code></b> — not <code>conf_opl.cfg</code> — so the two builds never overwrite each other's settings. Everything else in the shared <code>OPL/</code> folder (artwork, themes, VMCs, per-game configs in <code>CFG/</code>, and <code>favourites.bin</code>) is shared between all OPL-family builds. RiptOPL will also auto-import an existing uOPL / wOPL <code>favourites.bin</code> on first run.</p>
+<p>RiptOPL's master settings use <code>settings_riptopl.cfg</code> (with migration from
+<code>conf_riptopl.cfg</code>). That filename is separate from stock OPL's master config, but
+<code>conf_network.cfg</code>, app lists, per-game configuration and support files can still be shared.
+Favorites import from uOPL/wOPL is <b>one-way</b>: the next write saves RiptOPL's own <code>OFAV</code>
+format to <code>favourites.bin</code>, which those loaders cannot read back. Keep an original copy if
+you use them too. The settings home follows boot-directory discovery or <b>Custom Settings Path</b>;
+do not assume it is always <code>mc0:/OPL/</code>.</p>
 </details>
 
 <details class="deep"><summary>Do I need Neutrino to play games?</summary>
-<p>No. RiptOPL ships with OPL's built-in core, which handles the vast majority of PS2 games without any extra setup. Neutrino is an optional external core you can assign per game for titles that benefit from it — for example, those that need its compatibility modes or network-boot features (UDPBD / UDPFS). See <a href="neutrino.html">Neutrino Core</a> for details. Neutrino is bundled inside the release zip and does not need to be downloaded separately.</p>
+<p>No. RiptOPL ships with OPL's built-in core, which handles the vast majority of PS2 games without any extra setup. Neutrino is an optional external core you can assign per game for titles that benefit from it — for example, those that need its compatibility modes or network-boot features (UDPBD / UDPFS). See <a href="neutrino.html">Neutrino Core</a> for details. Neutrino normally comes in the installable package; if download/extraction failed for that release, its notes identify the omission and you need a complete Neutrino install separately.</p>
 </details>
 
 <details class="deep"><summary>My game list is empty after enabling a device. What do I check?</summary>
@@ -209,8 +223,8 @@ RiptOPL saves its master config as <code>settings_riptopl.cfg</code> — distinc
   <a href="https://github.com/ps2homebrew">ps2homebrew</a> team and the wider OPL family — see
   <a href="credits.html">Credits &amp; Sources</a>. For the canonical project, see
   <a href="https://github.com/ps2homebrew/Open-PS2-Loader">ps2homebrew/Open-PS2-Loader</a>.</p>
-  <p class="prov-inline">RiptOPL is a downstream fork, not the canonical project. PS1 emulation is Sony's POPS,
-  which is <b>not</b> distributed here. PS1/POPSTARTER deep reference: the sister
+  <p class="prov-inline">RiptOPL is a downstream fork, not the canonical project. POPSTARTER uses Sony's POPS; Ember is a separate emulator. Sony's POPS is
+  <b>not</b> distributed here. PS1/POPSTARTER deep reference: the sister
   <a href="https://nathanneurotic.github.io/POPSLoader/">POPStarter docs</a>.</p>
 </footer>
 <script src="assets/app.js"></script>

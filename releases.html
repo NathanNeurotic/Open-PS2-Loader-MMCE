@@ -34,6 +34,7 @@
     <a href="smb.html"><span class="em">🌐</span>SMB (network share)</a>
     <a href="hdd.html"><span class="em">💽</span>Internal HDD (APA &amp; exFAT)</a>
     <a href="network-boot.html"><span class="em">📡</span>Network Boot (UDPBD/UDPFS)</a>
+    <a href="http.html"><span class="em">🌐</span>HTTP</a>
     <h4>Features</h4>
     <a href="ps1-vcd.html"><span class="em">💿</span>PS1 Games</a>
     <a href="neutrino.html"><span class="em">⚛️</span>Neutrino Core</a>
@@ -42,6 +43,7 @@
     <a href="per-game-settings.html"><span class="em">🎚️</span>Per-game Settings</a>
     <a href="vmc.html"><span class="em">💾</span>VMC</a>
     <a href="cheats.html"><span class="em">🎮</span>Cheats</a>
+    <a href="retroachievements.html"><span class="em">🏆</span>RetroAchievements</a>
     <h4>Theme Engine</h4>
     <a href="themes.html"><span class="em">🎨</span>Theme Engine</a>
     <h4>Reference</h4>
@@ -67,11 +69,7 @@
 <b><a href="https://www.psx-place.com/resources/popstarter.683/">POPStarter</a></b> by <b>krHACKen</b> — a PS1 launcher built around Sony's native <b>POPS</b> emulator for the PS2, used as RiptOPL's primary PS1 core alongside Ember. POPStarter provides the compatibility and launch layer for running PS1 VCDs from USB, MX4SIO, MMCE, iLink, internal HDD, and SMB; RiptOPL's iLink handoff is wired but still awaiting a passing hardware retest. The official POPStarter r13 package contains no Sony emulator binaries, libraries, or BIOS files; those components must be supplied separately by the user. Official download, documentation, compatibility information, and releases are maintained on <a href="https://www.psx-place.com/resources/popstarter.683/">PSX-Place</a>.<br>
 <b><a href="https://github.com/rickgaiser/neutrino">Neutrino</a></b> by <b><a href="https://github.com/rickgaiser">rickgaiser</a></b> — a small, fast, modular PS2 device emulator, and RiptOPL's second PS2 loader core alongside OPL's own. Normally ships as a ready-to-use <code>neutrino/</code> folder inside the installable package (check release notes for omissions) (drag-and-drop to <code>mc?:/neutrino/</code>), under the <b>AFL-3.0</b> licence; <a href="https://github.com/rickgaiser/neutrino/releases">releases</a>.</p></section>
 <h1>Releases</h1>
-<p class="lead">RiptOPL ships on two channels: a continuously-rebuilt <b>rolling</b> development release
-(published as GitHub <b>Latest</b>) and curated <b>v* tagged</b> releases. The publishing branch is
-<code>rebuild/main</code> during the rebuild and <code>master</code> after cutover. Both channels use
-the same normalized package pipeline and best-effort rules, so their public formats cannot silently
-diverge even when an optional pack or flavour is absent from a particular run.</p>
+<p class="lead">Choose <a href="https://github.com/NathanNeurotic/Open-PS2-Loader/releases/tag/rolling">Rolling</a> for current development or <a href="https://github.com/NathanNeurotic/Open-PS2-Loader/releases/tag/current-fan-favorite">Current Fan Favorite Build</a> for a preserved development snapshot. The publishing branch is <code>rebuild/main</code>; neither choice guarantees compatibility with every setup.</p>
 
 <div class="callout info"><div class="h">ℹ One full-feature build</div>
 RiptOPL ships a single standard ELF that includes <b>GSM</b> video-mode handling,
@@ -84,7 +82,7 @@ standard ELF, but you do not have to build it yourself — the rolling release p
 <code>make DUALSENSE=1</code> is only needed if you compile your own. Forced-progressive
 <b>1080p</b> GSM support is hardware-confirmed and built into every standard loader. Selecting it is
 guarded by a three-step in-GUI confirmation, and holding <b>Triangle + Cross</b> during console boot
-forces the safe 480p progressive recovery mode.</div>
+forces 480p for the OPL menu only; the display and connection must accept it.</div>
 
 <h2 id="channels">Release channels</h2>
 
@@ -97,12 +95,7 @@ forces the safe 480p progressive recovery mode.</div>
   <td>Latest features, actively tested builds, eager testers</td>
   <td>Development builds — <em>may be unstable</em></td>
 </tr>
-<tr>
-  <td><b>Tagged release</b></td>
-  <td><code>v*</code> (e.g. <code>v1.2.0</code>)</td>
-  <td>Stability-first installs, setups you do not want to touch often</td>
-  <td>Curated, known-good</td>
-</tr>
+<tr><td><b>Current Fan Favorite Build</b></td><td><code>current-fan-favorite</code></td><td>A fixed development snapshot for comparison</td><td>Selected after positive feedback; compatibility varies</td></tr>
 </tbody>
 </table>
 
@@ -113,11 +106,7 @@ as pre-releases; a bare <code>v*</code> tag produces a full curated release with
 
 <h2 id="rolling-assets">What the rolling release contains</h2>
 
-<p>Every push to the publishing branch (<code>rebuild/main</code> during the rebuild, then
-<code>master</code>) wipes the previous rolling assets and republishes a fresh set. The headline item
-is a full installable package zip. After normalization, the public download set has up to five
-archives: package, exact source, variants, and the language/debug packs when those optional jobs
-produce them.</p>
+<p>Successful publishing runs on <code>rebuild/main</code> replace the rolling assets. Archives are organized by purpose: the normal installable package, RA development package, exact source, VARIANTS, and optional language/debug packs. Read the release notes for omitted flavours or companion downloads.</p>
 
 <table data-sortable>
 <thead><tr><th>Asset</th><th>What it is</th></tr></thead>
@@ -306,7 +295,7 @@ languages, but rarer scripts may need the external font.</p>
 
 <p>For a complete first-run walkthrough (folder layout, enabling devices, launching your first game),
 see <a href="getting-started.html">Getting Started</a>.</p>
-</main>
+<h2 id="archive-availability">Archive availability</h2><p>MEGA uploads require successful publishing and configured credentials. Superseded or failed runs may have no archive. Installable packages, source and metadata are archived when upload succeeds; VARIANTS and DEBUG are excluded. Neutrino download/extraction is best-effort, so check release notes before relying on a bundled core.</p></main>
   <aside class="toc"><div class="toc-h">On this page</div><nav id="toc-nav"></nav></aside>
 </div>
 <footer>
@@ -314,8 +303,8 @@ see <a href="getting-started.html">Getting Started</a>.</p>
   <a href="https://github.com/ps2homebrew">ps2homebrew</a> team and the wider OPL family — see
   <a href="credits.html">Credits &amp; Sources</a>. For the canonical project, see
   <a href="https://github.com/ps2homebrew/Open-PS2-Loader">ps2homebrew/Open-PS2-Loader</a>.</p>
-  <p class="prov-inline">RiptOPL is a downstream fork, not the canonical project. PS1 emulation is Sony's POPS,
-  which is <b>not</b> distributed here. PS1/POPSTARTER deep reference: the sister
+  <p class="prov-inline">RiptOPL is a downstream fork, not the canonical project. POPSTARTER uses Sony's POPS; Ember is a separate emulator. Sony's POPS is
+  <b>not</b> distributed here. PS1/POPSTARTER deep reference: the sister
   <a href="https://nathanneurotic.github.io/POPSLoader/">POPStarter docs</a>.</p>
 </footer>
 <script src="assets/app.js"></script>
