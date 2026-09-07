@@ -200,7 +200,7 @@ this fork builds on top of it — traces directly back to that work.</p>
 <h3>rickgaiser — Neutrino (second PS2 core)</h3>
 <p>Author of <b><a href="https://github.com/rickgaiser/neutrino">Neutrino</a></b>, a
 <i>"Small, Fast and Modular PS2 Device Emulator"</i> — and RiptOPL's <b>second PS2 loader core</b>
-alongside OPL's own. Neutrino is an independent project, <b>not</b> part of RiptOPL and not our work.
+alongside OPL's own.
 Every release package bundles the official latest build, re-fetched from upstream at publish time, as
 a ready-to-use <code>neutrino/</code> folder.</p>
 <p>It is bundled under the <b>AFL-3.0</b> licence. One honest note on "unmodified": we add exactly one
@@ -220,13 +220,12 @@ and handing off are ours — and genuine Neutrino bugs upstream.</p>
 <h3>Gageformer — Ember (second PS1 core)</h3>
 <p>Author of <b><a href="https://github.com/Gageformer/Ember/releases">Ember</a></b>, an independent PlayStation 1 emulator written from
 scratch for the PlayStation 2 — original recompiler, memory model, geometry pipeline and graphics
-translation. Ember is <b>not</b> part of RiptOPL and is not our work; it ships inside the release
+translation. It ships inside the release
 package as an <code>EMBER/</code> folder and serves as RiptOPL's <b>second PS1 core</b> alongside
 POPSTARTER.</p>
-<p>It is bundled unmodified, with Gageformer's blessing, under the <b>Ember Public Beta Testing
+<p>It is bundled unmodified under the <b>Ember Public Beta Testing
 Licence</b> — included in the package as <code>EMBER/LICENSE-BETA.txt</code>, which governs the
-build it accompanies. He not only permitted RiptOPL driving <code>ember.elf</code> directly in place
-of his own launcher, he encouraged it. Please report Ember problems to
+build it accompanies. Please report Ember problems to
 <a href="https://github.com/NathanNeurotic/Open-PS2-Loader/issues">us</a> first, not to him: the
 launching is ours.</p>
 <p>Ember's own licence credits <b><a href="https://github.com/stenzek/duckstation">DuckStation</a></b>
@@ -236,14 +235,11 @@ as a correctness reference for a small number of routines. Ember is not a fork o
 <div class="step">
 <h3>hacan359 (yoba) — RetroAchievements</h3>
 <p>Author of <b>RetroAchievements support for real PlayStation 2 hardware</b>, and of the PC client
-it talks to, <b><a href="https://github.com/hacan359/xerabora">xeRAbora</a></b> (MIT). The design is
-his, and it splits cleanly: the console works out <i>which</i> game an image is and streams the
+it talks to, <b><a href="https://github.com/hacan359/xerabora">xeRAbora</a></b> (MIT). The console works out <i>which</i> game an image is and streams the
 handful of memory addresses that game's achievements watch, while everything above the wire —
 rcheevos, the RetroAchievements servers, your login — happens on the PC. That split is why the
 console side stays small enough to live inside a loader.</p>
-<p>He offered the work to this fork rather than keeping it to his own, and he writes and maintains
-the client; RiptOPL ships no PC client and will not grow one. RiptOPL's support is a
-<b>reimplementation against his published wire protocol</b>, not a merge of his tree, and it ships
+<p>RiptOPL implements the <b>published wire protocol</b> and ships
 as its own <code>RIPTOPL-RA-*.zip</code> build with a shortcut to xeRAbora inside. Please report
 <i>RiptOPL</i> problems to <a href="https://github.com/NathanNeurotic/Open-PS2-Loader/issues">us</a>
 first, not to him — the loader side is ours.</p>
