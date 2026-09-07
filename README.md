@@ -17,11 +17,34 @@ Licensed under Academic Free License version 3.0<br>
 Review the LICENSE file for further details.<br><br>
 
 [![CI](https://github.com/NathanNeurotic/Open-PS2-Loader/actions/workflows/flavours.yml/badge.svg?branch=rebuild/main)](https://github.com/NathanNeurotic/Open-PS2-Loader/actions/workflows/flavours.yml)
-![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/NathanNeurotic/Open-PS2-Loader/total?style=plastic&logo=github&logoSize=auto&label=Total%20Downloads&labelColor=navy&color=skyblue)
+[![Format](https://github.com/NathanNeurotic/Open-PS2-Loader/actions/workflows/check-format.yml/badge.svg?branch=rebuild/main)](https://github.com/NathanNeurotic/Open-PS2-Loader/actions/workflows/check-format.yml)
+[![Rolling Release](https://github.com/NathanNeurotic/Open-PS2-Loader/actions/workflows/rolling-release.yml/badge.svg?branch=rebuild/main)](https://github.com/NathanNeurotic/Open-PS2-Loader/actions/workflows/rolling-release.yml)
 [![Latest release](https://img.shields.io/github/v/release/NathanNeurotic/Open-PS2-Loader?style=plastic&logo=github&label=Latest%20Release&labelColor=navy&color=skyblue&include_prereleases)](https://github.com/NathanNeurotic/Open-PS2-Loader/releases)
+![Released](https://img.shields.io/github/release-date-pre/NathanNeurotic/Open-PS2-Loader?style=plastic&logo=github&label=Released&labelColor=navy&color=skyblue)
+![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/NathanNeurotic/Open-PS2-Loader/total?style=plastic&logo=github&logoSize=auto&label=Total%20Downloads&labelColor=navy&color=skyblue)
+[![MEGA Archive](https://img.shields.io/badge/MEGA-Rolling%20Archive-%23D90007?style=flat&logo=mega&logoColor=white)](https://mega.nz/folder/74pRHKRB#9SLDkrkvZAbeKO4Qvxg9LQ)
+
+[![License](https://img.shields.io/github/license/NathanNeurotic/Open-PS2-Loader?style=flat&labelColor=navy&color=skyblue&logo=opensourceinitiative&logoColor=white&label=License)](LICENSE)
+![Written in C](https://img.shields.io/badge/Written%20in-C-skyblue?style=flat&logo=c&logoColor=white&labelColor=navy)
+![Platform](https://img.shields.io/badge/Platform-PlayStation%202-skyblue?style=flat&logo=playstation2&logoColor=white&labelColor=navy)
+![Toolchain](https://img.shields.io/badge/Toolchain-ps2dev%20%2F%20PS2SDK-skyblue?style=flat&logo=docker&logoColor=white&labelColor=navy)
+![Translations](https://img.shields.io/badge/Translations-31%20languages-skyblue?style=flat&logo=googletranslate&logoColor=white&labelColor=navy)
+![Repo Size](https://img.shields.io/github/repo-size/NathanNeurotic/Open-PS2-Loader?style=flat&labelColor=navy&color=skyblue&logo=github&label=Repo%20Size)
+
+![Last Commit](https://img.shields.io/github/last-commit/NathanNeurotic/Open-PS2-Loader/rebuild/main?style=flat&labelColor=navy&color=skyblue&logo=git&logoColor=white&label=Last%20Commit)
+![Commits per month](https://img.shields.io/github/commit-activity/m/NathanNeurotic/Open-PS2-Loader/rebuild/main?style=flat&labelColor=navy&color=skyblue&logo=github&label=Commits%2FMonth)
+![Contributors](https://img.shields.io/github/contributors/NathanNeurotic/Open-PS2-Loader?style=flat&labelColor=navy&color=skyblue&logo=github&label=Contributors)
+[![Open Issues](https://img.shields.io/github/issues/NathanNeurotic/Open-PS2-Loader?style=flat&labelColor=navy&color=skyblue&logo=github&label=Open%20Issues)](https://github.com/NathanNeurotic/Open-PS2-Loader/issues)
+[![Stars](https://img.shields.io/github/stars/NathanNeurotic/Open-PS2-Loader?style=flat&labelColor=navy&color=skyblue&logo=github&label=Stars)](https://github.com/NathanNeurotic/Open-PS2-Loader/stargazers)
+
+![Storage](https://img.shields.io/badge/Storage-USB%20%C2%B7%20MX4SIO%20%C2%B7%20iLink%20%C2%B7%20MMCE%20%C2%B7%20HDD-2ea043?style=flat&labelColor=0b3d18)
+![Network](https://img.shields.io/badge/Network-SMB%20%C2%B7%20UDPBD%20%C2%B7%20UDPFS%20%C2%B7%20HTTP-2ea043?style=flat&labelColor=0b3d18)
+![PS2 Cores](https://img.shields.io/badge/PS2%20Cores-OPL%20%C2%B7%20Neutrino-2ea043?style=flat&labelColor=0b3d18)
+![PS1 Cores](https://img.shields.io/badge/PS1%20Cores-POPStarter%20%C2%B7%20Ember-2ea043?style=flat&labelColor=0b3d18)
+![RetroAchievements](https://img.shields.io/badge/RetroAchievements-dev%20build%2C%20untested-orange?style=flat&labelColor=7a3e00)
+
 [![Discord](https://img.shields.io/discord/1275875800318476381?style=flat&logo=Discord)](https://tinyurl.com/PS2SPACE)
 [![Documentation](https://img.shields.io/badge/Documentation-RiptOPL-skyblue?style=flat&logo=githubpages&logoColor=white&labelColor=navy)](https://nathanneurotic.github.io/Open-PS2-Loader/)
-[![MEGA Archive](https://img.shields.io/badge/MEGA-Rolling%20Archive-%23D90007?style=flat&logo=mega&logoColor=white)](https://mega.nz/folder/74pRHKRB#9SLDkrkvZAbeKO4Qvxg9LQ)
 
 > **What is RiptOPL?** A downstream fork of Open PS2 Loader with a built-in cover-art **Coverflow** theme (default), a **Favorites** tab, per-game **Neutrino** external-core launching, a reorganized category **settings layout**, DualSense support, and ready-to-use opinionated defaults. Its settings live in their own **`settings_riptopl.cfg`** to keep its master settings separate from official OPL and wOPL. Other files, including network and per-game settings, can still be shared. Favorites import from uOPL/wOPL is **one-way**: the next save writes RiptOPL’s own format to `favourites.bin`. See [Where your files live](#where-your-files-live). See **[This Fork's Additions](#this-forks-additions)**. For the canonical project, use [ps2homebrew/Open-PS2-Loader](https://github.com/ps2homebrew/Open-PS2-Loader).
 
