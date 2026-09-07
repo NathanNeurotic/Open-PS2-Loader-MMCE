@@ -94,6 +94,21 @@ static u8 ra_dst_mac[6];
 static u8 ra_frame[RA_FRAME_LEN] __attribute__((aligned(16)));
 static u8 *ra_payload = &ra_frame[RA_HDR_LEN];
 
+/* May this module look for the PC while a game runs? Off when the game
+   streams its own disc over the same NIC -- a share (ETH_MODE) or an HTTP
+   host. Both roads to the PC take something the game needs: the raw one
+   frees every SMAP receive descriptor it walks, and the disc stream arrives
+   through that ring; the lwIP one posts to the stack mailbox the SMB or HTTP
+   client is waiting on. Either way the game reaches its first menu and loads
+   for ever. ee_core decides and says so in a load argument. Sending is
+   unaffected and stays on. */
+static int ra_rx_in_game = 1;
+
+/* The game's serial, from the same argument, so the very first packets carry
+   it instead of fifteen zeroes -- the snapshot has it too, but not before the
+   EE has written one. */
+static char ra_game_id[16] = {0};
+
 /* Counters reported in every packet. */
 static u32 ra_seq = 0;      /* packets sent or skipped */
 static u32 ra_fail = 0;     /* SMAPSendPacket() errors */
@@ -216,6 +231,20 @@ static int ra_head_len = 0;
    header change can never silently truncate the tail. */
 static u32 ra_chunk = RA_SNAP_CHUNK_BYTES;
 
+/* Serial as-is, padded with '~'. Not '_': serials contain underscores
+   (SLUS_210.65). Only valid once ra_head_build has set the field offsets. */
+static void ra_id_put(const char *src)
+{
+    int i;
+
+    for (i = 0; i < 15; i++) {
+        char c = src[i];
+
+        ra_payload[RA_OFF(RA_F_ID) + i] =
+            (c >= 0x20 && c < 0x7F) ? (u8)c : (u8)'~';
+    }
+}
+
 static void ra_head_build(void)
 {
     static const char tag[] = "RA15";
@@ -245,6 +274,8 @@ static void ra_head_build(void)
     ra_chunk = (u32)(RA_PAYLOAD - ra_head_len);
     if (ra_chunk > RA_SNAP_CHUNK_BYTES)
         ra_chunk = RA_SNAP_CHUNK_BYTES;
+
+    ra_id_put(ra_game_id);
 }
 
 /* ---- Formatting helpers (no libc in this module) ---------------------- */
@@ -585,14 +616,7 @@ static void ra_send_one(void)
                 ra_fmt(&ra_payload[RA_OFF(RA_F_DS)], ra_snap->dma_skip, 6);
                 ra_fmt(&ra_payload[RA_OFF(RA_F_N)], ra_snap->count, 4);
 
-                /* Serial as-is, padded with '~'. Not '_': serials
-                   contain underscores (SLUS_210.65). */
-                for (i = 0; i < 15; i++) {
-                    char c = ra_snap->game_id[i];
-
-                    ra_payload[RA_OFF(RA_F_ID) + i] =
-                        (c >= 0x20 && c < 0x7F) ? (u8)c : (u8)'~';
-                }
+                ra_id_put((const char *)ra_snap->game_id);
             }
         } else {
             ra_snap_bad++;
@@ -728,6 +752,21 @@ static int ra_discover(void)
 
         tries++;
         if (tries >= RA_DISC_FAST) {
+            /* The endless slow re-query exists so the PC client may start
+               after the game. On a share it must not: every poll posts to the
+               stack mailbox the SMB or HTTP client is waiting on, and there
+               that is the road the game's own disc arrives by -- the same
+               reason ra_rx_in_game shuts the in-play reads down. Discovery
+               runs before that gate is reached, so bound it here instead:
+               the fast phase gets ten seconds, inside the start-up hold-off,
+               and then the stack is left alone for the rest of the session.
+               Nothing that worked is lost -- with no PC there is no address
+               to send telemetry to either. */
+            if (!ra_rx_in_game) {
+                lwip_close(s);
+                return 0;
+            }
+
             DelayThread(RA_DISC_SLOW_US);
             if (ra_disc_us < 0xF0000000)
                 ra_disc_us += RA_DISC_SLOW_US;
@@ -1023,8 +1062,10 @@ static void ra_thread(void *arg)
 
     for (;;) {
         ra_send_one();
-        ra_drain_rx();
-        ra_poll_pc();
+        if (ra_rx_in_game) {
+            ra_drain_rx();
+            ra_poll_pc();
+        }
         if (++iter % 600 == 0)
             ra_heartbeat();
         DelayThread(RA_PERIOD_US);
@@ -1036,13 +1077,16 @@ int _shutdown(void)
     return 0;
 }
 
-/* Arguments, built by ee_core (iopmgr.c):
-     argv[1]  snapshot buffer address in IOP RAM, eight hex digits; then
-              optionally a comma and the event buffer address in EE RAM,
-              eight hex digits more
-     argv[2]  own IP in dotted form (followed by netmask and gateway,
-              which this module does not need)
-   argv[0] is the module name, inserted by the IOP loader. */
+/* Arguments, built by ee_core (iopmgr.c). argv[1] is a comma-separated list,
+   each field optional from the left:
+     snapshot buffer address in IOP RAM, eight hex digits
+     event buffer address in EE RAM, eight hex digits
+     badge buffer address in EE RAM, eight hex digits
+     '1' or '0': may this module read from the network while a game runs
+     the game's serial, up to fifteen characters
+   argv[2] is the own IP in dotted form (followed by netmask and gateway,
+   which this module does not need). argv[0] is the module name, inserted by
+   the IOP loader. */
 int _start(int argc, char *argv[])
 {
     iop_thread_t thread;
@@ -1051,7 +1095,7 @@ int _start(int argc, char *argv[])
     if (argc >= 2 && argv[1] != NULL) {
         int len;
 
-        for (len = 0; len < 27 && argv[1][len] != '\0'; len++)
+        for (len = 0; len < 44 && argv[1][len] != '\0'; len++)
             ;
 
         if (len >= 8)
@@ -1060,6 +1104,15 @@ int _start(int argc, char *argv[])
             ra_ee_event = ra_hex_at(argv[1], 9, 8);
         if (len >= 26 && argv[1][17] == ',')
             ra_ee_badge = ra_hex_at(argv[1], 18, 8);
+        if (len >= 28 && argv[1][26] == ',')
+            ra_rx_in_game = argv[1][27] != '0';
+        if (len >= 29 && argv[1][28] == ',') {
+            int i;
+
+            for (i = 0; i < 15 && argv[1][29 + i] != '\0'; i++)
+                ra_game_id[i] = argv[1][29 + i];
+            ra_game_id[i] = '\0';
+        }
     }
 
     if (argc >= 3 && argv[2] != NULL)
