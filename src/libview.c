@@ -231,10 +231,15 @@ void libViewMarkAllDirty(void)
   value, '-' means nothing is remembered for that mode and the compiled default stands.
 
   Nothing here writes to disk, and nothing runs while browsing: L3 only moves the values in RAM.
-  The state is folded into the OPL settings set the next time that set is written (_saveConfig),
-  which is the only cost this feature has. That also means the store runs on the deferred-IO thread
-  while L3 runs on the GUI thread; both only touch single bytes, so the worst a race can do is
-  persist one page's position a moment early or late.
+  The state is folded into the LAST config set -- the small one holding last_played -- at the moment
+  that set is written (_saveConfig), so it costs no write of its own. That set is rewritten when a
+  game launches and when settings are saved, which between them cover the ways a session normally
+  ends; toggling L3 and then powering off without doing either is the deliberate gap.
+
+  The store therefore runs on the deferred-IO thread while L3 runs on the GUI thread. Both only
+  touch single bytes, so the worst a race can do is persist one page's position a moment early or
+  late. Saving from the commit itself is NOT an option: libViewCommitPending is reached from the IO
+  worker, and saveConfig hands work to that same worker through guiHandleDeferedIO.
 */
 #define LIB_VIEW_STATE_LEN  (MODE_COUNT + 1)
 #define LIB_VIEW_STATE_NONE '-'
@@ -270,35 +275,37 @@ static void libViewDecodeRing(const char *in, unsigned char *view, unsigned char
     }
 }
 
-void libViewLoadFromConfig(config_set_t *configOPL)
+void libViewLoadFromConfig(config_set_t *configLast)
 {
     const char *value;
 
-    if (configOPL == NULL)
+    if (configLast == NULL)
         return;
 
     value = NULL;
-    if (configGetStr(configOPL, CONFIG_OPL_LIB_VIEW_RETAINED, &value) && value != NULL)
+    if (configGetStr(configLast, CONFIG_LAST_LIB_VIEW_RETAINED, &value) && value != NULL)
         libViewDecodeRing(value, retainedView, NULL);
 
     // The Mixed ring carries its own "has been visited" flag: an unvisited page must enter on the
     // combined list the first time (libViewMixedActive), and restoring a position has to satisfy
     // that flag too or the restore would be overwritten on the first read.
     value = NULL;
-    if (configGetStr(configOPL, CONFIG_OPL_LIB_VIEW_MIXED, &value) && value != NULL)
+    if (configGetStr(configLast, CONFIG_LAST_LIB_VIEW_MIXED, &value) && value != NULL)
         libViewDecodeRing(value, mixedView, mixedViewInitialized);
 }
 
-void libViewStoreToConfig(config_set_t *configOPL)
+void libViewStoreToConfig(config_set_t *configLast)
 {
     char encoded[LIB_VIEW_STATE_LEN];
 
-    if (configOPL == NULL)
+    if (configLast == NULL)
         return;
 
+    // configSetStr only marks the set modified when the text actually changes, so a session that
+    // never touched L3 does not dirty the file and configWrite leaves the disk alone.
     libViewEncodeRing(encoded, retainedView, NULL);
-    configSetStr(configOPL, CONFIG_OPL_LIB_VIEW_RETAINED, encoded);
+    configSetStr(configLast, CONFIG_LAST_LIB_VIEW_RETAINED, encoded);
 
     libViewEncodeRing(encoded, mixedView, mixedViewInitialized);
-    configSetStr(configOPL, CONFIG_OPL_LIB_VIEW_MIXED, encoded);
+    configSetStr(configLast, CONFIG_LAST_LIB_VIEW_MIXED, encoded);
 }

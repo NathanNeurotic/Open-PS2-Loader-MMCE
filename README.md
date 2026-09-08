@@ -378,7 +378,10 @@ This build layers several features on top of upstream OPL:
   notification, or pause). APPS and Favorites remain independent. Wherever L3 does something, the
   view you leave a page on is **remembered across sessions** — each device page, the Favorites
   shelf and the APPS split side keep their own position, restored the next time you boot (a
-  remembered view that the display setting no longer allows is simply dropped). On a combined
+  remembered view that the display setting no longer allows is simply dropped). Pressing L3 never
+  writes to storage: the positions ride along with a write that already happens — **launching a
+  game, or saving settings** — so toggling and then powering off without doing either is the one
+  case that is not kept. On a combined
   Mixed list every row's cover is drawn at its own media's size, so PS1 cases stay square while PS2
   cases stay portrait. A `*.VCD` row boots through
   **POPSTARTER** — never OPL's own core and never Neutrino, so the Loader Core selector is inert for

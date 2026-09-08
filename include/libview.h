@@ -68,10 +68,11 @@ void libViewCommitPending(int mode);
 void libViewFinishPending(int mode);
 
 // Remembered L3 position, so every page comes back where the user left it. These only move the
-// state in and out of the OPL settings set in memory -- toggling L3 costs nothing, and whoever
-// writes that set carries the positions to disk. See the encoding note in libview.c.
-void libViewLoadFromConfig(config_set_t *configOPL);
-void libViewStoreToConfig(config_set_t *configOPL);
+// state in and out of the LAST config set in memory -- toggling L3 costs nothing, and the write
+// that set already gets (a game launch, a settings save) carries the positions to disk. See the
+// encoding note in libview.c.
+void libViewLoadFromConfig(config_set_t *configLast);
+void libViewStoreToConfig(config_set_t *configLast);
 
 // Dirty protocol consumed by support itemNeedsUpdate callbacks.
 int libViewConsumeDirty(int mode);

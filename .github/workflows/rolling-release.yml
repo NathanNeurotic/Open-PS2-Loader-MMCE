@@ -989,7 +989,8 @@ jobs:
             printf -- '  and confirm the game list populates and an ISO boots over your chosen protocol on real hardware.\n'
             printf -- '- Mixed cover sizing: on the Favorites All in One shelf and a device page set to Mixed, confirm PS1\n'
             printf -- '  and app covers are square and PS2 covers portrait, on your own theme as well as the built-in ones.\n'
-            printf -- '- Remembered L3 view: toggle a page, save settings, reboot, and confirm it comes back where you left it.\n'
+            printf -- '- Remembered L3 view: toggle a page, then launch a game OR save settings, reboot, and confirm it\n'
+            printf -- '  comes back where you left it. (A toggle followed by a power-off with neither is deliberately not kept.)\n'
             printf '\n## Other downloads\n'
             if ls rolling/RIPTOPL-RA-*.zip >/dev/null 2>&1; then
               printf -- '- RIPTOPL-RA-*.zip: the RetroAchievements loader as a complete package (POPS, EMBER, neutrino, shortcuts) -- **development build, not hardware-tested**\n'

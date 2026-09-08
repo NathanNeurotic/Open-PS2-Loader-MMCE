@@ -602,7 +602,11 @@ int menuSaveSettings(void)
     guiGameSavePadEmuGlobalConfig(configGetByType(CONFIG_GAME));
     guiGameSavePadMacroGlobalConfig(configGetByType(CONFIG_GAME));
 #endif
-    result = saveConfig(CONFIG_OPL | CONFIG_NETWORK | CONFIG_GAME, 1);
+    // CONFIG_LAST is in the list for the remembered L3 positions (_saveConfig folds them in there).
+    // It is otherwise only written when a game launches, and that write is gated on Remember Last
+    // Played -- so without this a user with that setting off could never persist a view. It costs
+    // nothing when nothing changed: configWrite skips an unmodified set without touching the disk.
+    result = saveConfig(CONFIG_OPL | CONFIG_NETWORK | CONFIG_GAME | CONFIG_LAST, 1);
     menuSetParentalLockCheckState(1); // Re-enable parental lock check.
 
     // SMB, UDPFS and UDPBD share the one SMAP NIC and cannot coexist -- each loader refuses to
