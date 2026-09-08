@@ -134,6 +134,15 @@ game runs normally but nothing reaches the PC.
 The PC client is found automatically: the console broadcasts a query on UDP port 18194 and the client
 answers. Nothing is stored between runs.
 
+The sender follows xeRAbora alpha.8's console changes (`9bacfe59` and `9531fd9c`): it polls
+every 4 ms, sends each new snapshot once, and retries a busy transmitter or torn copy on the
+next poll. An unchanged snapshot is repeated only after about a second without a new one.
+RiptOPL additionally records the sequence of the staged payload, rather than rereading the live
+DMA buffer after sending, and leaves a snapshot pending if any packet fails to send. These
+contracts have host regression tests; snapshot loss and gameplay timing still need PS2 validation.
+Use the current upstream xeRAbora PC client. This sender update does not establish that the
+SMB/HTTP gameplay limitation above is fixed.
+
 ---
 
 ## Files on the card
