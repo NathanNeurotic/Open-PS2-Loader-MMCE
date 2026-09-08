@@ -77,7 +77,9 @@ The RA path retains the console's physical-disc drivers and PS2LOGO authenticati
 OPL telemetry core. It accepts PS2 CD/DVD boot executables in the disc root, with names up to
 15 characters. Nested boot paths, PS1 discs and video DVDs are not supported by this RA action.
 Physical memory cards are used; image-specific VMC, cheats, GSM, pad emulation, language overrides
-and compatibility patches are not applied. The power-off controller combo is unavailable on this
+and storage-emulation patches are not applied. The thread/pad fixes for Eutechnyx titles,
+Shaun Palmer's Pro Snowboarder and PAL .hack selectors remain enabled because disc launches retain
+OPL's hooks. The power-off controller combo is unavailable on this
 path. Disc boot, telemetry across game IOP resets and the IGR return path still need PS2 validation.
 
 ---

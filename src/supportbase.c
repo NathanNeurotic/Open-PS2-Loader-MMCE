@@ -1933,7 +1933,10 @@ int sbHashGameDeferred(const char *path, const char *name, const char *ext, cons
     snprintf(ra_hash_startup, sizeof(ra_hash_startup), "%s", startup ? startup : "");
     ra_hash_format = format;
 
-    ioPutRequest(IO_CUSTOM_SIMPLEACTION, &sbHashGameDeferredWorker);
+    if (ioPutRequest(IO_CUSTOM_SIMPLEACTION, &sbHashGameDeferredWorker) != IO_OK) {
+        ra_hash_busy = 0;
+        return 0;
+    }
     return 1;
 }
 

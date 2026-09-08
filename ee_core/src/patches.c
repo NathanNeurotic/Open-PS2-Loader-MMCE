@@ -904,10 +904,6 @@ static void HarvestMoonAWLPatch(int region)
 void apply_patches(const char *path)
 {
     USE_LOCAL_EECORE_CONFIG;
-#ifdef RETROACHIEVEMENTS
-    if (config->GameMode == DISC_MODE)
-        return;
-#endif
     const patchlist_t *p;
     int mode;
     // Some patches hack into specific ELF files
@@ -922,6 +918,15 @@ void apply_patches(const char *path)
     // if there are patches matching game name/mode then fill the patch table
     for (p = patch_list; p->game; p++) {
         if ((!_strcmp(config->GameID, p->game)) && ((p->mode == ALL_MODE) || (mode == p->mode))) {
+#ifdef RETROACHIEVEMENTS
+            // Disc launches retain OPL's thread/pad hooks, but not its emulated
+            // storage. Keep only the fixes needed by those hooks.
+            if (config->GameMode == DISC_MODE &&
+                p->patch.addr != PATCH_EUTECHNYX_WU_TID &&
+                p->patch.addr != PATCH_PRO_SNOWBOARDER &&
+                p->patch.addr != PATCH_DOT_HACK)
+                continue;
+#endif
             switch (p->patch.addr) {
                 case PATCH_GENERIC_NIS:
                     NIS_generic_patches();

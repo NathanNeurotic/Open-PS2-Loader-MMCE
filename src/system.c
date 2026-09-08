@@ -483,6 +483,10 @@ static int sysParseBoot2(const char *cnf, char *out, int outSize)
                 while (*eq != '\0' && *eq != '\r' && *eq != '\n' && *eq != ' ' && *eq != '\t' && i < outSize - 1)
                     out[i++] = *eq++;
                 out[i] = '\0';
+                if (*eq != '\0' && *eq != '\r' && *eq != '\n' && *eq != ' ' && *eq != '\t') {
+                    out[0] = '\0';
+                    return -1;
+                }
                 return (i > 0) ? 0 : -1;
             }
             p += 5;

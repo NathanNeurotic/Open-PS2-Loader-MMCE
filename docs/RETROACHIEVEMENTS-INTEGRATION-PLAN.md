@@ -398,7 +398,8 @@ retains ROM CDVDMAN/CDVDFSV, and skips OPL CDVDMAN's shutdown RPC. RiptOPL reuse
 physical-disc probe, active settings folder and normal frontend teardown.
 
 The separate **Launch PS2 Disc** action retains the existing normal disc boot. Physical-disc RA
-uses real memory cards and does not apply image-specific patches. See the
+uses real memory cards and excludes storage-emulation patches while retaining the selected
+thread/pad fixes required by OPL's hooks. See the
 [current guide](RETROACHIEVEMENTS.md#physical-discs) for operation, limits and outstanding PS2 tests.
 Upstream hardware results do not validate this port.
 

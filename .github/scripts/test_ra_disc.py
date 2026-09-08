@@ -242,4 +242,97 @@ int main(void) {
 '''
 run('power_input',prefix+s+test)
 
+s=(root/'src/system.c').read_text(encoding='utf-8')
+s=s[s.index('static int sysParseBoot2'):s.index('// Boot the physical PS2 disc')]
+run('boot_path', '#include <assert.h>\n#include <stdio.h>\n#include <string.h>\n#include <strings.h>\n'+s+r'''
+int main(void) {
+    char out[64], cnf[100], token[65];
+    memset(token,'A',64);token[64]=0;
+    snprintf(cnf,sizeof(cnf),"BOOT2 = %s",token);
+    assert(sysParseBoot2(cnf,out,sizeof(out))<0 && out[0]==0);
+    token[63]=0;
+    const char *ends[]={"","\n","\r\n"," ","\t"};
+    for(unsigned i=0;i<sizeof(ends)/sizeof(ends[0]);i++) {
+        snprintf(cnf,sizeof(cnf),"BOOT2 = %s%s",token,ends[i]);
+        assert(sysParseBoot2(cnf,out,sizeof(out))==0 && !strcmp(out,token));
+    }
+    assert(sysParseBoot2("BOOT2 = \r\n",out,sizeof(out))<0);
+    assert(sysParseBoot2("BOOT2 = A",out,1)<0);
+    assert(sysParseBoot2("BOOT2 = A",out,0)<0);
+    assert(sysParseBoot2("boot2 = cdrom0:\\SLUS_201.74;1\r\n",out,sizeof(out))==0);
+    assert(!strcmp(out,"cdrom0:\\SLUS_201.74;1"));
+    puts("PASS: BOOT2 exact fit, overflow, delimiters and normal CRLF paths");
+}
+''')
+
+s=(root/'src/supportbase.c').read_text(encoding='utf-8')
+s=s[s.index('static char ra_hash_path'):s.index('static void sbTestPCLinkWorker')]
+prefix=r'''
+#include <assert.h>
+#include <stdio.h>
+enum { IO_OK=0, IO_CUSTOM_SIMPLEACTION=1 };
+static int result, requests, hashes;
+static void (*worker)(void);
+static int ioPutRequest(int kind,void (*fn)(void)) {assert(kind==IO_CUSTOM_SIMPLEACTION);requests++;worker=fn;return result;}
+static void sbHashGame(const char *p,const char*n,const char*e,const char*s,int f) {(void)p;(void)n;(void)e;(void)s;(void)f;hashes++;}
+'''
+run('image_queue',prefix+s+r'''
+int main(void) {
+    for(int error=-1;error>=-6;error--) {
+        result=error;
+        assert(!sbHashGameDeferred("p","n","iso","SLUS_201.74",1));
+        assert(!sbHashGameBusy());
+    }
+    result=IO_OK;
+    assert(sbHashGameDeferred("p","n","iso","SLUS_201.74",1));
+    assert(sbHashGameBusy() && requests==7);
+    assert(!sbHashGameDeferred("p","n","iso","SLUS_201.74",1) && requests==7);
+    worker();assert(!sbHashGameBusy() && hashes==1);
+    assert(sbHashGameDeferred("p","n","iso","SLUS_201.74",1));
+    puts("PASS: failed image-hash submissions release busy state and allow a later request");
+}
+''')
+
+s=(root/'ee_core/src/patches.c').read_text(encoding='utf-8')
+s=s[s.index('void apply_patches(const char *path)'):]
+cases=re.findall(r'case (PATCH_\w+):\s*\n\s*(?:if \(file_eq_gameid\)\s*)?(\w+)\(',s)
+assert len(cases)==16, cases
+prefix=r'''
+#include <assert.h>
+#include <stdio.h>
+#include <string.h>
+#include <stdint.h>
+#define RETROACHIEVEMENTS 1
+#define _strcmp strcmp
+#define _strncmp strncmp
+#define _lw(x) 0
+#define _sw(v,a) ((void)0)
+#define Skip_BIK_Videos() 0
+#define Skip_Videos_sceMpegIsEnd() ((void)0)
+enum { DISC_MODE=30,HDD_MODE,ETH_MODE,BDM_MODE,ALL_MODE,COMPAT_MODE_4=1 };
+static struct { int GameMode; char GameID[16]; } cfg;
+#define USE_LOCAL_EECORE_CONFIG __typeof__(cfg) *config=&cfg
+static int g_compat_mask;
+typedef struct { const char *game; int mode; struct { uintptr_t addr,check,val; } patch; } patchlist_t;
+'''
+prefix+='enum { '+', '.join(c for c,f in cases)+' };\n'
+prefix+='static int hits[16];\n'
+for c,f in cases:
+    prefix+=f'#define {f}(...) (hits[{c}]++)\n'
+prefix+='static const patchlist_t patch_list[]={\n'
+for c,f in cases:
+    prefix+='{"TEST_000.00",ALL_MODE,{'+c+',0,0}},\n'
+prefix+='{NULL,0,{0,0,0}}};\n'
+run('patch_selection',prefix+s+r'''
+int main(void) {
+    strcpy(cfg.GameID,"TEST_000.00");cfg.GameMode=DISC_MODE;
+    apply_patches("cdrom0:\\TEST_000.00;1");
+    for(int i=0;i<16;i++) assert(hits[i]==(i==PATCH_EUTECHNYX_WU_TID || i==PATCH_PRO_SNOWBOARDER || i==PATCH_DOT_HACK));
+    memset(hits,0,sizeof(hits));cfg.GameMode=BDM_MODE;
+    apply_patches("cdrom0:\\TEST_000.00;1");
+    for(int i=0;i<16;i++) assert(hits[i]==1);
+    puts("PASS: disc thread/pad patches retained, storage patches excluded, image patch dispatch preserved");
+}
+''')
+
 work.cleanup()
