@@ -7,9 +7,12 @@
 #include "include/opl.h"
 #include "include/libview.h"
 
-// Both-mode device state, the Favorites ring, and the APPS split ring. Zero is the wanted default
-// for ordinary devices/APPS (PS2/Apps); Favorites intentionally begins at All.
-static unsigned char retainedView[MODE_COUNT] = {[FAV_MODE] = LIB_VIEW_ALL};
+// Both-mode device state, the Favorites ring, and the APPS split ring. Zero -- LIB_VIEW_ISO, so
+// PS2 for a device or Favorites and Apps for the APPS tab -- is the wanted FIRST-RUN default
+// everywhere: Favorites' ring reads PS2 -> PS1 -> ELF -> All from there, so it opens on the plain
+// PS2 shelf and the all-in-one one is a press away. A position remembered from an earlier session
+// (libViewLoadFromConfig) overrides this, so it only decides where a fresh config starts.
+static unsigned char retainedView[MODE_COUNT];
 
 // Mixed has a different three-stop ring from Both. Keep its position separately so switching the
 // setting to Mixed always enters the combined list the first time, while later visits retain the
@@ -149,11 +152,12 @@ int libViewStageAdvance(int mode)
 
     cur = libViewActive(mode);
     if (mode == FAV_MODE) {
-        // Explicit order: All -> PS2 -> PS1 -> ELF -> All.
-        pendingView[mode] = (cur == LIB_VIEW_ALL) ? LIB_VIEW_ISO :
-                            (cur == LIB_VIEW_ISO) ? LIB_VIEW_PS1 :
+        // Explicit order: PS2 -> PS1 -> ELF -> All -> PS2. The final arm is the fallback for any
+        // value outside the ring (a hand-edited remembered position), and lands on the default.
+        pendingView[mode] = (cur == LIB_VIEW_ISO) ? LIB_VIEW_PS1 :
                             (cur == LIB_VIEW_PS1) ? LIB_VIEW_ELF :
-                                                    LIB_VIEW_ALL;
+                            (cur == LIB_VIEW_ELF) ? LIB_VIEW_ALL :
+                                                    LIB_VIEW_ISO;
     } else if (mode == APP_MODE) {
         pendingView[mode] = cur == LIB_VIEW_PS1_ELF ? LIB_VIEW_ISO : LIB_VIEW_PS1_ELF;
     } else if (gDefaultGameView == GAME_VIEW_MIXED) {
@@ -216,4 +220,92 @@ void libViewMarkAllDirty(void)
     int mode;
     for (mode = 0; mode < MODE_COUNT; mode++)
         libDirty[mode] = 1;
+}
+
+/*
+  Remembering where the user left each page.
+
+  Both rings are per-mode arrays, so the obvious encoding -- a config key per mode -- would be
+  thirty keys for one idea the user thinks of as "where I left that page". Instead each ring is one
+  fixed-width string, ONE CHARACTER PER MODE, indexed by the IO_MODES enum: '0'..'5' is a LIB_VIEW_*
+  value, '-' means nothing is remembered for that mode and the compiled default stands.
+
+  Nothing here writes to disk, and nothing runs while browsing: L3 only moves the values in RAM.
+  The state is folded into the LAST config set -- the small one holding last_played -- at the moment
+  that set is written (_saveConfig), so it costs no write of its own. That set is rewritten when a
+  game launches and when settings are saved, which between them cover the ways a session normally
+  ends; toggling L3 and then powering off without doing either is the deliberate gap.
+
+  The store therefore runs on the deferred-IO thread while L3 runs on the GUI thread. Both only
+  touch single bytes, so the worst a race can do is persist one page's position a moment early or
+  late. Saving from the commit itself is NOT an option: libViewCommitPending is reached from the IO
+  worker, and saveConfig hands work to that same worker through guiHandleDeferedIO.
+*/
+#define LIB_VIEW_STATE_LEN  (MODE_COUNT + 1)
+#define LIB_VIEW_STATE_NONE '-'
+
+// `set` (optional) marks which modes hold a real value; without it every mode is written.
+static void libViewEncodeRing(char *out, const unsigned char *view, const unsigned char *set)
+{
+    int mode;
+
+    for (mode = 0; mode < MODE_COUNT; mode++)
+        out[mode] = (set == NULL || set[mode]) ? (char)('0' + view[mode]) : LIB_VIEW_STATE_NONE;
+    out[MODE_COUNT] = '\0';
+}
+
+static void libViewDecodeRing(const char *in, unsigned char *view, unsigned char *set)
+{
+    int mode;
+
+    // A short string -- an older config, or a hand-edited one -- simply leaves the modes it does
+    // not reach at their defaults, so the format can grow with the mode enum without a migration.
+    for (mode = 0; mode < MODE_COUNT && in[mode] != '\0'; mode++) {
+        int value = in[mode] - '0';
+
+        // Refuse a view this mode cannot display. A remembered position outlives the setting that
+        // produced it (PS2/PS1 Game Display switched from Mixed to Both, Applications Display
+        // switched back to one list), and restoring it blindly would strand a page on a view with
+        // no backing list. An unusable value is dropped, not clamped: the default is always valid.
+        if (value < 0 || value >= LIB_VIEW_COUNT || !libViewSupported(mode, value))
+            continue;
+        view[mode] = (unsigned char)value;
+        if (set != NULL)
+            set[mode] = 1;
+    }
+}
+
+void libViewLoadFromConfig(config_set_t *configLast)
+{
+    const char *value;
+
+    if (configLast == NULL)
+        return;
+
+    value = NULL;
+    if (configGetStr(configLast, CONFIG_LAST_LIB_VIEW_RETAINED, &value) && value != NULL)
+        libViewDecodeRing(value, retainedView, NULL);
+
+    // The Mixed ring carries its own "has been visited" flag: an unvisited page must enter on the
+    // combined list the first time (libViewMixedActive), and restoring a position has to satisfy
+    // that flag too or the restore would be overwritten on the first read.
+    value = NULL;
+    if (configGetStr(configLast, CONFIG_LAST_LIB_VIEW_MIXED, &value) && value != NULL)
+        libViewDecodeRing(value, mixedView, mixedViewInitialized);
+}
+
+void libViewStoreToConfig(config_set_t *configLast)
+{
+    char encoded[LIB_VIEW_STATE_LEN];
+
+    if (configLast == NULL)
+        return;
+
+    // configSetStr only marks the set modified when the text actually changes, so a session that
+    // never touched L3 does not dirty the file and configWrite leaves the disk alone.
+    libViewEncodeRing(encoded, retainedView, NULL);
+    configSetStr(configLast, CONFIG_LAST_LIB_VIEW_RETAINED, encoded);
+
+    libViewEncodeRing(encoded, mixedView, mixedViewInitialized);
+    configSetStr(configLast, CONFIG_LAST_LIB_VIEW_MIXED, encoded);
 }

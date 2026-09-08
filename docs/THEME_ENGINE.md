@@ -48,20 +48,43 @@ override only what differs and inherit the rest.
 | `main0…` / `info0…` | The **games** list / info — the base layout | *(none — this is the base)* |
 | `appsMain0…` / `appsInfo0…` | The **apps** device list / info | → `mainN` / `infoN` |
 | `favsMain0…` / `favsInfo0…` | The **Favorites** tab list / info | → `mainN` / `infoN` |
-| `vcdMain0…` / `vcdInfo0…` | A device's homogeneous **PS1/VCD view**, plus selected PS1-row info in Mixed | main: → `appsMainN` → `mainN`  ·  info: → `infoN` |
+| `vcdMain0…` / `vcdInfo0…` | A device's homogeneous **PS1/VCD view**, plus every PS1 row's cover and info wherever it appears | main: → `appsMainN` → `mainN`  ·  info: → `infoN` |
 
 **The VCD family** (new in this fork) lets PS1/VCD games have their own look. A device's homogeneous
-PS1 view renders from `vcdMain*`; in a combined Mixed view the shared list uses the base `main*`
-family, while opening a selected PS1 row still uses `vcdInfo*`. Because each `vcdMain` slot falls
+PS1 view renders from `vcdMain*`. Because each `vcdMain` slot falls
 back to `appsMain` — a **square** box, matching
 PS1 jewel-case art — before `main`, a theme that defines *no* `vcdMain` blocks still shows PS1 games
 in the square apps box. So you only add `vcdMain` blocks to make PS1 covers *differ* from apps;
 `vcdInfo` falls back to the game `info` layout, preserving the rich PS1 metadata page.
 
+#### Mixed lists: the page picks the family, each row picks its own cover
+
+A **mixed** list holds more than one kind of media at once — the Favorites tab's *All* shelf, and a
+device page under **PS2/PS1 Game Display = Mixed**. The page as a whole still renders from one family
+(the base `main*` for a Mixed device page, `favsMain*` for Favorites): the background, the texts and
+the `ItemsList` belong to the *page*, so they stay put while you scroll.
+
+The **cover does not**. A PS2 case is portrait, a PS1 case and an app box are square, and forcing one
+shape on all three stretches whichever kinds are not the page's own. So the cover element — the
+`ItemCover` panel, the `Coverflow` carousel — is resolved **per row, by media kind**:
+
+| Row | Cover drawn from |
+|---|---|
+| PS2 disc game | the page's own family (`main2` / `favsMain2` / …) |
+| PS1 / VCD | `vcdMain*` (→ `appsMain*` → `main*`) |
+| App / ELF | `appsMain*` (→ `main*`) |
+
+Only the cover is redirected — its `width`/`height`, `overlay`/`overlay2` and `default` placeholder.
+Everything else on the page is untouched, and on a single-kind page the row's kind *is* the page's
+kind, so nothing is redirected at all. The same rule picks the info screen's cover from the matching
+`*Info*` family. In a Coverflow carousel the cover **width** stays uniform (so spacing stays even) and
+only the height follows each row's own element aspect.
+
 > The games / apps / favs families share one cover-art cache (deduplicated by `pattern`). The **PS1/VCD
 > view keeps its OWN cover cache**: separate PS2 and PS1 views reuse the device's game *list* indices,
-> so a shared cache would thrash covers on every toggle. A combined Mixed view instead uses the base
-> games list/cache for all visible rows. The VCD family automatically
+> so a shared cache would thrash covers on every toggle. A mixed list therefore draws from **two**
+> caches at once — PS1 rows from the VCD one, everything else from the shared one — and both are
+> warmed. The VCD family automatically
 > claims its own (4th) `ItemsList` slot and a separate cover cache — one small extra cache; the rest is
 > shared. (A theme needs no extra `ItemsList` block for this; it is auto-claimed via the fallback.)
 
@@ -438,6 +461,17 @@ Apps and PS1/VCD covers share the games frame but use a **square** element so th
 their square art, while games stay PS2-case **portrait**. The `vcdMain2` block above gives PS1/VCD
 covers their own square element; omit it and PS1 games reuse `appsMain2` (see *Block families*). The element `width`/`height` set the box
 aspect; the overlay corners (full-canvas of those dims) let the cover fill it.
+
+More than one of these blocks is live at once on a **mixed** list — each row's cover picks the one
+for its own media kind (see *Mixed lists* under *Block families*). Which trio is in play depends on
+the page, because only the PS1 and app rows are redirected; the PS2 row keeps whatever the page
+itself renders from:
+
+- a **device page** set to Mixed → `main2` + `vcdMain2` + `appsMain2`
+- the **Favorites** *All* shelf → `favsMain2` + `vcdMain2` + `appsMain2`
+
+So a theme that overrides `favsMain2` should size it as its **PS2** cover, and define `vcdMain2` /
+`appsMain2` for the other two kinds rather than leaving the whole shelf on one shape.
 
 ### Global Coverflow tuning (NOT in the theme)
 

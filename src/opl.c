@@ -492,7 +492,7 @@ static void itemExecToggleView(struct menu_item *curMenu)
     cacheDropQueuedArt();
 
     sfxPlay(SFX_CONFIRM);
-    // Favorites has four stops (All -> PS2 -> PS1 -> ELF), so the toast names the
+    // Favorites has four stops (PS2 -> PS1 -> ELF -> All), so the toast names the
     // one you landed on rather than reading as an on/off flag.
     {
         int view = libViewPendingTarget(support->mode);
@@ -2865,6 +2865,13 @@ static void _loadConfig()
             configGetInt(configOPL, CONFIG_OPL_APPS_DISPLAY, &gAppsDisplay);
             if (gAppsDisplay < APPS_DISPLAY_MIXED || gAppsDisplay > APPS_DISPLAY_SPLIT)
                 gAppsDisplay = APPS_DISPLAY_MIXED;
+            // Where the user left each L3 page last session. Read from the LAST set (the same
+            // configReadMulti above filled it), but sequenced HERE, after the two display settings
+            // above: the restore validates every remembered position against what its mode can
+            // currently display, and a position saved under a since-changed setting is dropped
+            // rather than clamped, so that page opens on its default instead of on a view with no
+            // rows. Reading it before those two would validate against stale settings.
+            libViewLoadFromConfig(configGetByType(CONFIG_LAST));
             if (!configGetInt(configOPL, CONFIG_OPL_EMBER_DISPLAY, &gEmberDisplay))
                 gEmberDisplay = EMBER_DISPLAY_LEAVE;
             if (gEmberDisplay < EMBER_DISPLAY_LEAVE || gEmberDisplay > EMBER_DISPLAY_480)
@@ -3451,6 +3458,14 @@ static void _saveConfig()
 
         configSetInt(configOPL, CONFIG_OPL_SWAP_SEL_BUTTON, gSelectButton == KEY_CIRCLE ? 0 : 1);
     }
+
+    // Fold in each page's current L3 position. Doing it at WRITE time is what keeps L3 itself free:
+    // pressing it never touches storage, and the position rides along with a write this set was
+    // already getting -- a game launch, or a settings save (which asks for CONFIG_LAST for exactly
+    // this reason). configSetStr marks the set modified only when the text really changed, so a
+    // session that never touched L3 still leaves the file alone.
+    if (lscstatus & CONFIG_LAST)
+        libViewStoreToConfig(configGetByType(CONFIG_LAST));
 
     if (lscstatus & CONFIG_NETWORK) {
         config_set_t *configNet = configGetByType(CONFIG_NETWORK);
