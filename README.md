@@ -759,8 +759,7 @@ With special and sincere thanks to:
 - **Berion** — for the artwork and theme design that has shaped how OPL *looks* for years.
   The visual language this fork builds on owes a great deal to that craft.
 - **AdityaKumar7209** — whose [**Modulo-R1**](https://github.com/AdityaKumar7209/Modulo-R1-Beta-Preview---PS2)
-  project inspired this fork's **folder browsing** in the game list. We didn't use their code, but the
-  idea of navigating game subfolders came from seeing it there — thank you for the spark.
+  project inspired this fork's **folder browsing** in the game list.
 - **Irfanlesnar** — creator of [**PS2-Launcher**](https://github.com/Irfanlesnar/PS2-Launcher),
   for UI, feature ideas, and contributions across the OPL fork ecosystem.
 - **Ifcaro** and **jimmikaelkael** — the original Open PS2 Loader authors — and every
