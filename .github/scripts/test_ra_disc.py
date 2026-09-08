@@ -320,7 +320,7 @@ prefix+='static int hits[16];\n'
 for c,f in cases:
     prefix+=f'#define {f}(...) (hits[{c}]++)\n'
 prefix+='static const patchlist_t patch_list[]={\n'
-for c,f in cases:
+for c,_ in cases:
     prefix+='{"TEST_000.00",ALL_MODE,{'+c+',0,0}},\n'
 prefix+='{NULL,0,{0,0,0}}};\n'
 run('patch_selection',prefix+s+r'''
