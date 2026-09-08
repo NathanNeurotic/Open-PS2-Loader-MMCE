@@ -81,6 +81,10 @@ typedef struct
     struct theme_element *coverElem;
 } items_list_t;
 
+// Forward declaration: an element carries a back-pointer to the family it was parsed into (see
+// theme_element_t::family), and theme_elems_t itself is defined below, after the element.
+struct theme_elems;
+
 typedef struct theme_element
 {
     int type;
@@ -102,6 +106,14 @@ typedef struct theme_element
     int deviceFilter;
     int deviceCoverage;
 
+    // The family this element was parsed into (main/info x games/apps/favs/vcd). Non-owning, set
+    // once at parse time. The per-row cover redirect (thmGetElemForItem) uses it to stay on the
+    // SAME screen half: an info-screen cover must resolve to another INFO element, never to the
+    // browse page's, whose coordinates belong to a different screen. NULL for the few elements
+    // built outside addGUIElem (the auto-added background, the loading icon), none of which is
+    // ever a redirect target -- the lookup matches GameImage/Coverflow by cover-cache suffix.
+    struct theme_elems *family;
+
     void *extended;
 
     void (*drawElem)(struct menu_list *menu, struct submenu_list *item, config_set_t *config, struct theme_element *elem);
@@ -110,7 +122,7 @@ typedef struct theme_element
     struct theme_element *next;
 } theme_element_t;
 
-typedef struct
+typedef struct theme_elems
 {
     theme_element_t *first;
     theme_element_t *last;

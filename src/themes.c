@@ -1209,42 +1209,89 @@ static void *thmGetItemSource(struct menu_list *menu, struct submenu_list *item)
     return menu->item->userdata;
 }
 
-// Find a game-image / coverflow element in a list by its cover-cache suffix (e.g. "COV").
-static theme_element_t *thmFindElemBySuffix(theme_elems_t *elems, const char *suffix)
+// Find a game-image / coverflow element in a list by its cover-cache suffix (e.g. "COV"). A family
+// may hold more than one element on the same suffix -- a carousel or big cover panel alongside a
+// list decorator, which is the split splitDecoratorCoverCache exists for. When `like` is given,
+// prefer the element DRAWN the same way (the carousel resolves to a carousel, a panel to a panel);
+// a Coverflow element is typed GAME_IMAGE like the rest, so the draw function is what separates
+// them. Falls back to the first suffix match, which is the historical behaviour.
+static theme_element_t *thmFindElemBySuffix(theme_elems_t *elems, const char *suffix, theme_element_t *like)
 {
+    theme_element_t *firstMatch = NULL;
+
     if (suffix == NULL)
         return NULL;
     for (theme_element_t *e = elems->first; e != NULL; e = e->next) {
         if (e->type != ELEM_TYPE_GAME_IMAGE && e->type != ELEM_TYPE_COVERFLOW)
             continue;
         mutable_image_t *eimg = (mutable_image_t *)e->extended;
-        if (eimg != NULL && eimg->cache != NULL && eimg->cache->suffix != NULL && strcmp(eimg->cache->suffix, suffix) == 0)
+        if (eimg == NULL || eimg->cache == NULL || eimg->cache->suffix == NULL || strcmp(eimg->cache->suffix, suffix) != 0)
+            continue;
+        if (like != NULL && e->drawElem == like->drawElem)
             return e;
+        if (firstMatch == NULL)
+            firstMatch = e;
     }
-    return NULL;
+    return firstMatch;
 }
 
-// Element to DRAW a submenu item with. The Favourites screen as a whole renders with the theme's
-// favs family (menuRenderMain switches the element set per mode); the VCD view and the Apps tab
-// render with the apps family the same way. This per-item hook adds ONE extra redirect on top: an
-// APP-source favourite redirects its COVER to the apps element (matched by cache suffix) so a
-// favourited app keeps its app box even when the theme defines no distinct favsMain cover. Non-app
-// favourites and every other screen pass through unchanged -- the element already comes from the
-// correct family. Single chokepoint for both drawGameImage and the coverflow carousel.
+// Family a redirected cover resolves into. Stays on the SAME screen half the source element came
+// from: a browse-page cover redirects to another main-family element, an info-page cover to an info
+// one. Redirecting across the two would hand the cover the other screen's coordinates.
+static theme_elems_t *thmKindFamily(theme_element_t *elem, int isApp)
+{
+    int info = elem->family == &gTheme->infoElems || elem->family == &gTheme->appsInfoElems ||
+               elem->family == &gTheme->favsInfoElems || elem->family == &gTheme->vcdInfoElems;
+
+    if (isApp)
+        return info ? &gTheme->appsInfoElems : &gTheme->appsMainElems;
+    return info ? &gTheme->vcdInfoElems : &gTheme->vcdMainElems;
+}
+
+// Element to DRAW a submenu item's COVER with. A page as a whole renders with one family
+// (menuRenderMain / menuGetInfoElems switch the element set per mode), which is right for the
+// background, the texts and the items list -- they belong to the page, not to any one row. The
+// cover does not: a PS2 case is portrait (184x256 on our built-in theme), a PS1 case and an app box
+// are square (184x184 / 256x256), and a MIXED page interleaves them -- the Favourites "All" shelf,
+// and a device page under PS2/PS1 Game Display = Mixed. Stamping the page family's dimensions on
+// every cover stretches whichever kinds are not the page's own (#623, Yuramash: PS1 covers stretched
+// on the Favourites mixer).
+//
+// So resolve the cover element per ROW, by media kind: PS1 rows draw with the vcd family, app/ELF
+// rows with the apps family, PS2 disc rows with the page's own element. On a homogeneous page the
+// row kind IS the page kind and the lookup lands back on the element it was given, so those pages
+// are unchanged. Matching is by cover-cache suffix, so a family that defines no counterpart element
+// (or a theme using a different pattern) falls through to the caller's element as before.
+//
+// Single chokepoint for the selected-cover panel (drawGameImage), the coverflow carousel and the
+// items-list cover warming. Only the ELEMENT is redirected -- geometry, case overlay, placeholder
+// and cover cache; the texture lookup stays on the page's own list, so art resolution, the
+// Favourites index proxying and per-row art gating are all untouched.
 static theme_element_t *thmGetElemForItem(struct menu_list *menu, struct submenu_list *item, theme_element_t *elem)
 {
-    if (item == NULL || elem == NULL)
+    if (item == NULL || elem == NULL || item->item.isFolder)
         return elem;
     item_list_t *menuList = (item_list_t *)menu->item->userdata;
-    if (menuList == NULL || menuList->mode != FAV_MODE)
+    if (menuList == NULL)
         return elem;
-    if (favGetItemSourceMode(item->item.id) != APP_MODE)
+
+    // Favourites also consults the record's SOURCE device: an app favourite stored before the ELF
+    // shelf existed still resolves to the apps box, exactly as it did when this hook was apps-only.
+    int rowView = libListRowView(menuList, item->item.id);
+    int isApp = rowView == LIB_VIEW_ELF || rowView == LIB_VIEW_PS1_ELF ||
+                (menuList->mode == FAV_MODE && favGetItemSourceMode(item->item.id) == APP_MODE);
+    if (!isApp && rowView != LIB_VIEW_PS1)
         return elem;
+
+    theme_elems_t *family = thmKindFamily(elem, isApp);
+    if (elem->family == family)
+        return elem; // already this kind's own element (a homogeneous page): nothing to redirect
+
     mutable_image_t *img = (mutable_image_t *)elem->extended;
     if (img == NULL || img->cache == NULL)
         return elem;
-    theme_element_t *appsElem = thmFindElemBySuffix(&gTheme->appsMainElems, img->cache->suffix);
-    return (appsElem != NULL) ? appsElem : elem;
+    theme_element_t *kindElem = thmFindElemBySuffix(family, img->cache->suffix, elem);
+    return (kindElem != NULL) ? kindElem : elem;
 }
 
 static int cfAnimFrameCount = 0;
@@ -1691,6 +1738,7 @@ static theme_element_t *initBasic(const char *themePath, config_set_t *themeConf
     elem->reflectionOffset = 0;
     elem->deviceFilter = 0;   // malloc'd without memset: MUST be zeroed explicitly (0 = unfiltered)
     elem->deviceCoverage = 0; // filled at validateGUIElems for unfiltered MenuIcon/ItemsList/HintText
+    elem->family = NULL;      // set by whoever chains the element into a family (addGUIElem, below)
     elem->extended = NULL;
     elem->drawElem = NULL;
     elem->endElem = &endBasic;
@@ -2120,6 +2168,7 @@ static void validateBackgroundElems(const char *themePath, config_set_t *themeCo
         LOG("THEMES No valid background found for main, add default BG_ART\n");
         theme_element_t *backgroundElem = initBasic(themePath, themeConfig, theme, "bg", ELEM_TYPE_BACKGROUND, 0, 0, ALIGN_NONE, screenWidth, screenHeight, SCALING_NONE, gDefaultCol, theme->fonts[0]);
         initBackground(themePath, themeConfig, theme, backgroundElem, "bg", "BG", 1, NULL);
+        backgroundElem->family = mainElems;
         backgroundElem->next = mainElems->first;
         mainElems->first = backgroundElem;
     }
@@ -2129,6 +2178,7 @@ static void validateBackgroundElems(const char *themePath, config_set_t *themeCo
             LOG("THEMES No valid background found for info, add default BG_ART\n");
             theme_element_t *backgroundElem = initBasic(themePath, themeConfig, theme, "bg", ELEM_TYPE_BACKGROUND, 0, 0, ALIGN_NONE, screenWidth, screenHeight, SCALING_NONE, gDefaultCol, theme->fonts[0]);
             initBackground(themePath, themeConfig, theme, backgroundElem, "bg", "BG", 1, NULL);
+            backgroundElem->family = infoElems;
             backgroundElem->next = infoElems->first;
             infoElems->first = backgroundElem;
         }
@@ -2168,6 +2218,7 @@ static theme_element_t *validateItemsList(const char *themePath, config_set_t *t
         LOG("THEMES No itemsList found, adding a default one\n");
         list = initBasic(themePath, themeConfig, theme, "il", ELEM_TYPE_ITEMS_LIST, 42, 42, ALIGN_NONE, 373, 316, SCALING_RATIO, theme->titleColor, theme->fonts[0]);
         initItemsList(themePath, themeConfig, theme, list, "il", NULL);
+        list->family = mainElems;
         list->next = mainElems->first->next; // Position the itemsList as second element (right after the Background)
         mainElems->first->next = list;
     }
@@ -2422,7 +2473,7 @@ static void linkItemsListCoverElems(theme_elems_t *elems)
 
         itemsList = (items_list_t *)e->extended;
         if (itemsList->decoratorImage == NULL)
-            itemsList->coverElem = thmFindElemBySuffix(elems, "COV");
+            itemsList->coverElem = thmFindElemBySuffix(elems, "COV", NULL);
     }
 }
 
@@ -2608,6 +2659,8 @@ static int addGUIElem(const char *themePath, config_set_t *themeConfig, theme_t 
             }
 
             if (elem) {
+                elem->family = elems;
+
                 if (!elems->first)
                     elems->first = elem;
 
