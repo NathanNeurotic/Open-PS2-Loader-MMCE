@@ -164,7 +164,11 @@ static void IGR_Thread(void *arg)
         if (EnableDebug)
             DBGCOL(0xFF8000, IGR, "oplIGRShutdown()");
 
-        oplIGRShutdown(0);
+#ifdef RETROACHIEVEMENTS
+        // The shutdown RPC belongs to OPL CDVDMAN, absent in physical-disc mode.
+        if (config->GameMode != DISC_MODE)
+#endif
+            oplIGRShutdown(0);
 
         if (EnableDebug)
             DBGCOL(0x0000FF, IGR, "Reset IOP");
@@ -265,8 +269,12 @@ static void IGR_Thread(void *arg)
         if (EnableDebug)
             DBGCOL(0x0000FF, IGR, "oplIGRShutdown(1)");
 
-        // If combo is R3 + L3, Poweroff PS2
-        oplIGRShutdown(1);
+            // If combo is R3 + L3, Poweroff PS2
+#ifdef RETROACHIEVEMENTS
+        // The shutdown RPC belongs to OPL CDVDMAN, absent in physical-disc mode.
+        if (config->GameMode != DISC_MODE)
+#endif
+            oplIGRShutdown(1);
     }
 }
 

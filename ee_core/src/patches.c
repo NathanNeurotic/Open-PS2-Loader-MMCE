@@ -904,6 +904,10 @@ static void HarvestMoonAWLPatch(int region)
 void apply_patches(const char *path)
 {
     USE_LOCAL_EECORE_CONFIG;
+#ifdef RETROACHIEVEMENTS
+    if (config->GameMode == DISC_MODE)
+        return;
+#endif
     const patchlist_t *p;
     int mode;
     // Some patches hack into specific ELF files

@@ -17,6 +17,9 @@
 #include "include/gui.h"
 #include "include/guigame.h"
 #include "include/system.h"
+#ifdef RETROACHIEVEMENTS
+#include "include/discsupport.h"
+#endif
 #include "include/ioman.h"
 #include "include/sound.h"
 #include "include/favsupport.h"   // gFAVStartMode -- the Favourites tab counts as "something to show"
@@ -36,7 +39,11 @@ enum MENU_IDs {
     MENU_EXIT,
     MENU_POWER_OFF,
     MENU_LAUNCH_PS2_DISC,
-    MENU_MMCE
+    MENU_MMCE,
+#ifdef RETROACHIEVEMENTS
+    MENU_RA_DISC_CHECK,
+    MENU_RA_DISC_LAUNCH,
+#endif
 };
 
 enum GAME_MENU_IDs {
@@ -621,6 +628,10 @@ static void menuInitMainMenu(void)
 
     // initialize the menu
     submenuAppendItem(&mainMenu, -1, NULL, MENU_LAUNCH_PS2_DISC, _STR_LAUNCH_PS2_DISC);
+#ifdef RETROACHIEVEMENTS
+    submenuAppendItem(&mainMenu, -1, NULL, MENU_RA_DISC_CHECK, _STR_RA_DISC_CHECK);
+    submenuAppendItem(&mainMenu, -1, NULL, MENU_RA_DISC_LAUNCH, _STR_RA_DISC_LAUNCH);
+#endif
     submenuAppendItem(&mainMenu, -1, NULL, MENU_SETTINGS, _STR_SETTINGS);
     submenuAppendItem(&mainMenu, -1, NULL, MENU_NETWORK_UPDATE, _STR_NET_UPDATE);
     submenuAppendItem(&mainMenu, -1, NULL, MENU_NBD, _STR_STARTNBD);
@@ -1426,7 +1437,17 @@ void menuHandleInputMenu()
 
         sfxPlay(SFX_CONFIRM);
 
-        if (id == MENU_LAUNCH_PS2_DISC) {
+#ifdef RETROACHIEVEMENTS
+        if (id == MENU_RA_DISC_CHECK) {
+            if (discCheckSupportDeferred())
+                guiShowRANotice(_l(_STR_RA_DISC_CHECKING), NULL);
+            else
+                guiShowRANotice(_l(_STR_RA_CHECK_RUNNING), NULL);
+        } else if (id == MENU_RA_DISC_LAUNCH) {
+            discLaunch(&guiRenderProbeFrame);
+        } else
+#endif
+            if (id == MENU_LAUNCH_PS2_DISC) {
             // Pump a frame per poll: the drive can take seconds to answer with an empty tray, and
             // this runs on the GUI thread, so without it the menu simply stops dead (issue #465).
             if (sysLaunchDisc(&guiRenderProbeFrame) < 0) // success never returns; <0 -> stay in OPL

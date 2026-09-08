@@ -1916,6 +1916,11 @@ static void sbHashGameDeferredWorker(void);
    time; the caller tells the user. */
 static volatile int ra_hash_busy = 0;
 
+int sbHashGameBusy(void)
+{
+    return ra_hash_busy;
+}
+
 int sbHashGameDeferred(const char *path, const char *name, const char *ext, const char *startup, int format)
 {
     if (ra_hash_busy)

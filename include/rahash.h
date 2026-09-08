@@ -14,4 +14,6 @@ void raHashSetStepLog(ra_step_fn fn);
    Returns 0 on success. */
 int raHashIsoDirect(const char *isopath, const char *startup, char *out33);
 
+int raHashDisc(const char *bootPath, const char *startup, char *out33);
+
 #endif

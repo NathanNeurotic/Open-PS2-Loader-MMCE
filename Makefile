@@ -267,7 +267,7 @@ ifeq ($(RETROACHIEVEMENTS),1)
   #          ISO9660 directly -- mounting hangs on USB past the 2 GB mark.
   # ranet:   the menu-side PC client exchange (hash -> watch list over UDP).
   # rabadge: the "tracked game" badge cache behind the list mark and cover mark.
-  FRONTEND_OBJS += md5.o rawatch.o rahash.o ranet.o rabadge.o
+  FRONTEND_OBJS += md5.o rawatch.o rahash.o ranet.o rabadge.o discsupport.o
   # The in-game telemetry sender. Hand-builds Ethernet/UDP frames and calls
   # SMAPSendPacket directly, so it deliberately bypasses the menu network stack.
   IOP_OBJS += raudp.o

@@ -329,7 +329,7 @@ computes for the same file. Confirm against the author's client, not against a l
 3. **Main-menu items.** Upstream adds `MENU_RA_DISC_LAUNCH` / `MENU_RA_DISC_CHECK` to the main menu
    and then patches the separator arithmetic with a magic `+ 2`
    (`menuRenderMenu`, `if (cp == (MENU_ABOUT - 1 + 2))`). Skip both items in this phase — they
-   belong to Phase 5 (disc mode). Do not import the `+ 2`.
+   are now included by Phase 5 (disc mode). The menu counts its entries; do not import the `+ 2`.
 4. **About dialog.** Upstream adds six rows (`UI_LABEL`/`UI_BREAK`/`UI_SPACER`...). `diaAbout` never
    scrolls and has about one row of headroom. **Append "hacan359" to an existing credits line
    instead.** Add the full credit to `CREDITS` where there is room.
@@ -390,25 +390,17 @@ and anything else on the EE socket API. Do that swap **only under `RETROACHIEVEM
 phase. If it proves clean on hardware, propose promoting it to the default build as a **separate PR
 with its own hardware validation** — never as a side effect of the RA flavour.
 
-### Phase 5 — Disc mode (optional, gate behind its own decision)
+### Phase 5 — Disc mode (implemented; PS2 validation pending)
 
-Upstream's later commits add a fifth game source: **boot the disc in the tray, with achievements**.
-`src/discsupport.c` (~230 lines), `include/discsupport.h`, `src/ioprp.c` (`patch_IOPRP_image_disc`),
-`DISC_MODE` in `ee_core`, plus `ps2dev9.irx` + `smsutils.irx` shipped as standalone modules because
-the ROM CDVDMAN is left in place and OPL's cdvdman (which normally exports DEV9 and smsutils) is not
-loaded.
+The RA build now provides **RA: check disc support** and **RA: launch disc** in the main menu.
+The port uses the upstream EESYNC-only IOPRP layout and standalone DEV9/SMSUTILS modules,
+retains ROM CDVDMAN/CDVDFSV, and skips OPL CDVDMAN's shutdown RPC. RiptOPL reuses its bounded
+physical-disc probe, active settings folder and normal frontend teardown.
 
-It is a genuinely clean idea — the IOPRP simply omits the CDVDMAN replacement — and it is
-hardware-confirmed upstream (Shadow of the Colossus, `SCUS_974.72`, 8 minutes at 60 snapshots/s).
-
-What disc mode gives up, all of it living inside OPL's own cdvdman: **in-game reset (IGR), virtual
-memory cards, and per-image compatibility patches**. `oplIGRShutdown` must be skipped in
-`DISC_MODE` or the IGR thread spins forever waiting for an RPC server that was never loaded.
-
-**Recommendation: defer.** It adds a main-menu entry and a whole game source to a build that is
-already a flavour; it is separable; and it is the piece most likely to interact badly with this
-fork's device/mode plumbing (14 `IO_MODES`, folder browse, favourites, art index). Land Phases 0-4,
-get hardware confirmation, then decide.
+The separate **Launch PS2 Disc** action retains the existing normal disc boot. Physical-disc RA
+uses real memory cards and does not apply image-specific patches. See the
+[current guide](RETROACHIEVEMENTS.md#physical-discs) for operation, limits and outstanding PS2 tests.
+Upstream hardware results do not validate this port.
 
 ### Phase 6 — Documentation and credit
 
@@ -539,6 +531,6 @@ Answer these before Phase 3 lands; they do not block Phases 0-2.
 2. **NIC settlement.** Is the Phase 3 recommendation (RA as a fourth interlock claimant, clean
    refusal under UDPBD/UDPFS) acceptable for v1, or should the decoupled hand-built menu path be
    scoped now?
-3. **Disc mode.** In or out for the first RA release?
+3. **Disc mode.** Implemented in the RA flavour; PS2 validation remains outstanding.
 4. **`ps2ips` fixes.** Land them RA-only first, as planned — or fast-track the buffer-overrun fix to
    the default build as its own PR?

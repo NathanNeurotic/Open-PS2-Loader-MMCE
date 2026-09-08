@@ -29,6 +29,9 @@
 #include "include/util.h"
 #include "include/pad.h"
 #include "include/system.h"
+#ifdef RETROACHIEVEMENTS
+#include "include/discsupport.h"
+#endif
 #include "include/ioman.h"
 #include "include/ioprp.h"
 #include "include/bdmsupport.h"
@@ -522,13 +525,15 @@ static int sysDiscSettle(void (*progress)(void), int budgetMs)
     return type;
 }
 
-int sysLaunchDisc(void (*progress)(void))
+int sysGetDiscBootPath(char *path, int pathSize, void (*progress)(void))
 {
     u8 key[16];
-    char boot[16], path[64], cnf[1024];
-    char *args[1];
+    char boot[16], cnf[1024];
     u32 k32;
     int type, fd, len;
+
+    if (path == NULL || pathSize < 64)
+        return -3;
 
     if (sceCdStatus() == SCECdErOPENS) // tray open
         return -1;
@@ -587,7 +592,7 @@ int sysLaunchDisc(void (*progress)(void))
         close(fd);
         if (len > 0) {
             cnf[len] = '\0';
-            if (sysParseBoot2(cnf, path, sizeof(path)) != 0)
+            if (sysParseBoot2(cnf, path, pathSize) != 0)
                 path[0] = '\0';
         }
     }
@@ -616,12 +621,28 @@ int sysLaunchDisc(void (*progress)(void))
     if (path[0] == '\0') {
         if (boot[0] == '\0') // neither source produced a boot path
             return -3;
-        snprintf(path, sizeof(path), "cdrom0:\\%s;1", boot);
+        snprintf(path, pathSize, "cdrom0:\\%s;1", boot);
         LOG("[DISC] SYSTEM.CNF unavailable; using key-derived name\n");
     } else if (boot[0] != '\0' && strstr(path, boot) == NULL) {
         // BOOT2 wins (it is what the browser boots); the mismatch is diagnostic.
         LOG("[DISC] key-derived name %s does not match BOOT2 %s -- booting BOOT2\n", boot, path);
     }
+
+    return 0;
+}
+
+int sysLaunchDisc(void (*progress)(void))
+{
+    char path[64];
+    char *args[1];
+    int result;
+#ifdef RETROACHIEVEMENTS
+    if (discCheckBusy())
+        return -1;
+#endif
+    result = sysGetDiscBootPath(path, sizeof(path), progress);
+    if (result < 0)
+        return result;
 
     LOG("[DISC] booting %s\n", path);
 
@@ -748,7 +769,12 @@ static unsigned int sendIrxKernelRAM(const char *startup, const char *mode_str, 
     int i, modcount;
     unsigned int curIrxSize, size_ioprp_image, total_size;
 
-    if (!strcmp(mode_str, "BDM_USB_MODE"))
+#ifdef RETROACHIEVEMENTS
+    if (!strcmp(mode_str, "DISC_MODE")) {
+        // No emulated storage driver for the physical drive.
+    } else
+#endif
+        if (!strcmp(mode_str, "BDM_USB_MODE"))
         modules |= CORE_IRX_USB;
     else if (!strcmp(mode_str, "BDM_ILK_MODE"))
         modules |= CORE_IRX_ILINK;
@@ -787,6 +813,10 @@ static unsigned int sendIrxKernelRAM(const char *startup, const char *mode_str, 
     irxtable = (irxtab_t *)ModuleStorage;
     irxptr_tab = (irxptr_t *)((unsigned char *)irxtable + sizeof(irxtab_t));
     size_ioprp_image = size_IOPRP_img + size_cdvdman_irx + size_cdvdfsv_irx + size_eesync_irx + 256;
+#ifdef RETROACHIEVEMENTS
+    if (!strcmp(mode_str, "DISC_MODE"))
+        size_ioprp_image = patch_IOPRP_image_disc_size();
+#endif
     LOG("IOPRP image size calculated: %d\n", size_ioprp_image);
     ioprp_image = malloc(size_ioprp_image);
     if (ioprp_image == NULL) {
@@ -795,7 +825,12 @@ static unsigned int sendIrxKernelRAM(const char *startup, const char *mode_str, 
         LOG("IOPRP image allocation failed (%d bytes)\n", size_ioprp_image);
         size_ioprp_image = 0;
     } else {
-        size_ioprp_image = patch_IOPRP_image(ioprp_image, cdvdman_irx, size_cdvdman_irx);
+#ifdef RETROACHIEVEMENTS
+        if (!strcmp(mode_str, "DISC_MODE"))
+            size_ioprp_image = patch_IOPRP_image_disc(ioprp_image);
+        else
+#endif
+            size_ioprp_image = patch_IOPRP_image(ioprp_image, cdvdman_irx, size_cdvdman_irx);
     }
     LOG("IOPRP image size actual:     %d\n", size_ioprp_image);
 
@@ -838,6 +873,14 @@ static unsigned int sendIrxKernelRAM(const char *startup, const char *mode_str, 
         irxptr_tab[modcount].info = size_mx4sio_bd_irx | SET_OPL_MOD_ID(OPL_MODULE_ID_MX4SIOBD);
         irxptr_tab[modcount++].ptr = (void *)&mx4sio_bd_irx;
     }
+#ifdef RETROACHIEVEMENTS
+    if (!strcmp(mode_str, "DISC_MODE") && (modules & CORE_IRX_ETH)) {
+        irxptr_tab[modcount].info = size_ps2dev9_irx | SET_OPL_MOD_ID(OPL_MODULE_ID_DEV9);
+        irxptr_tab[modcount++].ptr = (void *)&ps2dev9_irx;
+        irxptr_tab[modcount].info = size_smsutils_irx | SET_OPL_MOD_ID(OPL_MODULE_ID_SMSUTILS);
+        irxptr_tab[modcount++].ptr = (void *)&smsutils_irx;
+    }
+#endif
     if (modules & CORE_IRX_ETH) {
         irxptr_tab[modcount].info = size_smap_ingame_irx | SET_OPL_MOD_ID(OPL_MODULE_ID_SMAP);
         irxptr_tab[modcount++].ptr = (void *)&smap_ingame_irx;
@@ -912,7 +955,10 @@ static unsigned int sendIrxKernelRAM(const char *startup, const char *mode_str, 
 #endif
 #endif
 
-    modcount += addIopPatch(mode_str, startup, &irxptr_tab[modcount]);
+#ifdef RETROACHIEVEMENTS
+    if (strcmp(mode_str, "DISC_MODE") != 0)
+#endif
+        modcount += addIopPatch(mode_str, startup, &irxptr_tab[modcount]);
 
     irxtable->modules = irxptr_tab;
     irxtable->count = modcount;
@@ -1729,7 +1775,13 @@ void sysLaunchLoaderElf(const char *filename, const char *mode_str, int size_cdv
 #endif
 #endif
 
-    modules |= CORE_IRX_VMC;
+#ifdef RETROACHIEVEMENTS
+    const int discMode = !strcmp(mode_str, "DISC_MODE");
+#else
+    const int discMode = 0;
+#endif
+    if (!discMode)
+        modules |= CORE_IRX_VMC;
 
     LOG("SYSTEM LaunchLoaderElf loading modules\n");
     ModuleStorageSize = (sendIrxKernelRAM(filename, mode_str, modules, ModuleStorage, size_cdvdman_irx, cdvdman_irx, size_mcemu_irx, mcemu_irx) + 0x3F) & ~0x3F;
@@ -1750,7 +1802,7 @@ void sysLaunchLoaderElf(const char *filename, const char *mode_str, int size_cdv
     }
     ConfigParam PARAM;
     GetOsdConfigParam(&PARAM);
-    if (gOSDLanguageEnable) { // only patch if enabled, and only on config fields wich have not chosen "system default"
+    if (!discMode && gOSDLanguageEnable) { // only patch if enabled, and only on config fields wich have not chosen "system default"
         if (gOSDLanguageValue >= LANGUAGE_JAPANESE && gOSDLanguageValue <= LANGUAGE_PORTUGUESE) {
             PARAM.language = gOSDLanguageValue;
             LOG("System Language enforced to %d\n", gOSDLanguageValue);
@@ -1793,7 +1845,7 @@ void sysLaunchLoaderElf(const char *filename, const char *mode_str, int size_cdv
     config->HDDSpindown = gHDDSpindown;
     config->g_ps2_ETHOpMode = gETHOpMode;
 
-    if (GetCheatsEnabled()) {
+    if (!discMode && GetCheatsEnabled()) {
         set_cheats_list();
         config->gCheatList = GetCheatsList();
     } else
@@ -1801,7 +1853,7 @@ void sysLaunchLoaderElf(const char *filename, const char *mode_str, int size_cdv
 
     // PS2RD .img cheats (item 26). Without this the EE loads the .img into RAM and then never hands
     // the pointer to the core, so LinkImage() had nothing to link and the whole feature was dead.
-    config->gImage = GetImageEnabled() ? (u32 *)GetImage() : NULL;
+    config->gImage = !discMode && GetImageEnabled() ? (u32 *)GetImage() : NULL;
 
 #ifdef RETROACHIEVEMENTS
     // RetroAchievements: the watch list for this game, already loaded by the launch
@@ -1822,7 +1874,7 @@ void sysLaunchLoaderElf(const char *filename, const char *mode_str, int size_cdv
     sprintf(config->g_ps2_gateway, "%u.%u.%u.%u", local_gateway[0], local_gateway[1], local_gateway[2], local_gateway[3]);
 
     // GSM now.
-    config->EnableGSMOp = GetGSMEnabled();
+    config->EnableGSMOp = !discMode && GetGSMEnabled();
     if (config->EnableGSMOp) {
         PrepareGSM(NULL, &gsm_config);
         config->GsmConfig.interlace = gsm_config.interlace;
@@ -1839,7 +1891,7 @@ void sysLaunchLoaderElf(const char *filename, const char *mode_str, int size_cdv
     }
 
 #ifdef PADEMU
-    config->EnablePadEmuOp = gEnablePadEmu;
+    config->EnablePadEmuOp = !discMode && gEnablePadEmu;
     config->PadEmuSettings = (unsigned int)(gPadEmuSettings >> 8);
     config->PadMacroSettings = (unsigned int)(gPadMacroSettings);
 #endif
@@ -1853,7 +1905,7 @@ void sysLaunchLoaderElf(const char *filename, const char *mode_str, int size_cdv
     config->CustomOSDConfigParam.language = PARAM.language;
     config->CustomOSDConfigParam.timezoneOffset = PARAM.timezoneOffset;
 
-    config->enforceLanguage = gOSDLanguageEnable;
+    config->enforceLanguage = !discMode && gOSDLanguageEnable;
 
     config->eeloadCopy = eeloadCopy;
     config->initUserMemory = initUserMemory;

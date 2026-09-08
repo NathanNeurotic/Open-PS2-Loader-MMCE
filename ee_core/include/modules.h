@@ -48,6 +48,8 @@ enum OPL_MODULE_ID {
     // mid-enum makes every later ID mean a different blob to any object file
     // that was not rebuilt. Delete obj/ whenever this enum changes.
     OPL_MODULE_ID_RAUDP,
+    OPL_MODULE_ID_DEV9,
+    OPL_MODULE_ID_SMSUTILS,
 #endif
 
     OPL_MODULE_ID_COUNT
