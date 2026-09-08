@@ -460,9 +460,18 @@ vcdMain2:
 Apps and PS1/VCD covers share the games frame but use a **square** element so the box matches
 their square art, while games stay PS2-case **portrait**. The `vcdMain2` block above gives PS1/VCD
 covers their own square element; omit it and PS1 games reuse `appsMain2` (see *Block families*). The element `width`/`height` set the box
-aspect; the overlay corners (full-canvas of those dims) let the cover fill it. All three blocks are
-live at once on a mixed list — each row's cover picks the one for its own media kind (see
-*Mixed lists* under *Block families*), so define all three if your theme can show a mixed shelf.
+aspect; the overlay corners (full-canvas of those dims) let the cover fill it.
+
+More than one of these blocks is live at once on a **mixed** list — each row's cover picks the one
+for its own media kind (see *Mixed lists* under *Block families*). Which trio is in play depends on
+the page, because only the PS1 and app rows are redirected; the PS2 row keeps whatever the page
+itself renders from:
+
+- a **device page** set to Mixed → `main2` + `vcdMain2` + `appsMain2`
+- the **Favorites** *All* shelf → `favsMain2` + `vcdMain2` + `appsMain2`
+
+So a theme that overrides `favsMain2` should size it as its **PS2** cover, and define `vcdMain2` /
+`appsMain2` for the other two kinds rather than leaving the whole shelf on one shape.
 
 ### Global Coverflow tuning (NOT in the theme)
 
