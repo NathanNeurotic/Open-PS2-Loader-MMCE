@@ -115,17 +115,24 @@ transport. Hiding rows that cannot launch keeps the network PS1 page honest.
   <thead><tr><th>Value</th><th>Behavior</th></tr></thead>
   <tbody>
     <tr><td><b>Both (L3)</b> (default)</td><td>Each device page has separate PS2 and PS1 views; L3 switches between them and each page retains its own position.</td></tr>
-    <tr><td><b>Mixed</b></td><td>Each device starts with PS2 and PS1 rows combined; L3 cycles <b>Mixed → PS2 → PS1</b> on that page.</td></tr>
+    <tr><td><b>Mixed</b></td><td>Each device starts with PS2 and PS1 rows combined; L3 cycles <b>Mixed → PS2 → PS1</b> on that page. In the combined list each row's cover is drawn at its own media's size, so PS1 covers stay square beside portrait PS2 covers.</td></tr>
     <tr><td><b>PS2</b></td><td>Applicable device pages show PS2 only; L3 is fully inert, with no hint, sound, notification, or pause.</td></tr>
     <tr><td><b>PS1</b></td><td>Applicable device pages show PS1 only; L3 is fully inert, with no hint, sound, notification, or pause.</td></tr>
   </tbody>
 </table>
 
 <p>APPS and Favorites do not inherit this setting. Favorites always has its independent
-<b>All in One → PS2 → PS1 → ELF</b> ring. <b>Applications Display</b> either keeps all ELFs in one
-inert Mixed list or splits Apps / titles containing <code>[PS1]</code> (case-insensitive) across L3;
-either side still launches an ordinary ELF. Switching back to an L3-enabled device mode restores
-each device page's retained position.</p>
+<b>PS2 → PS1 → ELF → All in One</b> ring, opening on PS2. <b>Applications Display</b> either keeps
+all ELFs in one inert Mixed list or splits Apps / titles containing <code>[PS1]</code>
+(case-insensitive) across L3; either side still launches an ordinary ELF. Switching back to an
+L3-enabled device mode restores each device page's retained position.</p>
+
+<div class="callout info"><div class="h">ℹ Positions survive a reboot</div>Wherever L3 does something,
+the view you leave a page on is <b>remembered across sessions</b> — every device page, the Favorites
+shelf and the APPS split side keep their own. Positions travel with your settings, so they are
+written the next time settings are saved rather than on every press. A remembered view that this
+picker no longer allows (you moved from <b>Mixed</b> to <b>Both</b>, say) is discarded rather than
+forced, so the page opens on its default instead of on a view with no rows.</div>
 
 <h2 id="launch">How PS1 games launch</h2>
 

@@ -115,7 +115,7 @@ chain — so you override only what differs and inherit the rest.</p>
 <tr><td><code>main0…</code> / <code>info0…</code></td><td>The <b>games</b> list / info — the base layout</td><td><em>(none — this is the base)</em></td></tr>
 <tr><td><code>appsMain0…</code> / <code>appsInfo0…</code></td><td>The <b>apps</b> device list / info</td><td>→ <code>mainN</code> / <code>infoN</code></td></tr>
 <tr><td><code>favsMain0…</code> / <code>favsInfo0…</code></td><td>The <b>Favorites</b> tab list / info</td><td>→ <code>mainN</code> / <code>infoN</code></td></tr>
-<tr><td><code>vcdMain0…</code> / <code>vcdInfo0…</code></td><td>A device's <b>PS1 / VCD</b> view (toggle with <b>L3</b>)</td><td>main: → <code>appsMainN</code> → <code>mainN</code> · info: → <code>infoN</code></td></tr>
+<tr><td><code>vcdMain0…</code> / <code>vcdInfo0…</code></td><td>A device's <b>PS1 / VCD</b> view (toggle with <b>L3</b>), plus every PS1 row's cover and info wherever it appears</td><td>main: → <code>appsMainN</code> → <code>mainN</code> · info: → <code>infoN</code></td></tr>
 </tbody>
 </table>
 
@@ -130,6 +130,33 @@ portrait box; everything else still inherits <code>main*</code>.</li>
 PS1 disc with no <code>vcdMain</code> blocks automatically uses the square apps box (jewel-case art is square),
 while <code>vcdInfo</code> falls back to the rich game <code>info</code> page.</li>
 </ul>
+
+<h3>Mixed lists: the page picks the family, each row picks its own cover</h3>
+<p>A <b>mixed</b> list holds more than one kind of media at once — the Favorites <b>All in One</b> shelf, and a
+device page under <b>PS2/PS1 Game Display = Mixed</b>. The page as a whole still renders from one family (the base
+<code>main*</code> on a Mixed device page, <code>favsMain*</code> on Favorites): the background, the texts and the
+<code>ItemsList</code> belong to the <em>page</em>, so they stay put while you scroll.</p>
+<p>The <b>cover</b> does not. A PS2 case is portrait, a PS1 case and an app box are square, and forcing one shape
+on all three stretches whichever kinds are not the page's own. So the cover element — the <code>ItemCover</code>
+panel, the <code>Coverflow</code> carousel — is resolved <b>per row, by media kind</b>:</p>
+<table data-sortable>
+<thead><tr><th>Row</th><th>Cover drawn from</th></tr></thead>
+<tbody>
+<tr><td>PS2 disc game</td><td>the page's own family — <code>main2</code> on a device page, <code>favsMain2</code> on Favorites</td></tr>
+<tr><td>PS1 / VCD</td><td><code>vcdMain*</code> → <code>appsMain*</code> → <code>main*</code></td></tr>
+<tr><td>App / ELF</td><td><code>appsMain*</code> → <code>main*</code></td></tr>
+</tbody>
+</table>
+<p>Only the cover is redirected — its <code>width</code>/<code>height</code>, <code>overlay</code>/<code>overlay2</code>
+and <code>default</code> placeholder. Everything else on the page is untouched, and on a single-kind page the row's
+kind <em>is</em> the page's kind, so nothing is redirected at all. The same rule picks the info screen's cover from
+the matching <code>*Info*</code> family. In a Coverflow carousel the cover <b>width</b> stays uniform (so spacing
+stays even) and only the height follows each row's own element aspect.</p>
+<div class="callout info"><div class="h">ℹ Two cover caches on a mixed list</div>The games, apps and Favorites
+families share one cover-art cache (deduplicated by <code>pattern</code>), while the <b>PS1/VCD view keeps its
+own</b> — separate PS2 and PS1 views reuse the device's game <em>list</em> indices, so a shared cache would thrash
+covers on every toggle. A mixed list therefore draws from <b>two</b> caches at once, PS1 rows from the VCD one and
+everything else from the shared one, and both are warmed.</div>
 
 <div class="callout info"><div class="h">⚠ Contiguous-numbering rule</div>Blocks are read <b>in order from 0
 and the engine stops at the first gap.</b> If you define <code>main0</code>, <code>main1</code>,
@@ -474,7 +501,10 @@ widescreen / pixel-aspect correction itself at draw time, exactly like the stock
 aspect via the element's <code>width</code>:<code>height</code> only — never try to pre-stretch them. Games use a
 PS2-case <b>portrait</b> box (184×256); apps and PS1/VCD covers use a <b>square</b> box (184×184) to match their
 square art. Define a <code>vcdMain</code> Coverflow block to give PS1 covers their own square element; omit it and
-PS1 games reuse <code>appsMain</code> (see §2).</div>
+PS1 games reuse <code>appsMain</code> (see §2). More than one of these blocks is live at once on a
+<b>mixed</b> list, where each row's cover picks the one for its own media kind — so a theme that
+overrides <code>favsMain2</code> should size it as its <b>PS2</b> cover and define <code>vcdMain2</code> /
+<code>appsMain2</code> for the other two kinds, rather than leaving the whole shelf on one shape.</div>
 
 <p>A minimal three-family Coverflow setup (the shape the fork's <code>&lt;Coverflow&gt;</code> theme uses):</p>
 <pre>main2:
