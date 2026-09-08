@@ -211,9 +211,12 @@ This build layers several features on top of upstream OPL:
   from every device into one list, and a star marks favorited titles everywhere. Favorites
   are stored in a shared `favourites.bin`, and RiptOPL will **import an existing uOPL / wOPL
   `favourites.bin` file** if it finds one. This is a **one-way import**: the next favorites write replaces that file with RiptOPL’s `OFAV` format, which those loaders cannot read back. Keep a copy of the original if you also use them.
-  Favorites always has its own independent **L3** ring: **All in One → PS2 → PS1 → ELF**.
-  The selected row's real type controls its actions and launcher even in All in One; the global
-  device-game display setting does not pin or disable this page.
+  Favorites always has its own independent **L3** ring: **PS2 → PS1 → ELF → All in One**, opening
+  on **PS2** until you move it. The selected row's real type controls its actions and launcher even
+  in All in One; the global device-game display setting does not pin or disable this page. In the
+  mixed **All in One** shelf each row's cover is drawn at its **own** media's size — PS2 cases stay
+  portrait while PS1 cases and app boxes stay square — instead of one shape being stretched onto
+  all three.
 - **Optional APPS / PS1ELF split:** **APPS Display** defaults to **Mixed**, with every configured
   ELF in one list and L3 inert. Choose **Apps / PS1ELF (L3)** to move entries whose displayed title
   contains **`[PS1]`** (case-insensitive) onto a second L3 view. This only organizes the list; both
@@ -372,7 +375,12 @@ This build layers several features on top of upstream OPL:
   **PS Emulation Settings**. **Both (L3)** (the default) switches between separate PS2 and PS1
   views; **Mixed** starts with both in one list and L3 cycles Mixed → PS2 → PS1; **PS2** and **PS1**
   lock every applicable device page to one library and make L3 fully inert (no hint, sound,
-  notification, or pause). APPS and Favorites remain independent. A `*.VCD` row boots through
+  notification, or pause). APPS and Favorites remain independent. Wherever L3 does something, the
+  view you leave a page on is **remembered across sessions** — each device page, the Favorites
+  shelf and the APPS split side keep their own position, restored the next time you boot (a
+  remembered view that the display setting no longer allows is simply dropped). On a combined
+  Mixed list every row's cover is drawn at its own media's size, so PS1 cases stay square while PS2
+  cases stay portrait. A `*.VCD` row boots through
   **POPSTARTER** — never OPL's own core and never Neutrino, so the Loader Core selector is inert for
   it. POPSTARTER VCDs work on USB / MMCE / MX4SIO / SMB **and the internal HDD** — both APA
   (exact `__.POPS[0-9]?` containers plus `PP.<name>` / `__.<name>` one-game partitions containing

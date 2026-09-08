@@ -98,6 +98,10 @@ enum CONFIG_INDEX {
 #define CONFIG_OPL_WIDESCREEN                 "wide_screen"
 #define CONFIG_OPL_DEFAULT_GAME_VIEW          "default_game_view"
 #define CONFIG_OPL_APPS_DISPLAY               "apps_display"
+// Remembered L3 position, one character per IO mode -- see libViewStoreToConfig in src/libview.c.
+// Two keys because the Both/Favorites/APPS ring and the device Mixed ring keep separate positions.
+#define CONFIG_OPL_LIB_VIEW_RETAINED          "lib_view_retained"
+#define CONFIG_OPL_LIB_VIEW_MIXED             "lib_view_mixed"
 #define CONFIG_OPL_EMBER_DISPLAY              "ember_display" // EMBER_DISPLAY_*: Ember settings.txt display mode
 #define CONFIG_OPL_VMODE                      "vmode"
 #define CONFIG_OPL_XOFF                       "xoff"

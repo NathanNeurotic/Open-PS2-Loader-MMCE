@@ -11,10 +11,13 @@
     PS2   - PS2 only; L3 is completely inert.
     PS1   - PS1 only; L3 is completely inert.
 
-  Favorites and APPS are deliberately independent. Favorites keeps its four-stop
-  All/PS2/PS1/ELF ring. APPS is either one unfiltered list (no L3) or Apps/PS1ELF, where [PS1]
+  Favorites and APPS are deliberately independent. Favorites keeps its four-stop ring, cycling
+  PS2 -> PS1 -> ELF -> All and opening on PS2. APPS is either one unfiltered list (no L3) or
+  Apps/PS1ELF, where [PS1]
   in an ELF's displayed title chooses the PS1ELF side. A PS1 device row still chooses its actual
   POPSTARTER/Ember core from row metadata; the display layer never changes launch semantics.
+
+  Every page's position is remembered across sessions (libViewLoadFromConfig / -StoreToConfig).
 */
 
 #ifndef __LIBVIEW_H
@@ -63,6 +66,12 @@ int libViewPending(int mode);
 int libViewPendingTarget(int mode);
 void libViewCommitPending(int mode);
 void libViewFinishPending(int mode);
+
+// Remembered L3 position, so every page comes back where the user left it. These only move the
+// state in and out of the OPL settings set in memory -- toggling L3 costs nothing, and whoever
+// writes that set carries the positions to disk. See the encoding note in libview.c.
+void libViewLoadFromConfig(config_set_t *configOPL);
+void libViewStoreToConfig(config_set_t *configOPL);
 
 // Dirty protocol consumed by support itemNeedsUpdate callbacks.
 int libViewConsumeDirty(int mode);
