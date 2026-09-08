@@ -192,4 +192,54 @@ int main(void) {
 '''
 run('launch',prefix+s+test)
 
+# Exercise the actual interrupt handler up to the point where it would suspend
+# game threads. Hardware register reads/writes use host bytes in this harness.
+s=(root/'ee_core/src/padhook.c').read_text(encoding='utf-8')
+s=s[s.index('static int IGR_Intc_Handler'):]
+s=s[:s.index('    // If power button or combo is press')]
+s=s.replace('    int i;','    (void)cause;')
+s+='    return Pad_Data.combo_type;\n}\n'
+prefix=r'''
+#include <assert.h>
+#include <stdio.h>
+#define RETROACHIEVEMENTS 1
+typedef unsigned char u8;
+enum { DISC_MODE=1, OTHER_MODE, IGR_LIBPAD, IGR_LIBPAD2,
+       IGR_PAD_STABLE_V1, IGR_PAD_STABLE_V2, IGR_COMBO_R1_L1_R2_L2,
+       IGR_COMBO_START_SELECT, IGR_COMBO_R3_L3 };
+static struct { int GameMode; } cfg;
+#define USE_LOCAL_EECORE_CONFIG __typeof__(cfg) *config=&cfg
+#define UNCACHED_SEG(x) (x)
+static struct { u8 *pad_buf; int pos_state,pos_frame,pos_combo1,pos_combo2;
+ int libpad,vb_count,prev_frame,combo_type; } Pad_Data;
+static struct { int press,vb_count; } Power_Button;
+static u8 ndin=0x20, poff=0x04, sdin=0x55, scmd=0x55;
+#define CDVD_R_NDIN (&ndin)
+#define CDVD_R_POFF (&poff)
+#define CDVD_R_SDIN (&sdin)
+#define CDVD_R_SCMD (&scmd)
+static int padOpen_hooked, snapshots, kernel_enters;
+static void RA_OnVblank(void) {snapshots++;}
+static void ee_kmode_enter(void) {kernel_enters++;}
+static void ee_kmode_exit(void) {}
+'''
+test=r'''
+int main(void) {
+    u8 pad[]={IGR_PAD_STABLE_V1,1,IGR_COMBO_R1_L1_R2_L2,IGR_COMBO_R3_L3};
+    Pad_Data.pad_buf=pad;Pad_Data.libpad=IGR_LIBPAD;
+    Pad_Data.pos_state=0;Pad_Data.pos_frame=1;Pad_Data.pos_combo1=2;Pad_Data.pos_combo2=3;
+    cfg.GameMode=DISC_MODE;
+    assert(IGR_Intc_Handler(0)==0);
+    assert(snapshots==1 && !kernel_enters && !Power_Button.press);
+    assert(sdin==0x55 && scmd==0x55); /* no ROM power-off cancellation */
+    pad[3]=IGR_COMBO_START_SELECT;
+    assert(IGR_Intc_Handler(0)==IGR_COMBO_START_SELECT); /* return combo still reaches teardown */
+    cfg.GameMode=OTHER_MODE;pad[3]=IGR_COMBO_R3_L3;
+    assert(IGR_Intc_Handler(0)==IGR_COMBO_R3_L3);
+    assert(sdin==0 && scmd==0x1b && Power_Button.press==1 && kernel_enters==1);
+    puts("PASS: disc power-off combo cannot suspend game threads; physical button untouched; normal mode preserved");
+}
+'''
+run('power_input',prefix+s+test)
+
 work.cleanup()
