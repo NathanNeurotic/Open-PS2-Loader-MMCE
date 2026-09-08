@@ -14,8 +14,8 @@
   Hashing on the console means the images themselves decide which games are
   supported; nothing on the PC has to be prepared or kept in sync.
 
-  Upstream design and implementation: hacan359. This port carries the image path
-  only -- the disc-in-the-tray source belongs to disc mode, which is deferred.
+  Upstream design and implementation: hacan359. Image files and physical discs
+  share the ISO9660 walker and hash algorithm.
 */
 
 #include <stdio.h>
@@ -81,8 +81,9 @@ static void step_num(const char *what, unsigned int a, unsigned int b, int c)
   bug it exists to avoid.
 */
 
-#define ISO_SECTOR  2048
-#define ISO_PVD_LBA 16
+#define ISO_SECTOR     2048
+#define ISO_PVD_LBA    16
+#define RA_SRC_DISC_FD (-100)
 
 static unsigned int le32(const unsigned char *p)
 {
@@ -90,8 +91,74 @@ static unsigned int le32(const unsigned char *p)
            ((unsigned int)p[2] << 16) | ((unsigned int)p[3] << 24);
 }
 
+#define DISC_READ_TRIES     16
+#define DISC_READ_NOM_TRIES 8
+
+static int disc_read_sectors(unsigned int lba, unsigned int count, void *buf)
+{
+    sceCdRMode mode;
+    int attempt, rv, err = SCECdErNO;
+
+    mode.trycount = 32;
+    mode.datapattern = SCECdSecS2048;
+    mode.pad = 0;
+
+    for (attempt = 0; attempt < DISC_READ_TRIES; attempt++) {
+        mode.spindlctrl = attempt < DISC_READ_NOM_TRIES ? SCECdSpinNom : SCECdSpinStm;
+
+        sceCdDiskReady(0);
+
+        rv = sceCdRead(lba, count, buf, &mode);
+        if (!rv) {
+            /* Refused before it started: drive not ready or a command
+               still pending. Worth another go after DiskReady. */
+            err = -1;
+            continue;
+        }
+
+        sceCdSync(0);
+
+        err = sceCdGetError();
+        if (err == SCECdErNO) {
+            if (attempt > 0)
+                step_num("cd-read-ok-after-retries", lba, count, attempt);
+            return 0;
+        }
+    }
+
+    step_num("cd-read-error", lba, count, err);
+    return -1;
+}
+
+/* Read whole sectors into the caller's aligned buffer. The image walker uses
+   sector-aligned offsets and buffers large enough for the rounded-up tail;
+   return only the requested byte count so padding never enters the hash. */
+static int disc_read_at(long long off, void *buf, int len)
+{
+    unsigned int lba, sectors;
+
+    if (len <= 0)
+        return -1;
+
+    if ((off % ISO_SECTOR) != 0) { /* never happens; a guard, not logic */
+        step_num("cd-read-unaligned", (unsigned int)off, (unsigned int)len, 0);
+        return -1;
+    }
+
+    lba = (unsigned int)(off / ISO_SECTOR);
+    sectors = (unsigned int)((len + ISO_SECTOR - 1) / ISO_SECTOR);
+
+    if (disc_read_sectors(lba, sectors, buf) != 0)
+        return -1;
+
+    return len;
+}
+
 static int read_at(int fd, long long off, void *buf, int len)
 {
+    if (fd == RA_SRC_DISC_FD)
+        return disc_read_at(off, buf, len);
+
     if (lseek64(fd, off, SEEK_SET) < 0)
         return -1;
 
@@ -276,4 +343,50 @@ int raHashIsoDirect(const char *isopath, const char *startup, char *out33)
     close(fd);
 
     return ret;
+}
+
+// Hash the same boot executable through the ROM filesystem first. Exact length
+// checks reject a truncated read instead of identifying a partial executable.
+int raHashDisc(const char *bootPath, const char *startup, char *out33)
+{
+    md5_state_t md5;
+    md5_byte_t digest[16];
+    int fd, size, left, ret = -1, i;
+
+    if (bootPath == NULL || startup == NULL || out33 == NULL)
+        return -1;
+    out33[0] = '\0';
+    fd = open(bootPath, O_RDONLY);
+    if (fd >= 0) {
+        size = lseek(fd, 0, SEEK_END);
+        if (size > 0 && size <= RA_HASH_MAX_EXEC && lseek(fd, 0, SEEK_SET) == 0) {
+            md5_init(&md5);
+            md5_append(&md5, (const md5_byte_t *)startup, strlen(startup));
+            left = size;
+            while (left > 0) {
+                int want = left > RA_HASH_CHUNK ? RA_HASH_CHUNK : left;
+                int got = read(fd, g_chunk, want);
+                if (got <= 0 || got > want)
+                    break;
+                md5_append(&md5, (const md5_byte_t *)g_chunk, got);
+                left -= got;
+            }
+            if (left == 0) {
+                static const char hex[] = "0123456789abcdef";
+                md5_finish(&md5, digest);
+                for (i = 0; i < 16; i++) {
+                    out33[i * 2] = hex[digest[i] >> 4];
+                    out33[i * 2 + 1] = hex[digest[i] & 15];
+                }
+                out33[32] = '\0';
+                ret = 0;
+            }
+        }
+        close(fd);
+    }
+    if (ret == 0)
+        return 0;
+
+    // Some ROM file drivers cannot read an extent that direct sector reads can.
+    return hash_boot_exec(RA_SRC_DISC_FD, startup, out33);
 }

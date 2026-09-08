@@ -138,6 +138,18 @@ static void ResetIopSpecial(const char *args, unsigned int arglen)
 
     DPRINTF("Loading extra IOP modules...\n");
 
+#ifdef RETROACHIEVEMENTS
+    // Physical discs use ROM CDVDMAN, so DEV9 and SMSUTILS must load separately.
+    if (config->GameMode == DISC_MODE && (RA_TelemetryWanted(config)
+#ifdef __LOAD_DEBUG_MODULES
+                                          || 1
+#endif
+                                          )) {
+        LoadOPLModule(OPL_MODULE_ID_DEV9, 0, 0, NULL);
+        LoadOPLModule(OPL_MODULE_ID_SMSUTILS, 0, 0, NULL);
+    }
+#endif
+
 #ifdef __LOAD_DEBUG_MODULES
 #if !defined(TTY_PPC)
     LoadOPLModule(OPL_MODULE_ID_SMSTCPIP, 0, 0, NULL);
@@ -195,6 +207,10 @@ static void ResetIopSpecial(const char *args, unsigned int arglen)
             break;
         case HDD_MODE:
             break;
+#ifdef RETROACHIEVEMENTS
+        case DISC_MODE:
+            break; // ROM CDVDMAN serves the optical drive.
+#endif
         case BDM_ILK_MODE:
             // IEEE1394_bd requires iLinkman, exactly as mx4sio_bd requires sio2man below. Do not
             // start it if that dependency failed: an IEEE1394_bd with no manager under it never

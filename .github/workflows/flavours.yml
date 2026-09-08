@@ -43,7 +43,19 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
+  ra-host-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Check disc hashing, reset image and launch gates
+        run: python3 .github/scripts/test_ra_disc.py
+
   build-flavour:
     strategy:
       fail-fast: false
@@ -85,6 +97,13 @@ jobs:
             digest: sha256:8fba50ecc2229acd7f8da63d34302f12939b7d4fa6848dda1e6a0ce083321a11
             pinned: "yes (2026-08-13)"
             opldiag: "1"
+          # RA is separately compiled; keep its disc core and modules covered on PRs.
+          - flavour: PS2DEVPINNED-RA
+            image: ps2dev/ps2dev@sha256:8fba50ecc2229acd7f8da63d34302f12939b7d4fa6848dda1e6a0ce083321a11
+            digest: sha256:8fba50ecc2229acd7f8da63d34302f12939b7d4fa6848dda1e6a0ce083321a11
+            pinned: "yes (2026-08-13)"
+            opldiag: "0"
+            ra: "1"
     runs-on: ubuntu-latest
     container: ${{ matrix.image }}
     steps:
@@ -101,7 +120,9 @@ jobs:
           fi
 
       - name: git checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
 
       - run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
@@ -111,7 +132,7 @@ jobs:
         run: sh .github/scripts/install_coherent_mmce.sh
 
       - name: Compile -> make clean release (${{ matrix.flavour }})
-        run: make --trace clean && make --trace LOCALVERSION=${{ matrix.flavour }} OPLDIAG=${{ matrix.opldiag }} release
+        run: make --trace clean && make --trace LOCALVERSION=${{ matrix.flavour }} OPLDIAG=${{ matrix.opldiag }} RETROACHIEVEMENTS=${{ matrix.ra || '0' }} release
 
       # Written AFTER the build so the compiler probe reflects what actually compiled. Every probe is
       # `|| true`: this file is a diagnostic and must never be the reason a good build fails to ship.
@@ -124,6 +145,7 @@ jobs:
           {
             echo "flavour:      ${{ matrix.flavour }}"
             echo "pinned:       ${{ matrix.pinned }}"
+            echo "retroachievements: ${{ matrix.ra || '0' }}"
             echo "opldiag:      ${{ matrix.opldiag }}"
             echo "image:        ${{ matrix.image }}"
             echo "digest:       ${{ matrix.digest }}"

@@ -60,6 +60,10 @@ static int eecoreInit(int argc, char **argv)
         config->GameMode = HDD_MODE;
     else if (!_strncmp(config->GameModeDesc, "MMCE_MODE", 9))
         config->GameMode = MMCE_MODE;
+#ifdef RETROACHIEVEMENTS
+    else if (!_strncmp(config->GameModeDesc, "DISC_MODE", 9))
+        config->GameMode = DISC_MODE;
+#endif
     DPRINTF("Game Mode = %d %s\n", config->GameMode, config->GameModeDesc);
 
     EnableDebug = config->EnableDebug;

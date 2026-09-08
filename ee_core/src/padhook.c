@@ -164,7 +164,11 @@ static void IGR_Thread(void *arg)
         if (EnableDebug)
             DBGCOL(0xFF8000, IGR, "oplIGRShutdown()");
 
-        oplIGRShutdown(0);
+#ifdef RETROACHIEVEMENTS
+        // The shutdown RPC belongs to OPL CDVDMAN, absent in physical-disc mode.
+        if (config->GameMode != DISC_MODE)
+#endif
+            oplIGRShutdown(0);
 
         if (EnableDebug)
             DBGCOL(0x0000FF, IGR, "Reset IOP");
@@ -265,8 +269,12 @@ static void IGR_Thread(void *arg)
         if (EnableDebug)
             DBGCOL(0x0000FF, IGR, "oplIGRShutdown(1)");
 
-        // If combo is R3 + L3, Poweroff PS2
-        oplIGRShutdown(1);
+            // If combo is R3 + L3, Poweroff PS2
+#ifdef RETROACHIEVEMENTS
+        // The shutdown RPC belongs to OPL CDVDMAN, absent in physical-disc mode.
+        if (config->GameMode != DISC_MODE)
+#endif
+            oplIGRShutdown(1);
     }
 }
 
@@ -329,30 +337,40 @@ static int IGR_Intc_Handler(int cause)
         }
     }
 
-    ee_kmode_enter();
+#ifdef RETROACHIEVEMENTS
+    // ROM CDVDMAN has no OPL shutdown RPC. Ignore the power-off combo before
+    // suspending game threads, and leave the physical power button to the ROM.
+    if (config->GameMode == DISC_MODE) {
+        if (Pad_Data.combo_type == IGR_COMBO_R3_L3)
+            Pad_Data.combo_type = 0;
+    } else
+#endif
+    {
+        ee_kmode_enter();
 
-    // Check power button press
-    if ((*CDVD_R_NDIN & 0x20) && (*CDVD_R_POFF & 0x04)) {
-        // Increment button press counter
-        Power_Button.press++;
+        // Check power button press
+        if ((*CDVD_R_NDIN & 0x20) && (*CDVD_R_POFF & 0x04)) {
+            // Increment button press counter
+            Power_Button.press++;
 
-        // Cancel poweroff to catch the second button press
-        *CDVD_R_SDIN = 0x00;
-        *CDVD_R_SCMD = 0x1B;
-    }
-
-    // Start VBlank counter when power button is pressed
-    if (Power_Button.press) {
-        // Check number of power button press after 1 ~ sec
-        if (Power_Button.vb_count++ >= 50) {
-            if (Power_Button.press == 1)
-                Pad_Data.combo_type = IGR_COMBO_R3_L3; // power button press 1 time, so poweroff
-            else
-                Pad_Data.combo_type = IGR_COMBO_START_SELECT; // power button press 2 time, so reset
+            // Cancel poweroff to catch the second button press
+            *CDVD_R_SDIN = 0x00;
+            *CDVD_R_SCMD = 0x1B;
         }
-    }
 
-    ee_kmode_exit();
+        // Start VBlank counter when power button is pressed
+        if (Power_Button.press) {
+            // Check number of power button press after 1 ~ sec
+            if (Power_Button.vb_count++ >= 50) {
+                if (Power_Button.press == 1)
+                    Pad_Data.combo_type = IGR_COMBO_R3_L3; // power button press 1 time, so poweroff
+                else
+                    Pad_Data.combo_type = IGR_COMBO_START_SELECT; // power button press 2 time, so reset
+            }
+        }
+
+        ee_kmode_exit();
+    }
 
     // If power button or combo is press
     // Disable all interrupts & reset some peripherals.

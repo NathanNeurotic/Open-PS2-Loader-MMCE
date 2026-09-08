@@ -116,3 +116,34 @@ static inline void Align_offsets(void *base_address, unsigned int *offset_in, st
         }
     }
 }
+
+#ifdef RETROACHIEVEMENTS
+// Physical-disc reset image: preserve ROM CDVDMAN/CDVDFSV and replace only EESYNC.
+// Based on hacan359's RA disc mode (cb713e68) and Neutrino's DVD reset layout.
+static const struct
+{
+    struct romdir_entry entries[5];
+    unsigned char extinfo[32];
+} discIoprp = {
+    {{"RESET", 8, 0}, {"ROMDIR", 0, 80}, {"EXTINFO", 0, 32}, {"EESYNC", 24, 0}, {"", 0, 0}},
+    {0, 0, 4, 1, 0x27, 0x08, 0x26, 0x20,
+     0, 0, 4, 1, 0x27, 0x08, 0x26, 0x20,
+     0x99, 0x99, 0, 2, 0, 0, 8, 3,
+     'S', 'y', 'n', 'c', 'E', 'E', 0, 0}};
+
+unsigned int patch_IOPRP_image_disc_size(void)
+{
+    return sizeof(discIoprp) + ((size_eesync_irx + 15) & ~15);
+}
+
+unsigned int patch_IOPRP_image_disc(void *image)
+{
+    struct romdir_entry *entries = image;
+    unsigned int size = patch_IOPRP_image_disc_size();
+    memset(image, 0, size);
+    memcpy(image, &discIoprp, sizeof(discIoprp));
+    entries[3].fileSize = size_eesync_irx;
+    memcpy((unsigned char *)image + sizeof(discIoprp), eesync_irx, size_eesync_irx);
+    return size;
+}
+#endif

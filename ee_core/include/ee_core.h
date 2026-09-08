@@ -74,6 +74,9 @@ enum GAME_MODE {
     HDD_MODE,
     MMCE_MODE,
     HTTP_MODE,
+#ifdef RETROACHIEVEMENTS
+    DISC_MODE,
+#endif
 };
 
 extern int EnableDebug;

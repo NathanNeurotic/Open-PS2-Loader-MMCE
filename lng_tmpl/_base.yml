@@ -1309,3 +1309,18 @@ gui_strings:
   string: Virtual memory cards are not available over HTTP -- use a physical card
 - label: HTTP_TAB_HINT
   string: HTTP reads games.csv from your server. Set the address, port and base path in Network settings, then use Test.
+
+- label: RA_DISC_CHECK
+  string: "RA: check disc support"
+- label: RA_DISC_LAUNCH
+  string: "RA: launch disc"
+- label: RA_DISC_CHECKING
+  string: Checking the disc for RetroAchievements
+- label: RA_DISC_HASH_FAILED
+  string: The disc could not be hashed -- check RA/hashes.txt in the settings folder
+- label: RA_DISC_HOME_ERROR
+  string: The settings path cannot be used for disc watch lists
+- label: RA_DISC_ENABLE
+  string: Enable RetroAchievements telemetry in Network settings first
+- label: RA_DISC_CHECK_FIRST
+  string: No watch list for this disc -- use RA check disc support first
