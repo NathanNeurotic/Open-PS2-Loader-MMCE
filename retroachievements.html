@@ -61,7 +61,7 @@
 <p>RiptOPL can report a running game's memory to a PC client that runs
 <a href="https://github.com/RetroAchievements/rcheevos">rcheevos</a> on the console's behalf, so achievements
 unlock on real PlayStation 2 hardware.</p>
-<p>The console does two things: it works out <strong>which</strong> game an image is (a hash), and once the game is
+<p>The console does two things: it works out <strong>which</strong> game an image or physical disc is (a hash), and once the game is
 running it streams the handful of memory addresses that game's achievements depend on. Everything
 else — talking to the RetroAchievements servers, deciding what unlocked, your login — happens on the
 PC.</p>
@@ -112,8 +112,8 @@ has run on a PlayStation 2. Treat the RA variant as a development build until th
 <td>done</td>
 </tr>
 <tr>
-<td>Disc-in-the-tray as a game source</td>
-<td>deliberately deferred</td>
+<td>Disc in the tray</td>
+<td>implemented in the RA build; <strong>not hardware-tested</strong></td>
 </tr>
 </tbody>
 </table>
@@ -150,6 +150,30 @@ has run on a PlayStation 2. Treat the RA variant as a development build until th
 <p>A game the console has a watch list for shows the badge and the cover mark after the next list
 refresh. Switch telemetry on and launch it.</p>
 <hr/>
+<h2 id="physical-discs">Physical discs</h2>
+<p>Use an RA build and the upstream xeRAbora PC client. Insert a PS2 game disc, then open
+RiptOPL's main menu:</p>
+<ol>
+<li>Choose <strong>RA: check disc support</strong>. RiptOPL hashes the disc's boot executable and asks the PC
+   client for its watch list. The check runs in the background and reports its result on screen.</li>
+<li>Enable <strong>RetroAchievements telemetry</strong> in <strong>Network</strong> settings.</li>
+<li>Choose <strong>RA: launch disc</strong>. This action requires a watch list for the disc currently in the tray.</li>
+</ol>
+<p>Disc watch lists and hash logs use <code>RA/</code> inside the active settings folder: for example,
+<code>mc0:/OPL/RA/SLUS_201.74.wl</code> and <code>mc0:/OPL/RA/hashes.txt</code>. The settings device must remain available
+through the support check and launch preparation. RiptOPL also keeps the returned list in
+memory for the current session, so a failed file save does not discard that result.
+If the menu is using UDPBD or UDPFS, switch that network protocol off before asking the PC client
+for support; it cannot take over their network stack. A previously saved watch list can still be used.</p>
+<p><strong>Launch PS2 Disc</strong> keeps the existing normal disc boot path. Use it when you want to launch
+without achievements, including when the PC has no watch list for that game.</p>
+<p>The RA path retains the console's physical-disc drivers and PS2LOGO authentication, then adds the
+OPL telemetry core. It accepts PS2 CD/DVD boot executables in the disc root, with names up to
+15 characters. Nested boot paths, PS1 discs and video DVDs are not supported by this RA action.
+Physical memory cards are used; image-specific VMC, cheats, GSM, pad emulation, language overrides
+and compatibility patches are not applied. The power-off controller combo is unavailable on this
+path. Disc boot, telemetry across game IOP resets and the IGR return path still need PS2 validation.</p>
+<hr/>
 <h2 id="which-launch-paths-can-work">Which launch paths can work</h2>
 <p>Telemetry lives inside OPL's own loader core, which only exists for launches OPL performs itself.</p>
 <table>
@@ -166,7 +190,7 @@ refresh. Switch telemetry on and launch it.</p>
 </tr>
 <tr>
 <td>ETH / SMB</td>
-<td>yes</td>
+<td>wired, but <strong>known bad upstream</strong> — see below</td>
 </tr>
 <tr>
 <td>HDD (APA)</td>
@@ -177,8 +201,12 @@ refresh. Switch telemetry on and launch it.</p>
 <td>yes</td>
 </tr>
 <tr>
+<td>Physical PS2 disc, <strong>RA: launch disc</strong></td>
+<td>implemented; <strong>not hardware-tested</strong></td>
+</tr>
+<tr>
 <td>HTTP</td>
-<td>local watch-list loading is wired into OPL-core launch; combined HTTP/RA operation is not hardware-validated</td>
+<td>local watch-list loading is wired into OPL-core launch; combined HTTP/RA operation is not hardware-validated, and it shares the ETH/SMB risk below</td>
 </tr>
 <tr>
 <td>Neutrino core (<code>$CoreLoader</code>)</td>
@@ -196,6 +224,17 @@ refresh. Switch telemetry on and launch it.</p>
 </table>
 <p>Neutrino, UDPFS and PS1 hand the console over to an external ELF and never load OPL's core, so there is
 nothing to take a snapshot from. This is structural, not an oversight.</p>
+<h3 id="do-not-expect-a-game-with-achievements-to-run-from-a-network-share">Do not expect a game with achievements to run from a network share</h3>
+<p>A game that streams its own disc over the NIC is competing with telemetry for that NIC. This build no
+longer <em>reads</em> from the network in play on such a launch — <code>raudp</code> stops walking the SMAP receive ring
+and stops polling the stack, because the game's disc stream arrives through both — but <strong>hacan359
+reports on hardware (2026-09-05) that this is not enough: a game with an achievement set still stops
+loading about a minute in from a share, so the send path disturbs the stream on its own.</strong> xeRAbora's
+own documentation says the same, and names the USB stick and the original disc as the only tested ways
+to play.</p>
+<p>That defect is upstream's and ours alike; we have not reproduced or ruled it out on our own hardware,
+because none of this has been hardware-tested here yet. Until it is, <strong>keep the images you play with
+achievements on a local device.</strong> The same reasoning applies to HTTP, which streams down the same path.</p>
 <p>HDD (APA) games are stored in HDLoader format and have no image file to hash, so while a watch list
 placed by hand still loads and streams, the console cannot work out the hash for them itself.</p>
 <h2 id="networking">Networking</h2>
@@ -213,8 +252,9 @@ answers. Nothing is stored between runs.</p>
 <pre><code>&lt;device root&gt;/RA/&lt;serial&gt;.wl        e.g. mass0:/RA/SLUS_210.65.wl
 </code></pre>
 <p>One watch list per tracked game, generated by the PC client from that game's achievement set. <code>RA/</code> follows the source’s support-file prefix, like <code>CHT/</code>. HTTP loads an existing watch list from the local settings home because the server is read-only; do not assume automatic image hashing/support detection works for a remote HTTP ISO. RiptOPL creates it along with the other library folders.</p>
-<p>A missing list is not an error. It means the game is simply not tracked, and it launches normally with
-no telemetry and no extra modules loaded.</p>
+<p>Image launches with a missing watch list proceed normally without telemetry or its extra modules.
+The explicit <strong>RA: launch disc</strong> action instead asks you to check support first; <strong>Launch PS2 Disc</strong>
+remains available for a normal disc boot.</p>
 <hr/>
 <h2 id="building">Building</h2>
 <pre><code class="language-bash">make clean &amp;&amp; make RETROACHIEVEMENTS=1 release
@@ -231,7 +271,8 @@ PC client.</p>
 build permutation, and the release workflow excludes it from the permanent MEGA archive as a
 diagnostic bundle rather than installable payload. The default build is unaffected by all of this — every RA source file and
 every call site is behind <code>#ifdef RETROACHIEVEMENTS</code>, and that is checked by comparing the two builds'
-symbol tables, loader core and embedded IOP modules.</p>
+symbol tables, loader core and embedded IOP modules. PR CI also builds the pinned
+<strong>PS2DEVPINNED-RA</strong> flavour and records the RA flag in its build manifest.</p>
 <h2 id="before-this-is-called-finished">Before this is called finished</h2>
 <p>Nothing below has been done. The feature is written end to end and builds clean; it has not run on a
 PlayStation 2. Emulator testing gets you as far as: the menu boots, the RA entries render and
@@ -322,6 +363,26 @@ ceiling — GS raster timing and real SMAP behaviour are not testable there.</p>
 <td>MX4SIO launch with telemetry</td>
 <td>no navigation or art regression (that device has history)</td>
 </tr>
+<tr>
+<td>16</td>
+<td>Check a physical PS2 CD/DVD, then RA launch with telemetry On</td>
+<td>correct hash/watch list, normal authentication, game and telemetry run</td>
+</tr>
+<tr>
+<td>17</td>
+<td>Swap the disc after checking support</td>
+<td>launch reads the current disc identity and requires its own watch list</td>
+</tr>
+<tr>
+<td>18</td>
+<td>Normal Launch PS2 Disc in both builds</td>
+<td>existing disc boot remains usable without RA</td>
+</tr>
+<tr>
+<td>19</td>
+<td>RA disc game performs an IOP reset; then try IGR</td>
+<td>disc access and telemetry recover; IGR returns without waiting on the absent OPL CDVDMAN RPC</td>
+</tr>
 </tbody>
 </table>
 <hr/>
@@ -351,15 +412,18 @@ ceiling — GS raster timing and real SMAP behaviour are not testable there.</p>
   <code>EXTRA_FEATURES=0</code>, which is also what the main loader ships as — so the RA archive is the
   shipping loader plus achievements, not a variant. <code>ra_snap_buf</code> and <code>ra_watch</code> are most of RA's
   share; shrink them before trying to add anything else to that build.</li>
-<li><strong>Do not build a PC client.</strong> hacan359 provides and maintains xeRAbora. Do not commit <code>pc/RA/</code>.</li>
-<li><strong>Disc mode is deferred</strong>, deliberately, as a separate game source. It is not a missing piece of
-  this work.</li>
+<li><strong>PC integration uses xeRAbora</strong>, maintained by hacan359.</li>
+<li><strong>Physical discs use an EESYNC-only reset image.</strong> ROM CDVDMAN/CDVDFSV remain in place;
+  standalone DEV9 and SMSUTILS load before the telemetry network stack. Do not call OPL CDVDMAN's
+  shutdown RPC in this mode. Hash checks share the existing I/O worker; a launch refuses while a check
+  is pending, before probing or tearing down devices.</li>
 </ul>
 <hr/>
 <h2 id="credits">Credits</h2>
 <ul>
 <li><strong>hacan359 (yoba)</strong> — the RetroAchievements design, the console implementation this port follows,
-  and the PC client.</li>
+  and the PC client. Physical-disc integration follows the
+  <a href="https://github.com/hacan359/Open-PS2-Loader/tree/cb713e686acb2fb63de20aa44b3fd4e8c59ca680">upstream disc implementation</a>.</li>
 <li><code>src/md5.c</code>, <code>include/md5.h</code> — L. Peter Deutsch, zlib licence, vendored unchanged.</li>
 </ul>
 </main>
