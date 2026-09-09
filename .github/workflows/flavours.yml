@@ -55,6 +55,8 @@ jobs:
           persist-credentials: false
       - name: Check disc hashing, reset image and launch gates
         run: python3 .github/scripts/test_ra_disc.py
+      - name: Check RA snapshot scheduling and transmission retries
+        run: python3 .github/scripts/test_ra_sender.py
 
   build-flavour:
     strategy:
